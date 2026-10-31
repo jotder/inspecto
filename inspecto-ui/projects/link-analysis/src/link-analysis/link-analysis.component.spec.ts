@@ -1957,6 +1957,76 @@ describe('LinkAnalysisComponent', () => {
         expect(text('working-set-on-screen')).toBe('2 nodes · 1 link on screen');
         fixture.destroy();
     });
+    it('LA-INVESTIGATE-UX-1: on an Investigation canvas K keeps, Ctrl+Z / Ctrl+Shift+Z undo and redo recorded steps, and the node menu expands with the tab filter', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [{ step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['ws-a'] } }],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [
+                { id: 'ws-a', hop: 0, hidden: false, kept: false },
+                { id: 'ws-b', hop: 1, hidden: false, kept: false },
+            ],
+            links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        const apply = vi.spyOn(c.investigation, 'apply').mockResolvedValue(true);
+        const undo = vi.spyOn(c.investigation, 'undo').mockResolvedValue(true);
+        const redo = vi.spyOn(c.investigation, 'redo').mockResolvedValue(true);
+        const nodeA = c.canvasData()!.nodes.find((n) => n.data.label === 'ws-a')!;
+
+        c.onSelectionChange([nodeA.id]);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }));
+        expect(apply).toHaveBeenCalledWith({ op: 'keep', ids: ['ws-a'] });
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+        expect(undo).toHaveBeenCalledWith(1); // the recorded step, not the display history
+        expect(redo).not.toHaveBeenCalled(); // nothing undone yet: Ctrl+Shift+Z stays the display redo
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true }));
+        expect(redo).not.toHaveBeenCalled();
+        c.investigation.undone.set([{ step: 1, kind: 'op', op: 'seed', params: { ids: ['ws-a'] } } as never]);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true }));
+        expect(redo).toHaveBeenCalledTimes(1);
+
+        // the node menu's Expand uses the tab's filter; "this once" changes one thing for this step only
+        const onExpand = vi.spyOn(c, 'onExpand').mockResolvedValue();
+        c.growExclude.filterRequest.set({ direction: 'out', degrees: 2, linkKinds: null, hold: true, threshold: 500 });
+        c.nodeMenuTargets.set([nodeA.id]);
+        await c.expandMenuTargets();
+        expect(onExpand.mock.calls[0][0]).toMatchObject({ req: { direction: 'out', degrees: 2 }, ctx: { frontier: ['ws-a'] } });
+        await c.expandMenuTargets({ direction: 'in' });
+        expect(onExpand.mock.calls[1][0].req).toMatchObject({ direction: 'in', degrees: 2 });
+        expect(c.growExclude.filterRequest()?.direction).toBe('out');
+
+        // Ctrl+Z inside a dialog records nothing
+        undo.mockClear();
+        const box = document.createElement('mat-dialog-container');
+        const field = document.createElement('div');
+        box.appendChild(field);
+        document.body.appendChild(box);
+        field.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+        expect(undo).not.toHaveBeenCalled();
+        box.remove();
+
+        // the menu's Expand anyway asks first, as the tab does; a No records nothing
+        const anyway = vi.spyOn(c.growExclude, 'expandAnyway').mockResolvedValue(true);
+        vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValueOnce(false);
+        await c.expandAnywayFromMenu('ws-b');
+        expect(anyway).not.toHaveBeenCalled();
+
+        // another Investigation starts with the defaults: the old filter is dropped
+        c.investigation.activeId.set('inv-10');
+        TestBed.tick();
+        expect(c.growExclude.filterRequest()).toBeNull();
+        fixture.destroy();
+    });
     it('LA-PRODUCT-NEXT-1 phase 4: Seal this window is offered only in an Investigation bound to the timeline column, with the capability', async () => {
         const { fixture } = create();
         fixture.detectChanges();

@@ -401,16 +401,36 @@ what you see. Every change ends with a one-line result and **Undo** (also **Ctrl
 Undo takes back only the step it names: if a colleague recorded a newer step meanwhile, nothing is undone and the log
 shows theirs. The words follow the Industry pack (Telecom: *subscribers* and *calls*).
 
+On an Investigation's canvas **Ctrl+Z** undoes the newest recorded step and **Ctrl+Shift+Z** (or **Ctrl+Y**) **redoes**
+it: Redo records the undone step again with the same parameters, through the same checks as the first time (an
+expand over the four-eyes thresholds is held again). A new step clears what can be redone. The rail's Undo / Redo
+arrows stay the display history (layout, colours, folds). The Investigation tab has the same **Undo** / **Redo** pair
+at its top.
+
 ### 7.1 Expand
 
-**Expand** (canvas toolbar, **G**, the canvas toolbar's **More** menu, or right-click a node) opens one form. With an
-Investigation open it is the **Expand** section of the **Investigation** tab: the tab opens and the form takes focus
-(right-clicking a node makes that node the *From*). On a graph you are only exploring it opens over the canvas, and
+**Expand** (canvas toolbar, **G**, the canvas toolbar's **More** menu, or right-click a node ▸ *Expand…*) opens one
+form. With an Investigation open it is the **Expand** section of the **Investigation** tab: the tab opens and the form
+takes focus (right-click ▸ *Expand filter…* makes that node the *From*); there **G** with entities selected expands
+them at once with the filter, and right-click ▸ **Expand** does the same for that node. On a graph you are only exploring it opens over the canvas, and
 **Cancel** closes it. The form, most important first:
 
-* **From**: the selection, the outer ring (next degree), the start entities or the whole Working Set; the line under it
-  says what that is, for example *From the 1 wallet started from*.
-* **Degrees**: a **− 3 +** stepper, from 1 up to the Industry pack's maximum. The arrow keys step it, Home and End jump
+* **From**: the selection, the outer ring (next degree), the start entities or the whole Working Set, one press each;
+  the line under it says what that is, for example *From the 1 wallet started from*.
+* **Expand** with its **preview line**, which says what it would add before anything changes: *This step adds about
+  342 numbers and 1,210 calls; 3 busy numbers will be held; 41 numbers are removed by your exclusion lists*. A step
+  that would need four-eyes approval says so. **Expand** runs it degree by degree. In an Investigation each degree is
+  a recorded `expand` step, and one Undo takes back the whole Expand. A server without the preview shows *No preview
+  on this server* and Expand still runs.
+
+Under the button is the **Expand filter**: six folds, each saying on one line what is set, a dot on any group set away
+from its default, *N changed* with **Reset to defaults** at the top and a reset inside each changed group. No group opens
+a popup. Direction and Depth start open; the others remember whether you left them open. In an Investigation the
+filter is what **every** expand uses — the button, a double-click, the right-click menu and **G** — and it stays as you
+set it while the Investigation is open, also when the tab is closed and shown again.
+
+* **Direction**: *Both ways*, *Outgoing*, *Incoming* (and *Both ways, mutual* in an Investigation), one press each.
+* **Depth**: a **− 3 +** Degrees stepper, from 1 up to the Industry pack's maximum. The arrow keys step it, Home and End jump
   to the ends; at an end the button says why it does nothing. **While the newest step is an Expand, Degrees is that
   Expand's size** (a line under the stepper says so): lower it and the Expand's outermost degrees leave the canvas and
   the recorded Expand, with the entities there and the links only they carried; raise it and the extra degrees expand
@@ -421,25 +441,27 @@ Investigation open it is the **Expand** section of the **Investigation** tab: th
   says. An Expand and a Degrees change never run at the same time; the later one is ignored. It applies about 0.3 s after you stop clicking. When the newest
   step is not an Expand (a start, a clean-up, a colleague's step, a reopened Investigation) the stepper is only the next
   Expand's request, as before.
-* **Direction**: *Both ways*, *Outgoing* or *Incoming* (and *Reciprocal* in an Investigation), chosen from a popup.
-* **Expand** with its **preview line**, which says what it would add before anything changes: *This step adds about
-  342 numbers and 1,210 calls; 3 busy numbers will be held; 41 numbers are removed by your exclusion lists*. A step
-  that would need four-eyes approval says so. **Expand** runs it degree by degree. In an Investigation each degree is
-  a recorded `expand` step, and one Undo takes back the whole Expand. A server without the preview shows *No preview
-  on this server* and Expand still runs.
-* The **filters**, in three folds that start closed and each say on one line what is set:
-  * **Links** (*All link kinds · at least 3 events*): the link kinds to follow, the minimum events per link and the
-    minimum distinct days.
-  * **Time** (Investigation only, *Investigation window*): the Investigation's own window, all available data, or a
-    window for this Expand only.
-  * **Limits** (*Busy over 500 links*): **Hold busy entities (more than *H* linked)**, on by default with *H* = the
-    Space's **busy limit** (default 500) — unticking it expands through every busy entity the Expand reaches, asks you
-    to confirm and logs the override —, the fewest and most links a neighbour may have, the most neighbours per entity
-    and the row limit per degree.
+* **Link kinds** (*All link kinds* / *2 of 5 link kinds*): one chip per kind, pressed = followed. Without a known list of
+  kinds an Investigation types them (comma-separated).
+* **Time** (Investigation only): chips for the *Investigation window*, *All data*, the last *7 / 30 / 90 days* (counted
+  back from the Dataset's latest event, never from today; when that time cannot be read the Expand keeps the
+  Investigation window and says so) and *Custom* (a window for this Expand only).
+* **Strength** (Investigation only, *At least 3 events*): the minimum events per link and the minimum distinct days.
+* **Fan-out and busy** (*Busy over 500 links · 50 per entity*): **Hold busy entities (more than *H* linked)**, on by
+  default with *H* = the Space's **busy limit** (default 500) — unticking it expands through every busy entity the
+  Expand reaches, asks you to confirm and logs the override —, the most neighbours per entity, the fewest and most links
+  a neighbour may have and the row limit per degree.
 
-  A field in error opens its fold when you press Expand. A blank field uses the Industry pack's setting.
+A field in error opens its fold when you press Expand. A blank field uses the Industry pack's setting.
 
-Double-click a node not expanded yet to expand it one degree without the dialog. A node no expand has followed yet has
+**Double-click** a node not expanded yet to expand it with the filter. **Right-click** a node (or the selection) on an
+Investigation's canvas for everything you can do with it, each a recorded step: **Expand** (the filter, **G**),
+**Expand, this once** (*Outgoing only*, *Incoming only*, *Two degrees*, *Only <kind> links*: the filter with that one
+thing changed, for this step only), **Shrink** (hide the entities only it links to), **Keep** (**K**), **Hide** (**H**),
+**Select neighbours**, **Exclude…** (**X**), **Collapse / unfold** and, on a busy entity, **Expand anyway**. With no
+Investigation open, right-click offers **Investigate this**: the Investigation tab's start form, filled with that
+entity. With entities selected, **G** (or **E**) expands them with the filter, **K** keeps and **H** hides them; the
+canvas toolbar has **Keep** beside **Hide**. A node no expand has followed yet has
 a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
 *Only unexpanded* under that legend row help you go one node at a time.
 
@@ -464,11 +486,22 @@ leaves**, **Keep only selected** and **Remove selected**. Each first says what i
 entities*) with **Apply** / **Cancel**. While exploring it hides with Undo; in an Investigation it is recorded as a
 `hide` with a reason filled in for you.
 
+In an Investigation the tab's **Clean up** fold does the same over the Working Set in **one press each**, the count on
+the button (a button with nothing to do is disabled and says why): **Hide 16 dangling leaves**, **Hide 12 with fewer
+than [3] events** (the stepper sets the events), **Hide 40 imei** (one button per Entity Type when there are several),
+**Keep paths between the 2 selected** (exactly two selected; the stepper sets the longest path in links) and **Keep only
+the 9 selected**. Each is one recorded `hide` with its reason noted; **Exclude instead of hide** makes it one `exclude`
+carrying that reason. Start entities and kept entities are never taken away. Undo takes it back. The Working Set
+carries link counts, not link times, so there is no "outside a time window" clean-up: set a **Time window** step (More
+steps) for later expands instead.
+
 ### 7.5 Exclude… and Hidden by lists
 
 **Exclude** (canvas toolbar, right-click, or **X** with nodes selected):
 
-* *From this Investigation only* — one `exclude` step with your reason (exploring: *Hide from this graph*).
+* *From this Investigation only* — one `exclude` step with your reason (exploring: *Hide from this graph*). The
+  reason field is in the same dialog, with this Investigation's last three reasons as one-press chips. The canvas
+  toolbar's Exclude opens this same dialog.
 * *Add to a list…* — an exclusion list of the entities' type, or a new one; they are added (four-eyes where the list
   is governed) and the list is applied, so they stay out of every later step. A **category list** kept by your
   administrator (VIPs, politicians) is offered only to a holder of *Manage exclusion categories*.
@@ -738,22 +771,25 @@ binds `events` for you.
 Top to bottom, most important first:
 
 1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose, Dataset, the data-trust chip
-   (**Data details**) and the Working Set counts; its `⋯` menu has **Settings…** (⚙ Settings ▸ Investigation
-   settings), **Close** and **Delete**.
-2. The **queued start entities**, when there are any.
-3. **Expand** ([§7.1](#71-expand)): the degree reached (*Degree 1 of 4*) and the per-degree results, then ONE Expand
-   form — From (the outer ring is the next degree), Degrees (**− n +**), Direction, **Expand** with its preview and
-   four-eyes line, and the Links / Time / Limits folds. A reader sees *Needs Incident management.* instead of the form.
-4. **Add start entities…** (with *Incident management*): the start form (Start from, Entity Type and value, an Entity
-   List or pasted values) records them as one Start step, also entities not in the Working Set yet.
-5. **Selected entity:** Start, Keep, Hide, Exclude, Annotate, Expand one hop, **Pick neighbours…** (tick some, or
-   **Add the 10 strongest**: one expand to only those), its neighbours; **Expand all**.
-6. **Busy entities** (each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
+   (**Data details**), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
+   Investigation settings), **Close** and **Delete**. Under it one counts line: *Working Set: 42 entities · 118 links ·
+   3 excluded · 2 hidden · 1 kept · degree 2 of 4 · 3 busy held*.
+2. **How to investigate** — five steps, shown until you press **Got it** (remembered in this browser).
+3. **Undo** / **Redo** of recorded steps, which stay at the top while the tab scrolls ([§7](#7-expand-and-clean-up-the-graph)).
+4. The **queued start entities**, when there are any.
+5. **Expand** ([§7.1](#71-expand)): the per-degree results, then ONE Expand form — From, **Expand** with its preview and
+   four-eyes line, and the **Expand filter** groups. A reader sees *Needs Incident management.* instead of the form.
+6. **Clean up** ([§7.4](#74-clean-up)): one-press clean-ups with their counts.
+7. **Selected entity:** who it is (masked, busy, not in the Working Set), **Start from it** when it is not in the Working
+   Set yet, **Expand anyway** on a busy one, **Pick neighbours…** (tick some, or **Add the 10 strongest**: one expand to
+   only those), its notes and **Note** / **Annotate**. Expand, Keep, Hide, Exclude and Shrink are on the canvas
+   (double-click, right-click, the selection bar, keys).
+8. **Busy entities** (a fold; each with its sealed count, *Busy: 650 linked entities (limit 500), not expanded*, and
    **Expand anyway**).
-7. **Steps**, in visible groups, each action a button that opens in place under its group: **Connect** (Connect start
-   entities) · **Time** (Time window, Snapshot marker) · **Compare** (Threshold, Compare).
-8. **Scope list:** entity ids to **Include** or **Leave out**.
-9. Two links: **Open the Step log** (the dock's Step log tab) and **Investigation settings…**.
+9. **More steps** (a fold): **Connect** (Connect start entities) · **Time** (Time window, Snapshot marker) · **Compare**
+   (Threshold, Compare), the **Scope list** (entity ids to **Include** or **Leave out**) and **Add start entities…**
+   (the start form: Start from, Entity Type and value, an Entity List or pasted values, recorded as one Start step).
+10. Two links: **Open the Step log** (the dock's Step log tab) and **Investigation settings…**.
 
 The tab lists no steps: the full record is in the dock's **Step log** (with **Undo** and **Re-order steps…**, which
 creates a fork), beside **Working Set rows**, **Coverage**, **Annotations** (entity and link) and **Excluded

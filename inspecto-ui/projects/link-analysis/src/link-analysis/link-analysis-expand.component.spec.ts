@@ -8,7 +8,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrowPreview, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { pickerSet } from '@inspecto/core/testing/pen-field';
 import { GrowContext } from './grow-exclude';
 import { GrowExcludeStore } from './grow-exclude.store';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
@@ -103,6 +102,9 @@ function create(
                     activeId: signal('inv-1'),
                     log: signal(null),
                     workingSet: signal(null),
+                    windowEnd: signal(null),
+                    latestEvent: signal(null),
+                    loadLatestEvent: async () => null,
                     withPresets: (p: object, r: object) => ({ ...p, ...r }),
                 },
             },
@@ -129,33 +131,45 @@ const degreesTo = (el: HTMLElement, n: number) => {
     const id = n > now ? 'stepper-increment' : 'stepper-decrement';
     for (let i = 0; i < Math.abs(n - now); i++) q(q(el, 'la-expand-degrees')!, id)!.click();
 };
-const fold = (el: HTMLElement, id: 'links' | 'time' | 'limits') => q(el, 'la-expand-fold-' + id)!.querySelector('details')!;
-const foldHint = (el: HTMLElement, id: 'links' | 'time' | 'limits') =>
+type FoldId = 'direction' | 'depth' | 'links' | 'time' | 'strength' | 'limits';
+const fold = (el: HTMLElement, id: FoldId) => q(el, 'la-expand-fold-' + id)!.querySelector('details')!;
+const foldHint = (el: HTMLElement, id: FoldId) =>
     fold(el, id).querySelector('summary')!.textContent!.replace(/\s+/g, ' ').trim();
 
 describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
     it('opens on the defaults: the first usable From, Both ways, 1 degree, supernodes held; degrees run 1…maxDegree; axe-clean', async () => {
         const { fixture, el, cmp } = create();
         await settle(fixture);
-        // Direction is a popup choice showing Both ways; Degrees a − 1 + stepper bounded 1…maxDegree
-        expect(q(el, 'la-expand-direction')!.textContent).toContain('Both ways');
+        // LA-INVESTIGATE-UX-1: Direction is one-press toggles with Both ways pressed; Degrees a − 1 + stepper bounded 1…maxDegree
+        expect(q(el, 'la-expand-direction-either')!.getAttribute('aria-pressed')).toBe('true');
+        expect(q(el, 'la-expand-direction-out')!.getAttribute('aria-pressed')).toBe('false');
         expect(spin(el).getAttribute('aria-valuenow')).toBe('1');
         expect(spin(el).getAttribute('aria-valuemin')).toBe('1');
         expect(spin(el).getAttribute('aria-valuemax')).toBe('4');
         // an Investigation also offers Reciprocal
         expect(cmp.directionOptions().map((o) => o.label)).toEqual(['Both ways', 'Outgoing', 'Incoming', 'Reciprocal']);
-        // order of importance: From, Degrees, Direction, the Expand button, then the filters
-        const order = ['la-expand-from', 'la-expand-degrees', 'la-expand-direction', 'la-expand-go', 'la-expand-filters'].map((id) => q(el, id)!);
+        // order of importance: From, the Expand button, then the filter: Direction, Depth, the other groups
+        const order = ['la-expand-from', 'la-expand-go', 'la-expand-filters', 'la-expand-direction', 'la-expand-degrees', 'la-expand-fold-links'].map(
+            (id) => q(el, id)!,
+        );
         for (let i = 1; i < order.length; i++)
             expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING, order[i].dataset['testid']).toBeTruthy();
-        // the filters are closed folds, each saying what is set
-        expect([fold(el, 'links').open, fold(el, 'time').open, fold(el, 'limits').open]).toEqual([false, false, false]);
+        // Direction and Depth start open; the other groups are closed, each saying what is set; nothing is marked changed
+        expect([fold(el, 'direction').open, fold(el, 'depth').open]).toEqual([true, true]);
+        expect([fold(el, 'links').open, fold(el, 'time').open, fold(el, 'strength').open, fold(el, 'limits').open]).toEqual([
+            false,
+            false,
+            false,
+            false,
+        ]);
+        expect(q(el, 'la-expand-changed')).toBeNull();
+        expect(el.querySelector('[data-testid="la-fold-changed"]')).toBeNull();
         expect(foldHint(el, 'links')).toContain('All link kinds');
         expect(foldHint(el, 'time')).toContain('Investigation window');
         expect(foldHint(el, 'limits')).toContain('Busy over 500 links');
         expect(q(el, 'la-expand-hold')?.textContent).toContain('Hold busy entities (more than 500 linked)');
         expect(q(el, 'la-expand-from-line')?.textContent).toContain('the outer ring (degree 1): 3 numbers');
-        expect(q(el, 'la-expand-hint')?.textContent).toContain('one Undo (Ctrl+Z) reverses it');
+        expect(q(el, 'la-expand-hint')?.textContent).toContain('One Undo (Ctrl+Z) reverses it');
         await expectNoA11yViolations(el);
     });
 
@@ -227,11 +241,14 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         expect(q(el, 'la-expand-no-hold')?.textContent).toContain('recorded as an override');
         expect(inv.previewExpand).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ ids: ['a', 'b', 'hub'], includeHubs: true }));
         expect(foldHint(el, 'limits')).toContain('Busy expanded through');
-        const sms = Array.from(q(el, 'la-expand-fold-links')!.querySelectorAll('mat-checkbox')).find((c) => c.textContent?.includes('sms'));
-        (sms!.querySelector('input') as HTMLInputElement).click();
+        // a link kind is a chip: pressed = followed
+        const sms = Array.from(q(el, 'la-expand-fold-links')!.querySelectorAll('button[aria-pressed]')).find((c) => c.textContent?.includes('sms'));
+        expect(sms!.getAttribute('aria-pressed')).toBe('true');
+        (sms as HTMLButtonElement).click();
         await settle(fixture, 350);
         expect(inv.previewExpand).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ linkKinds: ['voice'] }));
         expect(foldHint(el, 'links')).toContain('1 of 2 link kinds');
+        expect(sms!.getAttribute('aria-pressed')).toBe('false');
         go(el).click();
         expect(host.runs[0].req).toMatchObject({ hold: false, linkKinds: ['voice'] });
     });
@@ -244,12 +261,12 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         cmp.rung.controls.minEvents.setValue('0');
         await settle(fixture, 350);
         expect(el.querySelector('#la-expand-why')?.textContent).toContain('Fix the filters first.');
-        expect(fold(el, 'links').open).toBe(false);
+        expect(fold(el, 'strength').open).toBe(false);
         go(el).click();
         fixture.detectChanges();
         expect(host.runs).toHaveLength(0);
-        // the error is behind the Links fold: it opens, the Limits fold (nothing wrong there) stays closed
-        expect(fold(el, 'links').open).toBe(true);
+        // the error is behind the Strength fold: it opens, the Limits fold (nothing wrong there) stays closed
+        expect(fold(el, 'strength').open).toBe(true);
         expect(fold(el, 'limits').open).toBe(false);
     });
 
@@ -265,18 +282,68 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         cmp.rung.controls.budget.setValue('5000');
         cmp.form.controls.threshold.setValue(50);
         await settle(fixture, 350);
-        expect(foldHint(el, 'links')).toContain('All link kinds · at least 3 events · on 2+ days');
-        expect(foldHint(el, 'time')).toContain('All available data');
-        expect(foldHint(el, 'limits')).toContain('Busy over 50 links · neighbours with 1–40 links · 20 per entity · 5,000 rows');
+        expect(foldHint(el, 'links')).toContain('All link kinds');
+        expect(foldHint(el, 'strength')).toContain('At least 3 events · on 2+ days');
+        expect(foldHint(el, 'time')).toContain('All data');
+        expect(foldHint(el, 'limits')).toContain('Busy over 50 links · 20 per entity · neighbours with 1–40 links · 5,000 rows');
+        // LA-INVESTIGATE-UX-1: each changed group has a dot; the header counts them and resets them all
+        expect(q(el, 'la-expand-changed')?.textContent).toContain('3 changed');
+        for (const id of ['time', 'strength', 'limits'] as const)
+            expect(q(el, 'la-expand-fold-' + id)!.querySelector('[data-testid="la-fold-changed"]'), id).not.toBeNull();
+        expect(q(el, 'la-expand-fold-links')!.querySelector('[data-testid="la-fold-changed"]')).toBeNull();
+        q(el, 'la-expand-reset')!.click();
+        await settle(fixture, 350);
+        expect(q(el, 'la-expand-changed')).toBeNull();
+        expect(cmp.rung.controls.minEvents.value).toBeNull();
+        expect(cmp.form.controls.threshold.value).toBeNull();
+        expect(foldHint(el, 'time')).toContain('Investigation window');
     });
 
-    it('Direction is a popup choice: picking Outgoing re-reads the preview and is what Expand sends', async () => {
+    it('one group resets alone, and the tab filter is handed to the store for the canvas and kept across a remount', async () => {
+        const { fixture, el, cmp } = create({ embedded: true });
+        await settle(fixture, 350);
+        const store = TestBed.inject(GrowExcludeStore);
+        cmp.rung.controls.minEvents.setValue('4');
+        cmp.rung.controls.maxFanOut.setValue('30');
+        q(el, 'la-expand-direction-in')!.click();
+        await settle(fixture, 350);
+        // what a double-click on the canvas will expand with
+        expect(store.filterRequest()).toMatchObject({ direction: 'in', rung: { minEvents: 4, maxFanOut: 30 } });
+        cmp.resetGroup('strength');
+        await settle(fixture, 350);
+        expect(cmp.rung.controls.minEvents.value).toBeNull();
+        expect(cmp.rung.controls.maxFanOut.value).toBe('30');
+        expect(cmp.changed()).toEqual(['direction', 'limits']);
+        expect(store.filterRequest()?.rung).toEqual({ maxFanOut: 30 });
+        // a second form (the tab shown again) starts from what the first one left
+        const again = TestBed.createComponent(LinkAnalysisExpandComponent);
+        again.componentRef.setInput('ctx', CTX);
+        again.componentRef.setInput('embedded', true);
+        again.detectChanges();
+        expect(again.componentInstance.form.controls.direction.value).toBe('in');
+        expect(again.componentInstance.rung.controls.maxFanOut.value).toBe('30');
+    });
+
+    it('a "last 30 days" chip sends the 30 days up to the latest event, and says so when that time is unknown', async () => {
+        const { fixture, el, host, cmp } = create();
+        await settle(fixture);
+        q(el, 'la-expand-window-last30')!.click();
+        await settle(fixture, 350);
+        // the fake store knows no end: no window is sent, and the fold says why
+        expect(q(el, 'la-expand-window-no-end')?.textContent).toContain('latest event time is not known');
+        go(el).click();
+        expect(host.runs[0].req.rung?.window).toBeUndefined();
+        expect(foldHint(el, 'time')).toContain('Last 30 days');
+        expect(cmp.quickDays()).toBe(30);
+    });
+
+    it('Direction is one press: Outgoing re-reads the preview and is what Expand sends', async () => {
         const { fixture, el, inv, host } = create();
         await settle(fixture);
-        expect(q(el, 'la-expand-direction')!.querySelector('button')!.textContent).toContain('Both ways');
-        pickerSet(fixture, '[data-testid="la-expand-direction"]', 'out');
+        q(el, 'la-expand-direction-out')!.click();
         await settle(fixture, 350);
-        expect(q(el, 'la-expand-direction')!.querySelector('button')!.textContent).toContain('Outgoing');
+        expect(q(el, 'la-expand-direction-out')!.getAttribute('aria-pressed')).toBe('true');
+        expect(foldHint(el, 'direction')).toContain('Outgoing');
         expect(inv.previewExpand).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ direction: 'out' }));
         go(el).click();
         expect(host.runs[0].req.direction).toBe('out');
@@ -311,7 +378,7 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('embedded in the Investigation tab: no dialog chrome, no Cancel, no focus grab; focus() lands on From', async () => {
+    it('embedded in the Investigation tab: no dialog chrome, no Cancel, no focus grab; focus() lands on Expand', async () => {
         const { fixture, el, cmp, host } = create({ embedded: true });
         await settle(fixture, 350); // the tab section reads its preview after a 300 ms settle
         expect(q(el, 'la-expand-dialog')).toBeNull();
@@ -324,7 +391,7 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         section.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         expect(host.closed).toBe(0);
         cmp.focus();
-        expect(document.activeElement).toBe(q(el, 'la-expand-from')!.querySelector('button'));
+        expect(document.activeElement).toBe(go(el));
         // the preview and four-eyes line still show in the tab
         host.limits.set({ budgetAbove: 50, fanOutAbove: null });
         await settle(fixture);

@@ -60,6 +60,24 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
         expect(close).toHaveBeenCalledWith({ kind: 'here', reason: 'Switchboard, not a person' });
     });
 
+    it('LA-INVESTIGATE-UX-1: a recent reason is one press, and is what Exclude sends; axe-clean', async () => {
+        const { f, el, close } = create({ recentReasons: ['Call centre', 'Not relevant'] });
+        const chips = Array.from(el.querySelectorAll('[data-testid="la-exclude-recent"] button')) as HTMLButtonElement[];
+        expect(chips.map((b) => b.textContent?.trim())).toEqual(['Call centre', 'Not relevant']);
+        expect(chips[0].getAttribute('aria-pressed')).toBe('false');
+        chips[0].click();
+        f.detectChanges();
+        expect(chips[0].getAttribute('aria-pressed')).toBe('true');
+        await expectNoA11yViolations(el);
+        exclude(el);
+        expect(close).toHaveBeenCalledWith({ kind: 'here', reason: 'Call centre' });
+    });
+
+    it('no recent reasons: no chips', () => {
+        const { el } = create();
+        expect(el.querySelector('[data-testid="la-exclude-recent"]')).toBeNull();
+    });
+
     it('a blank reason is refused on screen; nothing closes', () => {
         const { f, el, close } = create();
         penEdit(f, penByLabel(el, 'Reason')!, '   ');

@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { EntityProjection, EntityTypeRef, G6Node, typedEntityKey } from '@inspecto/core/graph';
-import { InvestigationLogEntry, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
+import { InvestigationLogEntry, InvestigationOpRequest, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage } from '@inspecto/core/api';
 import type { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { resolveEntityId } from '@inspecto/core/graph';
@@ -190,6 +190,22 @@ const STEP_NAMES: Readonly<Record<string, string>> = {
     undo: 'Undo',
     merge: 'Merge',
 };
+
+/**
+ * LA-INVESTIGATE-UX-1 Redo: the request that records an undone step again — its op and its sealed params, which name the
+ * request's own keys (an expand's rung arrives resolved). Null-valued keys are left out (the server refuses some as
+ * typed), except a `window` step's: a sealed null window is "all time", sent as `'full'`. Null when the step cannot be
+ * sent again as sealed: an undo entry, one without an op, or a note on links (sealed as `{source, target, kind}`
+ * objects, while the request names links by their `lk.` ids).
+ */
+export function redoRequest(entry: InvestigationLogEntry): InvestigationOpRequest | null {
+    if (entry.kind !== 'op' || !entry.op) return null;
+    const sealed = (entry.params ?? {}) as Record<string, unknown>;
+    if (entry.op === 'annotate' && Array.isArray(sealed['links'])) return null;
+    const params = Object.fromEntries(Object.entries(sealed).filter(([, v]) => v !== null && v !== undefined));
+    if (entry.op === 'window' && params['window'] === undefined) params['window'] = 'full';
+    return { op: entry.op, ...params } as InvestigationOpRequest;
+}
 
 /** "Exclude by list" for `excludeBy`; an op this list does not know reads as words ("someNewOp" → "Some new op"). */
 export function stepName(op: string | null | undefined): string {

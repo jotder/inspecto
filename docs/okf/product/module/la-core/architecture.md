@@ -1173,6 +1173,49 @@ built as recommended). How it reads to a user: [user guide §7](user-guide-link-
   shown in the panel; the rail, Basic Grow, Undo, Ctrl+Z, degrading without the routes), `shortcuts-help.dialog.spec.ts`
   and `la-shell.component.spec.ts` (la-app's `?`), `access-catalog.spec.ts` (the node).
 
+#### 6.9.1 The Investigation tab as one Expand filter (LA-INVESTIGATE-UX-1, SPA, as built 2026-10-31)
+
+How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-and-clean-up-the-graph) and
+[§11.2](user-guide-link-analysis.md#112-the-investigation-tab-act-panel). No server change and no new op.
+
+- **One filter, published.** `LinkAnalysisExpandComponent`, embedded in the tab (the explorer's popup never publishes),
+  publishes its request to
+  `GrowExcludeStore.filterRequest` on every change and its raw values to `filterSnapshot`, which it restores when it is
+  mounted again (the tab only exists while the toolbox shows it). Every canvas expand — double-click, node menu, G/E with
+  a selection — goes through `expandInInvestigation(nodes, change)` → `onExpand` → `growInvestigation`, i.e. the SAME
+  degree walk, hub hold and four-eyes path as the tab's button. With no filter published yet the presets alone apply.
+  `change` is the node menu's *Expand, this once* (direction, two degrees, one link kind): this step only. Degrees moved
+  by the screen (LA-DEGREES-TRIM-1) is published too. Another Investigation opening clears the store's filter and puts
+  a mounted form back on its defaults. The node menu's *Expand anyway* confirms the override first, as the tab does;
+  recorded Ctrl+Z / Ctrl+Shift+Z obey the same target guard as G / X / K / H (not inside a dialog, menu or grid).
+- **Groups.** `investigation-filter.ts` names the six groups (`FILTER_GROUP_FIELDS`), their defaults and
+  `changedGroups()` (blank = default); `la-fold` gained `changed` (a dot), `dense`, `startOpen` and `rememberKey`
+  (localStorage `la.fold.*`, try/catch). Depth counts as changed only while it is not bound to the last Expand
+  (LA-DEGREES-TRIM-1 keeps that binding).
+- **Quick windows.** The rung's `window` control also takes `last7 | last30 | last90`; `rungOf(…, windowEnd)` sends them
+  as `[end − N days, end + 1 s)` (the server's range is half-open). The end is `windowEnd` (the preset window end) or
+  `InvestigationSessionStore.latestEvent`, read once on demand by `loadLatestEvent()`; unknown → no window is sent and
+  the fold says so. Never "today".
+- **Redo.** `InvestigationSessionStore.undone` is the stack of entries this browser undid; `redo()` re-appends the newest
+  as `redoRequest(entry)` = `{op, ...params}` minus null values (the sealed params name the request's own keys), through
+  `apply(…, true)`. Any other `apply`, `open`, `close` and `useDraft` clear it. A sealed null `window` is sent as
+  `'full'`; a note on links is not offered again (sealed as `{source, target, kind}`, while the request names `lk.` ids),
+  so `canRedo` is false for it. A redone expand that four-eyes holds leaves the stack like any recorded step. Ctrl+Z / Ctrl+Shift+Z on an
+  Investigation's canvas are recorded undo / redo (the last Grow / Exclude change first, as before); elsewhere they stay
+  the display history.
+- **Clean up.** `investigation-cleanup.ts` works on the WorkingSet (raw ids, hidden entities skipped, hop-0 and kept
+  entities spared), reusing `graph-cleanup.ts` (`keepPathsBetweenSeeds`, `keepOnly`) over `workingSetGraph(ws)`.
+  Leaves are ONE pass (entities with at most one link), not the broom's repeated `trimDanglingLeaves`: an Investigation
+  grown from one start entity is mostly a tree, which the repeated trim would take away whole. Each press is `GrowExcludeStore.cleanUp(ids, reason, exclude)`: `hide` + `annotate` (one grouped
+  Undo, as A3) or ONE `exclude` with the reason. ⚠ The Working Set carries link counts, not link times, so "outside a time
+  window" is deliberately not a clean-up.
+- **Canvas.** The node menu's recorded items show only on an Investigation's canvas; *Investigate this* (no Investigation
+  open) calls `LinkAnalysisStartBoxComponent.prefillEntity`. The selection bar's Exclude opens the same
+  `LinkAnalysisExcludeDialog` as X (the `EntityListReasonDialog` path is gone), which offers
+  `recentExcludeReasons(ws)` as chips.
+- Tests: `investigation-filter.spec.ts`, `investigation-cleanup.spec.ts`, the Redo case in
+  `link-analysis-investigation.store.spec.ts`, and the component specs of the tab, the Expand form and the Exclude dialog.
+
 ### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 
 The route family lives in the **core** (every edition, Basic included, not under `/inv`); its contract, gates,

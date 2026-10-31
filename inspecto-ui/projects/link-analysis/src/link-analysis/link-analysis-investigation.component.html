@@ -714,6 +714,17 @@
                         <button
                             mat-icon-button
                             class="ml-auto"
+                            type="button"
+                            matTooltip="How to investigate"
+                            aria-label="How to investigate"
+                            data-testid="act-howto-toggle"
+                            [attr.aria-expanded]="showHowTo()"
+                            (click)="showHowTo.set(!showHowTo())"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:question-mark-circle"></mat-icon>
+                        </button>
+                        <button
+                            mat-icon-button
                             [matMenuTriggerFor]="actMenu"
                             matTooltip="Investigation actions"
                             aria-label="Investigation actions"
@@ -782,10 +793,56 @@
                         >, not to the Investigation. Promote it from Drafts.
                     </inspecto-alert>
                 }
-                <p class="m-0 text-sm tabular-nums" aria-label="Working Set">
+                <p class="m-0 text-sm tabular-nums" aria-label="Working Set" data-testid="act-counts">
                     <strong>Working Set:</strong> {{ counts().entities }} {{ counts().entities === 1 ? 'entity' : 'entities' }} · {{ counts().links }} {{ counts().links === 1 ? 'link' : 'links' }} ·
                     {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
+                    <span class="text-secondary" data-testid="degree-label">· degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}</span>
+                    @if (hubs().length) {
+                        <span class="text-secondary"> · {{ hubs().length }} busy held</span>
+                    }
                 </p>
+                @if (showHowTo()) {
+                    <!-- LA-INVESTIGATE-UX-1: the first-run orientation; ? brings it back -->
+                    <section class="rounded-md border p-2 text-sm" style="border-color: var(--gamma-border)" aria-labelledby="act-howto-title" data-testid="act-howto">
+                        <h3 id="act-howto-title" class="m-0 text-sm font-semibold">How to investigate</h3>
+                        <ol class="m-0 mt-1 flex list-decimal flex-col gap-0.5 pl-5">
+                            <li>Start from an entity: it is the first step.</li>
+                            <li>Expand: double-click an entity, right-click it, or press G. The Expand filter below decides what is added.</li>
+                            <li>Clean up what is noise: one press each, every one is a recorded step.</li>
+                            <li>Back out with Undo (Ctrl+Z); Redo (Ctrl+Shift+Z) records it again.</li>
+                            <li>Keep (K) what proves the point, hide (H) or exclude (X) what does not.</li>
+                        </ol>
+                        <button mat-button type="button" class="mt-1" data-testid="act-howto-dismiss" (click)="dismissHowTo()">Got it</button>
+                    </section>
+                }
+                <!-- LA-INVESTIGATE-UX-1: Undo and Redo of recorded steps, always in reach -->
+                <div class="la-act-bar flex flex-wrap items-center gap-1 py-1" role="toolbar" aria-label="Steps" data-testid="act-bar">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="act-undo"
+                        [disabled]="!canWrite() || store.busy() || !store.canUndo()"
+                        [disabledInteractive]="true"
+                        [matTooltip]="undoTip()"
+                        (click)="undo()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
+                        Undo
+                    </button>
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="act-redo"
+                        [disabled]="!canWrite() || store.busy() || !store.canRedo()"
+                        [disabledInteractive]="true"
+                        [matTooltip]="redoTip()"
+                        (click)="redo()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
+                        Redo
+                    </button>
+                    <span class="text-secondary text-xs">Recorded steps · Ctrl+Z / Ctrl+Shift+Z</span>
+                </div>
             }
             @if (store.queuedSeeds().length) {
                 <!-- ── ranked nodes carried over from an analysis result; nothing is created until Start / Seed ── -->
@@ -838,9 +895,6 @@
             <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="act-expand-title" data-testid="degrees">
                 <div class="flex flex-wrap items-center gap-2">
                     <h3 id="act-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
-                    <span class="text-secondary text-sm" data-testid="degree-label">
-                        Degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}
-                    </span>
                     <ol class="m-0 flex list-none gap-1 p-0" aria-hidden="true">
                         @for (d of degreeSteps(); track d) {
                             <li>
@@ -864,7 +918,7 @@
                     <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
                         {{ degree().heldHubs.length }} busy
                         {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} held. Untick “Hold busy
-                        entities” under Expand ▸ Limits, or choose Expand anyway on one.
+                        entities” under Fan-out and busy, or choose Expand anyway on one (right-click it).
                     </p>
                 }
                 @if (store.degreeOutcomes().length) {
@@ -913,24 +967,106 @@
                     {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
                 </inspecto-alert>
             }
-            @if (canWrite()) {
-                <div class="flex flex-col gap-2" data-testid="act-add-start">
-                    <div>
+            <!-- LA-INVESTIGATE-UX-1: Clean up — one press each, the count on the button, one recorded step; Undo takes it back -->
+            <la-fold title="Clean up" [hint]="cleanupHint()" [startOpen]="true" rememberKey="act.cleanup" data-testid="act-cleanup">
+                <p class="text-secondary m-0 text-xs">
+                    Each press is one recorded step with its reason in the step log. Start entities and kept entities are never
+                    taken away.
+                </p>
+                <mat-checkbox [ngModel]="cleanupExclude()" (ngModelChange)="cleanupExclude.set($event)" data-testid="cleanup-exclude-instead">
+                    <span class="text-xs">Exclude instead of hide (excluded entities stay out of later expands)</span>
+                </mat-checkbox>
+                @if (!canWrite()) {
+                    <p class="text-secondary m-0 text-xs">{{ expandNeeds }}</p>
+                }
+                <div class="flex flex-col items-start gap-1">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="cleanup-leaves"
+                        [disabled]="!canWrite() || store.busy() || !cleanup().leaves.length"
+                        [disabledInteractive]="true"
+                        [matTooltip]="cleanup().leaves.length ? 'Entities with one link; press again to go one ring further' : 'No dangling leaves'"
+                        (click)="cleanUp(cleanup().leaves, 'Clean up: dangling leaves')"
+                    >
+                        {{ verb() }} {{ cleanup().leaves.length.toLocaleString('en') }} dangling {{ cleanup().leaves.length === 1 ? 'leaf' : 'leaves' }}
+                    </button>
+                    <div class="flex flex-wrap items-center gap-1">
                         <button
                             mat-stroked-button
                             type="button"
-                            data-testid="add-start-entities"
-                            [attr.aria-expanded]="store.addingStart()"
-                            (click)="store.addingStart.set(!store.addingStart())"
+                            data-testid="cleanup-weak"
+                            [disabled]="!canWrite() || store.busy() || !weak().length"
+                            [disabledInteractive]="true"
+                            [matTooltip]="weak().length ? '' : 'Every entity has at least this many events'"
+                            (click)="cleanUp(weak(), 'Clean up: fewer than ' + weakMin() + ' events')"
                         >
-                            Add start entities…
+                            {{ verb() }} {{ weak().length.toLocaleString('en') }} with fewer than {{ weakMin() }} events
                         </button>
+                        <inspecto-stepper-field
+                            label="Events"
+                            [formControl]="weakEvents"
+                            decrementLabel="Fewer events"
+                            incrementLabel="More events"
+                            [min]="2"
+                            [max]="1000"
+                            data-testid="cleanup-weak-min"
+                        ></inspecto-stepper-field>
                     </div>
-                    @if (store.addingStart()) {
-                        <ng-container [ngTemplateOutlet]="startSlot" />
+                    @if (cleanup().types.length > 1) {
+                        <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Clean up an entity type" data-testid="cleanup-types">
+                            @for (t of cleanup().types; track t.type) {
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    [attr.data-testid]="'cleanup-type-' + t.type"
+                                    [disabled]="!canWrite() || store.busy()"
+                                    (click)="cleanUp(t.ids, 'Clean up: entity type ' + t.type)"
+                                >
+                                    {{ verb() }} {{ t.ids.length.toLocaleString('en') }} {{ t.type }}
+                                </button>
+                            }
+                        </div>
+                    }
+                    @if (selectedIds().length === 2) {
+                        <div class="flex flex-wrap items-center gap-1">
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="cleanup-paths"
+                                [disabled]="!canWrite() || store.busy() || offPaths() === null || !offPaths()!.length"
+                                [disabledInteractive]="true"
+                                [matTooltip]="offPaths() === null ? 'Too many paths to work out in the browser: fewer links, or clean up first' : ''"
+                                (click)="cleanUp(offPaths() ?? [], 'Clean up: kept the paths between ' + selectedIds().join(' and '))"
+                            >
+                                Keep paths between the 2 selected ({{ verb().toLowerCase() }} {{ (offPaths()?.length ?? 0).toLocaleString('en') }})
+                            </button>
+                            <inspecto-stepper-field
+                                label="Links"
+                                [formControl]="pathLinks"
+                                decrementLabel="Shorter paths"
+                                incrementLabel="Longer paths"
+                                [min]="1"
+                                [max]="6"
+                            ></inspecto-stepper-field>
+                        </div>
+                    }
+                    @if (selectedIds().length) {
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="cleanup-keep-only"
+                            [disabled]="!canWrite() || store.busy() || !keepOnlyIds().length"
+                            [disabledInteractive]="true"
+                            (click)="cleanUp(keepOnlyIds(), 'Clean up: kept only the ' + selectedIds().length + ' selected')"
+                        >
+                            Keep only the {{ selectedIds().length }} selected ({{ verb().toLowerCase() }} {{ keepOnlyIds().length.toLocaleString('en') }})
+                        </button>
+                    } @else {
+                        <p class="text-secondary m-0 text-xs">Select entities on the canvas for Keep only these, or two for the paths between them.</p>
                     }
                 </div>
-            }
+            </la-fold>
             <div class="flex flex-col gap-2" data-testid="act-selected">
                 <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Selected entity</h3>
             <section
@@ -954,7 +1090,9 @@
                         }
                     </div>
                     <div class="flex flex-wrap gap-1">
-                        <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Start</button>
+                        @if (!selectedInSet().length) {
+                            <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Start from it</button>
+                        }
                         @if (selectedHubs().length && !isOverridden(selectedHubs()[0])) {
                             <button
                                 mat-stroked-button
@@ -964,30 +1102,13 @@
                             >
                                 Expand anyway
                             </button>
-                        } @else {
-                            <button
-                                mat-stroked-button
-                                [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
-                                (click)="expand()"
-                            >
-                                Expand one hop
-                            </button>
                         }
-                        <button
-                            mat-stroked-button
-                            [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
-                            (click)="mark('keep')"
-                        >
-                            Keep
-                        </button>
-                        <button
-                            mat-stroked-button
-                            [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
-                            (click)="mark('hide')"
-                        >
-                            Hide
-                        </button>
                     </div>
+                    @if (selectedInSet().length) {
+                        <p class="text-secondary m-0 text-xs" data-testid="selected-canvas-hint">
+                            Double-click it to expand with the filter; right-click it to keep, hide, exclude or shrink it.
+                        </p>
+                    }
                     @if (selectedInSet().length === 1) {
                         <div class="flex flex-col gap-1" data-testid="neighbours-section">
                             <button
@@ -1073,22 +1194,6 @@
                             }
                         </div>
                     }
-                    <inspecto-pen-field
-                        label="Reason"
-                        [formControl]="reason"
-                        [maxlength]="200"
-                        [error]="
-                            reason.touched && reason.hasError('required')
-                                ? 'An exclusion needs a reason — without one it cannot be challenged.'
-                                : reason.hasError('maxlength')
-                                  ? 'At most 200 characters.'
-                                  : ''
-                        "
-                        (keydown.enter)="exclude()"
-                    />
-                    <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="exclude()">
-                        Exclude
-                    </button>
                     <!-- LA-19: a note changes nothing about traversal, display or counts -->
                     @if (selectedNotes().length) {
                         <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm" aria-label="Notes on this entity">
@@ -1118,20 +1223,13 @@
                     </button>
                 } @else {
                     <p class="text-secondary m-0 text-sm">
-                        Click an entity on the canvas to act on it.
+                        Click an entity on the canvas to see it here; right-click it for everything you can do with it.
                     </p>
                 }
-                <button
-                    mat-button
-                    [disabled]="!canWrite() || store.busy() || !counts().entities"
-                    (click)="expand(true)"
-                    matTooltip="Expand one degree from every entity in the Working Set (at most 1,000)"
-                >
-                    Expand all
-                </button>
             </section>
             </div>
                 @if (hubs().length) {
+                <la-fold title="Busy entities" [hint]="hubs().length + ' held'" rememberKey="act.busy">
                 <section
                     class="flex flex-col gap-1 "
     
@@ -1173,7 +1271,9 @@
                         </p>
                     }
                 </section>
+                </la-fold>
                 }
+                <la-fold title="More steps" hint="Connect, time window, threshold, compare, scope" rememberKey="act.more" data-testid="act-more">
                 <!-- 7. Steps, in visible groups: each action is a button and opens in place, one at a time -->
                 <section class="flex flex-col gap-2" aria-labelledby="act-steps-title" data-testid="act-step-groups">
                     <h3 id="act-steps-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Steps</h3>
@@ -1288,6 +1388,25 @@
                     </p>
                 }
             </section>
+            @if (canWrite()) {
+                <div class="flex flex-col gap-2" data-testid="act-add-start">
+                    <div>
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            data-testid="add-start-entities"
+                            [attr.aria-expanded]="store.addingStart()"
+                            (click)="store.addingStart.set(!store.addingStart())"
+                        >
+                            Add start entities…
+                        </button>
+                    </div>
+                    @if (store.addingStart()) {
+                        <ng-container [ngTemplateOutlet]="startSlot" />
+                    }
+                </div>
+            }
+                </la-fold>
                 <!-- 8. Links: the steps are the bottom dock's Step log (with Undo and Re-order); Replay is in Settings -->
                 <div class="flex flex-wrap items-center gap-x-4 text-sm" data-testid="act-links">
                     <button

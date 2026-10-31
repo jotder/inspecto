@@ -309,7 +309,7 @@ import { idsInWorkingSet, mergePairOf, rawIdsOf, workingSetToGraph } from './inv
 import type { ColDef } from 'ag-grid-community';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
-import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
+import { leafNeighbours, recentExcludeReasons } from './investigation-cleanup';
 import { laLayoutCaps, laLimit, layeredShapeReason, layoutOverCapReason, overCapReason } from './la-limits';
 import { LaLimitsService } from './la-limits.service';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
@@ -3689,6 +3689,9 @@ Its prior copies stay in its version history.`,
         if (this.onGrowExcludeKey(e, target)) return;
         if (this.onCanvasModeKey(e, target)) return;
         if (!(e.ctrlKey || e.metaKey)) return;
+        // LA-INVESTIGATE-UX-1: on an Investigation's canvas Ctrl+Z / Ctrl+Shift+Z undo and redo RECORDED steps (the
+        // display changes keep the rail's own Undo / Redo); elsewhere they are the display history, as before.
+        const recorded = this.investigation.canvas() !== null && this.lens.canManageIncidents() && this.canvasKeyTarget(target);
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
             e.preventDefault();
             // LA-GROW-EXCLUDE-1: the last Grow / Exclude offers its own Undo first (the result line says Ctrl+Z).
@@ -3696,9 +3699,17 @@ Its prior copies stay in its version history.`,
                 void this.growExclude.undoLast();
                 return;
             }
+            if (recorded && this.investigation.canUndo()) {
+                if (!this.investigation.busy()) void this.investigation.undo(this.investigation.undoTarget());
+                return;
+            }
             this.undoPresentation();
         } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
             e.preventDefault();
+            if (recorded && this.investigation.canRedo()) {
+                if (!this.investigation.busy()) void this.investigation.redo();
+                return;
+            }
             this.redoPresentation();
         }
     }
@@ -3902,6 +3913,11 @@ Its prior copies stay in its version history.`,
         return (this.canvasData()?.nodes ?? []).filter((n) => picked.has(n.id));
     }
 
+    /** The selection as Working Set ids, for the Investigation tab's Clean up (Keep only these, paths between 2). */
+    readonly selectionWorkingSetIds = computed(() =>
+        this.investigation.canvas() === null ? [] : this.selectedWorkingSetIds(),
+    );
+
     /** The selection's raw ids that are entities of the open Investigation's Working Set - what an op may name (else 422). */
     private selectedWorkingSetIds(): string[] {
         const ws = this.investigation.workingSet();
@@ -3919,28 +3935,55 @@ Its prior copies stay in its version history.`,
     }
 
     /**
-     * An expand over `nodes` as the Investigation's own logged `expand` step - the same request, presets and one-hop
-     * bookkeeping as the Investigation tab's Expand, so four-eyes, masking and the budget gates apply unchanged.
+     * LA-INVESTIGATE-UX-1: an expand over `nodes` with the Investigation tab's **Expand filter** (direction, degrees, link
+     * kinds, window, strength, fan-out, busy) — a double-click, the node menu, G — walked degree by degree as the tab's
+     * Expand button walks it, so four-eyes, masking and the budget gates apply unchanged. `change` alters the filter for
+     * this step only ("Outgoing only"). Held (busy) entities among them stay held unless the filter expands through them.
      */
-    private async expandInInvestigation(nodes: G6GraphData['nodes']): Promise<boolean> {
+    private async expandInInvestigation(nodes: G6GraphData['nodes'], change: Partial<GrowRequest> = {}): Promise<boolean> {
         const ws = this.investigation.workingSet();
         const ids = [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
         if (!ids.length) {
             this.toastr.info('None of these nodes is in the Working Set.');
             return false;
         }
-        const ok = await this.investigation.apply({
-            op: 'expand',
-            ids,
-            ...this.investigation.withPresets(this.degreePresets(), {}),
-        });
-        if (!ok) {
-            this.toastr.error(this.investigation.error() || 'The expand was refused.');
+        const flagged = new Set((ws?.entities ?? []).filter((e) => e.highConnectivity).map((e) => e.id));
+        const overridden = this.investigation.overriddenHubs();
+        const held = (id: string) => flagged.has(id) && !overridden.has(id);
+        const t = this.growTerms();
+        const ctx: GrowContext = {
+            ...this.growContext(),
+            frontier: ids.filter((id) => !held(id)),
+            heldFrontier: ids.filter(held),
+            from: `${ids.length.toLocaleString('en')} ${ids.length === 1 ? t.node : t.nodes}`,
+            blocked: null,
+            sources: undefined,
+        };
+        const req: GrowRequest = {
+            ...(this.growExclude.filterRequest() ?? {
+                direction: 'either',
+                degrees: 1,
+                linkKinds: null,
+                hold: true,
+                threshold: this.growThreshold(),
+            }),
+            ...change,
+        };
+        if (req.hold && !ctx.frontier.length) {
+            this.toastr.info(`${ids.length === 1 ? `This ${t.node} is` : `These ${t.nodes} are`} busy and held: use Expand anyway.`);
             return false;
         }
-        const step = this.investigation.lastStep();
-        if (step?.status === 'pending' && step.pending?.id) this.investigation.markOneHop(step.pending.id, ids);
+        await this.onExpand({ ctx, req, from: 'selection' });
         return true;
+    }
+
+    /** "Keep selected" (Investigation only): a logged `keep` step — later clean-ups and exclusions spare them. */
+    async keepSelected(): Promise<void> {
+        if (this.investigation.canvas() === null || !this.writesToInvestigation()) return;
+        const ids = this.selectedWorkingSetIds();
+        if (!ids.length) return;
+        if (!(await this.investigation.apply({ op: 'keep', ids })))
+            this.toastr.error(this.investigation.error() || 'The keep was refused.');
     }
 
     /** "Hide selected": a LOGGED `hide` step inside an Investigation, a presentation hide (undoable) in exploration. */
@@ -3960,28 +4003,10 @@ Its prior copies stay in its version history.`,
         this.clearSelection();
     }
 
-    /** "Exclude selected" (Investigation only): a logged `exclude` step with a required reason, asked in the shared reason prompt. */
+    /** "Exclude selected" (Investigation only): the same Exclude… dialog as X and the node menu, the reason asked inline. */
     excludeSelected(): void {
         if (this.investigation.canvas() === null || !this.writesToInvestigation()) return;
-        const ids = this.selectedWorkingSetIds();
-        if (!ids.length) return;
-        this.dialog
-            .open<EntityListReasonDialog, EntityListReasonData, string | undefined>(EntityListReasonDialog, {
-                width: '28rem',
-                data: {
-                    title: `Exclude ${ids.length} ${ids.length === 1 ? 'entity' : 'entities'}`,
-                    message: 'They leave the Working Set and their links go with them. The step is logged with this reason.',
-                    confirmLabel: 'Exclude',
-                    destructive: true,
-                    maxLength: 200,
-                },
-            })
-            .afterClosed()
-            .subscribe(async (reason) => {
-                if (!reason) return;
-                if (await this.investigation.apply({ op: 'exclude', ids, reason })) this.clearSelection();
-                else this.toastr.error(this.investigation.error() || 'The exclusion was refused.');
-            });
+        this.openExclude();
     }
 
     /**
@@ -5401,6 +5426,7 @@ Its prior copies stay in its version history.`,
                             canManageLists: this.lens.canManageIncidents(),
                             canManageCategories: this.lens.canManageExclusionCategories(),
                             hereWhyNot: this.growWriteWhyNot(),
+                            recentReasons: recentExcludeReasons(this.investigation.workingSet()),
                         },
                     },
                 )
@@ -5661,6 +5687,86 @@ Its prior copies stay in its version history.`,
         this.openExpand();
     }
 
+    // ── LA-INVESTIGATE-UX-1: the node menu's recorded actions ──
+
+    private menuNodes(): G6GraphData['nodes'] {
+        const ids = new Set(this.nodeMenuTargets());
+        return (this.canvasData()?.nodes ?? []).filter((n) => ids.has(n.id) && n.data.kind !== SUPER_NODE_KIND);
+    }
+
+    /** The one held (busy) entity the menu was opened on, not yet expanded through; null otherwise. */
+    readonly nodeMenuHeld = computed(() => {
+        if (this.nodeMenuTargets().length !== 1) return null;
+        const ws = this.investigation.workingSet();
+        const node = this.canvasData()?.nodes.find((n) => n.id === this.nodeMenuTargets()[0]);
+        const id = node ? idsInWorkingSet(node, ws)[0] : undefined;
+        const e = id ? ws?.entities.find((x) => x.id === id) : undefined;
+        return e?.highConnectivity && !this.investigation.overriddenHubs().has(e.id) ? e.id : null;
+    });
+
+    /** Expand: the targets with the tab's filter; `change` alters it for this step only. */
+    async expandMenuTargets(change: Partial<GrowRequest> = {}): Promise<void> {
+        if (this.writesToInvestigation()) await this.expandInInvestigation(this.menuNodes(), change);
+    }
+
+    async expandAnywayFromMenu(id: string): Promise<void> {
+        if (!this.writesToInvestigation()) return;
+        // the recorded override, confirmed first as the tab's Expand anyway and the unticked Hold are
+        if (!(await this.confirmHubOverride([id]))) return;
+        if (!(await this.growExclude.expandAnyway(id, this.degreePresets())))
+            this.toastr.error(this.investigation.error() || 'The Expand was refused.');
+    }
+
+    /** Shrink: hide the entities only these link to (what their expand brought in) — one recorded hide, its reason noted. */
+    async shrinkMenuTargets(): Promise<void> {
+        if (!this.writesToInvestigation()) return;
+        const ws = this.investigation.workingSet();
+        const nodes = this.menuNodes();
+        const from = [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
+        const ids = ws ? leafNeighbours(ws, from) : [];
+        if (!ids.length) {
+            this.toastr.info('Nothing to shrink: no neighbour links only to it.');
+            return;
+        }
+        const label = nodes.length === 1 ? nodes[0].data.label : `${nodes.length} entities`;
+        if (!(await this.growExclude.cleanUp(ids, `Shrink: hid the leaves of ${label}`)))
+            this.toastr.error(this.investigation.error() || 'The shrink was refused.');
+    }
+
+    async markMenuTargets(op: 'keep' | 'hide'): Promise<void> {
+        if (!this.writesToInvestigation()) return;
+        const ws = this.investigation.workingSet();
+        const ids = [...new Set(this.menuNodes().flatMap((n) => idsInWorkingSet(n, ws)))];
+        if (ids.length && !(await this.investigation.apply({ op, ids })))
+            this.toastr.error(this.investigation.error() || `The ${op} was refused.`);
+    }
+
+    /** Select the canvas neighbours of `ids` (with them), so the selection bar acts on the whole group. */
+    selectNeighboursOf(ids: string[]): void {
+        const from = new Set(ids);
+        const next = new Set(ids);
+        for (const e of this.canvasData()?.edges ?? []) {
+            if (from.has(e.source)) next.add(e.target);
+            if (from.has(e.target)) next.add(e.source);
+        }
+        this.selectedNodeIds.set([...next]);
+        this.announceSelection(next.size);
+    }
+
+    /** "Investigate this" (no Investigation open): the start form, filled with the entity. */
+    readonly canInvestigateNode = computed(
+        () => this.investigationsEnabled() && !this.investigation.active() && !this.investigation.unsaved() && this.nodeMenuTargets().length === 1,
+    );
+
+    investigateNode(nodeId: string): void {
+        const node = this.canvasData()?.nodes.find((n) => n.id === nodeId);
+        const value = node ? (rawIdsOf(node)[0] ?? node.data.label) : '';
+        if (!value) return;
+        this.openInvestigation();
+        afterNextRender(() => setTimeout(() => this.newInvForm?.prefillEntity(value)), { injector: this.injector });
+    }
+
+
     /** L = Lasso, F = Fisheye, Esc = back to Pan (the same guards as G / X). True when the key was ours. */
     private onCanvasModeKey(e: KeyboardEvent, target: HTMLElement | null): boolean {
         const mode = canvasModeForKey(e, this.canvasMode());
@@ -5670,15 +5776,25 @@ Its prior copies stay in its version history.`,
         return true;
     }
 
-    /** G = Grow, X = Exclude… (outside a text field, a grid, a menu or a dialog). True when the key was ours. */
+    /**
+     * G = Grow, X = Exclude… (outside a text field, a grid, a menu or a dialog). True when the key was ours. In an
+     * Investigation (LA-INVESTIGATE-UX-1) G and E expand the selection with the tab's filter (no selection: the tab's
+     * Expand), K keeps and H hides the selection.
+     */
     private onGrowExcludeKey(e: KeyboardEvent, target: HTMLElement | null): boolean {
         if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return false;
         const key = e.key.toLowerCase();
-        if (key !== 'g' && key !== 'x') return false;
+        const recorded = this.investigation.canvas() !== null;
+        if (!['g', 'x', ...(recorded ? ['e', 'k', 'h'] : [])].includes(key)) return false;
         if (!this.canvasKeyTarget(target)) return false;
         e.preventDefault();
-        if (key === 'g') this.openExpand();
-        else this.openExclude();
+        const picked = this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND);
+        if (key === 'x') this.openExclude();
+        else if (key === 'k') void this.keepSelected();
+        else if (key === 'h') void this.hideSelected();
+        else if (recorded && picked.length) {
+            if (this.writesToInvestigation()) void this.expandInInvestigation(picked);
+        } else this.openExpand();
         return true;
     }
 

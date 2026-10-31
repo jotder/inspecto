@@ -138,12 +138,13 @@ status header has an **unknown** status, not an unbuilt one: this index once cal
 "NOT APPROVED, NOTHING BUILT" for two days because the status was inferred from a missing header instead of
 from the code.
 
-Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (**249** `.md` files, counted 2026-10-30). The **151**
+Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (**252** `.md` files, counted 2026-10-31). The **153**
 narrated here, newest first (⚠ 2026-09-08: two rows were missing — `record-transformer-replaces-map-plan`
 and `path-containment-unification` had been archived with no row — and the count read 46 over 52 rows; ⚠ both numbers had drifted again by 2026-09-13, reading 59 over 67 rows and 148 over 155 files, so **count them, never carry them forward**):
 
 | Archived plan | Archived | Its truth now lives in |
 |---|---|---|
+| [`2026-10-31-la-investigation-tab-redesign-plan`](archived-documents/plans-archive/2026-10-31-la-investigation-tab-redesign-plan.md) | 2026-10-31 — **SHIPPED** (`LA-INVESTIGATE-UX-1`: the Investigation tab as one Expand filter every canvas expand uses, one-press Clean up, Redo, node-menu actions; residual `LA-INVESTIGATE-UX-2`) | [`module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §6.9.1, [`module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) |
 | [`la-product-next-plan`](archived-documents/plans-archive/la-product-next-plan.md) | 2026-10-30 — **SHIPPED** (`LA-PRODUCT-NEXT-1`: maker-checker on role and policy edits, LA Access page, Investigation access review, timeline scrubber, pattern from a selection and pattern packs, Possible duplicates; 5c measured and parked) |
 | [`la-degrees-trim`](archived-documents/plans-archive/la-degrees-trim.md) | 2026-10-30 — **SHIPPED** (`LA-DEGREES-TRIM-1`: lowering Degrees trims the last Expand's outermost ring, unsaved cut in place, saved via `undo` steps; residual `LA-DEGREES-TRIM-2`) | [`module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) |
 | [`la-unsaved-investigation`](archived-documents/plans-archive/la-unsaved-investigation.md) | 2026-10-30 — **SHIPPED** (`LA-UNSAVED-INVESTIGATION-1`: start and Expand unsaved, Name and Purpose asked on Save, `POST /inv/expand/preview`, simpler Investigation tab) | [`module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) |

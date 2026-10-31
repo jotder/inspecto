@@ -63,6 +63,13 @@ export class GrowExcludeStore {
     readonly busy = signal(false);
     readonly growOpen = signal(false);
     readonly exclusionsOpen = signal(false);
+    /**
+     * LA-INVESTIGATE-UX-1: the Investigation tab's Expand filter as a request — what a double-click, the node menu, the
+     * selection bar and G expand with. Null until the tab's form has shown (the presets alone then apply).
+     */
+    readonly filterRequest = signal<GrowRequest | null>(null);
+    /** The form's raw values, so the filter survives the tab being closed and shown again. */
+    readonly filterSnapshot = signal<unknown>(null);
     /** Basic: busy nodes the last Grow previews named (id → contacts) — drawn held, not grown further. */
     readonly basicHeld = signal<ReadonlyMap<string, number>>(new Map());
     basicAdapter: BasicGrowAdapter | null = null;
@@ -70,10 +77,19 @@ export class GrowExcludeStore {
     constructor() {
         // An Undo belongs to the Investigation (or graph) it was made on: another one opening drops it.
         let scope: string | null | undefined;
+        let open: string | null | undefined;
         effect(() => {
             const now = `${this.investigation.activeId()}|${this.investigation.activeDraftId?.() ?? ''}`;
             if (scope !== undefined && scope !== now) untracked(() => this.lastChange.set(null));
             scope = now;
+            // LA-INVESTIGATE-UX-1: the Expand filter belongs to one Investigation; another one starts at the defaults
+            const id = this.investigation.activeId();
+            if (open !== undefined && open !== id)
+                untracked(() => {
+                    this.filterRequest.set(null);
+                    this.filterSnapshot.set(null);
+                });
+            open = id;
         });
     }
 
@@ -334,7 +350,13 @@ export class GrowExcludeStore {
      * selected is a `hide` too. OP-4: the pair is ONE change — its Undo takes back both, newest first, and stops on a
      * colleague's newer step (409), never undoing under it.
      */
-    async cleanUp(ids: string[], reason: string): Promise<boolean> {
+    async cleanUp(ids: string[], reason: string, exclude = false): Promise<boolean> {
+        if (exclude) {
+            // LA-INVESTIGATE-UX-1 "Exclude instead": ONE exclude step that carries the reason itself
+            if (!(await this.investigation.apply({ op: 'exclude', ids, reason }))) return false;
+            this.lastChange.set({ text: `Excluded ${ids.length.toLocaleString('en')}.`, ...this.undoOf(this.madeStep()) });
+            return true;
+        }
         if (!(await this.investigation.apply({ op: 'hide', ids }))) return false;
         const made = this.madeStep();
         const annotated = await this.investigation.apply({ op: 'annotate', ids, note: reason });

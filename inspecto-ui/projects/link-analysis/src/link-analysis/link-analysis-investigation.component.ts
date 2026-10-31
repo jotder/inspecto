@@ -11,7 +11,7 @@ import {
     untracked,
     viewChild,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { LensService } from '@inspecto/core/api';
 import {
     FormControl,
@@ -127,6 +127,10 @@ export const STEP_GROUPS: readonly StepGroup[] = [
 const MORE_STEPS = STEP_GROUPS.flatMap((g) => g.steps);
 
 import { LaFoldComponent } from './la-fold.component';
+import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
+import { GrowExcludeStore } from './grow-exclude.store';
+import { hintSeen, markHintSeen } from './grow-exclude';
+import { cleanupSets, keepOnlySelected, offPathsBetween, weaklyLinked } from './investigation-cleanup';
 import { NgTemplateOutlet } from '@angular/common';
 import { DISABLED_REASON } from './disabled-reasons';
 import { laLimit } from './la-limits';
@@ -135,7 +139,7 @@ import { laLimit } from './la-limits';
     selector: 'inspecto-link-analysis-investigation',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LaFoldComponent, PenFieldComponent, NgTemplateOutlet,
+    imports: [LaFoldComponent, PenFieldComponent, StepperFieldComponent, NgTemplateOutlet,
         FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
@@ -166,6 +170,15 @@ import { laLimit } from './la-limits';
     // Back on the tab: a decision made elsewhere (an approval in Oversight) shows without reopening.
     host: { class: 'block', '(window:focus)': 'onWindowFocus()' },
     templateUrl: './link-analysis-investigation.component.html',
+    // Undo / Redo stay in reach while the tab scrolls
+    styles: `
+        .la-act-bar {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--gamma-bg-card);
+        }
+    `,
 })
 export class LinkAnalysisInvestigationComponent {
     readonly store = inject(InvestigationSessionStore);
@@ -218,6 +231,76 @@ export class LinkAnalysisInvestigationComponent {
     // ── LA-UNSAVED-INVESTIGATION-1: working before Save ──
     /** How many entities are selected on the canvas: Start from selected names them. */
     readonly selectionCount = input(0);
+    /** LA-INVESTIGATE-UX-1: the canvas selection as Working Set ids (Clean up's Keep only these / paths between 2). */
+    readonly selectedIds = input<string[]>([]);
+    /** The pane's Grow / Exclude store: Clean up and Undo go through it so Ctrl+Z takes back exactly that change. */
+    private readonly grow = inject(GrowExcludeStore, { optional: true });
+
+    // ── LA-INVESTIGATE-UX-1: how to investigate, Undo / Redo, Clean up ──
+
+    readonly showHowTo = signal(!hintSeen('investigate'));
+    dismissHowTo(): void {
+        markHintSeen('investigate');
+        this.showHowTo.set(false);
+    }
+
+    readonly undoTip = computed(() =>
+        !this.canWrite() ? this.expandNeeds : this.store.canUndo() ? 'Undo the newest recorded step (Ctrl+Z)' : 'Nothing to undo',
+    );
+    readonly redoTip = computed(() =>
+        !this.canWrite()
+            ? this.expandNeeds
+            : this.store.canRedo()
+              ? `Record the undone ${this.store.redoName().toLowerCase()} step again (Ctrl+Shift+Z)`
+              : 'Nothing to redo',
+    );
+
+    /** The last Grow / Exclude / Clean up of this browser first (it may be several steps), else the newest step. */
+    async undo(): Promise<void> {
+        if (!this.canWrite()) return;
+        if (this.grow?.undoable()) await this.grow.undoLast();
+        else await this.store.undo(this.store.undoTarget());
+    }
+
+    async redo(): Promise<void> {
+        if (this.canWrite()) await this.store.redo();
+    }
+
+    readonly cleanupExclude = signal(false);
+    readonly verb = computed(() => (this.cleanupExclude() ? 'Exclude' : 'Hide'));
+    readonly weakEvents = new FormControl(2, { nonNullable: true });
+    readonly weakMin = toSignal(this.weakEvents.valueChanges, { initialValue: this.weakEvents.value });
+    readonly pathLinks = new FormControl(4, { nonNullable: true });
+    private readonly pathMax = toSignal(this.pathLinks.valueChanges, { initialValue: this.pathLinks.value });
+    readonly cleanup = computed(() => {
+        const ws = this.store.workingSet();
+        return ws ? cleanupSets(ws) : { leaves: [], types: [] };
+    });
+    readonly weak = computed(() => {
+        const ws = this.store.workingSet();
+        return ws ? weaklyLinked(ws, this.weakMin()) : [];
+    });
+    readonly keepOnlyIds = computed(() => {
+        const ws = this.store.workingSet();
+        return ws ? keepOnlySelected(ws, this.selectedIds()) : [];
+    });
+    readonly offPaths = computed(() => {
+        const ws = this.store.workingSet();
+        const [a, b] = this.selectedIds();
+        return ws && this.selectedIds().length === 2 ? offPathsBetween(ws, a, b, this.pathMax()) : [];
+    });
+    readonly cleanupHint = computed(() => {
+        const n = this.cleanup().leaves.length;
+        return n ? `${n.toLocaleString('en')} dangling ${n === 1 ? 'leaf' : 'leaves'}` : '';
+    });
+
+    /** One press = one recorded step (`hide`, or `exclude` with the reason), its reason noted; Undo takes it back. */
+    async cleanUp(ids: string[], reason: string): Promise<void> {
+        if (!this.canWrite() || !ids.length) return;
+        const exclude = this.cleanupExclude();
+        if (this.grow) await this.grow.cleanUp(ids, reason, exclude);
+        else await this.store.apply(exclude ? { op: 'exclude', ids, reason } : { op: 'hide', ids });
+    }
     /** Save…: the page asks for the Name and Purpose and records the steps. */
     readonly saveRequested = output<void>();
     /** Close of the unsaved work: the page asks Save, Discard or Cancel. */
@@ -447,10 +530,6 @@ export class LinkAnalysisInvestigationComponent {
         // the Space's limit at check time, never a number of our own (it may be raised above the shipped 1000)
         validators: [Validators.required, Validators.pattern(/\S/), (c) => Validators.maxLength(laLimit('input.purpose_length'))(c)],
     });
-    readonly reason = new FormControl('', {
-        nonNullable: true,
-        validators: [Validators.required, Validators.maxLength(200)],
-    });
     /** LA-19: `confidence` is deliberately NOT asked — its scale is undecided (D-U9) and the server refuses it. */
     readonly note = new FormControl('', {
         nonNullable: true,
@@ -596,21 +675,6 @@ export class LinkAnalysisInvestigationComponent {
             .then((ok) => ok && this.store.showWorkingSet.set(true));
     }
 
-    /**
-     * The quick one-hop expands (selected entity, whole Working Set) with the profile's presets. The read settings and
-     * the hub override live in the Expand dialog (LA-STUDIO-UI-REORG-1 §5.4).
-     */
-    async expand(all = false): Promise<void> {
-        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        // Every expand from the panel carries the profile's preset window and budget, like "Expand next degree".
-        const rung = this.store.withPresets(this.degreePresets(), {});
-        const ids = all ? undefined : this.selectedInSet();
-        if (await this.store.apply(ids ? { op: 'expand', ids, ...rung } : { op: 'expand', ...rung })) {
-            const step = this.store.lastStep();
-            if (step?.status === 'pending' && step.pending?.id) this.store.markOneHop(step.pending.id, ids);
-        }
-    }
-
     // ── LA-EXPAND-PICK-NEIGHBOURS-1: expand to the neighbours the analyst chooses ──
     readonly neighboursOpen = signal(false);
     /** Neighbour ids ticked in the list (cleared whenever a list is read or a step is added). */
@@ -694,25 +758,6 @@ export class LinkAnalysisInvestigationComponent {
             this.scopeIds.reset('');
             this.scopeError.set('');
         } else this.scopeError.set(this.store.error());
-    }
-
-    mark(op: 'hide' | 'keep'): void {
-        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        this.store.apply({ op, ids: this.selectedInSet() });
-    }
-
-    async exclude(): Promise<void> {
-        if (!this.canWrite()) return; // read-only: Enter in a field must not fire a write
-        if (this.reason.invalid) {
-            this.reason.markAsTouched();
-            return;
-        }
-        const ok = await this.store.apply({
-            op: 'exclude',
-            ids: this.selectedInSet(),
-            reason: this.reason.value.trim(),
-        });
-        if (ok) this.reason.reset('');
     }
 
     async annotate(): Promise<void> {

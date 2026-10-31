@@ -862,6 +862,19 @@
                             <button
                                 mat-icon-button
                                 type="button"
+                                (click)="keepSelected()"
+                                [disabled]="!selectedOnCanvas().length"
+                                [disabledInteractive]="true"
+                                [matTooltip]="selectedOnCanvas().length ? 'Keep the selected entities (K): later clean-ups spare them' : 'Select entities first.'"
+                                [attr.aria-label]="selectedOnCanvas().length ? 'Keep the selected entities (K)' : 'Keep: Select entities first.'"
+                                aria-keyshortcuts="K"
+                                data-testid="la-selection-keep"
+                            >
+                                <mat-icon svgIcon="heroicons_outline:lock-closed" aria-hidden="true"></mat-icon>
+                            </button>
+                            <button
+                                mat-icon-button
+                                type="button"
                                 (click)="excludeSelected()"
                                 [disabled]="!selectedOnCanvas().length"
                                 [disabledInteractive]="true"
@@ -1254,6 +1267,47 @@
                             aria-hidden="true"
                         ></div>
                         <mat-menu #nodeMenu="matMenu" aria-label="Node actions">
+                            @if (investigation.canvas()) {
+                                <!-- LA-INVESTIGATE-UX-1: recorded steps; Expand uses the Investigation tab's Expand filter -->
+                                @if (nodeMenuHeld(); as held) {
+                                    <button mat-menu-item type="button" (click)="expandAnywayFromMenu(held)" data-testid="la-node-menu-expand-anyway">
+                                        <mat-icon svgIcon="heroicons_outline:bolt" aria-hidden="true"></mat-icon>
+                                        <span>Expand anyway (busy)</span>
+                                    </button>
+                                }
+                                <button mat-menu-item type="button" (click)="expandMenuTargets()" data-testid="la-node-menu-expand">
+                                    <mat-icon svgIcon="mat_outline:open_with" aria-hidden="true"></mat-icon>
+                                    <span>Expand</span>
+                                    <span class="text-secondary ml-3 text-xs" aria-hidden="true">G</span>
+                                </button>
+                                <button mat-menu-item type="button" [matMenuTriggerFor]="expandOnce" data-testid="la-node-menu-expand-once">
+                                    <mat-icon svgIcon="heroicons_outline:adjustments-horizontal" aria-hidden="true"></mat-icon>
+                                    <span>Expand, this once</span>
+                                </button>
+                                <button mat-menu-item type="button" (click)="shrinkMenuTargets()" data-testid="la-node-menu-shrink">
+                                    <mat-icon svgIcon="heroicons_outline:arrows-pointing-in" aria-hidden="true"></mat-icon>
+                                    <span>Shrink (hide its leaves)</span>
+                                </button>
+                                <button mat-menu-item type="button" (click)="markMenuTargets('keep')" data-testid="la-node-menu-keep">
+                                    <mat-icon svgIcon="heroicons_outline:lock-closed" aria-hidden="true"></mat-icon>
+                                    <span>Keep</span>
+                                    <span class="text-secondary ml-3 text-xs" aria-hidden="true">K</span>
+                                </button>
+                                <button mat-menu-item type="button" (click)="markMenuTargets('hide')" data-testid="la-node-menu-hide">
+                                    <mat-icon svgIcon="heroicons_outline:eye-slash" aria-hidden="true"></mat-icon>
+                                    <span>Hide</span>
+                                    <span class="text-secondary ml-3 text-xs" aria-hidden="true">H</span>
+                                </button>
+                                <button mat-menu-item type="button" (click)="selectNeighboursOf(nodeMenuTargets())" data-testid="la-node-menu-select-neighbours">
+                                    <mat-icon svgIcon="heroicons_outline:cursor-arrow-rays" aria-hidden="true"></mat-icon>
+                                    <span>Select neighbours</span>
+                                </button>
+                            } @else if (canInvestigateNode()) {
+                                <button mat-menu-item type="button" (click)="investigateNode(nodeMenuTargets()[0])" data-testid="la-node-menu-investigate">
+                                    <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle" aria-hidden="true"></mat-icon>
+                                    <span>Investigate this</span>
+                                </button>
+                            }
                             <button mat-menu-item type="button" (click)="openExclude(nodeMenuTargets())" data-testid="la-node-menu-exclude">
                                 <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
                                 <span>Exclude{{ nodeMenuTargets().length > 1 ? ' ' + nodeMenuTargets().length : '' }}…</span>
@@ -1266,9 +1320,20 @@
                             </button>
                             <button mat-menu-item type="button" (click)="expandFromMenu()" data-testid="la-node-menu-grow">
                                 <mat-icon svgIcon="mat_outline:open_with" aria-hidden="true"></mat-icon>
-                                <span>Expand…</span>
-                                <span class="text-secondary ml-3 text-xs" aria-hidden="true">G</span>
+                                <span>{{ investigation.canvas() ? 'Expand filter…' : 'Expand…' }}</span>
+                                @if (!investigation.canvas()) {
+                                    <span class="text-secondary ml-3 text-xs" aria-hidden="true">G</span>
+                                }
                             </button>
+                        </mat-menu>
+                        <!-- "Expand, this once": the filter with one thing changed, for this step only -->
+                        <mat-menu #expandOnce="matMenu" aria-label="Expand, this once">
+                            <button mat-menu-item type="button" (click)="expandMenuTargets({ direction: 'out' })" data-testid="la-node-menu-expand-out">Outgoing only</button>
+                            <button mat-menu-item type="button" (click)="expandMenuTargets({ direction: 'in' })" data-testid="la-node-menu-expand-in">Incoming only</button>
+                            <button mat-menu-item type="button" (click)="expandMenuTargets({ degrees: 2 })" data-testid="la-node-menu-expand-two">Two degrees</button>
+                            @for (k of legendLinkKinds(); track k) {
+                                <button mat-menu-item type="button" (click)="expandMenuTargets({ linkKinds: [k] })">Only {{ k }} links</button>
+                            }
                         </mat-menu>
                         <!-- the explorer graph (nothing recorded) keeps Expand as a popup; an Investigation's is in its tab -->
                         @if (growExclude.growOpen() && growMode() !== 'investigation') {
@@ -1605,6 +1670,7 @@
                                     (settingsRequested)="openSettings('investigation')"
                                     (dockRequested)="openDock($event)"
                                     [selectionCount]="selectionCount()"
+                                    [selectedIds]="selectionWorkingSetIds()"
                                     (saveRequested)="saveUnsaved()"
                                     (closeRequested)="closeOpenWork()"
                                     (startFromSelected)="startFromSelected()"

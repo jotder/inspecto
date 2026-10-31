@@ -6,10 +6,12 @@ import {
     OnChanges,
     OnInit,
     computed,
+    effect,
     inject,
     input,
     output,
     signal,
+    untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -21,7 +23,7 @@ import { Subject, debounceTime, merge } from 'rxjs';
 import type { ExpandRung } from '@inspecto/link-analysis/api/inv.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
-import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import type { PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
 import type { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
@@ -41,6 +43,16 @@ import { DISABLED_REASON, mostDegrees } from './disabled-reasons';
 import { GrowExcludeStore } from './grow-exclude.store';
 import { FourEyesLimits, expandApproval } from './investigate-number';
 import { parseKinds, rungForm, rungOf, windowForm } from './investigation-rung-form';
+import {
+    FILTER_DEFAULTS,
+    FILTER_GROUP_FIELDS,
+    FilterGroupId,
+    FilterValues,
+    FilterWindow,
+    QUICK_WINDOW_DAYS,
+    changedGroups,
+} from './investigation-filter';
+import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { InvestigationWindowFieldsComponent } from './investigation-window-fields.component';
 import { LaFoldComponent } from './la-fold.component';
 import { laLimit } from './la-limits';
@@ -60,9 +72,11 @@ export interface ExpandDegreesChange {
 }
 
 /**
- * LA-STUDIO-UI-REORG-1 §5.4 (UIR-D5) — the **Expand** form: one form for every multi-degree expand. In order of
- * importance: From, Degrees (a − N + stepper), Direction (a popup choice), the Expand button with a preview line of
- * degree 1, then the filters in closed folds (Links · Time · Limits) that each say what is set. It only ASKS: `(expand)`
+ * LA-STUDIO-UI-REORG-1 §5.4 (UIR-D5), reworked by LA-INVESTIGATE-UX-1 — the **Expand** form: one form for every
+ * multi-degree expand. In order of importance: From (one press each), the Expand button with a preview line of degree 1,
+ * then the **Expand filter** as foldable groups (Direction · Depth · Link kinds · Time · Strength · Fan-out and busy),
+ * each saying what is set, marked when it differs from the default, with its own reset and one Reset to defaults. No
+ * group opens a popup. The filter is published to the store, so every canvas expand uses it. It only ASKS: `(expand)`
  * hands the choice to the screen, which walks it degree by degree (recorded `expand` steps in an Investigation,
  * neighbours reads on the explorer graph).
  *
@@ -83,7 +97,6 @@ export interface ExpandDegreesChange {
         MatTooltipModule,
         InspectoAlertComponent,
         ChipComponent,
-        InspectoOptionPickerComponent,
         PenFieldComponent,
         StepperFieldComponent,
         LaFoldComponent,
@@ -91,7 +104,7 @@ export interface ExpandDegreesChange {
     ],
     template: `
         <section
-            class="flex min-h-0 flex-col gap-3"
+            class="flex min-h-0 flex-col gap-2"
             [class]="embedded() ? '' : 'max-h-[75vh] w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-lg bg-card'"
             [style.border-color]="embedded() ? null : 'var(--gamma-border)'"
             [attr.role]="embedded() ? null : 'dialog'"
@@ -112,57 +125,63 @@ export interface ExpandDegreesChange {
 
             @if (showHint()) {
                 <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-expand-hint">
-                    <p class="m-0">Adds linked items one degree at a time. You see a preview first; one Undo (Ctrl+Z) reverses it.</p>
+                    <p class="m-0">
+                        Adds linked items one degree at a time, with the filter below. Double-click an entity on the canvas, or
+                        right-click it, to expand just that one the same way. One Undo (Ctrl+Z) reverses it.
+                    </p>
                     <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
                     <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                 </div>
             }
 
-            <form [formGroup]="form" class="flex flex-col gap-1" (ngSubmit)="submit()">
-                <!-- 1. From: the start entities -->
-                @if (fromOptions().length > 1) {
-                    <inspecto-option-picker
-                        label="From"
-                        [options]="fromOptions()"
-                        formControlName="from"
-                        data-testid="la-expand-from"
-                    ></inspecto-option-picker>
-                }
-                <p class="text-secondary m-0 text-xs" data-testid="la-expand-from-line">From {{ active().from }}</p>
+            <!-- 1. From: one press, no popup (LA-INVESTIGATE-UX-1) -->
+            @if (fromOptions().length > 1) {
+                <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Expand from" data-testid="la-expand-from">
+                    <span class="text-secondary text-xs">From</span>
+                    @for (o of fromOptions(); track o.value) {
+                        <button
+                            type="button"
+                            class="la-toggle"
+                            [attr.aria-pressed]="formValue().from === o.value"
+                            [matTooltip]="o.hint ?? ''"
+                            [attr.data-testid]="'la-expand-from-' + o.value"
+                            (click)="setFrom(o.value)"
+                        >
+                            <inspecto-chip [variant]="formValue().from === o.value ? 'soft' : 'outline'" [tone]="formValue().from === o.value ? 'primary' : 'neutral'">{{
+                                o.label
+                            }}</inspecto-chip>
+                        </button>
+                    }
+                </div>
+            }
+            <p class="text-secondary m-0 text-xs" data-testid="la-expand-from-line">From {{ active().from }}</p>
 
-                <!-- 2. Degrees: − N + -->
-                <inspecto-stepper-field
-                    label="Degrees"
-                    formControlName="degrees"
-                    decrementLabel="Fewer degrees"
-                    incrementLabel="More degrees"
-                    [min]="1"
-                    [max]="maxDegree()"
-                    [minReason]="fewestDegrees"
-                    [maxReason]="mostDegreesReason()"
-                    data-testid="la-expand-degrees"
-                ></inspecto-stepper-field>
-                @if (lastExpand() !== null) {
-                    <p class="text-secondary m-0 text-xs" data-testid="la-expand-degrees-bound">
-                        Degrees follows the last Expand: fewer removes its outermost degrees from the Working Set, more expands further.
-                    </p>
+            <!-- 2. The Expand button with its preview line -->
+            <div class="flex flex-wrap items-center gap-2" [class.justify-end]="!embedded()">
+                @if (!embedded()) {
+                    <button mat-button type="button" (click)="closed.emit()">Cancel</button>
                 }
-                @if (formValue().degrees > 1) {
-                    <p class="text-secondary m-0 text-xs">
-                        Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
-                    </p>
+                <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    data-testid="la-expand-go"
+                    [disabled]="!!goWhyNot()"
+                    [disabledInteractive]="true"
+                    [matTooltip]="goWhyNot() || ''"
+                    [attr.aria-describedby]="goWhyNot() ? (active().blocked ? 'la-expand-blocked-why' : 'la-expand-why') : null"
+                    (click)="submit()"
+                >
+                    Expand{{ formValue().degrees > 1 ? ' ' + formValue().degrees + ' degrees' : '' }}
+                </button>
+            </div>
+            <!-- T-193: a blocked start already says why in the alert below; the reason is never shown twice -->
+            @if (goWhyNot(); as why) {
+                @if (!active().blocked) {
+                    <p id="la-expand-why" class="text-secondary m-0 text-xs" [class.text-right]="!embedded()">{{ why }}</p>
                 }
+            }
 
-                <!-- 3. Direction: a popup choice, like From -->
-                <inspecto-option-picker
-                    label="Direction"
-                    formControlName="direction"
-                    [options]="directionOptions()"
-                    data-testid="la-expand-direction"
-                ></inspecto-option-picker>
-            </form>
-
-            <!-- 4. The Expand button with its preview line -->
             <div role="status" aria-live="polite" class="text-xs" data-testid="la-expand-preview">
                 @switch (pv().state) {
                     @case ('loading') {
@@ -194,10 +213,6 @@ export interface ExpandDegreesChange {
             </div>
 
             @if (approval(); as a) {
-                <p class="text-secondary m-0 text-xs" data-testid="la-expand-effective">
-                    Rows read per degree, at most {{ a.budget.toLocaleString('en-GB') }}. Neighbours per entity:
-                    {{ a.fanOut === null ? 'no limit' : 'at most ' + a.fanOut.toLocaleString('en-GB') }}.
-                </p>
                 @if (a.exceeded.length) {
                     <p class="text-warn m-0 text-xs" role="status" data-testid="la-expand-needs-approval">
                         Each degree will need approval from a second person: {{ a.exceeded.join('; ') }}. The walk stops at
@@ -210,43 +225,89 @@ export interface ExpandDegreesChange {
                 <inspecto-alert id="la-expand-blocked-why" variant="info" data-testid="la-expand-blocked">{{ why }}</inspecto-alert>
             }
 
-            <div class="flex flex-wrap items-center gap-2" [class.justify-end]="!embedded()">
-                @if (!embedded()) {
-                    <button mat-button type="button" (click)="closed.emit()">Cancel</button>
+            <!-- 3. The Expand filter: foldable groups, each saying what is set, a dot when changed, its own reset -->
+            <div class="flex flex-col" data-testid="la-expand-filters">
+                <div class="flex items-center gap-2 border-t pt-2" style="border-color: var(--gamma-border)">
+                    <h3 class="m-0 whitespace-nowrap text-sm font-semibold">{{ embedded() ? 'Expand filter' : 'Filter' }}</h3>
+                    @if (changed().length) {
+                        <span class="text-secondary whitespace-nowrap text-xs" data-testid="la-expand-changed">{{ changed().length }} changed</span>
+                        <button
+                            type="button"
+                            class="la-reset text-primary ml-auto whitespace-nowrap text-xs underline"
+                            data-testid="la-expand-reset"
+                            (click)="resetAll()"
+                        >
+                            Reset to defaults
+                        </button>
+                    } @else {
+                        <span class="text-secondary text-xs">Defaults</span>
+                    }
+                </div>
+                @if (embedded()) {
+                    <p class="text-secondary m-0 mb-1 text-xs">Every expand uses it: this button, a double-click, the right-click menu and G.</p>
                 }
-                <button
-                    mat-flat-button
-                    color="primary"
-                    type="button"
-                    data-testid="la-expand-go"
-                    [disabled]="!!goWhyNot()"
-                    [disabledInteractive]="true"
-                    [matTooltip]="goWhyNot() || ''"
-                    [attr.aria-describedby]="goWhyNot() ? (active().blocked ? 'la-expand-blocked-why' : 'la-expand-why') : null"
-                    (click)="submit()"
-                >
-                    Expand{{ formValue().degrees > 1 ? ' ' + formValue().degrees + ' degrees' : '' }}
-                </button>
-            </div>
-            <!-- T-193: a blocked start already says why in the alert above; the reason is never shown twice -->
-            @if (goWhyNot(); as why) {
-                @if (!active().blocked) {
-                    <p id="la-expand-why" class="text-secondary m-0 text-xs" [class.text-right]="!embedded()">{{ why }}</p>
-                }
-            }
 
-            <!-- 5. The filters: foldable groups, closed, each saying what is set -->
-            <div class="flex flex-col gap-2" data-testid="la-expand-filters">
-                <la-fold title="Links" [hint]="linksSummary()" [forceOpen]="tried() && linksInvalid()" data-testid="la-expand-fold-links">
+                <la-fold title="Direction" [dense]="true" [startOpen]="true" rememberKey="expand.direction" [hint]="directionSummary()" [changed]="isChanged('direction')" data-testid="la-expand-fold-direction">
+                    <div class="flex flex-wrap gap-1" role="group" aria-label="Direction" data-testid="la-expand-direction">
+                        @for (d of directionOptions(); track d.value) {
+                            <button
+                                type="button"
+                                class="la-toggle"
+                                [attr.aria-pressed]="formValue().direction === d.value"
+                                [matTooltip]="d.hint ?? ''"
+                                [attr.data-testid]="'la-expand-direction-' + d.value"
+                                (click)="setDirection(d.value)"
+                            >
+                                <inspecto-chip [variant]="formValue().direction === d.value ? 'soft' : 'outline'" [tone]="formValue().direction === d.value ? 'primary' : 'neutral'">{{
+                                    d.label
+                                }}</inspecto-chip>
+                            </button>
+                        }
+                    </div>
+                </la-fold>
+
+                <la-fold title="Depth" [dense]="true" [startOpen]="true" rememberKey="expand.depth" [hint]="depthSummary()" [changed]="isChanged('depth')" data-testid="la-expand-fold-depth">
+                    <form [formGroup]="form" (ngSubmit)="submit()">
+                        <inspecto-stepper-field
+                            label="Degrees"
+                            formControlName="degrees"
+                            decrementLabel="Fewer degrees"
+                            incrementLabel="More degrees"
+                            [min]="1"
+                            [max]="maxDegree()"
+                            [minReason]="fewestDegrees"
+                            [maxReason]="mostDegreesReason()"
+                            data-testid="la-expand-degrees"
+                        ></inspecto-stepper-field>
+                    </form>
+                    @if (lastExpand() !== null) {
+                        <p class="text-secondary m-0 text-xs" data-testid="la-expand-degrees-bound">
+                            Degrees follows the last Expand: fewer removes its outermost degrees from the Working Set, more expands further.
+                        </p>
+                    }
+                    @if (formValue().degrees > 1) {
+                        <p class="text-secondary m-0 text-xs">
+                            Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
+                        </p>
+                    }
+                </la-fold>
+
+                <la-fold title="Link kinds" [dense]="true" rememberKey="expand.kinds" [hint]="kindsSummary()" [changed]="isChanged('kinds')" [forceOpen]="tried() && kindsInvalid()" data-testid="la-expand-fold-links">
+                    @if (isChanged('kinds')) {
+                        <button type="button" class="la-reset text-primary self-start text-xs underline" (click)="resetGroup('kinds')">Reset link kinds</button>
+                    }
                     @if (ctx().linkKinds.length) {
-                        <div class="flex flex-col gap-1" role="group" aria-labelledby="la-expand-kinds">
-                            <span class="text-xs font-semibold" id="la-expand-kinds">{{ linkKindsLabel }}</span>
+                        <div class="flex flex-wrap gap-1" role="group" aria-labelledby="la-expand-kinds">
+                            <span class="sr-only" id="la-expand-kinds">{{ linkKindsLabel }}</span>
                             @for (k of ctx().linkKinds; track k) {
-                                <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">
-                                    <span class="text-xs">{{ k }}</span>
-                                </mat-checkbox>
+                                <button type="button" class="la-toggle" [attr.aria-pressed]="kindOn(k)" (click)="toggleKind(k, !kindOn(k))">
+                                    <inspecto-chip [variant]="kindOn(k) ? 'soft' : 'outline'" [tone]="kindOn(k) ? 'primary' : 'neutral'">{{ k }}</inspecto-chip>
+                                </button>
                             }
                         </div>
+                        @if (kinds()?.length === 0) {
+                            <p class="text-warn m-0 text-xs" role="alert">Choose at least one link kind to follow.</p>
+                        }
                     } @else if (ctx().mode === 'investigation') {
                         <ng-container [formGroup]="rung">
                             <inspecto-pen-field
@@ -260,13 +321,53 @@ export interface ExpandDegreesChange {
                     } @else {
                         <p class="text-secondary m-0 text-xs">This graph has one kind of {{ t().link }}, so there is nothing to choose.</p>
                     }
-                    @if (ctx().mode === 'investigation') {
+                </la-fold>
+
+                @if (ctx().mode === 'investigation' && ctx().hasWindow) {
+                    <la-fold title="Time" [dense]="true" rememberKey="expand.time" [hint]="timeSummary()" [changed]="isChanged('time')" [forceOpen]="tried() && timeInvalid()" data-testid="la-expand-fold-time">
+                        <div class="flex flex-wrap gap-1" role="group" aria-label="Time window" data-testid="la-expand-window">
+                            @for (o of windowOptions; track o.value) {
+                                <button
+                                    type="button"
+                                    class="la-toggle"
+                                    [attr.aria-pressed]="rungValue().window === o.value"
+                                    [matTooltip]="o.hint"
+                                    [attr.data-testid]="'la-expand-window-' + o.value"
+                                    (click)="setWindow(o.value)"
+                                >
+                                    <inspecto-chip [variant]="rungValue().window === o.value ? 'soft' : 'outline'" [tone]="rungValue().window === o.value ? 'primary' : 'neutral'">{{
+                                        o.label
+                                    }}</inspecto-chip>
+                                </button>
+                            }
+                        </div>
+                        @if (quickDays() && !windowEnd()) {
+                            <p class="text-secondary m-0 text-xs" role="status" data-testid="la-expand-window-no-end">
+                                {{ endLoading() ? 'Reading the latest event time…' : 'The latest event time is not known, so this Expand reads the Investigation window.' }}
+                            </p>
+                        } @else if (quickDays(); as days) {
+                            <p class="text-secondary m-0 text-xs">The {{ days }} days up to the latest event ({{ windowEnd() }}). This Expand only.</p>
+                        }
+                        @if (rungValue().window === 'override') {
+                            <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
+                                <p class="text-secondary m-0 mb-1 text-xs">This Expand only; the Investigation's own window is not changed.</p>
+                                <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
+                            </div>
+                        }
+                    </la-fold>
+                }
+
+                @if (ctx().mode === 'investigation') {
+                    <la-fold title="Strength" [dense]="true" rememberKey="expand.strength" [hint]="strengthSummary()" [changed]="isChanged('strength')" [forceOpen]="tried() && strengthInvalid()" data-testid="la-expand-fold-strength">
+                        @if (isChanged('strength')) {
+                            <button type="button" class="la-reset text-primary self-start text-xs underline" (click)="resetGroup('strength')">Reset strength</button>
+                        }
                         <div class="flex flex-col gap-2" [formGroup]="rung">
                             <inspecto-pen-field
                                 label="Minimum events per link"
                                 formControlName="minEvents"
                                 type="number"
-                                placeholder="1"
+                                [placeholder]="presets().minEvents?.toString() ?? '1'"
                                 [error]="rung.controls.minEvents.invalid ? 'A whole number of at least 1.' : ''"
                             />
                             <inspecto-pen-field
@@ -277,24 +378,13 @@ export interface ExpandDegreesChange {
                             />
                             <p class="text-secondary m-0 text-xs">Distinct days need the Investigation's time column. A blank field uses the Industry pack's setting.</p>
                         </div>
-                    }
-                </la-fold>
-
-                @if (ctx().mode === 'investigation' && ctx().hasWindow) {
-                    <la-fold title="Time" [hint]="timeSummary()" [forceOpen]="tried() && timeInvalid()" data-testid="la-expand-fold-time">
-                        <div class="flex flex-col gap-2" [formGroup]="rung">
-                            <inspecto-option-picker label="Time window" formControlName="window" [options]="windowOptions" />
-                            @if (rung.controls.window.value === 'override') {
-                                <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
-                                    <p class="text-secondary m-0 mb-1 text-xs">This Expand only; the Investigation's own window is not changed.</p>
-                                    <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
-                                </div>
-                            }
-                        </div>
                     </la-fold>
                 }
 
-                <la-fold title="Limits" [hint]="limitsSummary()" [forceOpen]="tried() && limitsInvalid()" data-testid="la-expand-fold-limits">
+                <la-fold title="Fan-out and busy" [dense]="true" rememberKey="expand.limits" [hint]="limitsSummary()" [changed]="isChanged('limits')" [forceOpen]="tried() && limitsInvalid()" data-testid="la-expand-fold-limits">
+                    @if (isChanged('limits')) {
+                        <button type="button" class="la-reset text-primary self-start text-xs underline" (click)="resetGroup('limits')">Reset fan-out and busy</button>
+                    }
                     <div class="flex flex-col gap-1" [formGroup]="form">
                         <mat-checkbox
                             formControlName="hold"
@@ -323,6 +413,14 @@ export interface ExpandDegreesChange {
                     @if (ctx().mode === 'investigation') {
                         <div class="flex flex-col gap-2" [formGroup]="rung" data-testid="la-expand-rung">
                             <inspecto-pen-field
+                                label="Most neighbours per entity"
+                                formControlName="maxFanOut"
+                                type="number"
+                                [placeholder]="presets().maxFanOut?.toString() ?? ''"
+                                [error]="rung.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
+                            />
+                            <p class="text-secondary m-0 text-xs">Strongest first. Blank means no limit.</p>
+                            <inspecto-pen-field
                                 label="Fewest links a neighbour may have"
                                 formControlName="candidateDegreeMin"
                                 type="number"
@@ -338,13 +436,6 @@ export interface ExpandDegreesChange {
                                 <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
                             }
                             <inspecto-pen-field
-                                label="Most neighbours per entity"
-                                formControlName="maxFanOut"
-                                type="number"
-                                [error]="rung.controls.maxFanOut.invalid ? 'A whole number of at least 1.' : ''"
-                            />
-                            <p class="text-secondary m-0 text-xs">Strongest first. Blank means no limit.</p>
-                            <inspecto-pen-field
                                 label="Row limit per degree"
                                 formControlName="budget"
                                 type="number"
@@ -353,6 +444,12 @@ export interface ExpandDegreesChange {
                             />
                             <p class="text-secondary m-0 text-xs">Stops at this many rows; the step is marked incomplete.</p>
                         </div>
+                        @if (approval(); as a) {
+                            <p class="text-secondary m-0 text-xs" data-testid="la-expand-effective">
+                                Rows read per degree, at most {{ a.budget.toLocaleString('en-GB') }}. Neighbours per entity:
+                                {{ a.fanOut === null ? 'no limit' : 'at most ' + a.fanOut.toLocaleString('en-GB') }}.
+                            </p>
+                        }
                     } @else {
                         <p class="text-secondary m-0 text-xs" data-testid="la-expand-basic-note">
                             More options appear when an Investigation is open.
@@ -361,6 +458,26 @@ export interface ExpandDegreesChange {
                 </la-fold>
             </div>
         </section>
+    `,
+    styles: `
+        .la-toggle {
+            cursor: pointer;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            border-radius: 9999px;
+        }
+        .la-reset {
+            cursor: pointer;
+            border: 0;
+            background: transparent;
+            padding: 0;
+        }
+        .la-toggle:focus-visible,
+        .la-reset:focus-visible {
+            outline: 2px solid var(--gamma-primary);
+            outline-offset: 2px;
+        }
     `,
 })
 export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
@@ -383,6 +500,17 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     readonly closed = output<void>();
 
     readonly store = inject(GrowExcludeStore);
+    /** Another Investigation opened while the form shows: its filter starts at the defaults (the store drops the old one). */
+    readonly reopenWatch = (() => {
+        let seen: string | null | undefined;
+        effect(() => {
+            const id = this.inv$?.activeId() ?? null;
+            if (seen !== undefined && seen !== id) untracked(() => this.resetForOther());
+            seen = id;
+        });
+    })();
+    /** The open Investigation (absent in a bare test bed): the end the "last N days" chips count back from. */
+    private readonly inv$ = inject(InvestigationSessionStore, { optional: true });
     private destroyRef = inject(DestroyRef);
     /**
      * The tab section outlives selections and steps, so a change of start re-reads the preview once things settle
@@ -397,11 +525,18 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     private host: ElementRef<HTMLElement> = inject(ElementRef);
 
     readonly guide = GROW_GUIDE;
-    readonly windowOptions: PickerOption[] = [
+    readonly windowOptions: { value: FilterWindow; label: string; hint: string }[] = [
         { value: 'inherit', label: 'Investigation window', hint: 'The window set for this Investigation' },
-        { value: 'full', label: 'All available data', hint: 'Ignore the window for this Expand' },
-        { value: 'override', label: 'Custom window', hint: 'A window for this Expand only' },
+        { value: 'full', label: 'All data', hint: 'Ignore the window for this Expand' },
+        { value: 'last7', label: '7 days', hint: 'The 7 days up to the latest event, for this Expand only' },
+        { value: 'last30', label: '30 days', hint: 'The 30 days up to the latest event, for this Expand only' },
+        { value: 'last90', label: '90 days', hint: 'The 90 days up to the latest event, for this Expand only' },
+        { value: 'override', label: 'Custom', hint: 'A window for this Expand only' },
     ];
+    /** The latest event the quick chips count back from (the preset window end, else the Dataset's latest event). */
+    readonly windowEnd = computed(() => this.inv$?.windowEnd() ?? this.inv$?.latestEvent() ?? null);
+    readonly endLoading = signal(false);
+    readonly quickDays = computed(() => QUICK_WINDOW_DAYS[this.rungValue().window] ?? null);
     /** An Expand was asked for with a filter in error: the fold holding it opens (an error behind a closed fold is invisible). */
     readonly tried = signal(false);
     readonly showHint = signal(!hintSeen('grow'));
@@ -424,11 +559,11 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     /** The Advanced "A window for this Expand…" fields. */
     readonly override = windowForm();
     /** null = every link kind. */
-    private readonly kinds = signal<string[] | null>(null);
+    readonly kinds = signal<string[] | null>(null);
     readonly formValue = signal(this.form.getRawValue());
-    private readonly rungValue = signal(this.rung.getRawValue());
+    readonly rungValue = signal(this.rung.getRawValue());
 
-    /** Direction as a popup choice (Both ways / Outgoing / Incoming, and Both ways, mutual in an Investigation). */
+    /** Direction as one-press toggles (Both ways / Outgoing / Incoming, and Both ways, mutual in an Investigation). */
     readonly directionOptions = computed<PickerOption[]>(() =>
         GROW_DIRECTIONS.filter((d) => d.value !== 'reciprocal' || this.ctx().mode === 'investigation').map((d) => ({
             value: d.value,
@@ -517,7 +652,9 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         this.rungValue();
         return this.inv() && names.some((n) => this.rung.controls[n].invalid);
     }
-    readonly linksInvalid = computed(() => this.kinds()?.length === 0 || this.bad('linkKinds', 'minEvents', 'minDistinctDays'));
+    readonly kindsInvalid = computed(() => this.kinds()?.length === 0 || this.bad('linkKinds'));
+    readonly strengthInvalid = computed(() => this.bad('minEvents', 'minDistinctDays'));
+    readonly linksInvalid = computed(() => this.kindsInvalid() || this.strengthInvalid());
     readonly timeInvalid = computed(() => {
         this.rungValue();
         return this.inv() && this.rung.controls.window.value === 'override' && this.override.invalid;
@@ -528,30 +665,140 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             this.bad('candidateDegreeMin', 'candidateDegreeMax', 'maxFanOut', 'budget') ||
             (this.inv() && this.rung.hasError('degreeOrder')),
     );
-    /** "All link kinds · at least 3 events · on 2+ days". */
-    readonly linksSummary = computed(() => {
+    /** "All link kinds" / "2 of 5 link kinds" / the kinds typed. */
+    readonly kindsSummary = computed(() => {
         const v = this.rungValue();
         const all = this.ctx().linkKinds;
         const on = this.kinds();
         const typed = this.inv() && !all.length ? parseKinds(String(v.linkKinds ?? '')) : [];
-        const parts = [
-            all.length && on !== null
-                ? `${on.length} of ${all.length} link kinds`
-                : typed.length
-                  ? typed.join(', ')
-                  : 'All link kinds',
-        ];
-        if (this.inv()) {
-            const ev = whole(v.minEvents);
-            const days = whole(v.minDistinctDays);
-            if (ev !== null) parts.push(`at least ${ev} events`);
-            if (days !== null) parts.push(`on ${days}+ days`);
-        }
+        return all.length && on !== null ? `${on.length} of ${all.length} link kinds` : typed.length ? typed.join(', ') : 'All link kinds';
+    });
+    /** "At least 3 events · on 2+ days", or what the pack sets. */
+    readonly strengthSummary = computed(() => {
+        const v = this.rungValue();
+        const ev = whole(v.minEvents) ?? this.presets().minEvents ?? null;
+        const days = whole(v.minDistinctDays);
+        const parts = [ev !== null && ev > 1 ? `At least ${ev} events` : 'Any link'];
+        if (days !== null) parts.push(`on ${days}+ days`);
         return parts.join(' · ');
     });
+    readonly directionSummary = computed(() => GROW_DIRECTIONS.find((d) => d.value === this.formValue().direction)?.label ?? '');
+    readonly depthSummary = computed(() => {
+        const d = this.formValue().degrees;
+        return `${d} ${d === 1 ? 'degree' : 'degrees'}`;
+    });
+
+    // ── what differs from the defaults: a dot per group, "N changed", and the resets ──
+
+    readonly filterValues = computed<FilterValues>(() => {
+        const f = this.formValue();
+        const r = this.rungValue();
+        return {
+            direction: f.direction,
+            degrees: f.degrees,
+            kinds: this.kinds(),
+            typedKinds: r.linkKinds,
+            window: r.window,
+            minEvents: r.minEvents,
+            minDistinctDays: r.minDistinctDays,
+            hold: f.hold,
+            threshold: f.threshold,
+            candidateDegreeMin: r.candidateDegreeMin,
+            candidateDegreeMax: r.candidateDegreeMax,
+            maxFanOut: r.maxFanOut,
+            budget: r.budget,
+        };
+    });
+    /** Depth follows the last Expand while that is the newest step, so it counts as changed only outside it. */
+    readonly changed = computed(() =>
+        changedGroups(this.filterValues()).filter((g) => g !== 'depth' || this.lastExpand() === null),
+    );
+    isChanged(g: FilterGroupId): boolean {
+        return this.changed().includes(g);
+    }
+
+    /** Put one group back on its defaults (the pack presets apply again). */
+    resetGroup(g: FilterGroupId): void {
+        const fields: readonly string[] = FILTER_GROUP_FIELDS[g];
+        const defaults = (keys: (keyof FilterValues)[]) =>
+            Object.fromEntries(keys.filter((k) => fields.includes(k)).map((k) => [k, FILTER_DEFAULTS[k]]));
+        this.form.patchValue(defaults(['direction', 'degrees', 'hold', 'threshold']));
+        this.rung.patchValue({
+            ...defaults(['window', 'minEvents', 'minDistinctDays', 'candidateDegreeMin', 'candidateDegreeMax', 'maxFanOut', 'budget']),
+            ...(fields.includes('typedKinds') ? { linkKinds: '' } : {}),
+        });
+        if (fields.includes('window')) this.override.reset();
+        if (fields.includes('kinds')) this.kinds.set(null);
+        this.publish();
+        this.refresh();
+    }
+
+    /** Set once the remembered filter is restored: a publish before that would overwrite it with the defaults. */
+    private ready = false;
+
+    private resetForOther(): void {
+        for (const g of Object.keys(FILTER_GROUP_FIELDS) as FilterGroupId[]) if (g !== 'depth') this.resetGroup(g);
+    }
+
+    resetAll(): void {
+        for (const g of this.changed()) this.resetGroup(g);
+    }
+
+    setFrom(value: unknown): void {
+        this.form.controls.from.setValue(value as ExpandFrom);
+    }
+
+    setDirection(value: unknown): void {
+        this.form.controls.direction.setValue(value as GrowDirection);
+    }
+
+    /** A time chip; a "last N days" chip reads the Dataset's latest event once when no end is known yet. */
+    async setWindow(value: FilterWindow): Promise<void> {
+        this.rung.controls.window.setValue(value);
+        if (QUICK_WINDOW_DAYS[value] === undefined || this.windowEnd() || !this.inv$) return;
+        this.endLoading.set(true);
+        try {
+            await this.inv$.loadLatestEvent();
+        } finally {
+            this.endLoading.set(false);
+        }
+        this.publish();
+        this.refresh();
+    }
+
+    /**
+     * Hand the filter to the store: what the canvas expands with, and what the tab shows again after it was closed. Only
+     * the Investigation tab's form is the filter; the explorer's popup keeps its own choice.
+     */
+    private publish(): void {
+        if (!this.embedded() || !this.ready) return;
+        this.store.filterRequest.set(this.request());
+        this.store.filterSnapshot.set({
+            form: this.form.getRawValue(),
+            rung: this.rung.getRawValue(),
+            override: this.override.getRawValue(),
+            kinds: this.kinds(),
+        } satisfies FilterSnapshot);
+    }
+
+    /** Take the filter back from the store (the tab was closed and is shown again); From follows the selection. */
+    private restore(): void {
+        const snap = this.store.filterSnapshot() as FilterSnapshot | null;
+        if (!snap || !this.embedded()) return;
+        const { from: _from, ...form } = snap.form;
+        this.form.patchValue(form, { emitEvent: false });
+        this.rung.patchValue(snap.rung, { emitEvent: false });
+        this.override.patchValue(snap.override, { emitEvent: false });
+        this.kinds.set(snap.kinds);
+        this.formValue.set(this.form.getRawValue());
+        this.rungValue.set(this.rung.getRawValue());
+        this.syncDegrees(); // Degrees follows the last Expand over what was remembered
+    }
+
     readonly timeSummary = computed(() => {
         const w = this.rungValue().window;
-        return this.windowOptions.find((o) => o.value === w)?.label ?? '';
+        const label = this.windowOptions.find((o) => o.value === w)?.label ?? '';
+        return QUICK_WINDOW_DAYS[w] !== undefined ? `Last ${label}` : label;
     });
     /** "Busy over 50 links · 20 per entity · 5,000 rows". */
     readonly limitsSummary = computed(() => {
@@ -559,11 +806,11 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         const parts = [f.hold ? `Busy over ${this.thresholdLabel()} links` : 'Busy expanded through'];
         if (this.inv()) {
             const v = this.rungValue();
+            const fan = whole(v.maxFanOut) ?? this.presets().maxFanOut ?? null;
+            if (fan !== null) parts.push(`${fan.toLocaleString('en-GB')} per entity`);
             const lo = whole(v.candidateDegreeMin);
             const hi = whole(v.candidateDegreeMax);
             if (lo !== null || hi !== null) parts.push(`neighbours with ${lo ?? 0}–${hi ?? 'any'} links`);
-            const fan = whole(v.maxFanOut);
-            if (fan !== null) parts.push(`${fan.toLocaleString('en-GB')} per entity`);
             const budget = whole(v.budget);
             if (budget !== null) parts.push(`${budget.toLocaleString('en-GB')} rows`);
         }
@@ -574,10 +821,16 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
     focus(): void {
         const el = this.host.nativeElement;
         el.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
-        el.querySelector<HTMLElement>('[data-testid="la-expand-from"] button, [role="spinbutton"]')?.focus();
+        el.querySelector<HTMLElement>('[data-testid="la-expand-go"]')?.focus();
     }
 
     ngOnInit(): void {
+        this.restore();
+        this.ready = true;
+        merge(this.form.valueChanges, this.rung.valueChanges, this.override.valueChanges)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.publish());
+        this.publish();
         this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.formValue.set(this.form.getRawValue()));
         this.rung.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.rungValue.set(this.rung.getRawValue()));
         this.override.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.rungValue.set(this.rung.getRawValue()));
@@ -619,6 +872,7 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             this.syncDegrees();
         }
         this.formValue.set(this.form.getRawValue());
+        this.publish();
         if (this.embedded()) this.startChanged.next();
         else if (this.previewKey() !== this.previewedKey) this.refresh();
     }
@@ -631,12 +885,13 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         if (last === null) return;
         this.form.controls.degrees.setValue(Math.min(last, Math.max(1, this.ctx().maxDegree)), { emitEvent: false });
         this.formValue.set(this.form.getRawValue());
+        this.publish(); // a double-click walks the Degrees the tab shows
     }
 
     /** The Advanced read settings as the server takes them; `{}` on the explorer graph. */
     private advancedRung(): ExpandRung {
         if (this.ctx().mode !== 'investigation') return {};
-        const { direction: _d, ...r } = rungOf(this.rung, this.override);
+        const { direction: _d, ...r } = rungOf(this.rung, this.override, this.windowEnd());
         return r;
     }
 
@@ -676,6 +931,7 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         const cur = this.kinds() ?? all;
         const next = on ? [...new Set([...cur, k])] : cur.filter((x) => x !== k);
         this.kinds.set(next.length === all.length ? null : next);
+        this.publish();
         this.refresh();
     }
 
@@ -693,6 +949,14 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         if (this.goWhyNot()) return;
         this.expand.emit({ ctx: this.active(), req: this.request(), from: this.formValue().from });
     }
+}
+
+/** The form's raw values as the store keeps them between showings of the tab. */
+interface FilterSnapshot {
+    form: ReturnType<LinkAnalysisExpandComponent['form']['getRawValue']>;
+    rung: ReturnType<LinkAnalysisExpandComponent['rung']['getRawValue']>;
+    override: ReturnType<LinkAnalysisExpandComponent['override']['getRawValue']>;
+    kinds: string[] | null;
 }
 
 /** A typed whole number, or null for a blank or non-number field (the fold summaries say only what is set). */

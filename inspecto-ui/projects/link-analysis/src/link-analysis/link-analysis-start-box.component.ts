@@ -647,6 +647,12 @@ export class LinkAnalysisStartBoxComponent {
             : 'Draws them and their links. Busy entities are held; Expand… goes further.';
     });
 
+    /** LA-INVESTIGATE-UX-1 "Investigate this" on a node: a fresh form starting from that one entity. */
+    prefillEntity(value: string): void {
+        this.resetNew();
+        this.form.controls.value.setValue(value);
+    }
+
     /** Each File ▸ New starts fresh: the start inputs are cleared (the form stays mounted while an Investigation is open). */
     resetNew(): void {
         const c = this.form.controls;

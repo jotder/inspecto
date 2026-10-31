@@ -9,6 +9,7 @@ import {
     InvService,
     InvestigationDetailsChange,
     InvestigationLog,
+    InvestigationLogEntry,
     InvestigationOpRequest,
     InvestigationReplayResult,
     InvestigationStepResult,
@@ -20,6 +21,7 @@ import {
     effectiveOpSteps,
     entityListErrorMessage,
     investigationErrorMessage,
+    redoRequest,
     stepName,
     truncatedSteps,
     workingSetToGraph,
@@ -35,7 +37,6 @@ import {
     degreeOutcome,
     degreeOutcomesFromLog,
     hubBadgeText,
-    oneHopFrom,
     degreeState,
     hubContactsFromRows,
     investigationTitle,
@@ -470,8 +471,10 @@ export class InvestigationSessionStore {
         this.degreeOutcomes.set([]);
         this.hubContacts.set(new Map());
         this.windowEnd.set(null);
+        this.latestEvent.set(null);
         this.lastOverride.set(null);
         this.addingStart.set(false);
+        this.undone.set([]);
     }
 
     /** Stop remembering an id (e.g. one the server no longer answers for). Nothing is deleted server-side. */
@@ -758,6 +761,22 @@ export class InvestigationSessionStore {
      * created here. Null = unknown, and then no window is sent ("all available data") — never "today".
      */
     readonly windowEnd = signal<string | null>(null);
+    /**
+     * LA-INVESTIGATE-UX-1: the bound Dataset's latest event time, read once on demand — the end of the Expand filter's
+     * "last 7 / 30 / 90 days" chips when no preset window end is known. Null = not read yet, or not readable.
+     */
+    readonly latestEvent = signal<string | null>(null);
+
+    /** Read {@link latestEvent} (once per open Investigation); the preset window end serves when it is known. */
+    async loadLatestEvent(): Promise<string | null> {
+        const known = this.windowEnd() ?? this.latestEvent();
+        const timeCol = this.header()?.timeCol;
+        if (known || !timeCol) return known;
+        const id = this.activeId();
+        const end = await this.latestTime(timeCol);
+        if (end && this.activeId() === id) this.latestEvent.set(end);
+        return end;
+    }
 
     /**
      * "Investigate a number": create the Investigation, seed the id, then expand `degrees` degrees with the presets.
@@ -911,8 +930,20 @@ export class InvestigationSessionStore {
         return { ...op, expandHubs: [...hubs].sort(), ...(only && !op.only ? { only: include } : {}) };
     }
 
-    /** Append one op, then re-read the log and the Working Set. */
-    async apply(request: InvestigationOpRequest): Promise<boolean> {
+    /**
+     * LA-INVESTIGATE-UX-1: the steps this browser undid, newest last. Redo records the newest again; any other new step,
+     * opening another Investigation or Draft, or closing clears them.
+     */
+    readonly undone = signal<InvestigationLogEntry[]>([]);
+    readonly canRedo = computed(() => {
+        const e = this.undone().at(-1);
+        return !!e && redoRequest(e) !== null;
+    });
+    /** What Redo would record again, for its tooltip ("Redo: Hide"). */
+    readonly redoName = computed(() => stepName(this.undone().at(-1)?.op));
+
+    /** Append one op, then re-read the log and the Working Set. `redo` keeps the undone stack (Redo appends through here). */
+    async apply(request: InvestigationOpRequest, redo = false): Promise<boolean> {
         const op = this.scoped(request);
         const id = this.activeId();
         if (!id) return false;
@@ -930,10 +961,24 @@ export class InvestigationSessionStore {
                 );
                 this.lastStep.set(step);
                 this.noteHubs(step);
+                if (!redo) this.undone.set([]);
                 await this.refresh(id);
             },
             message,
         );
+    }
+
+    /**
+     * Redo: record the newest undone step again, through {@link apply} — four-eyes, budgets, masking and access checks
+     * apply as they did the first time (an expand over the thresholds is held again).
+     */
+    async redo(): Promise<boolean> {
+        const entry = this.undone().at(-1);
+        const request = entry && redoRequest(entry);
+        if (!request) return false;
+        const ok = await this.apply(request, true);
+        if (ok) this.undone.update((u) => u.slice(0, -1));
+        return ok;
     }
 
     /**
@@ -944,6 +989,7 @@ export class InvestigationSessionStore {
     async undo(undoes?: number): Promise<boolean> {
         const id = this.activeId();
         if (!id) return false;
+        const target = this.log()?.entries.find((e) => e.step === (undoes ?? this.undoTarget()));
         const done = await this.run('Undo failed.', async () => {
             const draft = this.activeDraftId();
             this.lastStep.set(
@@ -951,6 +997,7 @@ export class InvestigationSessionStore {
                     draft ? this.inv.undoDraft(id, draft, undoes) : this.inv.undoInvestigation(id, undoes),
                 ),
             );
+            if (target) this.undone.update((u) => [...u, target]);
             await this.refresh(id);
         });
         if (!done && undoes != null && this.activeId() === id) await this.refresh(id).catch(() => undefined);
@@ -966,6 +1013,7 @@ export class InvestigationSessionStore {
             const loaded = await this.load(id, draftId);
             if (this.activeId() !== id) return;
             this.activeDraftId.set(draftId);
+            this.undone.set([]);
             this.lastStep.set(null);
             this.replayResult.set(null);
             this.commit(loaded);
@@ -1084,14 +1132,6 @@ export class InvestigationSessionStore {
     }
 
     private rebuildOutcomes = false;
-
-    /** A held expand from the panel is one hop from what it named — never the ladder's next degree. */
-    markOneHop(requestId: string, ids: readonly string[] | undefined): void {
-        const oneHop = oneHopFrom(ids);
-        this.degreeOutcomes.update((all) =>
-            all.map((o) => (o.awaitingApproval === requestId && !o.override ? { ...o, oneHop } : o)),
-        );
-    }
 
     /** Remember the sealed contact counts a step's read answered for its flagged entities. */
     private noteHubs(step: InvestigationStepResult | null | undefined): void {

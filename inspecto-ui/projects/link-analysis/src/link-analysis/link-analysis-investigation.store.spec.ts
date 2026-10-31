@@ -196,6 +196,48 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.canvas()?.nodes).toEqual([]);
     });
 
+    it('LA-INVESTIGATE-UX-1: Redo records the undone step again with its sealed params; a new step clears it', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1'].entries.push(
+            entry(1, { op: 'seed', params: { ids: ['4471'] } }),
+            entry(2, { op: 'expand', params: { ids: ['4471'], direction: 'out', budget: 500, window: null, maxFanOut: null } }),
+        );
+        sets['inv-1'] = ws(['4471']);
+        await store.open('inv-1');
+        expect(store.canRedo()).toBe(false);
+
+        inv.undoInvestigation.mockImplementation(() => {
+            logs['inv-1'].entries[1].undoneBy = 3;
+            logs['inv-1'].entries.push(entry(3, { kind: 'undo', undoes: 2 }));
+            return of(step(3, 'undo'));
+        });
+        expect(await store.undo(2)).toBe(true);
+        expect(store.canRedo()).toBe(true);
+        expect(store.redoName()).toBe('Expand'); // the Redo tooltip names the step
+
+        inv.appendInvestigationOp.mockImplementation(() => {
+            logs['inv-1'].entries.push(entry(4, { op: 'expand', params: { ids: ['4471'] } }));
+            return of(step(4, 'expand'));
+        });
+        expect(await store.redo()).toBe(true);
+        // the same op and params as sealed, nulls left out (the server refuses some as typed)
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith('inv-1', {
+            op: 'expand',
+            ids: ['4471'],
+            direction: 'out',
+            budget: 500,
+        });
+        expect(store.canRedo()).toBe(false);
+
+        // undo again, then a NEW step: the undone one can no longer be redone
+        expect(await store.undo(4)).toBe(true);
+        expect(store.canRedo()).toBe(true);
+        inv.appendInvestigationOp.mockImplementation(() => of(step(6, 'keep')));
+        expect(await store.apply({ op: 'keep', ids: ['4471'] })).toBe(true);
+        expect(store.canRedo()).toBe(false);
+    });
+
     it('LA-GROW-EXCLUDE-UNDO-RACE-1: undo names its step; a 409 (a newer step by a team member) re-reads the log', async () => {
         const { store, inv, logs, sets } = setup();
         await store.start(P, 'warrant 7');

@@ -7,6 +7,7 @@ import type {
     WindowDay,
 } from '@inspecto/link-analysis/api/inv.service';
 import { laLimit } from './la-limits';
+import { FilterWindow, QUICK_WINDOW_DAYS, quickWindow } from './investigation-filter';
 
 /**
  * LA-SPA-OWED-SURFACES-1 — the client-side mirror of the server's expand rung and `window` op bounds
@@ -61,7 +62,7 @@ export function rungForm() {
         {
             budget: new FormControl<number | string | null>(null, { validators: [...int(1), maxBudget] }),
             direction: new FormControl<ExpandDirection>('either', { nonNullable: true }),
-            window: new FormControl<'inherit' | 'full' | 'override'>('inherit', { nonNullable: true }),
+            window: new FormControl<FilterWindow>('inherit', { nonNullable: true }),
             /** Comma-separated link kinds; blank = all kinds. */
             linkKinds: new FormControl('', { nonNullable: true, validators: maxKinds }),
             minEvents: new FormControl<number | string | null>(null, { validators: int(1) }),
@@ -75,8 +76,11 @@ export function rungForm() {
 }
 export type RungForm = ReturnType<typeof rungForm>;
 
-/** Only the fields the analyst set — an unset field keeps the server default (budget 1 000-ish, minEvents 1, …). */
-export function rungOf(f: RungForm, override?: WindowForm): ExpandRung {
+/**
+ * Only the fields the analyst set — an unset field keeps the server default (budget 1 000-ish, minEvents 1, …). A quick
+ * window chip (the last N days) is sent as the range up to `windowEnd`; with no known end it is left out (inherit).
+ */
+export function rungOf(f: RungForm, override?: WindowForm, windowEnd: string | null = null): ExpandRung {
     const v = f.getRawValue();
     const r: ExpandRung = {};
     for (const k of [
@@ -91,9 +95,13 @@ export function rungOf(f: RungForm, override?: WindowForm): ExpandRung {
         if (n !== null) r[k] = n;
     }
     if (v.direction !== 'either') r.direction = v.direction;
+    const days = QUICK_WINDOW_DAYS[v.window];
     if (v.window === 'override') {
         if (override) r.window = windowOf(override);
-    } else if (v.window !== 'inherit') r.window = v.window;
+    } else if (days !== undefined) {
+        const w = quickWindow(days, windowEnd);
+        if (w) r.window = w;
+    } else if (v.window === 'full') r.window = 'full';
     const kinds = parseKinds(v.linkKinds);
     if (kinds.length) r.linkKinds = kinds;
     return r;

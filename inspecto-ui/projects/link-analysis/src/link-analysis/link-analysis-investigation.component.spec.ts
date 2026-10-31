@@ -291,9 +291,13 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         // Mark this position sits behind More steps ▾ (§5.8 block 7)
         (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set('snapshot');
         fixture.detectChanges();
-        for (const label of ['Start', 'Expand all', 'Undo', 'Mark this position', 'Fork a Draft']) {
+        // LA-INVESTIGATE-UX-1: Undo / Redo and every Clean up press are writes too
+        for (const label of ['Mark this position', 'Fork a Draft']) {
             expect(button(label)?.disabled, label).toBe(true);
         }
+        // disabled but focusable (disabledInteractive), so the tooltip with the reason reaches everyone
+        for (const id of ['act-undo', 'act-redo', 'cleanup-leaves', 'cleanup-weak'])
+            expect(el.querySelector(`[data-testid="${id}"]`)!.getAttribute('aria-disabled'), id).toBe('true');
     });
 
     it('without the capability Start Investigation is disabled with the reason, and Enter in a field fires no write', async () => {
@@ -318,7 +322,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await openInv(store);
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
-        penEdit(fixture, penByLabel(el, 'Reason')!, 'because');
+        penEdit(fixture, penByLabel(el, 'Note')!, 'because');
         await fixture.whenStable();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
     });
@@ -338,13 +342,48 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(JSON.stringify(inv.appendInvestigationOp.mock.calls[0])).toContain('seen at the depot');
     });
 
-    it('with the capability the read-only note is absent and Seed is enabled', async () => {
+    it('with the capability the read-only note is absent and Undo is enabled', async () => {
         const { fixture, store, el, button } = create();
         await openInv(store);
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="investigation-read-only"]')).toBeNull();
-        expect(button('Start').disabled).toBe(false);
+        expect(el.querySelector('[data-testid="act-undo"]')!.getAttribute('aria-disabled')).not.toBe('true');
+        // 'a' is in the Working Set: its actions are on the canvas, and the tab says so instead of a Start button
+        expect(el.querySelector('[data-testid="selected-canvas-hint"]')?.textContent).toContain('right-click it');
+        expect(button('Start from it')).toBeUndefined();
+    });
+
+    it('LA-INVESTIGATE-UX-1: Clean up states its count and records ONE step per press; Exclude instead carries the reason', async () => {
+        const e = (id: string, hop: number, type: string | null = 'msisdn') => ({ id, type, hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
+        const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
+        const ws: WorkingSet = {
+            entities: [e('a', 0), e('b', 1), e('c', 2), e('d', 2, 'imei')],
+            links: [l('a', 'b'), l('b', 'c'), l('b', 'd')],
+            excluded: [],
+            hash: '',
+        };
+        const { fixture, store, el, inv } = create({ ws });
+        await openInv(store);
+        fixture.detectChanges();
+        const press = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement;
+        // c and d dangle (one pass: b keeps its links to them until they go)
+        expect(press('cleanup-leaves').textContent).toContain('Hide 2 dangling leaves');
+        expect(press('cleanup-weak').textContent).toContain('Hide 2 with fewer than 2 events');
+        expect(press('cleanup-type-imei').textContent).toContain('Hide 1 imei');
+        inv.appendInvestigationOp.mockClear?.();
+        press('cleanup-leaves').click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(1);
+        expect(inv.appendInvestigationOp.mock.calls[0]).toEqual(['inv-1', { op: 'hide', ids: ['c', 'd'] }]);
+
+        (el.querySelector('[data-testid="cleanup-exclude-instead"] input') as HTMLInputElement).click();
+        fixture.detectChanges();
+        expect(press('cleanup-type-imei').textContent).toContain('Exclude 1 imei');
+        press('cleanup-type-imei').click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp.mock.calls[1]).toEqual(['inv-1', { op: 'exclude', ids: ['d'], reason: 'Clean up: entity type imei' }]);
+        await expectNoA11yViolations(el.querySelector('[data-testid="act-cleanup"]') as HTMLElement);
     });
 
     it('nothing open and nothing queued: the page-projected New Investigation form shows, and no Open… button (File menu)', () => {
@@ -373,7 +412,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         );
     });
 
-    it('open Investigation: renders the ordered op log and refuses an exclusion without a reason', async () => {
+    it('open Investigation: renders the ordered op log (an exclusion asks its reason in the canvas Exclude… dialog)', async () => {
         const { fixture, store, el, inv, button } = create();
         await openInv(store);
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
@@ -384,12 +423,10 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(steps[0]).toContain('Seeded 1 entity: a.');
         expect(steps[1]).toContain('Expand'); // the step name, never the op id (X9)
         await expectNoA11yViolations(el);
-
-        button('Exclude').click();
-        fixture.detectChanges();
+        // LA-INVESTIGATE-UX-1: the tab no longer excludes; the reason is asked in LinkAnalysisExcludeDialog (its spec)
+        expect(penByLabel(el, 'Reason')).toBeNull();
+        expect(button('Exclude')).toBeUndefined();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
-        refresh(fixture);
-        expect(penError(penByLabel(el, 'Reason')!)).toContain('needs a reason');
     });
 
     it('re-order explains the fork on screen, then forks with the new order', async () => {
@@ -848,7 +885,8 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         await openInv(store);
         store.degreeOutcomes.set([]);
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 0 of 4');
+        // LA-INVESTIGATE-UX-1: the degree reached is on the one counts line
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· degree 0 of 4');
         expect(el.querySelector('[data-testid="expand-next-degree"]')).toBeNull(); // merged into the one Expand form
         store.degreeOutcomes.set([
             { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
@@ -861,7 +899,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
             ],
         });
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('Degree 4 of 4');
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· degree 4 of 4');
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Degree 4 reached');
         expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
             'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',
@@ -1006,7 +1044,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(first[1]['includeHubs']).toBeUndefined();
         store.degreeOutcomes.set([]); // the stub admitted nothing; clear it so the degree is not "blocked"
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” under Expand ▸ Limits');
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” under Fan-out and busy');
     });
     it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
         const { fixture, store, el } = create({ ws: HUB_WS });
@@ -1052,9 +1090,9 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(section.querySelector('#act-expand-title')!.textContent!.trim()).toBe('Expand');
         const form = section.querySelector('[data-testid="projected-expand"]')!;
         expect(form).not.toBeNull();
-        // ONE control: the degree reached sits above the form, and there is no separate "Expand next degree"
+        // ONE control: the degree reached (on the counts line) sits above the form, and there is no "Expand next degree"
         expect(section.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
-        const reached = section.querySelector('[data-testid="degree-label"]')!;
+        const reached = el.querySelector('[data-testid="degree-label"]')!;
         expect(reached.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         // the old "Expand…" opener is gone: the form is right here
         expect(el.querySelector('[data-testid="expand-dialog-open"]')).toBeNull();
@@ -1155,14 +1193,16 @@ describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (L
     const part = (el: HTMLElement, s: InvestigationSection) =>
         el.querySelector(`inspecto-link-analysis-investigation[data-section="${s}"]`) as HTMLElement;
 
-    it('draws the eight blocks in order with no fold, and keeps setup, governance and dock parts out of it', async () => {
+    it('draws the blocks in order, the rare ones folded, and keeps setup, governance and dock parts out of it', async () => {
         const { fixture, store, el } = create();
         await openInv(store);
         store.selected.set({ id: 'a', data: { label: 'a' } } as never);
         fixture.detectChanges();
         const panel = act(el);
-        expect(panel.querySelector('la-fold')).toBeNull();
-        const order = ['act-header', 'degrees', 'act-selected', 'act-step-groups', 'scope-list', 'act-links'].map(
+        // LA-INVESTIGATE-UX-1: Clean up and More steps are folds (More steps holds the steps, the scope list, Add start)
+        expect(Array.from(panel.querySelectorAll('la-fold')).map((f) => f.getAttribute('title'))).toEqual(['Clean up', 'More steps']);
+        expect(panel.querySelector('[data-testid="act-more"] [data-testid="act-step-groups"]')).not.toBeNull();
+        const order = ['act-header', 'act-counts', 'act-bar', 'degrees', 'act-cleanup', 'act-selected', 'act-step-groups', 'scope-list', 'act-add-start', 'act-links'].map(
             (id) => panel.querySelector(`[data-testid="${id}"]`),
         );
         expect(order.every(Boolean)).toBe(true);

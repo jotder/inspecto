@@ -7,6 +7,7 @@ import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { needsPermission } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
@@ -29,6 +30,8 @@ export interface ExcludeDialogData {
     canManageCategories: boolean;
     /** Why "From this Investigation only" cannot run (no write capability); empty = it can. */
     hereWhyNot: string;
+    /** LA-INVESTIGATE-UX-1: this Investigation's last reasons, newest first — one press fills the Reason. */
+    recentReasons?: string[];
 }
 
 export type ExcludeDialogResult =
@@ -55,6 +58,7 @@ const NOT_BLANK = /\S/;
         MatTooltipModule,
         InspectoOptionPickerComponent,
         PenFieldComponent,
+        ChipComponent,
     ],
     template: `
         <h2 mat-dialog-title [matTooltip]="'Exclusion: the ' + data.terms.nodes + ' leave the graph and their ' + data.terms.links + ' go with them'">
@@ -117,6 +121,16 @@ const NOT_BLANK = /\S/;
                 }
                 @if (needsReason()) {
                     <inspecto-pen-field label="Reason" formControlName="reason" [maxlength]="200" [error]="reasonError()"></inspecto-pen-field>
+                    @if (data.recentReasons?.length) {
+                        <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Recent reasons" data-testid="la-exclude-recent">
+                            <span class="text-secondary text-xs">Recent:</span>
+                            @for (r of data.recentReasons; track r) {
+                                <button type="button" class="la-reason" [attr.aria-pressed]="value().reason === r" (click)="useReason(r)">
+                                    <inspecto-chip [variant]="value().reason === r ? 'soft' : 'outline'" [tone]="value().reason === r ? 'primary' : 'neutral'">{{ r }}</inspecto-chip>
+                                </button>
+                            }
+                        </div>
+                    }
                 }
             </form>
         </mat-dialog-content>
@@ -124,6 +138,19 @@ const NOT_BLANK = /\S/;
             <button mat-button type="button" (click)="requestClose()">Cancel</button>
             <button mat-flat-button color="primary" type="button" data-testid="la-exclude-go" (click)="submit()">Exclude</button>
         </mat-dialog-actions>
+    `,
+    styles: `
+        .la-reason {
+            cursor: pointer;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            border-radius: 9999px;
+        }
+        .la-reason:focus-visible {
+            outline: 2px solid var(--gamma-primary);
+            outline-offset: 2px;
+        }
     `,
 })
 export class LinkAnalysisExcludeDialog {
@@ -156,7 +183,7 @@ export class LinkAnalysisExcludeDialog {
     });
     readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: this.form.controls.kind.value });
     private readonly submitted = signal(false);
-    private readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+    readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
 
     /** A local hide (Basic) records nothing, so it asks no reason; a recorded step and a list write do. */
     readonly needsReason = computed(() => this.data.mode === 'investigation' || this.kind() === 'list');
@@ -183,6 +210,11 @@ export class LinkAnalysisExcludeDialog {
             : '',
     );
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    useReason(reason: string): void {
+        this.form.controls.reason.setValue(reason);
+        this.form.controls.reason.markAsDirty();
+    }
 
     submit(): void {
         this.submitted.set(true);
