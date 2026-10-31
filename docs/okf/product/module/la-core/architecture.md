@@ -1221,8 +1221,29 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
   open) calls `LinkAnalysisStartBoxComponent.prefillEntity`. The selection bar's Exclude opens the same
   `LinkAnalysisExcludeDialog` as X (the `EntityListReasonDialog` path is gone), which offers
   `recentExcludeReasons(ws)` as chips.
+- **Unsaved Undo / Redo and Clean up (LA-INVESTIGATE-UX-2, as built 2026-10-31).** The unsaved history lives in
+  `LinkAnalysisComponent`: `unsavedHistory` is a `graph-history.ts` stack of `UnsavedCanvas` snapshots (steps, the
+  drawn Working Set, graph, expanded ids, held hubs); every unsaved change (Expand, a Degrees resize, Start from
+  selected, a Clean up) calls `commitUnsaved(before)` after it draws, and `undoUnsaved()` / `redoUnsaved()` restore a
+  snapshot through `InvestigationSessionStore.setUnsavedSteps` (`popUnsaved` is gone). They are offered only while the
+  canvas still shows the graph the newest change drew (`unsavedDrawn`), the start itself is never undone, and a new start
+  clears the stack. Ctrl+Z / Ctrl+Shift+Z reach them after the last change's own Undo; the tab's act bar is one
+  `#actBar` template stamped in both branches, its buttons emitting `unsavedUndo` / `unsavedRedo` while unsaved. The
+  drawn unsaved Working Set moved to `InvestigationSessionStore.unsavedWs`, so the tab's Clean up (one `#cleanupFold`
+  template) counts it and emits `unsavedCleanUp`; `cleanUpUnsaved` marks the entities `hidden` on that set and records
+  `UnsavedStep {kind: 'hide', ids, reason}`. This is exact without a server change because the evaluator's `hide` only
+  flags entities (they stay in the set, so later previews seeded with the whole set agree, and `mergeWorkingSets` keeps
+  the flag). Save replays it as `hide` + `annotate(reason)` with the ids mapped through `exploreAliases` and kept to the
+  replayed set; `unsavedOps` never sends it to `POST /inv/expand/preview`. ⚠ *Exclude instead* is disabled while unsaved:
+  an `exclude` keeps entities out of later expands, which the preview route (`UNSAVED_OPS = seed, expand`) cannot
+  evaluate, so the screen would draw what Save would not record.
+- **Pick neighbours… on the node menu (LA-INVESTIGATE-UX-2).** Shown for one Working Set entity on an Investigation's
+  canvas (`nodeMenuEntity`); it selects the node, sets `InvestigationSessionStore.neighboursRequested` and opens the
+  tab, whose Act instance opens and reads the list once `selectedInSet()[0]` is that id (the tab may not exist when the
+  menu is used, hence a store signal rather than a call).
 - Tests: `investigation-filter.spec.ts`, `investigation-cleanup.spec.ts`, the Redo case in
-  `link-analysis-investigation.store.spec.ts`, and the component specs of the tab, the Expand form and the Exclude dialog.
+  `link-analysis-investigation.store.spec.ts`, and the component specs of the tab, the Expand form and the Exclude dialog;
+  the `LA-INVESTIGATE-UX-2` cases in the store, tab, canvas and `unsaved-investigation` specs.
 
 ### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 

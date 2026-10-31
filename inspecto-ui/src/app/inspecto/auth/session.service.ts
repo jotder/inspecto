@@ -475,7 +475,7 @@ export class SessionService {
             })
             .pipe(catchError(() => of(null)))
             .subscribe((res) => {
-                this.onAuthLost();
+                this.onAuthLost(false);
                 if (res?.endSessionUrl && !this.oidc?.mock) {
                     this.redirect(res.endSessionUrl);
                     return;
@@ -499,15 +499,17 @@ export class SessionService {
      * navigated, so a user on an already-loaded pane whose refresh failed sat on a dead page while every
      * further call 401'd, re-tried the refresh and failed again. The `authGuard` only runs on the NEXT route
      * activation, so nothing else could catch it.
+     * `rememberPage` is false for a deliberate sign-out: the next sign-in on this tab (possibly another user)
+     * must not be sent back to the page the last user left.
      */
-    onAuthLost(): void {
+    onAuthLost(rememberPage = true): void {
         writeResumable(false);
         this.accessToken.set(null);
         this.authenticated.set(false);
         this.actor.set(null);
         this.subjectDisplayName.set(null);
         this.capabilities.set([]);
-        recordReturnUrl(this.router.url);
+        if (rememberPage) recordReturnUrl(this.router.url);
         if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
 

@@ -156,6 +156,8 @@ export class InvestigationSessionStore {
      * and the ordered steps taken; null = none. Nothing of it is on the server until {@link saveUnsaved}.
      */
     readonly unsaved = signal<UnsavedInvestigation | null>(null);
+    /** LA-INVESTIGATE-UX-2: the unsaved Working Set the canvas draws (the server's preview, hides marked); Clean up counts it. */
+    readonly unsavedWs = signal<WorkingSet | null>(null);
     /** "Add start entities…" is open on the open Investigation: the tab shows the start form in add mode. */
     readonly addingStart = signal(false);
 
@@ -175,7 +177,9 @@ export class InvestigationSessionStore {
         return steps.flatMap((s): InvestigationOpRequest[] =>
             s.kind === 'seed'
                 ? [{ op: 'seed', ids: s.ids, ...(s.entityType ? { entityType: s.entityType } : {}) }]
-                : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
+                : s.kind === 'hide'
+                  ? [] // the preview takes seeds and expands only; a hide only marks entities
+                  : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
         );
     }
 
@@ -199,9 +203,9 @@ export class InvestigationSessionStore {
         );
     }
 
-    /** Drop the newest unsaved step (the canvas Undo reversed it). */
-    popUnsaved(): void {
-        this.unsaved.update((u) => (u ? { ...u, steps: u.steps.slice(0, -1) } : u));
+    /** LA-INVESTIGATE-UX-2: the unsaved steps become these (the canvas Undo or Redo restored them); nothing happens without unsaved work. */
+    setUnsavedSteps(steps: readonly UnsavedStep[]): void {
+        this.unsaved.update((u) => (u ? { ...u, steps: [...steps] } : u));
     }
 
     /** LA-DEGREES-TRIM-1: the newest unsaved step becomes this one (Degrees resized it); nothing happens without unsaved work. */
@@ -216,6 +220,7 @@ export class InvestigationSessionStore {
 
     discardUnsaved(): void {
         this.unsaved.set(null);
+        this.unsavedWs.set(null);
     }
 
     /**
@@ -239,13 +244,19 @@ export class InvestigationSessionStore {
         );
         if (!created) return { created: false, recorded: 0, message: this.error() };
         this.unsaved.set(null);
+        this.unsavedWs.set(null);
         this.windowEnd.set(b.windowEnd ?? null);
         const id = this.activeId();
         /** Server steps recorded so far: a seed is one, an Expand one per degree. */
         let recorded = 0;
         for (let i = 0; i < u.steps.length; i++) {
             const step = u.steps[i];
-            const r = step.kind === 'seed' ? await this.replaySeed(step) : await this.replayExpand(step, b);
+            const r =
+                step.kind === 'seed'
+                    ? await this.replaySeed(step)
+                    : step.kind === 'hide'
+                      ? await this.replayHide(step)
+                      : await this.replayExpand(step, b);
             recorded += r.recorded;
             if (this.activeId() !== id) return { created: true, recorded, message: '' };
             if (r.ok === 'held') {
@@ -266,6 +277,21 @@ export class InvestigationSessionStore {
         const ok = await this.apply({ op: 'seed', ids: step.ids, ...(step.entityType ? { entityType: step.entityType } : {}) });
         if (ok) this.showWorkingSet.set(true);
         return { ok, recorded: ok ? 1 : 0 };
+    }
+
+    /**
+     * LA-INVESTIGATE-UX-2: an unsaved Clean up, as the saved one records it — a `hide`, then an `annotate` with the reason.
+     * The ids are spoken in this Investigation's own (`exploreAliases`) and kept to what its Working Set holds.
+     */
+    private async replayHide(step: Extract<UnsavedStep, { kind: 'hide' }>): Promise<{ ok: boolean; recorded: number }> {
+        const ws = this.workingSet();
+        const back = new Map(Object.entries(ws?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
+        const held = new Set((ws?.entities ?? []).map((e) => e.id));
+        const ids = [...new Set(step.ids.map((v) => back.get(v) ?? v))].filter((id) => held.has(id));
+        if (!ids.length) return { ok: true, recorded: 0 };
+        if (!(await this.apply({ op: 'hide', ids }))) return { ok: false, recorded: 0 };
+        const noted = await this.apply({ op: 'annotate', ids, note: step.reason });
+        return { ok: noted, recorded: noted ? 2 : 1 };
     }
 
     /** The server Working Set's outer ring, as "Expand next degree" reads it (held hubs only when Hold is off). */
@@ -459,6 +485,7 @@ export class InvestigationSessionStore {
 
     /** Leave the open Investigation (it stays remembered). */
     close(): void {
+        this.neighboursRequested.set(null);
         this.activeId.set(null);
         this.activeDraftId.set(null);
         this.draftBaseStep.set(0);
@@ -665,6 +692,12 @@ export class InvestigationSessionStore {
         loading: boolean;
         error: string;
     } | null>(null);
+
+    /**
+     * LA-INVESTIGATE-UX-2: *Pick neighbours…* on the canvas node menu — the Working Set id whose list the Investigation
+     * tab opens once it shows that entity selected (the tab may not exist yet when the menu is used); null = none asked.
+     */
+    readonly neighboursRequested = signal<string | null>(null);
 
     async loadNeighbours(value: string): Promise<void> {
         this.neighbours.set({ of: value, rows: [], total: 0, hasMore: false, loading: true, error: '' });

@@ -294,6 +294,11 @@ still shows in the browser console, which a page cannot suppress) and lays Featu
 
 The layout was checked live 2026-10-17. What remains of `ANOMALY-UI-FINDINGS-1` is a live check of the sign-in return path under a real token lapse / 401.
 
+Sign-in return path (2026-10-31): only a LOST session records the page to return to (the route guard, a failed
+refresh, an unexpected 401). A deliberate sign-out does not: `SessionService.logout()` calls `onAuthLost(false)`, so
+the next sign-in on that tab, possibly by another user, lands on the default page and not on the page the last
+user left. Pinned in `session.service.spec.ts`.
+
 ## Decisions (operator, 2026-10-10)
 
 D-AD1 names (Anomaly Model / Anomaly Score / Feature / Peer Group) · D-AD2 robust z + seasonality + peers,

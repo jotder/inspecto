@@ -174,10 +174,12 @@ class TelcoRaGoldenTest {
         for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
             assertEquals(List.of(), rows(dataDir, control + "_findings",
                     "ITEM_KEY WHERE FINDING = 'leakage' AND LEAKAGE_AMOUNT IS NULL"), control);
-        // money stays DECIMAL end to end, so a tolerance compares exact cents, never float noise
-        for (String control : List.of("ra_rerating", "ra_rollforward", "ra_settlement"))
-            for (String t : rows(dataDir, control + "_findings", "DISTINCT typeof(LEAKAGE_AMOUNT)"))
-                assertTrue(t.startsWith("DECIMAL"), control + " LEAKAGE_AMOUNT is " + t);
+        // money stays DECIMAL end to end, so a tolerance compares exact cents, never float noise; the width is pinned
+        // because DuckDB 2.0 widens each + / - of two DECIMAL(18,s) by one digit (ra_rollforward's five terms: 22)
+        for (Map.Entry<String, String> e : Map.of("ra_rerating", "DECIMAL(38,4)", "ra_rollforward", "DECIMAL(18,4)",
+                "ra_settlement", "DECIMAL(38,4)").entrySet())
+            assertEquals(List.of(e.getValue()), rows(dataDir, e.getKey() + "_findings", "DISTINCT typeof(LEAKAGE_AMOUNT)"),
+                    e.getKey() + " LEAKAGE_AMOUNT type");
         assertEquals(List.of("45.0000", "90.0000"), rows(dataDir, "ra_settlement_findings",
                 "CAST(LEAKAGE_AMOUNT AS VARCHAR) WHERE REASON = 'unknown_partner' ORDER BY LEAKAGE_AMOUNT"),
                 "an unknown partner's whole billed total is the leakage, every line of it");
