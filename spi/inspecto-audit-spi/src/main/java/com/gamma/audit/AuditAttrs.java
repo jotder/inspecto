@@ -25,6 +25,10 @@ public final class AuditAttrs {
     public static final String ACTOR = "actor";
     /** Actor kind: {@code user}, {@code system}, {@code api_key}, … (defaults to {@code user}). */
     public static final String ACTOR_TYPE = "actor_type";
+    /** For a machine actor ({@code actor_type: service}, actor {@code client:<client id>}): the token's {@code sub},
+     *  which on Keycloak is the service-account user's UUID. Absent for a person, whose actor is the {@code sub}. Not
+     *  named {@code token_*}: {@code SecretScrubber} redacts every attribute whose key says token. */
+    public static final String IDP_SUBJECT = "idp_subject";
 
     // ── action (what) ─────────────────────────────────────────────────────────────
     /** Dotted action name, e.g. {@code pipeline.deleted}, {@code config.written}, {@code access.denied}. */
@@ -90,7 +94,7 @@ public final class AuditAttrs {
      * without landing here too.
      */
     public static final java.util.List<String> ALL = java.util.List.of(
-            ACTOR, ACTOR_TYPE, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
+            ACTOR, ACTOR_TYPE, IDP_SUBJECT, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
             IP, GEO_COUNTRY, GEO_DB_BUILD, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY,
             AUDIT_SEQ, AUDIT_PREV_HASH, AUDIT_HASH, AUDIT_UNLINKED);
 }

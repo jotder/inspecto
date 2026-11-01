@@ -50,21 +50,41 @@ calendar assigns a cycle to the version in force on its last day. Keep `cycle` c
 `tolerance_type` is `pct` or `abs`; `fx_rate_type` selects which `fx_rate` rows convert; `fx_date_rule` is `usage_date` or
 `period_end`.
 
+## Apply the dispute governance (once per Space)
+
+A Space Template carries no Workflow, SLA Policy or Escalation Rule (decision PS-O5: they are governance, written only through their
+`canAdminister` routes, and every import refuses them). The Case Rule and the Alert Rules ship and work without them, on the built-in
+CASE workflow. To get the dispute states, an administrator posts the three bodies in `config/governance/` of the new Space:
+
+```
+POST /api/v1/components/workflow          ← config/governance/case-workflow.json
+POST /api/v1/components/sla-policy        ← config/governance/case-sla-policy.json
+POST /api/v1/components/escalation-rule   ← config/governance/case-escalation-age.json
+```
+
+⚠ The workflow is the Space's ONE CASE workflow: every Case of the Space follows it. It keeps every built-in state and move, so other
+Cases still work; check for an existing authored CASE workflow first (`GET /api/v1/workflows/{type}` for the Case type) and merge rather than replace.
+The SLA targets and the escalation age are illustrative: set your own. With an Approval Policy on these kinds the save is held for a
+checker (`202 pending`).
+
 ## Tuning and as-of
 
-There are no thresholds in the SQL. `ps_calendar`, `ps_expected` and `ps_rollforward` read the Job parameter `as_of` (default today); pass the same
-date to all three to reproduce a past day (the roll-forward has a row for every month up to the `as_of` month). Reconciliations read one day: run `ps_voice` and `ps_sms` per day when catching up.
+There are no thresholds in the SQL. `ps_calendar`, `ps_expected` and `ps_rollforward` read the Job parameter `as_of` (default today); `ps_dispute` reads it too, with `window_alert_days` (default 5): the lead time before `dispute_window_end` at which
+`ps_dispute_window` raises its reminder. Pass the same
+date to all four to reproduce a past day (the roll-forward has a row for every month up to the `as_of` month). Reconciliations read one day: run `ps_voice` and `ps_sms` per day when catching up.
 
 ## Verify
 
 - `GET /api/v1/jobs` lists the chain Jobs `ps_calendar`, `ps_statement_current`, `ps_statement_findings`, `ps_expected`, `ps_billed`,
-  `ps_findings`, `ps_movement`, `ps_position`, `ps_rollforward` and the Jobs `ps_voice`, `ps_sms`.
+  `ps_findings`, `ps_dispute`, `ps_movement`, `ps_position`, `ps_rollforward`, the Jobs `ps_voice`, `ps_sms` and the Case Rule Job
+  `ps_dispute_case`; `GET /api/v1/cases/rules` lists `ps_dispute_case` (loaded from `config/ops/`).
 - After the first run the Dataset `settlement_calendar` has the closed cycles with business-day due dates.
-- The golden tests are `PartnerSettlementPackGoldenTest`, `PartnerSettlementPositionGoldenTest`, `PartnerSettlementReferenceTest`, `PartnerSettlementSeedTest` and
-  `PartnerSettlementCorpusTest` in module `inspecto-reconciliation`.
+- The golden tests are `PartnerSettlementPackGoldenTest`, `PartnerSettlementPositionGoldenTest`, `PartnerSettlementDisputeGoldenTest`,
+  `PartnerSettlementReferenceTest`, `PartnerSettlementSeedTest` and `PartnerSettlementCorpusTest` in module `inspecto-reconciliation`, and
+  `PartnerSettlementDisputeCaseTest` in module `inspecto-case-management`.
 
 ## Safety
 
 The pack publishes nothing, posts no payment or ledger entry and fetches no rate. Amounts are classified `CONFIDENTIAL`; no personal
-data is held (partners are organisations). The Alert Rule and Reconciliations need the edition's Alert Rule and Reconciliation
+data is held (partners are organisations). The Alert Rules and Reconciliations need the edition's Alert Rule and Reconciliation
 capabilities to author, as for any Space.

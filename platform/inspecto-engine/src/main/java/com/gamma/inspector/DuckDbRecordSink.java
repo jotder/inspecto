@@ -118,7 +118,7 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
             List<String> partCols = pd.isEmpty()
                     ? List.of("year", "month", "day")
                     : PartitionDef.columnNames(pd);
-            String dbDir = Paths.get(cfg.dirs().database(), key).toString();
+            String dbDir = com.gamma.config.safety.PathJail.childOf(cfg.dirs().database(), key);
             segs.put(key, new Seg(key, schema, partCols, dbDir));
         }
     }

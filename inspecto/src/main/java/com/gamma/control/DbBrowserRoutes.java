@@ -361,6 +361,8 @@ final class DbBrowserRoutes implements RouteModule {
      */
     private static Optional<Path> pipelineDatabaseDir(ApiContext api, String storeName) {
         return HostContext.of(api).service().configFor(storeName)
+                // an object-store database is not browsable from here (no local directory to walk)
+                .filter(cfg -> !com.gamma.config.safety.PathJail.isUri(cfg.dirs().database()))
                 .map(cfg -> Path.of(cfg.dirs().database()).toAbsolutePath().normalize())
                 .filter(Files::isDirectory);
     }

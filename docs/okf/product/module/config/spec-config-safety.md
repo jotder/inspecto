@@ -191,9 +191,22 @@ local `s3:` directory — see `PathJail.isUri`), so an object-store location has
   `requireObjectStore`; every other `dirs.*` (and every other path key) keeps the flat "is a URI" refusal.
   `PartitionWriter.writeToObjectStore` re-checks the same rule before any I/O, so a caller that skipped the
   gate still cannot COPY outside an allowed prefix.
-* ⚠ **Accepted at the gate is not yet written by a run:** `ConsignmentIngestStrategy.configure` refuses a URI
-  `dirs.database` by name — the ingest lane has no credentials route and its sealed connection has external
-  access off. That wiring is the rest of the row. Call (BACKLOG §1; **ASSISTANT-DECIDED under operator delegation 2026-10-18; CONFIRMED 2026-10-20 (operator, accepted the recommended answer).** server list only, no per-Space key): whether a Space may narrow the
+* **The Connection it writes through, `output.connection` (2026-11-01).** An `s3://` `dirs.database` must name the `s3` Connection
+  that reaches it, and a local one may not name any (`ConfigSafetyValidator.checkOutputConnection`, 422 on
+  `output.connection`). The pipeline stores an id, never a secret; whether the id is registered is checked
+  where the run resolves it (`ObjectStoreDatabase`, module.engine `spec-output-sinks.md` § *Object-store `dirs.database`*).
+* **The run's seal admits the prefix alone.** `SqlSandbox.sealAllowing(conn, dirs, files, objectPrefixes)` adds
+  each contained prefix to DuckDB's `allowed_directories` (with a trailing `/`, which is redundant: removing it
+  left every test green, because DuckDB treats each entry as a directory itself). Measured on DuckDB 2.0.0.0
+  against MinIO with external access off: under the prefix, COPY and reads work; `s3://b/pX`, another
+  prefix in the bucket, another bucket and any `http://` URL are refused with "file system operations are
+  disabled by configuration", before a dial. ⚠ DuckDB's check is **lexical**: `s3://b/p/../q` passes it, and
+  the store judges the key as written (MinIO 403; on AWS `..` is a literal key segment, so it stays under
+  the prefix). The DuckDB secret is also scoped to the prefix, so a request outside it is not signed — a
+  second, independent line: with the seal widened to the whole bucket (a mutant), the live test's
+  expression read outside the prefix still landed nothing, and only the seal test caught the mutant.
+* Previously (2026-10-18 → 2026-11-01) `ConsignmentIngestStrategy.configure` refused a URI `dirs.database`
+  by name; that refusal is gone. Call (BACKLOG §1; **ASSISTANT-DECIDED under operator delegation 2026-10-18; CONFIRMED 2026-10-20 (operator, accepted the recommended answer).** server list only, no per-Space key): whether a Space may narrow the
   server list to its own prefix.
 
 Pinned by `PathJailObjectStoreTest`, `ConfigSafetyValidatorTest.anAllowListedObjectStoreDatabaseDirIsAcceptedAndNothingElseIs`

@@ -32,6 +32,14 @@ class PathJailObjectStoreTest {
     }
 
     @Test
+    void childOfJoinsAUriWithASlashAndALocalDirWithThePlatformSeparator() {
+        assertEquals("s3://lake/space-a/db/orders", PathJail.childOf("s3://lake/space-a/db", "orders"));
+        assertEquals("s3://lake/space-a/db/orders", PathJail.childOf("s3://lake/space-a/db/", "orders"));
+        assertEquals(java.nio.file.Paths.get("local", "db", "orders").toString(),
+                PathJail.childOf(java.nio.file.Paths.get("local", "db").toString(), "orders"));
+    }
+
+    @Test
     void anEmptyAllowListRefusesEverything() {
         PathJail.requireObjectStore(ALLOW, "s3://lake/space-a/orders", "f");   // the probe that succeeds
         refused(List.of(), "s3://lake/space-a/orders");

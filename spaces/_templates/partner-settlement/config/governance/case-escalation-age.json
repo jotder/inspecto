@@ -1,0 +1,23 @@
+{
+  "id": "ps-dispute-not-sent",
+  "objectType": "CASE",
+  "on": "age",
+  "afterMinutes": 4320,
+  "notify": true,
+  "when": {
+    "kind": "group",
+    "op": "AND",
+    "items": [
+      {"kind": "condition", "field": "category", "operator": "=", "value": "partner-settlement"},
+      {
+        "kind": "group",
+        "op": "OR",
+        "items": [
+          {"kind": "condition", "field": "status", "operator": "=", "value": "OPEN"},
+          {"kind": "condition", "field": "status", "operator": "=", "value": "INVESTIGATING"},
+          {"kind": "condition", "field": "status", "operator": "=", "value": "ESCALATED"}
+        ]
+      }
+    ]
+  }
+}

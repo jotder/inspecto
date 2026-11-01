@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-372 test class(es): 372 unit, 0 real-HTTP control-plane, 0 IT.
+373 test class(es): 373 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -130,6 +130,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `MainAppMigrateConfigsArgsTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MainAppMigrateConfigsArgsTest.java` | 🔴 <b>CONFIG-MIGRATOR-LOSES-MAPPINGS-1 (b)</b> — {@code migrate-configs <config_root> --apply}, the form |
 | `MainAppPrepareInboxDirsTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MainAppPrepareInboxDirsTest.java` | {@code DATA-PATH-RESIDUALS-1} (b): the tar → inbox preparer reads its {@code dirs.*} ONLY through the engine |
 | `MultiCollectorProcessorTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MultiCollectorProcessorTest.java` | Tests for {@link MultiCollectorProcessor} — the multi-source orchestrator. <!-- vocab-allow: quoted Javadoc --> |
+| `ObjectStoreIngestTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/ObjectStoreIngestTest.java` | SCALEOUT-OBJSTORE-DATABASE-DIR-1: the ingest lane writes an allow-listed {@code s3://} {@code dirs.database} |
 | `OutputPerMemberEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputPerMemberEndToEndTest.java` | {@code processing.output_per_member} end to end through {@link CollectorProcessor#run} over the delimited-CSV |
 | `OutputPerMemberTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputPerMemberTest.java` | INGEST-MULTIFILE-BATCH-REPLAN-DUP-1 stage 2: {@code processing.output_per_member}. On, every member of a batch |
 | `OutputStemCollisionTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputStemCollisionTest.java` | INGEST-MULTIFILE-BATCH-REPLAN-DUP-1 stage 1 (operator decision D3, 2026-10-12): two members of ONE batch that |

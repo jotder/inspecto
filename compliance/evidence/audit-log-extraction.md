@@ -38,7 +38,7 @@ Beyond the common Event fields (`eventId`, `ts`, `timestamp`, `level`, `type`, `
 
 | Attribute | Meaning |
 |---|---|
-| `actor`, `actor_type` | who acted |
+| `actor`, `actor_type`, `idp_subject` | who acted (`actor_type` `service` = a machine token, actor `client:<client id>`; `idp_subject` = its IdP `sub`) |
 | `action`, `action_category` | what they did |
 | `target_type`, `target_id` | what they did it to |
 | `ip`, `user_agent` | where from |
@@ -53,7 +53,7 @@ CSV: the seven base columns plus one column per §2 attribute key, in the order 
 list against the constants so a new key cannot miss the export):
 
 ```
-timestamp,level,type,source,pipeline,correlationId,message,actor,actor_type,action,action_category,target_type,target_id,ip,user_agent,http_method,http_path,http_status,abac_action,policy
+timestamp,level,type,source,pipeline,correlationId,message,actor,actor_type,idp_subject,action,action_category,target_type,target_id,ip,user_agent,http_method,http_path,http_status,abac_action,policy
 ```
 
 An **unfiltered** CSV export keeps the seven-column operational-triage shape — attributes of mixed

@@ -177,7 +177,7 @@ public final class DrainCommand {
                 String segKey = segmented ? String.valueOf(node.cfg("table")) : "";
                 return writers.computeIfAbsent(segKey, k -> {
                     Map<String, Object> schema = segmented ? cfg.schemas().segments().get(k) : selection.schema();
-                    String dbDir = segmented ? Paths.get(cfg.dirs().database(), k).toString()
+                    String dbDir = segmented ? com.gamma.config.safety.PathJail.childOf(cfg.dirs().database(), k)
                                              : ConsignmentIngestStrategy.databaseDir(batch, cfg);
                     return new IngestSinkWriter(conn, cfg, ConsignmentIngestStrategy.partitionColumns(schema),
                             dbDir, baseName, batchId, srcIdToFile);

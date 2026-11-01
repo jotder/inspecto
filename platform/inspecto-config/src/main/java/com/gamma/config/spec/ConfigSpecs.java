@@ -429,6 +429,9 @@ public final class ConfigSpecs {
                 FieldSpec.of("output.filename_column", "Source filename column", FieldType.STRING,
                         "Adds a column of this name carrying each row's source file (B4); "
                                 + "blank = no column (lineage stays in the ledger only)."),
+                FieldSpec.of("output.connection", "Object-store Connection", FieldType.STRING,
+                        "Required when dirs.database is an s3:// location, and refused otherwise: the id of the "
+                                + "s3 Connection whose endpoint and credentials reach it. An id, never a secret."),
                 // DuckLake registration (DuckLakeRegistrar.registerOne). Optional: catalog_url, data_path and
                 // table become required only when enabled is true — ConfigSafetyValidator enforces that and
                 // jails data_path, so none is FieldSpec.required here. A sinks[] entry's own ducklake block

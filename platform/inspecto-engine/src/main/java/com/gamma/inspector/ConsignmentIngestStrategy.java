@@ -855,7 +855,7 @@ interface ConsignmentIngestStrategy {
     /** Output database dir for a batch: {@code dirs.database}, or a {@code table}-named subdir when set. */
     static String databaseDir(Consignment batch, PipelineConfig cfg) {
         return (batch.table() != null && !batch.table().isBlank())
-                ? Paths.get(cfg.dirs().database(), batch.table()).toString()
+                ? com.gamma.config.safety.PathJail.childOf(cfg.dirs().database(), batch.table())
                 : cfg.dirs().database();
     }
 
@@ -949,17 +949,13 @@ interface ConsignmentIngestStrategy {
                 DuckDbUtil.memoryLimit(cfg.duckdb().memoryLimit()),
                 scratchDir(cfg),
                 DuckDbUtil.globalOr(cfg.duckdb().maxTempDirectorySize(), DuckDbUtil.PROP_MAX_TEMP_DIRECTORY_SIZE));
-        // The one extension an ingest lane loads explicitly must be loaded BEFORE the seal: after it, LOAD
-        // is refused like any other file access. (An object-store dirs.database needs httpfs + a URL
-        // allowlist; it is refused at the write gate today, so it stays refused here too — fail closed.)
+        // The extensions an ingest lane loads explicitly must be loaded BEFORE the seal: after it, LOAD
+        // is refused like any other file access.
         if (cfg.xlsx() != null) com.gamma.etl.ExcelExtension.ensureLoaded(conn);
-        // The write gate now ACCEPTS an allow-listed s3:// dirs.database (SCALEOUT-OBJSTORE-DATABASE-DIR-1), but
-        // this lane has no credentials route and no URL seal yet — and Paths.get below would turn the URI into
-        // a local 's3:' directory on Linux. Refuse by name rather than mishandle it.
-        if (cfg.dirs() != null && com.gamma.config.safety.PathJail.isUri(cfg.dirs().database()))
-            throw new SQLException("refusing to ingest: dirs.database '" + cfg.dirs().database() + "' is an "
-                    + "object-store location, which the ingest lane does not write yet "
-                    + "(SCALEOUT-OBJSTORE-DATABASE-DIR-1)");
+        // SCALEOUT-OBJSTORE-DATABASE-DIR-1: an s3:// dirs.database gets httpfs, the output.connection's secret and
+        // its one prefix on the seal — or a named refusal.
+        List<String> objectPrefixes = cfg.dirs() != null && com.gamma.config.safety.PathJail.isUri(cfg.dirs().database())
+                ? List.of(ObjectStoreDatabase.prepare(conn, cfg)) : List.of();
         List<java.nio.file.Path> allowed = ingestAllowedDirs(cfg, inputs);
         for (java.nio.file.Path dir : allowed) {
             String why = forbiddenIngestDir(dir);
@@ -973,7 +969,7 @@ interface ConsignmentIngestStrategy {
             if (exposed != null)
                 throw new SQLException("refusing to ingest: " + exposed + " (processing.refusal)");
         }
-        com.gamma.sql.SqlSandbox.sealAllowing(conn, allowed);
+        com.gamma.sql.SqlSandbox.sealAllowing(conn, allowed, List.of(), objectPrefixes);
     }
 
     /**
@@ -997,8 +993,11 @@ interface ConsignmentIngestStrategy {
 
     static List<java.nio.file.Path> ingestAllowedDirs(PipelineConfig cfg, java.util.Collection<File> inputs) {
         java.util.LinkedHashSet<java.nio.file.Path> dirs = new java.util.LinkedHashSet<>();
+        // An object-store location is not a Path (Linux would read it as a local 's3:' dir): configure admits it
+        // on the seal as a prefix of its own.
         java.util.function.Consumer<String> add = d -> {
-            if (d != null && !d.isBlank()) dirs.add(Paths.get(d).toAbsolutePath().normalize());
+            if (d != null && !d.isBlank() && !com.gamma.config.safety.PathJail.isUri(d))
+                dirs.add(Paths.get(d).toAbsolutePath().normalize());
         };
         // Not the temp DB's own directory: the open database needs no file permission, and with no
         // dirs.temp it is java.io.tmpdir — every other process's scratch. The spill dir is scratchDir below.

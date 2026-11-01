@@ -260,6 +260,7 @@ against, round-tripped untouched.
 | `origin` | spec |
 | `output` | spec |
 | `output.compression` | spec |
+| `output.connection` | spec |
 | `output.ducklake` | spec |
 | `output.filename_column` | spec |
 | `output.format` | spec |

@@ -42,11 +42,38 @@ without `--bundle`, which checks the text hashes and the package.ps1 wiring.
 `.jnilib` in the sidecar (47 native jar entries across onnxruntime 1.20.0, tokenizers 0.36.0 and JNA 5.17.0, all
 platforms). Each is classified by file name to its artifact's licence and its sha256 is pinned per jar entry in `natives.json`
 (`pins`); an unclassified or mismatching native fails CI and `package.ps1`. `natives.json` `artifacts` is cross-checked against
-`tools/dependencies.lock`. **Not verified:** whether the Linux/macOS `libtokenizers` builds statically link GCC or other
-third-party runtimes needing their own texts (the Windows build visibly bundles MinGW DLLs; the others carry no such files;
-on Linux the system libstdc++ is used). **Exercised:** `inspecto-intelligence` `NativeEmbeddingLoadTest` embeds one string
+`tools/dependencies.lock`. **Runtimes (verified 2026-11-01):** neither the Linux nor the macOS `libtokenizers` links a GCC
+or C++ runtime statically — both `.so` files need the system `libstdc++.so.6` and `libgcc_s.so.1` (`readelf -d`), the
+`.dylib` the system `libc++` and `libiconv`; the statically linked code is Rust crates, listed in the next section. **Exercised:** `inspecto-intelligence` `NativeEmbeddingLoadTest` embeds one string
 through `OnnxEmbeddingAdapter`, so the ubuntu CI reactor loads and runs `libonnxruntime.so`, `libonnxruntime4j_jni.so` and
 `libtokenizers.so` (skipped, with the reason printed, only where the jars carry no native for the os/arch). No CI job runs macOS.
+
+**Crates statically linked into `libtokenizers` (`NATIVE-LICENCE-LINUX-MACOS-1`, recorded 2026-11-01).**
+[`tokenizers-0.36.0-crates.json`](../third-party-licenses/tokenizers-0.36.0-crates.json) lists the 177 Rust crates
+linked into the four tokenizers natives, each with its crates.io licence and, where it is not in all four, its platforms.
+How it was established, on a networked shift:
+- **Upstream.** `tokenizers.properties` in the jar reads `0.21.0-0.36.0`; the natives are built from
+  `deepjavalibrary/djl` tag `v0.36.0` (commit `e87652d9`), `extensions/tokenizers/rust/`, whose `Cargo.lock` pins
+  `tokenizers` 0.21.4 (sha256 recorded in the file). DJL builds with `cargo build --release`, without `--locked`.
+- **Graph.** `cargo metadata --filter-platform` for `x86_64-` and `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin` and
+  `x86_64-pc-windows-msvc` (in a `rust:1.89` container), walked from the root over normal dependencies only: build and dev
+  dependencies and proc-macros are not linked.
+- **Cross-check against the binaries.** The four natives here are the ones pinned in `natives.json`. All 67 crate versions
+  whose source paths are embedded in them match the tag's `Cargo.lock`. The Linux `Cargo.toml` adds `openssl` (vendored), and
+  the lock does not pin it. The shipped `.so` holds no OpenSSL code: there is no OpenSSL symbol and no version banner, and the
+  CRYPTOGAMS strings belong to `ring`. The file marks that family `notLinked`.
+- **C and C++ compiled in** (`bundledNativeCode`): Oniguruma (BSD-2-Clause, via `onig_sys`), esaxx (MIT, via `esaxx-rs`),
+  `ring`'s BoringSSL-derived C and assembly (Apache-2.0 and ISC), and the Rust standard library (MIT OR Apache-2.0).
+- **Licences found:** MIT OR Apache-2.0 and its spellings, MIT, Apache-2.0, Unicode-3.0, ISC, BSD-2/3-Clause, Zlib, 0BSD,
+  BSL-1.0 options, Unlicense OR MIT and CDLA-Permissive-2.0 (`webpki-roots`), all permissive. ⚠ **One is not:** `option-ext`
+  0.2.0 is **MPL-2.0** (weak, file-level copyleft). `dirs-sys` 0.5.0 (under `hf-hub`) pulls it in, on every platform.
+  **Open for the operator** (row `NATIVE-LICENCE-LINUX-MACOS-1`, not decided here):
+  (a) whether the MPL-2.0 crate is acceptable as shipped;
+  (b) only `Apache-2.0.txt` ships for the tokenizers natives, and the MIT, BSD, ISC, Unicode, Zlib, CDLA, Oniguruma and esaxx
+  notices are not reproduced;
+  (c) `tokenizers.dll` is built with MSVC (`VCRUNTIME140.dll`), and it imports none of the three MinGW DLLs that ship beside
+  it, so the GPL-3.0-with-exception runtime may not be needed at all.
+- **Deployment fact:** `linux-x86_64/libtokenizers.so` needs glibc 2.34 or later (it resolves on `ubuntu:24.04`, `ldd`).
 
 **Shade merge (`NATIVE-LICENCE-SHADE-MERGE-1`, shipped 2026-10-03).** `features/inspecto-intelligence/pom.xml` concatenates colliding `META-INF/LICENSE`, `LICENSE.txt` and `LICENSE.md` (`AppendingTransformer`) and merges `NOTICE*` (`ApacheNoticeResourceTransformer`), so no artifact's licence file is dropped first-wins. `check-native-licences` requires a shipped text for every DLL; the only exception is a `textPending` that names an open backlog row.
 

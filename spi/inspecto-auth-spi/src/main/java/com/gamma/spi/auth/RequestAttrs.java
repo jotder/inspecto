@@ -153,11 +153,12 @@ public final class RequestAttrs {
         return (a == null || a.isBlank()) ? "appUser" : a.trim();
     }
 
-    /** The audit {@code actorType} for this request: {@code "agent"} when {@code #HEADER_AGENT_SESSION}
-     *  is present (and no authenticated human {@code Subject} overrides it), else the historic
-     *  {@code "user"}. Additive-only companion to {@code #actor} — see there for precedence. */
+    /** The audit {@code actorType} for this request: {@code "service"} for a machine {@code Subject} (a
+     *  client-credentials token, OIDC-CC-MACHINE-ACTOR-1), {@code "user"} for any other authenticated one,
+     *  {@code "agent"} when {@code #HEADER_AGENT_SESSION} is present and no Subject overrides it, else the
+     *  historic {@code "user"}. Additive-only companion to {@code #actor} — see there for precedence. */
     public static String actorType(HttpExchange ex) {
-        if (attr(ex, ATTR_SUBJECT) instanceof Subject) return "user";
+        if (attr(ex, ATTR_SUBJECT) instanceof Subject s) return s.machine() ? "service" : "user";
         String agentSession = ex.getRequestHeaders().getFirst(HEADER_AGENT_SESSION);
         return (agentSession != null && !agentSession.isBlank()) ? "agent" : "user";
     }

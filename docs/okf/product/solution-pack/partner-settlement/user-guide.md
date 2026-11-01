@@ -8,14 +8,15 @@ timestamp: 2026-10-20T00:00:00Z
 
 # Partner settlement — user guide
 
-What a Space created from the `partner-settlement` template gives an analyst in slices S1 to S4. Design detail is in [architecture](architecture.md); the per-reason reading guide is `config/runbooks/partner-settlement-runbooks.md` in the Space.
+What a Space created from the `partner-settlement` template gives an analyst in slices S1 to S5. Design detail is in [architecture](architecture.md); the per-reason reading guide is `config/runbooks/partner-settlement-runbooks.md` in the Space.
 
 ## The daily cycle
 
 | When | What runs | Output |
 |---|---|---|
-| 01:00 | `ps_calendar`, then the eight Jobs after it, each on the previous one's success | the calendar, the current statement lines, statement findings, expected and billed amounts, settlement findings, then the movements, the position and the roll-forward |
+| 01:00 | `ps_calendar`, then the nine Jobs after it, each on the previous one's success | the calendar, the current statement lines, statement findings, expected and billed amounts, settlement findings, the dispute lines, then the movements, the position and the roll-forward |
 | 05:30 | `ps_voice`, `ps_sms` | Breaks per agreement, direction, service, destination class and day; an Incident when a Reconciliation breaches |
+| 06:00 | `ps_dispute_case` | the dispute Incidents grouped into one Case per partner and cycle |
 
 ## Reading the work
 
@@ -32,20 +33,37 @@ What a Space created from the `partner-settlement` template gives an analyst in 
 6. **Breaks** work as in any Reconciliation (assign, resolve, auto-close when the data is fixed); promote a Break to an Incident from
    the Reconciliation screen.
 
+## Working a dispute
+
+1. **The Case is the dispute, the Incident is the line.** Every `amount_mismatch` and `fx_difference` is a row of
+   `settlement_dispute` and a CRITICAL Incident (`ps_dispute_line`); the Case Rule `ps_dispute_case` puts every line of one partner
+   and cycle into one Case (category `partner-settlement`). A cut-off pair is a timing convention and never a dispute line.
+2. **Move the Case** (once an administrator has applied the dispute workflow): `investigate`, then `dispute` when the claim is sent
+   to the partner, then `agree` or `reject`; an agreed dispute goes to `await_credit` (`CREDIT_PENDING`) and is closed when the credit
+   note arrives; a rejected one is escalated again or closed. Without the workflow the Case follows the built-in path.
+3. **Record the Impact** on the Case (PS-D6), in the settlement currency: `suspected` = what you disputed (start from the sum of
+   `disputed_amount` of its lines), `confirmed` = the credit the partner accepted, `recovered` = the credit note received (still
+   allowed on the closed Case), `prevented` = a variance caught before we paid.
+4. **The contractual deadline is data.** Each dispute line carries the cycle's `dispute_window_end` and `days_to_window_end`;
+   `ps_dispute_window` opens a reminder Incident in the Case when the window closes within five days (the Job parameter
+   `window_alert_days`). It does not read the Case's state: if the dispute is already sent, resolve the reminder.
+5. **Internal targets** come from the Case SLA Policy and an escalation that notifies when a settlement Case is three days old and
+   still not `DISPUTED` (both illustrative, set by the administrator).
+
 ## Reading the position and the roll-forward
 
 1. **`settlement_position`** has one row per netting group, cycle month and settlement currency: `payable` (what the partner statements say we owe), `receivable`, `net` (positive = we pay) and `net_direction`. `orig_net` shows the net in each original currency (for example `EUR:-4.0000,USD:123.0000`), so a converted statement is visible in both currencies. A cycle with no statement has no row.
 2. **`settlement_rollforward`** has one row per month for every netting group and currency, from the first movement to today: `opening + invoiced - paid + adjustments = closing` (positive = we owe). A quiet month repeats the balance. A restated statement changes the `invoiced` of its month and every later `closing`.
 3. **`settlement_movement`** is the line-level truth under both, with the FX rate, its date and its type on every converted line. Filter on `status`: `fx_missing` lines add no amount and are counted in `lines_unconverted`; `unknown_agreement` lines (a payment naming an agreement or partner finance has not set up) are in no balance.
-4. Netting is inside one settlement currency, and a position is what the statements say, not an agreed balance: disputes are not read.
+4. Netting is inside one settlement currency, and a position is what the statements say, not an agreed balance. `disputed_amount` and `disputed_lines` show the dispute lines of that group and month beside the net; they are never netted into it, and they do not change with the Case's outcome.
 
 ## What it will not tell you
 
 A finding is a difference between what a partner says is owed and what we price ourselves, never proof the partner is wrong: the
 rate card, the attribution of usage to an agreement and the cut-off are inputs this pack trusts. It does not move money, post
-accruals or open a dispute with the partner; those are later slices and finance processes.
+accruals or send a dispute to the partner (the evidence pack is a later slice); finance processes do that.
 
 ## Verify
 
-- `GET /api/v1/jobs` lists the nine `ps_*` chain Jobs and the two Reconciliation Jobs.
+- `GET /api/v1/jobs` lists the ten `ps_*` chain Jobs, the two Reconciliation Jobs and `ps_dispute_case`.
 - After a run, `settlement_calendar` has a row per agreement and closed cycle; `settlement_findings` is empty on clean data.

@@ -1,0 +1,21 @@
+{
+  "id": "case",
+  "objectType": "CASE",
+  "initial": "OPEN",
+  "terminal": ["CLOSED"],
+  "transitions": [
+    {"from": "OPEN", "to": "INVESTIGATING", "action": "investigate"},
+    {"from": "INVESTIGATING", "to": "ESCALATED", "action": "escalate"},
+    {"from": "INVESTIGATING", "to": "RESOLVED", "action": "resolve"},
+    {"from": "ESCALATED", "to": "RESOLVED", "action": "resolve"},
+    {"from": "RESOLVED", "to": "CLOSED", "action": "close"},
+    {"from": "INVESTIGATING", "to": "DISPUTED", "action": "dispute"},
+    {"from": "ESCALATED", "to": "DISPUTED", "action": "dispute"},
+    {"from": "DISPUTED", "to": "AGREED", "action": "agree"},
+    {"from": "DISPUTED", "to": "REJECTED", "action": "reject"},
+    {"from": "REJECTED", "to": "ESCALATED", "action": "escalate"},
+    {"from": "REJECTED", "to": "CLOSED", "action": "close"},
+    {"from": "AGREED", "to": "CREDIT_PENDING", "action": "await_credit"},
+    {"from": "CREDIT_PENDING", "to": "CLOSED", "action": "close"}
+  ]
+}

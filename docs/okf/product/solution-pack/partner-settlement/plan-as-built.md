@@ -1,16 +1,16 @@
 ---
 type: Feature
 title: "Partner settlement — decisions and as-built record"
-description: "Slices S0 to S4 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
+description: "Slices S0 to S5 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
 tags: [partner-settlement, plan, as-built]
-timestamp: 2026-10-22T00:00:00Z
+timestamp: 2026-11-01T00:00:00Z
 ---
 
 # Partner settlement — decisions and as-built record
 
-> **What this page is.** The durable record of slices **S0 to S4** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
-> 2026-10-21), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
-> [admin guide](admin-guide.md). **Open work** (S5 to S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
+> **What this page is.** The durable record of slices **S0 to S5** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
+> 2026-10-21, S5 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
+> [admin guide](admin-guide.md). **Open work** (S6 to S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
 > pack) lives in [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history: the archived original
 > [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md)
 > (sections 16 and 17 are the as-built narratives).
@@ -31,7 +31,7 @@ it to a credit note. No real partner statement, TAP file or wholesale invoice ha
 | PS-D2 | Leave `ra_settlement`, `ic_statement`, `ic_rates` in `telco-ra` as the starter | Delete the three files and re-pin `TelcoRaGoldenTest` |
 | PS-D3 | Per-agreement tolerance by SQL normalisation before the Reconciliation, no add-on change | Add `toleranceFrom: <column>` to the Reconciliation add-on (a `ReconService` change with its own tests); take it only if analysts are confused |
 | PS-D4 | FX rates from an operator-fed `fx_rate` Reference; the platform fetches no market rate | A Collector against a rate provider, demand-gated |
-| PS-D5 | Ship an authored CASE workflow that replaces the Space default (states are a superset) | A `kind: settlement` Case attribute and a branching workflow (a Workflow & SLA change). ⚠ As built, a Space Template cannot carry it: open item for S5 |
+| PS-D5 | Ship an authored CASE workflow that replaces the Space default (states are a superset) | A `kind: settlement` Case attribute and a branching workflow (a Workflow & SLA change). Built at S5 as an administrator-applied body (PS-O5 below) |
 | PS-D6 | Impact on a dispute Case: suspected = disputed, confirmed = accepted credit, recovered = credit note received, prevented = caught before payment | Documentation only |
 | PS-D7 | Accrual provision on disputed amounts: a configurable default of 100 %, stated as finance policy | One config key |
 | PS-D8 | The evidence pack through Regulatory Reporting (`settlement-dispute-pack`), no new document engine | A PDF letter engine, demand-gated |
@@ -65,7 +65,7 @@ Two statements name an unknown partner (`P99`) and an unknown agreement for a kn
 
 ## S1 to S3: References, ingestion and the compare
 
-Golden: 8 `amount_mismatch`, 2 `cutoff_difference`, 1 `fx_difference`, 1 `missing_statement`, 1 `unrated_usage`, every look-alike
+Golden: 9 `amount_mismatch` (corrected 2026-11-01 from 8: the corpus also plants A1 `06-26`), 2 `cutoff_difference`, 1 `fx_difference`, 1 `missing_statement`, 1 `unrated_usage`, every look-alike
 silent; every expected and billed amount equals a plain-Java oracle; the Breaks equal the oracle's key set; a second run gives the
 same counts. Tests: `PartnerSettlementCorpusTest` (4), `PartnerSettlementReferenceTest` (4), `PartnerSettlementSeedTest` (1),
 `PartnerSettlementPackGoldenTest` (12); `ControlApiSpaceTemplateSeedGateTest` applies the template and checks its runbook.
@@ -121,3 +121,42 @@ rebuild, like S3).
 `;`, even in a quoted literal), so `orig_net` joins with a comma. A blank `netting_group` zeroed the roll-forward through an equality
 join: both joins compare with `IS NOT DISTINCT FROM`. The corpus `contractRate` filters the currency pair. The S3 `SeedTest` ingests
 the S4 corpus so the payment feed's seed has a Pipeline-written file to compare against.
+
+## S5: disputes as Cases
+
+Delivered: the Job `ps_dispute` writing `settlement_dispute` (between `ps_findings` and `ps_movement`, so the chain is now ten Jobs),
+the position's `disputed_amount` and `disputed_lines`, the Alert Rules `ps_dispute_line` and `ps_dispute_window`, the Case Rule
+`ps_dispute_case` with its `caserule.evaluate` Job, and three governance bodies in `config/governance/` (the CASE workflow, a Case SLA
+Policy, an age Escalation Rule). Now 17 Datasets (10 Job-written), 3 Alert Rules, 1 Case Rule.
+
+**Decisions made inside S5, under operator delegation, PENDING CONFIRMATION** (each reversible, none touches an engine):
+
+| ID | Decision | How to reverse |
+|---|---|---|
+| PS-O5 | The dispute workflow, SLA Policy and Escalation Rule reach a Space by an **administrator apply step**: JSON bodies ship in `config/governance/` and are posted to their `canAdminister` routes once per Space. No governance seed: the template seed gate and every import refuse governance kinds on purpose (`ASSURE-WORKFLOW-SLA-1`), and a template that could seed a workflow would replace every Case's lifecycle in the Space without a review. | A governance seed in `SpaceManager.createFromTemplate` behind `canAdminister` (an engine and security change with its own tests) |
+| PS-S5-1 | A dispute line is an `amount_mismatch` or `fx_difference`; a `cutoff_difference` (a timing convention whose pair nets inside tolerance) and every data-quality finding are not | One `IN (...)` list in `ps_dispute` |
+| PS-S5-2 | `dispute_key` = partner, cycle start, cycle end (two agreements of one partner and one cycle share a Case; different cycles do not) | The key expression in `ps_dispute` |
+| PS-S5-3 | `disputed_amount` = the absolute variance in the settlement currency; on the position it is a sum beside the net and does not follow the Case outcome (SQL cannot read Case state) | A signed column, or an outcome feed exported from the Cases |
+| PS-S5-4 | Both new Alert Rules are CRITICAL, because only a CRITICAL Alert opens an Incident and the plan makes each line an Incident; `ps_findings_found` stays WARNING | Severity on the two rule files |
+| PS-S5-5 | The window reminder reads the data (`window_alert` within `window_alert_days`, default 5, both ends inclusive), not the Case state: a Case already `DISPUTED` is reminded too | An Escalation Rule condition on a Case attribute, once a Case carries its window end |
+| PS-S5-6 | The workflow keeps every built-in CASE state and move (it replaces the built-in for every Case in the Space) and adds `DISPUTED`, `AGREED`, `REJECTED`, `CREDIT_PENDING`; `REJECTED` goes back to `ESCALATED` or to `CLOSED` | Edit the body before applying it |
+| PS-S5-7 | SLA (one working day to respond, 20 to resolve, Mon-Fri 09:00-17:00 UTC) and the escalation (notify at three days for a `partner-settlement` Case still `OPEN`, `INVESTIGATING` or `ESCALATED`) are illustrative | The administrator edits the bodies |
+| PS-S5-8 | Disposition: the built-in ladder is not extended; the outcome is the Case state (`AGREED`, `REJECTED`, `CREDIT_PENDING`) plus the Impact, so no glossary change is needed at S8 for it | A disposition value in the glossary and the ladder |
+
+**Known limit:** the position LEFT-joins the disputes onto the statement groups, so a dispute line whose (netting group, month,
+currency) has no statement movement (only possible when an agreement version changes netting group or currency mid-cycle, which
+the corpus does not do) is in `settlement_dispute` but not on any position; a full join is the fix if that case appears.
+
+**Deferred from the S5 plan row:** the payment-due date as an Alert Rule (it needs the open balance per cycle, which is S6 aging), and
+the statement-due date (already the `missing_statement` finding, so no new rule). The Impact is not written by the pack (PS-D9).
+
+**Verification.** `PartnerSettlementDisputeGoldenTest` (5, `inspecto-reconciliation`) and `PartnerSettlementDisputeCaseTest` (2,
+`inspecto-case-management`), described on the [architecture](architecture.md) page; the S3 and S4 goldens pass unchanged except the
+chain list and the template-shape counts. The golden split mirrors the bypass pack's B3: the SQL half runs the real chain, the Case
+half runs the shipped rules on the real object engine with the Measure probe answering the keys the SQL half pins.
+
+**Traps.** ⚠ An Alert Rule severity must be `INFO`, `WARNING` or `CRITICAL` (the template gate refuses `MAJOR`), and only `CRITICAL`
+opens an Incident. ⚠ An SLA Policy stamps `dueAt` / `responseDueAt` on the SLA sweep, not when the Case opens. ⚠ `PUT
+/objects/{id}/impact` takes `{"impact": {...}}`.
+⚠ `affected-modules` does not name `ControlApiSpaceTemplateSeedGateTest` (directory `inspecto`, artifact `inspecto-processor`), which applies every template: run it
+when a template changes.

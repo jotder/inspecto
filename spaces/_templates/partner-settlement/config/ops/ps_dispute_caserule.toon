@@ -1,0 +1,10 @@
+case_rule:
+  name: ps_dispute_case
+  title: "Partner settlement dispute: one partner and cycle"
+  threshold: 1
+  windowMinutes: 1440
+  category: partner-settlement
+  tags: settlement-desk
+  groupBy: dispute_key
+  filter:
+    type: INCIDENT

@@ -672,9 +672,9 @@ appends its own index, so the object lane **cannot reproduce the stable `<baseNa
 filesystem"* — is **false there**: each run writes a **new `path`**, so `DO UPDATE` never fires for it
 and every run inserts its own row. ⛔ Do not "unify" the two lanes on the strength of the local one's
 idempotence: re-running a batch is idempotent locally and additive on an object store, which is a
-semantic difference, not a naming detail. ⚠ Nothing in production reaches that lane yet —
-`dirs.database` refuses a URI at both the jail and the 422 gate until the credentials decision
-(`BACKLOG.md` §1) lands — so this is a property to preserve when it does, not a live behaviour.
+semantic difference, not a naming detail. ⚠ **Live since 2026-11-01:** the ingest lane writes an
+allow-listed `s3://` `dirs.database` (`SCALEOUT-OBJSTORE-DATABASE-DIR-1`; `spec-output-sinks.md`
+§ *Object-store `dirs.database`*), so a re-run batch now really does add rows here.
 
 ⚠ **`run_id` is deliberately still nullable**, even though every production path has supplied one since
 slice 3. `NULL ≠ NULL` in a UNIQUE constraint on both DuckDB and Postgres, so a null-run row is **exempt**

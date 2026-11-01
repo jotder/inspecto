@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import com.gamma.spi.auth.GeoCountryResolvers;
 import com.gamma.spi.auth.PublicPaths;
 import com.gamma.spi.auth.RequestAttrs;
+import com.gamma.spi.auth.Subject;
 
 /**
  * The security audit trail's capture point — turns a state-changing Control API request into one
@@ -139,6 +140,8 @@ public final class AuditTrail {
      * plus {@link AuditAttrs#GEO_DB_BUILD}. Never a city. A resolver that throws costs the geo attributes only.
      */
     static Event.Builder located(HttpExchange ex, Event.Builder b) {
+        // OIDC-CC-MACHINE-ACTOR-1: a machine actor is named by its client id; keep the IdP's own handle beside it.
+        RequestAttrs.subject(ex).filter(Subject::machine).ifPresent(s -> b.attr(AuditAttrs.IDP_SUBJECT, s.machineSub()));
         String ip = RequestAttrs.ip(ex);
         b.ip(ip);
         if (ip == null) return b;

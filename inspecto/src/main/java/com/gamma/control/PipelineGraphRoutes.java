@@ -906,7 +906,10 @@ final class PipelineGraphRoutes implements RouteModule {
                     .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.producesReference()
                             && p.dirs() != null
                             && p.dirs().database() != null && !p.dirs().database().isBlank())
-                    .findFirst().map(p -> List.of(Path.of(p.dirs().database()))).orElse(List.of());
+                    .findFirst()
+                    // an object-store database is no Path; the seal then refuses the read (fail closed)
+                    .filter(p -> !com.gamma.config.safety.PathJail.isUri(p.dirs().database()))
+                    .map(p -> List.of(Path.of(p.dirs().database()))).orElse(List.of());
           }
 
           @Override

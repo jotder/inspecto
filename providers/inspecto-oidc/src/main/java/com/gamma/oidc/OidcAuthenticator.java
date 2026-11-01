@@ -186,9 +186,12 @@ public final class OidcAuthenticator implements Authenticator {
             // match `subjectType: role` shares — the Subject itself stays capabilities-only.
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
             Subject.stampIssuer(ex, claims.getIssuer());   // bearer vs gateway issuer: separate idempotency namespaces
-            return Optional.of(new Subject(subjectId, Set.copyOf(capabilities),
+            // OIDC-CC-MACHINE-ACTOR-1: a machine is named by its client, not a service-account UUID. Bearer path only.
+            String machine = proc == processor ? MachineTrust.machineClient(claims, machineTrust) : null;
+            return Optional.of(new Subject(machine == null ? subjectId : "client:" + machine, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs, keycloak),
-                    attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims)));
+                    attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims),
+                    machine == null ? null : subjectId));
         } catch (Exception e) {
             return Optional.empty();   // bad signature, wrong issuer/audience, expired, malformed — all 401
         }

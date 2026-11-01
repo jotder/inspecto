@@ -1,10 +1,10 @@
 # Partner settlement
 
 > **Level 2 solution page.** Content pack: Space Template `partner-settlement`
-> (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S4 of `PACK-PARTNER-SETTLEMENT-1` are built: the
-> References, statement ingestion, the compare, and netting positions with a roll-forward.** Disputes as Cases, aging, accruals and the evidence pack are later
-> slices ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S4 in the
-> [as-built record](plan-as-built.md)). Checked against the template on 2026-10-21.
+> (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S5 of `PACK-PARTNER-SETTLEMENT-1` are built: the
+> References, statement ingestion, the compare, netting positions with a roll-forward, and disputes as Cases.** Aging, accruals and the evidence pack are later
+> slices ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S5 in the
+> [as-built record](plan-as-built.md)). Checked against the template on 2026-11-01.
 
 ## Business problem
 
@@ -37,8 +37,8 @@ template applies (the Alert Rule gate reads the Schema of `settlement_findings`)
 
 ## What the pack sets up
 
-Nine chained `sql.template` Jobs (the first daily at 01:00, each next one on the previous one's success), two `recon.run` Jobs
-(05:30) and one Alert Rule:
+Ten chained `sql.template` Jobs (the first daily at 01:00, each next one on the previous one's success), two `recon.run` Jobs
+(05:30), one `caserule.evaluate` Job (06:00), three Alert Rules and one Case Rule:
 
 | Job | Writes | Notes |
 |---|---|---|
@@ -48,12 +48,17 @@ Nine chained `sql.template` Jobs (the first daily at 01:00, each next one on the
 | `ps_expected` | `settlement_expected` | latest re-rating run per agreement and cycle, in the settlement currency, with the tolerance in force that day |
 | `ps_billed` | `settlement_billed` | the partner's usage lines at the same grain; `amount` snapped to expected inside the tolerance |
 | `ps_findings` | `settlement_findings` | `amount_mismatch`, `cutoff_difference`, `fx_difference`, `missing_statement`, `unrated_usage`, `fx_rate_missing` |
+| `ps_dispute` | `settlement_dispute` | one row per `amount_mismatch` or `fx_difference` finding: `dispute_key` (partner, cycle start, cycle end), `disputed_amount` (absolute variance), the agreement's currency and netting group, `dispute_window_end`, `days_to_window_end`, `window_alert` |
 | `ps_movement` | `settlement_movement` | every current statement line and every payment or note at line level, in the settlement currency with both currencies and the FX row (rate, date, type, status), signed from our side; `status` is `ok`, `fx_missing` or `unknown_agreement` |
-| `ps_position` | `settlement_position` | per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay), `net_direction`, `orig_net` (net per original currency), line counts, `lines_unconverted` |
+| `ps_position` | `settlement_position` | per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay), `net_direction`, `orig_net` (net per original currency), line counts, `lines_unconverted`, `disputed_amount` and `disputed_lines` beside the net |
 | `ps_rollforward` | `settlement_rollforward` | per netting group and settlement currency, one row for every month to the as-of month: `opening + invoiced - paid + adjustments = closing` |
 | `ps_voice`, `ps_sms` | Break state | one Reconciliation per service family over `settlement_expected` and `settlement_billed`, keys `agreement_id, direction, service, destination_class` at day grain |
 
-`ps_findings_found` is one Alert Rule over `settlement_findings`, counted `by agreement_id`: one Alert per agreement.
+`ps_findings_found` is one Alert Rule over `settlement_findings`, counted `by agreement_id`: one Alert per agreement (WARNING, no
+Incident). `ps_dispute_line` (CRITICAL, `by dispute_key, item_key`) opens one Incident per dispute line and `ps_dispute_window`
+(CRITICAL, `sum(window_alert)` `by dispute_key`) one per partner cycle whose window closes within the lead time. The Case Rule
+`ps_dispute_case` (`config/ops/ps_dispute_caserule.toon`, `groupBy: dispute_key`, threshold 1, category `partner-settlement`) groups
+every Incident that carries a `dispute_key` into one Case per partner and cycle; the Job `ps_dispute_case` evaluates it daily.
 
 ## Decisions and seams worth knowing
 
@@ -90,12 +95,18 @@ Nine chained `sql.template` Jobs (the first daily at 01:00, each next one on the
 - **Netting and the roll-forward (S4).** Netting happens inside one settlement currency: agreements of one netting group in
   different settlement currencies give separate positions (cross-currency netting needs a position currency and a reverse-rate
   convention, an open decision). A statement belongs to the month its cycle ends in, a payment or note to the month of its date. The
-  position reads what the current statements say, the roll-forward adds what finance recorded; neither reads our pricing or a dispute,
-  so a position is not an agreed balance. A movement that cannot be placed is named (`fx_missing`, `unknown_agreement`), never
+  position reads what the current statements say, the roll-forward adds what finance recorded; neither nets our pricing or a dispute in
+  (S5 adds the disputed amount as its own columns beside the net), so a position is not an agreed balance. A movement that cannot be placed is named (`fx_missing`, `unknown_agreement`), never
   summed or dropped; there is no opening-balance feed (a series opens at zero) and no payment-integrity finding yet.
-- **Not built (later slices).** The authored dispute Workflow, SLA Policy and Escalation
-  Rule, and the Case grouping (S5; a Space Template carries no governance objects, so these are applied by an administrator);
-  aging, accruals and the dashboard (S6); the evidence pack (S7); wholesale, MVNO and roaming (W1 to W3, demand-gated).
+- **Disputes (S5, PS-O5).** The Incident is the line, the Case is the dispute. The authored CASE workflow, a Case SLA Policy and an
+  age Escalation Rule ship as JSON bodies in `config/governance/` that an administrator posts to `/components/workflow`,
+  `/components/sla-policy` and `/components/escalation-rule` once per Space: a Space Template carries no governance (the seed gate
+  and every import refuse `registry/workflows/`, `registry/sla-policies/`, `registry/escalation-rules/`). The workflow is a superset of
+  the built-in CASE states, because it replaces the built-in for every Case of the Space. The contractual dispute window is data
+  (`settlement_calendar.dispute_window_end`), not the SLA clock; the reminder reads the data and not the Case state, so a Case
+  already `DISPUTED` is reminded too. The disputed amount is the absolute variance of the dispute lines, beside the net and never in
+  it, and it does not follow the Case outcome. Impact is the analyst's (PS-D6, PS-D9).
+- **Not built (later slices).** Aging, accruals and the dashboard (S6); the evidence pack (S7); wholesale, MVNO and roaming (W1 to W3, demand-gated).
 
 ## Verification
 
@@ -117,6 +128,17 @@ adjustments = closing; opening = previous closing; the last closing = the sum of
 restated statement moves the closing by exactly the corrected line and the roll-forward still closes; with no FX rate the lines are
 counted and named. Eleven mutants each turn a named row red (see the [as-built record](plan-as-built.md)); one, a flipped sign, leaves the SQL identity green, which
 is why the oracle and hand-worked amounts exist.
+
+`PartnerSettlementDisputeGoldenTest` (S5, same module, 5 tests) holds `settlement_dispute` to the ten planted variance lines (nine
+amount mismatches, one FX difference) with every disputed amount equal to the S3 oracle's, one dispute per partner and cycle against a
+hand-written list, the window end equal to the calendar's and the lead time inclusive at both ends (5 days before and the last day
+alert, 6 days before and the day after do not), the two shipped Alert Rules through the production grouped Measure probe, and the
+position's disputed columns equal to the dispute lines with the net identity intact; dropping `fx_difference` from the Job turns the
+P3 June dispute red. `PartnerSettlementDisputeCaseTest` (module `inspecto-case-management`, 2 tests) posts the three shipped governance
+bodies through their routes over real HTTP, runs the shipped Alert Rules and Case Rule on the real object engine (ten lines and one
+reminder become six Cases; an unrelated Incident never joins), stamps the SLA on the sweep, escalates an `OPEN` settlement Case and not a
+`DISPUTED` one, moves Cases `DISPUTED → AGREED → CREDIT_PENDING → CLOSED` and `DISPUTED → REJECTED → ESCALATED → RESOLVED → CLOSED`, and
+records the Impact as PS-D6 maps it.
 
 ## Related
 
