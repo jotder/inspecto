@@ -913,6 +913,21 @@ export interface WorkingSetRelationQuery {
     offset?: number;
 }
 
+/** One list of `GET …/compare`: its first `comparison.list_cap` items, and whether it was cut there. */
+export interface ComparisonSection<T> {
+    count: number;
+    items: T[];
+    truncated: boolean;
+}
+
+/**
+ * `GET /inv/investigations/{id}/compare` (comparison mode, a live read): the Working Set's entities with an event on one of
+ * its links in window A only, B only, or both. Ids are masked as the Working Set's are. Only what the SPA reads is typed.
+ */
+export interface InvestigationComparison {
+    entities: { onlyA?: ComparisonSection<string>; onlyB: ComparisonSection<string>; both?: ComparisonSection<string> };
+}
+
 // ── LA-19: the coverage indicator (`InvestigationCoverageRoutes`) ──────────────────────────────────────
 
 /** `GET /inv/investigations/{id}/coverage` — which local days of a bounded window have NO rows in the Dataset. */
@@ -1928,6 +1943,14 @@ export class InvService {
     /** LA-DATA-TRUST-1 S5: the days of this Investigation's window that were corrected after the analyst last looked. */
     investigationDataChanges(id: string): Observable<InvestigationDataChanges> {
         return this.http.get<InvestigationDataChanges>(invPath(id, 'data-changes'));
+    }
+
+    /** Comparison mode: windows A and B (each `from` and/or `to`, ISO with an offset), diffed over the Working Set, read live. */
+    compareInvestigationWindows(
+        id: string,
+        w: { aFrom?: string; aTo?: string; bFrom?: string; bTo?: string; timezone?: string },
+    ): Observable<InvestigationComparison> {
+        return this.http.get<InvestigationComparison>(invPath(id, 'compare'), { params: toParams({ ...w }) });
     }
 
     /** LA-19: coverage over `from`/`to` (+ `timezone`), or — with none — over the Investigation's own window. */

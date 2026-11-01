@@ -23,7 +23,7 @@ refuses to start rather than serve unauthenticated. Wider security posture: [adm
 | `auth.oidc.jwksUri` | yes* | from discovery / keycloak preset | Signing keys (RS256). |
 | `auth.oidc.tokenEndpoint` | yes* | from discovery / keycloak preset | Server-side code and refresh exchange. No path preset for `generic` or `wso2`: set it or use discovery. |
 | `auth.oidc.audience` | no (warned) | none | Expected `aud`. Unset logs "OIDC audience validation is OFF" at boot. |
-| `auth.oidc.clientId` | no | `inspecto-spa` | The SPA's client id. |
+| `auth.oidc.clientId` | no | `inspecto-spa` | The SPA's client id. On `keycloak` it is also the only client whose client roles count (`resource_access.<clientId>.roles`); the token's `azp` is never used, so set it if your SPA client has another id. |
 | `auth.oidc.clientSecret` | no | none | Confidential client only; pass a reference such as `${ENV:AUTH_OIDC_CLIENT_SECRET}`, never the value. |
 | `auth.oidc.rolesClaim` | no | `roles` | Claim holding role names (WSO2: `groups`). Setting it switches the Keycloak union off. |
 | `auth.oidc.authorizeUrl`, `auth.oidc.endSessionUrl`, `auth.oidc.scopes` | no | URLs from discovery / keycloak preset; `scopes` none (explicit only) | Published to the SPA by `GET /bootstrap`; no `authorizeUrl` means the SPA gets no OIDC config from the server. |

@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `OIDC-CC-INTEGRATION-ROLE-1` | P3 | feature | a machine principal gets one narrow integration grant in one Space, never a human capability. | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
@@ -44,4 +45,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-INVESTIGATION-EDIT-HARDENING-1` | P3 | defect | what is left of hardening the Investigation rename route (PATCH /inv/investigations/{id}): a Postgres run and one product call | — |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
-| `LA-INVESTIGATE-UX-2` | P3 | feature | residuals of the Investigation tab redesign (LA-INVESTIGATE-UX-1, 2026-10-31). | — |
+| `DEMO-AUTH-SUBJECT-DISPLAY-NAME-1` | P3 | defect | a Demo Auth Subject carries no display name, so a new Investigation records no owner name (T-186) and File ▸ Open… shows the login id. | — |

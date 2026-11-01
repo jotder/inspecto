@@ -44,7 +44,9 @@ without `issuer`; discovery `issuer` not equal to an explicit `-Dauth.oidc.issue
 ## `RoleMapper`
 
 Reads role names from `rolesClaim` (default `roles`). With `provider=keycloak` and no explicit
-`rolesClaim`, unions `realm_access.roles` and `resource_access.<clientId>.roles`. Unknown roles grant
+`rolesClaim`, unions `realm_access.roles` and `resource_access.<clientId>.roles`, where `clientId` is
+`auth.oidc.clientId` (default `inspecto-spa`, as `OidcTokenRelay`). The token's `azp` is never the client:
+a caller would then pick its own roles (`OIDC-KEYCLOAK-AZP-ROLES-1`, 2026-11-01). Unknown roles grant
 nothing (fail closed).
 
 ## `OidcTokenRelay`

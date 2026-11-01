@@ -7,8 +7,8 @@ import { keepOnly, keepPathsBetweenSeeds } from '@inspecto/link-analysis/graph/g
  * ids it would take away, so the tab can state its count on the button and record it as ONE step (`hide`, or `exclude`
  * with its reason). Start entities (hop 0) and kept entities are never taken away; hidden ones are already gone.
  *
- * The Working Set carries link COUNTS, not link times, so "outside a time window" is not a clean-up here (a `window`
- * step changes what later expands read).
+ * The Working Set carries link COUNTS, not link times, so "outside a time window" needs a live read of the Dataset
+ * (`GET …/compare`, LA-INVESTIGATE-UX-2 item 2); {@link outsideWindow} only spares what that read names.
  */
 export interface CleanupSets {
     /**
@@ -93,6 +93,18 @@ export function leafNeighbours(ws: WorkingSet, ids: string[]): string[] {
     }
     const out = [...adj].filter(([id, nb]) => !from.has(id) && [...nb].every((n) => from.has(n))).map(([id]) => id);
     return spare(out, sparedIds(ws));
+}
+
+/**
+ * Outside a time window: the ids a live read named (Working Set entities with link events, none of them in the window),
+ * kept to the visible Working Set, start and kept entities spared — as every Clean up spares them.
+ */
+export function outsideWindow(ws: WorkingSet, read: string[]): string[] {
+    const shown = new Set(ws.entities.filter((e) => !e.hidden).map((e) => e.id));
+    return spare(
+        read.filter((id) => shown.has(id)),
+        sparedIds(ws),
+    );
 }
 
 /** The last `n` distinct exclusion reasons of this Investigation, newest first: one-press choices in Exclude…. */

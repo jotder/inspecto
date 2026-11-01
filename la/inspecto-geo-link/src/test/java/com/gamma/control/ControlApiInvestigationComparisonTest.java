@@ -181,6 +181,39 @@ class ControlApiInvestigationComparisonTest {
         }
     }
 
+    /**
+     * LA-INVESTIGATE-UX-2 item 2, the SPA's Clean up "outside a time window": window A = the analyst's window, window B = all
+     * time (only an end, far ahead). B-only entities are the Working Set entities with link events, none of them in the
+     * window; the SPA records them as one ordinary {@code hide}, so the log stays count-only and replays.
+     */
+    @Test
+    void allTimeAsWindowBListsTheEntitiesOutsideWindowAForOneHide(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            build(c);
+            String outside = "/inv/investigations/case-a/compare?aFrom=2026-09-03T00:00:00-03:00&aTo=2026-09-06T00:00:00-03:00"
+                    + "&bTo=9999-12-31T00:00:00Z";
+            JsonNode d = data(send(c.port, "GET", outside, null, null));
+            // a-c and c-d have 09-05 events; b's only link (a-b) is on 09-01.
+            assertEquals(List.of("b"), ids(d.at("/entities/onlyB")), d.toString());
+            assertFalse(d.at("/entities/onlyB/truncated").asBoolean());
+            assertEquals(List.of("a", "c", "d"), ids(d.at("/entities/both")));
+            // An open-ended window: from 09-02 on, every entity but b has an event, and so does nothing else.
+            JsonNode open = data(send(c.port, "GET", "/inv/investigations/case-a/compare?aFrom=2026-09-02T00:00:00-03:00"
+                    + "&bTo=9999-12-31T00:00:00Z", null, null));
+            assertEquals(List.of("b"), ids(open.at("/entities/onlyB")), open.toString());
+
+            post(c, "/inv/investigations/case-a/ops", "{\"op\":\"hide\",\"ids\":" + JSON.writeValueAsString(ids(d.at("/entities/onlyB"))) + "}");
+            JsonNode ws = post(c, "/inv/investigations/case-a/replay", "{}").get("workingSet");
+            List<String> hidden = new ArrayList<>();
+            ws.get("entities").forEach(e -> { if (e.get("hidden").asBoolean()) hidden.add(e.get("id").asText()); });
+            assertEquals(List.of("b"), hidden, ws.toString());
+            // Nothing about the window was recorded: the log is the four ops it had plus one plain hide.
+            List<String> log = Files.readAllLines(root.resolve("audit/snapshots/investigations/case-a/log.jsonl"));
+            assertEquals(4, log.size());
+            assertFalse(log.get(3).contains("9999"), log.get(3));
+        }
+    }
+
     @Test
     void theDossierCarriesTheComparisonOnlyWhenAskedAndOutsideItsManifest(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
