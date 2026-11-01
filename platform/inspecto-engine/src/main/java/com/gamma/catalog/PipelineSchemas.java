@@ -1,8 +1,8 @@
 package com.gamma.catalog;
 
-import com.gamma.config.io.ConfigCodec;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
+import com.gamma.util.ToonHelper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -163,7 +163,7 @@ public final class PipelineSchemas {
     private static boolean claimsAnotherStore(Path file, String origin) {
         Map<String, Object> raw;
         try {
-            raw = ConfigCodec.toMap(Files.readString(file));
+            raw = ToonHelper.load(file.toString());
         } catch (Exception e) {
             return false;
         }
