@@ -1,0 +1,17 @@
+{
+  "id": "case",
+  "objectType": "CASE",
+  "calendar": {
+    "zone": "Etc/UTC",
+    "workingDays": ["MON", "TUE", "WED", "THU", "FRI"],
+    "start": "09:00",
+    "end": "17:00"
+  },
+  "targets": [
+    {
+      "priority": "*",
+      "responseMinutes": 480,
+      "resolutionMinutes": 9600
+    }
+  ]
+}

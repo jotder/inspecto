@@ -1,0 +1,9 @@
+name: ps_dispute_line
+dataset: settlement_dispute
+measure: count
+by[2]: dispute_key,item_key
+comparator: gte
+threshold: 1
+severity: CRITICAL
+stormCap: 500
+description: "A dispute line: an amount_mismatch or fx_difference beyond the agreement tolerance. One Incident per line; the Case Rule ps_dispute_case groups the lines of one partner and cycle (dispute_key) into one dispute Case. Runbook: config/runbooks/partner-settlement-runbooks.md."

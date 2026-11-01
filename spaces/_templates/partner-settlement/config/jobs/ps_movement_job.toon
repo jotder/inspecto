@@ -6,5 +6,5 @@ job:
   sources: "settlement_statement_current,settlement_payment,settlement_agreement,fx_rate"
   sink_dataset: settlement_movement
   on_signal: job.run.completed
-  when: "$signal.job == ps_findings && $signal.outcome == SUCCESS"
+  when: "$signal.job == ps_dispute && $signal.outcome == SUCCESS"
   enabled: true

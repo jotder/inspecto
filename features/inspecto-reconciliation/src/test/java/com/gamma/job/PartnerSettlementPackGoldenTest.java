@@ -53,10 +53,11 @@ class PartnerSettlementPackGoldenTest {
             for (Path p : files.sorted().toList()) {
                 JobConfig j = JobConfig.load(p.toString());
                 if ("sql.template".equals(j.type())) sqlJobs.add(j.name());
+                else if ("caserule.evaluate".equals(j.type())) assertEquals("ps_dispute_case", j.params().get("rule"), j.name());
                 else assertEquals("recon.run", j.type());
             }
         }
-        assertEquals(new TreeSet<>(PartnerSettlementSpace.CHAIN), new TreeSet<>(sqlJobs), "nine chained sql.template Jobs (six compare, three position), no more");
+        assertEquals(new TreeSet<>(PartnerSettlementSpace.CHAIN), new TreeSet<>(sqlJobs), "ten chained sql.template Jobs (six compare, the dispute lines, three position), no more");
         // the chain: each Job after the first runs on the previous Job's success
         for (int i = 1; i < PartnerSettlementSpace.CHAIN.size(); i++) {
             JobConfig j = JobConfig.load(s.config().resolve("jobs").resolve(PartnerSettlementSpace.CHAIN.get(i) + "_job.toon").toString());
@@ -65,8 +66,16 @@ class PartnerSettlementPackGoldenTest {
         }
         assertEquals("0 1 * * *", JobConfig.load(s.config().resolve("jobs").resolve("ps_calendar_job.toon").toString()).cron());
         try (var files = Files.list(s.config().resolve("registry").resolve("datasets"))) {
-            assertEquals(16, files.count(), "seven feeds and nine Job-written Datasets");
+            assertEquals(17, files.count(), "seven feeds and ten Job-written Datasets");
         }
+        for (String r : List.of("ps_dispute_line", "ps_dispute_window"))
+            assertTrue(Files.isRegularFile(s.config().resolve("registry").resolve("alert-rules").resolve(r + ".toon")), r);
+        assertTrue(Files.isRegularFile(s.config().resolve("ops").resolve("ps_dispute_caserule.toon")), "the dispute Case Rule ships");
+        // PS-O5: the dispute workflow, SLA Policy and Escalation Rule ship as bodies an administrator applies, never as live governance
+        for (String g : List.of("case-workflow.json", "case-sla-policy.json", "case-escalation-age.json"))
+            assertTrue(Files.isRegularFile(s.config().resolve("governance").resolve(g)), g);
+        for (String kind : List.of("workflows", "sla-policies", "escalation-rules"))
+            assertFalse(Files.exists(s.config().resolve("registry").resolve(kind)), "a template carries no " + kind);
         assertTrue(Files.isRegularFile(s.config().resolve("runbooks").resolve("partner-settlement-runbooks.md")), "the runbook ships");
         assertTrue(Files.isRegularFile(s.config().resolve("registry").resolve("alert-rules").resolve("ps_findings_found.toon")));
         for (String r : List.of("ps_voice", "ps_sms"))
