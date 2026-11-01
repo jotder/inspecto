@@ -495,9 +495,12 @@ than [3] events** (the stepper sets the events), **Hide 40 imei** (one button pe
 the 9 selected**. Each is one recorded `hide` with its reason noted; **Exclude instead of hide** makes it one `exclude`
 carrying that reason. Start entities and kept entities are never taken away. Undo takes it back. The fold works on an
 unsaved Investigation too: each press hides on screen and Save records it as the `hide` and its reason; *Exclude
-instead of hide* needs a saved Investigation. The Working Set
-carries link counts, not link times, so there is no "outside a time window" clean-up: set a **Time window** step (More
-steps) for later expands instead.
+instead of hide* needs a saved Investigation. On a saved Investigation with a time column, **Outside a time window**
+takes a From and/or To (ISO with an offset or Z, `[From, To)`): **Find what is outside the window** reads the Dataset
+now for the entities none of whose links has an event in it, and **Hide 7 with no link event in the window** records
+them as one `hide` whose reason names the window (the Working Set carries link counts, not link times, so the read is
+live and only its answer is recorded). An entity whose links carry no time at all is never counted as outside. A
+**Time window** step (More steps) is different: it changes what later expands read.
 
 ### 7.5 Exclude… and Hidden by lists
 

@@ -125,12 +125,15 @@ export const STEP_GROUPS: readonly StepGroup[] = [
     },
 ];
 const MORE_STEPS = STEP_GROUPS.flatMap((g) => g.steps);
+/** Window B of the outside-a-window read: every event (a window needs an end, and nothing is recorded this late). */
+const ALL_TIME_END = '9999-12-31T00:00:00Z';
 
 import { LaFoldComponent } from './la-fold.component';
 import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
 import { GrowExcludeStore } from './grow-exclude.store';
 import { hintSeen, markHintSeen } from './grow-exclude';
-import { cleanupSets, keepOnlySelected, offPathsBetween, weaklyLinked } from './investigation-cleanup';
+import { cleanupSets, keepOnlySelected, offPathsBetween, outsideWindow, weaklyLinked } from './investigation-cleanup';
+import { ISO_INSTANT } from './investigation-rung-form';
 import { NgTemplateOutlet } from '@angular/common';
 import { DISABLED_REASON } from './disabled-reasons';
 import { laLimit } from './la-limits';
@@ -327,6 +330,72 @@ export class LinkAnalysisInvestigationComponent {
         const n = this.cleanup().leaves.length;
         return n ? `${n.toLocaleString('en')} dangling ${n === 1 ? 'leaf' : 'leaves'}` : '';
     });
+
+    // ── LA-INVESTIGATE-UX-2 item 2: outside a time window. The Working Set carries link counts, not link times, so the
+    // entities are read live (`GET …/compare`, window A = this one, window B = all time: B-only = events, none in A) and
+    // recorded as an ordinary Clean up step; nothing about the window is sealed but the reason. Saved Investigations only.
+    readonly outsideFrom = new FormControl('', { nonNullable: true, validators: Validators.pattern(ISO_INSTANT) });
+    readonly outsideTo = new FormControl('', { nonNullable: true, validators: Validators.pattern(ISO_INSTANT) });
+    private readonly outsideFromValue = toSignal(this.outsideFrom.valueChanges, { initialValue: '' });
+    private readonly outsideToValue = toSignal(this.outsideTo.valueChanges, { initialValue: '' });
+    /** What the last read named, over which window and Working Set: a later change to either makes it stale. */
+    private readonly outsideRead = signal<{ ids: string[]; from: string; to: string; hash: string } | null>(null);
+    readonly outsideBusy = signal(false);
+    readonly outsideError = signal('');
+    readonly outsideInverted = computed(() => {
+        const [from, to] = [this.outsideFromValue().trim(), this.outsideToValue().trim()];
+        return ISO_INSTANT.test(from) && ISO_INSTANT.test(to) && Date.parse(from) >= Date.parse(to);
+    });
+    readonly outsideInvalid = computed(() => {
+        const [from, to] = [this.outsideFromValue().trim(), this.outsideToValue().trim()];
+        return (!from && !to) || (!!from && !ISO_INSTANT.test(from)) || (!!to && !ISO_INSTANT.test(to)) || this.outsideInverted();
+    });
+    /** The entities to take away, or null while there is no fresh read. */
+    /** An error is about the window it was read over: a new window clears it. */
+    private readonly outsideErrorReset = effect(() => {
+        this.outsideFromValue();
+        this.outsideToValue();
+        untracked(() => this.outsideError.set(''));
+    });
+    readonly outsideIds = computed(() => {
+        const r = this.outsideRead();
+        const ws = this.store.workingSet();
+        if (!r || !ws || r.hash !== ws.hash || r.from !== this.outsideFromValue().trim() || r.to !== this.outsideToValue().trim())
+            return null;
+        return outsideWindow(ws, r.ids);
+    });
+
+    async findOutside(): Promise<void> {
+        const id = this.store.activeId();
+        const ws = this.store.workingSet();
+        if (!id || !ws || this.outsideInvalid()) return;
+        const [from, to] = [this.outsideFromValue().trim(), this.outsideToValue().trim()];
+        this.outsideBusy.set(true);
+        this.outsideError.set('');
+        this.outsideRead.set(null);
+        try {
+            const c = await firstValueFrom(
+                this.inv.compareInvestigationWindows(id, { aFrom: from || undefined, aTo: to || undefined, bTo: ALL_TIME_END }),
+            );
+            const read = c.entities.onlyB;
+            if (read.truncated)
+                this.outsideError.set(
+                    `More than ${read.items.length.toLocaleString('en')} entities have no link event in the window: narrow the window, or clean up first.`,
+                );
+            else this.outsideRead.set({ ids: read.items, from, to, hash: ws.hash });
+        } catch (err) {
+            this.outsideError.set(apiErrorMessage(err, 'Could not read the link events in the window.'));
+        } finally {
+            this.outsideBusy.set(false);
+        }
+    }
+
+    async cleanUpOutside(ids: string[]): Promise<void> {
+        const r = this.outsideRead();
+        if (!r) return;
+        await this.cleanUp(ids, `Clean up: no link event in [${r.from || 'the start'}, ${r.to || 'the end'})`);
+        this.outsideRead.set(null);
+    }
 
     /** One press = one recorded step (`hide`, or `exclude` with the reason), its reason noted; Undo takes it back. */
     async cleanUp(ids: string[], reason: string): Promise<void> {

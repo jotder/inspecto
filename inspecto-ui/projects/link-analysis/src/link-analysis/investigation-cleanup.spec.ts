@@ -5,6 +5,7 @@ import {
     keepOnlySelected,
     leafNeighbours,
     offPathsBetween,
+    outsideWindow,
     recentExcludeReasons,
     weaklyLinked,
 } from './investigation-cleanup';
@@ -77,5 +78,11 @@ describe('investigation-cleanup (LA-INVESTIGATE-UX-1)', () => {
     it('recent reasons: distinct, newest first, at most three', () => {
         expect(recentExcludeReasons(ws())).toEqual(['Not relevant', 'Call centre']);
         expect(recentExcludeReasons(null)).toEqual([]);
+    });
+
+    it('outside a time window: the ids the read named that are on screen, start, kept and hidden entities spared', () => {
+        // the live read names b, c, d, x and an id that left the Working Set since (gone)
+        const out = outsideWindow(ws({ c: { kept: true }, x: { hidden: true } }), ['b', 'c', 'd', 'x', 's', 'gone']);
+        expect(out).toEqual(['b', 'd']);
     });
 });

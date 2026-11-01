@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **75<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 61<!--count:backlog-p3--> × P3** —
+> **74<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 60<!--count:backlog-p3--> × P3** —
+> ⬇ **75 → 74 (P3 61 → 60) on 2026-11-01**: closed P3 `LA-INVESTIGATE-UX-2` — its last item (2) shipped: Clean up's *Outside a time window* on a saved Investigation with a time column. The tab reads the entities with no link event in `[from, to)` live through the existing `GET /inv/investigations/{id}/compare` (window B = all time; `entities.onlyB`) and records them as one ordinary `hide` (+ its reason) or `exclude`; no backend, op or persisted-field change, so the Working Set stays count-only (D-OPS-1). Known limit: not offered unsaved (no id for the read; Save first). As-built: `okf/product/module/la-core/architecture.md` §6.9.1.
 > ⬇ **76 → 75 (P3 62 → 61) on 2026-11-01**: closed P3 defect `LA-INVESTIGATE-REDO-PAIR-1` — on a saved Investigation one Redo now records again the whole change one Undo took back: a Clean up / Shrink's `hide` and its `annotate` reason in order (a multi-degree Grow likewise), and one Undo takes a redone change back whole. The client redo stack holds changes, not steps (`InvestigationSessionStore.undone`, `undo(step, change)`; the Degrees trim still one degree at a time); UI only. As built: `okf/product/module/la-core/architecture.md` §6.9.1. Not re-driven live.
 > ↔ **76 (unchanged) on 2026-11-01**: narrowed P3 `LA-INVESTIGATE-UX-2` — shipped (5): Clean up's *Exclude instead* on an unsaved Investigation without Save first. `POST /inv/expand/preview` takes `exclude` steps with their reason, in log order, through the append's own validation and evaluator; Save replays one `exclude`. As-built: `okf/product/module/la-core/architecture.md` §6.9.1. (2) and (4) stay open.
 > ⬇ **77 → 76 (P2 15 → 14) on 2026-11-01**: closed P2 defect `LINEAGE-SCHEMA-CLASS-LOST-1` — pipeline-schema masking lineage now fails closed (`{*=UNKNOWN}`) when any `*_pipeline.toon` fails to load unless its decoded `id` / `name` / `stream` provably name another store (the file name is no longer consulted), and a rename through `mapping.rules` (`processing.mapping_file`, sibling `*_mapping.csv`) carries the class like `mapping.fields` (`{m=MSISDN, msisdn=MSISDN}`) - facts in `okf/product/module/access/architecture-overview.md` §9.
@@ -386,10 +387,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 61<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 61<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 75<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 74<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -683,7 +684,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
   - **Not run:** the Postgres contract case `updateDetailsIsOneReadModifyWriteAndAnAbsentInvestigationWritesNothing` (`PgInvestigationStoreContractTest`) needs `INSPECTO_TEST_PG_URL`; the PG code mirrors the FS code but has never executed.
   - **Open call:** the Dossier states the title and purpose sealed at create, not the edited ones. Decide whether it should also show the edit (outside the hashed manifest).
 - **P3** · `LA-WHITEPAPER-DEMO-1` — **narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal record (11 PASS, T2 PARTIAL because no Risk Score model ships, T13 evidence only).** **Re-walked 2026-10-28 on today's build:** 11 PASS, T2 FAIL (the Risk Score Job scores 96 accounts but the Studio's Factors look-up sends the masked alias: `LA-SUSPICION-FACTORS-MASKED-1`), T13 evidence only; T11's viewer was missing from the console build (`LA-CONSOLE-EMBED-VIEWER-1`, fixed the same day; the public read itself PASS). Still owed: one spoken rehearsal with a sceptical second person, timed against 45 and 35 minutes. The two calls (Demo Users for a rehearsal, a real IdP sign-in only for the real review; keep T12 in the technical cut) were CONFIRMED by the operator 2026-10-25. → `okf/product/module/la-core/admin-guide-demo.md` section 9; `superpower/link-analysis-roadmap.md` §D2 [items: module.la-core · kind: chore · hold: external]
-- **P3** · `LA-INVESTIGATE-UX-2` — **residuals of the Investigation tab redesign (`LA-INVESTIGATE-UX-1`, 2026-10-31).** (2) "Hide everything outside a time window" was not built: the Working Set carries link counts, not link times (see D-OPS-1 under `LA-INVESTIGATION-OPS-DEFERRED-1`). Items (1) unsaved Redo + Clean up and (3) *Pick neighbours…* on the node menu shipped 2026-10-31, and (5) *Exclude instead* on an unsaved Investigation (the unsaved preview takes `exclude` steps) shipped 2026-11-01 (as built: `okf/product/module/la-core/architecture.md` §6.9.1); (4) the live drive of the saved-Investigation flows was done 2026-11-01 (all PASS but Redo after a Clean up, filed as `LA-INVESTIGATE-REDO-PAIR-1`; record and click re-measure in the archived plan `archived-documents/plans-archive/2026-10-31-la-investigation-tab-redesign-plan.md` §2 and §7.1). [items: module.la-core · kind: feature]
 
 ## 4. Engineering platform — build, test, CI & tooling
 

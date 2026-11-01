@@ -1235,7 +1235,7 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
   Leaves are ONE pass (entities with at most one link), not the broom's repeated `trimDanglingLeaves`: an Investigation
   grown from one start entity is mostly a tree, which the repeated trim would take away whole. Each press is `GrowExcludeStore.cleanUp(ids, reason, exclude)`: `hide` + `annotate` (one grouped
   Undo, as A3) or ONE `exclude` with the reason. ⚠ The Working Set carries link counts, not link times, so "outside a time
-  window" is deliberately not a clean-up.
+  window" is the one Clean up that reads the Dataset (below).
 - **Canvas.** The node menu's recorded items show only on an Investigation's canvas; *Investigate this* (no Investigation
   open) calls `LinkAnalysisStartBoxComponent.prefillEntity`. The selection bar's Exclude opens the same
   `LinkAnalysisExcludeDialog` as X (the `EntityListReasonDialog` path is gone), which offers
@@ -1265,6 +1265,24 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
   of an excluded value brings it back as a seed after an exclude does. Save replays it as one `exclude` with the reason,
   ids mapped through `exploreAliases` and kept to the replayed set. Known limit: the Studio does not fold excludes, so a 33rd unsaved exclude makes the next Expand's preview 422 (Save, then go on). Tests: `ControlApiUnsavedPreviewTest` (parity with
   a created Investigation, log order, aliases only on a masked Space, malformed excludes 422).
+- **Outside a time window (LA-INVESTIGATE-UX-2 item 2, as built 2026-11-01).** No backend change, no new op, no new
+  persisted field: D-OPS-1 refuses sealing link times into the Working Set, so the tab reads them live through the
+  existing comparison read, `GET /inv/investigations/{id}/compare`, with window A = the analyst's `[from, to)` and window
+  B = all time (`bTo=9999-12-31T00:00:00Z`, `ALL_TIME_END`). `entities.onlyB` is then exactly the Working Set entities with
+  at least one event on a Working Set link and none in the window; `outsideWindow(ws, ids)` keeps the visible ones and
+  spares start and kept entities, and the press is the ordinary `cleanUp(ids, reason, exclude)`: one `hide` (+ `annotate`
+  with `Clean up: no link event in [from, to)`) or one `exclude`. So the log stays count-only and replays, and the Dossier
+  and sealing are untouched. Ids come back masked exactly as the Working Set's (`EntityMasking.of(inv, [])` on both) and the
+  append resolves the pseudonyms. Limits it inherits from the read: `comparison.max_entities` (a larger Working Set is
+  422), `comparison.list_cap` (a cut `onlyB` is refused in the tab, never half applied; it is at or below
+  `input.max_ids`, the per-op id cap, by default), the R3 gate, and rows with a NULL time are not counted, so an entity
+  whose links carry no time is never "outside". The read is audited as `LINK_INVESTIGATION_COMPARED`. The result is
+  tied to the window and the Working Set hash it was read over and is dropped when either changes. Known limit: offered
+  on a saved Investigation with a time column only, because an unsaved one has no id for the read; Save first. Only
+  `from` / `to` are asked (the read route takes no slot, days or excluded dates). Tests: the `LA-INVESTIGATE-UX-2 (2)`
+  cases in `link-analysis-investigation.component.spec.ts` and `investigation-cleanup.spec.ts`, and
+  `ControlApiInvestigationComparisonTest.allTimeAsWindowBListsTheEntitiesOutsideWindowAForOneHide` (the contract the tab
+  relies on, over real HTTP).
 - **Pick neighbours… on the node menu (LA-INVESTIGATE-UX-2).** Shown for one Working Set entity on an Investigation's
   canvas (`nodeMenuEntity`); it selects the node, sets `InvestigationSessionStore.neighboursRequested` and opens the
   tab, whose Act instance opens and reads the list once `selectedInSet()[0]` is that id (the tab may not exist when the

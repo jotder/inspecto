@@ -649,6 +649,61 @@
                         } @else {
                             <p class="text-secondary m-0 text-xs">Select entities on the canvas for Keep only these, or two for the paths between them.</p>
                         }
+                        @if (!isUnsaved() && store.header()?.timeCol) {
+                            <!-- LA-INVESTIGATE-UX-2 (2): read live from the Dataset; the Working Set carries no link times -->
+                            <div class="flex flex-col gap-1 self-stretch" role="group" aria-label="Outside a time window" data-testid="cleanup-window">
+                                <p class="text-secondary m-0 text-xs">
+                                    Outside a time window: entities none of whose links has an event in [From, To), read from the
+                                    Dataset now. Either end may be blank.
+                                </p>
+                                <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                                    <inspecto-pen-field
+                                        label="From"
+                                        [formControl]="outsideFrom"
+                                        placeholder="2026-09-01T00:00:00Z"
+                                        [error]="outsideFrom.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''"
+                                    />
+                                    <inspecto-pen-field
+                                        label="To"
+                                        [formControl]="outsideTo"
+                                        placeholder="2026-10-01T00:00:00Z"
+                                        [error]="outsideTo.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''"
+                                    />
+                                </div>
+                                @if (outsideInverted()) {
+                                    <p class="text-warn m-0 text-xs" role="alert">'From' must be before 'To'.</p>
+                                }
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    class="self-start"
+                                    data-testid="cleanup-window-find"
+                                    [disabled]="outsideBusy() || outsideInvalid()"
+                                    [disabledInteractive]="true"
+                                    [matTooltip]="outsideInvalid() ? 'Set a valid From and/or To, From before To' : ''"
+                                    (click)="findOutside()"
+                                >
+                                    Find what is outside the window
+                                </button>
+                                @if (outsideError()) {
+                                    <p class="text-warn m-0 text-xs" role="alert" data-testid="cleanup-window-error">{{ outsideError() }}</p>
+                                }
+                                @if (outsideIds(); as ids) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        class="self-start"
+                                        data-testid="cleanup-window-hide"
+                                        [disabled]="!canWrite() || store.busy() || !ids.length"
+                                        [disabledInteractive]="true"
+                                        [matTooltip]="ids.length ? '' : 'Nothing to take away: every other entity has a link event in the window'"
+                                        (click)="cleanUpOutside(ids)"
+                                    >
+                                        {{ verb() }} {{ ids.length.toLocaleString('en') }} with no link event in the window
+                                    </button>
+                                }
+                            </div>
+                        }
                     </div>
                 </la-fold>
             </ng-template>

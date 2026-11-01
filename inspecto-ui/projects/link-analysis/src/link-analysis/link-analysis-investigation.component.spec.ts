@@ -158,6 +158,10 @@ function create(
         confirm?: () => Promise<boolean>;
         /** The caller's role the members route answers; absent = the route is not mocked (the call fails). */
         role?: 'lead' | 'analyst' | null;
+        /** The Investigation's time column (absent = none, as LOG). */
+        timeCol?: string;
+        /** The ids `GET …/compare` lists under `entities.onlyB`, and whether that list was cut. */
+        onlyB?: { items: string[]; truncated: boolean };
     } = {},
 ) {
     const inv = {
@@ -172,7 +176,10 @@ function create(
             of({ id, title: c.title ?? 'Burners', purpose: c.purpose ?? null, updatedBy: 'alice', updatedAt: 'x' }),
         ),
         createInvestigation: vi.fn(() => of(LOG.header)),
-        investigationLog: vi.fn(() => of(LOG)),
+        investigationLog: vi.fn(() => of(opts.timeCol ? { ...LOG, header: { ...LOG.header, timeCol: opts.timeCol } } : LOG)),
+        compareInvestigationWindows: vi.fn(() =>
+            of({ entities: { onlyB: { count: opts.onlyB?.items.length ?? 0, items: opts.onlyB?.items ?? [], truncated: opts.onlyB?.truncated ?? false } } }),
+        ),
         replayInvestigation: vi.fn(() => of({ workingSet: opts.ws ?? WS })),
         appendInvestigationOp: vi.fn(() => of({})),
         undoInvestigation: vi.fn(() => of({})),
@@ -394,6 +401,89 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await fixture.whenStable();
         expect(inv.appendInvestigationOp.mock.calls[1]).toEqual(['inv-1', { op: 'exclude', ids: ['d'], reason: 'Clean up: entity type imei' }]);
         await expectNoA11yViolations(el.querySelector('[data-testid="act-cleanup"]') as HTMLElement);
+    });
+
+    it('LA-INVESTIGATE-UX-2 (2): Clean up hides what has no link event in a time window, read live, as ONE recorded step', async () => {
+        const e = (id: string, hop: number) => ({ id, type: 'msisdn', hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
+        const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
+        const ws: WorkingSet = {
+            entities: [e('a', 0), e('b', 1), e('c', 1), e('d', 2)],
+            links: [l('a', 'b'), l('a', 'c'), l('c', 'd')],
+            excluded: [],
+            hash: 'sha256:w1',
+        };
+        // the read lists the start entity a too: it is spared, as every Clean up spares it
+        const { fixture, store, el, inv } = create({ ws, timeCol: 'at', onlyB: { items: ['a', 'c', 'd'], truncated: false } });
+        await openInv(store);
+        fixture.detectChanges();
+        const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+        expect(q('cleanup-window')).not.toBeNull();
+        penEdit(fixture, penByLabel(q('cleanup-window'), 'From')!, '2026-09-01T00:00:00Z');
+        penEdit(fixture, penByLabel(q('cleanup-window'), 'To')!, '2026-09-08T00:00:00Z');
+        (q('cleanup-window-find') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.compareInvestigationWindows).toHaveBeenCalledWith('inv-1', {
+            aFrom: '2026-09-01T00:00:00Z',
+            aTo: '2026-09-08T00:00:00Z',
+            bTo: '9999-12-31T00:00:00Z',
+        });
+        const hide = q('cleanup-window-hide') as HTMLButtonElement;
+        expect(hide.textContent).toContain('Hide 2 with no link event in the window');
+        inv.appendInvestigationOp.mockClear?.();
+        hide.click();
+        await fixture.whenStable();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(1);
+        expect(inv.appendInvestigationOp.mock.calls[0]).toEqual(['inv-1', { op: 'hide', ids: ['c', 'd'] }]);
+        await expectNoA11yViolations(q('act-cleanup'));
+    });
+
+    it('LA-INVESTIGATE-UX-2 (2): a cut read is refused, not half applied', async () => {
+        const { fixture, store, el } = create({ timeCol: 'at', onlyB: { items: ['b'], truncated: true } });
+        await openInv(store);
+        fixture.detectChanges();
+        const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+        penEdit(fixture, penByLabel(q('cleanup-window'), 'From')!, '2026-09-01T00:00:00Z');
+        (q('cleanup-window-find') as HTMLButtonElement).click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(q('cleanup-window-hide')).toBeNull();
+        expect(q('cleanup-window-error').textContent).toContain('narrow');
+        // a new window clears the error: it was about the old one
+        penEdit(fixture, penByLabel(q('cleanup-window'), 'From')!, '2026-09-02T00:00:00Z');
+        fixture.detectChanges();
+        expect(q('cleanup-window-error')).toBeNull();
+    });
+
+    it('LA-INVESTIGATE-UX-2 (2): a read is dropped once the window or the Working Set changes', async () => {
+        const { fixture, store, el } = create({ timeCol: 'at', onlyB: { items: ['b'], truncated: false } });
+        await openInv(store);
+        fixture.detectChanges();
+        const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+        const find = async () => {
+            (q('cleanup-window-find') as HTMLButtonElement).click();
+            await fixture.whenStable();
+            fixture.detectChanges();
+        };
+        penEdit(fixture, penByLabel(q('cleanup-window'), 'From')!, '2026-09-01T00:00:00Z');
+        await find();
+        expect(q('cleanup-window-hide')).not.toBeNull();
+        penEdit(fixture, penByLabel(q('cleanup-window'), 'To')!, '2026-09-08T00:00:00Z');
+        fixture.detectChanges();
+        expect(q('cleanup-window-hide')).toBeNull();
+        await find();
+        expect(q('cleanup-window-hide')).not.toBeNull();
+        store.workingSet.set({ ...store.workingSet()!, hash: 'sha256:other' });
+        fixture.detectChanges();
+        expect(q('cleanup-window-hide')).toBeNull();
+    });
+
+    it('LA-INVESTIGATE-UX-2 (2): an Investigation without a time column offers no window clean-up', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="act-cleanup"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="cleanup-window"]')).toBeNull();
     });
 
     it('nothing open and nothing queued: the page-projected New Investigation form shows, and no Open… button (File menu)', () => {
