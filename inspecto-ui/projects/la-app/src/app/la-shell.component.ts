@@ -53,7 +53,7 @@ function readExpanded(): boolean {
     },
     template: `
         <aside
-            class="bg-card flex h-12 flex-0 flex-row items-center gap-1 border-b px-2 md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:gap-2 md:border-r md:border-b-0 md:py-3"
+            class="bg-card flex min-h-12 flex-0 flex-row items-center gap-1 border-b px-2 max-md:flex-wrap md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:gap-2 md:border-r md:border-b-0 md:py-3"
             [class.md:w-16]="!expanded()"
             [class.md:w-56]="expanded()"
         >
