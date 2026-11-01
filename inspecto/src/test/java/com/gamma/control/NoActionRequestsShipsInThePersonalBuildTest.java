@@ -68,7 +68,7 @@ class NoActionRequestsShipsInThePersonalBuildTest {
     void everyActionRequestPathAnswers503NotInstalledOnThePersonalBuild(@TempDir Path dir, @TempDir Path wr) throws Exception {
         try (Ctx c = open(dir, wr)) {
             List<String[]> surface = AbsentModuleRoutes.surface("action-requests");
-            assertEquals(7, surface.size(), "the manifest names the seven Action Request routes");
+            assertEquals(9, surface.size(), "the manifest names the seven Action Request routes and the two Incident Brief routes");
             for (String[] r : surface) {
                 HttpResponse<String> res = send(c.port, r[0], r[1].replace("([^/]+)", "probe"), "{}");
                 assertEquals(503, res.statusCode(), r[0] + " " + r[1] + " -> " + res.body());
