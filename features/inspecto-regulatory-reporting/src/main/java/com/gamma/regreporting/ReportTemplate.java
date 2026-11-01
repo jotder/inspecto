@@ -35,13 +35,23 @@ import java.util.stream.Stream;
  *     reportId,report.id,true,64
  *     incident/title,incidents.title,false,400       (a "group/leaf" field: one repeating group per list item)
  *     narrative,input.narrative,true,20000          (input.* = a value the maker types)
+ *   rows:                                           (optional: Dataset rows behind the member Incidents)
+ *     dataset: settlement_dispute
+ *     matchOn: dispute_key
  * </pre>
+ * With {@code rows}, the context's {@code rows} list holds the rows of {@code dataset} whose {@code matchOn} column equals
+ * a value a member Incident carries in its Alert Rule key ({@code key.<matchOn>}); a field reads them as {@code rows.<column>}.
  * Built-ins ship on the module classpath ({@link #BUILT_INS}); a Space's own sit in its config root under
  * {@link #SPACE_DIR}, and win on an id clash. A template that does not validate is listed with its problems and can
  * draft nothing.
  */
 public record ReportTemplate(String id, String title, String description, String format, String rootElement,
-                             String schema, String deliveryKind, String deliveryDir, List<Field> fields, String origin) {
+                             String schema, String deliveryKind, String deliveryDir, List<Field> fields, String origin,
+                             Rows rows) {
+
+    /** The optional Dataset rows source: rows of {@code dataset} whose {@code matchOn} equals a member Incident's key. */
+    public record Rows(String dataset, String matchOn) {
+    }
 
     /** One output field. {@code group} is the part before {@code /} (null for a plain field). */
     public record Field(String name, String group, String leaf, String source, boolean required, int maxLength) {
@@ -50,14 +60,16 @@ public record ReportTemplate(String id, String title, String description, String
     static final String SPACE_DIR = "regulatory-report-templates";
     static final List<String> BUILT_INS = List.of("sample-sar");
     static final Set<String> FORMATS = Set.of("xml", "csv", "json");
-    static final Set<String> ROOTS = Set.of("report", "subject", "incidents", "evidence", "input");
-    static final Set<String> LIST_ROOTS = Set.of("incidents", "evidence");
+    static final Set<String> ROOTS = Set.of("report", "subject", "incidents", "evidence", "input", "rows");
+    static final Set<String> LIST_ROOTS = Set.of("incidents", "evidence", "rows");
     static final String CONST = "const:";
     static final Pattern SAFE_ID = Pattern.compile("[a-z0-9][a-z0-9-]{1,63}");
     /** An XML element name we are sure of: ASCII NCName, no "xml" prefix games. */
     static final Pattern ELEMENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_.-]{0,63}");
     static final Pattern INPUT_KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,63}");
     static final int MAX_FIELDS = 200;
+    /** A Dataset id or column a {@code rows} block names: a plain identifier. */
+    static final Pattern IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,127}");
     /** An XSD file name: looked up beside the Space's templates, then beside the built-ins on the classpath. */
     static final Pattern SCHEMA_FILE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,59}\\.xsd");
 
@@ -84,6 +96,7 @@ public record ReportTemplate(String id, String title, String description, String
         m.put("schema", schema);
         m.put("origin", origin);
         m.put("delivery", Map.of("kind", deliveryKind, "dir", deliveryDir));
+        if (rows != null) m.put("rows", Map.of("dataset", rows.dataset(), "matchOn", rows.matchOn()));
         m.put("inputs", List.copyOf(inputKeys()));
         List<Map<String, Object>> fs = new ArrayList<>();
         for (Field f : fields) {
@@ -131,7 +144,7 @@ public record ReportTemplate(String id, String title, String description, String
             throw new Invalid(List.of("does not parse as TOON: " + unparseable.getMessage()));
         }
         for (String k : m.keySet())
-            if (!Set.of("id", "title", "description", "format", "rootElement", "schema", "delivery", "fields").contains(k))
+            if (!Set.of("id", "title", "description", "format", "rootElement", "schema", "delivery", "fields", "rows").contains(k))
                 problems.add("unknown key '" + k + "'");
         String id = str(m.get("id"));
         if (id == null || !SAFE_ID.matcher(id).matches()) problems.add("'id' must match " + SAFE_ID.pattern());
@@ -160,6 +173,17 @@ public record ReportTemplate(String id, String title, String description, String
             if (!"file-drop".equals(kind)) problems.add("'delivery.kind' must be file-drop (the only delivery built)");
             if (dir == null) problems.add("'delivery.dir' is required");
         } else problems.add("'delivery' is required ({kind: file-drop, dir: ...})");
+
+        Rows rowsSource = null;
+        if (m.get("rows") instanceof Map<?, ?> r) {
+            String ds = str(r.get("dataset"));
+            String on = str(r.get("matchOn"));
+            for (Object k : r.keySet())
+                if (!Set.of("dataset", "matchOn").contains(String.valueOf(k))) problems.add("unknown key 'rows." + k + "'");
+            if (ds == null || !IDENT.matcher(ds).matches()) problems.add("'rows.dataset' must be a Dataset id matching " + IDENT.pattern());
+            if (on == null || !IDENT.matcher(on).matches()) problems.add("'rows.matchOn' must be a column matching " + IDENT.pattern());
+            rowsSource = new Rows(ds, on);
+        } else if (m.containsKey("rows")) problems.add("'rows' is a block {dataset, matchOn}");
 
         List<Field> fields = new ArrayList<>();
         if (m.get("fields") instanceof List<?> rows && !rows.isEmpty()) {
@@ -198,6 +222,8 @@ public record ReportTemplate(String id, String title, String description, String
                             + "), optionally 'group/leaf'");
                 if (max < 0) problems.add("field '" + name + "': maxLength must be 0 (none) or more");
                 problems.addAll(sourceProblems(name, source));
+                if (rowsSource == null && (source.equals("rows") || source.startsWith("rows.")))
+                    problems.add("field '" + name + "': a rows source needs a 'rows' block {dataset, matchOn}");
                 if (group != null) {
                     String listRoot = source.contains(".") ? source.substring(0, source.indexOf('.')) : source;
                     if (!LIST_ROOTS.contains(listRoot))
@@ -214,7 +240,8 @@ public record ReportTemplate(String id, String title, String description, String
         } else problems.add("'fields' must list at least one {name, source, required, maxLength}");
 
         if (!problems.isEmpty()) throw new Invalid(problems);
-        return new ReportTemplate(id, title, str(m.get("description")), format, root, schema, kind, dir, List.copyOf(fields), origin);
+        return new ReportTemplate(id, title, str(m.get("description")), format, root, schema, kind, dir, List.copyOf(fields), origin,
+                rowsSource);
     }
 
     private static List<String> sourceProblems(String name, String source) {

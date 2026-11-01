@@ -20,6 +20,7 @@ import java.util.Map;
  *   subject   the Case or Incident the report is raised from (its object view)
  *   incidents [ the Case's member Incidents ]   (the Incident itself when raised from one)
  *   evidence  [ {objectId, name, uri, contentType, caption, author, createdAt} ]   (attachment notes)
+ *   rows      [ Dataset rows behind the member Incidents' keys ]   (only with a template {@code rows} block)
  *   input     {the maker's typed values}
  * </pre>
  * A source path walks maps; through a list it maps over the items. A required field that resolves empty, a value

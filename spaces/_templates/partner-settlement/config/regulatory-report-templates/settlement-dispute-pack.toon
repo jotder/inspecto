@@ -1,0 +1,57 @@
+id: settlement-dispute-pack
+title: Partner settlement dispute pack (JSON)
+description: "The evidence pack of one partner settlement dispute Case: every disputed line with the partner's statement id and version, our re-rated amount with its rate ids and re-rating run, the variance and its reason, the agreement version and tolerance, both FX rows, and the Case's Incident timeline. Rows come from settlement_dispute by the Incidents' dispute_key; a line with no re-rating run refuses the draft. Illustrative layout, no partner's format."
+format: json
+rootElement: settlementDisputePack
+delivery:
+  kind: file-drop
+  dir: regulatory-submissions/settlement-dispute-pack
+rows:
+  dataset: settlement_dispute
+  matchOn: dispute_key
+fields[45]{name,source,required,maxLength}:
+  schema,"const:inspecto-settlement-dispute-pack/1",true,0
+  reportId,report.id,true,64
+  preparedAt,report.createdAt,true,0
+  preparedBy,report.author,true,256
+  caseId,subject.id,true,128
+  caseTitle,subject.title,true,400
+  caseStatus,subject.status,true,32
+  disputedTotal,subject.impact.suspected,false,64
+  impactCurrency,subject.impact.currency,false,8
+  line/disputeKey,rows.dispute_key,true,128
+  line/itemKey,rows.item_key,true,256
+  line/partnerId,rows.partner_id,true,64
+  line/agreementId,rows.agreement_id,true,64
+  line/agreementVersion,rows.agreement_version,true,32
+  line/cycleStart,rows.period_start,true,32
+  line/cycleEnd,rows.period_end,true,32
+  line/usageDate,rows.usage_date,true,32
+  line/direction,rows.direction,true,32
+  line/service,rows.service,true,32
+  line/destinationClass,rows.destination_class,true,64
+  line/statementId,rows.statement_id,false,128
+  line/statementVersion,rows.statement_version,false,16
+  line/billedAmount,rows.billed_amount,false,32
+  line/expectedAmount,rows.expected_amount,true,32
+  line/rateIds,rows.rate_ids,true,512
+  line/ratingRunId,rows.rating_run_id,true,128
+  line/variance,rows.variance,true,32
+  line/reason,rows.reason,true,32
+  line/disputedAmount,rows.disputed_amount,true,32
+  line/currency,rows.currency,true,8
+  line/toleranceType,rows.tolerance_type,true,16
+  line/tolerance,rows.tolerance,true,32
+  line/toleranceAmount,rows.tolerance_amount,true,32
+  line/ratedCurrency,rows.rated_currency,true,8
+  line/ourFxRate,rows.our_fx_rate,true,32
+  line/ourFxRateDate,rows.our_fx_rate_date,false,32
+  line/invoicedCurrency,rows.invoiced_currency,false,8
+  line/partnerFxRate,rows.partner_fx_rate,false,32
+  line/disputeWindowEnd,rows.dispute_window_end,true,32
+  incident/id,incidents.id,true,128
+  incident/title,incidents.title,true,400
+  incident/status,incidents.status,true,32
+  incident/severity,incidents.severity,false,32
+  incident/openedAt,incidents.createdAt,true,32
+  narrative,input.narrative,true,20000

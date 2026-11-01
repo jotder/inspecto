@@ -1,9 +1,9 @@
 # Partner settlement
 
 > **Level 2 solution page.** Content pack: Space Template `partner-settlement`
-> (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S6 of `PACK-PARTNER-SETTLEMENT-1` are built: the
-> References, statement ingestion, the compare, netting positions with a roll-forward, disputes as Cases, and aging with accruals
-> and the dashboard.** The evidence pack is a later slice ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S6 in the
+> (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S7 of `PACK-PARTNER-SETTLEMENT-1` are built: the
+> References, statement ingestion, the compare, netting positions with a roll-forward, disputes as Cases, aging with accruals
+> and the dashboard, and the dispute evidence pack.** Docs and registration (S8) and W1 to W3 are open ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S7 in the
 > [as-built record](plan-as-built.md)). Checked against the template on 2026-11-01.
 
 ## Business problem
@@ -120,7 +120,17 @@ every Incident that carries a `dispute_key` into one Case per partner and cycle;
   received; a statement-less cycle is `unbilled` up to and including `statement_due` and `statement_late` after it, the same day the
   `missing_statement` finding starts. The KPI tiles count one currency (`kpi_currency`, default USD) and add payables and receivables as
   amounts at stake; the bar Widgets show every currency. The pack reports accruals, never posts them.
-- **Not built (later slices).** The evidence pack (S7); wholesale, MVNO and roaming (W1 to W3, demand-gated).
+- **The evidence pack (S7, PS-S7-1, decided under delegation, pending confirmation).** Two Report Templates of Regulatory Reporting,
+  `settlement-dispute-pack` (JSON) and `settlement-dispute-pack-csv`, in `config/regulatory-report-templates/`, drafted from the
+  dispute Case: the Case and its Incident timeline, plus the `settlement_dispute` rows whose `dispute_key` a member Incident
+  carries in its Alert Rule key (the Report Template `rows` source, a generic Regulatory Reporting seam added for this slice).
+  `ps_dispute` now also writes the evidence of each line: our `rate_ids` and `rating_run_id`, the `agreement_version`
+  (`valid_from` of the version in force), `tolerance_type`, `tolerance`, `tolerance_amount`, both FX rows (`rated_currency`,
+  `our_fx_rate`, `our_fx_rate_date`; `invoiced_currency`, `partner_fx_rate`) and the `statement_id` and `statement_version`. A line
+  with no re-rating run (`rate_ids` or `rating_run_id` blank) refuses the draft (422), never exports blank. Four-eyes and the file
+  drop are Regulatory Reporting's own; a maker without `canRevealLinkEntities` cannot read a rows report back (it is withheld). No PDF
+  letter (demand-gated, PS-D8).
+- **Not built (later slices).** Docs and registration (S8); wholesale, MVNO and roaming (W1 to W3, demand-gated).
 
 ## Verification
 
@@ -163,6 +173,13 @@ cycles at their lead time (the corpus holds a 5-day and a 6-day cycle) and follo
 counted; E1's July accrual is `unbilled` on its statement due date and `statement_late` the day after, when the `missing_statement`
 finding starts; a 50 % provision halves the dispute provision; every `settlement_overview` tile renders through the KPI and BI routes
 with each bar equal to the Dataset's sum. Six mutants each turn a named row red (see the [as-built record](plan-as-built.md)).
+
+`PartnerSettlementDisputeGoldenTest` also pins the S7 evidence (6 tests now): every dispute line's run and rate ids equal the
+corpus's latest run of that day (the stale May run loses), the agreement version and tolerance equal the corpus agreement in force,
+C1's FX line carries the partner's 0.93 beside our 0.91 and A1's July line the restated statement version 2, and every `rows.<column>`
+both shipped templates read is a column the Job writes. `PartnerSettlementDisputePackTest` (module `inspecto-regulatory-reporting`, 4
+tests) renders both shipped templates: the rate and run of every line are named, and a line with no run is refused for each format.
+The draft, the four-eyes approval and the file drop of a rows template run over HTTP in `ControlApiRegulatoryReportRowsTest` (6 tests).
 
 ## Related
 

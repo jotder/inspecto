@@ -47,7 +47,13 @@ What a Space created from the `partner-settlement` template gives an analyst in 
 4. **The contractual deadline is data.** Each dispute line carries the cycle's `dispute_window_end` and `days_to_window_end`;
    `ps_dispute_window` opens a reminder Incident in the Case when the window closes within five days (the Job parameter
    `window_alert_days`). It does not read the Case's state: if the dispute is already sent, resolve the reminder.
-5. **Internal targets** come from the Case SLA Policy and an escalation that notifies when a settlement Case is three days old and
+5. **File the evidence pack** when the claim goes to the partner: in *Operations ▸ Regulatory Reports*, **New report**, template
+   `settlement-dispute-pack` (JSON) or `settlement-dispute-pack-csv`, the dispute Case, and a narrative. The pack lists every
+   disputed line with the partner's statement id and version, our rate ids and re-rating run, the variance and its reason, the
+   agreement version and tolerance, both FX rows, and the Case's Incidents. A line with no re-rating run refuses the draft: re-rate
+   the cycle first. A second person approves it and it is dropped to `regulatory-submissions/settlement-dispute-pack*`; you send it.
+   Without the capability to reveal entity keys you cannot read the drafted pack back; the approver can.
+6. **Internal targets** come from the Case SLA Policy and an escalation that notifies when a settlement Case is three days old and
    still not `DISPUTED` (both illustrative, set by the administrator).
 
 ## Reading the position and the roll-forward
@@ -76,7 +82,7 @@ What a Space created from the `partner-settlement` template gives an analyst in 
 
 A finding is a difference between what a partner says is owed and what we price ourselves, never proof the partner is wrong: the
 rate card, the attribution of usage to an agreement and the cut-off are inputs this pack trusts. It does not move money, post
-accruals or send a dispute to the partner (the evidence pack is a later slice); finance processes do that.
+accruals or send a dispute to the partner (the evidence pack is a file you send); finance processes do that.
 
 ## Verify
 

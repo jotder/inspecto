@@ -65,7 +65,8 @@ import java.util.Set;
  * <p><b>Draft gates, in order</b>: {@code canWorkIncidents} (the route) → write root 503 → an unknown body key 422 →
  * the template unknown or failing to load 422 → not exactly one of {@code caseId} / {@code incidentId} 422 → an input
  * the template does not read, or a non-scalar one 422 → no operational objects 503 → the subject absent or out of
- * the caller's scope 404 → a member Incident out of the caller's scope 403 (a partial filing is refused) → the drop
+ * the caller's scope 404 → a member Incident out of the caller's scope 403 (a partial filing is refused) → the rows
+ * Dataset absent or not visible 404, unbindable or over {@link ReportRows#MAX_ROWS} rows 422 → the drop
  * directory refused by the path jail 422 → the render refused (a required field empty, a value over its maxLength)
  * 422 → saved {@code draft}.
  *
@@ -205,6 +206,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
         List<Map<String, Object>> items = new ArrayList<>();
         int total = 0;
         if (root != null) {
+            ReportTemplate.Catalog catalog = ReportTemplate.load(root);
             synchronized (RegulatoryReports.lock()) {
                 for (Map<String, Object> rec : RegulatoryReports.list(root)) {
                     RegulatoryReports.expireIfDue(root, rec);
@@ -212,7 +214,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
                             && blankOr(incident, rec.get("incidentId")) && blankOr(kase, rec.get("caseId"))
                             && visible(api, ex, rec)) {
                         total++;
-                        if (items.size() < LIST_CAP) items.add(shown(api, ex, RegulatoryReports.summary(rec)));
+                        if (items.size() < LIST_CAP) items.add(shown(api, ex, RegulatoryReports.summary(rec), catalog));
                     }
                 }
             }
@@ -243,7 +245,8 @@ public final class RegulatoryReportRoutes implements RouteModule {
                 && (RegulatoryReports.DRAFT.equals(rec.get("status")) || RegulatoryReports.PENDING.equals(rec.get("status")))) {
             // computed live: the approver must see a Case edited after the report was rendered
             try {
-                String now = ReportRenderer.sourceFingerprint(context(api, ex, rec, Map.of()));
+                ReportTemplate t = ReportTemplate.load(root).get(String.valueOf(rec.get("template")));
+                String now = ReportRenderer.sourceFingerprint(context(api, ex, rec, Map.of(), t));
                 view.put("sourceChanged", !now.equals(rec.get("sourceFingerprint")));
             } catch (ApiException gone) {
                 view.put("sourceChanged", true);
@@ -324,9 +327,12 @@ public final class RegulatoryReportRoutes implements RouteModule {
 
     /**
      * Assemble the report context from the record's subject (see {@link ReportRenderer}). Throws 404 when the
-     * subject is absent or out of scope, 403 when a member Incident is out of the caller's scope.
+     * subject is absent or out of scope, 403 when a member Incident is out of the caller's scope. With a template
+     * {@code rows} block ({@code t} may be null: none) the context also carries {@link ReportRows the rows} behind
+     * the member Incidents' keys.
      */
-    static Map<String, Object> context(ApiContext api, HttpExchange ex, Map<String, Object> rec, Map<String, Object> inputs) {
+    static Map<String, Object> context(ApiContext api, HttpExchange ex, Map<String, Object> rec, Map<String, Object> inputs,
+                                       ReportTemplate t) {
         boolean isCase = rec.get("caseId") != null;
         String id = String.valueOf(isCase ? rec.get("caseId") : rec.get("incidentId"));
         String kind = isCase ? "case" : "incident";
@@ -376,6 +382,14 @@ public final class RegulatoryReportRoutes implements RouteModule {
         ctx.put("subject", objectView(subject));
         ctx.put("incidents", incidents.stream().map(RegulatoryReportRoutes::objectView).toList());
         ctx.put("evidence", evidence);
+        if (t != null && t.rows() != null) {
+            java.util.Set<String> keys = new java.util.TreeSet<>();
+            for (OperationalObject i : incidents) {
+                String k = i.attributes().get("key." + t.rows().matchOn());
+                if (k != null && !k.isBlank()) keys.add(k);
+            }
+            ctx.put("rows", ReportRows.read(api, ex, api.writeRoot(), t.rows(), keys));
+        }
         ctx.put("input", inputs);
         return ctx;
     }
@@ -395,13 +409,29 @@ public final class RegulatoryReportRoutes implements RouteModule {
      * A report as THIS caller sees it. The stored filing keeps the real identifiers (it is what is delivered); a caller
      * without the reveal capability gets {@code content}, {@code subjectTitle} and the string {@code inputs} with the
      * subject's and member Incidents' classified keys replaced inline ({@link ObjectReadMasking#text}). Without the
-     * engine the keys cannot be resolved, so those fields are withheld (fail closed).
+     * engine the keys cannot be resolved, so those fields are withheld (fail closed). A report whose template reads
+     * Dataset {@code rows} (or whose template no longer loads) is withheld the same way: its rows carry columns no
+     * object key names, so masking them by the keys would be guesswork.
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> shown(ApiContext api, HttpExchange ex, Map<String, Object> view) {
+        return shown(api, ex, view, null);
+    }
+
+    /** As {@link #shown(ApiContext, HttpExchange, Map)} with the template catalog already loaded (null: load it). */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> shown(ApiContext api, HttpExchange ex, Map<String, Object> view, ReportTemplate.Catalog catalog) {
         ObjectReadMasking masking = ObjectReadMasking.forRequest(api, ex);
         if (masking == null) return view;
         Map<String, Object> out = new LinkedHashMap<>(view);
+        if (catalog == null) catalog = ReportTemplate.load(api.writeRoot());
+        ReportTemplate t = catalog.get(String.valueOf(view.get("template")));
+        if (view.get("rowsDataset") != null || t == null || t.rows() != null) {
+            // Dataset rows carry columns no object key names: withheld, never masked by guesswork (fail closed)
+            out.keySet().removeAll(Set.of("content", "subjectTitle", "inputs"));
+            out.put("keyMasked", true);
+            return out;
+        }
         List<Map<String, Object>> rows = new ArrayList<>();
         try {
             ObjectService svc = OpsEngine.of(api);
@@ -487,13 +517,14 @@ public final class RegulatoryReportRoutes implements RouteModule {
         rec.put("mediaType", ReportRenderer.mediaType(t.format()));
         rec.put("caseId", kase);
         rec.put("incidentId", incident);
+        if (t.rows() != null) rec.put("rowsDataset", t.rows().dataset());   // MAC-covered: withholding never follows a later template edit
         rec.put("author", author);
         rec.put("authorType", ApiContext.actorType(ex));
         rec.put("reason", reason);
         rec.put("createdAt", createdAt);
         rec.put("expiresAt", Instant.parse(createdAt).plus(PendingChanges.expiryHours(root), ChronoUnit.HOURS).toString());
 
-        Map<String, Object> ctx = context(api, ex, rec, inputs);   // 503 / 404 / 403
+        Map<String, Object> ctx = context(api, ex, rec, inputs, t);   // 503 / 404 / 403
         rec.put("subjectTitle", ((Map<String, Object>) ctx.get("subject")).get("title"));
         Path dropDir;
         try {

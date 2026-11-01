@@ -1,16 +1,16 @@
 ---
 type: Feature
 title: "Partner settlement — decisions and as-built record"
-description: "Slices S0 to S6 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
+description: "Slices S0 to S7 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
 tags: [partner-settlement, plan, as-built]
 timestamp: 2026-11-01T00:00:00Z
 ---
 
 # Partner settlement — decisions and as-built record
 
-> **What this page is.** The durable record of slices **S0 to S6** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
-> 2026-10-21, S5 and S6 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
-> [admin guide](admin-guide.md). **Open work** (S7, S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
+> **What this page is.** The durable record of slices **S0 to S7** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
+> 2026-10-21, S5, S6 and S7 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
+> [admin guide](admin-guide.md). **Open work** (S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
 > pack) lives in [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history: the archived original
 > [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md)
 > (sections 16 and 17 are the as-built narratives).
@@ -205,3 +205,35 @@ reads 288.2352, C1's EUR 75.0001 added); the statement-due day counted late (E1 
 filter: a measure is `agg(column)` over the whole Dataset, so a subset needs its own column. ⚠ `PARTNER_SETTLEMENT_REGENERATE=true`
 rewrites every seed byte-wise (same Schema): restore the unchanged ones (`git checkout -- spaces/_templates/partner-settlement/data`)
 before committing.
+
+## S7: the dispute evidence pack
+
+Delivered: the Report Templates `settlement-dispute-pack` (JSON) and `settlement-dispute-pack-csv` in
+`config/regulatory-report-templates/`, thirteen evidence columns on `settlement_dispute` (`ps_dispute` now also reads
+`settlement_expected` and `settlement_billed`), and a generic Regulatory Reporting seam: the Report Template `rows` block
+(`rows: {dataset, matchOn}`, [Regulatory Reporting spec](../../module/regulatory-reporting/spec.md)).
+
+**Decisions made inside S7, assistant-decided 2026-11-01 under delegation, PENDING OPERATOR CONFIRMATION:**
+
+| ID | Decision | How to reverse |
+|---|---|---|
+| PS-S7-1 | **Option A.** A Report Template could read only the Case, its Incidents, attachments and typed inputs, and a dispute-line Incident carries only its Alert Rule key (`dispute_key`, `item_key`), so the line evidence could not reach a filing. Regulatory Reporting gained a generic `rows` source: the rows of a named Dataset whose `matchOn` column equals a value a member Incident carries in `key.<matchOn>`. **Rejected, option B** (pack only): widen `ps_dispute_line`'s `by` to about twelve evidence columns. Every Incident title would then hold the whole row; a new re-rating run would change the key and open a second Incident for the same line in the same Case; the renderer still could not address the dotted `key.*` attributes; and the `ps_dispute_window` Incident in the same Case, which carries no line, would break a required per-Incident run field. | Remove the `rows` block from the templates and the `rows` support from `ReportTemplate` / `ReportRows` |
+| PS-S7-2 | The evidence rides on `settlement_dispute` (thirteen more columns), not a new Job and Dataset: it is the same grain and key, and the chain, the Alert Rules and the Case Rule stay as they were | A separate `ps_dispute_evidence` Job |
+| PS-S7-3 | "No re-rating run" = `rate_ids` or `rating_run_id` blank on a line (a `statement_only` variance has no expected row); both are required fields, so the draft is refused 422 naming the line, never filed blank. A Case with no dispute row behind its keys is refused too | `required` on the two fields |
+| PS-S7-4 | Two templates, JSON (`rootElement: settlementDisputePack`, lines and Incidents as arrays) and CSV (one header and one data row, each line field joined by `; `, as the renderer does for every CSV); the layout is illustrative, no partner's format | Edit the templates |
+| PS-S7-5 | A report whose template reads `rows` is withheld (`content`, `subjectTitle`, `inputs` removed, `keyMasked: true`) from a reader without `canRevealLinkEntities`: the rows carry columns no object key names, so masking by the keys would be guesswork. The settlement desk (role `operations`) can draft and send for approval but not read the pack back; the approver (`admin`) reads it | Mask rows with the Dataset's `BiResultMasking` (needs a public seam in `inspecto`) |
+
+**Seam facts** (Regulatory Reporting): the rows are read through the Dataset's relation with the keys bound, `ORDER BY ALL`, at most
+1000 per report (more is 422, never truncated); a Dataset the drafter cannot see is 404; the rows join the source fingerprint, so a
+row changed after the draft shows `sourceChanged` to the approver. Values are passed as text, numbers or booleans (a date as its
+ISO text).
+
+**Verification.** `PartnerSettlementDisputeGoldenTest` (6 tests, one new: run and rate ids against the corpus's latest run, agreement
+version, tolerance, both FX rows of C1 June, A1 July's restated statement version 2, every template `rows.<column>` written by the
+Job); `PartnerSettlementDisputePackTest` (4, `inspecto-regulatory-reporting`: both shipped templates render, name the rate and run,
+refuse a run-less line and an empty Case); `ControlApiRegulatoryReportRowsTest` (6: only the matched rows in a stable order, withholding that survives a later template edit, the
+four-eyes path delivering them, `sourceChanged` after a row change, the 422 and 404 gates, the `rows` block validation).
+
+**Traps.** ⚠ A template source walks maps by `.`, so an Incident attribute named `key.<column>` cannot be addressed by a field;
+the `rows` source reads it on the server instead. ⚠ The seed of `settlement_dispute` was regenerated (new columns); restore every
+other seed after `PARTNER_SETTLEMENT_REGENERATE=true`.
