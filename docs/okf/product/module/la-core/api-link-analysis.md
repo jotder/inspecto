@@ -20,7 +20,7 @@ Grouped; the authoritative list is each module's `META-INF/inspecto/module.toon`
 | Drafts | `.../drafts`, `/rebase`, `/promote`, `/discard`, `/conflicts` |
 | Dossier, embeds | `.../dossier`, `/dossier/bundle`, `/verify`, `.../embeds` |
 | Graph, index | `GET /inv/graph/algorithms`, `POST /inv/graph/runs`, `GET /inv/index`, `POST /inv/index/builds` |
-| Entities | `/inv/entity-types`, `/inv/entity-identities`, `/inv/entities/{type}/{key}/profile` |
+| Entities | `/inv/entity-types`, `DELETE /inv/entity-types/{id}` (an unused Entity Type; `canAuthorWorkbench`; 409 names the Dataset columns, live Entity Lists or Investigations that still use it, or refuses the last type), `/inv/entity-identities`, `/inv/entities/{type}/{key}/profile` |
 | geo-link | `.../measures`, `/data-changes`, `/alert-rules`, `/standing-detection` |
 
 Request gate order: authenticate -> rate limit -> ABAC -> module enabled -> capability -> open gate (member, policy).

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { Observable, switchMap, tap } from 'rxjs';
 import { SpacesService, apiUrl } from '@inspecto/core/api';
 import { type EntityNormaliser } from '@inspecto/core/graph';
 
@@ -158,6 +158,17 @@ export class LinkAnalysisSettingsService {
         return this.http
             .put<LinkAnalysisLimits>(apiUrl('/settings/link-analysis'), limits)
             .pipe(tap((l) => this.apply(l)));
+    }
+
+    /**
+     * LA-ENTITY-TYPE-RETIRE-1: delete an Entity Type nothing uses (`DELETE /inv/entity-types/{id}`); a 409 names what still
+     * does. The settings are read again after, so every screen showing the types in force drops it.
+     */
+    deleteEntityType(id: string): Observable<LinkAnalysisLimits> {
+        return this.http.delete(apiUrl(`/inv/entity-types/${encodeURIComponent(id)}`)).pipe(
+            switchMap(() => this.get()),
+            tap((l) => this.apply(l)),
+        );
     }
 
     private apply(l: LinkAnalysisLimits): void {

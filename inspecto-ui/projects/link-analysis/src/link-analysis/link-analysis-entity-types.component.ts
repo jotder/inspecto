@@ -6,14 +6,14 @@ import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { NewEntityTypeComponent } from '@inspecto/link-analysis/entities/new-entity-type.component';
-import { NORMALISER_OPTIONS, settingsBodyWithTypes } from '@inspecto/link-analysis/entities/entity-columns';
-import { LinkAnalysisLimits, LinkAnalysisSettingsService } from './link-analysis-settings.service';
+import { NORMALISER_OPTIONS } from '@inspecto/link-analysis/entities/entity-columns';
+import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 
 /**
  * **⚙ Settings → Entity Types** (LA-STUDIO-UI-REORG-1 §5.10, sweep S3): the types in force, *New Entity Type*, and
- * *Retire*. Both write the Space's stated `entityTypes` list through `PUT /settings/link-analysis` — the stated list
- * replaces the defaults, so retiring one states the types in force minus it. The server validates (a type a column
- * still claims, or the last type, is refused there) and its message is shown.
+ * *Delete*. New writes the Space's stated `entityTypes` list through `PUT /settings/link-analysis`; Delete calls
+ * `DELETE /inv/entity-types/{id}` (LA-ENTITY-TYPE-RETIRE-1), which refuses (409) while a Dataset column, a live Entity
+ * List or an Investigation uses the type, or for the last type, and its message is shown.
  */
 @Component({
     selector: 'inspecto-la-entity-types',
@@ -33,11 +33,11 @@ import { LinkAnalysisLimits, LinkAnalysisSettingsService } from './link-analysis
                                 mat-button
                                 class="ml-auto"
                                 [disabled]="busy()"
-                                [attr.data-testid]="'la-entity-type-retire-' + t.id"
-                                [attr.aria-label]="'Retire the Entity Type ' + (t.label || t.id)"
-                                (click)="retire(t.id, t.label || t.id)"
+                                [attr.data-testid]="'la-entity-type-delete-' + t.id"
+                                [attr.aria-label]="'Delete the Entity Type ' + (t.label || t.id)"
+                                (click)="remove(t.id, t.label || t.id)"
                             >
-                                Retire
+                                Delete
                             </button>
                         }
                     </li>
@@ -80,21 +80,18 @@ export class LinkAnalysisEntityTypesComponent {
     readonly busy = signal(false);
     readonly error = signal('');
 
-    async retire(id: string, label: string): Promise<void> {
+    async remove(id: string, label: string): Promise<void> {
         const ok = await this.confirm.confirmDestructive(
-            `Retire the Entity Type "${label}"? Columns can no longer be classified as it; saved Investigations keep their steps.`,
-            { title: 'Retire Entity Type', confirmText: 'Retire' },
+            `Delete the Entity Type "${label}"? It cannot be undone. A type still used by a Dataset column, an Entity List or an Investigation is not deleted.`,
+            { title: 'Delete Entity Type', confirmText: 'Delete' },
         );
         if (!ok) return;
         this.busy.set(true);
         this.error.set('');
         try {
-            // The PUT replaces the document: start from what is stored now.
-            const served = await firstValueFrom(this.settings.get());
-            const kept = (served.entityTypesInForce ?? []).filter((t) => t.id !== id);
-            await firstValueFrom(this.settings.save(settingsBodyWithTypes(served, kept) as unknown as LinkAnalysisLimits));
+            await firstValueFrom(this.settings.deleteEntityType(id));
         } catch (e) {
-            this.error.set(apiErrorMessage(e, 'The Entity Type could not be retired.'));
+            this.error.set(apiErrorMessage(e, 'The Entity Type could not be deleted.'));
         } finally {
             this.busy.set(false);
         }

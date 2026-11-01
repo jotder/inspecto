@@ -92,6 +92,9 @@ public final class CapabilityManifest {
             new Entry("PUT", "/entity-lists/([^/]+)/attributes", Roles.CAN_MANAGE_EXCLUSION_CATEGORIES),
             // ASSURE-ENTITY-LISTS-RESIDUALS-1 (3): registers a DATASET (Dataset config), so the Dataset-authoring capability.
             new Entry("POST", "/entity-lists/([^/]+)/register-dataset", Roles.CAN_AUTHOR_WORKBENCH),
+            // EntityProfileRoutes (LA-ENTITY-TYPE-RETIRE-1) — deleting an unused Entity Type rewrites the stated list,
+            // the capability that states it through PUT /settings/link-analysis.
+            new Entry("DELETE", "/inv/entity-types/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // EntityIdentityRoutes (LA-17 slice 2) — identity assertions share the same fact log, same capability.
             new Entry("GET", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("GET", "/inv/entity-identities/group", Roles.CAN_MANAGE_INCIDENTS),
