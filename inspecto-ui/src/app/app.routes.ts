@@ -157,6 +157,11 @@ export const appRoutes: Route[] = [
             { path: 'jobs', loadChildren: () => import('app/modules/admin/jobs/jobs.routes') }, // also matches jobs/:name (side-panel detail, R5)
             { path: 'enrichment', loadChildren: () => import('app/modules/admin/enrichment/enrichment.routes') },
             { path: 'catalog', loadChildren: () => import('app/modules/admin/catalog/catalog.routes') },
+            {
+                path: 'add-data',
+                loadComponent: () =>
+                    import('app/modules/admin/add-data/add-data.page').then((m) => m.ConsoleAddDataPageComponent),
+            },
             { path: 'data-browser', loadChildren: () => import('app/modules/admin/data-browser/data-browser.routes') },
             {
                 path: 'processing-status',

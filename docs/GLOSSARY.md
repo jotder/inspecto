@@ -732,6 +732,24 @@ Break, a **recurrence**), not a new one. *(`assigned`, occurrences and recurrenc
 Breaks can raise **Incidents** (future). *(Lifecycle locked with the product owner 2026-07-03, shipped as
 C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 
+**Partner settlement terms** *(the `partner-settlement` Space Template, `PACK-PARTNER-SETTLEMENT-1`, added at slice S8
+2026-11-01; as built: `okf/product/solution-pack/partner-settlement/architecture.md`)*:
+
+**Settlement Agreement** — The effective-dated commercial terms with one partner for one service. A **Reference**.
+⛔ never *Contract* in UI text; ⛔ not *Rate card* (the price list, which belongs to re-rating).
+
+**Settlement Statement** — A partner's document of what it says is owed for a period; versioned, with a control
+total. A **Stream**. ⛔ never *Invoice* for an interconnect statement.
+
+**Settlement Cycle** — One period of an agreement between statement dates; the unit of netting and of a dispute
+**Case**. ⛔ never *Billing cycle*.
+
+**Settlement Position** — Per netting group and cycle: payable, receivable and net, in both currencies. A
+**Dataset**. ⛔ never *Balance* alone.
+
+**Dispute** — A **Case** grouping the **Incidents** sent to a partner for one Settlement Cycle. ⛔ not a new object
+type; ⛔ never *Claim* (`la-claims` is another pack).
+
 ---
 
 ## 8. Observability

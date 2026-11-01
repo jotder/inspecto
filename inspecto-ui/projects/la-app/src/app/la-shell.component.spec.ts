@@ -133,6 +133,14 @@ describe('la-app shell and landing page', () => {
         expect(host.className).toContain('[--shell-chrome-height:3rem]');
     });
 
+    it('lets the narrow top bar wrap instead of scrolling the page sideways (320 px reflow)', async () => {
+        const el = await render();
+        const bar = el.querySelector('aside') as HTMLElement;
+        expect(bar.classList).toContain('max-md:flex-wrap');
+        expect(bar.classList).toContain('min-h-12');
+        expect(bar.classList).not.toContain('h-12');
+    });
+
     it('marks the open area with aria-current and keeps each area nameable when slim', async () => {
         TestBed.configureTestingModule({});
         const el = await render();
