@@ -1,2 +1,3 @@
 com.gamma.predictive.SegmentJobType
 com.gamma.predictive.ChurnJobType
+com.gamma.predictive.ForecastJobType

@@ -1,2 +1,3 @@
 com.gamma.predictive.SegmentationKindValidator
 com.gamma.predictive.ChurnKindValidator
+com.gamma.predictive.ForecastKindValidator

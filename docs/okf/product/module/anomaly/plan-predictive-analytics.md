@@ -6,6 +6,8 @@
 
 *2026-11-01:* slice **S3 (Churn A) is BUILT** as `PREDICTIVE-CHURN-DECLARED-1` in the same module: the `churn-model` kind, the `predict.churn` Job, `insufficient` scores, the `churn.score.produced` Signal and the `afterScore` pending Alert Rule. As built, with decisions D-PC1…D-PC9 (no new writer inventory row: the pending-rule writer was already approved): [`okf/product/module/predictive/spec-churn.md`](../predictive/spec-churn.md).
 
+*2026-11-01:* slice **S4 (Forecast A+B) is BUILT** as `PREDICTIVE-FORECAST-1` in the same module: the `forecast-model` kind (day / week grain, seasonal-naive and additive Holt-Winters with AUTHORED smoothing, OD-11's limits), the `predict.forecast` Job, the interval and the backtest error vs seasonal-naive stored per row. As built, with decisions D-PF1…D-PF11 (no grid search, OD-6; relative MAE instead of MASE): [`okf/product/module/predictive/spec-forecast.md`](../predictive/spec-forecast.md).
+
 *Status before parking:* **Status 2026-10-12: interview HELD - decisions in section 9a (OD-1..OD-9, OD-14, OD-17 decided; S0 done); no kernel built; P3 design-only.** Written by a docs-only lane
 before any code. The key deliverable is section 9 (open decisions). Row: `PREDICTIVE-ANALYTICS-1` (P3) in
 [BACKLOG](../../../../BACKLOG.md); the later Sales & Marketing BI pack is `PACK-SALES-MARKETING-1`. How an add-on, an optional

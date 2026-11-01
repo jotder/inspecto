@@ -24,7 +24,10 @@
         contract. The RFM inputs are windowed Measures (MeasureCompiler window + recency, ANALYTICS-CORE-1 C1). Second
         slice PREDICTIVE-CHURN-DECLARED-1: the churn-model kind (ChurnModel / ChurnKindValidator, reserved churn_scores_
         stores) and the predict.churn Job Type (ChurnJobType / ChurnEvaluator / ChurnScorer): a declared-coefficient
-        logistic score with per-input contributions, insufficient below minHistoryDays. No
+        logistic score with per-input contributions, insufficient below minHistoryDays. Third slice
+        PREDICTIVE-FORECAST-1: the forecast-model kind (ForecastModel / ForecastKindValidator, reserved forecasts_
+        stores) and the predict.forecast Job Type (ForecastJobType / ForecastEvaluator / Forecaster): seasonal-naive and
+        Holt-Winters per series with an interval and the stored backtest error. No
         routes yet (PREDICTIVE-SURFACE-1). Package com.gamma.predictive. THIN: no shade. Built only under the
         edition-standard / -advanced / -preview profiles.
     </description>

@@ -82,6 +82,9 @@ public final class ComponentStore {
                     // Churn Model (PREDICTIVE-CHURN-DECLARED-1): a declared-coefficient logistic score, run by the
                     // predict.churn Job (com.gamma.predictive.ChurnModel validates it at save; module inspecto-predictive).
                     "churn-model",
+                    // Forecast Model (PREDICTIVE-FORECAST-1): seasonal-naive / Holt-Winters per series, run by the
+                    // predict.forecast Job (com.gamma.predictive.ForecastModel validates it at save; module inspecto-predictive).
+                    "forecast-model",
                     // Notification channel destinations (NotificationRoutes /notifications/channels* admin
                     // CRUD, 2026-07-18): the managed record of where a channel delivers; live delivery still
                     // resolves channels from notify.* JVM flags (ChannelConfig).

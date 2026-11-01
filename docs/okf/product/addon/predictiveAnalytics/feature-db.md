@@ -13,11 +13,13 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.predictiveAnalytics`](../../../../../product-map/addon/predictiveAnalytics.toon).
 
-4 row(s).
+6 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
 | churn-model | config kind | predictive | standard;advanced;preview | predictiveAnalytics | ga | `churn-model` | `features/inspecto-predictive/src/main/resources/META-INF/inspecto/module.toon` |
+| forecast-model | config kind | predictive | standard;advanced;preview | predictiveAnalytics | ga | `forecast-model` | `features/inspecto-predictive/src/main/resources/META-INF/inspecto/module.toon` |
 | segmentation-model | config kind | predictive | standard;advanced;preview | predictiveAnalytics | ga | `segmentation-model` | `features/inspecto-predictive/src/main/resources/META-INF/inspecto/module.toon` |
 | predict.churn | job type | predictive | standard;advanced;preview | predictiveAnalytics | ga | `predict.churn` | `features/inspecto-predictive/src/main/resources/META-INF/inspecto/module.toon` |
+| predict.forecast | job type | predictive | standard;advanced;preview | predictiveAnalytics | ga | `predict.forecast` | `features/inspecto-predictive/src/main/resources/META-INF/inspecto/module.toon` |
 | predict.segment | job type | predictive | standard;advanced;preview | predictiveAnalytics | ga | `predict.segment` | `features/inspecto-predictive/src/main/resources/META-INF/inspecto/module.toon` |

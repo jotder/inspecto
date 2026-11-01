@@ -372,7 +372,7 @@ rating" / "fraud score" for this concept. As built: [`okf/product/module/scoring
 
 **Churn Model** *(2026-10-12, OD-1; declared slice built 2026-11-01, PREDICTIVE-CHURN-DECLARED-1 — kind `churn-model`, Job `predict.churn`, stores `churn_scores_<model>`; as built: [`okf/product/module/predictive/spec-churn.md`](okf/product/module/predictive/spec-churn.md))* — The component kind that declares a churn score: named **Inputs** (trailing-window entity Measures) with authored coefficients (the platform does not train in v1). Its Instance is a **Churn Score**. **Input** here means one declared variable of a Churn Model; ⛔ not a **Feature** (that word is reserved for an Anomaly Model).
 
-**Forecast Model** *(2026-10-12, OD-1)* — The component kind that declares a time-series forecast (seasonal-naive or Holt-Winters, with a stored backtest). Its Instance is a **Forecast**: predicted values with an interval per series and bucket.
+**Forecast Model** *(2026-10-12, OD-1; first slice built 2026-11-01, PREDICTIVE-FORECAST-1 — kind `forecast-model`, Job `predict.forecast`, stores `forecasts_<model>`; as built: [`okf/product/module/predictive/spec-forecast.md`](okf/product/module/predictive/spec-forecast.md))* — The component kind that declares a time-series forecast (seasonal-naive or Holt-Winters, with a stored backtest). Its Instance is a **Forecast**: predicted values with an interval per series and bucket.
 
 **Consequence** — A **typed action a Decision Engine produces** (`route · tag · quarantine · drop · emit-signal ·
 create-alert · start-job · trigger-pipeline · render-widget · generate-report · invoke-api`), executed via the

@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | the design of record is plan-predictive-analytics.md in the module/anomaly hub (PREDICTIVE-ANALYTICS-1, parked); this hub holds the as-built slices |
-| spec | current | [Churn Scores — the Churn Model kind and the predict.churn Job (declared coefficients)](spec-churn.md) · [Customer Segments — the Segmentation Model kind and the predict.segment Job (declared RFM)](spec-segmentation.md) |
+| spec | current | [Churn Scores — the Churn Model kind and the predict.churn Job (declared coefficients)](spec-churn.md) · [Forecasts — the Forecast Model kind and the predict.forecast Job (seasonal-naive and Holt-Winters)](spec-forecast.md) · [Customer Segments — the Segmentation Model kind and the predict.segment Job (declared RFM)](spec-segmentation.md) |
 | architecture | missing | |
 | features | current | [Predictive Analytics — features](features-predictive.md) |
 | feature-db | current | [Predictive Analytics — feature database](feature-db.md) |
