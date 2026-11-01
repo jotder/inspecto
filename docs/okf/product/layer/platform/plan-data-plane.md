@@ -66,7 +66,7 @@ authoritative for the Edition column**; this table mirrors it.
 |---|---|---|---|---|
 | `DAT-1` | **Dataset** umbrella (Table / Derived Table / View) over partitioned Parquet, described by Schemas, browsable in the Catalog | Must | ✅ SHIPPED | All |
 | `DAT-2` | **Query** as a first-class Component (`sql \| structured`) + Query Library + `$`-**Parameters** + **Result Set** | Must | ✅ SHIPPED (R3 + W4) | All |
-| `DAT-3` | Live query execution `POST /queries/{id}/run` on DuckDB with **server-side** parameter resolution | Must | ✅ **server SHIPPED — no client consumer.** The SPA never calls the route; the Query Library previews through `/db/query` after resolving `$`-parameters **client-side** (§3.4) | All |
+| `DAT-3` | Live query execution `POST /queries/{id}/run` on DuckDB with **server-side** parameter resolution | Must | ✅ SHIPPED, both halves. The Query Library's *Run saved* (`queries.component.ts` `runSaved` → `QueriesService`) calls the route; the editor's Run on an unsaved draft still previews through `/db/query` with `$`-parameters resolved **client-side** (§3.4). *(Corrected 2026-11-01: this said the SPA never called the route.)* | All |
 | `DAT-4` | **Matrix** materialization: persisted summary Derived Tables as managed assets | Should | ✅ SHIPPED 2026-07-08 (`task: materialize`); **surfaced 2026-09-14** — `POST /datasets/{id}/materialize` (202 + `runId`) plus one committed example job, and the task's five parameters declared at last (§3.6) | All |
 | `DAT-5` | Row-level calculated columns on Datasets | Should | ✅ SHIPPED 2026-07-08; window functions 2026-07-24. Design of record: §6.2 of this spec (why a real SQL parser
 was refused) and `okf/product/module/processor/spec-queries.md` §3.3–§3.5. *(Provenance:
@@ -75,16 +75,15 @@ was refused) and `okf/product/module/processor/spec-queries.md` §3.3–§3.5. *
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 
-- **`DAT-3`'s route has no caller in the product.** `QueryRoutes` (`inspecto/src/main/java/com/gamma/control/QueryRoutes.java:43`)
-  serves `POST /queries/{id}/run` with `Parameters.resolve` server-side; `inspecto-ui/src/app` contains no
-  request to it. The Query Library's Run button resolves `$today`/`$day(-7)`/declared defaults in
-  `inspecto/query/parameters.ts` and posts the SQL to `/db/query` through `DatasetRowsService`. Server-side
-  resolution — `$current_user`, `$role` — therefore never reaches an operator's query. Same shape as `API`'s
-  `If-Match` and cursor findings.
+- **`DAT-3`'s route has a caller, but only for saved queries.** `QueryRoutes` serves `POST /queries/{id}/run`
+  with `Parameters.resolve` server-side, and the Query Library's *Run saved* action calls it. The editor's Run
+  on an unsaved draft resolves `$today`/`$day(-7)`/declared defaults in `inspecto/query/parameters.ts` and
+  posts the SQL to `/db/query` through `DatasetRowsService`, so a draft can preview green and still fail when
+  a job runs it. *(Corrected 2026-11-01: this said the route had no caller.)*
 - **`DAT-4` vs the binding glossary.** `GLOSSARY.md` §6-B says Matrix is "not yet surfaced in the UI as of
   2026-07-20"; §13 records the `DERIVED_TABLE` → **Matrix** label DONE on 2026-08-04 and `MaterializeTask`
-  shipped 2026-07-08. Corrected with this spec. What remains true: **nothing in the SPA triggers a
-  materialization**; `materialized` is a `DatasetKind` value modelled "for completeness".
+  shipped 2026-07-08. Corrected with this spec. Since 2026-09-14 the SPA triggers a materialization too
+  (Materialize in the Dataset editor, §3.6). *(Corrected 2026-11-01: this said nothing in the SPA did.)*
 - **The DuckDB `memory_limit` default is documented three ways and the code has none.** `duckdb.md` and the
   release-notes draft say the D11 pair `memory_limit=2GB` + `maxConcurrentRuns=4` is "on by default";
   `BACKLOG.md` GAP-4 says only the concurrency half is; `DuckDbUtil.memoryLimit` resolves config → served
@@ -476,7 +475,7 @@ and calculated-column editors; `calculated-column-guard.ts` mirrors `ExpressionG
 (not authoritative); `bind-shared-dataset.dialog.ts` builds a `physical` Dataset with `physicalRef =
 shared/<owner>/<item>` for an Exchange grant; `dataset-registration.service.ts` registers a pipeline's store as
 a Dataset idempotently (`putIfAbsent` by `physicalRef`, never throws). **Query Library** (`/studio/queries`):
-both types authored; `$`-parameters SQL-only; Run resolves parameters **client-side** and previews through
+both types authored; `$`-parameters SQL-only; *Run saved* calls `POST /queries/{id}/run`; the draft Run resolves parameters **client-side** and previews through
 `DatasetRowsService` → `/db/query` (one page, `DEFAULT_ROW_LIMIT=1000`, `truncated` flag); a `503` on save is
 explained (write root), a `422` is not specially handled. **Widget explorer** → `DatasetResultService` →
 `/bi/query`, with a Time grain select feeding `QuerySpec.grains`. `DatasetRowsService` is **the single rows
@@ -570,8 +569,8 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Evidence | Why it matters |
 |---|---|---|
-| **The Query Library never calls `POST /queries/{id}/run`** | zero callers in `inspecto-ui/src/app`; `queries.component.ts` → `DatasetRowsService.sql()` → `/db/query` | Server-side parameter resolution (`$current_user`, `$role`), the Result Set descriptor and the 500/10 000 limits are unreachable from the product; `DAT-3` is a Must whose client half is absent |
-| **No UI triggers `materialize`**; no committed job schedules one | `DatasetKind.materialized` "for completeness"; no `materialize` job in `spaces/` | `DAT-4` is reachable only by hand-authoring a maintenance job |
+| ✅ ~~The Query Library never calls `POST /queries/{id}/run`~~ — resolved: *Run saved* calls it (`QueriesService`) | | |
+| ✅ ~~No UI triggers `materialize`; no committed job schedules one~~ — resolved 2026-09-14: Materialize in the Dataset editor, `POST /datasets/{id}/materialize`, `orders_by_region_materialize_job.toon` (§3.6) | | |
 | **`memory_limit` had no default in code** while two pages said it did | `DuckDbUtil.memoryLimit` → DuckDB default; `BACKLOG.md` GAP-4 | Corrected in both pages with this spec; ✅ GAP-4 then shipped a code default 2026-09-26 |
 | **The `transform.dim.scd2` processor, `valid_to`, feed effective dates and per-row as-of joins are unbuilt**; `load: scd2` itself IS honoured (version store + single-instant `as_of`) | `ProcessorCatalog` `transform.dim.scd2` PLANNED; `ReferenceScd2CharacterizationTest` | A fact cannot be joined to the dimension as of its own event time |
 | **`DuckLakeRegistrar` has no test**; the warehouse runbook has no code | `inspecto-etl` test tree; `warehouse_setup.sql` at the repo root | `SP-SNK-03` is ✅ on the board for a registrar nothing exercises |
@@ -727,8 +726,8 @@ run time; `SchemaFieldTypes` at load (`MET`); `expression-guard` and `measure-gr
 
 | Gap | Evidence |
 |---|---|
-| **No client-side test of `/queries/{id}/run`** — no client code calls it | §2 |
-| **No test of a materialization from the product** — nothing in the product triggers one | §3.6 |
+| ✅ ~~No client-side test of `/queries/{id}/run`~~ — `queries.component.spec.ts` covers *Run saved* | §2 |
+| ✅ ~~No test of a materialization from the product~~ — `ControlApiDatasetMaterializeTest` drives the route | §3.6 |
 | **`DuckLakeRegistrar` has no test; the warehouse runbook has no code** | `inspecto-etl` test tree; repo root |
 | **Postgres coverage is opt-in and partial** — 9 of 12 families, only with a server | §3.8 |
 | **No test that the DuckDB session zone equals the host zone** — pinned by ⛔ comments at three call sites | `duckdb.md` |

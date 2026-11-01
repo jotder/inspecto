@@ -138,12 +138,13 @@ status header has an **unknown** status, not an unbuilt one: this index once cal
 "NOT APPROVED, NOTHING BUILT" for two days because the status was inferred from a missing header instead of
 from the code.
 
-Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (**252** `.md` files, counted 2026-10-31). The **154**
+Full list: [`archived-documents/plans-archive/`](archived-documents/plans-archive/) (**253** `.md` files, counted 2026-11-01). The **155**
 narrated here, newest first (⚠ 2026-09-08: two rows were missing — `record-transformer-replaces-map-plan`
 and `path-containment-unification` had been archived with no row — and the count read 46 over 52 rows; ⚠ both numbers had drifted again by 2026-09-13, reading 59 over 67 rows and 148 over 155 files, so **count them, never carry them forward**):
 
 | Archived plan | Archived | Its truth now lives in |
 |---|---|---|
+| [`2026-10-30-la-doc-code-discrepancies-plan`](archived-documents/plans-archive/2026-10-30-la-doc-code-discrepancies-plan.md) | 2026-11-01 — **SHIPPED** (`LA-DOC-CODE-SYNC-1`: the la-core hub reconciled with the code; the code half was already fixed by `5bbdc9c82`) | `okf/product/module/la-core/` (`architecture.md` §1, §3, §6, §7; `user-guide-link-analysis.md` §4, §15) |
 | [`space-data-root-plan`](archived-documents/plans-archive/space-data-root-plan.md) | 2026-10-31 — **SHIPPED** (`SPACE-DATA-ROOT-1`: a Space's `data/`, `audit/` and `duckdb/` on another volume via `space.toon data_root` or `-Dspaces.data.root`, ownership stamp, overlap refusal, Space references `<id>.ref`; residual `SPACE-DATA-ROOT-CONFIG-AUDIT-1`) | [`module/config/architecture-spaces.md`](okf/product/module/config/architecture-spaces.md), [`module/config/admin-guide-configuration-reference.md`](okf/product/module/config/admin-guide-configuration-reference.md) |
 | [`2026-10-31-la-investigation-tab-redesign-plan`](archived-documents/plans-archive/2026-10-31-la-investigation-tab-redesign-plan.md) | 2026-10-31 — **SHIPPED** (`LA-INVESTIGATE-UX-1`: the Investigation tab as one Expand filter every canvas expand uses, one-press Clean up, Redo, node-menu actions; residual `LA-INVESTIGATE-UX-2`) | [`module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §6.9.1, [`module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) |
 | [`la-product-next-plan`](archived-documents/plans-archive/la-product-next-plan.md) | 2026-10-30 — **SHIPPED** (`LA-PRODUCT-NEXT-1`: maker-checker on role and policy edits, LA Access page, Investigation access review, timeline scrubber, pattern from a selection and pattern packs, Possible duplicates; 5c measured and parked) |

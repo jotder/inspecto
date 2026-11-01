@@ -173,7 +173,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Contradiction to be aware of:** the readiness plan's DR-T6 row says `TILL-06` "at 82 %". The test and the manual say **97 %**. Quote 97 %.
 * **Proves:** whole-Dataset behaviour detectors are server-computed and read the whole Dataset, not the filtered view (manual §4.3, §9.8).
 * **If it goes wrong:** **Run Measure** stays disabled until the form is valid; the window is capped at 31 days, evaluated in UTC; 413/429 have plain
-  sentences (burst of 20 then one request per 3 s).
+  sentences (burst of 30 then one request per 2 s).
 
 ### S7. Members, roles and gates (3 min) [fm.analyst, ra.analyst, demo.manager, curl]
 * **Click:** as `fm.analyst`, Investigation header > **Members**: owner/lead `fm.analyst`, `admin` lead, `ra.analyst` and `fm.manager` reviewers. Then show

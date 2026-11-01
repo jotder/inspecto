@@ -73,9 +73,9 @@ has been amended in the same commit as this file.**
 
 | ID | Requirement (as it holds) | MoSCoW | Status of record | Edition of record |
 |---|---|---|---|---|
-| **OPS-1** | One **Signal** ledger; Events, Alerts and Notifications are *views* over it; live tail, saved views, CSV export | Must | ✅ SHIPPED (R4 unification 2026-07; Signal-primary flip 2026-07-18). **CORRECTION:** "live tail" is **client polling** (2–60 s, paused while the tab is hidden), not a push stream; the server's SSE `GET /signals/stream` exists and **has no client consumer**; there is no `/events/stream` | **Recording: All. Reading: S/E.** The feed routes (`/events*`) are the optional `inspecto-observability` module (EDG-01 cell 6, 2026-09-08); Personal answers `503` naming the module and the SPA shows an explained state. The board's bare `All` is half true |
+| **OPS-1** | One **Signal** ledger; Events, Alerts and Notifications are *views* over it; live tail, saved views, CSV export | Must | ✅ SHIPPED (R4 unification 2026-07; Signal-primary flip 2026-07-18). **CORRECTION:** "live tail" is **client polling** (2–60 s, paused while the tab is hidden), not a push stream, with the server's SSE `GET /signals/stream` now consumed too — the Events pane subscribes through `EventsService.stream()` and keeps polling as the fallback (`CONSUMER-PAIRS-1`); there is no `/events/stream` | **Recording: All. Reading: S/E.** The feed routes (`/events*`) are the optional `inspecto-observability` module (EDG-01 cell 6, 2026-09-08); Personal answers `503` naming the module and the SPA shows an explained state. The board's bare `All` is half true |
 | **OPS-2** | **Metrics**, Prometheus-compatible — throughput, error rate, lag, run durations | Must | ✅ SHIPPED. **CORRECTION:** the cell said the exposition is "core and ungated in every bundle; the gating is EDG-01 debt". **False since 2026-09-07** — EDG-01 cell 5 moved `GET /metrics` into `inspecto-observability`; on Personal the path answers `503` with no `# HELP` leak. `MetricRegistry` stays core. "Deliberately unauthenticated" is *true* (`ControlApi.PUBLIC_PATHS`) and is precisely **why** the ungated Personal exposure was the P1 that started EDG-01 | **S/E** for the scrape. `GET /metrics/acquisition` (JSON, core, **authenticated** — not in `PUBLIC_PATHS`) is **All**. ⚠ `BACKLOG.md` §5 said this row "says `All`" — it says `S/E`; struck 2026-09-08 |
-| **OPS-3** | Three-layer audit: file/batch audit ledgers, provenance rows, an **append-only who-did-what Audit Log** | Must | ✅ SHIPPED. **CORRECTIONS (three):** (a) the log is **append-only by construction of the write path, NOT tamper-evident** — no hash, chain or signature exists (`compliance/controls-matrix.md` AU-9); `EDITIONS.md` SEC-09 said "tamper-evident" and `USER_GUIDE.md`/`GLOSSARY.md` said "immutable" — amended. (b) **Sign-ins are not audited**: `AuditTrail` records mutating `POST/PUT/PATCH/DELETE`, export `GET`s and access-denied attempts; authentication events are out of scope (BACKLOG §6 standing entry). `USER_GUIDE.md` §3 and the GLOSSARY entry listed "sign-ins/logins" — amended. (c) The audit CSV export is **core** `GET /audit/export?format=csv` since 2026-09-08 (`AuditLogRoutes`), no longer a branch of `/events/export` | **All** (recording *and* reading — the one observability read that stays on Personal; EDITIONS §Audit) |
+| **OPS-3** | Three-layer audit: file/batch audit ledgers, provenance rows, an **append-only who-did-what Audit Log** | Must | ✅ SHIPPED. **CORRECTIONS (three):** (a) the log is **append-only by construction of the write path, and tamper-EVIDENT since 2026-09-27** (`ASSURE-AUDIT-CHAIN-1`: a per-Space hash chain plus MAC-signed daily anchors, checked by `GET /audit/verify`, `AuditVerifier`) — but not tamper-proof or immutable (`compliance/controls-matrix.md` AU-9). (b) **Sign-ins are audited**: besides mutating `POST/PUT/PATCH/DELETE`, export `GET`s and access-denied attempts, the `/auth/*` session routes write typed rows through `AuditTrail.authentication()` (category `authentication`, actions `auth.exchange` / `refresh` / `logout`). *(Both corrected 2026-11-01: this cell said neither existed.)* (c) The audit CSV export is **core** `GET /audit/export?format=csv` since 2026-09-08 (`AuditLogRoutes`), no longer a branch of `/events/export` | **All** (recording *and* reading — the one observability read that stays on Personal; EDITIONS §Audit) |
 | **OPS-4** | Durable **Run reporting** — success rate, p50/p95 | Should | ✅ SHIPPED. **CORRECTION:** "off by default" is true of **one of three** ledgers only. The **batch-audit report** (`GET /status`, `/report`, `/runs/{name}/report`, p50/p95/**p99**, `?from&to`) reads the status store, whose backend default is **`db` since 2026-08-31** — always on. The **file run log** (`jobs_audit/jobs_runs.csv` + JSONL) is always on. Only the **job-run DB projection** (`/jobs/metrics|runs|failures`, T27) is off (`-Djobs.backend` default `none`, `404` until set) | All |
 | **OPS-5** | Per-edge **Provenance** + conservation invariant → Alerts + an edge-weight overlay | Should | 🟡 PARTIAL — built, tested, **default off** (`-Dprovenance.backend` default `none`; `/provenance*` answers `404` until `duckdb`); verified against synthetic data only; the live soak is BACKLOG §2. **CORRECTION:** there is **no Sankey component** — the pipeline editor paints per-edge record counts as weight labels on the canvas edges (T17). The wording "Sankey overlay" is the design's name for that; the row keeps it, this file names what shipped | All |
 | **OPS-6** | Record-level lineage & replay | **Won't (now)** | — per-batch ancestry is the accepted grain (`/runs/{name}/lineage`, `/lineage?store=`) | — |
@@ -204,7 +204,7 @@ id of the Signal that triggered a Run (a mirror's root is deliberately `null`) �
 | Route | Home | Edition | Notes |
 |---|---|---|---|
 | `GET /events[?limit]`, `/events/search[?level&type&pipeline&correlationId&q&from&to&limit&offset]`, `/events/{id}`, `/events/export[?format=csv\|json&…]`, `GET\|POST /events/views`, `POST /events/views/{id}/delete` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` | S/E | Absent the module, `AbsentModuleRoutes` (core) answers `503` naming it on every path. **Recording is not gated.** `/bootstrap.features.events` tells the SPA |
-| `GET /signals`, `/signals/tree?correlationId=&limit=`, `/signals/stream` (SSE with heartbeat comments) | `inspecto/src/main/java/com/gamma/control/SignalRoutes.java` | All | `correlationId` is **required** on the tree (400 otherwise — "a tree without an anchor is an unbounded forest"); `/signals/stream` has **no SPA consumer** (§5) |
+| `GET /signals`, `/signals/tree?correlationId=&limit=`, `/signals/stream` (SSE with heartbeat comments) | `inspecto/src/main/java/com/gamma/control/SignalRoutes.java` | All | `correlationId` is **required** on the tree (400 otherwise — "a tree without an anchor is an unbounded forest"); `/signals/stream` is consumed by the Events pane (`EventsService.stream()`) |
 | `GET /audit/search`, `/audit/export?format=csv` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java` | All | Fail-closed to `type=AUDIT\|ACCESS_DENIED`; the auditor's evidence CSV (§3.3) |
 
 Saved views persist through `SavedViewStore` (`inspecto-event`). The SPA's `EventsService` and
@@ -323,10 +323,12 @@ success → one row; the OOM rethrow → one row). The suite goes red with the r
 doubled.
 
 **Durability claims, exactly.** The trail is **append-only by construction** — one write seam, no update
-or delete route, 405 inherent to dispatch — and that is the whole claim. It is **not tamper-evident** (no
-hash chain, no signature), not permission-hardened (no `PosixFilePermission` call exists repo-wide), and
+or delete route, 405 inherent to dispatch — plus, since 2026-09-27 (`ASSURE-AUDIT-CHAIN-1`), **tamper-evident**:
+a per-Space hash chain with MAC-signed daily anchors that `GET /audit/verify` recomputes, naming the first bad
+record. It is still not tamper-proof (a chain rewritten end to end after the last anchor needs an anchor kept
+off the box), not permission-hardened (no `PosixFilePermission` call exists repo-wide), and
 the in-memory backend **drops** on restart; the Parquet backend's buffer drops after 50k events on sustained
-flush failure (`controls-matrix.md` AU-9). Anyone who needs evidential integrity must add it; see §5.
+flush failure (`controls-matrix.md` AU-9). *(Corrected 2026-11-01: this said there was no hash chain.)*
 
 **Crash durability (operator, 2026-09-26).** On the Parquet backend **an audit row is on disk once its request
 is answered**: every buffered event is also written to a write-ahead journal (`<eventsDir>/pending.jsonl`, one
@@ -742,17 +744,14 @@ the form authors the kind), and per-measure limits.
 > **crosses** areas; a spec holds what belongs to **one**. See
 > [`archived-documents/plans-archive/post-consolidation-sprints.md`](../../../../archived-documents/plans-archive/post-consolidation-sprints.md) §Sprint 2.
 
-1. **`GET /signals/stream` (SSE) has no client.** The Events pane polls; nothing in `inspecto-ui/src/app`
-   opens an `EventSource`. The sixth instance of *server half shipped, no consumer* — not a Must this time
-   (OPS-1's "live tail" is met by polling), but it belongs in the same product conversation as the five
-   Musts (`If-Match`, cursor pagination, `permissions[]`, `POST /queries/{id}/run`, Expectations).
+1. ✅ **CLOSED — `GET /signals/stream` (SSE) has a client.** The Events pane subscribes through
+   `EventsService.stream()` (an `EventSource`), polling stays as the fallback (`CONSUMER-PAIRS-1`).
 2. **No `event_prune` Job instance ships anywhere** (`spaces/`, `docs/ops`), so the one-year audit window
    is stated policy on every deployment that does not author it. Either ship a disabled template in
    `spaces/demo` (like `retention_job_template`) or record the omission as a deliberate operator act the
    way `incident_purge` is.
-3. **Tamper-evidence is a promise with no owner.** `SEC-09`'s title, `USER_GUIDE.md` §3 and the GLOSSARY
-   said it; AU-9 says explicitly not. Corrected to "append-only" here; whether evidential integrity (hash
-   chain / signed partitions) is ever wanted needs a product decision, not a doc edit.
+3. ✅ **CLOSED 2026-09-27 — tamper-evidence shipped** (`ASSURE-AUDIT-CHAIN-1`: hash chain, signed daily
+   anchors, `GET /audit/verify`; AU-9 evidence §6).
 4. **The Overview's raw-metrics toggle on Personal** calls `/metrics` and receives `503`; the tile has a
    per-call `catchError` but whether it renders the *explained* state (module absent) rather than a
    generic failure was not verified.
