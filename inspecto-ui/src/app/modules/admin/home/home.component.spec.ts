@@ -60,9 +60,7 @@ function create(s: Stubs = {}) {
     };
     const events = {
         signalCount: vi.fn((_type: string) =>
-            s.writesError
-                ? throwError(() => s.writesError)
-                : of(s.writes ?? { count: 0, datasets: 0, capped: false }),
+            s.writesError ? throwError(() => s.writesError) : of(s.writes ?? { count: 0, datasets: 0, capped: false }),
         ),
     };
     const session = {
@@ -130,8 +128,22 @@ describe('HomeComponent', () => {
         const { el } = create({ runs: [] });
         expect(el.querySelector('h1')?.textContent).toContain('Welcome to Inspecto.');
         expect(el.textContent).toContain('Nothing has been onboarded yet');
-        expect(el.textContent).toContain('Onboard a Stream');
         expect(el.textContent).not.toContain('Needs attention');
+    });
+
+    it('first run leads with Add data; Onboard a Stream stays the advanced start (ONBOARDING-FIRST-RUN-1 C3, OF-3)', async () => {
+        const { el } = create({ runs: [] });
+        expect(el.querySelector('[data-testid="home-add-data"]')?.getAttribute('href')).toBe('/add-data');
+        expect(el.querySelector('[data-testid="home-onboard-stream"]')?.getAttribute('href')).toBe(
+            '/catalog?onboard=stream',
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it('Add data is offered without the connection-onboarding right; the advanced start is not', () => {
+        const { el } = create({ runs: [], can: { onboard: false } });
+        expect(el.querySelector('[data-testid="home-add-data"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="home-onboard-stream"]')).toBeNull();
     });
 
     // The run-history call needs the DuckDB jobs backend. A failure there is NOT an empty install, and
