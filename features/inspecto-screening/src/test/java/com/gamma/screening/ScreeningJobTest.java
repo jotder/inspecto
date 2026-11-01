@@ -99,6 +99,10 @@ class ScreeningJobTest {
 
             Map<String, Map<String, Object>> hits = hitsBySubject(cfg);
             assertEquals(3, hits.size(), hits.keySet().toString());
+            Map<String, Object> index = ScreeningHits.dedupeIndex(cfg);
+            for (Map<String, Object> h : hits.values()) assertEquals(h.get("dedupeKey"), index.get(h.get("id")));
+            assertTrue(java.nio.file.Files.isRegularFile(cfg.resolve(ScreeningHits.DIR).resolve(ScreeningHits.INDEX)),
+                    "the Run saves its dedupe index");
             assertEquals("vladimir putin", hits.get("c1").get("entry"));
             assertEquals("name", hits.get("c1").get("method"));
             assertEquals("Putin, Vladimir", hits.get("c1").get("subjectName"));
@@ -124,6 +128,37 @@ class ScreeningJobTest {
             assertEquals(3, ScreeningHits.list(cfg).size());
             assertEquals("dismissed", ScreeningHits.read(cfg, String.valueOf(c1.get("id"))).get("state"),
                     "a dismissed hit stays dismissed");
+
+            // The index covers every hit now, so a Run never reads a hit document again (D6).
+            Files.writeString(ScreeningLists.hitFile(cfg, String.valueOf(hits.get("c2").get("id"))), "not json");
+            assertTrue(js.triggerRun("nightly", null).isPresent());
+            JobRun third = await(() -> js.lastRunOf("nightly").orElse(null), second.runId());
+            assertEquals("SUCCESS", third.status(), "a Run read a hit the index covers: " + third.message());
+            assertTrue(third.message().contains("0 new hit(s)"), third.message());
+        }
+    }
+
+    @Test
+    void aRunNeverOverwritesAHitWithASameSecondId(@TempDir Path dir) throws Exception {
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        plant(cfg, data);
+        System.setProperty("assist.write.root", cfg.toString());
+        System.setProperty("data.dir", data.toString());
+        java.util.concurrent.atomic.AtomicInteger draws = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.IntSupplier before = ScreeningHits.random;
+        // The first three draws are equal: the second hit is raised with the first hit's id (in the same second).
+        ScreeningHits.random = () -> { int k = draws.getAndIncrement(); return k < 3 ? 7 : k; };
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(job(Map.of())), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString(), null, null, data.toString())) {
+            js.start();
+            assertTrue(js.triggerRun("nightly", null).isPresent());
+            JobRun run = await(() -> js.lastRunOf("nightly").orElse(null), "");
+            assertEquals("SUCCESS", run.status(), "run failed: " + run.message());
+            assertTrue(run.message().contains("3 new hit(s)"), run.message());
+            assertEquals(3, ScreeningHits.list(cfg).size(), "every raised hit keeps its own document");
+        } finally {
+            ScreeningHits.random = before;
         }
     }
 

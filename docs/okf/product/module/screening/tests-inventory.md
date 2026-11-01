@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.screening`](../../../../../product-map/module/screening.toon).
 
-12 test class(es): 11 unit, 1 real-HTTP control-plane, 0 IT.
+13 test class(es): 12 unit, 1 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl features/inspecto-screening -Dtest=ControlApiScreeningTest,Scree
 | `NameMatcherGoldenTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/NameMatcherGoldenTest.java` | Golden pin of the Screening name method's Jaro-Winkler and Match Score, written BEFORE the token metric moved to <!-- vocab-allow: quoted Javadoc --> |
 | `NameMatcherTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/NameMatcherTest.java` | Golden pairs for the Screening name method (SCR-D3). Each group is judged against the default threshold |
 | `ScreenerTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/ScreenerTest.java` | {@link Screener} over a real Entity List fact log (SCR-D3 … SCR-D9, SCR-D14). |
+| `ScreeningHitsScaleMeasureTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/ScreeningHitsScaleMeasureTest.java` | D6 (SCREENING-1): how long a Run's dedupe pass takes over N stored hits, without the index (every document read) |
 | `ScreeningHitsTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/ScreeningHitsTest.java` | The Screening Hit store and state machine (SCR-D10 … SCR-D12). |
 | `ScreeningJobTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/ScreeningJobTest.java` | The {@code screening.run} Job over a real Parquet Dataset (SCR-D7, SCR-D8, SCR-D11): it raises one open hit per |
 | `ScreeningJobTypeManifestTest` | `com.gamma.screening` | unit | `features/inspecto-screening/src/test/java/com/gamma/screening/ScreeningJobTypeManifestTest.java` | {@code provides.jobTypes} of this module's manifest equals the Job Types its providers register. |

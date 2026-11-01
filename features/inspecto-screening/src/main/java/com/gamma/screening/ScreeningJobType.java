@@ -137,8 +137,8 @@ public final class ScreeningJobType implements JobTypeProvider {
             source.put("dataset", p.dataset());
             int screened = 0, matched = 0, raised = 0;
             synchronized (ScreeningHits.lock()) {
-                Set<Object> known = new HashSet<>();
-                for (Map<String, Object> h : ScreeningHits.list(writeRoot)) known.add(h.get("dedupeKey"));
+                Map<String, Object> index = ScreeningHits.dedupeIndex(writeRoot);
+                Set<Object> known = new HashSet<>(index.values());
                 for (Map<String, Object> row : rows.rows()) {
                     Object key = row.get(p.keyField());
                     if (key == null) continue;
@@ -154,10 +154,15 @@ public final class ScreeningJobType implements JobTypeProvider {
                                 masked(masker, p.dataset(), p.nameField(), name), masked(masker, p.dataset(), p.idField(), id));
                         Map<String, Object> hit = ScreeningHits.raise(stored, m, p.threshold(), source, actor);
                         hit.put("dedupeKey", dedupe);   // keyed on the subject key, which is never masked
+                        hit.put("id", ScreeningHits.freshId(index, String.valueOf(hit.get("id")),   // a same-second id
+                                Instant.parse(String.valueOf(hit.get("raisedAt"))),                   // would overwrite a hit
+                                ScreeningHits.random));
                         ScreeningHits.save(writeRoot, hit);
+                        index.put(String.valueOf(hit.get("id")), dedupe);
                         raised++;
                     }
                 }
+                ScreeningHits.saveIndex(writeRoot, index);
             }
             Map<String, Object> attrs = new LinkedHashMap<>();
             attrs.put("job", cfg.name());

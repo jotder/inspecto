@@ -38,7 +38,9 @@ List, are refused at save (422); a draft (`enabled: false`) may name ones that d
 
 - One HMAC-signed JSON per hit at `<write-root>/screening-hits/<id>.json`, signed with the Space's Pending Change
   key. Reserved from every import, skipped by the whole-Space export, carried by backup (compliance evidence).
-- No retention: hits are kept. A Run lists every hit to dedupe; fine for thousands, not for millions.
+- No retention: hits are kept. A Run dedupes through `screening-hits/dedupe-index.json` (signed); deleting or
+  editing that file is safe, the next Run rebuilds it from the hits (slowly: ~12.5 ms a hit on Windows). The hit list
+  in the pane still reads every hit, so it slows down past a few thousand hits.
 - Audit rows `screening.run.hits`, `screening.hit.decided`, `screening.hit.revealed`; never the screened name.
 
 ## Common failures

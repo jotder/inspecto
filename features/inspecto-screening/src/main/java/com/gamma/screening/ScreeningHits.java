@@ -53,6 +53,7 @@ public final class ScreeningHits {
 
     static final String DIR = "screening-hits";
     static final String DOMAIN = "screening-hit";
+    static final String INDEX = "dedupe-index.json", INDEX_DOMAIN = "screening-hit-index";
     static final Pattern SAFE_ID = Pattern.compile("sh-\\d{14}-[0-9a-f]{6}");
 
     static final String OPEN = "open", CONFIRMED = "confirmed", DISMISSED = "dismissed", ESCALATED = "escalated",
@@ -92,7 +93,7 @@ public final class ScreeningHits {
                                      Map<String, Object> source, String by) {
         Instant at = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         Map<String, Object> rec = new LinkedHashMap<>();
-        rec.put("id", "sh-" + STAMP.format(at) + "-" + String.format("%06x", ThreadLocalRandom.current().nextInt(1 << 24)));
+        rec.put("id", newId(at));
         rec.put("recordType", DOMAIN);
         rec.put("state", OPEN);
         rec.put("version", 1);
@@ -111,6 +112,24 @@ public final class ScreeningHits {
         rec.put("raisedBy", by);
         rec.put("history", new ArrayList<>(List.of(step(OPEN, by, at.toString(), null))));
         return rec;
+    }
+
+    /** {@code sh-<UTC second>-<24 random bits>}: unique only by chance, so a Run takes one with {@link #freshId}. */
+    static String newId(Instant at) {
+        return id(at, random.getAsInt());
+    }
+
+    /** The 24 random bits of an id; a test pins it to force a same-second collision. */
+    static volatile java.util.function.IntSupplier random = () -> ThreadLocalRandom.current().nextInt(1 << 24);
+
+    private static String id(Instant at, int random) {
+        return "sh-" + STAMP.format(at) + "-" + String.format("%06x", random & 0xffffff);
+    }
+
+    /** {@code id} unless {@code taken} already holds it (saving it would overwrite that hit), else a new one. */
+    static String freshId(Map<String, ?> taken, String id, Instant at, java.util.function.IntSupplier random) {
+        while (taken.containsKey(id)) id = id(at, random.getAsInt());
+        return id;
     }
 
     /** Move {@code rec} to {@code state}: bump the version, record who / when / why, append to history. */
@@ -211,6 +230,67 @@ public final class ScreeningHits {
         }
         out.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("id"))).reversed());
         return out;
+    }
+
+    /**
+     * The Run's dedupe index (SCREENING-1 D6): {@code <write-root>/screening-hits/dedupe-index.json}, hit id →
+     * {@code dedupeKey}, signed under its own domain. A Run reads this one file and only the hit documents it does
+     * not cover, instead of every document (measured 2026-11-01 at ~12.5 ms a document cold on Windows: 20 000 hits
+     * took 253 s under the hit lock). An index whose MAC does not verify, or that cannot be parsed, is rebuilt from
+     * the documents; an id whose document is gone is dropped. Lives inside {@code screening-hits/}, so import,
+     * export and backup treat it as they treat the hits. Call under {@link #lock()}; the caller saves it back with
+     * {@link #saveIndex} once it has added the hits it raised.
+     */
+    static Map<String, Object> dedupeIndex(Path root) throws IOException {
+        Path d = dir(root);
+        if (!Files.isDirectory(d)) return new LinkedHashMap<>();
+        Set<String> ids = new java.util.HashSet<>();
+        try (Stream<Path> s = Files.list(d)) {
+            for (Path p : s.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
+                String id = p.getFileName().toString().replaceFirst("\\.json$", "");
+                if (SAFE_ID.matcher(id).matches()) ids.add(id);
+            }
+        }
+        Map<String, Object> keys = readIndex(root);
+        keys.keySet().retainAll(ids);
+        for (String id : ids) {
+            if (keys.containsKey(id)) continue;
+            Map<String, Object> rec = read(root, id);
+            if (rec != null) keys.put(id, rec.get("dedupeKey"));
+        }
+        return keys;
+    }
+
+    /** The index's entries, or empty when it is absent, unreadable or fails its MAC (then it is rebuilt). */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> readIndex(Path root) throws IOException {
+        Path f = dir(root).resolve(INDEX);
+        if (!Files.isRegularFile(f)) return new LinkedHashMap<>();
+        Map<String, Object> doc;
+        try {
+            doc = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
+        } catch (IOException unreadable) {
+            return new LinkedHashMap<>();
+        }
+        if (doc == null) return new LinkedHashMap<>();   // a file holding just `null`
+        Object claimed = doc.remove(MAC);
+        String expected = PendingChanges.domainMac(root, INDEX_DOMAIN, doc);
+        boolean ok = claimed instanceof String c && MessageDigest.isEqual(
+                c.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8))
+                && INDEX_DOMAIN.equals(doc.get("recordType")) && doc.get("keys") instanceof Map<?, ?>;
+        return ok ? new LinkedHashMap<>((Map<String, Object>) doc.get("keys")) : new LinkedHashMap<>();
+    }
+
+    /** Persist the dedupe index, signed. */
+    static void saveIndex(Path root, Map<String, Object> keys) throws IOException {
+        Path f = dir(root).resolve(INDEX);
+        Files.createDirectories(f.getParent());
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("recordType", INDEX_DOMAIN);
+        doc.put("keys", keys);
+        Map<String, Object> normal = ApiContext.JSON.readValue(ApiContext.JSON.writeValueAsBytes(doc), MAP);
+        normal.put(MAC, PendingChanges.domainMac(root, INDEX_DOMAIN, normal));
+        AtomicFiles.write(f, ApiContext.JSON.writeValueAsBytes(normal), ".shi-");
     }
 
     /** The wire shape: the record without its MAC. */

@@ -86,6 +86,17 @@ screened subjects, matches and new hits. Test: `ScreeningJobTest`.
   subjectIdentifier, source {job, runId, dataset}, raisedAt, raisedBy, decidedBy, decidedAt, reason, history[]`.
 - **Identity**: `dedupeKey = sha256(listId, entry, subjectKey)`; a Run never raises a second hit for a key that has one in
   any state, so a dismissed false positive stays dismissed until the list entry changes.
+- **Dedupe index** (D6, 2026-11-01): `screening-hits/dedupe-index.json`, hit id → `dedupeKey`, signed with the same key
+  under domain `screening-hit-index`. A Run lists the directory's file names, keeps the index entries whose document
+  still exists, reads only the documents the index does not cover, and saves the index back with the hits it raised.
+  An index whose MAC does not verify or that cannot be parsed is rebuilt from the documents (one slow Run, never a
+  wrong one); re-keying an entry would suppress another subject's hit, so the MAC matters. It sits inside
+  `screening-hits/`, so import, export and backup treat it like the hits; no lockstep change was needed. ⚠ The index is
+  trusted for the ids it covers: a hit document edited on disk after it was indexed keeps its indexed key (the MAC
+  defends the import door, not a local administrator).
+- **Hit ids** are `sh-<UTC second>-<24 random bits>`. A Run takes an id no hit already holds (`ScreeningHits.freshId`
+  against the index): before 2026-11-01, two hits of one Run drawing the same id in the same second overwrote each
+  other (about 0.5 expected in a 100 000-hit Run).
 - **States**: `open → confirmed · dismissed · escalated`, `escalated → confirmed · dismissed`; `confirmed` and `dismissed`
   are final. Every decision bumps `version` and appends `{state, by, at, reason}` to `history`.
 - **Audit**: `EventType.AUDIT` rows `screening.run.hits` (one per Run: counts) and `screening.hit.decided` (hit id, list,
@@ -136,8 +147,12 @@ The Check a name result has one row per name: a name with no match shows *Checke
   token). Muhammad / Mohamed now match (the phonetic skeleton folds `o` to `u`, 2026-10-14); a Cyrillic token that holds a
   letter with no Latin look-alike (Виктор, Сергей) is transliterated by sound (viktor, sergei) and so reaches its Latin
   entry, while a look-alike-only or Latin-mixed token (`Pаvel`) keeps the look-alike fold.
-- A Run lists every hit document to dedupe (no index); fine for thousands of hits, not for millions.
-- `check` cannot raise hits (D4, decided 2026-10-14: stays read-only; raising belongs to the Job under `canWorkIncidents`); no Space-level threshold default (D5: not until a customer asks; SCR-D2 declined a settings file); no dedupe index (D6: measure at 100 000 hits first); an initial-letter difference that is not a known transliteration is never compared (D7: needs a full cross-join). Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO beats 6 and 7 built the same day.
+- A Run dedupes through the index (D6, built 2026-11-01): measured on Windows, reading every hit document took 62 s at
+  5 000 hits, 253 s at 20 000 and 1 030 s at 100 000, all under the hit lock; the indexed pass over 100 000 hits takes
+  0.5 s. Re-measure with `-Dscreening.measure=<hits>` on `ScreeningHitsScaleMeasureTest` (opt-in, skipped otherwise). ⚠ Still open: `GET /screening/hits` (the pane)
+  reads and verifies EVERY hit document on each call and is unpaginated, at the same ~12.5 ms a document cold, so
+  20 000 hits take about 4 minutes to list; it needs its own summary index or paging.
+- `check` cannot raise hits (D4, decided 2026-10-14: stays read-only; raising belongs to the Job under `canWorkIncidents`); no Space-level threshold default (D5: not until a customer asks; SCR-D2 declined a settings file); an initial-letter difference that is not a known transliteration is never compared (D7: needs a full cross-join). Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO beats 6 and 7 built the same day.
 
 ## Demo script and rehearsal (2026-10-14, Enterprise Demo Auth bundle, Space `screening-demo` from the `aml` template)
 Boot: `node tools/seed-screening-demo.mjs --spaces inspecto-demo/spaces` (roster), serve the bundle, sign in as Demo Admin, run it

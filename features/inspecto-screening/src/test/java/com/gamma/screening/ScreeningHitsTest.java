@@ -70,6 +70,64 @@ class ScreeningHitsTest {
     }
 
     @Test
+    void theDedupeIndexCoversEveryHitAndFollowsTheDirectory(@TempDir Path root) throws Exception {
+        String a = ScreeningLists.seedHit(root, "c1", "Vladimir Putin", "sanctions", "vladimir putin", 0.97);
+        String b = ScreeningLists.seedHit(root, "c2", "Kim Jong Un", "sanctions", "kim jong un", 0.95);
+        Map<String, Object> index = ScreeningHits.dedupeIndex(root);
+        assertEquals(Map.of(a, ScreeningHits.dedupeKey("sanctions", "vladimir putin", "c1"),
+                b, ScreeningHits.dedupeKey("sanctions", "kim jong un", "c2")), index);
+        ScreeningHits.saveIndex(root, index);
+        assertTrue(Files.isRegularFile(root.resolve(ScreeningHits.DIR).resolve(ScreeningHits.INDEX)));
+        assertEquals(List.of(a, b).stream().sorted().toList(),
+                ScreeningHits.list(root).stream().map(r -> String.valueOf(r.get("id"))).sorted().toList(),
+                "the index file is not listed as a hit");
+
+        String c = ScreeningLists.seedHit(root, "c3", "Ali Hassan", "pep", "ali hassan", 0.9);
+        Files.delete(ScreeningLists.hitFile(root, a));
+        assertEquals(Map.of(b, ScreeningHits.dedupeKey("sanctions", "kim jong un", "c2"),
+                c, ScreeningHits.dedupeKey("pep", "ali hassan", "c3")), ScreeningHits.dedupeIndex(root),
+                "a hit written after the index is read; a hit whose document is gone is dropped");
+    }
+
+    @Test
+    void aHitTheIndexCoversIsNotReadAgain(@TempDir Path root) throws Exception {
+        String id = ScreeningLists.seedHit(root, "c1", "Vladimir Putin", "sanctions", "vladimir putin", 0.97);
+        ScreeningHits.saveIndex(root, ScreeningHits.dedupeIndex(root));
+        Files.writeString(ScreeningLists.hitFile(root, id), "not json");
+        assertThrows(java.io.IOException.class, () -> ScreeningHits.list(root), "listing reads every document");
+        assertEquals(Map.of(id, ScreeningHits.dedupeKey("sanctions", "vladimir putin", "c1")),
+                ScreeningHits.dedupeIndex(root), "the Run reads the index, not the covered document");
+    }
+
+    @Test
+    void anEditedIndexIsRebuiltFromTheDocuments(@TempDir Path root) throws Exception {
+        String id = ScreeningLists.seedHit(root, "c1", "Vladimir Putin", "sanctions", "vladimir putin", 0.97);
+        String real = ScreeningHits.dedupeKey("sanctions", "vladimir putin", "c1");
+        ScreeningHits.saveIndex(root, ScreeningHits.dedupeIndex(root));
+        Path f = root.resolve(ScreeningHits.DIR).resolve(ScreeningHits.INDEX);
+        // Re-keying an entry to another subject's key would suppress that subject's hit forever.
+        String suppress = ScreeningHits.dedupeKey("sanctions", "kim jong un", "c2");
+        Files.writeString(f, Files.readString(f).replace(real, suppress));
+        assertEquals(Map.of(id, real), ScreeningHits.dedupeIndex(root), "an index that fails its MAC is rebuilt");
+        Files.writeString(f, "{broken");
+        assertEquals(Map.of(id, real), ScreeningHits.dedupeIndex(root), "an unreadable index is rebuilt");
+        Files.writeString(f, "null");
+        assertEquals(Map.of(id, real), ScreeningHits.dedupeIndex(root), "an index of null is rebuilt");
+    }
+
+    @Test
+    void aFreshIdNeverReusesATakenOne() {
+        java.time.Instant at = java.time.Instant.parse("2026-11-01T10:00:00Z");
+        String taken = "sh-20261101100000-00002a";
+        int[] draws = {0x2a, 0x2a, 0x2b};
+        int[] n = {0};
+        assertEquals("sh-20261101100000-00002b",
+                ScreeningHits.freshId(Map.of(taken, "k"), taken, at, () -> draws[n[0]++]), "two taken draws are skipped");
+        assertEquals("sh-20261101100000-000001", ScreeningHits.freshId(Map.of(taken, "k"), "sh-20261101100000-000001",
+                at, () -> { throw new AssertionError("a free id is kept"); }));
+    }
+
+    @Test
     void theDedupeKeyDependsOnListEntryAndSubject() {
         String k = ScreeningHits.dedupeKey("l", "e", "s");
         assertEquals(k, ScreeningHits.dedupeKey("l", "e", "s"));

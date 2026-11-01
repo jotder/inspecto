@@ -26,6 +26,11 @@ Domain-neutral: the AML pack (`PACK-AML-1`) builds on it.
 - 2026-10-11: phonetic / transliteration block keys.
 - 2026-10-14: four-eyes on `confirmed` (D1), a confirm opens an Incident and a Case (D2), the audited reveal (D3),
   the save-time check of a `screening.run` Job, the *Check a name* dialog.
+- 2026-11-01: the dedupe index (D6; building it once the measurement crossed the trigger was assistant-decided under
+  operator delegation, pending confirmation). D6's trigger was measured, not assumed: reading every hit document
+  took ~12.5 ms a document cold on Windows, 1 030 s at 100 000 hits, all under the hit lock; the indexed pass takes 0.5 s. A Run now reads one signed
+  index file plus only the hits it does not cover. The same change keeps a Run from reusing a hit id another hit
+  already holds (a same-second id used to overwrite that hit).
 
 ## Left
 
@@ -35,6 +40,5 @@ Open items stay on the `SCREENING-1` row; the recorded limits are in the [spec](
 
 - `check` raising hits: refused (D4); raising belongs to the Job.
 - A Space-level threshold default: not until a customer asks (D5, SCR-D2).
-- A dedupe index: measure at 100 000 hits first (D6).
 - Comparing an initial-letter difference that is not a known transliteration: needs a full cross-join (D7).
 - A module-contributed capability: declined; `canWorkIncidents` decides.

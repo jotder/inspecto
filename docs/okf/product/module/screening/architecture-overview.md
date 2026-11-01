@@ -46,7 +46,8 @@ An add-on over the platform base. It reads Entity Lists (`entity-list` module), 
 4. **Hits** (`ScreeningHits`). One HMAC-signed JSON document per hit at `<write-root>/screening-hits/<id>.json`,
    the Action Requests storage pattern (atomic temp + move, signed under domain `screening-hit`). A forged or edited
    document reads back `integrity: invalid` and can never be decided. Identity: `dedupeKey = sha256(listId, entry,
-   subjectKey)`; a Run never raises a second hit for a key that already has one.
+   subjectKey)`; a Run never raises a second hit for a key that already has one. It finds them through the signed
+   dedupe index `screening-hits/dedupe-index.json` (hit id → key), reading only the hits the index does not cover.
 5. **Decide**. States `open -> confirmed | dismissed | escalated`, `escalated -> confirmed | dismissed`; confirmed
    and dismissed are final. Whoever escalated cannot confirm (four-eyes). A confirm opens an Incident and a Case
    for the subject key and its Dataset (`ScreeningCases`) - never the screened name - and stamps `caseId` /
