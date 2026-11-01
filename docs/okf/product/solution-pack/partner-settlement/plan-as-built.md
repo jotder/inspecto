@@ -1,16 +1,16 @@
 ---
 type: Feature
 title: "Partner settlement — decisions and as-built record"
-description: "Slices S0 to S5 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
+description: "Slices S0 to S6 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
 tags: [partner-settlement, plan, as-built]
 timestamp: 2026-11-01T00:00:00Z
 ---
 
 # Partner settlement — decisions and as-built record
 
-> **What this page is.** The durable record of slices **S0 to S5** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
-> 2026-10-21, S5 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
-> [admin guide](admin-guide.md). **Open work** (S6 to S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
+> **What this page is.** The durable record of slices **S0 to S6** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
+> 2026-10-21, S5 and S6 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
+> [admin guide](admin-guide.md). **Open work** (S7, S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
 > pack) lives in [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history: the archived original
 > [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md)
 > (sections 16 and 17 are the as-built narratives).
@@ -160,3 +160,48 @@ opens an Incident. ⚠ An SLA Policy stamps `dueAt` / `responseDueAt` on the SLA
 /objects/{id}/impact` takes `{"impact": {...}}`.
 ⚠ `affected-modules` does not name `ControlApiSpaceTemplateSeedGateTest` (directory `inspecto`, artifact `inspecto-processor`), which applies every template: run it
 when a template changes.
+
+## S6: aging, accruals and the dashboard
+
+Delivered: the Jobs `ps_aging` (`settlement_aging`) and `ps_accrual` (`settlement_accrual`) after `ps_rollforward` (the chain is now
+twelve Jobs), the payment-due Alert Rule `ps_payment_due` deferred from S5, the KPIs `ps_open_disputed`, `ps_aged_over_60`,
+`ps_accrued_unbilled`, three bar Widgets and the dashboard `settlement_overview`, and the runbook section. Now 19 Datasets (12
+Job-written), 4 Alert Rules.
+
+**Decisions made inside S6, under operator delegation, PENDING CONFIRMATION** (each reversible, none touches an engine):
+
+| ID | Decision | How to reverse |
+|---|---|---|
+| PS-S6-1 | Grain: one aging row per agreement and statement cycle (not per netting group): the payment due date, the dispute window and the statement date are per agreement cycle | Aggregate the aging by `netting_group` in a Widget, or a second Job |
+| PS-S6-2 | A payment names its agreement, not a cycle, so finance's payments and notes are applied to the agreement's cycles **oldest first** (FIFO), per agreement, direction and settlement currency; a cycle with a negative statement takes nothing; money beyond every cycle is not shown (the roll-forward carries it); records after `as_of` and statements received after it are not counted | A cycle reference on the payment feed (a Schema change) and an exact match before FIFO |
+| PS-S6-3 | Balances **and** disputes are aged from the received date of the current statement version. The plan's alternative, the Case's `DISPUTED` timestamp, cannot reach SQL; ageing from `settlement_dispute` gives the same date because a dispute line has no date of its own | An outcome feed exported from the Cases (the PS-S5-3 reversal) adding the date the Case reached `DISPUTED` |
+| PS-S6-4 | Buckets `0-30`, `31-60`, `61-90`, `90+` (both ends inclusive), boundaries as Job parameters; the labels follow them | Parameters only |
+| PS-S6-5 | `ps_payment_due` is a WARNING (an Alert, not an Incident: a payment reminder is not a dispute), one key per agreement cycle (`aging_key`), raised from `payment_alert_days` (default 5) before the due date and every day after while the balance is open; the balance includes the disputed amount | Severity on the rule file; `open_balance - open_disputed` in the flag |
+| PS-S6-6 | `ps_accrual` prices the latest re-rating run itself (the `ps_expected` pricing, without its due filter), because `settlement_expected` holds a cycle only once its statement is due or received; for a due cycle the two agree to the cent (pinned on D1 July) | Widen `ps_expected` with a status column (changes the compare's input and the S3 golden) |
+| PS-S6-7 | A statement-less cycle is `unbilled` up to and including `statement_due` and `statement_late` from the day after, which is the day `missing_statement` starts; it accrues in both states. A billed cycle accrues nothing unbilled (`accrued = expected - invoiced` only for a period with no statement, as the plan says) | Accrue the expected-minus-invoiced difference on billed cycles too |
+| PS-S6-8 | The dispute provision is `provision_pct` (default 100, PS-D7) of the absolute disputed amount of the cycle, whatever the Case outcome (PS-S5-3) | The outcome feed above |
+| PS-S6-9 | The KPI tiles count **one** settlement currency (`kpi_currency`, default USD, a Job parameter writing `kpi_` columns, since a KPI has no filter) and add payables and receivables as amounts at stake, never netted; the Widgets show every currency | Converting into a reporting currency with `fx_rate` (needs a reporting rate-type decision), or one KPI per direction |
+| PS-S6-10 | Amounts on the aging and accrual rows are in the agreement's direction (positive = owed in that direction), not signed from our side as the movements are; `direction` is on every row | One sign expression per Job |
+
+**Known limits.** A cycle with a statement but no rated usage at all has no accrual row (so no dispute provision). A cycle whose
+lines resolve to two directions, or to two agreement versions with a different `currency` or `netting_group`, gives two aging (and
+accrual) rows with the same key, and the cycle's `open_disputed` and dispute provision then appear on both (the corpus never does
+this; an agreement keeps its direction, currency and netting group inside one cycle). A cycle whose statement totals negative takes no
+payment; the corpus has none, so that branch is not exercised. The KPIs read `as_of` at day grain with no comparison (each run
+replaces the snapshot, so there is no previous day to compare).
+
+**Verification.** `PartnerSettlementAgingGoldenTest` (9, `inspecto-reconciliation`), described on the [architecture](architecture.md)
+page. The earlier goldens pass unchanged except the chain list and the template-shape counts. On the corpus as of 2026-08-20: 13 aged
+cycles, 10 payment-due Alerts, 15 accrual rows (D1 July `statement_late` 1702.0000, E1 July `unbilled` 2573.0000), KPI values 213.2351
+open disputed, 4660.0000 aged over 60 days, 4275.0000 accrued unbilled (USD).
+
+**Mutation pass** (six mutants, all pinned in the golden, each red for the named reason and each probe green on the shipped Job):
+payments applied newest cycle first (the oracle differs); the payment-date filter dropped (C1's first cycle as of 07-09 shows
+566.0000 open, not 1566.0000); the first bucket boundary made exclusive (D1 May at exactly 30 days reads `31-60`); the payment lead
+time made exclusive (C1's late-July cycle, due in exactly 5 days, goes silent); the KPI currency filter removed (the open-disputed tile
+reads 288.2352, C1's EUR 75.0001 added); the statement-due day counted late (E1 July reads `statement_late` on its due date).
+
+**Traps.** ⚠ Every Control API response is enveloped in `data`: a test reading `content` at the top level gets `null`. ⚠ A KPI has no
+filter: a measure is `agg(column)` over the whole Dataset, so a subset needs its own column. ⚠ `PARTNER_SETTLEMENT_REGENERATE=true`
+rewrites every seed byte-wise (same Schema): restore the unchanged ones (`git checkout -- spaces/_templates/partner-settlement/data`)
+before committing.

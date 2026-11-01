@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: settlement_aging
+controls:
+  x[1]{field}:
+    age_bucket_currency
+  y[1]{field,agg}:
+    open_balance,sum
+options:
+  title: Open balance by age bucket and currency

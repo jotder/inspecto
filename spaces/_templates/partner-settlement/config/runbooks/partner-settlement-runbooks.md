@@ -1,8 +1,8 @@
 # Partner settlement runbooks
 
-> **Slices S1 to S5** (open work: `docs/superpower/telco-packs-plan.md`): the References, statement ingestion, the
-> compare, the netting positions with the roll-forward, and disputes as Cases. There is no aging or accrual here yet, and no
-> evidence pack; those arrive with the next slices.
+> **Slices S1 to S6** (open work: `docs/superpower/telco-packs-plan.md`): the References, statement ingestion, the
+> compare, the netting positions with the roll-forward, disputes as Cases, and aging with accruals. There is no evidence pack
+> yet; it arrives with the next slice.
 
 **Every number here is synthetic.** No real partner statement, TAP file or wholesale invoice has been seen: the statement layout
 is one canonical Schema, and mapping a partner's own layout into it is a Pipeline mapping, outside this pack. A finding is a
@@ -10,7 +10,7 @@ difference between what a partner says is owed and what we price ourselves, neve
 
 ## What runs
 
-Ten chained `sql.template` Jobs (each runs when the previous one succeeds; the first runs daily at 01:00), the Case Rule Job `ps_dispute_case` (06:00) and two `recon.run` Jobs
+Twelve chained `sql.template` Jobs (each runs when the previous one succeeds; the first runs daily at 01:00), the Case Rule Job `ps_dispute_case` (06:00) and two `recon.run` Jobs
 (05:30):
 
 | Job | Writes | What it does |
@@ -25,9 +25,11 @@ Ten chained `sql.template` Jobs (each runs when the previous one succeeds; the f
 | `ps_movement` | `settlement_movement` | Every money movement at line level: each current statement line and each finance payment, credit or debit note, in the settlement currency, with both currencies, the FX rate, its date and its type, and a `status` (`ok`, `fx_missing`, `unknown_agreement`). Signed from our side: positive is what we owe. |
 | `ps_position` | `settlement_position` | Per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay) and `net_direction`, `orig_net` (the net in each original currency), the statement and line counts, `lines_unconverted`, and `disputed_amount` / `disputed_lines` beside the net (never netted into it). |
 | `ps_rollforward` | `settlement_rollforward` | Per netting group and settlement currency, one row for every month from the first movement to the as-of month: `opening` + `invoiced` - `paid` + `adjustments` = `closing`. A month with no movement carries the balance. |
+| `ps_aging` | `settlement_aging` | Per agreement and statement cycle: `invoiced` (the current statement, in the agreement's direction), `settled_applied` (finance's records up to `as_of`, applied oldest cycle first), `open_balance`, `open_disputed` and `disputed_lines`, `age_days` from the statement's received date, `age_bucket` (boundaries `aging_bucket_1`, `_2`, `_3`, default 30, 60, 90), `payment_due`, `days_to_payment_due` and `payment_alert` (1 when an open balance is within `payment_alert_days`, default 5, of its due date or past it). |
+| `ps_accrual` | `settlement_accrual` | Per agreement and closed cycle: `expected_amount` (the latest re-rating run, whether or not the statement is due), `invoiced_amount`, `status` (`billed`; `unbilled` up to and including `statement_due`; `statement_late` after it), `accrued_unbilled` (the expected amount while no statement has arrived), and `dispute_provision` (`provision_pct`, default 100, of the disputed amount). Reported, never posted. |
 | `ps_voice`, `ps_sms` | Break state | One Reconciliation per service family on `settlement_expected` vs `settlement_billed`: Break lifecycle, recurrence and the Incident. |
 
-The three Jobs that read the as-of day, `ps_calendar`, `ps_expected` and `ps_rollforward`, take an `as_of` parameter (a date, default today); pass the
+The Jobs that read the as-of day, `ps_calendar`, `ps_expected`, `ps_dispute`, `ps_rollforward`, `ps_aging` and `ps_accrual`, take an `as_of` parameter (a date, default today); pass the
 same date to both to reproduce a past day. Only cycles that ended before `as_of` are calendared, and a cycle's expected amounts are
 compared only once its statement is received or its `statement_due` is before `as_of`.
 
@@ -113,6 +115,31 @@ Without these, the Cases still open and group, on the built-in CASE workflow (no
 amount disputed with the partner (when the Case reaches `DISPUTED`; `settlement_dispute.disputed_amount` summed over its lines is the
 starting figure), `confirmed` = the credit the partner accepted (`AGREED`), `recovered` = the credit note received (recorded on the
 closed Case), `prevented` = a variance caught before we paid. The pack never writes the Impact itself.
+
+## Aging, accruals and the dashboard
+
+**Open balance.** `ps_aging` applies finance's payments, credit notes and debit notes of an agreement to its statement cycles oldest
+first (a payment names its agreement, not a cycle). A cycle whose statement is negative takes nothing; money beyond every cycle is
+not shown here (the roll-forward carries it). A record finance files under another partner settles nothing (it is
+`unknown_agreement` on the movement), so that cycle stays open: fix the record, not the aging.
+
+**Age.** Balances and disputes are both aged from the date the current statement version was received; SQL cannot read when a Case
+reached `DISPUTED`. The bucket labels follow the boundaries (`0-30`, `31-60`, `61-90`, `90+` by default; both ends of a bucket
+inclusive).
+
+**`ps_payment_due`** (WARNING, one Alert per agreement and cycle): an open balance is due within `payment_alert_days` or is late. On
+a `we_pay` agreement it is our payment to release (pay the undisputed part; `open_disputed` is on the same row); on a `they_pay`
+agreement the partner owes us. The balance counts the disputed amount: a cycle whose only open money is under dispute still alerts.
+
+**Accruals.** A cycle with no statement accrues our expected amount. Up to and including its `statement_due` it is `unbilled`; after
+that it is `statement_late` and the `missing_statement` finding fires the same day. The dispute provision is a finance policy: set
+`provision_pct` on `ps_accrual`. The pack never posts an accrual.
+
+**Dashboard `settlement_overview`.** Three KPI tiles (`ps_open_disputed`, `ps_aged_over_60`, `ps_accrued_unbilled`) read the `kpi_`
+columns, which carry an amount only for `kpi_currency` (default USD, set on `ps_aging` and `ps_accrual`; change the KPI `unit` and
+titles with it), so a tile never adds two currencies. The tiles add payables and receivables as amounts at stake, never netted; the
+direction is on every row. Three bar Widgets show the open balance by age bucket and currency, the open disputed amount by partner and
+currency and the accruals by agreement, each in its settlement currency. "Aged over 60 days" follows `aging_bucket_2`.
 
 ## Limits
 
