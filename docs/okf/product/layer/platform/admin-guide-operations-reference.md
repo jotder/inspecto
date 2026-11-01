@@ -425,20 +425,21 @@ and unversioned.
 | `GET /health`, `GET /ready` | liveness / readiness (open); `/ready` stays 200 when the shared run lease's database is unreachable, by decision (operator 2026-10-03) — `okf/product/layer/platform/admin-guide-launch-flags.md` |
 | `GET /health/details` | per-subsystem UP/DOWN/NOT_CONFIGURED (MNT-15) — **auth-gated**, not a public path (row added 2026-09-08); includes `live.runLease.<scope>` (down since + last error) when a shared run lease is configured (2026-10-03) |
 | `GET /audit/search`, `GET /audit/export?format=csv` | the who-did-what trail, core in every edition since EDG-01 cell 6 (row added 2026-09-08; `okf/product/module/observability/plan-observability.md` §3.3) |
-| `GET /pipelines` | list pipelines + paused state + commit count |
-| `POST /pipelines` | body `{"configPath":"…"}` — register a new pipeline live from a config under `-Dassist.write.root`, no restart (v4.1) |
-| `POST /pipelines/{name}/trigger` | run one pipeline once |
-| `POST /pipelines/{name}/pause` · `/resume` | pause (poll cycle skips it) / resume |
-| `GET /pipelines/{name}/commits` | committed batch ids |
-| `GET /pipelines/{name}/batches` · `/files` · `/lineage[?batchId=]` | audit queries (via `StatusStore`) |
-| `GET /pipelines/{name}/quarantine` | quarantined inputs + reason |
-| `GET /pipelines/{name}/pending` | inbox scan — files awaiting processing (`pending`), an under-processing flag (`running`), and live per-file progress (`current`: batch id, file, index/total, started-at; `null` when not mid-file); read-only, no audit side effects (v4.1) |
-| `POST /pipelines/{name}/reprocess` | body `{"batchId":"…"}` — replay a batch |
+| `GET /pipelines` | list pipelines (summaries) |
+| `GET /runs` | list running pipelines + paused state + commit count |
+| `POST /runs` | body `{"configPath":"…"}` — register a new pipeline live from a config under `-Dassist.write.root`, no restart (v4.1) |
+| `POST /runs/{runId}/trigger` | run one pipeline once |
+| `POST /runs/{runId}/pause` · `/resume` | pause (poll cycle skips it) / resume |
+| `GET /runs/{runId}/commits` | committed batch ids |
+| `GET /runs/{runId}/batches` · `/files` · `/lineage[?batchId=]` | audit queries (via `StatusStore`) |
+| `GET /runs/{runId}/quarantine` | quarantined inputs + reason |
+| `GET /runs/{runId}/pending` | inbox scan — files awaiting processing (`pending`), an under-processing flag (`running`), and live per-file progress (`current`: batch id, file, index/total, started-at; `null` when not mid-file); read-only, no audit side effects (v4.1) |
+| `POST /runs/{runId}/reprocess` | body `{"batchId":"…"}` — replay a batch |
 | `POST /trigger` | run all pipelines once |
 | `POST /validate` | body `{"configPath":"…"}` (saved file) or `{"type":…,"config":{…}}` (unsaved draft — the full save gate, `SaveGate`) — structured findings |
 | `GET /status` | live status snapshot — all pipelines + rollup (v2.8.0) |
 | `GET /report[?from=&to=]` | service-wide batch-audit report; optional date range (v2.8.0; range v2.10.0) |
-| `GET /pipelines/{name}/report[?from=&to=]` | batch-audit report for one pipeline; optional date range (v2.8.0; range v2.10.0) |
+| `GET /runs/{runId}/report[?from=&to=]` | batch-audit report for one pipeline; optional date range (v2.8.0; range v2.10.0) |
 | `GET /jobs` | list config-driven jobs + last outcome + next fire (v2.8.0) |
 | `GET /jobs/{name}/runs` | recent run history for a job (v2.8.0) |
 | `POST /jobs/{name}/trigger` | run a job once now (v2.8.0) |
@@ -497,12 +498,12 @@ view operators and dashboards actually want — computed on demand through the s
 
 - `GET /status` — a live snapshot: per-pipeline paused state, committed-batch count,
   quarantined-file count, and last-batch id/status/time, plus a service rollup.
-- `GET /report` (service-wide) and `GET /pipelines/{name}/report` (one pipeline) — a
+- `GET /report` (service-wide) and `GET /runs/{runId}/report` (one pipeline) — a
   historical batch-audit rollup: total/success/failed batch counts, **error rate**, input
   & output rows, rejected files, output file count and bytes, average / max duration, and
   duration **percentiles** (`p50`/`p95`/`p99`) so a tail-latency spike isn't hidden by the mean.
 
-**Date ranges (v2.10.0).** The `/report`, `/pipelines/{name}/report` and
+**Date ranges (v2.10.0).** The `/report`, `/runs/{runId}/report` and
 `/enrichment/{job}/report` endpoints accept an optional inclusive `?from=&to=` window — a
 date (`2026-05-01`) or datetime (`2026-05-01 09:00:00`). A date-only `to` covers the whole
 day. The rollup (counts, percentiles, first/last time) is computed over just the rows whose
@@ -528,7 +529,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 Stage-2 recomputes persist a durable run-level ledger (`<output>_audit/<job>_enrich_runs.csv`
 + `_enrich_lineage.csv`, written by `EnrichmentAuditWriter`). From v2.9.0 that ledger is
-readable over the Control API — the Stage-2 counterpart to the `/pipelines/{name}/batches`
+readable over the Control API — the Stage-2 counterpart to the `/runs/{runId}/batches`
 + `/lineage` + `/report` surface — so you can answer "did the nightly KPI run, and what did
 it write?" without shelling onto the box.
 
@@ -811,9 +812,10 @@ header is a real OIDC bearer.)*
 scheduled sweep then breaches any Incident that passes its deadline while still being worked (i.e. not
 yet `RESOLVED`/`ARCHIVED`); each breach stamps a `slaBreachedAt` marker on the object (so it fires once)
 and emits an **`OBJECT_SLA_BREACH`** event into the event log, where it surfaces in `/events`
-alongside the Incident's activity. ⛔ The `*_escalation.toon` policy that was once applied on breach is
-**retired** (`RETIRE-HALVES-1`, 2026-09-14) — a breach emits its event and notifies; it no longer mutates
-the Incident. The cadence is `-Dobjects.sla.sweep.seconds` (default `60`; set `0`
+alongside the Incident's activity. The old `*_escalation.toon` policy is retired (`RETIRE-HALVES-1`,
+2026-09-14); its replacement is authored **Escalation Rules** (`registry/escalation-rules/<id>.toon`,
+`ASSURE-WORKFLOW-SLA-1`): on a breach or at an age a matching rule marks the Incident `escalated`, can raise
+its priority and reassign it, and emits `OBJECT_ESCALATED`. The cadence is `-Dobjects.sla.sweep.seconds` (default `60`; set `0`
 to disable):
 
 ```bash
@@ -922,8 +924,8 @@ Each ETL run produces three timestamped CSVs alongside the existing status file.
 
 | File | Description |
 |---|---|
-| `<pipeline>_status_<ts>.csv` | One row per processed file — same as before, with a `batch_id` column appended at the end |
-| `<pipeline>_batches_<ts>.csv` | One row per batch: batch_id, member count, total input bytes, total output bytes, status, duration |
+| `<pipeline>_status_<ts>.csv` | One row per processed file — same as before, with a `consignment_id` column appended at the end (ledgers written before the rename carry `batch_id`, read as the same column) |
+| `<pipeline>_batches_<ts>.csv` | One row per batch: consignment_id, member count, total input bytes, total output bytes, status, duration |
 | `<pipeline>_lineage_<ts>.csv` | Input-to-output row-count matrix — one row per (input file, output partition) pair |
 
 ### Commit log — the durable "did this batch finish" ledger
@@ -934,7 +936,7 @@ In addition to the three per-run CSVs, a single **persistent, append-only** comm
 <status_dir>/<pipeline>_commits.log
 ```
 
-Each committed batch appends one line — `committed_at,batch_id,pipeline,status,member_count,output_count,output_rows,output_bytes` — and the write is **`fsync`'d to disk** before the batch is considered done. Unlike the per-run `_batches_<ts>.csv` (which is buffered and can lose its tail if the process is killed), a line in the commit log durably means the batch's outputs, manifest, backup, and markers are all on disk. It's the file to `grep` when you need to answer "did batch X finish?" definitively:
+Each committed batch appends one line — `committed_at,consignment_id,pipeline,status,member_count,output_count,output_rows,output_bytes` — and the write is **`fsync`'d to disk** before the batch is considered done. Unlike the per-run `_batches_<ts>.csv` (which is buffered and can lose its tail if the process is killed), a line in the commit log durably means the batch's outputs, manifest, backup, and markers are all on disk. It's the file to `grep` when you need to answer "did batch X finish?" definitively:
 
 ```bash
 grep ',SUCCESS,' status/<adapter>/<pipeline>_commits.log   # every committed batch

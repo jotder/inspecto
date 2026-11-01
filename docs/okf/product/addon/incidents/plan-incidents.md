@@ -460,9 +460,12 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
   but an archived Incident is no longer worked either. Keyed on the state as well as `closedAt`, because an
   Incident can sit in a terminal state with no `closedAt` (a workflow file that later made its state terminal,
   an imported object) (`ObjectServiceTest.slaSweepSkipsEveryWorkflowTerminalStateButStillBreachesOpenOnes`). ⛔ **The `EscalationPolicy` that once ran on breach
-  is RETIRED (`RETIRE-HALVES-1`, 2026-09-14)** — a breach now emits its event and nothing else; no severity
-  bump, no re-routing, and `OBJECT_ESCALATED` is emitted by nothing (the `@PublicApi` constant stays for
-  stored events). The Case `targetDate` is a **loose** SLA — overdue hint only, no sweep.
+  was retired (`RETIRE-HALVES-1`, 2026-09-14)**, and its job came back as authored **Escalation Rules**
+  (`ASSURE-WORKFLOW-SLA-1`, 2026-09-29, next bullet): on an SLA breach or at an age, a matching rule marks the
+  Incident `escalated`, can raise its priority and reassign it, and emits `OBJECT_ESCALATED` (WARN when the rule
+  notifies) — fire-once per rule and breach (`ObjectService`). *(Corrected 2026-11-01: this said a breach mutated
+  nothing and `OBJECT_ESCALATED` was emitted by nothing.)* The Case `targetDate` is a **loose** SLA — overdue
+  hint only, no sweep.
 - **Incident governance — authored Workflow, SLA policy, Escalation Rules** (`ASSURE-WORKFLOW-SLA-1`, 2026-09-29). ✅ 2026-10-07: the Add Escalation Rule form has an "Advanced match (condition tree)" disclosure authoring the rule's optional `when` over the match context (`ESCALATION_CONTEXT_COLUMNS`); `escalationRuleContent(draft, stored)` carries every unmodelled key of a stored rule forward, so a save never drops `when`.
   🔁 **This REVERSES part of `RETIRE-HALVES-1`.** INC-4's retirement deleted the escalation engine because it was a
   backend nobody could see or author ("re-file when a customer names on-call escalation"). D-P4 (operator) named it:
