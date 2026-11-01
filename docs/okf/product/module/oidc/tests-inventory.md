@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.oidc`](../../../../../product-map/module/oidc.toon).
 
-8 test class(es): 7 unit, 1 real-HTTP control-plane, 0 IT.
+9 test class(es): 8 unit, 1 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl providers/inspecto-oidc -Dtest=AuthenticatorDiscoveryFailClosedT
 | `OidcAuthenticatorTckTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAuthenticatorTckTest.java` | {@link OidcAuthenticator} against the platform's Authenticator TCK (MODULE-REORG-1 P5b): an in-memory JWKS, no network. |
 | `OidcAuthenticatorTest` | `com.gamma.oidc` | real-HTTP control-plane test | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAuthenticatorTest.java` | Offline (no network) tests for {@link OidcAuthenticator}: a self-signed RSA key pair stands in for |
 | `OidcKeycloakAgainstRealProviderTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcKeycloakAgainstRealProviderTest.java` | {@link OidcAuthenticator} with {@code auth.oidc.provider=keycloak} + {@code auth.oidc.discoveryUrl} |
+| `OidcMachineTrustTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcMachineTrustTest.java` | Machine-token trust (OIDC-CC-CLIENT-PIN-1, OIDC-CC-LIFETIME-REPLAY-1): the {@code auth.oidc.clients} allowlist, |
 | `OidcProviderPresetTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcProviderPresetTest.java` | The provider preset ({@code auth.oidc.provider}) and discovery ({@code auth.oidc.discoveryUrl}): |
 | `OidcTokenRelayTckTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcTokenRelayTckTest.java` | {@link OidcTokenRelay} against the platform's TokenRelay TCK (MODULE-REORG-1 P5b): a stand-in IAM that refuses every grant. |
 | `OidcTokenRelayTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcTokenRelayTest.java` | Offline tests for {@link OidcTokenRelay}: a local {@link HttpServer} stands in for the IAM's |

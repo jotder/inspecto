@@ -4,7 +4,7 @@ title: OIDC authenticator and token relay — admin guide
 description: Configure OIDC sign-in (auth.oidc.* flags, Keycloak or WSO2 preset, discovery), trust the IdP certificate, and read the boot failures.
 resource: providers/inspecto-oidc/
 tags: [module, oidc, admin-guide, keycloak, wso2, tls, cacerts]
-timestamp: 2026-10-19T00:00:00Z
+timestamp: 2026-11-01T00:00:00Z
 ---
 
 # OIDC authenticator and token relay — admin guide
@@ -28,6 +28,9 @@ refuses to start rather than serve unauthenticated. Wider security posture: [adm
 | `auth.oidc.rolesClaim` | no | `roles` | Claim holding role names (WSO2: `groups`). Setting it switches the Keycloak union off. |
 | `auth.oidc.authorizeUrl`, `auth.oidc.endSessionUrl`, `auth.oidc.scopes` | no | URLs from discovery / keycloak preset; `scopes` none (explicit only) | Published to the SPA by `GET /bootstrap`; no `authorizeUrl` means the SPA gets no OIDC config from the server. |
 | `auth.oidc.gateway.issuer`, `.jwksUri`, `.audience`, `.header` | no | header `X-JWT-Assertion` | Gateway trust mode: accept a gateway-signed JWT when no valid Bearer token is present. Setting `.issuer` makes `.jwksUri` required. |
+| `auth.oidc.clients` | no | none (any client) | Comma-separated machine (client-credentials) clients that may call with a Bearer token. Setting it pins clients: see section 5. |
+| `auth.oidc.maxTokenLifetime` | no | none | Machine tokens only: ISO-8601 ceiling on `exp - iat`, such as `PT5M`. Requires `auth.oidc.clients`. |
+| `auth.oidc.refuseReplay` | no | `false` | Machine tokens only: `true` accepts each `jti` once per node. Requires `auth.oidc.clients` and `auth.oidc.maxTokenLifetime`. |
 
 \* Required after precedence: explicit flag, then discovery, then the `keycloak` preset
 (`providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcConfig.java`).
@@ -95,3 +98,32 @@ A bundle built with `-NoRuntime` uses the target JVM's truststore. The control p
 | Every request 401 | Opaque (non-JWT) tokens, wrong issuer or audience, no `sub`, expired, or a JWKS fetch blocked by TLS trust. Errors are deliberately not returned to the caller. |
 | Sign-in works, nothing visible | Role names do not match the Space's role table, or the wrong `rolesClaim`. |
 | Warning "OIDC audience validation is OFF" | `auth.oidc.audience` unset; any token from the issuer is accepted. |
+| Boot fails: "-Dauth.oidc.clients requires -Dauth.oidc.audience" | Client pinning is on without an audience (section 5). |
+| Boot fails: "-Dauth.oidc.jwksUri must be https" | Client pinning is on and the JWKS (explicit, discovered or preset) is plain http on a non-loopback host. |
+| Boot fails: "maxTokenLifetime and refuseReplay apply to machine clients only" | One of them is set without `auth.oidc.clients`. |
+| Boot fails: "refuseReplay requires -Dauth.oidc.maxTokenLifetime" | Replay refusal without a ceiling; the `jti` cache would be unbounded. |
+| Boot fails: "maxTokenLifetime must be a positive ISO-8601 duration" / "refuseReplay must be true or false" | Malformed value (`5m` is refused; write `PT5M`). |
+| A machine client 401s, people still sign in | Client not in `auth.oidc.clients`, token names no `azp` or `client_id`, no `iat` or too long-lived under a ceiling, or a reused or missing `jti` under replay refusal. |
+
+## 5. Machine clients (client-credentials tokens)
+
+Without `auth.oidc.clients`, any client of the issuer is accepted, as before. To let an integration call with a
+client-credentials token (security review: [tests-security-review-oidc-client-credentials](tests-security-review-oidc-client-credentials.md)):
+
+```
+AUTH_OIDC_AUDIENCE=<audience>
+INSPECTO_JAVA_OPTS=-Dauth.oidc.clients=la-integration -Dauth.oidc.maxTokenLifetime=PT5M -Dauth.oidc.refuseReplay=true
+```
+
+* With `auth.oidc.clients` set, boot requires `auth.oidc.audience` and an https JWKS (http only on loopback).
+* A Bearer token is admitted only when its client, `azp` else `client_id`, is listed, or is the SPA client
+  (`auth.oidc.clientId`, default `inspecto-spa`). A token naming no client is refused. People sign in through the
+  SPA client, so their tokens are never checked for lifetime or replay; do not list the SPA client as a machine client.
+* `maxTokenLifetime` requires `iat` on machine tokens and refuses `exp - iat` above it.
+* `refuseReplay` makes every machine token single-use: the client must fetch a new token for each call. Most
+  client-credentials libraries reuse a token until it expires, and those get a 401 on the second call; turn it on
+  only for a client built that way.
+* `refuseReplay` requires `jti` and refuses a `jti` already seen, until its `exp` plus the 60 s skew. The cache is
+  per node: behind a load balancer a token can still be used once on each node.
+* Not pinned: the gateway trust path (`auth.oidc.gateway.*`), whose assertion the gateway mints for its own callers.
+* The role a machine client holds is still a deployment condition: see the review's conditions 3 and 4.
