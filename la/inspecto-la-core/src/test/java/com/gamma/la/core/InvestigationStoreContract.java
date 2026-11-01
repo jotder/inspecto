@@ -339,9 +339,18 @@ abstract class InvestigationStoreContract {
         InvestigationStore s = fresh();
         assertFalse(s.updateDetails("gone", current -> fail("never called for an absent Investigation")), "never created");
         s.create("d", "{}");
-        assertTrue(s.deleteInvestigation("d"));
-        assertFalse(s.updateDetails("d", current -> "{\"title\":\"late\"}"), "an edit racing a delete is refused, not a failure");
-        assertTrue(s.details("d").isEmpty());
+        boolean deleted;
+        try {
+            deleted = s.deleteInvestigation("d");
+            assertTrue(deleted);
+        } catch (com.gamma.spi.auth.ApiException e) {
+            assertEquals(503, e.status, "a backend without delete refuses it 503 (LA-INVESTIGATION-DELETE-PG-1), so no edit can race one");
+            deleted = false;
+        }
+        if (deleted) {
+            assertFalse(s.updateDetails("d", current -> "{\"title\":\"late\"}"), "an edit racing a delete is refused, not a failure");
+            assertTrue(s.details("d").isEmpty());
+        }
 
         // LA-INVESTIGATION-EDIT-HARDENING-1: racing edits each see the record the previous one wrote - none is lost
         s.create("e", "{}");
