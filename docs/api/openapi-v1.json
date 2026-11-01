@@ -12502,6 +12502,48 @@
         "x-optional-module" : true
       }
     },
+    "/incidents/{incidentId}/briefs" : {
+      "get" : {
+        "tags" : [ "incidents" ],
+        "summary" : "GET /incidents/{incidentId}/briefs (generated skeleton)",
+        "operationId" : "getIncidentsByIncidentIdBriefs",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "incidentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "post" : {
+        "tags" : [ "incidents" ],
+        "summary" : "POST /incidents/{incidentId}/briefs (generated skeleton)",
+        "operationId" : "postIncidentsByIncidentIdBriefs",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "incidentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/inv/case-history" : {
       "post" : {
         "tags" : [ "inv" ],

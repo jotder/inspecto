@@ -128,6 +128,10 @@ public final class CapabilityManifest {
             new Entry("POST", "/action-requests/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/action-requests/([^/]+)/retry", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/action-requests/([^/]+)/mark-failed", Roles.CAN_APPROVE_CHANGES),
+            // IncidentBriefRoutes (AGENTIC-INVESTIGATION-1) — investigating an Incident and reading its Briefs is working
+            // it; a proposal it files is a pending Action Request, decided under the four-eyes entries above.
+            new Entry("GET", "/incidents/([^/]+)/briefs", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/incidents/([^/]+)/briefs", Roles.CAN_WORK_INCIDENTS),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),

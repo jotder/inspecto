@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.actionRequests`](../../../../../product-map/addon/actionRequests.toon).
 
-9 row(s).
+11 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -21,8 +21,10 @@ tags: [feature-db, addon]
 | actionRequests | feature | action-requests | standard;advanced;preview | actionRequests | ga | `actionRequests` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /action-requests" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"GET /action-requests"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /action-requests/([^/]+)" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"GET /action-requests/([^/]+)"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /incidents/([^/]+)/briefs" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"GET /incidents/([^/]+)/briefs"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /action-requests" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"POST /action-requests"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /action-requests/([^/]+)/approve" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"POST /action-requests/([^/]+)/approve"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /action-requests/([^/]+)/decline" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"POST /action-requests/([^/]+)/decline"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /action-requests/([^/]+)/mark-failed" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"POST /action-requests/([^/]+)/mark-failed"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /action-requests/([^/]+)/retry" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"POST /action-requests/([^/]+)/retry"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /incidents/([^/]+)/briefs" | route | action-requests | standard;advanced;preview | actionRequests | ga | `"POST /incidents/([^/]+)/briefs"` | `features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon` |

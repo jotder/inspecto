@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-7 route(s) registered; 7 in the OpenAPI contract, 0 not.
+9 route(s) registered; 9 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -22,6 +22,8 @@ tags: [api, routes, generated]
 | POST | `/action-requests/{actionrequestId}/decline` | POST /action-requests/{actionrequestId}/decline (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
 | POST | `/action-requests/{actionrequestId}/mark-failed` | POST /action-requests/{actionrequestId}/mark-failed (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
 | POST | `/action-requests/{actionrequestId}/retry` | POST /action-requests/{actionrequestId}/retry (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| GET | `/incidents/{incidentId}/briefs` | GET /incidents/{incidentId}/briefs (generated skeleton) | incidents | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java` |
+| POST | `/incidents/{incidentId}/briefs` | POST /incidents/{incidentId}/briefs (generated skeleton) | incidents | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java` |
 
 ## Drift
 
