@@ -153,7 +153,7 @@ M2/M3 built (configuration once built) · 🧩 plugin (M4). "Edition" is where t
 5. **`JdbcSink`** (M3) — batched, run-keyed `MERGE`; DuckDB-native for Postgres/MySQL. Effort **M**.
 6. **Outbound connector SPI** (M4) — Kafka first. Effort **M**, plugin lane thereafter.
 
-None of this changes the edge story: Personal and Standard keep zero external runtime services; the warehouse
+None of this changes the edge story: Basic and Standard keep zero external runtime services; the warehouse
 is the *customer's* system, reached only by the outbound job.
 
 ## 7. What must not be claimed yet

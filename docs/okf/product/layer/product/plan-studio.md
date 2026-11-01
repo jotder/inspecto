@@ -52,7 +52,7 @@ chart, a board, a graph, a map — and where an investigator asks *who connects 
   pattern packs, saved Link-Analysis Views.
 * **Geo Map Analysis** — the offline MapLibre basemap, GeoSource/GeoQuery, the intelligence
   toolbox, tools and layers, saved Geo Views.
-* **The edition gate** for the two investigation studios (`inspecto-geo-link`, Professional+).
+* **The edition gate** for the two investigation studios (`inspecto-geo-link`, Standard+).
 
 **Out of scope (owned elsewhere)**
 
@@ -91,13 +91,13 @@ CORRECTION the board was wrong on 2026-09-08 and has been amended in the same co
 | **BI-7** | Semantic / headless BI API | Could | ✅ SHIPPED. **CORRECTION (two):** (a) the cell's "Open follow-up: swapping the UI viz layer onto it" is **done** — `DatasetResultService`'s live path *is* `POST /bi/query`, and every Widget renders through it. (b) `GET /bi/datasets`, which the cell also claimed, is ⛔ **RETIRED 2026-09-14** (`RETIRE-HALVES-1`) — it never had a client consumer; Dataset listing goes through the generic component registry | **S/E as a product decision the code does not apply** — see the note below this table |
 | **BI-8** | Widget/Dashboard template marketplace | Could | ✅ SHIPPED as a **curated seed pack**, not a marketplace. Exactly three ids ship (`kpi-overview`, `quality-monitor`, `trend-monitor`), the corpus is a Java constant, and apply is all-or-nothing with a `409` on any id collision. An external marketplace is out of scope by design (§6) | All |
 | **INV-1** | **Link Analysis Studio**: Entity Projection over a Dataset, shared G6 host, 11 layouts, communities, pattern matching, saved **Link-Analysis Views** | Should | ✅ SHIPPED. **CORRECTIONS (three):** (a) the cell's "Open per design §7: `attrCols` mapping surface + the schema-relationship model" — **both shipped**, `attrCols` on both sides and the relationship inference on 2026-07-20; the concept page had already flagged that note stale. (b) "with the offline sample fold as fallback" is **gone**: since the mock backend was deleted a backend failure **surfaces**. (c) The counts are pinnable — 11 layouts, 6 pattern packs, two community methods | **S/E** — `inspecto-geo-link` (see `INV-2`) |
-| **INV-2** | **Geo Map Analysis Studio**: offline MapLibre basemap, GeoSource/GeoQuery, heatmap, od-routes, time slider + playback, intelligence toolbox, measure/radius/polygon/notes tools, layer manager + GeoJSON overlays, saved **Geo Views** | Should | ✅ SHIPPED. **CORRECTIONS (two):** (a) "DuckDB-spatial backend = Phase 4" mislabels both halves — the **Phase 4 server-side projection shipped** (`POST /geo/projection`, `POST /geo/routes`), and the DuckDB `spatial` extension is a **deliberate refusal**, not a pending phase (no geometry op is needed and the hardened sandbox disables extension loading). (b) The client-side fallback is gone, as for `INV-1`. (c) 🔴 **The basemap is not PMTiles**: `inspecto-ui/src/assets/basemap/` ships four slimmed Natural Earth GeoJSON layers plus glyph fonts (~2.7 MB), and **zero `.pmtiles` files exist in the tree** — no code references the protocol either. A planet extract would have been ~100 MB, so it was refused at bundling time (D2, 2026-07-05); the word survived in this row, in `geo-map.md`, and in this file's own first draft | **S/E** — ✅ **GATED 2026-09-07** (EDG-01 cell 3b: `GeoRoutes` + `InvRoutes` moved into `inspecto-geo-link`; Personal gets a core `503` stub). ~~code is core and ungated, EDG-01~~ — stale from 2026-09-07 until 2026-09-08 |
-| **INV-3** | **Cases** grouping Incidents; RCA templates; correlation ids end-to-end | Must | ✅ SHIPPED — **but this row does not belong to Studio.** ⛔ **MOVED to `INC`** (`incidents/incidents.md` owns the Alert → Incident → Case chain, Case Rules and RCA templates). A Case is one `ObjectType` value on the operational-objects tables, reached at `/cases` from the objects module, not from `/studio/*`. `GLOSSARY.md` §14's point that "Investigation" was never a coherent area is this row | **CORRECTION — S/E, not `All`.** The Case machinery is `inspecto-ops` (`EDITIONS` `CP-11`, gated 2026-09-08 by EDG-01 cell 7). Personal gets `AbsentModuleRoutes` and `features.ops = false` |
+| **INV-2** | **Geo Map Analysis Studio**: offline MapLibre basemap, GeoSource/GeoQuery, heatmap, od-routes, time slider + playback, intelligence toolbox, measure/radius/polygon/notes tools, layer manager + GeoJSON overlays, saved **Geo Views** | Should | ✅ SHIPPED. **CORRECTIONS (two):** (a) "DuckDB-spatial backend = Phase 4" mislabels both halves — the **Phase 4 server-side projection shipped** (`POST /geo/projection`, `POST /geo/routes`), and the DuckDB `spatial` extension is a **deliberate refusal**, not a pending phase (no geometry op is needed and the hardened sandbox disables extension loading). (b) The client-side fallback is gone, as for `INV-1`. (c) 🔴 **The basemap is not PMTiles**: `inspecto-ui/src/assets/basemap/` ships four slimmed Natural Earth GeoJSON layers plus glyph fonts (~2.7 MB), and **zero `.pmtiles` files exist in the tree** — no code references the protocol either. A planet extract would have been ~100 MB, so it was refused at bundling time (D2, 2026-07-05); the word survived in this row, in `geo-map.md`, and in this file's own first draft | **S/E** — ✅ **GATED 2026-09-07** (EDG-01 cell 3b: `GeoRoutes` + `InvRoutes` moved into `inspecto-geo-link`; Basic gets a core `503` stub). ~~code is core and ungated, EDG-01~~ — stale from 2026-09-07 until 2026-09-08 |
+| **INV-3** | **Cases** grouping Incidents; RCA templates; correlation ids end-to-end | Must | ✅ SHIPPED — **but this row does not belong to Studio.** ⛔ **MOVED to `INC`** (`incidents/incidents.md` owns the Alert → Incident → Case chain, Case Rules and RCA templates). A Case is one `ObjectType` value on the operational-objects tables, reached at `/cases` from the objects module, not from `/studio/*`. `GLOSSARY.md` §14's point that "Investigation" was never a coherent area is this row | **CORRECTION — S/E, not `All`.** The Case machinery is `inspecto-ops` (`EDITIONS` `CP-11`, gated 2026-09-08 by EDG-01 cell 7). Basic gets `AbsentModuleRoutes` and `features.ops = false` |
 | **INV-4** | Cross-studio bridges | Could | ✅ SHIPPED — **exactly one bridge exists**: geo co-location → a graph dialog over the shared G6 host. A full hand-off into `/studio/link-analysis` was deliberately deferred, and there is no link→geo bridge | S/E with the studios |
 
-🔴 **Three BI rows promise Professional+ for code that is ungated — the mirror image of `OPS-2`.** `BI-4`,
+🔴 **Three BI rows promise Standard+ for code that is ungated — the mirror image of `OPS-2`.** `BI-4`,
 `BI-6` and `BI-7` all read `S/E`, but `BiRoutes`, `ShareRoutes`, `ShareTokens`, `TablePngRenderer` and
-`PdfRenderer` all sit in the **core** modules and no `features.*` flag governs them: a Personal install can
+`PdfRenderer` all sit in the **core** modules and no `features.*` flag governs them: a Basic install can
 mint a public share link, run a headless BI query and render a PDF. EDG-01's six cells did not include them,
 and `EDITIONS` `CP-08` (✅ in all three editions) is what the build actually does. EDG-01's own closing rule
 applies verbatim: *until it ships, the P cells are a stated product decision the code does not apply — say
@@ -275,7 +275,7 @@ four seams (every rule shape, not only freshness):
 Session decisions (2026-09-26, recorded here, reversible):
 * **The feed is a personal inbox** — an addressed notification is hidden from every other Subject,
   `canAdminister` included. Oversight of every breach is `GET /alerts` and the Incidents a critical breach
-  opens. Personal has no Subject, so there nothing is hidden, as before.
+  opens. Basic has no Subject, so there nothing is hidden, as before.
 * **Unowned means broadcast**, not "addressed to `appUser`" — a Personal-built or pre-existing rule notifies
   exactly as it always did, and `appUser` is never written into the stored component (R3 would read it as a
   claimed owner and refuse the first claim).
@@ -288,7 +288,7 @@ Session decisions (2026-09-26, recorded here, reversible):
   an owner-less rule for anyone, which addressed that rule's alerts to the named Subject. Now a body `owner`
   other than the caller is a `403 PERMISSION_DENIED`, and a first claim may only claim for the caller, unless
   the caller holds `canConfigureAccess` or `canAdminister`. It applies to every R3 component kind, not only
-  alert rules. No Subject (Personal): unchanged. Pinned by `ControlApiComponentSharesTest`.
+  alert rules. No Subject (Basic): unchanged. Pinned by `ControlApiComponentSharesTest`.
 
 Pinned by `AlertOwnerRoutingTest` (engine), `NotificationServiceTest` (the `owned`/`unowned`/opt-out/template
 cases) and `ControlApiAlertOwnerTest` (real HTTP, with Subjects).
@@ -614,8 +614,8 @@ are the values four-eyes approved (below).
 - **Audit**: every run emits an `AUDIT` event `publish.postgres.run` (`outcome`, `schema`, `tables`, `rows`,
   `error`), plus the `publish.postgres.completed` Signal on success. A dry run resolves the plan, the destination
   and the egress check, and sends nothing.
-- **Edition**: the Job Type registers everywhere, but the driver is the Professional/Enterprise `postgresql.jar`
-  sidecar (PG-1), so a Personal run fails with `No suitable driver` (`EDITIONS.md` JOB-06).
+- **Edition**: the Job Type registers everywhere, but the driver is the Standard/Advanced `postgresql.jar`
+  sidecar (PG-1), so a Basic run fails with `No suitable driver` (`EDITIONS.md` JOB-06).
 
 **Tests**
 - `PostgresPublishJobTest` (17, with DuckDB standing in for the target) covers:
@@ -767,7 +767,7 @@ A worked example ships: `spaces/demo/config/registry/alert-rules/orders_low_volu
 list, and no `features.*` flag governs the Query Library, Viz Library, Dashboard Builder, Template
 Gallery or KPI gallery. `EDITIONS` `CP-08` is ✅ in all three editions and is correct.
 
-**The two investigation studios are Professional+** (`CP-09`, EDG-01 cell 3b, 2026-09-07).
+**The two investigation studios are Standard+** (`CP-09`, EDG-01 cell 3b, 2026-09-07).
 `inspecto-la-api` contributes `GeoRoutes` and `InvRoutes` (and the rest of the Link Analysis routes) through the public `RouteModule`
 ServiceLoader seam (`la/inspecto-la-api/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule`); `inspecto-geo-link` is the
 bridge (it binds the Dataset and Case ports and holds the Alert Rule routes).
@@ -776,7 +776,7 @@ installed. The SPA reads `bootstrap.features.geoLink` into a session signal and 
 entries and the Menu-Builder offer.
 
 🔴 **`hasRoute` deliberately excludes stubs, and that exclusion is the whole point.** The first version
-counted them, so `/bootstrap` reported `geoLink: true` on a Personal build because the 503 stub had
+counted them, so `/bootstrap` reported `geoLink: true` on a Basic build because the 503 stub had
 claimed the pattern. *"A route exists" and "the feature is installed" are different questions* — the
 flag is derived from what actually registered, never guessed from the edition string. Stubs register
 **last**, only for patterns `hasRoute` reports unclaimed.
@@ -811,7 +811,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | 2026-08-14 | The rows seam is asked in **one** place (`DatasetRowsService`), under the spec-running result service; every result is a page carrying `truncated` and an error | `plan-studio.md` |
 | 2026-08-31 | **`MOCK-DEAD-COMPUTE-1`** — the former client-side folds are retained as reference oracles after the mock backend's deletion, because the live paths are asserted against them; deleting them deletes the guards | code contracts in `entity-projection.ts`, `geo-projection.ts` |
 | 2026-09-02 | `trend-monitor` added to the template pack — the temporal starter board | `plan-studio.md`; `EDITIONS` `CP-08` |
-| 2026-09-07 | **EDG-01 cell 3b** — `GeoRoutes` + `InvRoutes` move to `inspecto-geo-link` (Professional+); Personal gets a core 503 stub | operator; `EDITIONS` `CP-09` |
+| 2026-09-07 | **EDG-01 cell 3b** — `GeoRoutes` + `InvRoutes` move to `inspecto-geo-link` (Standard+); Basic gets a core 503 stub | operator; `EDITIONS` `CP-09` |
 | 2026-09-07 | 🔴 `hasRoute` **excludes absent-module stubs**, so a capability flag stays honest; stubs register last and only for unclaimed patterns | `ApiContext` contract |
 | 2026-09-08 | This spec: `INV-3` moved to `INC` and its edition corrected; `INV-1`/`INV-2`'s stale open items and mislabelled deferral fixed; `BI-1`'s Datasets pane, `BI-4`'s formats and `BI-7`'s follow-up corrected; the Visualization Type count pinned at 13 | this file §2 |
 
@@ -872,7 +872,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 9. **The template gallery's own specs use ids that do not ship.** Its tests name `kpi_total`,
    `sum_by_dim` and `kpi_board` alongside the one real id, so a reader grepping for shipped ids finds
    fixtures. Ids are server-owned; the fixtures should say so.
-10. 🔴 **`BI-4`, `BI-6` and `BI-7` promise Professional+ for ungated code** (the note under §2). A Personal
+10. 🔴 **`BI-4`, `BI-6` and `BI-7` promise Standard+ for ungated code** (the note under §2). A Basic
     install can mint a public share link, run a headless BI query and render a PDF. Either the three rows
     become `All`, or a seventh EDG-01 cell moves them. A product decision either way.
 11. 🔴 **The anonymous public embed has no compliance control.** `compliance/controls-matrix.md` holds no
@@ -898,7 +898,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
     migration ("build NOT started"), the latter two shipped 2026-07-27. The archive is unmaintained by
     policy, but current pages cite these three *as design of record*.
 17. **`exchange-sharing.md` is named authoritative for sharing and never mentions editions.** Sharing a
-    Widget or a saved view needs `inspecto-exchange` (`SEC-10`, gated 2026-09-07), so a Personal install
+    Widget or a saved view needs `inspecto-exchange` (`SEC-10`, gated 2026-09-07), so a Basic install
     cannot do it — and the authoritative doc does not say so.
 
 ## 6. Refused & superseded
@@ -930,7 +930,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | A general-purpose PDF export | **Refused 2026-07-20** | no PDF library on the classpath and an offline build, so PDF is a PNG snapshot wrapped in a minimal container |
 | Free SQL text on the embed and BI wire | **Refused by construction** | only validated `{agg, field}` pairs cross; a view-bound or expression Widget degrades to "not embeddable" |
 | Distinguishable failures on a share token | **Refused** | tampered, expired, malformed and unknown all return the same 404 |
-| Counting absent-module stubs in `hasRoute` | **Refused 2026-09-07, learned the hard way** | it reported `geoLink: true` on a Personal build |
+| Counting absent-module stubs in `hasRoute` | **Refused 2026-09-07, learned the hard way** | it reported `geoLink: true` on a Basic build |
 | `/studio/datasets` as a Studio pane | **Superseded (Phase B.2)** | a Dataset is a Catalog asset; the path survives as a redirect |
 | The offline mock arm under every Studio result path | **Superseded by the mock backend's deletion** | a backend failure now surfaces |
 | Distributed graph databases, streaming graph analytics, live co-editing, 3D/VR/AR, GPU compute, federation, blockchain, OSINT/dark-web ingestion, media extraction, forensics, cyber attack graphs, interactive graphs beyond 100M nodes | **Won't, per the owner's own list** | archived `link-analysis-studio-plan.md` |
@@ -998,5 +998,5 @@ this file and the concept pages for *what is*.
   `node tools/check-gate-tally.mjs`, all from the repo root.
 * **Falsify, don't read** — three claims worth re-probing on a running server: `POST /bi/query` with a
   free-text expression must be a 422, never an executed string; a tampered share token and an expired
-  one must return the identical 404 body; and on a Personal bundle `POST /inv/projection` must be a 503
+  one must return the identical 404 body; and on a Basic bundle `POST /inv/projection` must be a 503
   naming the module while `/bootstrap` reports `geoLink: false`.

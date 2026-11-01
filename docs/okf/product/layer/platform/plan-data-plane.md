@@ -71,7 +71,7 @@ authoritative for the Edition column**; this table mirrors it.
 | `DAT-5` | Row-level calculated columns on Datasets | Should | ✅ SHIPPED 2026-07-08; window functions 2026-07-24. Design of record: §6.2 of this spec (why a real SQL parser
 was refused) and `okf/product/module/processor/spec-queries.md` §3.3–§3.5. *(Provenance:
 `docs/archived-documents/plans-archive/calculated-columns-design.md`, not maintained.)* | All |
-| `DAT-6` | Optional Postgres state store | Should | ✅ SHIPPED — **single operator only** (one shared `Connection` per store); the multi-user deployment is `OPS-03`, **PARKED**; the proving test is **opt-in** and covers 9 of 12 families (§3.8) ⚠ **How the driver reaches a deployment (2026-09-09):** as the third-party `postgresql.jar` sidecar that `package.ps1 -Edition Standard|Enterprise` stages — it is test-scoped in the reactor, so it is staged but **not** first-party (`editions.md` §3.3). 🔴 `REQUIREMENTS.md` added "NOT via `inspecto-connectors`, which no bundle ships"; the second half went stale on 2026-09-07 when `CONNECTORS-BUNDLE-1` made that sidecar ride **every** bundle (`from: 'all'` in `tools/bundle-modules.mjs`). The driver is simply a separate jar, not a connector. | S/E (`OPS-02`) |
+| `DAT-6` | Optional Postgres state store | Should | ✅ SHIPPED — **single operator only** (one shared `Connection` per store); the multi-user deployment is `OPS-03`, **PARKED**; the proving test is **opt-in** and covers 9 of 12 families (§3.8) ⚠ **How the driver reaches a deployment (2026-09-09):** as the third-party `postgresql.jar` sidecar that `package.ps1 -Edition Standard|Advanced` stages — it is test-scoped in the reactor, so it is staged but **not** first-party (`editions.md` §3.3). 🔴 `REQUIREMENTS.md` added "NOT via `inspecto-connectors`, which no bundle ships"; the second half went stale on 2026-09-07 when `CONNECTORS-BUNDLE-1` made that sidecar ride **every** bundle (`from: 'all'` in `tools/bundle-modules.mjs`). The driver is simply a separate jar, not a connector. | S/E (`OPS-02`) |
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 
@@ -337,7 +337,7 @@ to expose it. ⇒ **a task's presence in the runner's switch is not evidence its
 ✅ **The consumer half is proven live too (2026-09-15).** `spaces/demo/config/orders/orders_by_region_feed_pipeline.toon`
 consumes the matrix this section's job writes (`connector: dataset` + `on: dataset`), and on a live multi-Space
 server the materialize's `DatasetWriteSignal` fired it within the same second — 4 rows in, 4 rows committed. The
-proof, and the two defects it surfaced (a broken committed job, a space that does not boot on Personal), are in
+proof, and the two defects it surfaced (a broken committed job, a space that does not boot on Basic), are in
 `acquisition.md` §8.5. ⚠ The committed job now reads `measures: "sum(gross)"` — the measure grammar is `count` or
 `agg(field)`, never `field,agg`.
 
@@ -389,11 +389,11 @@ Every DB implementation is plain JDBC over **one shared `Connection` per store**
 migration tool; a failed open **degrades** to memory/file with a warning. **`-Dinspecto.db=duckdb|postgres`**
 selects a *connection*, never an on/off switch — choosing Postgres **moves** the DB-backed families, it enables
 nothing (PG-1, 2026-08-14); an unhonourable `postgres` **fails at boot** (`verifySelectable`, `OperationalDbTest`)
-instead of coming up healthy with stores switched off; the driver rides Standard/Enterprise as the
+instead of coming up healthy with stores switched off; the driver rides Standard/Advanced as the
 `postgresql.jar` sidecar (a Maven profile was refused — it would gate a runtime dependency); the password is a
 `SecretResolver` reference. The operational-DB screen (`GET /system/operational-db`, `POST …/test` with
 `OK | DRIVER_MISSING | AUTH_FAILED | UNREACHABLE`) **reports and validates, never writes** — no `PUT`, by
-decision. Edition model in one line: **Personal = embedded DuckDB for everything; Standard = PostgreSQL for
+decision. Edition model in one line: **Basic = embedded DuckDB for everything; Standard = PostgreSQL for
 the operational stores, DuckDB retained as the query engine over Parquet; business data in neither**.
 
 **Proving it** (DAT-6): `PostgresStateStoreTest` needs a server you supply (`-Dinspecto.test.pg.url` /
@@ -527,7 +527,7 @@ earlier one, both appear.
 | §7.5 probe | Fixed-bucket histogram for non-additive measures | aggregate state is persistable but **not restorable** |
 | 2026-08-10 | `consignment_outputs` defaults **on** — the one exception then | `ReprocessCommand`'s duplication refusal is decidable only from `COMPACTED_AWAY` rows |
 | 2026-09-01 (D-9, operator) | Dedup ledger defaults **on**; keys **hashed, never verbatim**; absence **fail-closed** | an MSISDN table is a data-protection surface the other ledgers are not |
-| 2026-09-07 | Delivery receipts default **`none`** — the opposite call | default-on would mint a DB file in the CWD of every Personal install |
+| 2026-09-07 | Delivery receipts default **`none`** — the opposite call | default-on would mint a DB file in the CWD of every Basic install |
 | 2026-08-14 (PG-1) | One selection `-Dinspecto.db`; it **moves, never enables**; unhonourable Postgres **fails at boot**; the driver is a **sidecar**, not a Maven profile | deployments had come up healthy with stores silently off; a profile would gate a runtime dependency |
 | 2026-08-15 | The operational-DB screen **never writes** | the process serving the UI is the one that needs the DB; a `PUT` would be a second declaration of the same fact |
 | 2026-09-07 (operator) | `PostgresStateStoreTest` needs a server you supply; skips **per test** | an `@BeforeAll` assumption prints "Tests run: 0" and hides the absent coverage |

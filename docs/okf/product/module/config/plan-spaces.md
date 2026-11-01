@@ -57,7 +57,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| `SPC-1` | Isolated **Spaces** (config / data / audit / duckdb per Space), CRUD without restart, one-time migrator | Must | ✅ SHIPPED — ⚠ "isolated" is a **layout** on Personal/Standard and an **enforced boundary** only on Enterprise (CP-07, SEC-06; §3.9) | All |
+| `SPC-1` | Isolated **Spaces** (config / data / audit / duckdb per Space), CRUD without restart, one-time migrator | Must | ✅ SHIPPED — ⚠ "isolated" is a **layout** on Basic/Standard and an **enforced boundary** only on Advanced (CP-07, SEC-06; §3.9) | All |
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
 | `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT PARTIAL** — the server-side catalog exists; **five** templates ship (`orders-starter`; since 2026-09-30 the `business-assurance`, `telco-fraud` and `telco-ra` content packs — `telco-ra` is the generic half of Telecom RA, §3.5 — and `payment-fraud` slice 1, §3.5.1); Financial Audit and Link Analysis do not exist in any shipped artifact (§2 corrections) | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
@@ -77,13 +77,13 @@ matrix is authoritative for the Edition column**; this table mirrors it.
   spec; the four verticals are §5's lead item and need a product call (rebuild as `_templates/` entries, or
   drop the promise).
 - **`SPC-1`'s "Isolated Spaces" is true of the *mechanism* on every edition and of the *boundary* only on
-  Enterprise.** Every Space has its own service, scheduler, event log, stores, connection registry and
+  Advanced.** Every Space has its own service, scheduler, event log, stores, connection registry and
   metric label, and requests are bound by the `space` MDC — but nothing in the core *denies* a
   cross-Space request; the deny exists only in `inspecto-policy`'s two seed policies (`EDITIONS.md` CP-07:
   "isolation is a *layout* in P/S; enforced by seeded policies only in E"). And one process-global flag can
   collapse the layout: a global `-D*.db.url` funnels **every** Space into one shared file (`db-layer.md`).
   The row keeps ✅ because the requirement text names the layout; the note is here so nobody reads
-  "isolated" as "enforced" on Personal.
+  "isolated" as "enforced" on Basic.
 
 **Two more corrections in sibling docs, made with this spec:** `api-stability.md`'s release notes stated
 the `DELETE /spaces/{id}` rule **backwards** ("409 unless `?purge=true`") — the code refuses **only with**
@@ -92,7 +92,7 @@ the `DELETE /spaces/{id}` rule **backwards** ("409 unless `?purge=true`") — th
 
 **One standing note no status token can carry:** ⚠ **`-Dspaces.root` unset is not "one Space", it is the
 legacy flat layout.** `SpaceRoot.legacy()` resolves every store CWD-relative, so a default-ON DB family
-mints a database file in the working directory of every Personal install and of every test JVM. The repo
+mints a database file in the working directory of every Basic install and of every test JVM. The repo
 learned this twice (dedup ledger; delivery receipts, which therefore default to `none`) and pins the test
 side in the root `pom.xml` surefire properties (§3.8).
 
@@ -201,8 +201,8 @@ parked in the plan's §4 (needs real feeds).
 
 - **What it is.** Configuration only: no new Step Processor.
   - The vendor feed mapping stays parked.
-  - The pack needs **Professional or Enterprise**, because it ships Alert Rules (`alert.dispatch`). The gallery
-    marks it `creatable: false` on Personal.
+  - The pack needs **Standard or Advanced**, because it ships Alert Rules (`alert.dispatch`). The gallery
+    marks it `creatable: false` on Basic.
   - `ra_objects_analytics` needs the ops module.
 - **Feeds.** Eight canonical synthetic feeds, each with a Pipeline and a Schema.
   - Money is `DECIMAL(18,4)`.
@@ -337,7 +337,7 @@ zero-Space recovery create asks it too, since `POST /spaces` is `canAdminister` 
 half-made tree is deleted and nothing is registered; a `kpis/*.toon` the registry cannot read is refused,
 never seeded unchecked. The tree is seeded in a unique `_staging/<id>-<nanos>/` (discovery never boots it) and
 renamed into place only once the gate passes, so a cleanup that fails (a Windows lock) is logged and suppressed —
-the refusal stays the answer — and the leftover never blocks the id. With no Subject (Personal, an unauthenticated
+the refusal stays the answer — and the leftover never blocks the id. With no Subject (Basic, an unauthenticated
 recovery create) Dataset access is fail-open; a template Dataset shared away from the caller is refused as
 "shared away", not as absent (template content is the server's own, so there is nothing to hide). A KPI tile in the template binds by `options.kpi.kpiId` (no new mechanism). ⚠ The gate
 reads the Dataset's Schema, so a KPI over a Dataset that the template's own pipeline has not filled yet (a
@@ -462,7 +462,7 @@ the KPI gate both read the Dataset's Schema and fail closed on a Dataset with no
 **zero-row seed** per sink in the day layout, `data/fraud_<typology>/window_date=1970-01-01/seed.parquet` (a
 placeholder day no run replaces; a flat `seed.parquet` would be refused by the incremental layout gate). The
 reader auto-detects the `window_date=` folders, so the Schema carries `window_date` (as the last column). A test regenerates them from each Job's SQL and fails when a seed's Schema drifts. ⚠ The Alert Rules
-are Professional+: a Personal build refuses the whole template at `POST /spaces`, though the gallery still lists it.
+are Standard+: a Basic build refuses the whole template at `POST /spaces`, though the gallery still lists it.
 
 **Golden corpus**: synthetic, from a fixed-seed generator (`inspecto/src/test/java/com/gamma/control/TelcoFraudCorpus.java`,
 seed `20260930`; fictional numbering — home country code `999`, foreign callers `287` / `289`) committed under
@@ -853,8 +853,8 @@ Offering placement (`offerings/standard.toon` `contentPacks`) and by the templat
 #### 3.5.4 The `aml` function pack (`PACK-AML-1`, 2026-10-10)
 
 Configuration only (no platform or add-on source edit; the one build change is two TEST-scope dependencies in
-`inspecto-scoring`'s pom so its golden test can run Screening and load a Report Template). Needs Professional or
-Enterprise; listed in `offerings/standard.toon` `contentPacks`. Two synthetic feeds: `aml_txn` (account ledger:
+`inspecto-scoring`'s pom so its golden test can run Screening and load a Report Template). Needs Standard or
+Advanced; listed in `offerings/standard.toon` `contentPacks`. Two synthetic feeds: `aml_txn` (account ledger:
 `CASH_DEPOSIT`, `CASH_WITHDRAWAL`, `TRANSFER`, `WIRE`; `account_id` pays `counterparty_id`; `DECIMAL(18,2)`) and
 `aml_parties` (party-register snapshot). Country codes XA-XF are placeholders.
 
@@ -901,7 +901,7 @@ window, `seasonality: weekday`, `minBaselinePoints: 3` and `highThreshold: 80`.
   `wallet_txn`, `wallets`, `aml_txn`; columns and types from the feed's schema TOON). The gate is not relaxed. The
   seed stays beside the ingested files (zero rows; the store is read `union_by_name`).
 - **Edition.** Without the anomaly module the model is opaque config and its Job does not run; `telco-fraud`'s
-  description says that part needs Professional or Enterprise with Anomaly Detection.
+  description says that part needs Standard or Advanced with Anomaly Detection.
 - **Tests.** `AnomalyTemplateModelsTest` (anomaly module) runs each pack's model through the kind's save gates
   against the pack's registry and seeds and checks the Job + pending-rule wiring. `TelcoFraudTemplateGoldenTest`
   counts only the `sql.template` detection Jobs. The pack golden corpora are not extended (one or ten days of data,
@@ -910,7 +910,7 @@ window, `seasonality: weekday`, `minBaselinePoints: 3` and `highThreshold: 80`.
 #### 3.5.6 The `la-showcase` Link Analysis demo (`LA-DEMO-SEED-1`, 2026-10-10)
 
 Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty companion whose `modules.toon` disables `geoLink`, so
-`/inv/*` there answers 404 `MODULE_DISABLED` while its other routes work; DR-S7). Needs the Enterprise **Demo Auth** build (`package.ps1
+`/inv/*` there answers 404 `MODULE_DISABLED` while its other routes work; DR-S7). Needs the Advanced **Demo Auth** build (`package.ps1
 -Edition Advanced -DemoAuth`, add `-Ui la-app` for the la-app shell); the Link Analysis modules and `canAdminister` to create it.
 
 - **Content.** One Collector + Pipeline + Dataset (`mule_transfers`, partition `BOOKED_DATE`, one file per UTC day, `file_template` so a missing
@@ -940,10 +940,10 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   A Space created later from the gallery (`POST /spaces {"id":"la-showcase","template":"la-showcase"}`) is equivalent.
   **Since 2026-10-12 the `-DemoAuth -Ui la-app` bundle ships `la-showcase` already seeded** (bundles ship no Spaces *except* this flavor): unzip,
   `serve-demo`, sign in - see [`build-test.md`](../../layer/platform/spec-build-test.md) (step 6f) and the variants runbook.
-- **Variants.** `inspecto-personal` (launch config; a Personal bundle from `package.ps1` with no flags, port 8098): `GET /inv/investigations` answers 503
-  `CAPABILITY_UNAVAILABLE`. **Postgres store (no Docker automation):** start the Enterprise/Preview server with
+- **Variants.** `inspecto-personal` (launch config; a Basic bundle from `package.ps1` with no flags, port 8098): `GET /inv/investigations` answers 503
+  `CAPABILITY_UNAVAILABLE`. **Postgres store (no Docker automation):** start the Advanced/Preview server with
   `-Dinvestigations.backend=db -Dinvestigations.db.url=jdbc:postgresql://<host>:5432/<db>` (password through the `SecretResolver`; the `la-store-pg` jar is
-  Preview/Enterprise only), create the Space, seed. Sample Enterprise PDP policy (deny `ra.analyst` Investigation reads): `config/examples/access-policy-deny-persona.md`,
+  Preview/Advanced only), create the Space, seed. Sample Advanced PDP policy (deny `ra.analyst` Investigation reads): `config/examples/access-policy-deny-persona.md`,
   inert until applied with `PUT /access/policies`; a persona-based `when` is unverified by any repository test.
 - **Not verified here.** The seed script's request bodies are grounded in route code and tests and unit-tested against a mocked `fetch`; it has NOT been run
   against a live server, nor has a Space been created from the template in a Link Analysis build (the template-scanning tests create it in a build without
@@ -986,13 +986,13 @@ registry id** (operator, 2026-09-06). Schema: `docs/api/schemas/metadata-bundle.
 
 ### 3.7 The Exchange boundary (cross-Space, by grant)
 
-`inspecto-exchange` (Professional+, EDG-01 cell 4) roots at `spaces/_shared/` — reserved, never a Space —
+`inspecto-exchange` (Standard+, EDG-01 cell 4) roots at `spaces/_shared/` — reserved, never a Space —
 holding `offers.toon` (owner-listed Datasets / Widgets / saved views, catalog metadata only) and `grants.toon`
 (the `ShareGrant` ledger tying an offer to a consumer Space). Sharing is per-item, opt-in, grant-mediated,
 **read-only**, fail-closed; **cross-Space writes never**; **Schema sharing refused** (a Dataset's Result Set
 is self-describing); Dashboards, Pipelines, Jobs, Queries and Expectations are integral to their Space and
 move only by *copy* (a bundle). Every route 409s outside a multi-Space runtime, and `features.exchange` is
-derived from `hasRoute`, not from "a container root exists" — a Personal install with `-Dspaces.root` once
+derived from `hasRoute`, not from "a container root exists" — a Basic install with `-Dspaces.root` once
 advertised a Share button that 404'd. Mechanism: `exchange-sharing.md`.
 
 ### 3.8 Per-Space stores, settings documents, and the CWD trap
@@ -1019,11 +1019,11 @@ default to `none`). Any new DB-backed family must decide its default with this i
 ### 3.9 What "isolated" means per edition (SPC-5)
 
 On every edition a Space is a **layout**: its own directory, service, scheduler, ledger, stores, registry,
-MDC label. On **Enterprise** it is also a **boundary**: `PolicyEngine.SEED` ships `space-isolation` (route)
+MDC label. On **Advanced** it is also a **boundary**: `PolicyEngine.SEED` ships `space-isolation` (route)
 and `space-isolation-rows` (row) — deny when the subject's mapped `space` home claim ≠ the bound Space,
 engaging **only when a `space` claim is mapped** in `roles.toon` (unmapped ⇒ no isolation, never a bricked
 API), exempting `canConfigureAccess` holders, overridable per policy name in `access-policies.toon`. The
-policy detail is `SEC` §3.10; the tenancy fact is here: **Personal and Standard do not enforce tenancy** —
+policy detail is `SEC` §3.10; the tenancy fact is here: **Basic and Standard do not enforce tenancy** —
 any authenticated subject can address any Space by URL. That is the deliberate edition placement of
 2026-07-23, not a gap; it is stated because `SPC-1` reads "isolated" for `All`.
 
@@ -1077,8 +1077,8 @@ earlier one, both appear.
 | 2026-08-14 | `PathJail` roots are `-Dassist.safety.roots` ∪ **discovered Space roots**, ⛔ never `-Dspaces.root`; config refs resolve against the **CWD**, never the Space root | the flag is unset in single-tenant mode and in the job runner; every shipped config authors from the server root |
 | 2026-08-14 (PG-1) | One backend selection `-Dinspecto.db=duckdb|postgres`; an unhonourable `postgres` **fails at boot** | deployments had come up "healthy" with stores silently switched off |
 | 2026-08-15 | The operational-DB screen reports and validates, **never writes** | the process serving the UI cannot configure its own dependency |
-| 2026-09-07 (D8) | Delivery receipts default **`none`** — the opposite call from the dedup ledger | default-ON would mint a DB file in the CWD under `legacy()` on every Personal install |
-| 2026-09-07 (EDG-01 cell 4) | `features.exchange` derives from **`hasRoute`**, not from "a container root exists" | a Personal install with `-Dspaces.root` advertised a Share button that 404'd |
+| 2026-09-07 (D8) | Delivery receipts default **`none`** — the opposite call from the dedup ledger | default-ON would mint a DB file in the CWD under `legacy()` on every Basic install |
+| 2026-09-07 (EDG-01 cell 4) | `features.exchange` derives from **`hasRoute`**, not from "a container root exists" | a Basic install with `-Dspaces.root` advertised a Share button that 404'd |
 
 ### Templates, bundles, exchange
 
@@ -1108,7 +1108,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Bundle residuals — `requires` present-but-different classification; per-editor "load as draft" import | `BACKLOG.md` §3 *Bundle / Exchange* | ⛔ do not fake a draft with a cross-kind `enabled: false` |
 | Space-to-space comparison — residuals only; the storage-growth comparison SHIPPED 2026-09-24 (`space.comparison`, `canAdminister`-gated) and its UI 2026-10-11 (Settings › Spaces › *Compare Spaces*; [jobs](../processor/spec-jobs.md) § Space comparison) | `BACKLOG.md` §6 *Space comparison beyond the on-demand admin run* | Declined 2026-10-18: no scheduled runs, no all-Space enumeration, no persisted rows |
 | Cross-Space controller / connector-direct emission (S8) | `BACKLOG.md` §3 | Optional Signal-network slice |
-| Enterprise distributed tier — shared-state backends, distributed scheduler | `BACKLOG.md` §2 *E1*; `REQUIREMENTS.md` NFR-8 | Design only |
+| Advanced distributed tier — shared-state backends, distributed scheduler | `BACKLOG.md` §2 *E1*; `REQUIREMENTS.md` NFR-8 | Design only |
 | Row / column-level sharing policy | design §6 of the archived sharing plan | Not filed as a row; listed in `exchange-sharing.md` as future |
 
 ### `UNTRACKED` — surfaced by this spec, no board row
@@ -1254,7 +1254,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | `ControlApiSpaceTemplateKpiTest` (4) | a template's KPI pack meets the `/components/kpi` save gate and capability; a refusal creates no Space |
 | `ControlApiMultiSpaceTest` (1) | a multi-Space server smoke |
 | `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (11) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
-| `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Personal carries no exchange module |
+| `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Basic carries no exchange module |
 | `PostgresStateStoreTest` (opt-in, `-Dinspecto.test.pg.url`; 11 skipped otherwise) | the DB-backed stores against a real Postgres |
 
 About 92 `@Test` methods across the eighteen Space and bundle classes, all in the default reactor.
