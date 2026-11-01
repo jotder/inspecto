@@ -354,6 +354,23 @@ public final class ConsignmentIngestor {
     }
 
     /**
+     * SCALEOUT-OBJSTORE-DATABASE-DIR-1: the registrar connection's credentials for an {@code s3://}
+     * {@code dirs.database} whose output DuckLake registers; {@code null} for every other pipeline.
+     */
+    static DuckLakeRegistrar.ConnectionSetup objectStoreSetup(PipelineConfig cfg, List<String> written)
+            throws IOException {
+        if (written.isEmpty() || cfg.dirs() == null || !com.gamma.config.safety.PathJail.isUri(cfg.dirs().database()))
+            return null;
+        Map<String, Object> lake = cfg.sinks().get(0).duckLake();
+        if (lake == null || !Boolean.parseBoolean(String.valueOf(lake.get("enabled")))) return null;
+        try {
+            return ObjectStoreDatabase.registrarSetup(cfg, written);
+        } catch (java.sql.SQLException e) {
+            throw new IOException(e.getMessage(), e);
+        }
+    }
+
+    /**
      * The batch's durable source finalisation, in crash-safe order: DuckLake register → manifest → backup →
      * <b>markers LAST</b> → fingerprint ledger / DB-export watermark. Extracted from {@link #commit} so the
      * branch-aware {@link com.gamma.pipeline.exec.ConsignmentGraphRunner} can drive the identical sequence as its
@@ -460,8 +477,8 @@ public final class ConsignmentIngestor {
         // took over must not commit; its files stay in the inbox for the new holder.
         CommitFence.check(CommitFence.Scope.RUN, cfg.identity().pipelineName());
 
-        DuckLakeRegistrar.register(outputs.stream().map(PartitionOutput::outputFile).toList(),
-                batch.table(), cfg, batch.batchId());
+        List<String> written = outputs.stream().map(PartitionOutput::outputFile).toList();
+        DuckLakeRegistrar.register(written, batch.table(), cfg, batch.batchId(), objectStoreSetup(cfg, written));
 
         String stageSourceId = cfg.collector().id();
         String batchIdForStages = batch.batchId();

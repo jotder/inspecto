@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code HttpExchange} attributes are private to the exchange only by default —
  * {@code sun.net.httpserver.ExchangeImpl} falls back to the shared {@code HttpContext} map on any
  * pre-JDK-26 runtime, or a current one started with {@code -Djdk.httpserver.attributes=context}. The
- * deployment bundle's {@code -NoRuntime} flavor explicitly supports "Java 24+", so the shared-map
+ * deployment bundle's {@code -NoRuntime} flavor runs on any Java 27+ the customer supplies, so the shared-map
  * configuration is a supported deployment, not a hypothetical. There, ControlApi's single
  * {@code createContext("/")} means every request shares one map: request A authenticates as alice,
  * request B hits a public path (auth optional, nothing stamped, no 401), and B's

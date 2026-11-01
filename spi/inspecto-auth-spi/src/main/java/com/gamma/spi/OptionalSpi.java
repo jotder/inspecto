@@ -23,14 +23,14 @@ import org.slf4j.LoggerFactory;
  * empty, and it throws an {@link Error}, which nothing up the call stack catches. The concrete instance:
  * the assistant modules' upstream dependency is compiled to <b>Java 25 bytecode</b> (class-file major 69,
  * measured 2026-09-12 across every {@code eoiagent-*} jar) while the reactor's own compile target — and
- * therefore the floor a skip-runtime deployment must meet — is <b>24</b>. On a Java 24 host with the
+ * therefore the floor a skip-runtime deployment had to meet — was <b>24</b> (it is <b>27</b> since 2026-09-17). On a Java 24 host with the
  * assistant jar staged, class loading raises {@code UnsupportedClassVersionError}, {@code ServiceLoader}
  * re-throws it, and {@code CollectorService.start()} dies. <b>The whole server fails to boot because an
  * optional component could not load.</b>
  *
  * <p>That is why {@code PKG-5} stood refused, and it is the real blocker — not the "resolve the JDK 25+ vs
  * Java 24+ floor" question the board row names. With this class in place the floor question dissolves:
- * the bundle's stated requirement stays 24, the assistant is staged in every edition as an <b>optional</b>
+ * the bundle's stated requirement stayed 24 (now 27), the assistant is staged in every edition as an <b>optional</b>
  * component (operator decision 2026-09-12), and on a host too old to load it the product starts normally
  * and the assistant is simply absent — which is a state the UI already knows how to render.
  *

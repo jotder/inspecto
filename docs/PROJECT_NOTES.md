@@ -951,8 +951,8 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   clearing the whole `ControlApi.REQUEST_SCOPED_ATTRS` roster as dispatch's first act, with a
   reflection-based completeness guard so a new `ATTR_*` constant missing from the roster is a red build
   rather than a leak). ⚠ **Do not dismiss this as latent on the strength of the local JDK** — the
-  `-NoRuntime` bundle documents "Java 24+" as its target requirement, so the shared-map configuration is
-  a *supported deployment*. Read the JDK source before reasoning about attribute lifetime.
+  `-NoRuntime` bundle runs on any Java 27+ the customer supplies, and `-Djdk.httpserver.attributes=context`
+  there brings the shared map back, so the shared-map configuration is a *supported deployment*. Read the JDK source before reasoning about attribute lifetime.
 
 - **A profile-scoped module is invisible to the verify loop that everyone actually runs.**
   `inspecto-oidc` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
