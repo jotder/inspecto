@@ -7,7 +7,7 @@
 // Nothing is modified. Exit 1 if any ✗, else 0. The check functions are pure over an injected `probe`
 // (see realProbe) so tools/dev-doctor.test.mjs drives them with fixtures.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,13 +55,20 @@ export function checkMaven(p) {
     const v = mvn.ok ? verOf(mvn.out, /Apache Maven (\d+)\.(\d+)/) : null;
     out.push(v && gte(v, [3, 9]) ? r(OK, 'maven', `${v.join('.')}`)
         : r(FAIL, 'maven', v ? `${v.join('.')}, need 3.9+` : 'not found', 'install Apache Maven 3.9+ and add its bin to PATH'));
-    const repo = join(p.home, '.m2', 'repository');
-    out.push(p.exists(join(repo, 'com', 'eoiagent')) ? r(OK, '~/.m2 com/eoiagent', 'present')
-        : r(FAIL, '~/.m2 com/eoiagent', 'missing (built from source jotder/inspect-agent)',
+    const repo = mavenLocalRepo(p);
+    out.push(p.exists(join(repo, 'com', 'eoiagent')) ? r(OK, 'maven repo com/eoiagent', `present in ${repo}`)
+        : r(FAIL, 'maven repo com/eoiagent', `missing in ${repo} (built from source jotder/inspect-agent)`,
             'gh repo clone jotder/inspect-agent && cd inspect-agent && mvn -DskipTests install'));
-    out.push(p.exists(join(repo, 'com', 'gamma', 'inspector')) ? r(OK, '~/.m2 com/gamma/inspector', 'present')
-        : r(FAIL, '~/.m2 com/gamma/inspector', 'no previous inspecto install', 'mvn -DskipTests install  (repo root, online once)'));
+    out.push(p.exists(join(repo, 'com', 'gamma', 'inspector')) ? r(OK, 'maven repo com/gamma/inspector', `present in ${repo}`)
+        : r(FAIL, 'maven repo com/gamma/inspector', `no previous inspecto install in ${repo}`, 'mvn -DskipTests install  (repo root, online once)'));
     return out;
+}
+
+/** The local repository Maven uses: <localRepository> of ~/.m2/settings.xml (${user.home} expanded), else ~/.m2/repository. */
+export function mavenLocalRepo(p) {
+    const xml = (p.readText(join(p.home, '.m2', 'settings.xml')) ?? '').replace(/<!--[\s\S]*?-->/g, ''); // the stock file has a commented-out example
+    const m = /<localRepository>\s*([^<]*?)\s*<\/localRepository>/.exec(xml);
+    return m?.[1] ? m[1].replace(/\$\{user\.home\}/g, p.home) : join(p.home, '.m2', 'repository');
 }
 
 export function checkNode(p) {
@@ -184,6 +191,7 @@ export function realProbe(root) {
             return { ok: !x.error && x.status === 0, status: x.error ? null : x.status, out: `${x.stdout ?? ''}${x.stderr ?? ''}` };
         },
         exists: (path) => existsSync(path),
+        readText: (path) => { try { return readFileSync(path, 'utf8'); } catch { return null; } },
         listDirs(path) {
             try { return readdirSync(path, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); }
             catch { try { statSync(path); } catch { /* vanished */ } return null; }
