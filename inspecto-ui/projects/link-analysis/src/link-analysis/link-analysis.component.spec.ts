@@ -2031,7 +2031,7 @@ describe('LinkAnalysisComponent', () => {
         expect(redo).not.toHaveBeenCalled(); // nothing undone yet: Ctrl+Shift+Z stays the display redo
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true }));
         expect(redo).not.toHaveBeenCalled();
-        c.investigation.undone.set([{ step: 1, kind: 'op', op: 'seed', params: { ids: ['ws-a'] } } as never]);
+        c.investigation.undone.set([[{ step: 1, kind: 'op', op: 'seed', params: { ids: ['ws-a'] } } as never]]);
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true }));
         expect(redo).toHaveBeenCalledTimes(1);
 

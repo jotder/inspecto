@@ -1220,7 +1220,14 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
   as `redoRequest(entry)` = `{op, ...params}` minus null values (the sealed params name the request's own keys), through
   `apply(…, true)`. Any other `apply`, `open`, `close` and `useDraft` clear it. A sealed null `window` is sent as
   `'full'`; a note on links is not offered again (sealed as `{source, target, kind}`, while the request names `lk.` ids),
-  so `canRedo` is false for it. A redone expand that four-eyes holds leaves the stack like any recorded step. Ctrl+Z / Ctrl+Shift+Z on an
+  so `canRedo` is false for it. A redone expand that four-eyes holds leaves the stack like any recorded step.
+  **One change, not one step (LA-INVESTIGATE-REDO-PAIR-1, fixed 2026-11-01):** `undone` holds CHANGES (each its entries
+  in recorded order). `undo(step, change)`: `GrowExcludeStore.undoOf` undoes a change newest first, `'one'` then
+  `'join'`, so one Redo re-records a Clean up / Shrink's `hide` and its `annotate` reason (or a multi-degree Grow) in
+  order; a step that fails part-way, or the rest after a step four-eyes holds, stays for the next Redo. The steps one
+  Redo recorded are remembered, and the screen's Undo (`'newest'`, the default) naming the newest of them while they are
+  still the newest effective steps takes them all back as one change. The Degrees stepper's trim passes `'one'`: it
+  undoes, and so redoes, one degree at a time, a redone Expand included. Ctrl+Z / Ctrl+Shift+Z on an
   Investigation's canvas are recorded undo / redo (the last Grow / Exclude change first, as before); elsewhere they stay
   the display history.
 - **Clean up.** `investigation-cleanup.ts` works on the WorkingSet (raw ids, hidden entities skipped, hop-0 and kept

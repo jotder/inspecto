@@ -502,7 +502,7 @@ export class InvestigationSessionStore {
         this.latestEvent.set(null);
         this.lastOverride.set(null);
         this.addingStart.set(false);
-        this.undone.set([]);
+        this.clearRedo();
     }
 
     /** Stop remembering an id (e.g. one the server no longer answers for). Nothing is deleted server-side. */
@@ -965,16 +965,23 @@ export class InvestigationSessionStore {
     }
 
     /**
-     * LA-INVESTIGATE-UX-1: the steps this browser undid, newest last. Redo records the newest again; any other new step,
-     * opening another Investigation or Draft, or closing clears them.
+     * LA-INVESTIGATE-UX-1: the changes this browser undid, newest last; a change is its steps in the order they were
+     * recorded (a Clean up is a `hide` and its `annotate`, LA-INVESTIGATE-REDO-PAIR-1). Redo records the newest change
+     * again; any other new step, opening another Investigation or Draft, or closing clears them.
      */
-    readonly undone = signal<InvestigationLogEntry[]>([]);
+    readonly undone = signal<InvestigationLogEntry[][]>([]);
     readonly canRedo = computed(() => {
-        const e = this.undone().at(-1);
-        return !!e && redoRequest(e) !== null;
+        const change = this.undone().at(-1);
+        return !!change?.length && change.every((e) => redoRequest(e) !== null);
     });
     /** What Redo would record again, for its tooltip ("Redo: Hide"). */
-    readonly redoName = computed(() => stepName(this.undone().at(-1)?.op));
+    readonly redoName = computed(() => stepName(this.undone().at(-1)?.[0]?.op));
+    /** The steps the last Redo recorded as one change, so one Undo of the newest takes them all back again. */
+    private redone: number[] = [];
+    private clearRedo(): void {
+        this.undone.set([]);
+        this.redone = [];
+    }
 
     /** Append one op, then re-read the log and the Working Set. `redo` keeps the undone stack (Redo appends through here). */
     async apply(request: InvestigationOpRequest, redo = false): Promise<boolean> {
@@ -995,7 +1002,7 @@ export class InvestigationSessionStore {
                 );
                 this.lastStep.set(step);
                 this.noteHubs(step);
-                if (!redo) this.undone.set([]);
+                if (!redo) this.clearRedo();
                 await this.refresh(id);
             },
             message,
@@ -1007,20 +1014,42 @@ export class InvestigationSessionStore {
      * apply as they did the first time (an expand over the thresholds is held again).
      */
     async redo(): Promise<boolean> {
-        const entry = this.undone().at(-1);
-        const request = entry && redoRequest(entry);
-        if (!request) return false;
-        const ok = await this.apply(request, true);
-        if (ok) this.undone.update((u) => u.slice(0, -1));
-        return ok;
+        if (!this.canRedo()) return false;
+        this.redone = [];
+        const made: number[] = [];
+        for (const entry of this.undone().at(-1)!) {
+            if (!(await this.apply(redoRequest(entry)!, true))) return false;
+            const step = this.lastStep();
+            // a step recorded again leaves the change, so a failure part-way redoes only the rest next time
+            this.undone.update((u) => {
+                const rest = u.at(-1)!.slice(1);
+                return rest.length ? [...u.slice(0, -1), rest] : u.slice(0, -1);
+            });
+            // held for a second person's approval: stop there, as the first walk did; the rest waits for the next Redo
+            if (step?.status === 'pending') return true;
+            if (step) made.push(step.step);
+        }
+        this.redone = made;
+        return true;
     }
 
     /**
      * Undo the newest effective step. `undoes` names the step the caller means (LA-GROW-EXCLUDE-UNDO-RACE-1): when another
      * step is the newest by now — a team member's — the server refuses (409) and the log is read again, so the screen shows
-     * what is newest instead of undoing it.
+     * what is newest instead of undoing it. `change` says what Redo gets back (LA-INVESTIGATE-REDO-PAIR-1): `'one'` this
+     * step as its own change; `'join'` this step joined to the change the previous undo started (the caller undoes a
+     * change newest first), so one Redo records it all again; `'newest'` (the screen's Undo) as `'one'`, except that an
+     * undo of the newest step of what the last Redo recorded takes that whole change back.
      */
-    async undo(undoes?: number): Promise<boolean> {
+    async undo(undoes?: number, change: 'newest' | 'one' | 'join' = 'newest'): Promise<boolean> {
+        const redone = this.redone;
+        this.redone = [];
+        const newest = this.effectiveSteps().slice(-redone.length).map((e) => e.step);
+        if (change === 'newest' && redone.length > 1 && undoes === redone.at(-1) && newest.join() === redone.join()) {
+            for (const [i, step] of [...redone].reverse().entries())
+                if (!(await this.undo(step, i ? 'join' : 'one'))) return false;
+            return true;
+        }
         const id = this.activeId();
         if (!id) return false;
         const target = this.log()?.entries.find((e) => e.step === (undoes ?? this.undoTarget()));
@@ -1031,7 +1060,10 @@ export class InvestigationSessionStore {
                     draft ? this.inv.undoDraft(id, draft, undoes) : this.inv.undoInvestigation(id, undoes),
                 ),
             );
-            if (target) this.undone.update((u) => [...u, target]);
+            if (target)
+                this.undone.update((u) =>
+                    change === 'join' && u.length ? [...u.slice(0, -1), [target, ...u.at(-1)!]] : [...u, [target]],
+                );
             await this.refresh(id);
         });
         if (!done && undoes != null && this.activeId() === id) await this.refresh(id).catch(() => undefined);
@@ -1047,7 +1079,7 @@ export class InvestigationSessionStore {
             const loaded = await this.load(id, draftId);
             if (this.activeId() !== id) return;
             this.activeDraftId.set(draftId);
-            this.undone.set([]);
+            this.clearRedo();
             this.lastStep.set(null);
             this.replayResult.set(null);
             this.commit(loaded);

@@ -238,6 +238,76 @@ describe('InvestigationSessionStore (LA-10)', () => {
         expect(store.canRedo()).toBe(false);
     });
 
+    it('LA-INVESTIGATE-REDO-PAIR-1: one Redo records again the whole change one Undo took back, and one Undo takes the redone change back', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        const entries = () => logs['inv-1'].entries;
+        const next = () => Math.max(...entries().map((e) => e.step)) + 1;
+        entries().push(
+            entry(1, { op: 'seed', params: { ids: ['4471'] } }),
+            entry(2, { op: 'hide', params: { ids: ['a', 'b'] } }),
+            entry(3, { op: 'annotate', params: { ids: ['a', 'b'], note: 'Clean up: dangling leaves' } }),
+        );
+        sets['inv-1'] = ws(['4471']);
+        await store.open('inv-1');
+        inv.undoInvestigation.mockImplementation((_id: string, undoes: number) => {
+            const n = next();
+            entries().find((e) => e.step === undoes)!.undoneBy = n;
+            entries().push(entry(n, { kind: 'undo', undoes }));
+            return of(step(n, 'undo'));
+        });
+        inv.appendInvestigationOp.mockImplementation((_id: string, req: { op: string } & Record<string, unknown>) => {
+            const n = next();
+            const { op, ...params } = req;
+            entries().push(entry(n, { op: op as InvestigationLogEntry['op'], params }));
+            return of(step(n, op));
+        });
+
+        // a Clean up's Undo (GrowExcludeStore.undoOf): the annotate, then the hide as part of the same change
+        expect(await store.undo(3)).toBe(true);
+        expect(await store.undo(2, 'join')).toBe(true);
+        expect(store.redoName()).toBe('Hide');
+
+        // ONE Redo records both again, in their order, the reason included
+        expect(await store.redo()).toBe(true);
+        expect(inv.appendInvestigationOp.mock.calls.map((c) => c[1])).toEqual([
+            { op: 'hide', ids: ['a', 'b'] },
+            { op: 'annotate', ids: ['a', 'b'], note: 'Clean up: dangling leaves' },
+        ]);
+        expect(store.canRedo()).toBe(false);
+        expect(store.effectiveSteps().map((e) => e.step)).toEqual([1, 6, 7]);
+
+        // ONE Undo of the newest step takes the redone change back whole, and one Redo restores it again
+        expect(await store.undo(store.undoTarget())).toBe(true);
+        expect(inv.undoInvestigation.mock.calls.slice(2).map((c) => c[1])).toEqual([7, 6]);
+        expect(store.effectiveSteps().map((e) => e.step)).toEqual([1]);
+        expect(await store.redo()).toBe(true);
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(4);
+        expect(store.canRedo()).toBe(false);
+
+        // the Degrees stepper's trim ('one') takes back only the step it names, even of a redone change
+        expect(await store.undo(store.undoTarget(), 'one')).toBe(true);
+        expect(store.effectiveSteps().map((e) => e.step)).toEqual([1, 10]);
+        expect(store.redoName()).toBe('Annotation');
+    });
+
+    it('LA-INVESTIGATE-REDO-PAIR-1: a Redo held for four-eyes approval stops there; the rest waits for the next Redo', async () => {
+        const { store, inv, logs, sets } = setup();
+        await store.start(P, 'warrant 7');
+        logs['inv-1'].entries.push(
+            entry(1, { op: 'seed', params: { ids: ['4471'] } }),
+            entry(2, { op: 'expand', params: { ids: ['4471'] }, undoneBy: 4 }),
+            entry(3, { op: 'expand', params: { ids: ['b'] }, undoneBy: 5 }),
+        );
+        sets['inv-1'] = ws(['4471']);
+        await store.open('inv-1');
+        store.undone.set([[logs['inv-1'].entries[1], logs['inv-1'].entries[2]]]);
+        inv.appendInvestigationOp.mockImplementation(() => of({ ...step(6, 'expand'), status: 'pending' as const }));
+        expect(await store.redo()).toBe(true);
+        expect(inv.appendInvestigationOp).toHaveBeenCalledTimes(1);
+        expect(store.undone()).toEqual([[logs['inv-1'].entries[2]]]);
+    });
+
     it('LA-GROW-EXCLUDE-UNDO-RACE-1: undo names its step; a 409 (a newer step by a team member) re-reads the log', async () => {
         const { store, inv, logs, sets } = setup();
         await store.start(P, 'warrant 7');

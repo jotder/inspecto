@@ -160,7 +160,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         ]);
         expect(store.lastChange()?.text).toBe('Expanded 3 degrees: 5 numbers and 7 calls added; 1 busy number held.');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[3], [2], [1]]); // the group, newest first, each naming its step
+        expect(session.undo.mock.calls).toEqual([[3, 'one'], [2, 'join'], [1, 'join']]); // the group, newest first, each naming its step
         expect(store.lastChange()?.text).toBe('Undone (3 steps).');
         expect(await store.undoLast()).toBe(false); // nothing of ours left: the screen's own Undo runs
     });
@@ -173,7 +173,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {});
             expect(store.lastExpandDegrees()).toBe(3);
             expect(await store.trimLastExpand(1)).toBe(true);
-            expect(session.undo.mock.calls).toEqual([[3], [2]]); // the first degree stays
+            expect(session.undo.mock.calls).toEqual([[3, 'one'], [2, 'one']]); // the first degree stays
             expect(store.lastExpandDegrees()).toBe(1);
             expect(store.lastChange()?.text).toBe('Lowered to 1 degree: the outer 2 degrees of the last Expand removed from the Working Set (2 steps undone, kept in the log).');
         });
@@ -195,7 +195,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
                 return false;
             });
             expect(await store.trimLastExpand(1)).toBe(false);
-            expect(session.undo.mock.calls).toEqual([[3]]);
+            expect(session.undo.mock.calls).toEqual([[3, 'one']]);
             expect(store.lastExpandDegrees()).toBe(3);
             expect(store.lastChange()?.text).toContain('not the newest step');
         });
@@ -263,7 +263,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             const { store, session } = reopened(['g1', 'g2', 'g2', 'g2']);
             expect(store.lastExpandDegrees()).toBe(3); // steps 3-5; the older Expand g1 (step 2) is not part of it
             expect(await store.trimLastExpand(1)).toBe(true);
-            expect(session.undo.mock.calls).toEqual([[5], [4]]);
+            expect(session.undo.mock.calls).toEqual([[5, 'one'], [4, 'one']]);
             expect(store.lastExpandDegrees()).toBe(1);
         });
 
@@ -304,7 +304,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(applied).toHaveLength(2);
         expect(store.lastChange()?.text).toContain('Degree 2 needs a second person’s approval, so the walk stopped there.');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[1]]);
+        expect(session.undo.mock.calls).toEqual([[1, 'one']]);
     });
 
     it('grouped Undo stops at the first 409 (a team member’s newer step) and says why', async () => {
@@ -314,7 +314,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         // a peer's step lands after this browser's walk
         await session.apply({ op: 'expand', ids: ['peer'] });
         await undo();
-        expect(session.undo.mock.calls).toEqual([[2]]); // refused at the first: degree 1 is not undone under it
+        expect(session.undo.mock.calls).toEqual([[2, 'one']]); // refused at the first: degree 1 is not undone under it
         expect(store.lastChange()?.text).toContain('not the newest step');
     });
 
@@ -324,7 +324,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         expect(applied).toEqual([{ op: 'hide', ids: ['a', 'b'] }, { op: 'annotate', ids: ['a', 'b'], note: 'Trimmed to 2' }]);
         expect(store.lastChange()?.text).toContain('hid 2');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[2], [1]]);
+        expect(session.undo.mock.calls).toEqual([[2, 'one'], [1, 'join']]); // one change, so one Redo records both again
         expect(store.lastChange()?.text).toBe('Undone (2 steps).');
     });
 
@@ -337,7 +337,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             return false;
         });
         await undo();
-        expect(session.undo.mock.calls).toEqual([[2]]); // the hide (step 1) is not undone under the colleague's step
+        expect(session.undo.mock.calls).toEqual([[2, 'one']]); // the hide (step 1) is not undone under the colleague's step
         expect(store.lastChange()?.text).toContain('step 3 (keep by lead-1)');
     });
 
@@ -362,7 +362,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             return false;
         });
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[1]]);
+        expect(session.undo.mock.calls).toEqual([[1, 'one']]);
         expect(store.lastChange()?.text).toContain('step 1 is not the newest step any more');
     });
 

@@ -247,7 +247,7 @@ export class GrowExcludeStore {
         const drop = run.steps.slice(degrees);
         let done = 0;
         for (const step of [...drop].reverse()) {
-            if (!(await this.investigation.undo(step))) break;
+            if (!(await this.investigation.undo(step, 'one'))) break;
             done++;
         }
         if (done) this.expandRun.set({ id: run.id, steps: run.steps.slice(0, have - done) });
@@ -516,7 +516,8 @@ export class GrowExcludeStore {
         return {
             valid: still,
             undo: async () => {
-                for (const step of [...made].reverse()) if (!(await this.investigation.undo(step))) break;
+                for (const [i, step] of [...made].reverse().entries())
+                    if (!(await this.investigation.undo(step, i ? 'join' : 'one'))) break;
                 const n = made.length;
                 this.lastChange.set(
                     this.investigation.error()
