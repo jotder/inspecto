@@ -299,8 +299,9 @@ crosses the wire is always a validated `{agg, field}` pair, so a named-Measure e
 kind of spec that cannot cross and must fail honestly.
 
 The **Query Library** (`/studio/queries`) authors SQL with `$`-parameters and previews the Result Set.
-⚠ It previews through `DatasetRowsService` (`/db/table`, `/db/query`) — **not** through
-`POST /queries/{id}/run`, which has no client caller at all.
+⚠ The editor previews an unsaved draft through `DatasetRowsService` (`/db/table`, `/db/query`); the
+*Run saved* action runs a stored query through `POST /queries/{id}/run` (`STUDIO-HALVES-1`). *(Corrected
+2026-11-01: this said the route had no client caller.)*
 
 ### 3.5 Dashboards
 
@@ -849,9 +850,8 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 2. ~~**`GET /bi/datasets` has no client consumer**~~ ✅ **CLOSED by retirement 2026-09-14**
    (`RETIRE-HALVES-1`) — the seventh instance of a shipped server half with no caller, and the second
    inside `BI-7` alone. Of the two options, the operator took the route's deletion over adopting it.
-3. **`POST /queries/{id}/run` still has no client consumer**, and `plan-studio.md` named it as Studio's
-   execution path. `DAT` §5 already carries this as a Must; Studio is the area that was documented as
-   its consumer, so the two records should be filed together.
+3. ~~**`POST /queries/{id}/run` still has no client consumer**~~ ✅ **CLOSED** (`STUDIO-HALVES-1`) — the
+   Query Library's *Run saved* calls it (`queries.component.ts` `runSaved`).
 4. **A Measure has no server home.** `BI-3` and `BI-5` both speak of Measures, but a named Measure is a
    client-side expression while the wire only carries validated `{agg, field}` pairs. A named Measure can
    therefore never cross to `/bi/query`, be embedded, or drive a measure alert. That gap is deliberate
