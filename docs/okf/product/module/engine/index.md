@@ -36,6 +36,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P3 | feature | Branch-aware executor residuals | demand |
 | — | P3 | feature | Consignment addressing | demand |
+| `MAPPING-EPOCH-TIMESTAMP-1` | P3 | feature | a field mapping cannot type an epoch-seconds string as a TIMESTAMP. | — |
+| `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |

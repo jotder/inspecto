@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **68<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 55<!--count:backlog-p3--> × P3** —
+> **70<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 57<!--count:backlog-p3--> × P3** —
+> ⬆ **68 → 70 (P3 55 → 57) on 2026-11-01**: filed P3 features `MAPPING-EPOCH-TIMESTAMP-1` (§3.3, a field mapping cannot type an epoch-seconds string) and `REPORT-PDF-CHARTS-1` (§3.6, a report PDF is a table snapshot) [items: module.engine · kind: feature] — the two product gaps behind MFS demo review items 25 and 26, checked against the code; item 26's Hive-partition half is already reachable (`parquet.hive_partitioning`).
 > ↔ **68 (no count change) on 2026-11-01**: narrowed P3 `PACK-PARTNER-SETTLEMENT-1` — slice S7 built: the dispute evidence pack, Report Templates `settlement-dispute-pack` (JSON) and `-csv` drafted from the dispute Case with every line's rate ids, re-rating run, statement version, agreement version, tolerance and both FX rows, refusing a line with no run (422); Regulatory Reporting gained a generic Report Template `rows` source (Dataset rows matched on the member Incidents' Alert Rule key). Decisions PS-S7-1…5 assistant-decided under delegation, pending confirmation. Left: S8, W1…W3.
 > ⬇ **69 → 68 (P3 56 → 55) on 2026-11-01**: closed P3 feature `PREDICTIVE-FORECAST-1` — the `forecast-model` kind in `features/inspecto-predictive` (one series per `key`, a `count` / `countDistinct` / `sum` Measure per `day` or ISO `week` bucket, empty buckets 0; `seasonal-naive` or additive `holt-winters` with authored α β γ; horizon 1..90; history default 364 days / 156 weeks; `maxSeries` default 100 000, ceiling 1 000 000, past it the run fails) and the `predict.forecast` Job writing `forecasts_<model>` + `_latest`: one row per series per future bucket with `forecast`, an 80/90/95/99 % interval from the backtest RMSE, and the backtest error stored on every row (`backtest_mae`, `backtest_smape`, `backtest_rel_mae` vs seasonal-naive on a `min(horizon, season)` hold-out); a series under two seasons is one `insufficient` row (NULL, never 0); every row recomputes from its explanation. Save gates incl. the reserved `forecasts_` prefix. Decisions D-PF1…D-PF11 assistant-decided under operator delegation, pending confirmation. No routes, chart or degradation flag (`PREDICTIVE-SURFACE-1`, `PREDICTIVE-VALIDATE-DRIFT-1`). As built in `okf/product/module/predictive/spec-forecast.md`.
 > ⬇ **70 → 69 (P3 57 → 56) on 2026-11-01**: closed P3 defect `LA-ENTITY-TYPE-RETIRE-1` [items: module.la-core · kind: defect] — an unused Entity Type can now be deleted (operator decision: delete if unused, no Retire state): `DELETE /inv/entity-types/{id}` (`canAuthorWorkbench`) refuses 409, naming the use, while a Dataset column's classification, a live Entity List or an Investigation (header, log or open Draft) names the type, and for the last type; a bin button on the Entity Type page and *Delete* in ⚙ Settings → Entity Types (which used to rewrite the list with no use check). As built in `okf/product/module/la-core/architecture.md` (Entity profiles).
@@ -407,10 +408,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 55<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 57<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 55<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 68<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 57<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 70<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -569,6 +570,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Parsing
 
 - **P3** · `PARSING-DERIVE-EDITOR-1` — **slice 4 of Parsing D9: an optional profile editor for ASN.1 `derive` / `children`.** The drawer lists derived columns read-only today; `ASN1-DERIVE-NOT-IN-GRAMMAR` and the counters channel stay in §6 *Parsing (Stage-1) residual deferrals*. → `okf/product/module/engine/spec-parser-plugins.md` (D9) [items: module.telecom-asn1, module.etl · kind: feature · hold: operator]
+- **P3** · `MAPPING-EPOCH-TIMESTAMP-1` — **a field mapping cannot type an epoch-seconds string as a TIMESTAMP.** The mapping's date and time formats are strptime patterns, and an epoch count is not one, so a feed that carries a 10-digit epoch (with `0` for none) needs a `sql` step with `to_timestamp(x::BIGINT)` and a `0` → NULL guard. Found in the MFS demo onboarding (2026-10-26, `last_date_balance`; review item 26), where that workaround is in force. The other half of item 26 is not a gap: Hive partition columns are reachable through the Parquet parser's `parquet.hive_partitioning` option (since 2026-08-28). [items: module.engine · kind: feature]
 
 
 ### 3.4 Catalog, Onboarding, Datasets & Lineage
@@ -628,6 +630,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/product/module/processor/spec-queries.md` [items: module.processor · kind: feature · hold: demand]
+
+- **P3** · `REPORT-PDF-CHARTS-1` — **a report Job's PDF is a table snapshot, never a chart.** `format: pdf` wraps the same table image `format: png` renders (`ReportJob` → `TablePngRenderer`, capped at its row limit), so a scheduled PDF cannot carry the dashboard's charts or KPI tiles. Found in the MFS demo review (2026-10-27, item 25); until then dashboards are the storytelling surface. [items: module.engine · kind: feature]
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
 `trend-monitor` today. See [`okf/product/layer/product/user-guide-studio.md`](okf/product/layer/product/user-guide-studio.md).
