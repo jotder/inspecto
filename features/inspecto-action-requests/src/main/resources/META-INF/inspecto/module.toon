@@ -8,6 +8,6 @@ provides:
   features[1]: actionRequests
   contracts[1]: ConsequenceProvider
   consequences[1]: invoke-api
-  routes[7]: "GET /action-requests","GET /action-requests/([^/]+)","POST /action-requests","POST /action-requests/([^/]+)/approve","POST /action-requests/([^/]+)/decline","POST /action-requests/([^/]+)/retry","POST /action-requests/([^/]+)/mark-failed"
+  routes[9]: "GET /incidents/([^/]+)/briefs","POST /incidents/([^/]+)/briefs","GET /action-requests","GET /action-requests/([^/]+)","POST /action-requests","POST /action-requests/([^/]+)/approve","POST /action-requests/([^/]+)/decline","POST /action-requests/([^/]+)/retry","POST /action-requests/([^/]+)/mark-failed"
 requires:
   modules[1]: notify-channels

@@ -1,8 +1,6 @@
 # Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)
 
-> ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
-
-**Status before parking:** 🟡 DESIGN 2026-10-18 — nothing built. §8 decisions taken by the assistant under operator delegation (2026-10-18) — **PENDING OPERATOR CONFIRMATION**; S0 (decisions + GLOSSARY) done, S1+ not started.
+**Status:** 🟢 **S1 BUILT 2026-11-01** (deterministic Incident Brief: why + evidence + declared value at risk, with an optional proposed next action filed as a four-eyes Action Request) — as built in §10; S2…S6 open (`docs/BACKLOG.md`). §8 decisions taken by the assistant under operator delegation (2026-10-18) and the S1 decisions in §10.1 (2026-11-01) are **PENDING OPERATOR CONFIRMATION**.
 **Row:** `docs/BACKLOG.md` §4, `AGENTIC-INVESTIGATION-1` (P2, competitive gap AA).
 **Competitors:** Mobileum RAID Agentic and Subex AI Agent Squads (see `okf/product/layer/product/brochure-competitive-matrix.md`, rows AA and the gap table).
 
@@ -143,3 +141,38 @@ Each slice ships alone: S1+S2 already close most of the "explains why it fired" 
 
 - `AgentApprovals` four-eyes: bind `decidedBy` to the authenticated Subject and exclude the starting user.
 - Generalize the `invoke-api` four-eyes path so every Consequence kind can be requested the same way.
+
+## 10. As built — S1 (2026-11-01)
+
+**Routes** (module `inspecto-action-requests`, feature `actionRequests`, class `IncidentBriefRoutes`, model `IncidentBriefs`):
+
+| Route | Capability | What |
+|---|---|---|
+| `POST /incidents/{id}/briefs` | `canWorkIncidents` | Build and save a Brief; with `{"propose":{connection, method, payloadTemplate, idempotencyKey?, reason?}}` also file the proposed next action as a `pending` Action Request |
+| `GET /incidents/{id}/briefs` | `canWorkIncidents` | The Incident's Briefs, newest first |
+
+**Create gates, in order:** capability → write root 503 → unknown body key / `propose` not an object / unknown `propose.*` key 422 → no operational objects 503 → Incident absent or out of the caller's scope 404 → not an Incident 422 → (with `propose`) every Action Request create gate → saved. A refused create saves nothing.
+
+**Content (playbook `incident-brief/v1`, deterministic, no model):**
+
+- **why** — title, severity, status, correlationId and the trigger attributes present on the Incident (`alertRule`, `rule`, `expectation`, `decisionRule`, `signal`, `threshold`, `observed`, …), citing evidence `e1`. `triggerDeclared: false` when none is recorded.
+- **evidence** — `e1` the Incident; `e2` the declared impact when present; then up to 5 similar past Incidents (open or closed, token Jaccard over title + description via the Analytics Kernel's `Similarity.jaccard`, newest 500 scanned). Each item has `kind`, `citation` (`GET /objects/{id}`) and `summary`. **An Incident the caller cannot see is never cited** (the incident `LinkedSubjectProvider.visibleTo` check, the same one Action Requests use). A saved Brief is filtered again **for each reader** on `GET` (it was filtered for whoever started it), so a scoped reader never sees an out-of-scope Incident an unscoped analyst's Brief cited (verification finding, 2026-11-01).
+- **valueAtRisk** — the Incident's **declared** impact from the Impact ledger (`PUT /objects/{id}/impact`): `outstanding` (confirmed − recovered, derived by the ops module) when something is confirmed, else `suspected`, with the formula and currency. Absent → `declared: false`, never a number.
+- **proposal** — `null`, or `{actionRequestId, status: pending, approval}`.
+
+**Seams:** `ObjectAccess.detail(id)` and `ObjectAccess.recentDetail(kind, limit)` (new defaults in `inspecto-engine`, implemented by `ObjectServiceAccess` in `inspecto-ops`) — Action Requests deliberately do not depend on `inspecto-ops`. Store: one JSON document per Brief at `<write-root>/incident-briefs/<id>.json` (`ib-<yyyyMMddHHmmss>-<6 hex>`), atomic, jailed, **unsigned** (a Brief decides nothing; the signed Action Request does). Audit: `incident-brief.created`.
+
+**Safety invariant, tested and falsified:** the proposal is filed by `ActionRequestRoutes.propose` with **author = the human who started the Brief** and **coAuthor = `agent:incident-brief:<briefId>`**; the always-on four-eyes decide gate refuses both. `ControlApiIncidentBriefsTest.theProposedActionDoesNothingUntilADifferentPersonApprovesIt`: filing sends nothing; the starter approving → 403 and nothing sent; a different approver → sent once. Mutant (author = the agent identity, no coAuthors) → the starter's approve returns 200 and the test goes red.
+
+### 10.1 S1 decisions (assistant-decided 2026-11-01 — PENDING OPERATOR CONFIRMATION)
+
+| # | Decision | Why | Reverse by |
+|---|---|---|---|
+| S1-1 | **No model in S1.** The Brief is a fixed deterministic playbook; model-written prose over the cited facts is a later layer in `inspecto-intelligence` (Advanced). | Every claim must cite evidence; a deterministic slice is testable with no LLM and has no data-egress question. | Add the prose layer (S2+) |
+| S1-2 | **Value at risk = the declared Impact ledger** of the Incident, not yet a `valueAtRisk` block on the Expectation / Decision Rule (S3). | It is already a declared, audited, typed amount; decision 4 (declared only) holds. | Ship S3 and prefer the rule's declaration |
+| S1-3 | **The proposable action is an Action Request (an outbound call)**, chosen by the human in the `propose` body. Decision 3's exclusion of `invoke-api` is narrowed: the Action Request route itself IS the unified four-eyes path; Consequence-kind proposals (`create-alert`, `start-job`, …) and the per-Space allow-list stay S4. | Reuses the existing four-eyes store; no parallel approval path. | Refuse `propose` until S4 |
+| S1-4 | **Lives in `inspecto-action-requests` (Standard and up)**, not Advanced only (decision 6). | No model is involved, and the Brief belongs beside the approval path its proposals use. | Move the routes to an Advanced-only module |
+| S1-5 | **Briefs are kept beside Action Requests in the write root**, not yet cascaded by `IncidentPurgeTask` (decision 8 → S5). | Same lifecycle as the Action Requests they link to today. | Ship the S5 cascade |
+
+**Still open (BACKLOG row):** S2 the Incident page "Investigate" panel; S3 the rule-level `valueAtRisk` declaration; S4 Consequence-kind proposals with the per-Space allow-list and server-side execute on approval; S5 feedback loop and purge cascade; the model-written prose layer; S6 (could) scheduled top-N.
+

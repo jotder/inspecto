@@ -162,6 +162,29 @@ public final class ObjectServiceAccess implements ObjectAccess {
         return service.get(objectId).map(ObjectServiceAccess::flatten);
     }
 
+    @Override
+    public Optional<Map<String, Object>> detail(String objectId) {
+        return service.get(objectId).map(ObjectServiceAccess::detailOf);
+    }
+
+    @Override
+    public List<Map<String, Object>> recentDetail(ObjectType kind, int limit) {
+        return service.query(ObjectQuery.builder().objectType(kind).limit(limit).build())
+                .stream().map(ObjectServiceAccess::detailOf).toList();
+    }
+
+    /** {@link #flatten} plus what a reader of the object's content needs (the Incident Brief). */
+    private static Map<String, Object> detailOf(OperationalObject o) {
+        Map<String, Object> m = flatten(o);
+        m.put("title", o.title());
+        m.put("description", o.description());
+        m.put("severity", o.severity());
+        m.put("status", o.status());
+        m.put("createdAt", o.createdAt());
+        Impact.of(o).ifPresent(i -> m.put("impact", i.toMap()));
+        return m;
+    }
+
     /** ONE projection behind both {@link #summary} and {@link #findByStatus}, so the two cannot drift. */
     private static Map<String, Object> flatten(OperationalObject o) {
         Map<String, Object> m = new LinkedHashMap<>();

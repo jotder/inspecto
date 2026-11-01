@@ -143,6 +143,17 @@ public interface ObjectAccess {
     Optional<Map<String, Object>> summary(String objectId);
 
     /**
+     * The {@link #summary} keys plus {@code title}, {@code description}, {@code severity}, {@code status},
+     * {@code createdAt} and, when one is recorded, {@code impact} (the typed impact's map, its derived
+     * {@code outstanding} included). Added for the Incident Brief ({@code AGENTIC-INVESTIGATION-1}), which reads an
+     * Incident without depending on the ops module. Empty when no such object exists, or without the ops module.
+     */
+    default Optional<Map<String, Object>> detail(String objectId) { return Optional.empty(); }
+
+    /** The newest {@code limit} objects of {@code kind}, open or closed, as {@link #detail} maps; none by default. */
+    default List<Map<String, Object>> recentDetail(ObjectType kind, int limit) { return List.of(); }
+
+    /**
      * Every object of {@code kind} in {@code status}, as the same flat maps {@link #summary} returns.
      *
      * <p>⚠ Narrow on purpose: the one consumer is the intelligence agent's remediable-state scan, which

@@ -51,6 +51,8 @@ Investigation (§7, *Live drive*); "—" = not driven that day.
 | S1 | Save | 2 · 1 | 2 · 1 (unchanged) | **2 · 1** PASS (+ pen and typing to rename) |
 | N1 | *Pick neighbours…* from the node menu (new in `LA-INVESTIGATE-UX-2` (3)) | — | — | **4 · 1** PASS (right-click, *Pick neighbours…*, tick one, *Add selected (1)*) |
 
+The workflows marked "—" were re-measured live on 2026-11-02: [`tests-investigation-tab-live-drive.md`](../../okf/product/module/la-core/tests-investigation-tab-live-drive.md).
+
 ## 3. The design
 
 ### 3.1 One rule: the panel holds the filter, the canvas acts
