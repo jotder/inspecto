@@ -221,7 +221,7 @@ output:
   `/`-join for a URI; the joined key is judged by `requireObjectStore` at the write, so a `..` table name is
   refused there.
 * **Refused by name** (each a `SQLException` at `configure`, so the batch fails before any I/O), decided
-  under operator delegation 2026-11-01, pending confirmation: no / unregistered / non-`s3` / tunnelled or
+  under operator delegation 2026-11-01, operator-confirmed 2026-11-01: no / unregistered / non-`s3` / tunnelled or
   proxied / keyless Connection; a `sinks:` list; `produces: reference`. Readers of
   an object-store pipeline's output (DB browser, join reference, enrichment) skip it, and the seal then
   refuses the read. Left open on the row: fan-out, reference stores, readers.
@@ -233,7 +233,7 @@ output:
   bare host, `EgressGate`), then the same prefix-scoped `inspecto_output_store` secret. ⛔ Because that
   connection has no seal, every written file is first judged by `PathJail.requireObjectStore` against the
   database prefix alone; a file outside it (a sibling prefix, `..`, another bucket, a local path) fails the
-  batch before registration — decided under operator delegation 2026-11-01, pending confirmation, as is the
+  batch before registration — decided under operator delegation 2026-11-01, operator-confirmed 2026-11-01, as is the
   consequence that a partition value whose key segment falls outside the containment rule's character set
   fails a registered batch rather than registering it. The setup is built only when the lake is enabled, so
   an unregistered pipeline is unchanged. The lake's own `data_path` / catalog credentials are untouched:

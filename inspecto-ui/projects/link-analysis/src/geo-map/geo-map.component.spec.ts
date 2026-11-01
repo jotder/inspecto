@@ -235,6 +235,12 @@ describe('GeoMapComponent', () => {
         await c.run();
         expect(c.geo()?.routes).toHaveLength(1);
         expect(c.querySummary()).toContain('→');
+        fixture.detectChanges();
+        // an inline span ignores max-width, so the summary ran off both edges at 320 px
+        const summary = fixture.nativeElement.querySelector('button[aria-label="Edit the query"] span.truncate');
+        expect(summary.classList).toContain('inline-block');
+        // the page's own map keeps a floor (a 0 px map at 320 / 640 px); the dashboard widget's map does not
+        expect(fixture.nativeElement.querySelector('inspecto-map-view').classList).toContain('min-h-64');
         expect(c.extent()).toEqual([100, 200]);
 
         c.setTimeTo(120); // window [100, 120] keeps Dhaka, drops Dubai and the route
