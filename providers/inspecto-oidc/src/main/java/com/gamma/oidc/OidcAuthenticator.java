@@ -217,12 +217,13 @@ public final class OidcAuthenticator implements Authenticator {
         return out;
     }
 
-    /** {@code auth.oidc.provider=keycloak} unions realm + client roles, unless {@code rolesClaim} is set explicitly. */
+    /** {@code auth.oidc.provider=keycloak} unions realm + client roles, unless {@code rolesClaim} is set explicitly.
+     *  The client is {@code auth.oidc.clientId} with the same {@code inspecto-spa} default as {@code OidcTokenRelay}. */
     private static RoleMapper.Keycloak keycloakRoles() {
         String explicit = System.getProperty("auth.oidc.rolesClaim");
         if (OidcConfig.provider() != OidcConfig.Provider.KEYCLOAK || (explicit != null && !explicit.isBlank()))
             return null;
-        return new RoleMapper.Keycloak(System.getProperty("auth.oidc.clientId"));
+        return new RoleMapper.Keycloak(System.getProperty("auth.oidc.clientId", "inspecto-spa"));
     }
 
     private static JWKSource<SecurityContext> jwksSource(String propertyKey, String configured) {

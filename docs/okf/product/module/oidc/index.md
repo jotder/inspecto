@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `OIDC-KEYCLOAK-AZP-ROLES-1` | P2 | defect | on the Keycloak preset with auth.oidc.clientId unset, the authenticator takes roles from the calling client's OWN client roles. | — |
 | `OIDC-CC-CLIENT-PIN-1` | P3 | feature | pin which clients may call: audience required, a client allowlist, and an https JWKS when machine tokens are trusted. | — |
 | `OIDC-CC-INTEGRATION-ROLE-1` | P3 | feature | a machine principal gets one narrow integration grant in one Space, never a human capability. | — |
 | `OIDC-CC-MACHINE-ACTOR-1` | P3 | feature | the audit trail names the client id for a machine call, not a service-account UUID recorded as a user. | — |
