@@ -38,7 +38,8 @@ Proven live against WSO2 Identity Server 7.3.0 and Keycloak
 
 ## Left
 
-* Inbound OIDC client-credentials trust for Link Analysis integration awaits a security review
-  (`LA-EDITIONS-RESIDUALS-1` item 5b in [BACKLOG](../../../../BACKLOG.md)).
+* Inbound OIDC client-credentials trust for Link Analysis integration: reviewed 2026-11-01, verdict
+  **enable with conditions** ([security review](tests-security-review-oidc-client-credentials.md)). A machine token is
+  already accepted like a user's, so the conditions are deployment rules until the filed rows (in Open work) put them in code.
 * A live check of the SPA's sign-in return path under a real token lapse needs a running provider
   (`ANOMALY-UI-FINDINGS-1`).

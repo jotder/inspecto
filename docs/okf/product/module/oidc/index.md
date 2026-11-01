@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | n/a | end users only see the sign-in button, documented with the other access screens in module.access user-guide-access.md |
 | admin-guide | current | [OIDC authenticator and token relay — admin guide](admin-guide.md) |
 | api | n/a | implements the Authenticator and TokenRelay contracts owned by module.auth-spi; the /auth/* routes live in the core and are documented in module.access api-access.md |
-| tests | current | [OIDC authenticator and token relay — tests inventory](tests-inventory.md) |
+| tests | current | [OIDC authenticator and token relay — tests inventory](tests-inventory.md) · [Security review: inbound OIDC client-credentials tokens for Link Analysis](tests-security-review-oidc-client-credentials.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
@@ -32,4 +32,9 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.oidc` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `OIDC-CC-CLIENT-PIN-1` | P3 | feature | pin which clients may call: audience required, a client allowlist, and an https JWKS when machine tokens are trusted. | — |
+| `OIDC-CC-INTEGRATION-ROLE-1` | P3 | feature | a machine principal gets one narrow integration grant in one Space, never a human capability. | — |
+| `OIDC-CC-MACHINE-ACTOR-1` | P3 | feature | the audit trail names the client id for a machine call, not a service-account UUID recorded as a user. | — |
+| `OIDC-CC-LIFETIME-REPLAY-1` | P3 | feature | an upper bound on token lifetime, and optional replay refusal, for machine tokens. | — |

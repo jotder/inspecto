@@ -29,8 +29,8 @@ import java.util.Set;
 final class RoleMapper {
     private RoleMapper() {}
 
-    /** The Keycloak preset's role source: realm roles union client roles of {@code clientId} (null: the token's
-     *  {@code azp}). Passed only when {@code auth.oidc.provider=keycloak} and no explicit {@code rolesClaim}. */
+    /** The Keycloak preset's role source: realm roles union client roles of {@code clientId} (null: realm roles
+     *  only, never the token's {@code azp}). Passed only when {@code auth.oidc.provider=keycloak} and no explicit {@code rolesClaim}. */
     record Keycloak(String clientId) {}
 
     static Set<String> capabilitiesFor(JWTClaimsSet claims, String rolesClaim, Map<String, Roles.Def> defs) {
@@ -96,7 +96,7 @@ final class RoleMapper {
     }
 
     /** With a {@link Keycloak} source: {@code realm_access.roles} union {@code resource_access.<client>.roles}
-     *  (client = configured id, else the token's {@code azp}); otherwise exactly {@link #roles(JWTClaimsSet, String)}. */
+     *  (client = the configured id only); otherwise exactly {@link #roles(JWTClaimsSet, String)}. */
     static List<String> roles(JWTClaimsSet claims, String rolesClaim, Keycloak keycloak) {
         if (keycloak != null) return keycloakRoles(claims, keycloak.clientId());
         try {
@@ -118,10 +118,10 @@ final class RoleMapper {
         Set<String> out = new LinkedHashSet<>();
         if (claims.getClaim("realm_access") instanceof Map<?, ?> realm && realm.get("roles") instanceof List<?> l)
             for (Object o : l) out.add(String.valueOf(o));
-        String client = configuredClient != null && !configuredClient.isBlank() ? configuredClient
-                : claims.getClaim("azp") instanceof String azp ? azp : null;
-        if (client != null && claims.getClaim("resource_access") instanceof Map<?, ?> res
-                && res.get(client) instanceof Map<?, ?> c && c.get("roles") instanceof List<?> l)
+        // never the token's azp: a client would then grant itself roles (OIDC-KEYCLOAK-AZP-ROLES-1)
+        if (configuredClient != null && !configuredClient.isBlank()
+                && claims.getClaim("resource_access") instanceof Map<?, ?> res
+                && res.get(configuredClient) instanceof Map<?, ?> c && c.get("roles") instanceof List<?> l)
             for (Object o : l) out.add(String.valueOf(o));
         return new ArrayList<>(out);
     }

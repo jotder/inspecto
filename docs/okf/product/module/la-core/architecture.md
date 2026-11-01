@@ -405,6 +405,11 @@ else no `ownerName` (the UI shows the login id). Masking: the name passes `Entit
 is a masked entity id shows as its per-Investigation pseudonym; the name is never laid over the header (`withDetails` takes only title and
 purpose), so it reaches neither the log header, the embed nor the Dossier. Not atomic with the create: a crash between the two writes
 leaves an Investigation that shows its login id, which is the older behaviour, not a failure.
+**Live check 2026-11-01 (Preview Demo Auth bundle of `a24fca153`): FAIL on Demo Auth.** An Investigation instantiated from
+`mule-ring-template` as `fm.analyst` (and one made by a plain create) listed `owner` only, with no `ownerName`, so **File ▸ Open…** read
+"Owner fm.analyst" even to its creator, and no `investigation-details.json` was written. Cause: `DemoAuthenticator` puts the Demo User's
+name in `Subject.attributes().displayName`, not in the `displayName` component, so `recordOwnerName` finds no name and the list fallback
+none either (defect `DEMO-AUTH-SUBJECT-DISPLAY-NAME-1`). An OIDC sign-in, which fills `displayName`, was not driven.
 
 
 **Reference rows (`POST /inv/reference-rows`, 2026-10-11).** Body `{dataset, keyCol, keys[1..500], columns?, investigationId?}`
@@ -1230,6 +1235,11 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
   undoes, and so redoes, one degree at a time, a redone Expand included. Ctrl+Z / Ctrl+Shift+Z on an
   Investigation's canvas are recorded undo / redo (the last Grow / Exclude change first, as before); elsewhere they stay
   the display history.
+  **Live check 2026-11-01 (Preview Demo Auth bundle of `a24fca153`, a saved throwaway Investigation): PASS.** Clean up
+  *Hide 14 dangling leaves* recorded `hide` 3 + `annotate` 4; one Undo recorded undo 5, 6; one Redo recorded `hide` 7 +
+  `annotate` 8 with the same reason ("Clean up: dangling leaves"); one Undo then took 7 and 8 back ("Undone (2 steps)").
+  Node menu *Shrink (hide its leaves)* on the hub: `hide` 11 + `annotate` 12, one Undo (13, 14), one Redo `hide` 15 +
+  `annotate` 16, reason "Shrink: hid the leaves of …" both times.
 - **Clean up.** `investigation-cleanup.ts` works on the WorkingSet (raw ids, hidden entities skipped, hop-0 and kept
   entities spared), reusing `graph-cleanup.ts` (`keepPathsBetweenSeeds`, `keepOnly`) over `workingSetGraph(ws)`.
   Leaves are ONE pass (entities with at most one link), not the broom's repeated `trimDanglingLeaves`: an Investigation

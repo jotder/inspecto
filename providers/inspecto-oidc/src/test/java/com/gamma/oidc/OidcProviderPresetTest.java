@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -86,14 +87,32 @@ class OidcProviderPresetTest {
     }
 
     @Test
-    void keycloakFallsBackToAzpWhenNoClientIdIsConfigured() {
+    void keycloakWithoutAClientIdNeverReadsTheTokensAzp() {
+        assertEquals(List.of("business"), RoleMapper.roles(claims(), "roles", new RoleMapper.Keycloak(null)),
+                "no clientId: realm roles only, never the client the token names");
+    }
+
+    /** OIDC-KEYCLOAK-AZP-ROLES-1: a realm client that gives itself {@code admin} must not get it. */
+    @Test
+    void anUnsetClientIdNeverGrantsTheCallingClientsOwnRoles() {
+        System.setProperty("auth.oidc.provider", "keycloak");
+        JWTClaimsSet evil = new JWTClaimsSet.Builder().subject("svc-uuid").claim("azp", "evil-client")
+                .claim("resource_access", Map.of("evil-client", Map.of("roles", List.of("admin", "super"))))
+                .build();
+        RoleMapper.Keycloak source = roleSourceFor(null);
+        Set<String> caps = RoleMapper.capabilitiesFor(evil, "roles", Roles.SEED, source);
+        assertFalse(caps.contains(Roles.CAN_ADMINISTER), "got " + caps);
+        assertFalse(caps.contains(Roles.CAN_REVEAL_LINK_ENTITIES), "got " + caps);
+        assertEquals(new RoleMapper.Keycloak("inspecto-spa"), source, "the documented default, as the token relay");
+    }
+
+    @Test
+    void aConfiguredClientIdIsTheOnlyClientWhoseRolesCount() {
+        System.setProperty("auth.oidc.provider", "keycloak");
+        System.setProperty("auth.oidc.clientId", CLIENT);
+        assertEquals(new RoleMapper.Keycloak(CLIENT), roleSourceFor(null));
         assertEquals(Set.of("business", "operations"),
-                Set.copyOf(RoleMapper.roles(claims(), "roles", new RoleMapper.Keycloak(null))));
-        JWTClaimsSet noAzp = new JWTClaimsSet.Builder().subject("u1")
-                .claim("realm_access", Map.of("roles", List.of("business")))
-                .claim("resource_access", Map.of(CLIENT, Map.of("roles", List.of("operations")))).build();
-        assertEquals(List.of("business"), RoleMapper.roles(noAzp, "roles", new RoleMapper.Keycloak(null)),
-                "no clientId and no azp: realm roles only, never a guess");
+                Set.copyOf(RoleMapper.roles(claims(), "roles", roleSourceFor(null))));
     }
 
     @Test
@@ -119,7 +138,7 @@ class OidcProviderPresetTest {
         assertTrue(a != null);
         // the wiring is private; assert through the same decision the constructor makes
         assertNull(roleSourceFor("groups"));
-        assertEquals(new RoleMapper.Keycloak(null), roleSourceFor(null));
+        assertEquals(new RoleMapper.Keycloak("inspecto-spa"), roleSourceFor(null));
     }
 
     private static RoleMapper.Keycloak roleSourceFor(String explicit) {
