@@ -136,6 +136,7 @@ public final class RecipeCompiler {
                 case "pivot" -> nodes.add(pivot(id, cfg, refusals));
                 case "entity_link" -> nodes.add(entityLink(id, cfg, refusals));
                 case "outlier", "binning", "correlation" -> nodes.add(distribution(verb, id, cfg, refusals));
+                case "changepoint", "retention", "funnel" -> nodes.add(changeOrCohort(verb, id, cfg, refusals));
                 case "route" -> {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
@@ -533,6 +534,31 @@ public final class RecipeCompiler {
         return PipelineNode.of(id, type.type(), new LinkedHashMap<>(cfg));
     }
 
+    /**
+     * {@code changepoint:} / {@code retention:} / {@code funnel:} -> {@code transform.timeseries.changepoint} /
+     * {@code transform.cohort.retention} / {@code transform.cohort.funnel}, config verbatim (ANALYTICS-STEPS-TS-1);
+     * refused as the run would refuse it ({@link com.gamma.pipeline.exec.TimeSeriesStep},
+     * {@link com.gamma.pipeline.exec.CohortStep}).
+     */
+    private static PipelineNode changeOrCohort(String kind, String id, Map<String, Object> cfg,
+                                               List<PipelineCompileException.Refusal> refusals) {
+        BuiltinNodeType type = switch (kind) {
+            case "changepoint" -> BuiltinNodeType.TRANSFORM_CHANGEPOINT;
+            case "retention" -> BuiltinNodeType.TRANSFORM_RETENTION;
+            default -> BuiltinNodeType.TRANSFORM_FUNNEL;
+        };
+        try {
+            switch (type) {
+                case TRANSFORM_CHANGEPOINT -> com.gamma.pipeline.exec.TimeSeriesStep.parseChangePoint(cfg);
+                case TRANSFORM_RETENTION -> com.gamma.pipeline.exec.CohortStep.parseRetention(cfg);
+                default -> com.gamma.pipeline.exec.CohortStep.parseFunnel(cfg);
+            }
+        } catch (IllegalArgumentException e) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id, e.getMessage()));
+        }
+        return PipelineNode.of(id, type.type(), new LinkedHashMap<>(cfg));
+    }
+
     /** {@code unpivot: {columns[] | columns_pattern, name_column?, value_column?, value_type?, include_nulls?}} ->
      *  a transform.matrix.unpivot node, config verbatim. Exactly one column selector; the rest is judged at run. */
     private static PipelineNode unpivot(String id, Map<String, Object> cfg,
@@ -772,6 +798,7 @@ public final class RecipeCompiler {
                     case "pivot" -> stepNode = pivot(stepId, stepCfg, refusals);
                     case "entity_link" -> stepNode = entityLink(stepId, stepCfg, refusals);
                     case "outlier", "binning", "correlation" -> stepNode = distribution(verb, stepId, stepCfg, refusals);
+                    case "changepoint", "retention", "funnel" -> stepNode = changeOrCohort(verb, stepId, stepCfg, refusals);
                     case "summarize" -> stepNode = summarize(stepId, stepCfg, refusals);
                     case "profile" -> stepNode = profile(stepId, stepCfg, refusals);
                     case "running" -> stepNode = running(stepId, stepCfg, refusals);

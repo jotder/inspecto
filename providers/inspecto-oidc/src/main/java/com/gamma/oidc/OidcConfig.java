@@ -86,18 +86,24 @@ final class OidcConfig {
         return doc;
     }
 
-    private static JsonNode fetch(String url) {
+    /** {@code url} as a URI when it is https, or http on a loopback host; else boot is refused naming {@code key}. */
+    static URI requireHttps(String url, String key) {
         URI uri;
         try {
             uri = URI.create(url.trim());
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("inspecto-oidc: -Dauth.oidc.discoveryUrl is not a valid URL");
+            throw new IllegalStateException("inspecto-oidc: -D" + key + " is not a valid URL");
         }
         String host = uri.getHost() == null ? "" : uri.getHost();
         boolean loopback = host.equals("localhost") || host.equals("127.0.0.1") || host.equals("[::1]");
         if (!"https".equalsIgnoreCase(uri.getScheme()) && !(loopback && "http".equalsIgnoreCase(uri.getScheme())))
-            throw new IllegalStateException("inspecto-oidc: -Dauth.oidc.discoveryUrl must be https "
+            throw new IllegalStateException("inspecto-oidc: -D" + key + " must be https "
                     + "(http is allowed only for localhost)");
+        return uri;
+    }
+
+    private static JsonNode fetch(String url) {
+        URI uri = requireHttps(url, "auth.oidc.discoveryUrl");
         try {
             HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
             HttpResponse<String> r = http.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET().build(),

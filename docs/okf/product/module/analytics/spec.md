@@ -35,7 +35,8 @@ timestamp: 2026-10-18T00:00:00Z
 > C5 [hour of week and seasonal profile](#hour-of-week-and-seasonal-profile), C6
 > [change-point and regime detection](#change-point-and-regime-detection), C1
 > [windowed and ratio Measures](#windowed-and-ratio-measures), C9 [cohort retention and funnel](#cohort-retention-and-funnel).
-> No caller uses the kernels yet; their Steps are open (`ANALYTICS-STEPS-TS-1`).
+> Pipelines reach C6 and C9 through their Steps (2026-11-01, `ANALYTICS-STEPS-TS-1`):
+> [Change-point and cohort Steps](#change-point-and-cohort-steps).
 >
 > **The model kernels are built (2026-10-18, Could C2, C3, C4 and the Spearman residual of S3):** rank correlation
 > (`method: spearman`), k-means, logistic regression with the holdout split, and an isolation forest behind the Anomaly
@@ -740,8 +741,9 @@ kernel the template's own `actual − forecast`: `outside_band`, `regime_change`
 of its 175 days in all five corpora (rows 8..182; warm-up 21 = the template's 28 days). The template itself is **not
 rewired** to the kernel: its recursion is one state machine shared with the forecaster, and no shipped number moves.
 
-**No Step yet** (D-AN11): the template raises it in a `sql.template` Job, where the SQL form drops in; a
-`transform.timeseries.changepoint` Step needs a residual-producing Step first and is filed as `CHANGEPOINT-STEP-1`.
+**Step** (2026-11-01): `transform.timeseries.changepoint` — [Change-point and cohort Steps](#change-point-and-cohort-steps).
+The template still raises its flags in a `sql.template` Job (D-AN11); a pipeline gets the residual from a `sql` Step
+after a `forecast` (`actual - forecast` where `horizon = 0`).
 
 Tests: `ChangePointTest` (spike, K-run, one short of K, persistent shift with and without `rebase`, ramp, outside points
 not feeding the CUSUM, warm-up, negative shift, σ estimate by hand, input rules); `ChangePointDuckDbParityTest` (SQL =
@@ -824,16 +826,51 @@ funnel's steps is ignored. ⚠ **The anchor is always the earliest step-1**: an 
 whoever reads the funnel. `from_previous` is NULL for step 1 and where the previous step is empty; `from_first` is 1 for step 1
 and NULL when step 1 is empty. The caller bounds the time range by filtering the relation.
 
-**No Step yet** (D-AN13): a pack reaches these through Steps, and the registration seams (`ProcessorCatalog`,
-`NodeAttributes`, the two contract JSONs, `BuiltinNodeType`) were under edit by another lane the same day; filed with the
-change-point Step as `ANALYTICS-STEPS-TS-1`. The Sales & Marketing pack's plan is not in the repository, so the Step's
-shape (columns, one Step or two) is best fixed against it.
+**Steps** (2026-11-01): `transform.cohort.retention` and `transform.cohort.funnel` —
+[Change-point and cohort Steps](#change-point-and-cohort-steps).
 
 Tests: `CohortTest` (hand matrices for monthly EXACT and UNBOUNDED retention, `from` and `maxPeriods`, the zone moving an
 event across a month, week and day periods; a hand funnel of 6 entities with ordering, same-instant, earliest-anchor and
 within cases; input rules), `CohortDuckDbParityTest` (retention SQL = JVM over 400 seeded entities for 4 grains × 4 zones ×
 2 modes across the Berlin and New York DST changes with a different session zone, and over a DATE column; funnel SQL = JVM
 with no window, 48 h and 30 d).
+
+## Change-point and cohort Steps
+
+*`ANALYTICS-STEPS-TS-1`, built 2026-11-01.* The C6 and C9 kernels as Pipeline Steps, in the house pattern of the
+forecast and distribution Steps: one grammar parsed in one place (`TimeSeriesStep.parseChangePoint`,
+`CohortStep.parseRetention` / `parseFunnel` in `platform/inspecto-engine/.../pipeline/exec`), read by the run
+(`RowShaper`), the recipe compiler (`RecipeCompiler` / `RecipeConverter`) and the save gate (`ConfigRoutes`, with the
+output columns flowing on to later Steps), so all three refuse the same config with the same words. Registered in
+`BuiltinNodeType` (flat home `steps:`, kinds `changepoint`, `retention`, `funnel`), `PipelineConfig.Step.KINDS`,
+`NodeAttributes`, `ProcessorCatalog` (BI family, DELIVERED) and both UI contract JSONs. Keys, defaults and refusals per
+Step: [step catalog](../etl/spec-step-catalog.md#changepoint--transformtimeserieschangepoint--change-point-regime--drift-detector).
+
+**Shape decisions (assistant-decided 2026-11-01, pending operator confirmation; the Sales & Marketing pack's plan is
+still not in the repository):**
+* **Two cohort Steps, not one.** Retention and funnel answer different questions over different inputs (a funnel needs
+  a step column, a retention a grain and an as-of); one Step with a mode switch would carry keys that mean nothing in
+  the other mode. Their output columns are the kernels' own, unrenamed.
+* **The change-point keeps every row.** It adds the four flags to the inbound rows (joined back on key + order), so the
+  actual, forecast and residual stay beside the flags; the kernel's own SQL returns only the series columns.
+* **σ is stated, never estimated by the Step.** `sigma` (one number) or `sigma_column` (per series) — exactly one.
+  Estimating σ inside the Step would pick a lag and a window for the author; `scaleOfDifferences` stays a kernel
+  function a `sql` Step or a Job can call.
+* **The data is checked before the kernel runs.** The kernel's SQL silently misreads a repeated order value, a NULL or
+  zero σ, a NaN residual (a σ of 0 compares nothing as outside) or a text order column (`'10'` sorts before `'9'`), so
+  the run refuses them first, with counts. A σ column that varies within a series is not refused: the kernel reads
+  each row's own σ. Caps:
+  10,000 points per series (the recursive CTE runs one iteration per point, as the forecast's) and the score
+  contract's 200,000 series.
+* No `group_by` on the cohort Steps: the kernels have none, and a per-segment matrix is a `route` before the Step.
+
+Tests: `RowShaperChangeCohortTest` (engine: a spike vs a three-point regime change, per-series σ from a column, a CUSUM
+drift on the 11th point after a warm-up, `rebase`, an exact and an unbounded monthly retention matrix, a funnel with and
+without `within`, every config refusal and every data refusal — all against figures worked by hand; falsified with ten
+mutants, each caught), `NodeConfigNameContractTest#changePointAndCohortAttributesSurviveTheSave` (every declared key
+survives the editor's lift and lower), `StepConfigSaveFindingsTest` (save gate: refusals with and without a schema, the
+flags flowing on, a summarising Step replacing the columns; falsified by disabling the change-point check and the
+retention column flow — all three caught), `BuiltinNodeTypeFlatHomeTest` (27 chain kinds).
 
 ## Holdout split
 

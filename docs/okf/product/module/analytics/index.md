@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `ANALYTICS-CORE-1` | P2 | feature | one home for data operations and statistics; minimise duplicate data-operations code across modules. | — |
-| `ANALYTICS-STEPS-TS-1` | P3 | feature | Steps for the Analytics Kernel time-series and cohort kernels: transform.timeseries.changepoint (ChangePoint, input a residual column + σ… | — |
 | `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the looping / graph-style query candidates now that 2.0.0.0 is pinned: C1 / C2 USING KEY recursion behind SqlGraphEngine (Analytics C7),… | — |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `PREDICTIVE-SEGMENT-RFM-1` | P3 | feature | a Segmentation Model component kind and a predict.segment Job: declared RFM bins and a label table; its Instance is a Customer Segment as… | — |

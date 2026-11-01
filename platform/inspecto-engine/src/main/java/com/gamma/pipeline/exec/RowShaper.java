@@ -212,6 +212,9 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_RESAMPLE.type().equals(type)) return resample(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SHIFT.type().equals(type))    return shift(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_FORECAST.type().equals(type)) return forecast(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_CHANGEPOINT.type().equals(type)) return changePoint(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_RETENTION.type().equals(type)) return retention(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_FUNNEL.type().equals(type))   return funnel(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SIMILARITY.type().equals(type)) return similarity(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_RANK.type().equals(type))     return rank(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SAMPLE.type().equals(type))   return sample(conn, node, input, outPrefix);
@@ -814,6 +817,94 @@ public final class RowShaper {
         if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input, timeType));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.timeseries.changepoint} (ANALYTICS-STEPS-TS-1) — every inbound row gains the kernel's
+     * {@code outside_band}, {@code regime_change}, {@code drift_change} and {@code warmup} flags (0/1; empty where the
+     * residual is empty). {@link TimeSeriesStep} owns the grammar; the SQL is the Analytics Kernel's ({@code ChangePoint}).
+     * Refuses, before detecting, a repeated or empty order value, a non-finite residual, a σ not above 0, or a run past
+     * the caps.
+     */
+    private static List<Relation> changePoint(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        TimeSeriesStep.Changes spec;
+        try {
+            spec = TimeSeriesStep.parseChangePoint(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = TimeSeriesStep.columnRefusal(TimeSeriesStep.CHANGEPOINT, spec.inputColumns(), List.of(),
+                List.copyOf(types.keySet()));
+        if (refusal == null) refusal = TimeSeriesStep.changePointRefusal(spec, types);
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String kernelInput = input;
+        if (spec.sigma() != null) {
+            kernelInput = table(prefix, "cp_in");
+            exec(conn, "CREATE OR REPLACE TEMP VIEW " + q(kernelInput) + " AS " + spec.kernelInputSql(input));
+        }
+        try {
+            try (Statement st = conn.createStatement(); java.sql.ResultSet rs = st.executeQuery(spec.checkSql(kernelInput))) {
+                rs.next();
+                refusal = spec.checkRefusal(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5),
+                        rs.getLong(6));
+            }
+            if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+            String data = table(prefix, PipelineRel.DATA);
+            exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input, kernelInput));
+            return List.of(new Relation(PipelineRel.DATA, data));
+        } finally {
+            if (spec.sigma() != null) exec(conn, "DROP VIEW IF EXISTS " + q(kernelInput));
+        }
+    }
+
+    /**
+     * {@code transform.cohort.retention} (ANALYTICS-STEPS-TS-1) — summarising: one row per cohort per observable period
+     * with the cohort size, the active entities and the rate. {@link CohortStep} owns the grammar; the SQL is the
+     * Analytics Kernel's ({@code Retention}).
+     */
+    private static List<Relation> retention(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        CohortStep.Cohorts spec;
+        try {
+            spec = CohortStep.parseRetention(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = TimeSeriesStep.columnRefusal(CohortStep.RETENTION, spec.inputColumns(), List.of(),
+                List.copyOf(types.keySet()));
+        if (refusal == null)
+            refusal = TimeSeriesStep.typeRefusal(CohortStep.RETENTION, spec.timeColumn(), spec.params().zone(),
+                    typeOf(types, spec.timeColumn()));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /**
+     * {@code transform.cohort.funnel} (ANALYTICS-STEPS-TS-1) — summarising: one row per funnel step with the entities
+     * that reached it and the conversion from the previous and the first step. {@link CohortStep} owns the grammar; the
+     * SQL is the Analytics Kernel's ({@code Funnel}).
+     */
+    private static List<Relation> funnel(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        CohortStep.Steps spec;
+        try {
+            spec = CohortStep.parseFunnel(node.config() == null ? Map.of() : node.config());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("node '" + node.id() + "': " + e.getMessage(), e);
+        }
+        Map<String, String> types = columnTypesOf(conn, input);
+        String refusal = TimeSeriesStep.columnRefusal(CohortStep.FUNNEL, spec.inputColumns(), List.of(),
+                List.copyOf(types.keySet()));
+        if (refusal == null) refusal = CohortStep.funnelTypeRefusal(spec.timeColumn(), typeOf(types, spec.timeColumn()));
+        if (refusal != null) throw new IllegalArgumentException("node '" + node.id() + "': " + refusal);
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + spec.select(input));
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

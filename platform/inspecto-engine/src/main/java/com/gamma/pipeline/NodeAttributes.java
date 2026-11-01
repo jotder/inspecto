@@ -587,6 +587,85 @@ public final class NodeAttributes {
                     .help("Spearman is Pearson on the ranks, so slope, intercept and r2 describe the line through the ranks."));
 
     /**
+     * {@code transform.timeseries.changepoint} (ANALYTICS-STEPS-TS-1): band breaches, regime changes and drift in a
+     * residual series, every row kept with the kernel's flags. Grammar in {@code TimeSeriesStep}; the rule is the
+     * Analytics Kernel's {@code ChangePoint}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_CHANGEPOINT = List.of(
+            NodeAttribute.of("order_column", "Order column", "string", "required").placeholder("bucket")
+                    .help("Orders each series: one row per key per point, evenly spaced, no gap (a resample's bucket)."),
+            NodeAttribute.of("residual_column", "Residual column", "string", "required").placeholder("residual")
+                    .help("Actual minus expected (a forecast, a baseline or a peer median). An empty residual gets no flag."),
+            NodeAttribute.of("sigma", "Residual scale (sigma)", "number", "optional").placeholder("12.5")
+                    .help("The residual's typical spread, one number for every series. Set this or a sigma column, not both."),
+            NodeAttribute.of("sigma_column", "Sigma column", "string", "optional").placeholder("sigma")
+                    .help("A column holding each series' own sigma, the same on every row of a series. Set this or sigma."),
+            NodeAttribute.of("group_by", "Series keys", "list", "optional").placeholder("REGION")
+                    .help("One series per key. Leave blank for one series."),
+            NodeAttribute.of("z", "Band width (z)", "number", "advanced")
+                    .defaultValue(com.gamma.pipeline.exec.TimeSeriesStep.CHANGEPOINT_DEFAULTS.z())
+                    .help("A residual further than z sigmas from 0 is outside the band."),
+            NodeAttribute.of("regime_run", "Regime run", "number", "advanced").min(2)
+                    .max(com.gamma.pipeline.exec.TimeSeriesStep.MAX_CHANGEPOINT_POINTS)
+                    .defaultValue(com.gamma.pipeline.exec.TimeSeriesStep.CHANGEPOINT_DEFAULTS.regimeRun())
+                    .help("This many outside points in a row are one regime change, raised on the last of them."),
+            NodeAttribute.of("cusum_k", "Drift allowance (k)", "number", "advanced").min(0)
+                    .defaultValue(com.gamma.pipeline.exec.TimeSeriesStep.CHANGEPOINT_DEFAULTS.cusumK())
+                    .help("CUSUM slack in sigmas: a steady lean smaller than this never adds up to a drift."),
+            NodeAttribute.of("cusum_h", "Drift limit (h)", "number", "advanced")
+                    .defaultValue(com.gamma.pipeline.exec.TimeSeriesStep.CHANGEPOINT_DEFAULTS.cusumH())
+                    .help("CUSUM decision limit in sigmas: a lean that adds up past this is a drift."),
+            NodeAttribute.of("warmup", "Warm-up points", "number", "advanced").min(0)
+                    .max(com.gamma.pipeline.exec.TimeSeriesStep.MAX_CHANGEPOINT_POINTS).defaultValue(0)
+                    .help("Leading points of each series that update the state but carry no flag."),
+            NodeAttribute.of("rebase", "Re-level after a change", "boolean", "advanced").defaultValue(false)
+                    .help("For a model that does not re-level itself: after a regime change or drift, the new level reads "
+                            + "as residual 0. Without it such a model raises a regime change every regime run."));
+
+    /**
+     * {@code transform.cohort.retention} (ANALYTICS-STEPS-TS-1): one row per cohort per observable period. Grammar in
+     * {@code CohortStep}; the definition is the Analytics Kernel's {@code Retention}; keys proven by
+     * {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_RETENTION = List.of(
+            NodeAttribute.of("entity_column", "Entity column", "string", "required").placeholder("CUSTOMER_ID")
+                    .help("Who is followed. An entity's cohort is the bucket of its first event; compared as text."),
+            NodeAttribute.of("time_column", "Time column", "string", "required").placeholder("EVENT_AT")
+                    .help("When each event happened: a DATE or TIMESTAMP, or a TIMESTAMP WITH TIME ZONE with a time zone."),
+            NodeAttribute.of("grain", "Cohort grain", "select", "required")
+                    .options("hour", "Hour", "day", "Day", "week", "Week (Monday)", "month", "Month", "quarter", "Quarter",
+                            "year", "Year")
+                    .help("The cohort and period bucket."),
+            NodeAttribute.of("through", "As of", "string", "required").placeholder("2026-06-30")
+                    .help("The as-of date: later events are dropped and a period not yet over it is absent, never 0."),
+            timezone(),
+            NodeAttribute.of("from", "First cohort", "string", "optional").placeholder("2026-01-01")
+                    .help("Leaves older cohorts out of the result; their entities still count as not new."),
+            NodeAttribute.of("mode", "Active means", "select", "optional").defaultValue("exact")
+                    .options("exact", "Active in that period", "unbounded", "Active in that period or later")
+                    .help("Exact is classic retention; unbounded never rises with the period."),
+            NodeAttribute.of("max_periods", "Most periods", "number", "advanced").min(0)
+                    .max(com.gamma.pipeline.exec.CohortStep.MAX_RETENTION_PERIODS)
+                    .defaultValue(com.gamma.analytics.cohort.Retention.DEFAULT_MAX_PERIODS)
+                    .help("The highest period reported per cohort."));
+
+    /**
+     * {@code transform.cohort.funnel} (ANALYTICS-STEPS-TS-1): one row per funnel step. Grammar in {@code CohortStep}; the
+     * definition is the Analytics Kernel's {@code Funnel}; keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_FUNNEL = List.of(
+            NodeAttribute.of("entity_column", "Entity column", "string", "required").placeholder("CUSTOMER_ID")
+                    .help("Who goes through the funnel; compared as text."),
+            NodeAttribute.of("step_column", "Step column", "string", "required").placeholder("EVENT_TYPE")
+                    .help("Names what each event is. An event outside the funnel's steps is ignored."),
+            NodeAttribute.of("time_column", "Time column", "string", "required").placeholder("EVENT_AT")
+                    .help("When each event happened (a TIMESTAMP). Filter the rows first to bound the period."),
+            NodeAttribute.of("steps", "Steps", "list", "required").placeholder("visit, signup, purchase")
+                    .help("2 to 12 distinct step names in funnel order. Each step counts at or after the one before it."),
+            NodeAttribute.of("within", "Within", "string", "optional").placeholder("30d")
+                    .help("Longest time from an entity's first step-1 event to a later step (30s, 90m, 48h, 30d). Blank: no limit."));
+
+    /**
      * {@code transform.similarity} (ANALYTICS-CORE-1 S1, catalog {@code quality.match.fuzzy}): a similarity score of two
      * columns and an optional candidate flag. Grammar in {@code SimilarityStep}; keys proven by
      * {@code NodeConfigNameContractTest}. A candidate, never an identity (D-M1).
@@ -896,7 +975,7 @@ public final class NodeAttributes {
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, TRIGGER, MARKER_DEDUP, OUTPUT, SINK_PERSISTENT,
                 TRANSFORM_FILTER, TRANSFORM_LOOKUP, TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE,
-                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_RANK, TRANSFORM_SAMPLE, TRANSFORM_PIVOT, TRANSFORM_ENTITY_LINK, TRANSFORM_OUTLIER, TRANSFORM_BINNING, TRANSFORM_CORRELATION, SINK_WEBHOOK, SINK_EXCEL, GAP))
+                TRANSFORM_JOIN, TRANSFORM_SQL, TRANSFORM_PROFILE, TRANSFORM_RUNNING, TRANSFORM_HASH, TRANSFORM_MASK, TRANSFORM_EXPLODE, TRANSFORM_UNPIVOT, TRANSFORM_RESAMPLE, TRANSFORM_SHIFT, TRANSFORM_FORECAST, TRANSFORM_SIMILARITY, TRANSFORM_RANK, TRANSFORM_SAMPLE, TRANSFORM_PIVOT, TRANSFORM_ENTITY_LINK, TRANSFORM_OUTLIER, TRANSFORM_BINNING, TRANSFORM_CORRELATION, TRANSFORM_CHANGEPOINT, TRANSFORM_RETENTION, TRANSFORM_FUNNEL, SINK_WEBHOOK, SINK_EXCEL, GAP))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -926,6 +1005,9 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_OUTLIER.type(), TRANSFORM_OUTLIER);
         m.put(BuiltinNodeType.TRANSFORM_BINNING.type(), TRANSFORM_BINNING);
         m.put(BuiltinNodeType.TRANSFORM_CORRELATION.type(), TRANSFORM_CORRELATION);
+        m.put(BuiltinNodeType.TRANSFORM_CHANGEPOINT.type(), TRANSFORM_CHANGEPOINT);
+        m.put(BuiltinNodeType.TRANSFORM_RETENTION.type(), TRANSFORM_RETENTION);
+        m.put(BuiltinNodeType.TRANSFORM_FUNNEL.type(), TRANSFORM_FUNNEL);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.TRANSFORM_SQL.type(), TRANSFORM_SQL);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);

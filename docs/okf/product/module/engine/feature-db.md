@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-128 row(s).
+131 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -42,10 +42,12 @@ tags: [feature-db, module]
 | AWS SQS / SNS event publisher | processor | engine | basic;standard;advanced;preview |  | planned | `sink.stream.aws` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Azure Blob & ADLS Gen2 ingest | processor | engine | basic;standard;advanced;preview |  | partial | `acquisition.file.azure` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Change Data Capture (Debezium) | processor | engine | basic;standard;advanced;preview |  | planned | `acquisition.cdc.debezium` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
+| Change-point, regime & drift detector | processor | engine | basic;standard;advanced;preview |  | delivered | `transform.timeseries.changepoint` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Character map & code page transcoder | processor | engine | basic;standard;advanced;preview |  | planned | `quality.cleanse.transcode` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Circuit breaker & fallback switch | processor | engine | basic;standard;advanced;preview |  | delivered | `control.circuitbreaker` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | ClickHouse / StarRocks analytical sink | processor | engine | basic;standard;advanced;preview |  | planned | `sink.db.clickhouse` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Cluster & edit value normalizer | processor | engine | basic;standard;advanced;preview |  | planned | `quality.cluster.edit` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
+| Cohort retention matrix | processor | engine | basic;standard;advanced;preview |  | delivered | `transform.cohort.retention` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Constraint & range checker (Expectations) | processor | engine | basic;standard;advanced;preview |  | partial | `quality.constraint.check` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | CSV partitioned store | processor | engine | basic;standard;advanced;preview |  | delivered | `sink.file.csv` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Custom ingester plugin (segments, multi-event) | processor | engine | basic;standard;advanced;preview |  | delivered | `parser.plugin` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
@@ -98,6 +100,7 @@ tags: [feature-db, module]
 | Named-group regex extractor | processor | engine | basic;standard;advanced;preview |  | delivered | `parser.pattern.regex` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | One-way salted cryptographic hasher | processor | engine | basic;standard;advanced;preview |  | delivered | `quality.crypto.hash` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | ONNX Runtime embedded inference | processor | engine | basic;standard;advanced;preview |  | planned | `ml.inference.onnx` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
+| Ordered conversion funnel | processor | engine | basic;standard;advanced;preview |  | delivered | `transform.cohort.funnel` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Outbound webhook dispatcher | processor | engine | basic;standard;advanced;preview |  | delivered | `sink.api.webhook` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Outlier detector & IQR boxplot fencer | processor | engine | basic;standard;advanced;preview |  | delivered | `transform.stats.outlier` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Parameterized stored-procedure caller | processor | engine | basic;standard;advanced;preview |  | planned | `transform.db.procedure` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |

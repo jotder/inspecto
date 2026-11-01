@@ -410,6 +410,9 @@ leaves an Investigation that shows its login id, which is the older behaviour, n
 "Owner fm.analyst" even to its creator, and no `investigation-details.json` was written. Cause: `DemoAuthenticator` puts the Demo User's
 name in `Subject.attributes().displayName`, not in the `displayName` component, so `recordOwnerName` finds no name and the list fallback
 none either (defect `DEMO-AUTH-SUBJECT-DISPLAY-NAME-1`). An OIDC sign-in, which fills `displayName`, was not driven.
+**Fixed 2026-11-01 (`DEMO-AUTH-SUBJECT-DISPLAY-NAME-1`):** `DemoAuthenticator` passes the Demo User's name as the Subject's `displayName`
+component as well, so nothing on the LA side changed. `DemoAuthHttpTest` asserts the session's display name, and
+`ControlApiInvestigationListTest` now covers the template-instantiate path. Not re-walked live yet.
 
 
 **Reference rows (`POST /inv/reference-rows`, 2026-10-11).** Body `{dataset, keyCol, keys[1..500], columns?, investigationId?}`

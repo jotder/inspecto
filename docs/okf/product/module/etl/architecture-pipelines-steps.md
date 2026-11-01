@@ -62,7 +62,8 @@ on the [scheduler](../processor/architecture-jobs-scheduler.md). Code homes:
 `transform.mask`, `transform.explode`, `transform.matrix.unpivot`, `transform.timeseries.resample`,
 `transform.timeseries.shift`, `transform.timeseries.forecast`, `transform.similarity`,
 `transform.analytics.rank`, `transform.sample`, `transform.matrix.pivot`, `transform.entity.link`,
-`transform.stats.outlier`, `transform.data.binning`, `transform.stats.correlation`, `transform.split`,
+`transform.stats.outlier`, `transform.data.binning`, `transform.stats.correlation`,
+`transform.timeseries.changepoint`, `transform.cohort.retention`, `transform.cohort.funnel`, `transform.split`,
 `transform.merge`; and the sinks
 (`sink.persistent`, `sink.materialized`, `sink.webhook`, `sink.excel`, `sink.view`). The step catalog documents each
 one's keys, refusals and a runnable example.

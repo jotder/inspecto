@@ -1473,6 +1473,209 @@
     } ],
     "help" : "Spearman is Pearson on the ranks, so slope, intercept and r2 describe the line through the ranks."
   } ],
+  "transform.timeseries.changepoint" : [ {
+    "key" : "order_column",
+    "label" : "Order column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "Orders each series: one row per key per point, evenly spaced, no gap (a resample's bucket).",
+    "placeholder" : "bucket"
+  }, {
+    "key" : "residual_column",
+    "label" : "Residual column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "Actual minus expected (a forecast, a baseline or a peer median). An empty residual gets no flag.",
+    "placeholder" : "residual"
+  }, {
+    "key" : "sigma",
+    "label" : "Residual scale (sigma)",
+    "type" : "number",
+    "tier" : "optional",
+    "help" : "The residual's typical spread, one number for every series. Set this or a sigma column, not both.",
+    "placeholder" : "12.5"
+  }, {
+    "key" : "sigma_column",
+    "label" : "Sigma column",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "A column holding each series' own sigma, the same on every row of a series. Set this or sigma.",
+    "placeholder" : "sigma"
+  }, {
+    "key" : "group_by",
+    "label" : "Series keys",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "One series per key. Leave blank for one series.",
+    "placeholder" : "REGION"
+  }, {
+    "key" : "z",
+    "label" : "Band width (z)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 4.0,
+    "help" : "A residual further than z sigmas from 0 is outside the band."
+  }, {
+    "key" : "regime_run",
+    "label" : "Regime run",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 3,
+    "min" : 2.0,
+    "max" : 10000.0,
+    "help" : "This many outside points in a row are one regime change, raised on the last of them."
+  }, {
+    "key" : "cusum_k",
+    "label" : "Drift allowance (k)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 0.25,
+    "min" : 0.0,
+    "help" : "CUSUM slack in sigmas: a steady lean smaller than this never adds up to a drift."
+  }, {
+    "key" : "cusum_h",
+    "label" : "Drift limit (h)",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 8.0,
+    "help" : "CUSUM decision limit in sigmas: a lean that adds up past this is a drift."
+  }, {
+    "key" : "warmup",
+    "label" : "Warm-up points",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 0,
+    "min" : 0.0,
+    "max" : 10000.0,
+    "help" : "Leading points of each series that update the state but carry no flag."
+  }, {
+    "key" : "rebase",
+    "label" : "Re-level after a change",
+    "type" : "boolean",
+    "tier" : "advanced",
+    "default" : false,
+    "help" : "For a model that does not re-level itself: after a regime change or drift, the new level reads as residual 0. Without it such a model raises a regime change every regime run."
+  } ],
+  "transform.cohort.retention" : [ {
+    "key" : "entity_column",
+    "label" : "Entity column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "Who is followed. An entity's cohort is the bucket of its first event; compared as text.",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "time_column",
+    "label" : "Time column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "When each event happened: a DATE or TIMESTAMP, or a TIMESTAMP WITH TIME ZONE with a time zone.",
+    "placeholder" : "EVENT_AT"
+  }, {
+    "key" : "grain",
+    "label" : "Cohort grain",
+    "type" : "select",
+    "tier" : "required",
+    "options" : [ {
+      "value" : "hour",
+      "label" : "Hour"
+    }, {
+      "value" : "day",
+      "label" : "Day"
+    }, {
+      "value" : "week",
+      "label" : "Week (Monday)"
+    }, {
+      "value" : "month",
+      "label" : "Month"
+    }, {
+      "value" : "quarter",
+      "label" : "Quarter"
+    }, {
+      "value" : "year",
+      "label" : "Year"
+    } ],
+    "help" : "The cohort and period bucket."
+  }, {
+    "key" : "through",
+    "label" : "As of",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "The as-of date: later events are dropped and a period not yet over it is absent, never 0.",
+    "placeholder" : "2026-06-30"
+  }, {
+    "key" : "timezone",
+    "label" : "Time zone",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Only for a TIMESTAMP WITH TIME ZONE column: whose calendar the buckets follow (UTC, Europe/Berlin...). Leave blank for a DATE or TIMESTAMP column, which is bucketed on its own clock.",
+    "placeholder" : "Europe/Berlin"
+  }, {
+    "key" : "from",
+    "label" : "First cohort",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Leaves older cohorts out of the result; their entities still count as not new.",
+    "placeholder" : "2026-01-01"
+  }, {
+    "key" : "mode",
+    "label" : "Active means",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "exact",
+    "options" : [ {
+      "value" : "exact",
+      "label" : "Active in that period"
+    }, {
+      "value" : "unbounded",
+      "label" : "Active in that period or later"
+    } ],
+    "help" : "Exact is classic retention; unbounded never rises with the period."
+  }, {
+    "key" : "max_periods",
+    "label" : "Most periods",
+    "type" : "number",
+    "tier" : "advanced",
+    "default" : 120,
+    "min" : 0.0,
+    "max" : 10000.0,
+    "help" : "The highest period reported per cohort."
+  } ],
+  "transform.cohort.funnel" : [ {
+    "key" : "entity_column",
+    "label" : "Entity column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "Who goes through the funnel; compared as text.",
+    "placeholder" : "CUSTOMER_ID"
+  }, {
+    "key" : "step_column",
+    "label" : "Step column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "Names what each event is. An event outside the funnel's steps is ignored.",
+    "placeholder" : "EVENT_TYPE"
+  }, {
+    "key" : "time_column",
+    "label" : "Time column",
+    "type" : "string",
+    "tier" : "required",
+    "help" : "When each event happened (a TIMESTAMP). Filter the rows first to bound the period.",
+    "placeholder" : "EVENT_AT"
+  }, {
+    "key" : "steps",
+    "label" : "Steps",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "2 to 12 distinct step names in funnel order. Each step counts at or after the one before it.",
+    "placeholder" : "visit, signup, purchase"
+  }, {
+    "key" : "within",
+    "label" : "Within",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Longest time from an entity's first step-1 event to a later step (30s, 90m, 48h, 30d). Blank: no limit.",
+    "placeholder" : "30d"
+  } ],
   "transform.join" : [ {
     "key" : "reference",
     "label" : "Reference",
