@@ -217,16 +217,16 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   graph edits (**Expand**, which in an Investigation opens its tab section, **Collapse**, **Hide**, **Exclude** and **Merge** on an Investigation's canvas, **Attach to
   Case**), **Clean up** (the broom), and **Held** and **Hidden by lists**.
 * **Canvas:** the graph, with the legend, the Working set tiles and the minimap.
-* **Right panel**, collapsed to a thin rail (**Show the toolbox**, **Browser**, **Server**, **Investigation**) or open
+* **Right panel**, collapsed to a thin rail (**Show the toolbox**, **On screen**, **Whole Dataset**, **Investigation**) or open
   with three tabs (**«** collapses it again; LA-PANELS-REDESIGN-1, 2026-10-29):
-  * **Browser**: *Find something interesting* and the tools that run on the graph on screen.
-  * **Server**: the server algorithms and the tools that read the whole Dataset.
+  * **On screen**: *Find something interesting* and the tools that run on the graph on screen.
+  * **Whole Dataset**: the server algorithms and the tools that read the whole Dataset.
   * **Investigation**: the New Investigation form, or the open one's Act panel ([§11](#11-investigations)).
 
   The analysis catalogue is [§8](#8-the-analysis-catalogue). Settings in the three tabs are edited the same way
   everywhere: **label · value · ✎** (click the pencil or the value, Enter keeps it, Escape drops it), and a choice
   opens as a list in a popup.
-* **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus,
+* **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus **Steps** (one line per step) while an Investigation is still unsaved, or,
   with an Investigation open, **Step log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
   entities**. Its tabs are plain text tabs, the open one underlined; on a narrow screen they scroll sideways. Drag its
   edge to resize; it remembers its tab and height in this browser.
@@ -991,7 +991,8 @@ paths, patterns, Value Measures and the Working Set.
   (canvas, labels, layouts and browser algorithm caps for your own machine, never above the Space's value; *Reset to
   Space value*). A value outside its range is refused with the range. Exact keys and defaults: [Part II, *Grounded
   limits and consequences*](#grounded-limits-and-consequences-code-read-2026-09-20--2026-09-22).
-* Rate limit: a burst of 20 requests per user, then one every 3 seconds.
+* Rate limit: a burst of 30 requests per user, then one every 2 seconds (server-wide `rate.link_analysis_burst` /
+  `rate.link_analysis_per_s`).
 
 ---
 
@@ -1058,7 +1059,7 @@ The Studio was reorganized on 2026-10-27 (`LA-STUDIO-UI-REORG-1`). Nothing was r
 | Save as a case (saved view) | **File ▸ Save view** / **Save view as…** |
 | Open saved views | **File ▸ Open…** ▸ *Saved views* |
 | Toolbox → View tab | The tool rail (layout, filters, Display options) and **Canvas mode** |
-| Toolbox → Analysis tab, *All algorithms (server)* | Right panel ▸ **Browser** and **Server** tabs (2026-10-29: the Analysis tab's Browser \| Server switch became two tabs) |
+| Toolbox → Analysis tab, *All algorithms (server)* | Right panel ▸ **On screen** and **Whole Dataset** tabs (2026-10-29: the Analysis tab's Browser \| Server switch became two tabs, renamed for where the tools look) |
 | Start box's *Follow the money*, *Open a saved view*, *Explore a Dataset* cards | **File ▸ Examples ▸ Follow the money**, **File ▸ Open…**, **File ▸ Explore Dataset…** |
 | Start box ▸ One entity ▸ *Investigate*, then the purpose form, then Expand… | One start form in the Investigation tab (File ▸ New): Start from, Time column, Time zone, Degrees; Name and Purpose on **Save** |
 | Selection bar, box select | Canvas toolbar selection group; **Shift+drag** lasso in Pan, or Lasso mode |
@@ -3039,7 +3040,7 @@ counts, never edge timestamps, so only the Dataset routes (which read the `timeC
   `wasNull` turned every NULL time into 1970 on the index path until the equivalence test caught it. The SPA panel
   gained a "Series per: Each link / Each entity" selector (`series` on the wire); an entity finding highlights its NODE
   and is listed by name. ✅ Sealing a finding set as a `temporal` op shipped 2026-10-05 (below, *The `temporal` op*).
-* **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Server tab (until 2026-10-29 the Analysis tab) of the
+* **SPA overlay (2026-10-05).** `link-analysis-temporal-findings.component.ts` is a panel under the Whole Dataset tab (until 2026-10-29 the Analysis tab) of the
   Analysis panel (a sibling of the catalogue, shown/hidden with `[class.hidden]`). It needs a **time column** and an **edge mapping**
   (the host's `traversalTargets`, the same ones server paths and the server pattern use), calls
   `InvService.temporalPattern` and hands the answer to the pure `temporal-findings.ts` (`temporalResultToState`).
@@ -3336,7 +3337,7 @@ community and the telecom pattern packs (Wangiri, IRSF, SIM box, forwarding chai
 Attach to Case, export. (9) Under the hood: the Pipelines and Jobs that built it.
 
 **Case history caps (2026-10-12).** `POST /inv/case-history` counts only records the caller may read against its caps 
-(100 Case-linked Investigations, 500 attachment records): hidden ones neither consume a cap nor set `truncated`, so a 
+(by default 200 Case-linked Investigations and 1,000 attachment records: `case_history.max_linked_investigations`, `case_history.max_attachments`): hidden ones neither consume a cap nor set `truncated`, so a 
 low-privilege caller learns nothing about the Space and its own matches are never crowded out. A DoS bound of 5x the caps 
 (hidden included) ends the scan; it sets `truncated` only for a caller that was admitted at least one record (see the 
 `CaseHistory` javadoc).
@@ -3427,7 +3428,7 @@ facts are in [architecture.md](architecture.md) §6.14.
 - **Right panel**: Analysis (Discover + one catalogue with a Browser | Server toggle; server rows carry
   `data-server-algorithm`; *Open in the dock* fills the Results tab) and Investigation (the Act panel: header with
   `⋯` Settings… / Close / Delete, seed queue, Expand…, Selected entity, Held, Scope list, More steps ▾, last 5 steps).
-- **Dock** (`la-dock`, `DOCK_TABS`): Rows, Results, and with an Investigation Step log, Working Set rows, Coverage,
+- **Dock** (`la-dock`, `DOCK_TABS`): Rows, Results, Steps while an Investigation is unsaved, and with an Investigation open Step log, Working Set rows, Coverage,
   Annotations, Excluded entities. State in `localStorage` `inspecto.la.dock`, height `inspecto.split.link-analysis.dock`.
 - **Domain profile**: no picker; `profileId = investigation.boundProfileId() ?? boundProfile() ??
   activeDomainProfileId()`; shown read-only at the top of Graph model.

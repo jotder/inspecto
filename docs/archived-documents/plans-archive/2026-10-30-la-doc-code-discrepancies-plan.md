@@ -1,5 +1,21 @@
 # Link Analysis Doc-vs-Code Discrepancy Fixes Implementation Plan
 
+> **As built (2026-11-01, `LA-DOC-CODE-SYNC-1`, closed).** Taken over from a peer's uncommitted draft.
+> - **D1 / Task 1 (code) was already fixed on master by `5bbdc9c82`**: `openNodeDetail` passes the resolved
+>   `entityType` to `entityPageOf`, with a spec. Nothing was changed here.
+> - **D2-D7 fixed in the la-core hub**, every number re-read from code: 97 routes in la-api's `module.toon` + 7 in
+>   geo-link's = 104; 28 la-api `RouteModule`s + 4 in geo-link (`EmbedExpirySweepModule` and `IntegrationWebhooks`
+>   serve no route); 30 route-serving modules override `featureIds()`; limits from `LaLimit.java`.
+> - **Hypotheses the code refuted:** (a) D7 was inverted: the right-panel tabs are labelled **On screen** /
+>   **Whole Dataset** in code (G16, operator 2026-10-29; ids stay `browser` / `server`), so §2 and §8 were right and
+>   §4, the migration table and Part II were fixed instead. (b) The rate limit is server-wide (`la-limits.toon`,
+>   `Layer.INSTALL`), not per Space. (c) `DELETE /inv/investigations/{id}` is lead-only and answers 409 while linked to
+>   an open Case or holding a pending approval (not "owner or administrator"). (d) The dock's **Steps** tab lists one
+>   line per step; no per-step undo was claimed.
+> - **Also fixed** (same defects, outside the plan's list): the rate limit in `admin-guide-demo.md` and the "no delete
+>   route" answer in `tests-stakeholder-qa.md`. Left alone: architecture §6's "live route inventory lists 78" (a
+>   measurement, not re-run).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Resolve all seven discrepancies identified between the Link Analysis OKF hub documentation (`docs/okf/product/module/la-core/`) and the Link Analysis implementation (`la/*`, `platform/inspecto-entity-store`, and `inspecto-ui/projects/link-analysis/`): fix the one code defect in `openNodeDetail` (`entityPage` resolution) and update six stale/contradictory documentation areas to match the shipped codebase.
