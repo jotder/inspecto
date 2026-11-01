@@ -1,0 +1,9 @@
+name: ps_accrued_unbilled
+title: Accrued unbilled (USD)
+dataset: settlement_accrual
+measure: sum(kpi_accrued_unbilled)
+timeField: as_of
+grain: day
+comparison: none
+direction: down
+unit: USD

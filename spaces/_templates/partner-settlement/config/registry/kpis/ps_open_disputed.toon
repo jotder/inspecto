@@ -1,0 +1,9 @@
+name: ps_open_disputed
+title: Open disputed amount (USD)
+dataset: settlement_aging
+measure: sum(kpi_open_disputed)
+timeField: as_of
+grain: day
+comparison: none
+direction: down
+unit: USD

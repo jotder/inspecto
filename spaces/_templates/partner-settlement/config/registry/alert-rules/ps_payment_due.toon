@@ -1,0 +1,8 @@
+name: ps_payment_due
+dataset: settlement_aging
+measure: sum(payment_alert)
+by[1]: aging_key
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A statement cycle still has an open balance within payment_alert_days (Job ps_aging, default 5) of its payment due date, or past it. For a we_pay agreement it is our payment to make; for a they_pay agreement the partner's payment to us is due or late. One Alert per agreement and cycle; the open balance applies finance's payments oldest cycle first and counts the disputed amount (see open_disputed). Runbook: config/runbooks/partner-settlement-runbooks.md."

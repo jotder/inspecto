@@ -1,14 +1,14 @@
 ---
 type: Feature
 title: "Partner settlement — features"
-description: "Agreement-aware partner statement settlement: effective-dated terms, a cycle calendar, statement integrity, a per-agreement compare, netting positions with a roll-forward, and disputes as Cases."
+description: "Agreement-aware partner statement settlement: effective-dated terms, a cycle calendar, statement integrity, a per-agreement compare, netting positions with a roll-forward, disputes as Cases, and aging with accruals and a dashboard."
 tags: [partner-settlement, features, presales]
-timestamp: 2026-10-20T00:00:00Z
+timestamp: 2026-11-01T00:00:00Z
 ---
 
 # Partner settlement — features
 
-**Product Map Item:** [`solution-pack.partner-settlement`](../../../../../product-map/solution-pack/partner-settlement.toon) · **Status:** preview (slices S1 to S5: References, statement ingestion, the compare, netting positions and the roll-forward, disputes as Cases) · **Availability:** Standard and up (`minEdition: standard`; `offerings/standard.toon` `contentPacks`). Commercial terms are not set.
+**Product Map Item:** [`solution-pack.partner-settlement`](../../../../../product-map/solution-pack/partner-settlement.toon) · **Status:** preview (slices S1 to S6: References, statement ingestion, the compare, netting positions and the roll-forward, disputes as Cases, aging and accruals) · **Availability:** Standard and up (`minEdition: standard`; `offerings/standard.toon` `contentPacks`). Commercial terms are not set.
 
 ## What it is
 
@@ -29,11 +29,14 @@ Wholesale finance and revenue-assurance teams at operators and MVNOs that settle
 - Settlement positions per netting group and cycle (payable, receivable, net, in the settlement currency and each original currency) and a roll-forward whose closing carries month to month; a line with no FX rate is counted and named, never summed or dropped
 - Disputes as Cases: every amount mismatch and FX difference is a dispute line (one Incident each), grouped into one Case per partner and cycle; the disputed amount rides beside the net on the position, never in it; an Incident reminds when a cycle's contractual dispute window is about to close — [case-management](../../module/case-management/index.md)
 - A dispute workflow (`OPEN → INVESTIGATING → DISPUTED → AGREED | REJECTED → CREDIT_PENDING → CLOSED`), a Case SLA Policy and an age Escalation Rule, shipped as bodies an administrator applies once — [workflow](../../module/workflow/index.md)
+- Aging per agreement and statement cycle: finance's payments and notes applied oldest cycle first, the open balance and the open disputed amount in configurable age buckets (0-30, 31-60, 61-90, 90+ days by default), and an Alert when an open balance reaches its payment due date
+- Accruals, reported and never posted: our expected amount for a cycle whose statement has not arrived (unbilled before its due date, late after it) and a configurable provision on the disputed amount (default 100 %)
+- A `settlement_overview` dashboard: open disputed amount, open balance aged over 60 days and accrued unbilled as KPI tiles, and the open balance by age, the disputes by partner and the accruals by agreement as bars — [analytics](../../module/analytics/index.md)
 - Zero-row schema seeds, a runbook and a synthetic corpus with planted variances and look-alikes
 
 ## Not yet
 
-Aging and accruals and the settlement dashboard, the evidence pack, wholesale / MVNO constructs and roaming (TAP). It posts no payment or ledger entry and fetches no market FX rate. No real partner statement has been seen: the statement Schema is a synthetic proposal.
+The evidence pack, wholesale / MVNO constructs and roaming (TAP). The KPI tiles count one currency (USD by default). It posts no payment, accrual or ledger entry and fetches no market FX rate. No real partner statement has been seen: the statement Schema is a synthetic proposal.
 
 ## Related hubs
 

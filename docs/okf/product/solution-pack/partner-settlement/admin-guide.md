@@ -71,16 +71,22 @@ checker (`202 pending`).
 
 There are no thresholds in the SQL. `ps_calendar`, `ps_expected` and `ps_rollforward` read the Job parameter `as_of` (default today); `ps_dispute` reads it too, with `window_alert_days` (default 5): the lead time before `dispute_window_end` at which
 `ps_dispute_window` raises its reminder. Pass the same
-date to all four to reproduce a past day (the roll-forward has a row for every month up to the `as_of` month). Reconciliations read one day: run `ps_voice` and `ps_sms` per day when catching up.
+date to all of them, and to `ps_aging` and `ps_accrual`, to reproduce a past day (the roll-forward has a row for every month up to the `as_of` month). Reconciliations read one day: run `ps_voice` and `ps_sms` per day when catching up.
+
+`ps_aging` takes the bucket boundaries `aging_bucket_1`, `aging_bucket_2`, `aging_bucket_3` (default 30, 60, 90 days; the KPI "aged
+over 60 days" follows `aging_bucket_2`, rename it if you change it) and `payment_alert_days` (default 5). `ps_accrual` takes
+`provision_pct` (default 100): the share of the disputed amount provisioned, a finance policy. Both take `kpi_currency` (default USD):
+the one settlement currency the KPI tiles count; change the KPIs' `unit` and titles with it.
 
 ## Verify
 
 - `GET /api/v1/jobs` lists the chain Jobs `ps_calendar`, `ps_statement_current`, `ps_statement_findings`, `ps_expected`, `ps_billed`,
-  `ps_findings`, `ps_dispute`, `ps_movement`, `ps_position`, `ps_rollforward`, the Jobs `ps_voice`, `ps_sms` and the Case Rule Job
+  `ps_findings`, `ps_dispute`, `ps_movement`, `ps_position`, `ps_rollforward`, `ps_aging`, `ps_accrual`, the Jobs `ps_voice`, `ps_sms` and the Case Rule Job
   `ps_dispute_case`; `GET /api/v1/cases/rules` lists `ps_dispute_case` (loaded from `config/ops/`).
-- After the first run the Dataset `settlement_calendar` has the closed cycles with business-day due dates.
+- After the first run the Dataset `settlement_calendar` has the closed cycles with business-day due dates, and the dashboard
+  `settlement_overview` renders its six tiles.
 - The golden tests are `PartnerSettlementPackGoldenTest`, `PartnerSettlementPositionGoldenTest`, `PartnerSettlementDisputeGoldenTest`,
-  `PartnerSettlementReferenceTest`, `PartnerSettlementSeedTest` and `PartnerSettlementCorpusTest` in module `inspecto-reconciliation`, and
+  `PartnerSettlementAgingGoldenTest`, `PartnerSettlementReferenceTest`, `PartnerSettlementSeedTest` and `PartnerSettlementCorpusTest` in module `inspecto-reconciliation`, and
   `PartnerSettlementDisputeCaseTest` in module `inspecto-case-management`.
 
 ## Safety

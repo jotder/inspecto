@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Open balance aged over 60 days (USD)
+  kpi:
+    kpiId: ps_aged_over_60

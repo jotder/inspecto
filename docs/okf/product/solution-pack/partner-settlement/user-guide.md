@@ -8,13 +8,13 @@ timestamp: 2026-10-20T00:00:00Z
 
 # Partner settlement — user guide
 
-What a Space created from the `partner-settlement` template gives an analyst in slices S1 to S5. Design detail is in [architecture](architecture.md); the per-reason reading guide is `config/runbooks/partner-settlement-runbooks.md` in the Space.
+What a Space created from the `partner-settlement` template gives an analyst in slices S1 to S6. Design detail is in [architecture](architecture.md); the per-reason reading guide is `config/runbooks/partner-settlement-runbooks.md` in the Space.
 
 ## The daily cycle
 
 | When | What runs | Output |
 |---|---|---|
-| 01:00 | `ps_calendar`, then the nine Jobs after it, each on the previous one's success | the calendar, the current statement lines, statement findings, expected and billed amounts, settlement findings, the dispute lines, then the movements, the position and the roll-forward |
+| 01:00 | `ps_calendar`, then the eleven Jobs after it, each on the previous one's success | the calendar, the current statement lines, statement findings, expected and billed amounts, settlement findings, the dispute lines, then the movements, the position, the roll-forward, the aging and the accruals |
 | 05:30 | `ps_voice`, `ps_sms` | Breaks per agreement, direction, service, destination class and day; an Incident when a Reconciliation breaches |
 | 06:00 | `ps_dispute_case` | the dispute Incidents grouped into one Case per partner and cycle |
 
@@ -57,6 +57,21 @@ What a Space created from the `partner-settlement` template gives an analyst in 
 3. **`settlement_movement`** is the line-level truth under both, with the FX rate, its date and its type on every converted line. Filter on `status`: `fx_missing` lines add no amount and are counted in `lines_unconverted`; `unknown_agreement` lines (a payment naming an agreement or partner finance has not set up) are in no balance.
 4. Netting is inside one settlement currency, and a position is what the statements say, not an agreed balance. `disputed_amount` and `disputed_lines` show the dispute lines of that group and month beside the net; they are never netted into it, and they do not change with the Case's outcome.
 
+## Aging, accruals and the dashboard
+
+1. **`settlement_aging`** has one row per agreement and statement cycle, in the agreement's direction (`we_pay`: what we owe;
+   `they_pay`: what the partner owes us): `invoiced`, `settled_applied` (finance's payments and notes applied to the oldest cycle
+   first), `open_balance`, `open_disputed`, `age_days` from the date the statement was received and `age_bucket`. A payment finance
+   filed under the wrong partner settles nothing, so its cycle stays open.
+2. **`ps_payment_due`** raises one WARNING Alert per cycle whose `open_balance` is due within five days (`payment_alert_days`) or is
+   late. The balance includes the disputed amount; pay the undisputed part and leave the rest to the dispute Case.
+3. **`settlement_accrual`** has one row per agreement and closed cycle. `status` is `billed`, `unbilled` (no statement yet, not due)
+   or `statement_late` (no statement and past `statement_due`, when `missing_statement` also fires). `accrued_unbilled` is our expected
+   amount while no statement has arrived; `dispute_provision` is the provision on the disputed amount. Finance posts accruals; the pack
+   only reports them.
+4. **The `settlement_overview` dashboard** shows the open disputed amount, the open balance aged over 60 days and the accrued unbilled
+   amount as tiles (USD only by default, payables and receivables added as amounts at stake) and three bars that never add two currencies (by age bucket and currency, by partner and currency, by agreement).
+
 ## What it will not tell you
 
 A finding is a difference between what a partner says is owed and what we price ourselves, never proof the partner is wrong: the
@@ -65,5 +80,5 @@ accruals or send a dispute to the partner (the evidence pack is a later slice); 
 
 ## Verify
 
-- `GET /api/v1/jobs` lists the ten `ps_*` chain Jobs, the two Reconciliation Jobs and `ps_dispute_case`.
+- `GET /api/v1/jobs` lists the twelve `ps_*` chain Jobs, the two Reconciliation Jobs and `ps_dispute_case`.
 - After a run, `settlement_calendar` has a row per agreement and closed cycle; `settlement_findings` is empty on clean data.

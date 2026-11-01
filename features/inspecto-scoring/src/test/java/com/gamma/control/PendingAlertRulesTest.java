@@ -203,7 +203,7 @@ class PendingAlertRulesTest {
         Map<String, Object> kind = new java.util.HashMap<>(ok);
         kind.put("afterScore", Map.of("kind", "kpi", "model", MODEL));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, kind, RULE))
-                .getMessage().contains("afterScore.kind must be one of [anomaly-model, risk-score]"));
+                .getMessage().contains("afterScore.kind must be one of [anomaly-model, churn-model, risk-score]"));
         Map<String, Object> wrongKind = new java.util.HashMap<>(ok);
         wrongKind.put("afterScore", Map.of("kind", "anomaly-model", "model", MODEL));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> PendingAlertRules.requireDeclarable(config, wrongKind, RULE))
