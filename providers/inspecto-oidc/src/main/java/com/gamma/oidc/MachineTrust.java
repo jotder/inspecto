@@ -90,6 +90,21 @@ final class MachineTrust {
         return true;
     }
 
+    /**
+     * The client a machine (client-credentials) token was minted for, or {@code null} for a person's token
+     * (OIDC-CC-MACHINE-ACTOR-1, review G7). A token is a machine's when it says so ({@code gty} is
+     * {@code client_credentials}, or Auth0's {@code client-credentials}) or when its client is listed in
+     * {@code auth.oidc.clients} ({@code policy}, may be {@code null}). Nothing else is guessed: a token naming an
+     * unknown client without {@code gty} stays a person's. A token naming no client has no client to record.
+     */
+    static String machineClient(JWTClaimsSet claims, MachineTrust policy) {
+        String client = client(claims);
+        if (client == null) return null;
+        if (policy != null && policy.clients.contains(client) && !client.equals(policy.spaClient)) return client;
+        Object gty = claims.getClaim("gty");
+        return "client_credentials".equals(gty) || "client-credentials".equals(gty) ? client : null;
+    }
+
     /** {@code azp}, else {@code client_id}; {@code null} when neither is a non-blank string. */
     private static String client(JWTClaimsSet claims) {
         if (claims.getClaim("azp") instanceof String azp && !azp.isBlank()) return azp;

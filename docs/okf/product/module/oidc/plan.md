@@ -40,6 +40,14 @@ Proven live against WSO2 Identity Server 7.3.0 and Keycloak
   (`auth.oidc.clientId`) is always admitted and never checked for lifetime or replay, so people's sign-in is
   unchanged. Settings that would guard nothing (a ceiling or replay refusal without the list) refuse boot. The
   gateway path is not pinned, and replay refusal is per node; DPoP / mTLS waits for demand.
+* **A machine is named by its client** (`OIDC-CC-MACHINE-ACTOR-1`, 2026-11-01): `MachineTrust.machineClient` makes a
+  Bearer token a machine's when its client is listed in `auth.oidc.clients` or it carries `gty` `client_credentials` /
+  `client-credentials`; nothing else is guessed (WSO2 sends `client_id` on people's tokens too). The Subject's **id**
+  becomes `client:<client id>`, not only the audit actor, because owner fields are written from `RequestAttrs.actor`
+  and read back against `Subject.id()` (Investigation lead and members, for example): the two must stay one value.
+  `Subject.machineSub` keeps the `sub`, audited as `idp_subject` (not `token_sub`: `SecretScrubber` redacts any key
+  that says token). An approved Pending Change replays under a Subject rebuilt from its author id, so that replay's
+  row says `actor_type: user`; the actor is still `client:<client id>`.
 * **Fail closed at boot** when issuer or JWKS URI is missing, the provider value is unknown, or discovery fails.
 
 ## Left

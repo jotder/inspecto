@@ -22,6 +22,7 @@ Enterprises that need single sign-on through their own identity provider.
 
 - JWKS-validated resource server with role mapping — [architecture](architecture.md)
 - Opt-in machine-client pinning: client allowlist, lifetime ceiling and replay refusal — [admin-guide](admin-guide.md)
+- A machine call is audited under its client id (`client:<client id>`, `actor_type: service`) — [admin-guide](admin-guide.md)
 - Real sign-in path for Standard and Advanced releases — [admin-guide-real-signin](../la-core/admin-guide-real-signin.md)
 
 ## Related hubs
