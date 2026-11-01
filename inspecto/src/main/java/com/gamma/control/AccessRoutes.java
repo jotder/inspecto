@@ -107,8 +107,10 @@ final class AccessRoutes implements RouteModule {
         Roles.effective(api.writeRoot()).forEach((name, def) ->
                 rows.add(roleShape(name, def, doc.authored().containsKey(name) ? "authored" : "seed")));
         out.put("roles", rows);
-        if (!doc.attributeClaims().isEmpty())
-            out.put("identity", Map.of("attributeClaims", doc.attributeClaims()));
+        Map<String, Object> identity = new LinkedHashMap<>();
+        if (!doc.attributeClaims().isEmpty()) identity.put("attributeClaims", doc.attributeClaims());
+        if (!doc.machineClients().isEmpty()) identity.put("machineClients", doc.machineClients());
+        if (!identity.isEmpty()) out.put("identity", identity);
         out.put("products", products());
         return out;
     }
@@ -160,8 +162,9 @@ final class AccessRoutes implements RouteModule {
 
     /** Full replace of the authored doc (settings-doc discipline): roles named here override their
      *  seed entry (an empty capability list revokes); seed roles not named keep their defaults. The
-     *  optional {@code identity.attributeClaims} allowlist (ABAC A1) rides the same doc — omitting it
-     *  clears it, like any full-replace field. */
+     *  optional {@code identity.attributeClaims} allowlist (ABAC A1) and {@code identity.machineClients} (the
+     *  machines this Space admits, OIDC-CC-INTEGRATION-ROLE-1) ride the same doc — omitting one clears it,
+     *  like any full-replace field. */
     /** IFMATCH-COVERAGE-GAP-1: {@code Roles} is a full-replace settings doc read by
      *  {@code GET /access/roles} (which already publishes a content ETag) and edited/PUT back by an
      *  operator — a genuine read-modify-write with real double-write exposure between two admins, so
@@ -171,15 +174,17 @@ final class AccessRoutes implements RouteModule {
         ETags.requireMatch(ex, ETags.of(ContentHash.of(roles(api))));
         Map<String, Roles.Def> authored = Roles.validate(body.get("roles"));
         List<String> attributeClaims = Roles.attributeClaims(body.get("identity"));
+        List<String> machineClients = Roles.machineClients(body.get("identity"));
         AccessPolicyStore.requireLoadableUnder(root, attributeClaims);   // F1: never deny-all as a side effect
-        PendingChanges.hold(api, ex, ROLES_KIND, "roles", rolesContent(authored, attributeClaims),
+        PendingChanges.hold(api, ex, ROLES_KIND, "roles", rolesContent(authored, attributeClaims, machineClients),
                 Files.exists(root.resolve(Roles.FILE)) ? rolesContent(Roles.load(root)) : null);   // maker-checker
-        Roles.write(root, authored, attributeClaims);
+        Roles.write(root, authored, attributeClaims, machineClients);
         return ETags.respond(ex, roles(api));
     }
 
     /** The authored roles doc as the content a Pending Change pins (sorted, so the version is order-free). */
-    private static Map<String, Object> rolesContent(Map<String, Roles.Def> authored, List<String> attributeClaims) {
+    private static Map<String, Object> rolesContent(Map<String, Roles.Def> authored, List<String> attributeClaims,
+                                                    List<String> machineClients) {
         Map<String, Object> roles = new java.util.TreeMap<>();
         authored.forEach((name, def) -> {
             Map<String, Object> r = new LinkedHashMap<>();
@@ -190,11 +195,12 @@ final class AccessRoutes implements RouteModule {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("roles", roles);
         doc.put("attributeClaims", attributeClaims.stream().sorted().toList());
+        doc.put("machineClients", machineClients.stream().sorted().toList());
         return doc;
     }
 
     private static Map<String, Object> rolesContent(Roles.Doc doc) {
-        return doc.unreadable() ? Map.of("unreadable", true) : rolesContent(doc.authored(), doc.attributeClaims());
+        return doc.unreadable() ? Map.of("unreadable", true) : rolesContent(doc.authored(), doc.attributeClaims(), doc.machineClients());
     }
 
     private static Map<String, Object> roleShape(String name, Roles.Def def, String source) {

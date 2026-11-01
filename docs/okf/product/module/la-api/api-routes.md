@@ -38,7 +38,7 @@ tags: [api, routes, generated]
 | POST | `/inv/graph/runs` | Start a graph run over an Investigation's Working Set | inv | `canRunLinkGraphAnalysis` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |
 | GET | `/inv/graph/runs/{runId}` | Read one graph run | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |
 | POST | `/inv/graph/runs/{runId}/cancel` | Cancel a graph run | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |
-| POST | `/inv/inbound/investigations` | Third-party integration (inbound): open a seeded Investigation for an external record | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java` |
+| POST | `/inv/inbound/investigations` | Third-party integration (inbound): open a seeded Investigation for an external record | inv | `canOpenInboundInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java` |
 | GET | `/inv/index` | List the edge/node indexes of the caller's viewable Datasets | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java` |
 | POST | `/inv/index/builds` | Start an edge/node index build over a Dataset | inv | `canBuildLinkIndex` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java` |
 | GET | `/inv/index/builds/{buildId}` | Read one index build | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java` |

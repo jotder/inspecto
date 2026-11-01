@@ -882,7 +882,7 @@ Plan: [`inspecto-la-editions-plan`](../../../../archived-documents/plans-archive
 surface). Outbound (case hand-off, webhooks, client-credentials trust) is a separate lane.
 
 * **Routes** (`InvestigationInboundRoutes`, la-api, geoLink feature):
-  * `POST /inv/inbound/investigations` — gated on `canManageIncidents`. A fraud product or case manager hands over its own record
+  * `POST /inv/inbound/investigations` — gated on `canOpenInboundInvestigation` (was `canManageIncidents` until 2026-11-01). A fraud product or case manager hands over its own record
     and the entities it is about; Inspecto LA opens an Investigation seeded with them and answers its id and a link.
   * `POST /inv/deep-links/resolve` — read-shaped (CapabilityManifest exemption): validates an "Open in Inspecto LA" link for the
     SPA's `/open` page.
@@ -903,8 +903,10 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   on any node or store backend; the loser reads as a repeat. A repeat answers the same id with `created:false`, never re-derives the
   binding, and adds nothing; if the first call died between steps, the repeat seeds or labels what is missing. A repeat by a Subject
   who cannot change that Investigation (not its lead, R3, PDP) is **409** without the id.
-* **Auth.** Any Subject the installed `Authenticator` yields: an OIDC service-account token works as-is, and that Subject becomes the
-  lead. Machine-to-machine client-credentials trust, token scope and replay belong to the outbound lane's security review.
+* **Auth.** Gate `canOpenInboundInvestigation` (seed role `integration`; was `canManageIncidents` until 2026-11-01). The caller
+  becomes the lead and reads the Investigation through the member rule. A machine (client-credentials) Subject is admitted only in a
+  Space whose `roles.toon` lists its client in `identity.machineClients` and keeps only that capability (`OIDC-CC-INTEGRATION-ROLE-1`,
+  decisions A1 + B1 + C2 operator-decided 2026-11-01; [oidc review](../oidc/tests-security-review-oidc-client-credentials.md)).
 * **Wire contract (inbound).**
 
   ```http
@@ -1043,8 +1045,8 @@ Webhook payload example:
 }
 ```
 
-**Machine-to-machine trust (I1) is NOT enabled.** Outbound calls carry only the Connection's secret header; no inbound
-OIDC client-credentials trust exists. Owed before any is built, a formal security review covering:
+**Machine-to-machine trust (I1).** Reviewed 2026-11-01, verdict enable with conditions; items 2 and 6 below are held by code since
+`OIDC-CC-INTEGRATION-ROLE-1` (2026-11-01). Outbound calls carry only the Connection's secret header. The review covered:
 
 1. **SSRF**: every outbound target is a registered `https` Connection under the egress allowlist with a pinned address;
    confirm no inbound route accepts a URL to call back, and that redirects stay unfollowed.

@@ -218,7 +218,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/expand/preview` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:162` |
 | POST | `/inv/graph/runs` | gated | `canRunLinkGraphAnalysis` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:126` |
 | POST | `/inv/graph/runs/([^/]+)/cancel` | exempt | self-service | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:131` |
-| POST | `/inv/inbound/investigations` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:77` |
+| POST | `/inv/inbound/investigations` | gated | `canOpenInboundInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:77` |
 | POST | `/inv/index/builds` | gated | `canBuildLinkIndex` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:131` |
 | POST | `/inv/index/builds/([^/]+)/cancel` | exempt | self-service | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IndexRoutes.java:134` |
 | PUT | `/inv/integration` | gated | `canAdminister` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IntegrationRoutes.java:65` |

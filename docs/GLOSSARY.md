@@ -137,6 +137,8 @@ auth-free core a Capability is derived from the active Lens (honor-system previe
 signals are re-derived from the subject's Role grants and no pane changes. Panes gate on a Capability,
 never on Lens identity. *(Added 2026-07-03.)*
 
+**Inbound Investigation grant** *(capability `canOpenInboundInvestigation`; added 2026-11-01, `OIDC-CC-INTEGRATION-ROLE-1`)* — The integration **Capability**: opening a Link Analysis **Investigation** from an external system's record (`POST /inv/inbound/investigations`) and nothing else; the caller reads the Investigations it leads through the Investigation's own member rule. Seeded to the role `integration` (and `super`). It is the only capability a **machine Subject** (a client-credentials token, `Subject.machine()`) keeps: every other grant is dropped at authentication, and a machine is admitted only in a Space whose `roles.toon` lists its client in `identity.machineClients`. ⛔ Not `canManageIncidents`, which opens every other Investigation write; never "integration role" for the capability (the role is `integration`, the capability is this).
+
 **Access Catalog** — The canonical tree of gateable surface: menu groups → panes → functionalities
 (action nodes, each bound to exactly one Capability). Derived from the navigation config + the Capability
 seam; persisted per Space (`access-catalog` component kind). *(Added 2026-07-14; provenance:

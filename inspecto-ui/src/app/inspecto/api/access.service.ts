@@ -60,8 +60,16 @@ export interface RoleDef {
 export interface RolesDoc {
     roles: RoleDef[];
     error?: string;
+    /** `roles.toon` `identity`: the IdP claims copied onto a Subject, and the machine (client-credentials) clients this
+     *  Space admits (OIDC-CC-INTEGRATION-ROLE-1). The role editor does not edit it, so a save sends it back unchanged. */
+    identity?: RolesIdentity;
     /** Product → the capabilities its screens gate (`CapabilityManifest.PRODUCTS`), e.g. `link-analysis`. */
     products?: Record<string, string[]>;
+}
+
+export interface RolesIdentity {
+    attributeClaims?: string[];
+    machineClients?: string[];
 }
 
 /** One Access Policy (ABAC A2/A3): an allow/deny over subject/resource/environment attributes. */
@@ -223,7 +231,7 @@ export class AccessService {
     /** Full replace of the AUTHORED overlay (settings-doc discipline): roles named here override
      *  their seed entry (an empty capability list revokes); seed roles not named keep their
      *  defaults. Returns the resulting effective table. */
-    saveRoles(authored: RoleDef[]): Observable<RolesDoc> {
+    saveRoles(authored: RoleDef[], identity?: RolesIdentity): Observable<RolesDoc> {
         // A Space's cached bootstrap carries the capabilities these roles grant: ask again.
         return this.http
             .put<RolesDoc>(apiUrl('/access/roles'), {
@@ -232,6 +240,8 @@ export class AccessService {
                     capabilities: r.capabilities,
                     ...(r.dataScopes?.length ? { dataScopes: r.dataScopes } : {}),
                 })),
+                // a full replace: omitting identity would clear the Space's machine clients and attribute claims
+                ...(identity ? { identity } : {}),
             })
             .pipe(tap(() => this.reads.clear()));
     }

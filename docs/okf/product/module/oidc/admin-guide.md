@@ -126,7 +126,18 @@ INSPECTO_JAVA_OPTS=-Dauth.oidc.clients=la-integration -Dauth.oidc.maxTokenLifeti
 * `refuseReplay` requires `jti` and refuses a `jti` already seen, until its `exp` plus the 60 s skew. The cache is
   per node: behind a load balancer a token can still be used once on each node.
 * Not pinned: the gateway trust path (`auth.oidc.gateway.*`), whose assertion the gateway mints for its own callers.
-* The role a machine client holds is still a deployment condition: see the review's conditions 3 and 4.
+* **What a machine may do, and where** (`OIDC-CC-INTEGRATION-ROLE-1`, operator-decided 2026-11-01). Give the service
+  account the seed role `integration` (capability `canOpenInboundInvestigation`: `POST /inv/inbound/investigations` and
+  reads of the Investigations it leads). A machine keeps only that capability, whatever roles it holds: every other
+  granted capability is dropped at authentication. It is admitted only in a Space whose `roles.toon` names its client:
+
+  ```
+  identity:
+    machine_clients[1]: la-integration
+  ```
+
+  Elsewhere every call answers 403 (a public path just treats it as anonymous). Saving roles from the role editor keeps
+  the list. Keycloak may send no `gty`, so list the client in `auth.oidc.clients` too, or its token is taken for a person's.
 * **Audit.** A machine call is recorded as actor `client:<client id>` (`azp`, else `client_id`) with `actor_type: service`,
   and the token's `sub` (on Keycloak the service-account user's UUID) as `idp_subject` on the same row. A token is a
   machine's when its client is listed in `auth.oidc.clients`, or, list or not, when it carries `gty: client_credentials`

@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.oidc` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `OIDC-CC-INTEGRATION-ROLE-1` | P3 | feature | a machine principal gets one narrow integration grant in one Space, never a human capability. | operator |
+_No open rows._

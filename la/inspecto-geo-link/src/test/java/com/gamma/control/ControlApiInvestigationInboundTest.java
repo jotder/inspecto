@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.gamma.access.Roles;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
 import org.junit.jupiter.api.AfterEach;
@@ -11,6 +12,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -39,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ControlApiInvestigationInboundTest {
 
-    private static final String ANALYST = "Bearer analyst", READER = "Bearer reader";
+    private static final String ANALYST = "Bearer analyst", READER = "Bearer reader", MACHINE = "Bearer machine";
     private static final String INBOUND = "/inv/inbound/investigations", RESOLVE = "/inv/deep-links/resolve";
 
     @AfterEach
@@ -47,12 +49,18 @@ class ControlApiInvestigationInboundTest {
         Authenticators.forTest(null);
     }
 
-    /** OWNER (analyst-1) may manage Incidents and reveal; ANALYST may manage Incidents only; READER holds nothing. */
+    /** OWNER (analyst-1) may open inbound, manage Incidents and reveal; ANALYST may open inbound and manage Incidents; READER
+     *  manages Incidents only (which no longer opens inbound); STRANGER holds nothing. MACHINE is the client-credentials
+     *  Subject of client {@code fraudpro}, granted human capabilities as well as the integration one (a seed role misgranted). */
     private static void subjects() {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
-            case OWNER -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents", "canRevealLinkEntities")));
-            case ANALYST -> Optional.of(new Subject("analyst-2", Set.of("canManageIncidents")));
-            case READER, STRANGER -> Optional.of(new Subject("analyst-3", Set.of()));
+            case OWNER -> Optional.of(new Subject("analyst-1", Set.of("canOpenInboundInvestigation", "canManageIncidents",
+                    "canRevealLinkEntities")));
+            case ANALYST -> Optional.of(new Subject("analyst-2", Set.of("canOpenInboundInvestigation", "canManageIncidents")));
+            case READER -> Optional.of(new Subject("analyst-3", Set.of("canManageIncidents")));
+            case STRANGER -> Optional.of(new Subject("analyst-3", Set.of()));
+            case MACHINE -> Optional.of(new Subject("client:fraudpro", Set.of("canOpenInboundInvestigation", "canManageIncidents",
+                    "canRevealLinkEntities", "canAdminister"), null, Map.of(), null, null, "svc-account-uuid"));
             default -> Optional.empty();
         });
     }
@@ -168,7 +176,8 @@ class ControlApiInvestigationInboundTest {
         subjects();
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {
             String body = alert("fraudpro", "AL-7", "\"msisdn:" + A + "\"", "");
-            assertEquals(403, send(c, "POST", INBOUND, body, READER).statusCode(), "canManageIncidents");
+            assertEquals(403, send(c, "POST", INBOUND, body, READER).statusCode(), "canManageIncidents no longer opens inbound");
+            assertEquals(403, send(c, "POST", INBOUND, body, STRANGER).statusCode(), "canOpenInboundInvestigation");
             assertEquals(401, send(c, "POST", INBOUND, body, "Bearer nobody").statusCode(), "no Subject");
             assertEquals(0, data(get(c, "/inv/investigations", OWNER)).get("total").asInt());
 
@@ -176,6 +185,58 @@ class ControlApiInvestigationInboundTest {
             HttpResponse<String> theirs = send(c, "POST", INBOUND, body, ANALYST);
             assertEquals(409, theirs.statusCode(), "another Subject cannot adopt it: " + theirs.body());
             assertFalse(theirs.body().contains("ext-"), "and is not told its id: " + theirs.body());
+        }
+    }
+
+    /**
+     * OIDC-CC-INTEGRATION-ROLE-1 (B1): a machine admitted by the Space opens its record and reads the Investigation it leads, but
+     * keeps only the allowlisted capability: the human ones it was granted are dropped, so every other Investigation write, a
+     * reveal and an admin route are refused. A person in the same Space keeps their grants.
+     */
+    @Test
+    void anAdmittedMachineOpensAndReadsWhatItLeadsAndKeepsOnlyAllowlistedCapabilities(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            Roles.write(root, Map.of(), List.of(), List.of("fraudpro"));
+            java.util.Map<String, Object> shared = new java.util.LinkedHashMap<>(EntityProfileFixture.callsDataset());
+            shared.put("shares", List.of(Map.of("subjectType", "user", "subjectId", "client:fraudpro", "access", "view")));
+            new com.gamma.pipeline.ComponentStore(root.resolve("registry")).write("dataset", "calls_ds", shared);   // R3: it may view the Dataset
+            String id = data(send(c, "POST", INBOUND, alert("fraudpro", "AL-M1", "\"msisdn:" + A + "\"", ""), MACHINE))
+                    .get("investigationId").asText();
+            assertEquals(1, data(get(c, "/inv/investigations/" + id + "/log", MACHINE)).get("entries").size(),
+                    "reads the Investigation it leads");
+
+            HttpResponse<String> op = send(c, "POST", "/inv/investigations/" + id + "/ops",
+                    "{\"op\":\"seed\",\"ids\":[\"" + B + "\"],\"entityType\":\"msisdn\"}", MACHINE);
+            assertEquals(403, op.statusCode(), "canManageIncidents was dropped: no other Investigation write: " + op.body());
+            assertEquals(403, send(c, "PATCH", "/inv/investigations/" + id, "{\"title\":\"x\"}", MACHINE).statusCode());
+            assertEquals(403, send(c, "POST", "/inv/investigations/" + id + "/reveal", "{}", MACHINE).statusCode(),
+                    "canRevealLinkEntities was dropped");
+            assertEquals(403, send(c, "DELETE", "/spaces/nope", null, MACHINE).statusCode(), "canAdminister was dropped");
+
+            String theirs = data(send(c, "POST", INBOUND, alert("casemgr", "AL-P1", "\"msisdn:" + A + "\"", ""), OWNER))
+                    .get("investigationId").asText();
+            assertEquals(404, get(c, "/inv/investigations/" + theirs + "/log", MACHINE).statusCode(), "owner-scoped: not its own");
+            assertEquals(200, send(c, "PATCH", "/inv/investigations/" + theirs, "{\"title\":\"Renamed\"}", OWNER).statusCode(),
+                    "a person is unaffected");
+        }
+    }
+
+    /** OIDC-CC-INTEGRATION-ROLE-1 (C2): a machine is refused 403 in a Space whose roles.toon does not name its client. */
+    @Test
+    void aMachineInASpaceThatDoesNotNameItsClientIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            String body = alert("fraudpro", "AL-M2", "\"msisdn:" + A + "\"", "");
+            HttpResponse<String> none = send(c, "POST", INBOUND, body, MACHINE);
+            assertEquals(403, none.statusCode(), "no roles.toon names it: " + none.body());
+            assertTrue(none.body().contains("machineClients"), none.body());
+
+            Roles.write(root, Map.of(), List.of(), List.of("other-client"));
+            assertEquals(403, send(c, "POST", INBOUND, body, MACHINE).statusCode(), "another client is named");
+            assertEquals(403, get(c, "/inv/investigations", MACHINE).statusCode(), "reads are refused too");
+            assertEquals(0, data(get(c, "/inv/investigations", OWNER)).get("total").asInt(), "nothing was opened");
+            assertEquals(200, send(c, "POST", INBOUND, body, OWNER).statusCode(), "a person is unaffected");
         }
     }
 

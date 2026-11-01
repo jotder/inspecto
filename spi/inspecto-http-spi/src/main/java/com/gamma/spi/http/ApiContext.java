@@ -230,6 +230,10 @@ public interface ApiContext extends WriteRootProvider {
             try {
                 Roles.configRoot(ex, configRoot);
                 there = a.authenticate(ex).orElse(null);
+                // OIDC-CC-INTEGRATION-ROLE-1: a machine is judged by the OWNING Space too (its machineClients, allowlist)
+                if (there != null && there.machine()) there = Roles.admitMachine(configRoot, there);
+            } catch (ApiException refused) {
+                there = null;
             } finally {
                 attr(ex, Roles.ATTR_CONFIG_ROOT, priorRoot);
                 attr(ex, ComponentAccess.ATTR_HELD_ROLES, priorHeld);

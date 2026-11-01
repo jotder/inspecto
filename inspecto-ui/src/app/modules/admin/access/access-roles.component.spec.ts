@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 
 import { deriveDefaultAccessCatalog } from 'app/inspecto/access/access-catalog';
-import { AccessNode, AccessService, LensService, RoleDef } from 'app/inspecto/api';
+import { AccessNode, AccessService, LensService, RoleDef, RolesIdentity } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { AccessRolesComponent } from './access-roles.component';
@@ -44,15 +44,16 @@ function create(
         canEdit?: boolean;
         dialogResult?: RoleDef;
         held?: boolean;
+        identity?: RolesIdentity;
     } = {},
 ) {
-    const saveRoles = vi.fn((authored: RoleDef[]) =>
+    const saveRoles = vi.fn((authored: RoleDef[], _identity?: RolesIdentity) =>
         opts.held
             ? of({ status: 'pending', pendingChange: { id: 'pc-1' } } as unknown as { roles: RoleDef[] })
             : of({ roles: authored.map((r) => ({ ...r, source: 'authored' as const })) }),
     );
     const api = {
-        roles: vi.fn(() => of({ roles: opts.roles ?? [SEED_OPS, AUTHORED], error: opts.error })),
+        roles: vi.fn(() => of({ roles: opts.roles ?? [SEED_OPS, AUTHORED], error: opts.error, identity: opts.identity })),
         profiles: vi.fn(() => of(opts.profiles ?? [])),
         saveRoles,
     };
@@ -129,6 +130,13 @@ describe('AccessRolesComponent', () => {
         await c.revert(AUTHORED);
         expect(saveRoles).toHaveBeenCalledTimes(1);
         expect(saveRoles.mock.calls[0][0]).toEqual([]); // fraud-analyst was the only authored row
+    });
+
+    it('a save sends the identity block back unchanged, so the machine clients survive (OIDC-CC-INTEGRATION-ROLE-1)', async () => {
+        const identity = { machineClients: ['fraudpro'], attributeClaims: ['department'] };
+        const { c, saveRoles } = create({ identity });
+        await c.revert(AUTHORED);
+        expect(saveRoles.mock.calls[0][1]).toEqual(identity);
     });
 
     it('a dialog save replaces the role inside the authored overlay and reloads from the response', () => {

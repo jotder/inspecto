@@ -74,7 +74,7 @@ public final class InvestigationInboundRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
-        api.post("/inv/inbound/investigations", ApiContext.withCapability("canManageIncidents",
+        api.post("/inv/inbound/investigations", ApiContext.withCapability("canOpenInboundInvestigation",
                 (e, m) -> inbound(api, e, api.body(e))));
         api.post("/inv/deep-links/resolve", (e, m) -> resolve(api, e, api.body(e)));
     }
@@ -84,7 +84,7 @@ public final class InvestigationInboundRoutes implements RouteModule {
     /**
      * Body {@code {reference: {system, type?, id, url?, label?}, entities: ["<type>:<key>", ...], purpose, title?,
      * window?: {from?, to?, ...}, binding?: {dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?}}}.
-     * Gates: {@code canManageIncidents} 403 → write root 503 → a malformed reference, entity or window 422 → then, only when the
+     * Gates: {@code canOpenInboundInvestigation} 403 (OIDC-CC-INTEGRATION-ROLE-1) → write root 503 → a malformed reference, entity or window 422 → then, only when the
      * reference is new: a malformed binding, or (no binding) no single link mapping binds EVERY entity type the call names 422 → the create's own
      * gates; and for a repeat: an Investigation the caller cannot change 409.
      */

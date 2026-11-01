@@ -58,7 +58,7 @@ public final class CapabilityManifest {
             new Entry("POST", "/inv/investigations/([^/]+)/references", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationInboundRoutes (LA-EDITIONS-1 §4) — a third-party product opens a seeded Investigation; it composes the
             // create, seed and reference writes above, so it is Case work like them. The deep-link resolve is read-shaped.
-            new Entry("POST", "/inv/inbound/investigations", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/inbound/investigations", Roles.CAN_OPEN_INBOUND_INVESTIGATION),
             // IntegrationRoutes (LA-EDITIONS-1 phase 6) - the settings decide where evidence and events leave the
             // installation, so reading or changing them is administration; a hand-off is Case work on one Investigation.
             new Entry("GET", "/inv/integration", Roles.CAN_ADMINISTER),
@@ -677,5 +677,6 @@ public final class CapabilityManifest {
             Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
             Roles.CAN_BUILD_LINK_INDEX, Roles.CAN_SHARE_INVESTIGATION, Roles.CAN_MANAGE_EXCLUSION_CATEGORIES,
             Roles.CAN_UPLOAD_DATA, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_WORK_INCIDENTS,
-            Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS));
+            Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS,
+            Roles.CAN_OPEN_INBOUND_INVESTIGATION));
 }

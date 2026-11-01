@@ -307,7 +307,7 @@ class OidcAuthenticatorTest {
         // module; widening them for a test was judged the wrong trade. Keep the list in sync.
         String jwt = token(Instant.now().plusSeconds(60), List.of("super"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Optional<Subject> subject = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt);
-        assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS, Roles.CAN_MANAGE_INCIDENTS,
+        assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS, Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_OPEN_INBOUND_INVESTIGATION,
                         Roles.CAN_TRIAGE_REQUIREMENTS, Roles.CAN_ONBOARD_CONNECTIONS,
                         Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
                         Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,

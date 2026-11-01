@@ -1206,6 +1206,21 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                         "X-Actor is not accepted on this edition; the actor is taken from the authenticated session");
             java.util.Optional<Subject> subject = a.authenticate(ex);
+            // OIDC-CC-INTEGRATION-ROLE-1 (B1 + C2): a machine only in a Space naming its client, with allowlisted grants
+            // only. On a public path a refused machine just stays anonymous.
+            if (subject.isPresent() && subject.get().machine()) {
+                try {
+                    subject = java.util.Optional.of(Roles.admitMachine(rolesRoot, subject.get()));
+                } catch (ApiException refused) {
+                    if (required) {   // audited under its client id, holding nothing
+                        Subject s = subject.get();
+                        ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, new Subject(s.id(), java.util.Set.of(), s.dataScopes(),
+                                s.attributes(), s.email(), s.displayName(), s.machineSub()));
+                        throw refused;
+                    }
+                    subject = java.util.Optional.empty();
+                }
+            }
             if (subject.isPresent()) ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, subject.get());
             else if (required) throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "authentication required");
         });

@@ -37,6 +37,15 @@ the ABAC engine plug in from providers (see [architecture-overview](architecture
 - Public classes carry `@PublicApi(since = "4.0.0")` — intent only, see
   [API stability](../api/plan-api-stability.md).
 
+**Machine Subjects (`OIDC-CC-INTEGRATION-ROLE-1`, built 2026-11-01; decisions A1 + B1 + C2 operator-decided 2026-11-01).** A Subject with `machine()` true is shaped in
+`ControlApi.authenticate`, after the Authenticator and before any route gate, by `Roles.admitMachine(configRoot, subject)`:
+(C2) it is admitted only when the bound Space's `roles.toon` lists its client (`client:<id>` → `<id>`) in
+`identity.machineClients` (`machine_clients` on disk), else 403, and on a public path it stays anonymous; (B1) it keeps only
+`Roles.MACHINE_CAPABILITIES` = `{canOpenInboundInvestigation}` (A1), every other granted capability dropped. A person's Subject
+is untouched. The owning-Space gate (`ApiContext.requireCapabilityIn`, the Exchange routes) re-authenticates and runs `admitMachine` against the owning Space too. `GET/PUT /access/roles` carry `identity.machineClients` beside `attributeClaims` (a full replace: omitting it
+clears it; the role editor sends the loaded block back). Seed role `integration` grants `canOpenInboundInvestigation`.
+Residual: the routes with no capability gate (reads, read-shaped POSTs) stay open to an admitted machine as to any Subject.
+
 ## Files on disk (per Space config root)
 
 `roles.toon` · `access-policies.toon` · `registry/access-profiles/role-<name>.toon` ·

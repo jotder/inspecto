@@ -53,6 +53,7 @@ export const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
     canRevealLinkEntities: 'Reveal link entities',
     canApproveLinkExpansions: 'Approve link expansions',
     canUploadData: 'Upload data',
+    canOpenInboundInvestigation: 'Open inbound Investigations',
     canAuthorAlertRules: 'Alert Rule authoring',
 };
 

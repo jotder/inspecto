@@ -18,6 +18,7 @@ import {
     heldMessage,
     LensService,
     RoleDef,
+    RolesIdentity,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -89,6 +90,8 @@ export class AccessRolesComponent {
     /** Set ⇔ the authored roles.toon is unreadable (all grants suspended, fail-closed). */
     readonly docError = signal<string | null>(null);
     private readonly roleProfiles = signal<Record<string, AccessProfile>>({});
+    /** The doc's `identity` block, sent back unchanged on every save (the editor does not edit it). */
+    private readonly identity = signal<RolesIdentity | undefined>(undefined);
 
     readonly canEdit = computed(() => this.lens.canConfigureAccess());
 
@@ -181,7 +184,7 @@ export class AccessRolesComponent {
 
     private persist(authored: RoleDef[]): void {
         this.saving.set(true);
-        this.api.saveRoles(authored).subscribe({
+        this.api.saveRoles(authored, this.identity()).subscribe({
             next: (doc) => {
                 const held = heldChange(doc);
                 if (held) {
@@ -190,6 +193,7 @@ export class AccessRolesComponent {
                     return; // nothing was written: the table keeps the stored roles
                 }
                 this.rows.set(doc.roles ?? []);
+                this.identity.set(doc.identity);
                 if (doc.products) this.products.set(doc.products);
                 this.docError.set(doc.error ?? null);
                 this.saving.set(false);
@@ -210,6 +214,7 @@ export class AccessRolesComponent {
         }).subscribe({
             next: ({ roles, profiles }) => {
                 this.rows.set(roles.roles ?? []);
+                this.identity.set(roles.identity);
                 this.products.set(roles.products ?? {});
                 this.docError.set(roles.error ?? null);
                 const byRole: Record<string, AccessProfile> = {};

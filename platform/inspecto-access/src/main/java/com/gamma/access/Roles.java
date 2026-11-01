@@ -205,6 +205,23 @@ public final class Roles {
      */
     public static final String CAN_MANAGE_EXCLUSION_CATEGORIES = "canManageExclusionCategories";
 
+    /**
+     * Opening a Link Analysis Investigation from an external system's record ({@code POST /inv/inbound/investigations}
+     * only; {@code OIDC-CC-INTEGRATION-ROLE-1}, operator decision A1 2026-11-01). The integration grant: a machine
+     * (client-credentials) Subject holds it to hand over its record, and reads the Investigations it leads through the
+     * Investigation's own member rule. ⛔ Deliberately NOT {@link #CAN_MANAGE_INCIDENTS}, which opens every other
+     * Investigation write, hand-off included. Granted in {@link #SEED} to {@code integration} only; {@code super} holds
+     * everything.
+     */
+    public static final String CAN_OPEN_INBOUND_INVESTIGATION = "canOpenInboundInvestigation";
+
+    /**
+     * What a machine Subject ({@link Subject#machine()}) may keep (operator decision B1 2026-11-01, an allowlist): every
+     * other granted capability is dropped at authentication ({@link #admitMachine}), so a human capability added later is
+     * closed to machines until someone lists it here.
+     */
+    public static final Set<String> MACHINE_CAPABILITIES = Set.of(CAN_OPEN_INBOUND_INVESTIGATION);
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     public static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -269,6 +286,9 @@ public final class Roles {
                 CAN_WORK_INCIDENTS, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_UPLOAD_DATA, CAN_SHARE_INVESTIGATION), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
+        // OIDC-CC-INTEGRATION-ROLE-1: the role an integration's service account holds; a machine still needs its client
+        // named in the Space's identity.machineClients (admitMachine).
+        m.put("integration", new Def(Set.of(CAN_OPEN_INBOUND_INVESTIGATION), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order
     }
 
@@ -277,8 +297,9 @@ public final class Roles {
     /** The authored doc (authored roles only, no seed merge) + the {@code identity.attributeClaims}
      *  allowlist (ABAC A1 — which verified IdP claims an {@link Authenticator} may copy onto
      *  {@link Subject#attributes()}; empty = no attributes, ever) + its readability. */
-    public record Doc(Map<String, Def> authored, List<String> attributeClaims, boolean unreadable) {
-        static final Doc ABSENT = new Doc(Map.of(), List.of(), false);
+    public record Doc(Map<String, Def> authored, List<String> attributeClaims, List<String> machineClients,
+                      boolean unreadable) {
+        static final Doc ABSENT = new Doc(Map.of(), List.of(), List.of(), false);
     }
 
     /** Keyed on the file's exact text: an (mtime, size) stamp missed a same-size rewrite inside one mtime tick. */
@@ -319,18 +340,19 @@ public final class Roles {
             return parsed;
         } catch (IOException e) {
             LOG.warn("roles: cannot stat {} — suspending role grants (fail-closed): {}", file, e.toString());
-            return new Doc(Map.of(), List.of(), true);
+            return new Doc(Map.of(), List.of(), List.of(), true);
         }
     }
 
     private static Doc parseFile(Path file) {
         try {
             Map<String, Object> m = ToonHelper.load(file.toString());
-            return new Doc(validate(m.get("roles")), attributeClaims(m.get("identity")), false);
+            return new Doc(validate(m.get("roles")), attributeClaims(m.get("identity")), machineClients(m.get("identity")),
+                    false);
         } catch (Exception e) {
             LOG.warn("roles: {} is unreadable — suspending ALL role grants (fail-closed) until fixed: {}",
                     file, e.toString());
-            return new Doc(Map.of(), List.of(), true);
+            return new Doc(Map.of(), List.of(), List.of(), true);
         }
     }
 
@@ -339,6 +361,24 @@ public final class Roles {
      *  when unset — and when the doc is unreadable (fail-closed: no grants, no attributes). */
     public static List<String> attributeClaims(HttpExchange ex) {
         return load(RequestAttrs.attr(ex, ATTR_CONFIG_ROOT) instanceof Path p ? p : null).attributeClaims();
+    }
+
+    /**
+     * Admit a machine Subject to the request's bound Space and shape its grants ({@code OIDC-CC-INTEGRATION-ROLE-1},
+     * operator decisions B1 + C2, 2026-11-01). A person's Subject is returned unchanged. A machine is admitted only where
+     * the Space's {@value #FILE} names its client in {@code identity.machineClients} (403 elsewhere, and with no Space
+     * bound or an unreadable doc), and keeps only the {@link #MACHINE_CAPABILITIES} it was granted.
+     */
+    public static Subject admitMachine(Path configRoot, Subject subject) {
+        if (!subject.machine()) return subject;
+        String client = subject.id().startsWith("client:") ? subject.id().substring("client:".length()) : null;
+        if (client == null || !load(configRoot).machineClients().contains(client))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                    "this Space does not admit the client '" + client + "' (roles.toon identity.machineClients)");
+        Set<String> kept = new LinkedHashSet<>(subject.capabilities());
+        kept.retainAll(MACHINE_CAPABILITIES);
+        return new Subject(subject.id(), Set.copyOf(kept), subject.dataScopes(), subject.attributes(), subject.email(),
+                subject.displayName(), subject.machineSub());
     }
 
     // ── validation (shared by the PUT route and the file parser — one grammar) ──────
@@ -399,6 +439,26 @@ public final class Roles {
         return List.copyOf(out);
     }
 
+    /** Parse+validate the optional {@code identity.machineClients} list (the client ids of the machines this Space
+     *  admits; empty = none). Throws {@link ApiException} 422 on any violation. */
+    public static List<String> machineClients(Object identityObj) {
+        if (!(identityObj instanceof Map<?, ?> identity)) return List.of();   // a non-object is refused by attributeClaims
+        Object clientsObj = identity.get("machineClients");
+        if (clientsObj == null) clientsObj = identity.get("machine_clients");
+        if (clientsObj == null) return List.of();
+        if (!(clientsObj instanceof List<?> clients))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'identity.machineClients' must be a list of client ids");
+        if (clients.size() > MAX_ATTRIBUTE_CLAIMS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "too many machineClients (max " + MAX_ATTRIBUTE_CLAIMS + ")");
+        Set<String> out = new LinkedHashSet<>();
+        for (Object c : clients) {
+            String client = trimOrEmpty(c);
+            if (client.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "blank machine client id");
+            out.add(client);
+        }
+        return List.copyOf(out);
+    }
+
     private static Set<String> dataScopes(String role, Object scopesObj) {
         if (scopesObj == null) return null;   // key absent — the role contributes no scoping
         if (!(scopesObj instanceof List<?> scopes))
@@ -417,9 +477,15 @@ public final class Roles {
 
     // ── persistence (canonical TOON, crash-safe — AccessRoutes' PUT) ────────────────
 
-    /** Write {@code authored} (+ the optional {@code identity.attributeClaims} allowlist) as
+    /** Write {@code authored} (+ the optional {@code identity.attributeClaims} and {@code machineClients} lists) as
      *  {@value #FILE} under {@code configRoot} (snake-case on disk). */
     public static void write(Path configRoot, Map<String, Def> authored, List<String> attributeClaims) throws IOException {
+        write(configRoot, authored, attributeClaims, List.of());
+    }
+
+    /** {@link #write(Path, Map, List)} plus the Space's {@code identity.machineClients}. */
+    public static void write(Path configRoot, Map<String, Def> authored, List<String> attributeClaims,
+                             List<String> machineClients) throws IOException {
         List<Map<String, Object>> roles = authored.entrySet().stream().map(e -> {
             Map<String, Object> r = new LinkedHashMap<String, Object>();
             r.put("name", e.getKey());
@@ -429,8 +495,10 @@ public final class Roles {
         }).toList();
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("roles", roles);
-        if (!attributeClaims.isEmpty())
-            doc.put("identity", Map.of("attribute_claims", List.copyOf(attributeClaims)));
+        Map<String, Object> identity = new LinkedHashMap<>();
+        if (!attributeClaims.isEmpty()) identity.put("attribute_claims", List.copyOf(attributeClaims));
+        if (!machineClients.isEmpty()) identity.put("machine_clients", List.copyOf(machineClients));
+        if (!identity.isEmpty()) doc.put("identity", identity);
         AtomicFiles.write(configRoot.resolve(FILE),
                 JToon.encode(doc).getBytes(StandardCharsets.UTF_8), ".roles-");
     }

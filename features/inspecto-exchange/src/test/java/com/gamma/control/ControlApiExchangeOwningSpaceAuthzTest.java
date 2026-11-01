@@ -54,8 +54,12 @@ class ControlApiExchangeOwningSpaceAuthzTest {
         String h = ex.getRequestHeaders().getFirst("Authorization");
         if (h == null || !h.startsWith("Bearer ")) return Optional.empty();
         String role = h.substring(7);
+        boolean machine = role.startsWith("machine:");   // a client-credentials Subject of client fraudpro holding the role
+        if (machine) role = role.substring("machine:".length());
         Roles.Def def = Roles.effective(ex).get(role);
-        return Optional.of(new Subject("user-" + role, def == null ? Set.of() : def.capabilities()));
+        Set<String> caps = def == null ? Set.of() : def.capabilities();
+        return Optional.of(machine ? new Subject("client:fraudpro", caps, null, Map.of(), null, null, "svc-uuid")
+                : new Subject("user-" + role, caps));
     };
 
     private record Ctx(SpaceManager spaces, ControlApi api, int port) implements AutoCloseable {
@@ -127,6 +131,26 @@ class ControlApiExchangeOwningSpaceAuthzTest {
             assertEquals(ShareGrant.ACTIVE, status(c, id), "a refused revoke must leave the grant active");
             assertEquals(200, send(c.port, "POST", "/exchange/grants/" + id + "/revoke", "", "financier").statusCode());
             assertEquals(ShareGrant.REVOKED, status(c, id));
+        }
+    }
+
+    /** OIDC-CC-INTEGRATION-ROLE-1: the owning-Space gate re-authenticates, so it must judge a machine too - refused where the
+     *  owning Space does not name its client (C2), and stripped to the machine allowlist where it does (B1). */
+    @Test
+    void aMachineIsJudgedByTheOwningSpaceToo(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String id = arrange(c);
+            Roles.write(configOf(c, "hub"), Map.of("financier", new Roles.Def(Set.of(Roles.CAN_APPROVE_SHARES), null)),
+                    List.of(), List.of("fraudpro"));
+            HttpResponse<String> foreign = send(c.port, "POST", "/exchange/grants/" + id + "/approve", "", "machine:financier");
+            assertEquals(403, foreign.statusCode(), "opco does not admit the client: " + foreign.body());
+            Roles.write(configOf(c, "opco"), Map.of("financier", new Roles.Def(Set.of(Roles.CAN_APPROVE_SHARES,
+                    Roles.CAN_OFFER_DATASETS), null)), List.of(), List.of("fraudpro"));
+            assertEquals(403, send(c.port, "POST", "/exchange/grants/" + id + "/approve", "", "machine:financier").statusCode(),
+                    "admitted, but canApproveShares is not on the machine allowlist");
+            assertEquals(ShareGrant.REQUESTED, status(c, id));
+            assertEquals(200, send(c.port, "POST", "/exchange/grants/" + id + "/approve", "", "financier").statusCode(),
+                    "a person is unaffected");
         }
     }
 
