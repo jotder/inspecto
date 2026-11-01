@@ -38,7 +38,7 @@
       "texts": [
         "Apache-2.0.txt"
       ],
-      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file"
+      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file; the Rust crates statically linked into it and their licences are in tokenizers-0.36.0-crates.json"
     },
     "onnxruntime.dll": {
       "licence": "MIT",
@@ -101,14 +101,14 @@
       "texts": [
         "Apache-2.0.txt"
       ],
-      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file"
+      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file; the Rust crates statically linked into it and their licences are in tokenizers-0.36.0-crates.json"
     },
     "libtokenizers.dylib": {
       "licence": "Apache-2.0",
       "texts": [
         "Apache-2.0.txt"
       ],
-      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file"
+      "note": "ai.djl.huggingface:tokenizers ships no NOTICE file; the Rust crates statically linked into it and their licences are in tokenizers-0.36.0-crates.json"
     },
     "libjnidispatch.so": {
       "licence": "Apache-2.0 (JNA is LGPL-2.1-or-later OR Apache-2.0; Inspecto takes it under the Apache-2.0 option)",

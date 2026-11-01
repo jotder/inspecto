@@ -415,8 +415,9 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
   from the Maven Central jars); an unclassified or hash-mismatching native fails, and `artifacts` must equal the versions
   in `tools/dependencies.lock`, so a bump of onnxruntime/tokenizers/JNA forces a re-pin. Fixture test:
   `tools/check-native-licences.test.mjs` (run in CI). The Linux/macOS libs reuse their artifact's licence classification;
-  whether Linux `libtokenizers.so` statically links libstdc++ is NOT verified (on Linux the system libstdc++ is
-  used; the MinGW DLLs are Windows-only). `NativeEmbeddingLoadTest` embeds one string through `OnnxEmbeddingAdapter`,
+  verified 2026-11-01, neither Linux `libtokenizers.so` nor the `.dylib` links a C++ runtime statically (they need the
+  system `libstdc++` / `libc++`). The 177 Rust crates they do link are listed in
+  `compliance/third-party-licenses/tokenizers-0.36.0-crates.json`. `NativeEmbeddingLoadTest` embeds one string through `OnnxEmbeddingAdapter`,
   so the ubuntu CI reactor loads AND runs the Linux onnxruntime/tokenizers natives (2026-10-04); macOS is untested.
 
 ## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)
