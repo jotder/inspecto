@@ -273,8 +273,10 @@ Install steps:
 
 1. JDK 27 first on `PATH` **and** `JAVA_HOME` pointing at the same JDK 27 (a `JAVA_HOME` left on 26 makes
    Maven fail with "release version 27 not supported"); Apache Maven 3.9+.
-2. Build `jotder/inspect-agent` from source into `~/.m2` (`mvn -DskipTests install` in its clone), then
-   `mvn -DskipTests install` here once so `~/.m2` holds a previous Inspecto install.
+2. Build `jotder/inspect-agent` from source into the Maven local repository (`mvn -DskipTests install` in
+   its clone), then `mvn -DskipTests install` here once so it holds a previous Inspecto install. The local
+   repository is the `<localRepository>` of `~/.m2/settings.xml` when set (`${user.home}` expanded), else
+   `~/.m2/repository`; the doctor resolves it the same way and names the path it checked.
 3. Node.js 22+ with npm; `npm ci` in `inspecto-ui`.
 4. The codegraph CLI, then `codegraph index` in the checkout.
 5. `git config core.hooksPath .githooks`, set `user.name` / `user.email`, `gh auth login`.
