@@ -5,6 +5,6 @@ offeringRole: optional
 bindingTime: boot
 absentMessage: "Predictive Analytics is not installed in this bundle - it is provided by the optional inspecto-predictive module (Standard edition and above)."
 provides:
-  configKinds[1]: segmentation-model
+  configKinds[2]: segmentation-model,churn-model
   contracts[2]: JobTypeProvider,ComponentKindValidator
-  jobTypes[1]: predict.segment
+  jobTypes[2]: predict.segment,predict.churn

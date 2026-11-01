@@ -50,7 +50,7 @@ final class PartnerSettlementSpace {
     static final Path TEMPLATE = Path.of("..", "..", "spaces", "_templates", "partner-settlement").toAbsolutePath().normalize();
     /** The Jobs in chain order. */
     static final List<String> CHAIN = List.of("ps_calendar", "ps_statement_current", "ps_statement_findings", "ps_expected", "ps_billed", "ps_findings",
-            "ps_dispute", "ps_movement", "ps_position", "ps_rollforward");
+            "ps_dispute", "ps_movement", "ps_position", "ps_rollforward", "ps_aging", "ps_accrual");
     /** The first six Jobs (S1 to S3). */
     static final List<String> COMPARE_CHAIN = CHAIN.subList(0, 6);
     /** The S5 dispute lines and the S4 Jobs, which read what the compare chain wrote. */

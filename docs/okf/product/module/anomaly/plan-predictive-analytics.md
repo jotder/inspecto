@@ -4,6 +4,8 @@
 
 *2026-11-01:* slice **S2 (Segmentation A) is BUILT** as `PREDICTIVE-SEGMENT-RFM-1` in the new module `features/inspecto-predictive` (S1's windowed Measures were built as ANALYTICS-CORE-1 C1; the module skeleton came with S2). As built, with decisions D-PS1…D-PS8 (output prefix `customer_segments_`, not `segments_`): [`okf/product/module/predictive/spec-segmentation.md`](../predictive/spec-segmentation.md). The rest of this design stays parked.
 
+*2026-11-01:* slice **S3 (Churn A) is BUILT** as `PREDICTIVE-CHURN-DECLARED-1` in the same module: the `churn-model` kind, the `predict.churn` Job, `insufficient` scores, the `churn.score.produced` Signal and the `afterScore` pending Alert Rule. As built, with decisions D-PC1…D-PC9 (no new writer inventory row: the pending-rule writer was already approved): [`okf/product/module/predictive/spec-churn.md`](../predictive/spec-churn.md).
+
 *Status before parking:* **Status 2026-10-12: interview HELD - decisions in section 9a (OD-1..OD-9, OD-14, OD-17 decided; S0 done); no kernel built; P3 design-only.** Written by a docs-only lane
 before any code. The key deliverable is section 9 (open decisions). Row: `PREDICTIVE-ANALYTICS-1` (P3) in
 [BACKLOG](../../../../BACKLOG.md); the later Sales & Marketing BI pack is `PACK-SALES-MARKETING-1`. How an add-on, an optional

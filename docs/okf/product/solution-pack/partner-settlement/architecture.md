@@ -1,9 +1,9 @@
 # Partner settlement
 
 > **Level 2 solution page.** Content pack: Space Template `partner-settlement`
-> (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S5 of `PACK-PARTNER-SETTLEMENT-1` are built: the
-> References, statement ingestion, the compare, netting positions with a roll-forward, and disputes as Cases.** Aging, accruals and the evidence pack are later
-> slices ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S5 in the
+> (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S6 of `PACK-PARTNER-SETTLEMENT-1` are built: the
+> References, statement ingestion, the compare, netting positions with a roll-forward, disputes as Cases, and aging with accruals
+> and the dashboard.** The evidence pack is a later slice ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S6 in the
 > [as-built record](plan-as-built.md)). Checked against the template on 2026-11-01.
 
 ## Business problem
@@ -37,8 +37,8 @@ template applies (the Alert Rule gate reads the Schema of `settlement_findings`)
 
 ## What the pack sets up
 
-Ten chained `sql.template` Jobs (the first daily at 01:00, each next one on the previous one's success), two `recon.run` Jobs
-(05:30), one `caserule.evaluate` Job (06:00), three Alert Rules and one Case Rule:
+Twelve chained `sql.template` Jobs (the first daily at 01:00, each next one on the previous one's success), two `recon.run` Jobs
+(05:30), one `caserule.evaluate` Job (06:00), four Alert Rules, one Case Rule, three KPIs and the `settlement_overview` dashboard:
 
 | Job | Writes | Notes |
 |---|---|---|
@@ -52,6 +52,8 @@ Ten chained `sql.template` Jobs (the first daily at 01:00, each next one on the 
 | `ps_movement` | `settlement_movement` | every current statement line and every payment or note at line level, in the settlement currency with both currencies and the FX row (rate, date, type, status), signed from our side; `status` is `ok`, `fx_missing` or `unknown_agreement` |
 | `ps_position` | `settlement_position` | per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay), `net_direction`, `orig_net` (net per original currency), line counts, `lines_unconverted`, `disputed_amount` and `disputed_lines` beside the net |
 | `ps_rollforward` | `settlement_rollforward` | per netting group and settlement currency, one row for every month to the as-of month: `opening + invoiced - paid + adjustments = closing` |
+| `ps_aging` | `settlement_aging` | per agreement and statement cycle: `invoiced` (in the agreement's direction), `settled_applied` (finance records up to `as_of`, oldest cycle first), `open_balance`, `open_disputed`, `age_days` from the statement's received date, `age_bucket` (boundaries 30 / 60 / 90 by parameter), `payment_due`, `payment_alert`, and the `kpi_` columns for `kpi_currency` |
+| `ps_accrual` | `settlement_accrual` | per agreement and closed cycle: `expected_amount` (the latest run, due or not), `invoiced_amount`, `status` (`billed`, `unbilled`, `statement_late`), `accrued_unbilled`, `dispute_provision` (`provision_pct`, default 100), `accrual_total` |
 | `ps_voice`, `ps_sms` | Break state | one Reconciliation per service family over `settlement_expected` and `settlement_billed`, keys `agreement_id, direction, service, destination_class` at day grain |
 
 `ps_findings_found` is one Alert Rule over `settlement_findings`, counted `by agreement_id`: one Alert per agreement (WARNING, no
@@ -59,6 +61,9 @@ Incident). `ps_dispute_line` (CRITICAL, `by dispute_key, item_key`) opens one In
 (CRITICAL, `sum(window_alert)` `by dispute_key`) one per partner cycle whose window closes within the lead time. The Case Rule
 `ps_dispute_case` (`config/ops/ps_dispute_caserule.toon`, `groupBy: dispute_key`, threshold 1, category `partner-settlement`) groups
 every Incident that carries a `dispute_key` into one Case per partner and cycle; the Job `ps_dispute_case` evaluates it daily.
+`ps_payment_due` (WARNING, `sum(payment_alert)` `by aging_key`) names every cycle whose open balance is within `payment_alert_days`
+(default 5) of its payment due date or past it. The KPIs `ps_open_disputed`, `ps_aged_over_60` and `ps_accrued_unbilled` (time field
+`as_of`, day grain, no comparison) and three bar Widgets make up `settlement_overview`.
 
 ## Decisions and seams worth knowing
 
@@ -106,7 +111,16 @@ every Incident that carries a `dispute_key` into one Case per partner and cycle;
   (`settlement_calendar.dispute_window_end`), not the SLA clock; the reminder reads the data and not the Case state, so a Case
   already `DISPUTED` is reminded too. The disputed amount is the absolute variance of the dispute lines, beside the net and never in
   it, and it does not follow the Case outcome. Impact is the analyst's (PS-D6, PS-D9).
-- **Not built (later slices).** Aging, accruals and the dashboard (S6); the evidence pack (S7); wholesale, MVNO and roaming (W1 to W3, demand-gated).
+- **Aging and accruals (S6, decided under delegation, pending confirmation).** A payment names its agreement, not a cycle, so
+  `ps_aging` applies finance's records to the statement cycles of the agreement **oldest first**, per agreement, direction and
+  settlement currency; payments after `as_of` and statements received after it are not counted. Balances and disputes are both aged
+  from the received date of the current statement version (SQL cannot read when a Case reached `DISPUTED`, and the Break's `ageDays`
+  is read-time). The payment-due Alert is a WARNING Alert, not an Incident, and counts the disputed amount in the open balance.
+  `ps_accrual` prices the latest re-rating run itself, because `settlement_expected` holds a cycle only once its statement is due or
+  received; a statement-less cycle is `unbilled` up to and including `statement_due` and `statement_late` after it, the same day the
+  `missing_statement` finding starts. The KPI tiles count one currency (`kpi_currency`, default USD) and add payables and receivables as
+  amounts at stake; the bar Widgets show every currency. The pack reports accruals, never posts them.
+- **Not built (later slices).** The evidence pack (S7); wholesale, MVNO and roaming (W1 to W3, demand-gated).
 
 ## Verification
 
@@ -139,6 +153,16 @@ bodies through their routes over real HTTP, runs the shipped Alert Rules and Cas
 reminder become six Cases; an unrelated Incident never joins), stamps the SLA on the sweep, escalates an `OPEN` settlement Case and not a
 `DISPUTED` one, moves Cases `DISPUTED → AGREED → CREDIT_PENDING → CLOSED` and `DISPUTED → REJECTED → ESCALATED → RESOLVED → CLOSED`, and
 records the Impact as PS-D6 maps it.
+
+`PartnerSettlementAgingGoldenTest` (S6, same module, 9 tests) runs the S4 corpus through all twelve Jobs. Every aging row equals an
+oracle built from the S4 movement oracle (oldest-cycle-first application, received dates, the calendar's payment due date) and every
+accrual row an oracle that prices the latest re-rating run from the corpus; hand-worked figures pin A1's June (12624.5 recorded, May
+takes 10183.01, June gets 2441.49), D1's May left open by a record filed under another partner, and the three KPI values. The
+bucket boundaries are inclusive (30, 31, 60, 61, 90, 91 days) and configurable; the payment-due Alert Rule raises exactly the open
+cycles at their lead time (the corpus holds a 5-day and a 6-day cycle) and follows its parameter; a payment after `as_of` is not
+counted; E1's July accrual is `unbilled` on its statement due date and `statement_late` the day after, when the `missing_statement`
+finding starts; a 50 % provision halves the dispute provision; every `settlement_overview` tile renders through the KPI and BI routes
+with each bar equal to the Dataset's sum. Six mutants each turn a named row red (see the [as-built record](plan-as-built.md)).
 
 ## Related
 

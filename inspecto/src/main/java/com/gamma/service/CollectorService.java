@@ -861,7 +861,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final java.util.function.Consumer<com.gamma.audit.Event> pendingAlertRuleSubscriber;
 
     /**
-     * {@code risk.score.produced} / {@code anomaly.score.produced} → {@link com.gamma.control.PendingAlertRules#onScoreProduced}
+     * {@code risk.score.produced} / {@code anomaly.score.produced} / {@code churn.score.produced} → {@link com.gamma.control.PendingAlertRules#onScoreProduced}
      * for that score kind and model (D-AD7: one deferred-seed mechanism for every score kind).
      */
     private void onScoreProduced(com.gamma.audit.Event e) {
@@ -869,6 +869,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         com.gamma.signal.Signal sig = com.gamma.signal.Signal.fromEvent(e);
         String kind = com.gamma.signal.SignalType.RISK_SCORE_PRODUCED.equals(sig.type()) ? com.gamma.alert.RiskScoreOutputs.KIND
                 : com.gamma.signal.SignalType.ANOMALY_SCORE_PRODUCED.equals(sig.type()) ? com.gamma.alert.AnomalyScoreOutputs.KIND
+                : com.gamma.signal.SignalType.CHURN_SCORE_PRODUCED.equals(sig.type()) ? com.gamma.alert.ChurnScoreOutputs.KIND
                 : null;
         if (kind == null || !(sig.payload().get("model") instanceof String model)) return;
         java.nio.file.Path writeRoot = root.config();

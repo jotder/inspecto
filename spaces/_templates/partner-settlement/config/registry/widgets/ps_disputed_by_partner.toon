@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: settlement_aging
+controls:
+  x[1]{field}:
+    partner_currency
+  y[1]{field,agg}:
+    open_disputed,sum
+options:
+  title: Open disputed amount by partner and currency

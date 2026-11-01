@@ -12,7 +12,7 @@
 | Pack (board row) | Space Template | Built | Open slices | Open decisions | Hub |
 |---|---|---|---|---|---|
 | Bypass / SIM-box (`TELCO-BYPASS-SIMBOX-1`, matrix gap E) | `telco-bypass` | B0 measured; B1 to B3 (signals, Risk Score, lists, SIM Alert, cluster stage, box Incident and Case) | B4 to B7 (B5 demand-gated) | D-BP10 | [telco-bypass](../okf/product/solution-pack/telco-bypass/index.md) |
-| Partner settlement (`PACK-PARTNER-SETTLEMENT-1`, gap Q) | `partner-settlement` | S0 to S5 (References, ingestion, compare, netting, roll-forward, disputes as Cases) | S6 to S8; W1 to W3 demand-gated | PS-O1 to PS-O4, PS-O6, PS-O7 (§2.3; PS-O5 answered at S5, pending confirmation), the §4 contract | [partner-settlement](../okf/product/solution-pack/partner-settlement/index.md) |
+| Partner settlement (`PACK-PARTNER-SETTLEMENT-1`, gap Q) | `partner-settlement` | S0 to S6 (References, ingestion, compare, netting, roll-forward, disputes as Cases, aging and accruals) | S7, S8; W1 to W3 demand-gated | PS-O1 to PS-O4, PS-O6, PS-O7 (§2.3; PS-O5 answered at S5 and PS-S6-1 to PS-S6-10 at S6, pending confirmation), the §4 contract | [partner-settlement](../okf/product/solution-pack/partner-settlement/index.md) |
 | Re-rating (`PACK-RERATING-1`, gap C) | `telco-rerating` | R0 measured; R1 to R3 (hygiene, ambiguity, causes, root causes, plan inference) | R4, R6; R5 demand-gated; R7 only if G-K trips | D-RR10, the §4 contract | [telco-rerating](../okf/product/solution-pack/telco-rerating/index.md) |
 
 All three are configuration-only content packs (`minEdition: standard`, listed in `offerings/standard.toon` `contentPacks`, Product
@@ -103,13 +103,12 @@ to reverse each).
 
 ### 2.1 Open slices
 
-S5 is built (hub [as-built record](../okf/product/solution-pack/partner-settlement/plan-as-built.md)): its data half tests in
-`features/inspecto-reconciliation`, its Case half in `features/inspecto-case-management` (the reconciliation test classpath has no
-object engine). S7 needs Regulatory Reporting: check that module's test classpath first.
+S5 and S6 are built (hub [as-built record](../okf/product/solution-pack/partner-settlement/plan-as-built.md)): S5's data half and
+S6 test in `features/inspecto-reconciliation`, S5's Case half in `features/inspecto-case-management` (the reconciliation test
+classpath has no object engine). S7 needs Regulatory Reporting: check that module's test classpath first.
 
 | Slice | Content | Done when (verifiable) | Tests |
 |---|---|---|---|
-| **S6 aging and accruals** | The payment-due date as an Alert Rule (deferred from S5: it needs the open balance per cycle). `settlement_aging`: open balance and open dispute amount by age bucket (0–30, 31–60, 61–90, 90+ days, boundaries configurable), aged from the statement date for balances and from the Case's `DISPUTED` timestamp for disputes (SQL cannot read Case state: S6 decides how that timestamp reaches a Dataset, or ages disputes from `settlement_dispute` instead) (the Break's `ageDays` is read-time and not reused). `settlement_accrual` per `(agreement, period)`: `accrued = expected − invoiced` for a period with no statement yet, plus a provision on disputed amounts (PS-D7: configurable, default 100 %, a finance policy). KPIs (open disputed amount, aged > 60 days, accrued unbilled), the `settlement_overview` dashboard, the runbook. The pack reports accruals, never posts them. | KPI tiles render on the corpus; a late statement is an accrual before `statement_due` and a finding after. | golden: every dashboard tile renders (the `mobile-money` assertion). |
 | **S7 evidence pack** | Report Template `settlement-dispute-pack` (Regulatory Reporting, CSV and JSON, four-eyes, file-drop; PS-D8), rendered from the Case: statement header and disputed lines, our re-rated lines with `rate_id` and `rating_run_id`, the variance and its reason, the agreement version and tolerance, the FX row, the Incident timeline. A PDF dispute letter is demand-gated. | The CSV / JSON names the rate and run id of every disputed line; a line with no re-rating run is refused (422), not exported blank. | template-render unit test; four-eyes path asserted. |
 | **S8 docs and registration** | The glossary entries of §2.4; the matrix rows C and Q corrected (`ra_settlement` is a SQL control with a flat rate, not a Reconciliation, and the old board row bundled gaps Q and C); hub docs refreshed; `offerings/*.toon` and `tools/check-offerings.mjs`. | All guards green: vocabulary, doc links, offerings, product map. | the guards named. |
 | **W1…W3 wholesale, MVNO, roaming** | Demand-gated; W1 first (PS-D10). See §2.2. | A named prospect or the operator's call. | per slice at that time. |
