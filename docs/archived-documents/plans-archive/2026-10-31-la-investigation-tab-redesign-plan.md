@@ -29,25 +29,27 @@ Concretely (read from the code, 2026-10-31):
 
 Clicks are pointer presses (typing a value counts as one); *depth* is the number of popups / dialogs stacked at the
 deepest point. Baseline = master `bf2a90392`, read from the templates; the target is what this design delivers. Both
-get re-measured in the preview after the build.
+get re-measured in the preview after the build. The last column is the live re-measure of 2026-11-01 on a saved
+Investigation (§7, *Live drive*); "—" = not driven that day.
 
-| # | Workflow | Today: clicks · depth | Target: clicks · depth |
-|---|---|---|---|
-| W1 | Seed: start an Investigation from one entity (Dataset not yet picked) | 5 · 1 (Dataset picker dialog) | 4 · 1 (unchanged form; *Investigate this* on a node of an explored graph = **2 · 1**) |
-| W2 | Expand the selected node 2 degrees, outgoing, one link kind | 10 + typing · 1 (From, Direction pickers; kinds typed) | **4 · 0** (Out, kind chip, depth +, Expand) — and every later expand with the same filter **1 · 0** (double-click, or the node menu) |
-| W3 | Same, but only the last 30 days | +4 · 1 (Time fold, window picker, custom fields) | **+1 · 0** (*30 days* chip) |
-| W4 | Cap fan-out at 50 neighbours per entity | 3 + typing · 0 | 2 + typing · 0 (the group remembers being open) |
-| W5 | One-off: expand just this node, incoming only | 7 · 1 | **2 · 1** (right-click ▸ *Expand ▸ Incoming*) |
-| P1 | Remove leaf entities | 3 · 1 (broom menu, Apply) | **1 · 0** (*Trim 16 leaves*) |
-| P2 | Remove weakly linked entities (fewer than N events) | not possible as a step (undo, re-expand with Min events ≈ 8) | **2 + typing · 0** |
-| P3 | Remove an entity type | not possible as a step (legend chip hides the drawing only) | **2 · 0** (type chip, *Hide 40*) |
-| P4 | Remove everything outside a time window | not possible as a step (timeline filter is drawing-only) | **2 · 0** (window chip, *Hide 23*) — needs link times on the Working Set graph, see §6 R1 |
-| P5 | Keep only what lies on a path between two nodes I picked | ≈ 9 across two tabs (Browser ▸ shortest path, select, Keep only selected) | **3 · 0** (click A, Shift+click B, *Keep paths between these 2*) |
-| U1 | Undo the last step | 1 · 0 | 1 · 0 |
-| U2 | Redo it | not possible | **1 · 0** |
-| K1 | Keep (protect) a subgraph | lasso + scroll the tab + Keep = 3 · 0 | **2 · 0** (lasso, *Keep* on the selection bar) |
-| X1 | Exclude the selection with a reason | 4 + typing · **2** (popover → reason dialog) | 3 + typing · 1 (reason inline, last reasons as one-click chips) |
-| S1 | Save | 2 · 1 | 2 · 1 (unchanged) |
+| # | Workflow | Today: clicks · depth | Target: clicks · depth | Live 2026-11-01 (saved Investigation) |
+|---|---|---|---|---|
+| W1 | Seed: start an Investigation from one entity (Dataset not yet picked) | 5 · 1 (Dataset picker dialog) | 4 · 1 (unchanged form; *Investigate this* on a node of an explored graph = **2 · 1**) | — (driven only with the Dataset already set by the open view: tab, type, *Start* = 3 · 0) |
+| W2 | Expand the selected node 2 degrees, outgoing, one link kind | 10 + typing · 1 (From, Direction pickers; kinds typed) | **4 · 0** (Out, kind chip, depth +, Expand) — and every later expand with the same filter **1 · 0** (double-click, or the node menu) | later expands: double-click **1 · 0** PASS; node menu *Expand* 2 · 1 PASS |
+| W3 | Same, but only the last 30 days | +4 · 1 (Time fold, window picker, custom fields) | **+1 · 0** (*30 days* chip) | — |
+| W4 | Cap fan-out at 50 neighbours per entity | 3 + typing · 0 | 2 + typing · 0 (the group remembers being open) | — |
+| W5 | One-off: expand just this node, incoming only | 7 · 1 | **2 · 1** (right-click ▸ *Expand ▸ Incoming*) | **3 · 2** PASS (right-click, *Expand, this once*, *Outgoing only*: the one-off is a submenu, so one press and one level over target) |
+| P1 | Remove leaf entities | 3 · 1 (broom menu, Apply) | **1 · 0** (*Trim 16 leaves*) | **1 · 0** PASS (*Hide 402 dangling leaves*) |
+| P2 | Remove weakly linked entities (fewer than N events) | not possible as a step (undo, re-expand with Min events ≈ 8) | **2 + typing · 0** | **1 · 0** PASS at the default N = 2 (with *Exclude instead*: 2 · 0); − / + change N |
+| P3 | Remove an entity type | not possible as a step (legend chip hides the drawing only) | **2 · 0** (type chip, *Hide 40*) | — (one Entity Type in the drive) |
+| P4 | Remove everything outside a time window | not possible as a step (timeline filter is drawing-only) | **2 · 0** (window chip, *Hide 23*) — needs link times on the Working Set graph, see §6 R1 | not built |
+| P5 | Keep only what lies on a path between two nodes I picked | ≈ 9 across two tabs (Browser ▸ shortest path, select, Keep only selected) | **3 · 0** (click A, Shift+click B, *Keep paths between these 2*) | — (offered once 2 were selected; not pressed) |
+| U1 | Undo the last step | 1 · 0 | 1 · 0 | **1 · 0** PASS (bar *Undo* or Ctrl+Z; one press takes back a Clean up's `hide` + its reason note) |
+| U2 | Redo it | not possible | **1 · 0** | **1 · 0** PASS for a one-step action; **2 · 0 FAIL** after undoing a Clean up / Shrink (`LA-INVESTIGATE-REDO-PAIR-1`) |
+| K1 | Keep (protect) a subgraph | lasso + scroll the tab + Keep = 3 · 0 | **2 · 0** (lasso, *Keep* on the selection bar) | — (one node: right-click, *Keep* = 2 · 1 PASS) |
+| X1 | Exclude the selection with a reason | 4 + typing · **2** (popover → reason dialog) | 3 + typing · 1 (reason inline, last reasons as one-click chips) | **3 · 1** PASS with the prefilled reason; 4 · 1 with a recent-reason chip |
+| S1 | Save | 2 · 1 | 2 · 1 (unchanged) | **2 · 1** PASS (+ pen and typing to rename) |
+| N1 | *Pick neighbours…* from the node menu (new in `LA-INVESTIGATE-UX-2` (3)) | — | — | **4 · 1** PASS (right-click, *Pick neighbours…*, tick one, *Add selected (1)*) |
 
 ## 3. The design
 
@@ -189,3 +191,34 @@ The full reactor gate is not run (UI only): targeted UI specs plus typecheck and
 * **Verification:** targeted specs (no full gate), typecheck ×4, lint, lint:tokens; the unsaved tab was driven in the
   Demo Auth preview (filter groups, change dot, reset). The saved-Investigation flows were NOT driven live (it would have
   left records in the shared demo Space): `LA-INVESTIGATE-UX-2`.
+
+### 7.1 Live drive of the saved-Investigation flows (2026-11-01, `LA-INVESTIGATE-UX-2` item 4)
+
+**Setup.** `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` built from `origin/master` `7fd1bc8f3` in a
+sibling worktree. The staged bundle ran there on `127.0.0.1:8091` against a *copy* of the demo's `la-showcase` Space:
+the demo bundle's jars date from 2026-10-25 and lack the newer Investigation routes (delete, unsaved preview), so its
+`ui\` was not swapped and the demo was not touched. Signed in as the demo-fixture user `admin`; built-in browser. ONE
+throwaway Investigation (*THROWAWAY UX-2 live drive*, telecom_links_dataset, suspect MSISDN 99979100001, degree 1 =
+403 entities) was saved, driven through 25 recorded steps, then deleted with *⋯ ▸ Delete…* (its log then answers 404;
+the Space's only other Investigation, the seeded *Mule hub*, is untouched). Each check read the step log
+(`GET …/inv/investigations/{id}/log`) and the counts line, not only the screen. Click counts are in §2's last column.
+
+| Flow | Result | Evidence (step log) |
+|---|---|---|
+| Undo bar: *Undo* | PASS | a Clean up (`hide` 402 + its `annotate` reason) undone by one press: two `undo` steps; counts back to 0 hidden |
+| Undo bar: *Redo* | **FAIL** | the first press re-records only the `hide` (no reason note); a second press records the `annotate`. Redo is disabled again only after both, and a new step clears it (PASS). Filed `LA-INVESTIGATE-REDO-PAIR-1` |
+| Ctrl+Z / Ctrl+Shift+Z | PASS | same steps as the bar, with focus on the page (no field focused) |
+| Clean up ▸ *Hide 402 dangling leaves* | PASS | one `hide` (402 ids) + `annotate` "Clean up: dangling leaves"; 1 node left on screen |
+| Clean up ▸ *Exclude instead* ▸ *Exclude 400 with fewer than 2 events* | PASS | one `exclude` (400 ids), reason "Clean up: fewer than 2 events"; counts 400 excluded |
+| Node menu: 10 items | PASS | Expand · Expand, this once ▸ (Outgoing only, Incoming only, Two degrees) · Shrink · Keep · Hide · Select neighbours · Pick neighbours… · Exclude… · Collapse / unfold · Expand filter… |
+| Node menu ▸ *Pick neighbours…* | PASS | opens the tab's neighbour list (402, strongest first); *Add selected (1)* records one `expand` with `only: [<that neighbour>]` |
+| Node menu ▸ *Exclude…* with a reason | PASS | dialog prefilled "Not relevant to this Investigation" with the recent reason as a chip; the chip then *Exclude* records `exclude` with the chip's reason |
+| Node menu ▸ *Keep* / *Hide* | PASS | `keep` (1), `hide` (1) |
+| Node menu ▸ *Shrink* | PASS | `hide` of the one leaf + `annotate` "Shrink: hid the leaves of …"; with two nodes selected it acts on the selection and says *Nothing to shrink* (correct) |
+| Node menu ▸ *Expand, this once ▸ Outgoing only* | PASS | `expand` with `direction out` |
+| Node menu ▸ *Expand*, and double-click | PASS | one `expand` each with the tab's filter (4 → 16 entities) |
+| Node menu ▸ *Select neighbours* | PASS | the node and its neighbour selected; Clean up offers *Keep only the 2 selected* |
+
+**Seen, not filed** (no stated expectation to hold them to): the info banner from the start (*Drew 1 entity and 402
+linked…*) stays up through later steps until closed; a click on a node inside a multi-selection keeps the whole
+selection, and Escape does not clear it (a click on empty canvas does).
