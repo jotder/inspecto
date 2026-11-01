@@ -65,7 +65,7 @@ published as `live.investigations` on `/health/details`; `probeAtBoot` tries onc
 
 - The log is append-only; a write carries `expectedVersion`, and a mismatch raises
   `InvestigationVersionConflictException`.
-- Filesystem layout `<writeRoot>/audit/snapshots/investigations/<id>/`; the class Javadoc's shorter path is stale
+- Filesystem layout `<writeRoot>/audit/snapshots/investigations/<id>/`
   ([architecture](architecture.md) §3.2). Serialised by a JVM monitor plus an OS `FileChannel.lock` on `.store.lock`.
 - Graph Run checks size before work and the deadline at checkpoints; overrun ends `BUDGET_EXCEEDED` with no result.
 - Library code takes every limit as a parameter from its la-api caller ([architecture](architecture.md) §9).

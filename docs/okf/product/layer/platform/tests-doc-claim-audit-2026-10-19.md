@@ -148,16 +148,20 @@ describe a state that has since shipped.
 ### Verified stale and NOT yet fixed — work list
 
 1. **"Not built / not shipped" claims that have since shipped** (highest value):
-   `agent/plan-assistant` (bundles do ship `inspecto-agent` / `inspecto-intelligence`; `AgentAskResult.artifact`
-   has a producer; `component_draft` has hosts); `plan-observability` (audit hash chain, `/audit/verify`,
-   sign-in audit events, the `/signals/stream` EventSource consumer); `access/plan-security` and
-   `admin-guide-auth-security` (HTTPS test, policy-editor browser pass, maker-checker, OIDC discovery, the
-   `id_token_hint` cookie, the `auth` block in `/bootstrap`); `plan-data-plane` and `plan-studio` (the SPA does
-   call `POST /queries/{id}/run`; Materialize button and job exist); `plan-incidents`, `admin-guide-operations-reference`
-   (escalation rules mutate an Incident and emit `OBJECT_ESCALATED`).
-2. **Routes that no longer exist**: `admin-guide-operations-reference` documents `/pipelines/{name}/…` (now
-   `/runs/{id}/…`), an `ALERT` object type, an `ISSUE` lifecycle and `ingest` Job kind; a `batch_id` column in
-   the status CSV (now `consignment_id`).
+   ✅ **FIXED 2026-11-01** (re-verified against code first): `agent/plan-assistant` (bundles: `inspecto-agent`
+   Standard+, `inspecto-intelligence` Advanced; `AgentAskResult.artifact` has a producer; `component_draft` has
+   hosts — 17 claims); `plan-observability` (audit hash chain, `/audit/verify`, sign-in audit events, the
+   `/signals/stream` EventSource consumer — 7); `plan-data-plane` and `plan-studio` (the SPA calls
+   `POST /queries/{id}/run` via *Run saved*; Materialize button and job exist — 10); `plan-incidents`,
+   `admin-guide-operations-reference` (Escalation Rules mutate an Incident and emit `OBJECT_ESCALATED` — 2).
+   ⏸ **Open, owned by the access lane:** `access/plan-security` and `admin-guide-auth-security` (HTTPS test,
+   policy-editor browser pass, maker-checker, OIDC discovery, the `id_token_hint` cookie, the `auth` block in
+   `/bootstrap`).
+2. **Routes that no longer exist**: ✅ **FIXED 2026-11-01** in `admin-guide-operations-reference`:
+   `/pipelines/{name}/…` → `/runs/{runId}/…` (route table and prose; `GET|POST /pipelines` → `/runs` for the
+   run list and live registration — 4 claims) and the `batch_id` columns → `consignment_id` (status CSV,
+   batches CSV, commit log — 3). Still open: the `ALERT` object type, the `ISSUE` lifecycle and the `ingest`
+   Job kind.
 3. **Edition model**: `/bootstrap` reports `basic | standard | advanced`; the retired names Personal /
    Professional / Enterprise survive in most plans; `plan-editions` module and jar counts, Java floor (compile
    target is 27), profile count, example count.

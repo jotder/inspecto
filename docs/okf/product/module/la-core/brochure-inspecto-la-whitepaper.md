@@ -68,7 +68,8 @@ Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by
 | Capability | Basic | Standard | Advanced | Preview |
 | :--- | :---: | :---: | :---: | :---: |
 | Graph studio, projections from any Dataset, saved views, paths, neighbours, patterns, Value Measures | yes | yes | yes | yes |
-| Entity Lists, identity resolution, Entity profile pages | yes | yes | yes | yes |
+| Entity Lists, identity resolution | yes | yes | yes | yes |
+| Entity profile pages (decision `D-LAE4`) | — | yes | yes | yes |
 | Geo map, routes and co-location (decision `D-LAE5`, 2026-10-20) | — | yes | yes | yes |
 | Getting started, Add data from a file, Start from..., My work, help on every screen (`LA-ONBOARD-1`) | yes | yes | yes | yes |
 | Case history beside a node (decision `D-LAE1`); Link Analysis dashboard Widgets (decision `D-LAE2`) | — | yes | yes | yes |
