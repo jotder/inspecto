@@ -45,4 +45,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-INVESTIGATION-EDIT-HARDENING-1` | P3 | defect | what is left of hardening the Investigation rename route (PATCH /inv/investigations/{id}): a Postgres run and one product call | — |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
-| `DEMO-AUTH-SUBJECT-DISPLAY-NAME-1` | P3 | defect | a Demo Auth Subject carries no display name, so a new Investigation records no owner name (T-186) and File ▸ Open… shows the login id. | — |
