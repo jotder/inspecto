@@ -79,6 +79,9 @@ public final class ComponentStore {
                     // Segmentation Model (PREDICTIVE-SEGMENT-RFM-1): declared RFM bins + a label table, run by the
                     // predict.segment Job (com.gamma.predictive.SegmentationModel validates it at save; module inspecto-predictive).
                     "segmentation-model",
+                    // Churn Model (PREDICTIVE-CHURN-DECLARED-1): a declared-coefficient logistic score, run by the
+                    // predict.churn Job (com.gamma.predictive.ChurnModel validates it at save; module inspecto-predictive).
+                    "churn-model",
                     // Notification channel destinations (NotificationRoutes /notifications/channels* admin
                     // CRUD, 2026-07-18): the managed record of where a channel delivers; live delivery still
                     // resolves channels from notify.* JVM flags (ChannelConfig).

@@ -33,6 +33,7 @@ class SignalTypeTest {
         assertEquals("la.index.build.completed", SignalType.LA_INDEX_BUILD_COMPLETED);
         assertEquals("risk.score.produced", SignalType.RISK_SCORE_PRODUCED);
         assertEquals("anomaly.score.produced", SignalType.ANOMALY_SCORE_PRODUCED);
+        assertEquals("churn.score.produced", SignalType.CHURN_SCORE_PRODUCED);
         assertEquals("maintenance.filerepo.findings", SignalType.MAINTENANCE_FILEREPO_FINDINGS);
         assertEquals("maintenance.metadata.findings", SignalType.MAINTENANCE_METADATA_FINDINGS);
         assertEquals("maintenance.storage.threshold", SignalType.MAINTENANCE_STORAGE_THRESHOLD);

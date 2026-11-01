@@ -54,7 +54,7 @@ public final class ScoreOutputWriter {
      * prunes older history runs, never {@code _latest} or this run.
      *
      * <p>Kind column values bind by type: {@code VARCHAR} a String, {@code DOUBLE} / {@code INTEGER} a Number,
-     * {@code BOOLEAN} a Boolean, {@code TIMESTAMP} a {@link LocalDateTime}.
+     * {@code BOOLEAN} a Boolean, {@code TIMESTAMP} a {@link LocalDateTime}; {@code null} binds SQL NULL.
      *
      * @return the history directory written
      */
@@ -102,6 +102,10 @@ public final class ScoreOutputWriter {
     }
 
     private static void bind(PreparedStatement ps, int i, ScoreColumns.Column c, Object v) throws SQLException {
+        if (v == null) {   // SQL NULL, e.g. an insufficient Churn Score has no score (never 0)
+            ps.setNull(i, java.sql.Types.NULL);
+            return;
+        }
         switch (c.type()) {
             case "VARCHAR" -> ps.setString(i, (String) v);
             case "DOUBLE" -> ps.setDouble(i, ((Number) v).doubleValue());

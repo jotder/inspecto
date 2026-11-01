@@ -110,4 +110,10 @@ public final class SignalType {
      * anomaly module emits it and core ({@code CollectorService}) matches it to release deferred Alert Rules (D-AD7).
      */
     public static final String ANOMALY_SCORE_PRODUCED = "anomaly.score.produced";
+
+    /**
+     * Signal type {@code churn.score.produced} — a CROSS-MODULE contract like {@link #ANOMALY_SCORE_PRODUCED}: the
+     * predictive module emits it and core ({@code CollectorService}) matches it to release deferred Alert Rules.
+     */
+    public static final String CHURN_SCORE_PRODUCED = "churn.score.produced";
 }
