@@ -16,13 +16,13 @@ relies on you so it never has to read a full build log.
 
 ## Commands (offline; Windows toolchain)
 
-- **Authoritative verify:** `mvn -o clean test` (full reactor). JDK `C:\sandbox\.graalvm-cache\jdk-27-win`,
+- **Authoritative verify:** `mvn -o clean test` (full reactor). JDK `C:\.jdks\jdk-27-win`,
   Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Every JVM launch needs
   `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI).
   🔴 **Capture the log with `-B`, never `-q`, and get the verdict from the guard — not by reading:**
   ```
   mvn -o clean test -Pedition-advanced -B > build.log 2>&1
-  node tools/check-reactor-verdict.mjs build.log --expect-modules 33
+  node tools/check-reactor-verdict.mjs build.log --expect-modules 57
   ```
   Report the guard's exit code (0 = PASS · 1 = NON-VERDICT or failure · 2 = could not run).
 - **Package JAR:** `mvn -o clean package -q`.

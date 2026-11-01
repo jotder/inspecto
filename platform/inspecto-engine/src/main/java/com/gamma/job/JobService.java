@@ -312,6 +312,9 @@ public final class JobService implements AutoCloseable {
 
     /** Per-job upstream commits seen since the job's last {@code on_pipeline_gate=all} firing. */
     private final Map<String, Set<String>> pendingUpstreams = new ConcurrentHashMap<>();
+    /** The gate progress on disk, one {@code job<TAB>pipeline} line per pending commit, so a restart does not
+     *  reset a half-filled gate; {@code null} when the service has no audit directory (in-memory only). */
+    private final java.nio.file.Path gateFile;
     /** Loop cut: a signal-triggered Run beyond this chain depth does not fire (§8.4) — {@code -Djobs.signal.maxChainDepth}. */
     private final int maxChainDepth = Integer.getInteger("jobs.signal.maxChainDepth", 8);
     /** The ledger subscriber this service installed, kept so {@link #close()} can remove it — the default
@@ -400,6 +403,9 @@ public final class JobService implements AutoCloseable {
         this.provenanceStore = provenanceStore;
         this.runLogStore = new RunLogStore(auditDir);
         this.runArtifactStore = new RunArtifactStore(auditDir);
+        this.gateFile = auditDir == null || auditDir.isBlank() ? null
+                : java.nio.file.Path.of(auditDir).resolve("job-gate-pending.tsv");
+        loadGate();
         registerBuiltins();
         // Job Packs (P2c): load hot-deployable types BEFORE building Jobs, so a Job authored against a
         // pack type resolves at construction. Startup-scan signals no-op until the event log is wired.
@@ -982,6 +988,40 @@ public final class JobService implements AutoCloseable {
         this.pipelineConfigs = supplier;
     }
 
+    /** Read the gate progress left by an earlier run of this service; a bad line is skipped, a bad file is a WARN
+     *  (the gates then wait for a full cycle, a late run and never a wrong one). */
+    private void loadGate() {
+        if (gateFile == null || !java.nio.file.Files.isRegularFile(gateFile)) return;
+        try {
+            for (String line : java.nio.file.Files.readAllLines(gateFile)) {
+                int tab = line.indexOf('\t');
+                if (tab <= 0 || tab == line.length() - 1) continue;
+                pendingUpstreams.computeIfAbsent(line.substring(0, tab), k -> ConcurrentHashMap.newKeySet())
+                        .add(line.substring(tab + 1));
+            }
+        } catch (java.io.IOException | RuntimeException e) {
+            log.warn("[JOB] on_pipeline_gate progress {} could not be read ({}); the gates wait for a full cycle",
+                    gateFile, e.toString());
+        }
+    }
+
+    /** Write the gate progress (temp file, then an atomic move); a failure is a WARN, never thrown into the commit. */
+    private synchronized void saveGate() {
+        if (gateFile == null) return;
+        try {
+            List<String> lines = new ArrayList<>();
+            pendingUpstreams.forEach((job, seen) -> seen.forEach(p -> lines.add(job + '\t' + p)));
+            java.nio.file.Files.createDirectories(gateFile.getParent());
+            java.nio.file.Path tmp = gateFile.resolveSibling(gateFile.getFileName() + ".tmp");
+            java.nio.file.Files.write(tmp, lines);
+            java.nio.file.Files.move(tmp, gateFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.io.IOException | RuntimeException e) {
+            log.warn("[JOB] on_pipeline_gate progress {} could not be written ({}); a restart will forget it",
+                    gateFile, e.toString());
+        }
+    }
+
     private void onConsignmentEvent(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
         for (JobConfig c : configs) {
@@ -990,15 +1030,17 @@ public final class JobService implements AutoCloseable {
             if (!upstreams.contains(event.pipeline())) continue;
             if (c.name().equals(event.pipeline())) continue;   // self-loop guard
             // on_pipeline_gate=all (N-source merge, multiplicity Part B): fire once every named
-            // upstream has committed since the last firing, then re-arm. The pending set is
-            // in-memory — a restart forgets partial progress, so the gate waits for a full cycle
-            // again (a late run, never a wrong one). Default any = each commit fires, as before.
+            // upstream has committed since the last firing, then re-arm. The pending set is kept in
+            // job-gate-pending.tsv under the audit directory (a restart used to forget it, so the gate
+            // waited a full cycle again), so a half-filled gate survives a restart. Default any = each
+            // commit fires, as before.
             if (upstreams.size() > 1 && "all".equalsIgnoreCase(c.opt("on_pipeline_gate", "any"))) {
                 Set<String> seen = pendingUpstreams.computeIfAbsent(c.name(),
                         k -> ConcurrentHashMap.newKeySet());
-                seen.add(event.pipeline());
+                if (seen.add(event.pipeline())) saveGate();
                 if (!seen.containsAll(upstreams)) continue;
                 pendingUpstreams.remove(c.name());
+                saveGate();
             }
             fireOnCommit(c.name(), event);
         }

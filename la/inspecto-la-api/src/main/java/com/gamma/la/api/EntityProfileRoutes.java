@@ -46,6 +46,9 @@ public final class EntityProfileRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/inv/entity-types", (e, m) -> list(api, e));
+        // LA-ENTITY-TYPE-RETIRE-1: the same capability as stating the types (PUT /settings/link-analysis), which is how one is added
+        api.delete("/inv/entity-types/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> delete(api, e, m.group(1))));
         // the two profile GETs are registered by EntityPageRoutes, under the entityPages edition feature (D-LAE4)
         api.post("/inv/entities/([^/]+)/resolve", (e, m) -> resolve(api, e, m.group(1), api.body(e)));
         api.post("/inv/entities/([^/]+)/suggest", (e, m) -> suggest(api, e, m.group(1), api.body(e)));
@@ -123,6 +126,92 @@ public final class EntityProfileRoutes implements RouteModule {
                 "link.entity_types.listed - " + items.size() + " types, " + n + " bindings",
                 b -> b.attr("types", items.size()).attr("bindings", n));
         return Map.of("items", items);
+    }
+
+    /**
+     * {@code DELETE /inv/entity-types/{id}} (LA-ENTITY-TYPE-RETIRE-1, operator decision 2026-11-01: delete if unused, no Retire
+     * state): removes the type from the Space's stated list ({@link LinkAnalysisSettings#deleteEntityType}). Gates, in order:
+     * {@code canAuthorWorkbench} (403) → no write root 503 → a type not in force 404 → 409 while anything uses it ({@link #uses}) or
+     * when it is the last type → write. Unlike the reads, the use check walks EVERY Dataset, not just the caller's: a column
+     * the caller cannot view still uses the type, and is counted without its name.
+     */
+    private static Object delete(ApiContext api, HttpExchange ex, String id) throws java.io.IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "entity type delete");
+        type(writeRoot, id);
+        List<String> uses = uses(ex, writeRoot, id);
+        if (!uses.isEmpty())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "Entity Type '" + id + "' is still used by " + String.join("; ", uses)
+                    + " - it can be deleted once nothing uses it");
+        java.util.Optional<List<EntityTypes.EntityType>> kept;
+        try {
+            kept = LinkAnalysisSettings.deleteEntityType(writeRoot.resolve(LinkAnalysisSettings.FILE), id);
+        } catch (IllegalStateException last) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, last.getMessage());
+        } catch (java.io.IOException unreadable) {
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "the Link Analysis settings could not be read: " + unreadable.getMessage());
+        }
+        if (kept.isEmpty()) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no entity type '" + id + "'");
+        audit(ex, LinkEventTypes.LINK_ENTITY_TYPE_DELETED, "link.entity_type.deleted", "link.entity_type.deleted " + id,
+                b -> b.target("entity_type", id).attr("entityType", id).attr("remaining", kept.get().size()));
+        return Map.of("deleted", id, "entityTypesInForce", EntityTypes.shape(kept.get()));
+    }
+
+    /**
+     * What still uses Entity Type {@code id}, one phrase per kind, empty when nothing does. A use is: a column of any registered
+     * Dataset whose classification the type claims (named {@code dataset.column} when the caller may view the Dataset, else
+     * counted); a live Entity List of the type (a retired one can seed nothing again); an Investigation whose header (its endpoint
+     * types, ONB-LA-ENDPOINT-TYPE-1), main log or an open Draft's log names the type as an {@code entityType} /
+     * {@code sourceType} / {@code targetType} anywhere in an entry - a sealed seed, Seed by list, expand or connect, undone or
+     * not, since a replay reads every entry.
+     */
+    static List<String> uses(HttpExchange ex, Path writeRoot, String id) throws java.io.IOException {
+        EntityTypes.EntityType t = type(writeRoot, id);
+        List<String> out = new ArrayList<>();
+        List<String> columns = new ArrayList<>();
+        int hidden = 0;
+        for (com.gamma.la.core.DatasetProvider.Entry d : com.gamma.la.core.DatasetProviders.require().datasets(writeRoot)) {
+            if (!(d.content().get("columns") instanceof List<?> cols)) continue;
+            boolean visible = com.gamma.access.ComponentAccess.canView(ex, d.content());
+            for (Object o : cols) {
+                if (!(o instanceof Map<?, ?> c) || c.get("name") == null || c.get("classification") == null) continue;
+                String cls = String.valueOf(c.get("classification")).trim();
+                if (t.classifications().stream().noneMatch(x -> x.trim().equalsIgnoreCase(cls))) continue;
+                if (visible) columns.add(d.name() + "." + c.get("name"));
+                else hidden++;
+            }
+        }
+        if (!columns.isEmpty() || hidden > 0)
+            out.add("Dataset column" + (columns.size() + hidden == 1 ? " " : "s ") + String.join(", ", columns)
+                    + (hidden == 0 ? "" : (columns.isEmpty() ? "" : " and ") + hidden + " in Datasets you cannot view"));
+        List<String> lists = new ArrayList<>();
+        for (var l : GrowPreview.entityLists(writeRoot).values())
+            if (!l.retired() && id.equalsIgnoreCase(l.entityType())) lists.add(l.id());
+        if (!lists.isEmpty()) out.add("Entity List" + (lists.size() == 1 ? " " : "s ") + String.join(", ", lists));
+        int investigations = 0;
+        com.gamma.la.core.InvestigationStore store = com.gamma.la.core.InvestigationStores.of(writeRoot);
+        for (String inv : store.ids()) {
+            boolean named = names(DraftRebase.parseAll(store.header(inv).stream().toList()), id)
+                    || names(DraftRebase.parseAll(store.log(com.gamma.la.core.InvestigationStore.Scope.main(inv))), id);
+            for (String draft : named ? List.<String>of() : store.openDraftIds(inv))
+                named |= names(DraftRebase.parseAll(store.log(com.gamma.la.core.InvestigationStore.Scope.draft(inv, draft))), id);
+            if (named) investigations++;
+        }
+        if (investigations > 0) out.add(investigations + " Investigation" + (investigations == 1 ? "" : "s"));
+        return out;
+    }
+
+    /** Whether {@code node} (a parsed log entry, walked whole) names {@code id} under an Entity Type key - in any case, as masking reads a sealed type. */
+    private static boolean names(Object node, String id) {
+        if (node instanceof Map<?, ?> m) {
+            for (var e : m.entrySet()) {
+                if (Set.of("entityType", "sourceType", "targetType").contains(String.valueOf(e.getKey())) && e.getValue() instanceof String v && id.equalsIgnoreCase(v))
+                    return true;
+                if (names(e.getValue(), id)) return true;
+            }
+        } else if (node instanceof List<?> l) {
+            for (Object o : l) if (names(o, id)) return true;
+        }
+        return false;
     }
 
     static Object typeProfile(ApiContext api, HttpExchange ex, String id) {

@@ -37,7 +37,7 @@ Inspecto (repo `inspecto`) — Java 27 build / Maven `release=27`, multi-module 
 - **Main entry**: `com.gamma.inspector.CollectorProcessor` (ETL) · `com.gamma.service.CollectorService` (always-on
   host: scans `*_pipeline.toon`/`*_enrich.toon`/`*_job.toon`, serves Control API + UI on `:8080`).
 - **Tests**: `<module>/src/test/java/...`. Authoritative verify = `mvn -o clean test` (full reactor). Toolchain:
-  JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd` (run offline `-o`).
+  JDK `C:\.jdks\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd` (run offline `-o`).
 - **Docs**: `docs/okf/product/module/config/admin-guide-configuration-reference.md` (config ref) · `docs/okf/product/layer/platform/admin-guide-launch-flags.md` (runbook) · `docs/okf/product/module/connectors/admin-guide-connectors-runbook.md` (remote connectors) · `docs/okf/product/layer/platform/api-integrations-ducklake.md`
   (DuckLake, warehouse) · `docs/consolidated/` (stakeholder snapshot) ·
   `docs/superpowers/specs/` (as-built design specs).

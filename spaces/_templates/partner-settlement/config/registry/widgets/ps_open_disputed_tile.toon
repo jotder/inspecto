@@ -1,0 +1,5 @@
+vizType: kpi
+options:
+  title: Open disputed amount (USD)
+  kpi:
+    kpiId: ps_open_disputed

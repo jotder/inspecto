@@ -10,6 +10,7 @@ import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.alert.AnomalyScoreOutputs;
+import com.gamma.alert.ChurnScoreOutputs;
 import com.gamma.alert.RiskScoreOutputs;
 import com.gamma.analytics.score.ScoreKind;
 import org.slf4j.Logger;
@@ -33,9 +34,11 @@ import java.util.stream.Stream;
  * {@code <prefix><model>_latest} store has no Schema until the model first runs — so a Space Template declares such a
  * rule as PENDING, in {@code config/pending/alert-rules/<name>.toon}: the rule body plus
  * {@code afterScore: {kind, model}}, where {@code kind} is a score kind of {@link #KINDS} ({@code risk-score} reads
- * {@code risk_scores_<model>_latest}, {@code anomaly-model} reads {@code anomaly_scores_<model>_latest}).
+ * {@code risk_scores_<model>_latest}, {@code anomaly-model} reads {@code anomaly_scores_<model>_latest},
+ * {@code churn-model} reads {@code churn_scores_<model>_latest}).
  *
- * <p>When that model's Job has written its output ({@code risk.score.produced} / {@code anomaly.score.produced}), each
+ * <p>When that model's Job has written its output ({@code risk.score.produced} / {@code anomaly.score.produced} /
+ * {@code churn.score.produced}), each
  * pending rule naming the kind and model goes through the normal save gate ({@link AlertRoutes#parse}, the {@code by} Schema
  * check included) and is written to {@code registry/alert-rules/} and armed; the {@code _latest} Dataset it reads is
  * registered first through the Dataset save gate, since the Risk Score gate refuses one before the output exists. Never forced:
@@ -66,7 +69,8 @@ public final class PendingAlertRules {
     /** Every score kind a pending rule can wait for, by component kind (the score output contract's {@link ScoreKind}). */
     static final Map<String, ScoreKind> KINDS = Map.of(
             RiskScoreOutputs.KIND, RiskScoreOutputs.SCORE_KIND,
-            AnomalyScoreOutputs.KIND, AnomalyScoreOutputs.SCORE_KIND);
+            AnomalyScoreOutputs.KIND, AnomalyScoreOutputs.SCORE_KIND,
+            ChurnScoreOutputs.KIND, ChurnScoreOutputs.SCORE_KIND);
 
     /** A parsed {@code afterScore}: the score kind and model id. */
     record After(ScoreKind kind, String model) {}

@@ -13,7 +13,7 @@ Bundle: `pwsh -File inspecto/package.ps1 -Edition <Basic|Standard|Advanced|Previ
 without an OIDC issuer/JWKS — ask for IdP details before `serve.bat`, but never block the build on them.
 
 **JDK:** the shell's `JAVA_HOME` is `C:\.jdks\openjdk-26.0.1` while `java` on PATH is 27, so Maven dies
-"release version 27 not supported". Prefix: `JAVA_HOME="C:/sandbox/.graalvm-cache/jdk-27-win"` (toolchain) or
+"release version 27 not supported". Prefix: `JAVA_HOME="C:/.jdks/jdk-27-win"` (toolchain) or
 `"C:/Program Files/Java/latest/jdk-27"`. That failure is a compile failure — see stale-report trap in
 [[maven-verdict-traps]].
 

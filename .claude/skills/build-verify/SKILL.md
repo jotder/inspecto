@@ -12,7 +12,7 @@ description: >
 # Build / Test / Package / Run
 
 Inspecto — Java 27 build (`release=27`), Maven reactor `inspecto-parent`. UI is Angular
-(`inspecto-ui/`, **not** in the Maven reactor). Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven
+(`inspecto-ui/`, **not** in the Maven reactor). Toolchain: JDK `C:\.jdks\jdk-27-win`, Maven
 `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Always build offline (`-o`).**
 
 > Durable project knowledge (module map, gotchas, engine seams & perf, decisions):

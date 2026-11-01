@@ -39,8 +39,11 @@ N independent collector pipelines          one flow job                      one
 - **Trigger:** the flow job's `on_pipeline` takes a comma-separated upstream list, and
   `on_pipeline_gate: all` fires one run only after **every** named upstream has committed since
   the last firing (then re-arms). Default `any` fires per commit. The all-gate's pending set is
-  in-memory: a restart forgets partial progress and waits for a full cycle again — a late run,
-  never a wrong one (`JobService.onBatchEvent`). Cron remains fine when arrival times are known.
+  kept in `job-gate-pending.tsv` under the Space's audit directory (one `job<TAB>pipeline` line per
+  pending commit, written atomically on every change), so a restart no longer loses partial progress;
+  an unreadable file costs only a full cycle — a late run, never a wrong one
+  (`JobService.onConsignmentEvent`, pinned by `JobServiceTest.anAllGateKeepsItsProgressAcrossARestart`).
+  A service with no audit directory keeps it in memory only. Cron remains fine when arrival times are known.
 
 Demo: none shipped. The disabled `regional_orders_merge_flow.toon` template was removed
 (2026-08-18) when the demo space's authored flows were converted to canonical pipelines — a

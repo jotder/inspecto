@@ -379,6 +379,26 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
     }
 
+    /**
+     * Delete the Entity Type {@code id} from {@code link-analysis.toon} at {@code path} (LA-ENTITY-TYPE-RETIRE-1): states the
+     * types in force minus it, as a read-modify-write that keeps every other key - so deleting one of the inherited defaults
+     * states the rest. The caller has checked nothing uses it. Returns the types now in force, or empty when {@code id} is not in
+     * force; {@link IllegalStateException} for the last type (a stated list may not be empty). A document that does not parse
+     * is refused, never replaced.
+     */
+    public static Optional<List<EntityTypes.EntityType>> deleteEntityType(Path path, String id) throws IOException {
+        synchronized (LaLimits.WRITE_LOCK) {
+            Map<String, Object> m = LaLimits.loadRaw(path);   // absent = empty; unparseable = IOException (refused)
+            List<EntityTypes.EntityType> inForce = read(path).effectiveEntityTypes();
+            List<EntityTypes.EntityType> kept = inForce.stream().filter(t -> !t.id().equals(id)).toList();
+            if (kept.size() == inForce.size()) return Optional.empty();
+            if (kept.isEmpty()) throw new IllegalStateException("'" + id + "' is the last Entity Type in force; a Space keeps at least one");
+            m.put("entity_types", EntityTypes.shape(kept));
+            AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
+            return Optional.of(kept);
+        }
+    }
+
     /** The top-level keys {@link #write} models; a block's own sub-keys are listed beside its {@code block(...)} call. */
     private static final List<String> MODELLED = List.of("projection_node_cap", "analysis_node_cap", "suspicion_node_cap",
             "masking_mode", "four_eyes_budget_above", "four_eyes_fan_out_above", "entity_types", "merged_distinct_cap",

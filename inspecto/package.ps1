@@ -524,7 +524,7 @@ if ($Edition -ne 'Basic') {
     if (-not $anomalyJarSrc -or -not (Test-Path $anomalyJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $anomalyTargetDir\inspecto-anomaly-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-anomaly -am -DskipTests"
     }
-    # PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind + predict.segment). THIN like inspecto-anomaly; Standard and above (OD-5).
+    # PREDICTIVE-SEGMENT-RFM-1 + PREDICTIVE-CHURN-DECLARED-1: the Predictive Analytics add-on (segmentation-model + churn-model kinds, predict.segment + predict.churn). THIN like inspecto-anomaly; Standard and above (OD-5).
     $predictiveTargetDir = Join-Path $sandboxRoot 'features\inspecto-predictive\target'
     $predictiveJarSrc = Get-ChildItem -Path $predictiveTargetDir -Filter 'inspecto-predictive-*.jar' -ErrorAction SilentlyContinue |
                         Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -1013,11 +1013,11 @@ if ($anomalyJarSrc) {
 if ($predictiveJarSrc) {
     Copy-Item $predictiveJarSrc "$bundleDir\inspecto-predictive.jar"
     Write-Host "Bundled Predictive Analytics module -> inspecto-predictive.jar" -ForegroundColor Green
-    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - predict.segment would be an unknown Job Type.
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - predict.segment / predict.churn would be an unknown Job Type.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $paZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-predictive.jar")
     try {
-        foreach ($svc in @(@('com.gamma.job.JobTypeProvider', 'com.gamma.predictive.SegmentJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.predictive.SegmentationKindValidator'))) {
+        foreach ($svc in @(@('com.gamma.job.JobTypeProvider', 'com.gamma.predictive.SegmentJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.predictive.SegmentationKindValidator'), @('com.gamma.job.JobTypeProvider', 'com.gamma.predictive.ChurnJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.predictive.ChurnKindValidator'))) {
             $paEntry = $paZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
             if (-not $paEntry) { throw "inspecto-predictive.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
             $paReader = New-Object System.IO.StreamReader($paEntry.Open())

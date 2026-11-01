@@ -1,10 +1,15 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { GammaConfigService } from '@gamma/services/config';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
+import { LensService } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
+import { LinkAnalysisSettingsService } from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { EntityProfileService, EntityTypeProfile } from '@inspecto/link-analysis/api/entity-profile.service';
 import { EntityTypeComponent } from './entity-type.component';
@@ -108,8 +113,12 @@ const PROFILE: EntityTypeProfile = {
     masking: { mode: 'typed' },
 };
 
-function make(profile: EntityTypeProfile) {
+function make(
+    profile: EntityTypeProfile,
+    opts: { canEdit?: boolean; confirm?: boolean; del?: ReturnType<typeof vi.fn> } = {},
+) {
     const read = vi.fn(() => of(profile));
+    const del = opts.del ?? vi.fn(() => of({}));
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
@@ -120,6 +129,12 @@ function make(profile: EntityTypeProfile) {
                 useValue: { config$: of({ scheme: 'light' }), config: { scheme: 'light' } },
             },
             { provide: EntityProfileService, useValue: { entityTypeProfile: read } },
+            { provide: LinkAnalysisSettingsService, useValue: { deleteEntityType: del } },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => opts.canEdit ?? true } },
+            {
+                provide: InspectoConfirmService,
+                useValue: { confirmDestructive: vi.fn(async () => opts.confirm ?? true) },
+            },
             {
                 provide: ActivatedRoute,
                 useValue: {
@@ -133,8 +148,11 @@ function make(profile: EntityTypeProfile) {
     });
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, read };
+    return { fixture, el: fixture.nativeElement as HTMLElement, read, del };
 }
+
+const page = (fixture: ReturnType<typeof make>['fixture']) =>
+    fixture.debugElement.query(By.directive(EntityTypeComponent)).componentInstance as EntityTypeComponent;
 
 const section = (el: HTMLElement, name: string) => el.querySelector(`[data-section="${name}"]`) as HTMLElement;
 
@@ -245,6 +263,43 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
     it('says when the normaliser declares no safe prefix', () => {
         const { el } = make({ ...PROFILE, shapes: { ...PROFILE.shapes!, prefixLength: 0, prefix: [] } });
         expect(section(el, 'shapes').querySelector('[data-testid=no-prefix]')).toBeTruthy();
+    });
+
+    it('deletes the type after the confirm and goes back to Entities (LA-ENTITY-TYPE-RETIRE-1)', async () => {
+        const { el, fixture, del } = make(PROFILE);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        const button = el.querySelector('[data-testid=entity-type-delete]') as HTMLButtonElement;
+        expect(button.getAttribute('aria-label')).toBe('Delete the Entity Type MSISDN');
+        button.click();
+        await fixture.whenStable();
+        expect(del).toHaveBeenCalledWith('msisdn');
+        expect(navigate).toHaveBeenCalledWith(['/', 'entities']);
+    });
+
+    it("shows the server's reason when the type is still used, and stays on the page", async () => {
+        const reason = "Entity Type 'msisdn' is still used by Dataset columns ims_links_dataset.a_msisdn";
+        const { el, fixture } = make(PROFILE, {
+            del: vi.fn(() =>
+                throwError(
+                    () =>
+                        new HttpErrorResponse({ status: 409, error: { error: { code: 'CONFLICT', message: reason } } }),
+                ),
+            ),
+        });
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+        await page(fixture).remove();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid=delete-error]')!.textContent).toContain('ims_links_dataset.a_msisdn');
+        expect(navigate).not.toHaveBeenCalled();
+    });
+
+    it('a declined confirm deletes nothing; without the right there is no Delete', async () => {
+        const { fixture, del } = make(PROFILE, { confirm: false });
+        await page(fixture).remove();
+        expect(del).not.toHaveBeenCalled();
+        TestBed.resetTestingModule();
+        const reader = make(PROFILE, { canEdit: false });
+        expect(reader.el.querySelector('[data-testid=entity-type-delete]')).toBeNull();
     });
 
     it('has no axe violations and one h1', async () => {
