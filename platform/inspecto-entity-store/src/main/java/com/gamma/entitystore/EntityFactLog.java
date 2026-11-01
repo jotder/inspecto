@@ -1,5 +1,6 @@
 package com.gamma.entitystore;
 
+import com.gamma.config.safety.SpaceAuditDir;
 import com.gamma.spi.http.ApiContext;
 
 import java.io.IOException;
@@ -21,7 +22,8 @@ import java.util.regex.Pattern;
 
 /**
  * The per-Space, append-only <b>identity fact log</b> (LA-17, {@code docs/archived-documents/plans-archive/link-analysis-entity-model-design.md}
- * §4.2): {@code <Space config root>/audit/entity-facts/}, beside {@code SnapshotStore}'s {@code audit/snapshots/}.
+ * §4.2): {@code <Space config root>/audit/entity-facts/}, beside {@code SnapshotStore}'s {@code audit/snapshots/} — or, for a
+ * Space with a data root, {@code <data root>/audit/entity-facts/} ({@link SpaceAuditDir}, {@code SPACE-DATA-ROOT-CONFIG-AUDIT-1}).
  *
  * <p><b>Format.</b> One immutable JSON file per fact, named by its 12-digit zero-padded sequence number
  * ({@code 000000000001.json}, …). Fields, in this order: {@code seq, at, actor, reason, kind, listId}, the kind's
@@ -64,12 +66,14 @@ public final class EntityFactLog {
         }
     }
 
+    private final SpaceAuditDir audit;
     private final Path dir;
     private final Path writeRoot;
 
     public EntityFactLog(Path writeRoot) {
         this.writeRoot = writeRoot;
-        this.dir = writeRoot.resolve("audit").resolve(DIR);
+        this.audit = SpaceAuditDir.of(writeRoot, DIR);   // the data root's audit/ when the Space has one
+        this.dir = audit.dir();
     }
 
     /** The Space's ONE identity key ({@link MaskTokens#spaceKey}): what masks an Entity List member here. */
@@ -88,14 +92,12 @@ public final class EntityFactLog {
 
     /** Every fact, chain-verified. An absent directory is an empty log. */
     public Log read() throws IOException {
-        if (!Files.isDirectory(dir)) return new Log(List.of(), 0, "");
-        List<Long> seqs = new ArrayList<>();
-        try (var s = Files.list(dir)) {
-            s.forEach(p -> {
-                Matcher m = FACT_FILE.matcher(p.getFileName().toString());
-                if (m.matches()) seqs.add(Long.parseLong(m.group(1)));
-            });
+        Map<Long, Path> files = new java.util.HashMap<>();
+        for (Path p : audit.list(dir)) {   // plus any fact the move could not take from the old location
+            Matcher m = FACT_FILE.matcher(p.getFileName().toString());
+            if (m.matches()) files.put(Long.parseLong(m.group(1)), p);
         }
+        List<Long> seqs = new ArrayList<>(files.keySet());
         seqs.sort(null);
         List<Fact> facts = new ArrayList<>(seqs.size());
         String prev = "";
@@ -104,7 +106,7 @@ public final class EntityFactLog {
             if (seq != i + 1)
                 throw new BrokenChainException("identity fact log is broken: expected seq " + (i + 1)
                         + ", found " + seq + " (a fact is missing)");
-            byte[] bytes = Files.readAllBytes(file(seq));
+            byte[] bytes = Files.readAllBytes(files.get(seq));
             Map<String, Object> body;
             try {
                 @SuppressWarnings("unchecked") Map<String, Object> m = ApiContext.JSON.readValue(bytes, LinkedHashMap.class);

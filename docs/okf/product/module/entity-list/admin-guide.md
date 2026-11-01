@@ -47,6 +47,8 @@ answers `reviewAfter: true`. Detail: [spec](spec.md), "Four-eyes".
 ## Storage and retention
 
 - Fact log: `<write root>/audit/entity-facts/<12-digit seq>.json`, SHA-256 chained, append-only. **No retention.**
+  A Space with a data root keeps it at `<data root>/audit/entity-facts/`; an existing log is moved there on first
+  use, never overwriting (`SPACE-DATA-ROOT-CONFIG-AUDIT-1`, [Spaces](../config/architecture-spaces.md)).
 - Sidecar: `<dataRoot>/entity_list_<id>/entries.parquet`, guarded by an `.entity-list-output` marker and rewritten
   on every write.
 - Masking key: `<root>.secrets/.risk-score-mask.key` (moved 2026-10-13, D-M7).

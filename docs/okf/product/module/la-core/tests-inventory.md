@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-core`](../../../../../product-map/module/la-core.toon).
 
-24 test class(es): 24 unit, 0 real-HTTP control-plane, 0 IT.
+25 test class(es): 25 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -46,6 +46,7 @@ mvn -o test -pl la/inspecto-la-core -Dtest=DraftCheckpointsTest,DraftLifecycleTe
 | `LinkIdsTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/LinkIdsTest.java` | D-U9 remainder: the link wire id is the evaluator's key {@code source␀target␀kind}, reversibly and URL-safely encoded. <!-- vocab-allow: quoted Javadoc --> |
 | `LinkTemporalDetectorTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/LinkTemporalDetectorTest.java` |  |
 | `PatternStageMotifTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/PatternStageMotifTest.java` | LA's stage → the platform {@link TemporalMotifMatcher} stage: every field carried, the node kind folded to {@code admitsNodes}. |
+| `SnapshotStoreDataRootTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/SnapshotStoreDataRootTest.java` | SPACE-DATA-ROOT-CONFIG-AUDIT-1: snapshots and Investigations live under the data root's {@code audit/snapshots} |
 | `SnapshotStoreTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/SnapshotStoreTest.java` | {@code AUDIT-LOG-UNBOUNDED-READ-1}: {@link SnapshotStore#attachmentsOf} streams the one |
 | `WorkingSetGraphInputTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/WorkingSetGraphInputTest.java` | D-4 step 4: the Working Set adapter. Rows are built in the exact shape {@code WorkingSetRoutes.tables()} caches |
 | `WorkingSetSizeLimitTest` | `com.gamma.la.core` | unit | `la/inspecto-la-core/src/test/java/com/gamma/la/core/WorkingSetSizeLimitTest.java` |  |

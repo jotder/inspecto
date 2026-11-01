@@ -15,7 +15,7 @@ deal with its files, its settings documents and its keys. Design detail: [spec](
 
 | Path | Content | Notes |
 |---|---|---|
-| `<Space config root>/audit/entity-facts/NNNNNNNNNNNN.json` | identity fact log | append-only and hash-chained; never edit, rename or delete a file |
+| `<Space config root>/audit/entity-facts/NNNNNNNNNNNN.json` (`<data root>/audit/entity-facts/` when the Space has a data root) | identity fact log | append-only and hash-chained; never edit, rename or delete a file; moved onto a new data root automatically, never overwriting |
 | `<data root>/entity_list_<id>/entries.parquet` | Entity List sidecar | derived; rewritten on every change; safe to lose |
 | `<Space config root>/link-analysis.toon` | per-Space Link Analysis settings and `SPACE` limits | crash-safe TOON; missing or unreadable reads as defaults |
 | `la-limits.toon` in the server-wide document home | `INSTALL` limits | located by `-Dsystem.config.dir`, then the spaces container root, then the sole Space's write root |

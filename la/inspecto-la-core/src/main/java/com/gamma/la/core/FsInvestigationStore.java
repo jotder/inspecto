@@ -241,10 +241,11 @@ public final class FsInvestigationStore implements InvestigationStore {
 
     /** A bare id can never leave the store (SAFE_ID is checked by the caller); this is the belt to that brace. */
     private void contained(String id) {
-        Path root = investigationsRoot().normalize();
         Path target = investigationDir(id).normalize();
-        if (!target.startsWith(root) || target.equals(root))
-            throw new IllegalArgumentException("investigation id escapes the investigation store");
+        // an Investigation the move to the data root could not take is used where it is (SPACE-DATA-ROOT-CONFIG-AUDIT-1)
+        for (Path root : List.of(investigationsRoot().normalize(), snapshots.legacyInvestigationsRoot().normalize()))
+            if (target.startsWith(root) && !target.equals(root)) return;
+        throw new IllegalArgumentException("investigation id escapes the investigation store");
     }
 
     // ── identity ────────────────────────────────────────────────────────────────────────────────────────
@@ -286,7 +287,8 @@ public final class FsInvestigationStore implements InvestigationStore {
         Path inv = investigationDir(id);
         Path root = investigationsRoot();
         sweepTombstones(root);
-        Path tomb = root.resolve(".deleting-" + id + "-" + System.nanoTime());   // not a safe id, so no listing or open sees it
+        // beside the Investigation (an un-moved one sits under the old root), so the move below stays one rename
+        Path tomb = inv.getParent().resolve(".deleting-" + id + "-" + System.nanoTime());   // not a safe id, so no listing or open sees it
         synchronized (monitor(root)) {
             synchronized (monitor(inv)) {
                 if (!Files.isRegularFile(inv.resolve("header.json"))) return false;

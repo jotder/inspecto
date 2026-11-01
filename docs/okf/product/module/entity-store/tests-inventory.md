@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.entity-store`](../../../../../product-map/module/entity-store.toon).
 
-14 test class(es): 14 unit, 0 real-HTTP control-plane, 0 IT.
+15 test class(es): 15 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl platform/inspecto-entity-store
-mvn -o test -pl platform/inspecto-entity-store -Dtest=EntityFactLogTest,EntityFactsForTest
+mvn -o test -pl platform/inspecto-entity-store -Dtest=EntityFactLogDataRootTest,EntityFactLogTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `EntityFactLogDataRootTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/EntityFactLogDataRootTest.java` | SPACE-DATA-ROOT-CONFIG-AUDIT-1: the identity fact log lives on the Space's data root once it has one. |
 | `EntityFactLogTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/EntityFactLogTest.java` | The identity fact log's chain (LA-17, design §4.2) and the fold over it. The property: a log that does not verify is |
 | `EntityFactsForTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/EntityFactsForTest.java` | Test access to the Identity Fact log and its fold from other test packages. |
 | `EntityListEntriesTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/EntityListEntriesTest.java` | ASSURE-ENTITY-LISTS-1 (WS-12): range / CIDR entries, expiry and the Parquet sidecar, below HTTP. The properties: |

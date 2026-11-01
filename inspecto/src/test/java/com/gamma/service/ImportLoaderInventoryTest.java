@@ -87,7 +87,11 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
         ALLOWED.put("parked","backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
                 + "outside the config tree; the sweep skips it and no import lands outside <config>");
-        ALLOWED.put("archived-config", "ConfigMigrator's backup of a migrated config — written, never read back as "
+        // SPACE-DATA-ROOT-CONFIG-AUDIT-1: UploadRoutes resolves records/ under SpaceAuditDir.of(root, "la-uploads").dir(),
+        // so the literal chain is split there and the scan sees it without the audit/la-uploads/ prefix.
+        ALLOWED.put("records", "audit/la-uploads/records/ (UploadRoutes) - inside the RESERVED audit/ of the config root, "
+                + "or under the Space's data root when it has one; never a path an import lands");
+        ALLOWED.put("archived-config","ConfigMigrator's backup of a migrated config — written, never read back as "
                 + "live config, so a planted file there changes nothing");
         // AccessGrants.java:79-80 resolves these under a variable already holding <config>/registry — the literal
         // chain is split there, so the scan sees them without the prefix. Pinned reserved in the test below.

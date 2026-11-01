@@ -17,7 +17,7 @@ Analysis in [la-core](../la-core/api-link-analysis.md); both read this module.
 
 | Class | Role |
 |---|---|
-| `EntityFactLog` | Per-Space append-only identity fact log at `<Space config root>/audit/entity-facts/`. |
+| `EntityFactLog` | Per-Space append-only identity fact log at `<Space config root>/audit/entity-facts/`, or `<data root>/audit/entity-facts/` for a Space with a data root (`SpaceAuditDir`). |
 | `EntityRegistry` | Pure fold of the log into Entity Lists as of one sequence number. Not cached. |
 | `EntityListFacts` | Host-free read and append helpers shared by the Entity List routes and Link Analysis. |
 | `EntityListEntries` | Range entries stored as one canonical string: `prefix:<key>`, `range:<lo>..<hi>` (same-length keys), `cidr:<network>/<len>` (IPv4 or IPv6, no host bits). |

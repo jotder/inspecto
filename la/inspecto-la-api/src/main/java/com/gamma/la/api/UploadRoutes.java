@@ -5,6 +5,7 @@ import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
+import com.gamma.config.safety.SpaceAuditDir;
 import com.gamma.entitystore.EntityFactLog;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
@@ -84,8 +85,13 @@ public final class UploadRoutes implements RouteModule {
     private static final int MAX_LISTED = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** {@code <write root>/audit/la-uploads}, or the data root's {@code audit/la-uploads} when the Space has one. */
+    private static SpaceAuditDir uploads(Path root) {
+        return SpaceAuditDir.of(root, "la-uploads");
+    }
+
     private static Path recordDir(Path root, String collector) {
-        return root.resolve("audit").resolve("la-uploads").resolve("records").resolve(collector.replaceAll("[^A-Za-z0-9._-]", "_"));
+        return uploads(root).dir().resolve("records").resolve(collector.replaceAll("[^A-Za-z0-9._-]", "_"));
     }
 
     /** Whether the caller may act on every upload (Space administrator, or no Subject at all as on Basic). */
@@ -124,7 +130,7 @@ public final class UploadRoutes implements RouteModule {
         // Read the (small, retention-bounded) records, keep the caller's, sort, cut the page - and only THEN probe the
         // Collector's footprint for the rows on the page.
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (Map<String, Object> rec : records(dir))
+        for (Map<String, Object> rec : records(root, dir))
             if (admin || String.valueOf(me).equals(rec.get("uploader"))) rows.add(rec);
         rows.sort((a, b) -> String.valueOf(b.get("landedAt")).compareTo(String.valueOf(a.get("landedAt"))));
         int total = rows.size();
@@ -145,26 +151,21 @@ public final class UploadRoutes implements RouteModule {
     }
 
     /** Every readable record in {@code dir}. */
-    private static List<Map<String, Object>> records(Path dir) throws IOException {
+    private static List<Map<String, Object>> records(Path root, Path dir) throws IOException {
         List<Map<String, Object>> out = new ArrayList<>();
-        if (!Files.isDirectory(dir)) return out;
-        try (Stream<Path> s = Files.list(dir)) {
-            for (Path p : s.filter(f -> f.getFileName().toString().endsWith(".json")).toList()) {
-                Map<String, Object> rec = readRecord(p);
-                if (rec != null) out.add(rec);
-            }
+        for (Path p : uploads(root).list(dir)) {   // plus any record the move could not take from the old location
+            if (!p.getFileName().toString().endsWith(".json")) continue;
+            Map<String, Object> rec = readRecord(p);
+            if (rec != null) out.add(rec);
         }
         return out;
     }
 
     /** The record of {@code file}, matched by EXACT (case-sensitive) name against the stored records - never a filesystem
      *  lookup that a case-insensitive disk would answer for another spelling. */
-    private static Path recordOf(Path dir, String file) throws IOException {
-        if (!Files.isDirectory(dir)) return null;
+    private static Path recordOf(Path root, Path dir, String file) throws IOException {
         String want = file + ".json";
-        try (Stream<Path> s = Files.list(dir)) {
-            return s.filter(p -> p.getFileName().toString().equals(want)).findFirst().orElse(null);
-        }
+        return uploads(root).list(dir).stream().filter(p -> p.getFileName().toString().equals(want)).findFirst().orElse(null);
     }
 
     /** Drop records past {@link #RECORD_RETENTION_DAYS} (best effort; one directory listing). */
@@ -218,7 +219,7 @@ public final class UploadRoutes implements RouteModule {
         Path recordFile;
         Map<String, Object> rec;
         try {
-            recordFile = recordOf(recordDir(root, target.collector()), file);
+            recordFile = recordOf(root, recordDir(root, target.collector()), file);
             rec = recordFile == null ? null : readRecord(recordFile);
         } catch (IOException unreadable) {
             throw refuse("record", 503, ErrorCodes.CONTROL_PLANE_READ_ONLY, "the upload records cannot be read right now; nothing was deleted");
@@ -363,7 +364,7 @@ public final class UploadRoutes implements RouteModule {
         // Replace is the uploader's (or an administrator's) act, exactly like delete; the record keeps its ORIGINAL uploader.
         String uploader = ApiContext.actor(ex);
         if (existed) {
-            Path recPath = recordOf(recordDir(root, target.collector()), name);
+            Path recPath = recordOf(root, recordDir(root, target.collector()), name);
             Map<String, Object> prior = recPath == null ? null : readRecord(recPath);
             if (!ownerOrAdmin(ex, prior))
                 throw refuse("owner", 403, ErrorCodes.PERMISSION_DENIED, "'" + name
@@ -380,9 +381,9 @@ public final class UploadRoutes implements RouteModule {
                 throw refuse("conflict", 409, ErrorCodes.CONFLICT, "'" + landName + "' left the Collector's inbox while the replace was"
                         + " being made (the Collector picked it up); nothing was changed - upload it again without replace");
             synchronized (QUOTA_LOCK) {
-                Path ledger = root.resolve("audit").resolve("la-uploads")
-                        .resolve(java.time.LocalDate.now(ZoneOffset.UTC) + ".bytes");
-                long used = readLong(ledger);
+                SpaceAuditDir audit = uploads(root);
+                Path ledger = audit.dir().resolve(java.time.LocalDate.now(ZoneOffset.UTC) + ".bytes");
+                long used = readLong(audit.readable(ledger));
                 if (used + bytes.length > daily)
                     throw refuse("quota", 413, ErrorCodes.PAYLOAD_TOO_LARGE, "the Space's analyst uploads have landed " + used
                             + " of upload.daily_bytes (" + daily + ") today; this file would exceed it");

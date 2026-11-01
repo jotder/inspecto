@@ -116,6 +116,35 @@ class ControlApiSnapshotsTest {
         }
     }
 
+    /**
+     * SPACE-DATA-ROOT-CONFIG-AUDIT-1: a Space with a data root keeps its snapshots under {@code <data root>/audit/snapshots};
+     * a snapshot sealed before the move is moved there on first touch and still listed and attachable.
+     */
+    @Test
+    void aSpaceWithADataRootSealsUnderItAndStillServesTheOldSnapshots(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path base = tmp.resolve("spaces/demo");
+        Path config = Files.createDirectories(base.resolve("config"));
+        Path dataRoot = Files.createDirectories(tmp.resolve("mnt/demo"));
+        Files.createDirectories(config.resolve("audit/snapshots"));
+        Files.writeString(config.resolve("audit/snapshots/snap-old.json"), snapshot("snap-old"));
+        com.gamma.config.safety.DiscoveredRoots.register("demo", base);
+        com.gamma.config.safety.DiscoveredRoots.registerDataRoot("demo", dataRoot);
+        try (Ctx c = open(cfg, config)) {
+            assertEquals(200, post(c.port, "/inv/snapshots", snapshot("snap-new")).statusCode());
+            assertTrue(Files.isRegularFile(dataRoot.resolve("audit/snapshots/snap-new.json")), "sealed under the data root");
+            assertTrue(Files.isRegularFile(dataRoot.resolve("audit/snapshots/snap-old.json")), "the old snapshot moved");
+            assertFalse(Files.exists(config.resolve("audit/snapshots")), "nothing left in the config tree");
+
+            JsonNode listed = data(get(c.port, "/inv/snapshots"));
+            assertEquals(2, listed.get("total").asInt(), listed.toString());
+            HttpResponse<String> attached = post(c.port, "/inv/snapshots/attach", "{\"snapshotId\":\"snap-old\",\"caseId\":\"case-9\"}");
+            assertEquals(200, attached.statusCode(), attached.body());
+            assertTrue(Files.isRegularFile(dataRoot.resolve("audit/snapshots/attachments.jsonl")));
+        } finally {
+            com.gamma.config.safety.DiscoveredRoots.clear();
+        }
+    }
+
     /** The gate the whole object exists for: evidence is never silently replaced. */
     @Test
     void refusesToOverwriteASealedSnapshot(@TempDir Path cfg, @TempDir Path root) throws Exception {

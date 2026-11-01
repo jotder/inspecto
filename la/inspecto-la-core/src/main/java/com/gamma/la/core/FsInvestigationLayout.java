@@ -1,5 +1,7 @@
 package com.gamma.la.core;
 
+import com.gamma.config.safety.SpaceAuditDir;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
@@ -13,16 +15,20 @@ import java.util.List;
 /**
  * The on-disk layout of an Investigation's records ({@code <write root>/audit/snapshots/investigations/<id>/...}), as {@code SnapshotStore} wrote it
  * (LA-10, decision D-E2) before the {@link InvestigationStore} port existed. An implementation detail of
- * {@link FsInvestigationStore}: nothing else may name it. Every method is the unchanged code it was, so each byte on disk is too.
+ * {@link FsInvestigationStore}: nothing else may name it. Every method is the unchanged code it was, so each byte on disk is too
+ * — only the directory may now be on the Space's data root ({@code SPACE-DATA-ROOT-CONFIG-AUDIT-1}).
  *
  * <p>Write-once discipline: a header and every per-step Working Set are {@code CREATE_NEW}, and the log only ever appends.
  */
 final class FsInvestigationLayout {
 
+    private final SpaceAuditDir audit;
     private final Path dir;
 
+    /** The same directory as {@link SnapshotStore}: on the Space's data root when it has one ({@link SpaceAuditDir}). */
     FsInvestigationLayout(Path writeRoot) {
-        this.dir = writeRoot.resolve("audit").resolve("snapshots");
+        this.audit = SpaceAuditDir.of(writeRoot, "snapshots");
+        this.dir = audit.dir();
     }
 
     Path directory() {
@@ -60,7 +66,15 @@ final class FsInvestigationLayout {
 
     /** One Investigation's directory. The id is SAFE_ID-checked by the caller; the route jails the result. */
     public Path investigationDir(String id) {
-        return dir.resolve(INVESTIGATIONS).resolve(id);
+        // An Investigation still at the old location moves before it is read or written; when the move cannot take it, it is
+        // used whole where it is, never split across two places.
+        return audit.readable(dir.resolve(INVESTIGATIONS).resolve(id));
+    }
+
+    /** The old {@code config/audit/snapshots/investigations} an un-moved Investigation may still live under; equal to the
+     *  current one when the Space has no data root. */
+    Path legacyInvestigationsRoot() {
+        return audit.legacy().resolve(INVESTIGATIONS);
     }
 
     /** Create an Investigation's header. False when the id already exists — never an overwrite (409). */
@@ -81,14 +95,10 @@ final class FsInvestigationLayout {
      * through the read gate. A directory whose name is not a safe id, or with no header yet, is skipped.
      */
     public List<String> listInvestigations() throws IOException {
-        Path root = dir.resolve(INVESTIGATIONS);
-        if (!Files.isDirectory(root)) return List.of();
         List<String> out = new ArrayList<>();
-        try (var ds = Files.newDirectoryStream(root)) {
-            for (Path d : ds) {
-                String id = d.getFileName().toString();
-                if (SnapshotStore.SAFE_ID.matcher(id).matches() && Files.isRegularFile(d.resolve("header.json"))) out.add(id);
-            }
+        for (Path d : audit.list(dir.resolve(INVESTIGATIONS))) {
+            String id = d.getFileName().toString();
+            if (SnapshotStore.SAFE_ID.matcher(id).matches() && Files.isRegularFile(d.resolve("header.json"))) out.add(id);
         }
         out.sort(Comparator.naturalOrder());
         return out;
@@ -203,8 +213,10 @@ final class FsInvestigationLayout {
     /** Save one template. False when the id is already taken — never an overwrite (409). */
     public boolean createTemplate(String id, String json) throws IOException {
         Files.createDirectories(templateDirectory());
+        Path f = templateDirectory().resolve(id + ".json");
+        if (!audit.readable(f).equals(f)) return false;   // saved at the old location, which the move could not take
         try {
-            Files.writeString(templateDirectory().resolve(id + ".json"), json, StandardCharsets.UTF_8,
+            Files.writeString(f, json, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
             return true;
         } catch (FileAlreadyExistsException e) {
@@ -214,12 +226,9 @@ final class FsInvestigationLayout {
 
     /** Every saved template, raw, in id order (empty when none was ever saved). */
     public java.util.List<String> readTemplates() throws IOException {
-        Path d = templateDirectory();
-        if (!Files.isDirectory(d)) return java.util.List.of();
-        java.util.List<Path> files;
-        try (var s = Files.list(d)) {
-            files = s.filter(f -> f.getFileName().toString().endsWith(".json") && Files.isRegularFile(f)).sorted().toList();
-        }
+        java.util.List<Path> files = audit.list(templateDirectory()).stream()
+                .filter(f -> f.getFileName().toString().endsWith(".json") && Files.isRegularFile(f))
+                .sorted(Comparator.comparing(Path::getFileName)).toList();
         java.util.List<String> out = new java.util.ArrayList<>();
         for (Path f : files) out.add(Files.readString(f, StandardCharsets.UTF_8));
         return out;
@@ -227,7 +236,7 @@ final class FsInvestigationLayout {
 
     /** One template's raw JSON, or null when it was never saved. */
     public String readTemplate(String id) throws IOException {
-        Path f = templateDirectory().resolve(id + ".json");
+        Path f = audit.readable(templateDirectory().resolve(id + ".json"));
         return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
     }
 

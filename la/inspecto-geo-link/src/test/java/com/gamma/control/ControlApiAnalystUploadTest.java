@@ -267,6 +267,37 @@ class ControlApiAnalystUploadTest {
         }
     }
 
+    /**
+     * SPACE-DATA-ROOT-CONFIG-AUDIT-1: a Space with a data root keeps upload records and the quota ledger under
+     * {@code <data root>/audit/la-uploads}; a record written before the move is moved there and still listed.
+     */
+    @Test
+    void aSpaceWithADataRootKeepsUploadRecordsUnderIt(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path base = tmp.resolve("spaces/demo");
+        Path config = Files.createDirectories(base.resolve("config"));
+        Path dataRoot = Files.createDirectories(tmp.resolve("mnt/demo"));
+        Path oldRecords = Files.createDirectories(config.resolve("audit/la-uploads/records/up_feed"));
+        Files.writeString(oldRecords.resolve("UPL_0.csv.json"), "{\"collector\":\"up_feed\",\"file\":\"UPL_0.csv\",\"bytes\":1,"
+                + "\"lines\":1,\"sha256\":\"x\",\"uploader\":\"uploader-1\",\"replaced\":false,\"landedAt\":\"2026-11-01T00:00:00Z\"}");
+        com.gamma.config.safety.DiscoveredRoots.register("demo", base);
+        com.gamma.config.safety.DiscoveredRoots.registerDataRoot("demo", dataRoot);
+        try (Ctx c = open(cfg, config, true)) {
+            status(201, up(c, "UPL_1.csv", CSV.getBytes(StandardCharsets.UTF_8)), "landed");
+            Path records = dataRoot.resolve("audit/la-uploads/records/up_feed");
+            assertTrue(Files.isRegularFile(records.resolve("UPL_1.csv.json")), "the new record is under the data root");
+            assertTrue(Files.isRegularFile(records.resolve("UPL_0.csv.json")), "the old record moved");
+            try (Stream<Path> s = Files.list(dataRoot.resolve("audit/la-uploads"))) {
+                assertTrue(s.anyMatch(p -> p.getFileName().toString().endsWith(".bytes")), "the quota ledger too");
+            }
+            assertFalse(Files.exists(config.resolve("audit/la-uploads")), "nothing left in the config tree");
+            List<String> files = new java.util.ArrayList<>();
+            uploadsOf(c, UPLOADER).forEach(n -> files.add(n.get("file").asText()));
+            assertEquals(List.of("UPL_1.csv", "UPL_0.csv"), files);
+        } finally {
+            com.gamma.config.safety.DiscoveredRoots.clear();
+        }
+    }
+
     @Test
     void statusReadIs503WithoutAWriteRoot(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg, null, true)) {

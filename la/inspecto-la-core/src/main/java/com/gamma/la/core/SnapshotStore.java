@@ -1,5 +1,7 @@
 package com.gamma.la.core;
 
+import com.gamma.config.safety.SpaceAuditDir;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
@@ -48,10 +50,13 @@ public final class SnapshotStore {
 
     private static final String ATTACHMENTS = "attachments.jsonl";
 
+    private final SpaceAuditDir audit;
     private final Path dir;
 
+    /** {@code <write root>/audit/snapshots}, or the data root's {@code audit/snapshots} when the Space has one ({@link SpaceAuditDir}). */
     public SnapshotStore(Path writeRoot) {
-        this.dir = writeRoot.resolve("audit").resolve("snapshots");
+        this.audit = SpaceAuditDir.of(writeRoot, "snapshots");
+        this.dir = audit.dir();
     }
 
     /**
@@ -61,6 +66,7 @@ public final class SnapshotStore {
     public boolean create(String id, String json) throws IOException {
         Files.createDirectories(dir);
         Path f = dir.resolve(id + ".json");
+        if (!audit.readable(f).equals(f)) return false;   // sealed at the old location, which the move could not take
         try {
             Files.writeString(f, json, StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW,
                     StandardOpenOption.WRITE);
@@ -72,7 +78,7 @@ public final class SnapshotStore {
 
     /** One sealed snapshot's raw JSON, or null when the id was never written. */
     public String read(String id) throws IOException {
-        Path f = dir.resolve(id + ".json");
+        Path f = audit.readable(dir.resolve(id + ".json"));
         return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
     }
 
@@ -81,14 +87,8 @@ public final class SnapshotStore {
      * bounded read never looks like a complete one.
      */
     public List<String> list(int limit, int[] totalOut) throws IOException {
-        if (!Files.isDirectory(dir)) {
-            totalOut[0] = 0;
-            return List.of();
-        }
         List<Path> files = new ArrayList<>();
-        try (var s = Files.list(dir)) {
-            s.filter(p -> p.getFileName().toString().endsWith(".json")).forEach(files::add);
-        }
+        for (Path p : audit.list(dir)) if (p.getFileName().toString().endsWith(".json")) files.add(p);
         totalOut[0] = files.size();
         files.sort(Comparator.comparing((Path p) -> {
             try {
@@ -108,6 +108,7 @@ public final class SnapshotStore {
     /** Append one attachment record. The sealed snapshot is not reopened. */
     public void attach(String snapshotId, String caseId, String at) throws IOException {
         Files.createDirectories(dir);
+        audit.settle(dir.resolve(ATTACHMENTS));   // never start a second log beside one the move has not taken yet
         String line = "{\"snapshotId\":" + quote(snapshotId) + ",\"caseId\":" + quote(caseId)
                 + ",\"at\":" + quote(at) + "}\n";
         Files.writeString(dir.resolve(ATTACHMENTS), line, StandardCharsets.UTF_8,
@@ -116,7 +117,7 @@ public final class SnapshotStore {
 
     /** The Case ids one snapshot has been attached to, in the order they were recorded. */
     public List<String> attachmentsOf(String snapshotId) throws IOException {
-        Path f = dir.resolve(ATTACHMENTS);
+        Path f = audit.readable(dir.resolve(ATTACHMENTS));
         if (!Files.isRegularFile(f)) return List.of();
         List<String> out = new ArrayList<>();
         String needle = "\"snapshotId\":" + quote(snapshotId) + ",";
@@ -140,7 +141,7 @@ public final class SnapshotStore {
      * {@code truncatedOut[0]} when older records were left out.
      */
     public List<String> recentAttachments(int max, boolean[] truncatedOut) throws IOException {
-        Path f = dir.resolve(ATTACHMENTS);
+        Path f = audit.readable(dir.resolve(ATTACHMENTS));
         if (!Files.isRegularFile(f)) return List.of();
         java.util.ArrayDeque<String> tail = new java.util.ArrayDeque<>();
         boolean dropped = false;

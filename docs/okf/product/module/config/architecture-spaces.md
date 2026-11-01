@@ -99,8 +99,25 @@ first"). The migrator's process knows no other Space, so it cannot see an overla
 boots: two overlapping Space folders (a ref target inside another, or containing the spaces root) are both refused;
 a data root that is, contains or sits inside another Space's folder or data root refuses only the Space that
 declared it. A runtime create meets the same rule in `SpaceDataRoot.stake`.
-⚠ LA snapshots, LA upload records and the entity-list fact log write `config/audit/`, not the Space's `audit/`,
-so they stay with the config.
+**Config-tree audit stores (`SPACE-DATA-ROOT-CONFIG-AUDIT-1`, 2026-11-01).** LA snapshots and Investigations
+(`SnapshotStore`, `FsInvestigationLayout` → `audit/snapshots/`), LA upload records and the daily quota ledger
+(`UploadRoutes` → `audit/la-uploads/`) and the identity fact log (`EntityFactLog` → `audit/entity-facts/`) once wrote
+under `config/audit/` only. They now open their directory through `SpaceAuditDir.of(writeRoot, sub)`: when the
+write root is a Space's `config/` and that Space has a data root off its base, the directory is
+`<data root>/audit/<sub>` — exactly `PathJail.onDataRoot(<space>/audit/<sub>)`, so it stays inside the Space's
+allowed roots; with no data root (or a non-Space write root) it is `config/audit/<sub>`, unchanged. The
+`.inspecto-space` stamp and the `SPACE_OVERLAP` refusals are untouched (they judge the data root, not these subdirs).
+*One-time move:* the first open in a JVM moves every file under `config/audit/<sub>` across (copy to a temp name,
+atomic rename, delete the original; emptied directories removed). It never overwrites: a file in both places stays
+in both, is logged at WARN, and the new one is read; a second run moves nothing. A fault is logged at WARN and
+retried on the next open. *Fallback read:* a read that misses the new location while the old one holds the file
+re-runs the move (`settle`), so a store converges on one place; if the move still cannot take it, `readable`
+answers the old file and listings (`list`) add old-only entries. An Investigation the move cannot take is used whole
+where it is (`FsInvestigationLayout.investigationDir`; `FsInvestigationStore.contained` accepts the old root), never
+started again as an empty copy. One stuck file never strands the rest: the move carries on and reports the first
+fault. ⚠ Known limit: the move is per file, so an Investigation whose files only partly moved (a fault mid-directory)
+reads from the new place and misses the stuck file until the move succeeds; the WARN names it. ⚠ `SpaceDataRoot.claim` still refuses a moved Space whose `<space>/audit/` holds files; `config/audit/` is
+not checked there because these stores move it themselves.
 
 **Request binding.** `ControlApi.dispatch` strips `/api/v1`, matches `/spaces/{id}/…`, rewrites the path
 and binds the `space` SLF4J MDC key for the request; an un-prefixed path binds the current Space.

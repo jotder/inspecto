@@ -56,6 +56,15 @@ or whose data root is stamped (`.inspecto-space`) by another Space folder, or wh
 (`GET /spaces` lists it as skipped with the reason). ⚠ Keep `duckdb/` off object-storage mounts (s3fs,
 mountpoint-s3): DuckDB needs random writes.
 
+Link Analysis and Entity List records follow the data root too: `audit/snapshots/` (snapshots and Investigations),
+`audit/la-uploads/` (analyst upload records, the daily quota ledger) and `audit/entity-facts/` (the identity fact
+log) sit under `<data root>/audit/`. A Space with no data root keeps them in `config/audit/`, as before.
+*Migration note:* nothing to do by hand. The first time the server opens one of them after a data root is set, it
+moves the files from `config/audit/<dir>` to `<data root>/audit/<dir>` and removes the emptied folders. It never
+overwrites: a file already in both places stays in both, the server logs a WARN naming it, and the data-root copy
+is the one read — compare the two and delete the stale one by hand. A file the move could not take is still read
+from `config/audit/`.
+
 **Space references.** `<id>.ref` in the spaces root holds the absolute path of a Space folder elsewhere (e.g.
 `C:\sandbox\spaces\demo` from an install's `spaces\demo.ref`). The folder must be named `<id>` and lie outside the
 spaces root; a real `<id>/` beside the ref wins. Purge of a referenced Space deletes only the `.ref`.

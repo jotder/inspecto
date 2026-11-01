@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.config`](../../../../../product-map/module/config.toon).
 
-23 test class(es): 23 unit, 0 real-HTTP control-plane, 0 IT.
+24 test class(es): 24 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -43,6 +43,7 @@ mvn -o test -pl platform/inspecto-config -Dtest=ConfigCodecTest,ConfigLoaderTest
 | `SafetyPolicyPathsTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/SafetyPolicyPathsTest.java` | Slice S3 of {@code policy-narrowing-design.md}: {@code allow.roots} / {@code deny.roots} reach the path jail, |
 | `SafetyPolicyTierTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/SafetyPolicyTierTest.java` | The Safety Policy fold (design §3): the worked examples E1–E12, the boundary matchers (§3.3), and the |
 | `SchemaCompatibilityTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/SchemaCompatibilityTest.java` | {@link SchemaCompatibility} — the BACKWARD save-gate diff (ELT amendment §3.4.2, D-10). |
+| `SpaceAuditDirTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/SpaceAuditDirTest.java` | SPACE-DATA-ROOT-CONFIG-AUDIT-1: config/audit stores move onto the Space's data root, once, never overwriting. |
 | `StateAdvancePlanTimeTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/StateAdvancePlanTimeTest.java` | Policy-narrowing D9 (S6 plan-time half): {@code permit.advance_state: false} refuses a config that implies an advance. |
 | `StateGateTest` | `com.gamma.config.safety` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/safety/StateGateTest.java` | Slice S6 of {@code policy-narrowing-design.md}: {@link StateGate} over a run's pinned tier. |
 | `AcceptedConfigKeysTest` | `com.gamma.config.spec` | unit | `platform/inspecto-config/src/test/java/com/gamma/config/spec/AcceptedConfigKeysTest.java` | The dead-property census (`DUCKLE-C3-DEAD-PROPERTY-1`): a block no component reads must produce a |
