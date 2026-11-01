@@ -5,10 +5,12 @@ import com.gamma.analytics.forecast.ForecastOutput;
 import com.gamma.analytics.forecast.ForecastSql;
 import com.gamma.analytics.forecast.Forecaster;
 import com.gamma.analytics.score.EntityCap;
+import com.gamma.analytics.time.ChangePoint;
 import com.gamma.analytics.time.TimeGrain;
 import com.gamma.analytics.time.TimeSeriesSql;
 import com.gamma.etl.Identifiers;
 import com.gamma.query.MeasureCompiler;
+import com.gamma.util.SqlIdent;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,7 +25,9 @@ import java.util.Set;
 /**
  * The config grammar of the time-series Steps — {@code transform.timeseries.resample} ({@code steps:} kind
  * {@code resample}) and {@code transform.timeseries.shift} (kind {@code shift}), ANALYTICS-CORE-1 M5, and
- * {@code transform.timeseries.forecast} (kind {@code forecast}, S5; the kernel's {@link Forecaster}) — parsed once, so
+ * {@code transform.timeseries.forecast} (kind {@code forecast}, S5; the kernel's {@link Forecaster}) and
+ * {@code transform.timeseries.changepoint} (kind {@code changepoint}, ANALYTICS-STEPS-TS-1; the kernel's
+ * {@link ChangePoint}, over a residual series and its scale σ) — parsed once, so
  * the run ({@link RowShaper}), the recipe compiler and the save-time check refuse the same configs with the same words.
  * The SQL is the Analytics Kernel's ({@link TimeSeriesSql}, bucketing by {@link TimeGrain}); the resample's aggregates
  * are the Measure grammar's ({@link MeasureCompiler#aggregateSql}).
@@ -48,6 +52,16 @@ public final class TimeSeriesStep {
     static final String RESAMPLE = "transform.timeseries.resample";
     static final String SHIFT = "transform.timeseries.shift";
     static final String FORECAST = "transform.timeseries.forecast";
+    static final String CHANGEPOINT = "transform.timeseries.changepoint";
+
+    /** The longest residual series a change-point takes: the kernel's recursion advances one point per step. */
+    public static final int MAX_CHANGEPOINT_POINTS = 10_000;
+    /** The most series one change-point run takes (the score contract's default cap, as the forecast's). */
+    public static final long MAX_CHANGEPOINT_SERIES = EntityCap.DEFAULT;
+    /** The kernel's rule constants (the Business Assurance template's): z 4, regime run 3, CUSUM k 0.25, h 8. */
+    public static final ChangePoint.Params CHANGEPOINT_DEFAULTS = ChangePoint.Params.of(1.0);
+    /** The columns a change-point adds, 0/1 each: the kernel's flags. */
+    public static final List<String> CHANGEPOINT_FLAGS = List.of("outside_band", "regime_change", "drift_change", "warmup");
 
     /** The longest season a forecast takes, in buckets. */
     public static final int MAX_FORECAST_PERIOD = 1_000;
@@ -203,9 +217,9 @@ public final class TimeSeriesStep {
                 throw bad(FORECAST, "'method' '" + m + "' is not holt_winters or seasonal_naive");
             }
         }
-        int period = wholeNumber(cfg, "period", 2, MAX_FORECAST_PERIOD, "buckets per season, e.g. 7 for daily data "
+        int period = wholeNumber(cfg, "period", FORECAST, 2, MAX_FORECAST_PERIOD, "buckets per season, e.g. 7 for daily data "
                 + "with a weekly pattern");
-        int horizon = wholeNumber(cfg, "horizon", 1, MAX_FORECAST_HORIZON, "how many buckets ahead to forecast");
+        int horizon = wholeNumber(cfg, "horizon", FORECAST, 1, MAX_FORECAST_HORIZON, "how many buckets ahead to forecast");
         List<Double> levels = new ArrayList<>();
         Object lv = cfg.get("levels");
         List<?> raw = lv instanceof List<?> l ? l : lv == null || lv.toString().isBlank() ? List.of()
@@ -315,6 +329,162 @@ public final class TimeSeriesStep {
         return new Shift(time, grain, zone, List.copyOf(groupBy), List.copyOf(columns), periods, suffix);
     }
 
+    /** A parsed change-point config: the residual series and the kernel's rule. */
+    public record Changes(String orderColumn, String residualColumn, String sigmaColumn, Double sigma,
+                          List<String> groupBy, ChangePoint.Params params) {
+
+        /** The column the kernel reads σ from when {@code sigma} is stated as a number. */
+        static final String SIGMA = "__cp_sigma";
+
+        public List<String> inputColumns() {
+            List<String> out = new ArrayList<>(groupBy);
+            out.add(orderColumn);
+            out.add(residualColumn);
+            if (sigmaColumn != null) out.add(sigmaColumn);
+            return out;
+        }
+
+        /** The flag columns every inbound row gains. */
+        public List<String> addedColumns() {
+            return CHANGEPOINT_FLAGS;
+        }
+
+        /** The relation the kernel reads: {@code input} itself, or (σ a number) {@code input} with σ as a column. */
+        public String kernelInputSql(String input) {
+            // a parsed finite double re-printed (Java's shortest round-trip form), never authored text
+            return "SELECT *, CAST(" + Double.toString(sigma) + " AS DOUBLE) AS " + SqlIdent.q(SIGMA) + " FROM " + SqlIdent.q(input);
+        }
+
+        /** Every inbound row, ordered by key then order, with the kernel's flags (NULL on a row with an empty residual). */
+        public String select(String input, String kernelInput) {
+            String kernel = ChangePoint.sql(kernelInput, orderColumn, residualColumn,
+                    sigmaColumn == null ? SIGMA : sigmaColumn, groupBy, params);
+            StringBuilder on = new StringBuilder("i." + SqlIdent.q(residualColumn) + " IS NOT NULL AND i."
+                    + SqlIdent.q(orderColumn) + " = c." + SqlIdent.q(orderColumn));
+            StringBuilder order = new StringBuilder();
+            for (String k : groupBy) {
+                on.append(" AND i.").append(SqlIdent.q(k)).append(" IS NOT DISTINCT FROM c.").append(SqlIdent.q(k));
+                order.append("i.").append(SqlIdent.q(k)).append(", ");
+            }
+            StringBuilder flags = new StringBuilder();
+            for (String f : CHANGEPOINT_FLAGS) flags.append(", c.").append(SqlIdent.q(f));
+            return "SELECT i.*" + flags + " FROM " + SqlIdent.q(input) + " i LEFT JOIN (" + kernel + ") c ON " + on
+                    + " ORDER BY " + order + "i." + SqlIdent.q(orderColumn);
+        }
+
+        /**
+         * One row of problem counts over the kernel's input: {@code series, max_points, duplicated, null_order,
+         * bad_residual, bad_sigma} — see {@link #checkRefusal}.
+         */
+        public String checkSql(String kernelInput) {
+            String rel = SqlIdent.q(kernelInput), ord = SqlIdent.q(orderColumn), res = SqlIdent.q(residualColumn);
+            String sg = "CAST(" + SqlIdent.q(sigmaColumn == null ? SIGMA : sigmaColumn) + " AS DOUBLE)";
+            StringBuilder keys = new StringBuilder();
+            for (String k : groupBy) keys.append(keys.length() == 0 ? "" : ", ").append(SqlIdent.q(k));
+            String byKey = keys.length() == 0 ? "" : " GROUP BY " + keys;
+            String live = " WHERE " + res + " IS NOT NULL";
+            return "SELECT (SELECT count(*) FROM (SELECT DISTINCT " + (keys.length() == 0 ? "1" : keys) + " FROM " + rel
+                    + live + ")) AS series, coalesce((SELECT max(__n) FROM (SELECT count(*) AS __n FROM " + rel + live + byKey
+                    + ")), 0) AS max_points, (SELECT count(*) FROM (SELECT 1 FROM " + rel + live + " GROUP BY "
+                    + (keys.length() == 0 ? "" : keys + ", ") + ord + " HAVING count(*) > 1)) AS duplicated, "
+                    + "(SELECT count(*) FROM " + rel + live + " AND " + ord + " IS NULL) AS null_order, "
+                    + "(SELECT count(*) FROM " + rel + live + " AND NOT isfinite(CAST(" + res + " AS DOUBLE))) AS bad_residual, "
+                    + "(SELECT count(*) FROM " + rel + live + " AND NOT coalesce(" + sg + " > 0 AND isfinite(" + sg
+                    + "), false)) AS bad_sigma";
+        }
+
+        /** The refusal for a {@link #checkSql} row, or {@code null}. */
+        public String checkRefusal(long series, long maxPoints, long duplicated, long nullOrder, long badResidual,
+                                   long badSigma) {
+            if (series > MAX_CHANGEPOINT_SERIES)
+                return CHANGEPOINT + ": " + series + " series is more than the cap of " + MAX_CHANGEPOINT_SERIES
+                        + " - narrow the input or the group_by";
+            if (maxPoints > MAX_CHANGEPOINT_POINTS)
+                return CHANGEPOINT + ": a series has " + maxPoints + " points, more than the cap of "
+                        + MAX_CHANGEPOINT_POINTS + " - use a coarser grain or a shorter history";
+            if (duplicated > 0)
+                return CHANGEPOINT + ": " + duplicated + " '" + orderColumn + "' value(s) repeat within a series - a "
+                        + "series needs one row per key per point; resample first";
+            if (nullOrder > 0)
+                return CHANGEPOINT + ": " + nullOrder + " row(s) have a residual but an empty '" + orderColumn
+                        + "' - filter them out first";
+            if (badResidual > 0)
+                return CHANGEPOINT + ": " + badResidual + " '" + residualColumn + "' value(s) are not finite numbers";
+            if (badSigma > 0)
+                return CHANGEPOINT + ": " + badSigma + " row(s) have a residual but no sigma above 0 in '" + sigmaColumn
+                        + "' - sigma is the residual scale and must be a positive number on every row";
+            return null;
+        }
+    }
+
+    /** Parse and validate a change-point config; {@link IllegalArgumentException} names the first problem. */
+    public static Changes parseChangePoint(Map<?, ?> cfg) {
+        known(cfg, CHANGEPOINT, Set.of("order_column", "residual_column", "sigma", "sigma_column", "group_by", "z",
+                "regime_run", "cusum_k", "cusum_h", "warmup", "rebase"));
+        String order = required(cfg, "order_column", CHANGEPOINT, "the column the series is ordered on (e.g. the bucket)");
+        String residual = required(cfg, "residual_column", CHANGEPOINT, "actual minus expected, e.g. a forecast's error");
+        boolean hasSigma = cfg.get("sigma") != null && !cfg.get("sigma").toString().isBlank();
+        boolean hasColumn = cfg.get("sigma_column") != null && !cfg.get("sigma_column").toString().isBlank();
+        if (hasSigma == hasColumn)
+            throw bad(CHANGEPOINT, "needs exactly one of 'sigma' (the residual scale as a number) or 'sigma_column' "
+                    + "(a column holding it per row, constant per series)");
+        Double sigma = hasSigma ? number(cfg, "sigma", CHANGEPOINT, 0, false, 0) : null;
+        String sigmaColumn = hasColumn ? columnName(cfg.get("sigma_column"), "sigma_column", CHANGEPOINT) : null;
+        List<String> groupBy = identList(cfg, "group_by", CHANGEPOINT);
+        ChangePoint.Params d = CHANGEPOINT_DEFAULTS;
+        Object rb = cfg.get("rebase");
+        boolean rebase = false;
+        if (rb != null && !rb.toString().isBlank()) {
+            String r = rb.toString().trim().toLowerCase(Locale.ROOT);
+            if (!r.equals("true") && !r.equals("false")) throw bad(CHANGEPOINT, "'rebase' '" + rb + "' is not true or false");
+            rebase = r.equals("true");
+        }
+        ChangePoint.Params params = new ChangePoint.Params(sigma == null ? 1.0 : sigma,
+                number(cfg, "z", CHANGEPOINT, 0, false, d.z()),
+                wholeNumber(cfg, "regime_run", CHANGEPOINT, 2, MAX_CHANGEPOINT_POINTS, d.regimeRun()),
+                number(cfg, "cusum_k", CHANGEPOINT, 0, true, d.cusumK()),
+                number(cfg, "cusum_h", CHANGEPOINT, 0, false, d.cusumH()),
+                wholeNumber(cfg, "warmup", CHANGEPOINT, 0, MAX_CHANGEPOINT_POINTS, d.warmup()), rebase);
+        Changes c = new Changes(order, residual, sigmaColumn, sigma, List.copyOf(groupBy), params);
+        Set<String> seen = new HashSet<>();
+        for (String col : c.inputColumns())
+            if (!seen.add(col.toLowerCase(Locale.ROOT)))
+                throw bad(CHANGEPOINT, "column '" + col + "' is named twice - the group_by, order, residual and sigma "
+                        + "columns must all differ");
+        return c;
+    }
+
+    /**
+     * {@code null} when a change-point's flag columns (and, σ a number, its σ column) are free, its residual (and σ)
+     * columns are numbers and its order column a number, DATE or TIMESTAMP, else the refusal; {@code types} maps every
+     * inbound column to its DuckDB type.
+     */
+    public static String changePointRefusal(Changes spec, Map<String, String> types) {
+        List<String> added = new ArrayList<>(CHANGEPOINT_FLAGS);
+        if (spec.sigma() != null) added.add(Changes.SIGMA);
+        for (String f : added)
+            if (types.keySet().stream().anyMatch(x -> x.equalsIgnoreCase(f)))
+                return CHANGEPOINT + ": output column '" + f + "' collides with an inbound column - rename or drop it first";
+        List<String> numbers = spec.sigmaColumn() == null ? List.of(spec.residualColumn())
+                : List.of(spec.residualColumn(), spec.sigmaColumn());
+        for (String c : numbers) {
+            String t = typeOf(types, c);
+            if (!(t.startsWith("DECIMAL") || NUMERIC.contains(t)))
+                return CHANGEPOINT + ": '" + c + "' must be a number, not " + (t.isEmpty() ? "unknown" : t);
+        }
+        // a text order sorts '10' before '9', so the series would be read out of order with no error
+        String o = typeOf(types, spec.orderColumn());
+        if (!(o.startsWith("DECIMAL") || NUMERIC.contains(o) || o.equals("DATE") || o.startsWith("TIMESTAMP")))
+            return CHANGEPOINT + ": '" + spec.orderColumn() + "' must be a number, DATE or TIMESTAMP, not "
+                    + (o.isEmpty() ? "unknown" : o) + " - text sorts 10 before 9";
+        return null;
+    }
+
+    private static String typeOf(Map<String, String> types, String column) {
+        return types.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(column)).map(Map.Entry::getValue)
+                .findFirst().orElse("").toUpperCase(Locale.ROOT).trim();
+    }
+
     /**
      * The first refusal against the inbound columns, or {@code null}: a referenced column missing, or (shift) an
      * added column that collides with an inbound one.
@@ -350,19 +520,19 @@ public final class TimeSeriesStep {
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-    private static void known(Map<?, ?> cfg, String kind, Set<String> keys) {
+    static void known(Map<?, ?> cfg, String kind, Set<String> keys) {
         for (Object k : cfg.keySet())
             if (!keys.contains(String.valueOf(k)))
                 throw bad(kind, "does not take '" + k + "' (keys: " + new java.util.TreeSet<>(keys) + ")");
     }
 
-    private static String required(Map<?, ?> cfg, String key, String kind, String what) {
+    static String required(Map<?, ?> cfg, String key, String kind, String what) {
         Object v = cfg.get(key);
         if (v == null || v.toString().isBlank()) throw bad(kind, "needs a '" + key + "' - " + what);
         return columnName(v, key, kind);
     }
 
-    private static TimeGrain grain(Map<?, ?> cfg, String kind) {
+    static TimeGrain grain(Map<?, ?> cfg, String kind) {
         Object g = cfg.get("grain");
         if (g == null || g.toString().isBlank())
             throw bad(kind, "needs a 'grain' - one of " + grains());
@@ -377,7 +547,7 @@ public final class TimeSeriesStep {
         return java.util.Arrays.stream(TimeGrain.values()).map(TimeGrain::wire).toList();
     }
 
-    private static ZoneId zone(Map<?, ?> cfg, String kind) {
+    static ZoneId zone(Map<?, ?> cfg, String kind) {
         Object z = cfg.get("timezone");
         if (z == null || z.toString().isBlank()) return null;
         try {
@@ -389,7 +559,7 @@ public final class TimeSeriesStep {
         }
     }
 
-    private static LocalDateTime bound(Map<?, ?> cfg, String key, String kind) {
+    static LocalDateTime bound(Map<?, ?> cfg, String key, String kind) {
         Object v = cfg.get(key);
         if (v == null || v.toString().isBlank()) return null;
         String s = v.toString().trim();
@@ -400,17 +570,38 @@ public final class TimeSeriesStep {
         }
     }
 
-    private static int wholeNumber(Map<?, ?> cfg, String key, int min, int max, String what) {
+    static int wholeNumber(Map<?, ?> cfg, String key, String kind, int min, int max, String what) {
         Object v = cfg.get(key);
-        if (v == null || v.toString().isBlank()) throw bad(FORECAST, "needs a '" + key + "' - " + what);
+        if (v == null || v.toString().isBlank()) throw bad(kind, "needs a '" + key + "' - " + what);
         int n;
         try {
             n = Integer.parseInt(v.toString().trim());
         } catch (NumberFormatException e) {
-            throw bad(FORECAST, "'" + key + "' '" + v + "' is not a whole number");
+            throw bad(kind, "'" + key + "' '" + v + "' is not a whole number");
         }
-        if (n < min || n > max) throw bad(FORECAST, "'" + key + "' must be between " + min + " and " + max + ", got " + n);
+        if (n < min || n > max) throw bad(kind, "'" + key + "' must be between " + min + " and " + max + ", got " + n);
         return n;
+    }
+
+    /** An optional whole number in [min, max], {@code dflt} when blank. */
+    static int wholeNumber(Map<?, ?> cfg, String key, String kind, int min, int max, int dflt) {
+        Object v = cfg.get(key);
+        return v == null || v.toString().isBlank() ? dflt : wholeNumber(cfg, key, kind, min, max, "");
+    }
+
+    /** An optional number, {@code dflt} when blank; refused unless finite and {@code > min} ({@code ≥ min} when {@code closed}). */
+    static double number(Map<?, ?> cfg, String key, String kind, double min, boolean closed, double dflt) {
+        Object v = cfg.get(key);
+        if (v == null || v.toString().isBlank()) return dflt;
+        double d;
+        try {
+            d = Double.parseDouble(v.toString().trim());
+        } catch (NumberFormatException e) {
+            throw bad(kind, "'" + key + "' value '" + v + "' is not a number");
+        }
+        if (!Double.isFinite(d) || (closed ? d < min : d <= min))
+            throw bad(kind, "'" + key + "' must be " + (closed ? "at least " : "more than ") + min + ", got " + v);
+        return d;
     }
 
     private static double weight(Map<?, ?> cfg, String key, double dflt) {
@@ -432,7 +623,7 @@ public final class TimeSeriesStep {
         return d;
     }
 
-    private static List<String> identList(Map<?, ?> cfg, String key, String kind) {
+    static List<String> identList(Map<?, ?> cfg, String key, String kind) {
         List<String> out = new ArrayList<>();
         Object v = cfg.get(key);
         if (v instanceof List<?> l) {
@@ -444,7 +635,7 @@ public final class TimeSeriesStep {
         return out;
     }
 
-    private static String columnName(Object o, String where, String kind) {
+    static String columnName(Object o, String where, String kind) {
         String s = o.toString().trim();
         try {
             Identifiers.validate(s, kind + " " + where);
@@ -454,7 +645,7 @@ public final class TimeSeriesStep {
         return s;
     }
 
-    private static IllegalArgumentException bad(String kind, String msg) {
+    static IllegalArgumentException bad(String kind, String msg) {
         return new IllegalArgumentException(kind + " " + msg);
     }
 }

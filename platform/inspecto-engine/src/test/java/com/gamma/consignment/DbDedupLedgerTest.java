@@ -158,4 +158,73 @@ class DbDedupLedgerTest {
             assertEquals(0L, l.size());
         }
     }
+
+    /**
+     * 🔴 OPSTORE-BULK-INSERT-1: the DuckDB bulk claim (Appender + one {@code INSERT … RETURNING}) under real
+     * concurrency, on a FILE-backed ledger. Four Consignments claim overlapping slices of one key pool at
+     * once; every key must be won by exactly one of them, and the ledger must attribute it to that one. A
+     * bulk path that reported its whole input (not only the inserted rows) fails the sum below.
+     */
+    @Test
+    void concurrentBulkClaimsOfOverlappingKeysYieldOneWinnerPerKey(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir)
+            throws Exception {
+        int pool = 3_000, threads = 4, slice = 2_000;
+        List<String> keys = java.util.stream.IntStream.range(0, pool)
+                .mapToObj(i -> DbDedupLedger.hash(List.of("k" + i))).toList();
+        try (DbDedupLedger l = new DbDedupLedger("jdbc:duckdb:" + dir.resolve("dedup.duckdb").toAbsolutePath())) {
+            var start = new java.util.concurrent.CountDownLatch(1);
+            var exec = java.util.concurrent.Executors.newFixedThreadPool(threads);
+            try {
+                List<java.util.concurrent.Future<Set<String>>> futures = new java.util.ArrayList<>();
+                for (int t = 0; t < threads; t++) {
+                    int from = t * (pool - slice) / (threads - 1);   // slices overlap; together they cover the pool
+                    List<String> mine = keys.subList(from, from + slice);
+                    String cid = "c" + t;
+                    futures.add(exec.submit(() -> { start.await(); return l.claim("p", W, cid, mine); }));
+                }
+                start.countDown();
+                List<Set<String>> won = new java.util.ArrayList<>();
+                for (var f : futures) won.add(f.get(60, java.util.concurrent.TimeUnit.SECONDS));
+
+                java.util.Map<String, Integer> winners = new java.util.HashMap<>();
+                for (Set<String> w : won) for (String k : w) winners.merge(k, 1, Integer::sum);
+                assertEquals(pool, winners.size(), "every key in the pool was won by someone");
+                assertTrue(winners.values().stream().allMatch(n -> n == 1), "no key was won twice");
+                assertEquals(pool, won.stream().mapToInt(Set::size).sum(), "won sets are disjoint and cover the pool");
+                assertEquals(pool, l.size());
+                for (int t = 0; t < threads; t++)
+                    assertEquals(won.get(t).size(), l.retract("c" + t), "the ledger attributes each key to its winner");
+            } finally {
+                exec.shutdownNow();
+            }
+        }
+    }
+
+    /** One window's list can repeat a hash (two event dates in one window): it is won once, not refused. */
+    @Test
+    void aHashRepeatedInOneClaimIsWonOnce() throws Exception {
+        try (DbDedupLedger l = ledger()) {
+            String a = DbDedupLedger.hash(List.of("a")), b = DbDedupLedger.hash(List.of("b"));
+            assertEquals(List.of(a, b), List.copyOf(l.claim("p", W, "c1", List.of(a, b, a))),
+                    "both won, once each, in the caller's order");
+            assertEquals(2L, l.size());
+        }
+    }
+
+    /** The per-call staging table is dropped after the claim, on success and when the claim fails. */
+    @Test
+    void theBulkClaimLeavesNoStagingTableBehind() throws Exception {
+        java.sql.Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        try (DbDedupLedger l = new DbDedupLedger(conn)) {
+            l.claim("p", W, "c1", List.of(DbDedupLedger.hash(List.of("a"))));
+            assertThrows(java.sql.SQLException.class, () -> l.claim(null, W, "c2", List.of(DbDedupLedger.hash(List.of("b")))),
+                    "a NULL pipeline violates NOT NULL");
+            try (var st = conn.createStatement();
+                 var rs = st.executeQuery("SELECT count(*) FROM duckdb_tables() WHERE table_name LIKE 'dedup_stage_%'")) {
+                rs.next();
+                assertEquals(0, rs.getInt(1), "no staging table survives a claim");
+            }
+            assertEquals(1L, l.size(), "the failed claim inserted nothing");
+        }
+    }
 }

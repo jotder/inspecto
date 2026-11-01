@@ -185,6 +185,9 @@ public final class RecipeConverter {
                     case PipelineConfig.Step.OUTLIER -> steps.add(step("outlier", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.BINNING -> steps.add(step("binning", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.CORRELATION -> steps.add(step("correlation", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.CHANGEPOINT -> steps.add(step("changepoint", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.RETENTION -> steps.add(step("retention", new LinkedHashMap<>(cfg)));
+                    case PipelineConfig.Step.FUNNEL -> steps.add(step("funnel", new LinkedHashMap<>(cfg)));
                     case PipelineConfig.Step.ROUTE -> {
                         steps.add(step("route", routeStep(cfg, sink, extraSinks, dirs)));
                         routed = true;
@@ -324,6 +327,9 @@ public final class RecipeConverter {
                             case PipelineConfig.Step.OUTLIER -> branchSteps.add(step("outlier", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.BINNING -> branchSteps.add(step("binning", new LinkedHashMap<>(cfg)));
                             case PipelineConfig.Step.CORRELATION -> branchSteps.add(step("correlation", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.CHANGEPOINT -> branchSteps.add(step("changepoint", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.RETENTION -> branchSteps.add(step("retention", new LinkedHashMap<>(cfg)));
+                            case PipelineConfig.Step.FUNNEL -> branchSteps.add(step("funnel", new LinkedHashMap<>(cfg)));
                             default -> branchSteps.add(step(kind, cfg));
                         }
                     }

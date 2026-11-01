@@ -165,7 +165,7 @@ class ControlApiInvestigationListTest {
     }
 
     /**
-     * T-186: the creator's display name is recorded in the Investigation's details at create (and at fork), so the list
+     * T-186: the creator's display name is recorded in the Investigation's details at create (and at fork and template instantiate), so the list
      * names every owner; an Investigation created before that has none, so only its owner (from the Subject) sees a name.
      */
     @Test
@@ -191,6 +191,14 @@ class ControlApiInvestigationListTest {
             ok(c, "POST", "/inv/investigations/inv-new/reorder", "{\"id\":\"inv-fork\",\"order\":[]}", OWNER);
             assertEquals("Analyst One", JSON.readTree(Files.readString(
                     root.resolve("audit/snapshots/investigations/inv-fork/investigation-details.json"))).get("ownerName").asText());
+
+            // DEMO-AUTH-SUBJECT-DISPLAY-NAME-1: an Investigation instantiated from a template records its creator's name too
+            ok(c, "POST", "/inv/investigations/inv-new/ops", "{\"op\":\"seed\",\"ids\":[\"a\"],\"entityType\":\"subscriber\"}", OWNER);
+            ok(c, "POST", "/inv/investigations/inv-new/template", "{\"id\":\"tpl-1\",\"title\":\"one seed\"}", OWNER);
+            ok(c, "POST", "/inv/investigation-templates/tpl-1/instantiate",
+                    "{\"purpose\":\"FR-1\",\"id\":\"inv-tpl\",\"params\":{\"seed1\":[\"a\"]}}", OWNER);
+            assertEquals("Analyst One", JSON.readTree(Files.readString(
+                    root.resolve("audit/snapshots/investigations/inv-tpl/investigation-details.json"))).get("ownerName").asText());
 
             ok(c, "PATCH", "/inv/investigations/inv-new", "{\"title\":\"Renamed\"}", OWNER);
             assertEquals("Analyst One", item(ok(c, "GET", "/inv/investigations", null, MEMBER), "inv-new").get("ownerName").asText(),

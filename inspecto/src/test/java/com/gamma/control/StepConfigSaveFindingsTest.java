@@ -639,6 +639,46 @@ class StepConfigSaveFindingsTest {
                 "the outlier and bin columns flow on: correlation may read outlier_upper");
     }
 
+    // ── change point and cohort Steps (ANALYTICS-STEPS-TS-1) ─────────────────────
+
+    @Test
+    void aChangePointWithoutSigmaIsRefusedEvenWithNoSchema(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("changepoint",
+                Map.of("order_column", "ID", "residual_column", "QTY"))))), "steps[0].changepoint", "exactly one of 'sigma'");
+    }
+
+    @Test
+    void aChangePointOnAMissingColumnIsRefusedAndItsFlagsFlowOn(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("changepoint",
+                Map.of("order_column", "ID", "residual_column", "NOPE", "sigma", 2))))), "steps[0].changepoint", "NOPE");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("changepoint", Map.of("order_column", "ID", "residual_column", "QTY", "sigma", 2)),
+                Map.of("correlation", Map.of("columns", List.of("QTY", "regime_change")))))),
+                "the four flags flow on: correlation may read regime_change");
+    }
+
+    @Test
+    void aCohortStepOnTheWrongTimeTypeIsRefusedAndItsOutputReplacesTheColumns(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("retention",
+                Map.of("entity_column", "ID", "time_column", "QTY", "grain", "month", "through", "2026-06-30"))))),
+                "steps[0].retention", "must be a DATE or TIMESTAMP");
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(Map.of("funnel",
+                Map.of("entity_column", "ID", "step_column", "ID", "time_column", "QTY", "steps", List.of("a", "b")))))),
+                "steps[0].funnel", "named twice");
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("retention",
+                Map.of("entity_column", "ID", "time_column", "TS", "grain", "minute", "through", "2026-06-30"))))),
+                "steps[0].retention", "hour or coarser");
+        // ID is VARCHAR here, which fails open as a time column (a mapping-derived column is typed VARCHAR)
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("retention", Map.of("entity_column", "QTY", "time_column", "ID", "grain", "month",
+                        "through", "2026-06-30")),
+                Map.of("outlier", Map.of("column", "QTY"))))), "steps[1].outlier", "QTY");
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("retention", Map.of("entity_column", "QTY", "time_column", "ID", "grain", "month",
+                        "through", "2026-06-30")),
+                Map.of("outlier", Map.of("column", "rate"))))), "a retention's output feeds the next Step");
+    }
+
     // ── severity, silence and the valid shapes ───────────────────────────────────
 
     @Test

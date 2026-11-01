@@ -1016,6 +1016,67 @@ class NodeConfigNameContractTest {
         assertEquals(com.gamma.analytics.distribution.CorrelationSql.Method.SPEARMAN, c.method());
     }
 
+    /**
+     * The change-point and cohort Steps' contract (ANALYTICS-STEPS-TS-1): {@code changepoint:}, {@code retention:} and
+     * {@code funnel:} each lift to ONE node of their type, an edit of every declared key survives the lower and still
+     * parses as the run reads it.
+     */
+    @Test
+    void changePointAndCohortAttributesSurviveTheSave(@TempDir Path dir) throws Exception {
+        Map<String, Object> cp = new LinkedHashMap<>();
+        cp.put("order_column", "EVENT_DATE");
+        cp.put("residual_column", "QTY");
+        cp.put("sigma", 2.5);
+        cp.put("sigma_column", "PRICE");
+        cp.put("group_by", List.of("ID"));
+        cp.put("z", 3.5);
+        cp.put("regime_run", 4);
+        cp.put("cusum_k", 0.5);
+        cp.put("cusum_h", 6);
+        cp.put("warmup", 7);
+        cp.put("rebase", true);
+        // sigma and sigma_column are either-or: both survive the save, then each is read on its own
+        Map<String, Object> saved = new LinkedHashMap<>(
+                timeSeriesSavedAs(dir.resolve("c"), "changepoint", "transform.timeseries.changepoint", cp));
+        Map<String, Object> byNumber = new LinkedHashMap<>(saved);
+        byNumber.remove("sigma_column");
+        assertEquals(2.5, com.gamma.pipeline.exec.TimeSeriesStep.parseChangePoint(byNumber).sigma());
+        saved.remove("sigma");
+        var c = com.gamma.pipeline.exec.TimeSeriesStep.parseChangePoint(saved);
+        assertEquals("PRICE", c.sigmaColumn());
+        assertEquals(List.of("ID"), c.groupBy());
+        assertEquals(new com.gamma.analytics.time.ChangePoint.Params(1.0, 3.5, 4, 0.5, 6.0, 7, true), c.params());
+
+        Map<String, Object> ret = new LinkedHashMap<>();
+        ret.put("entity_column", "ID");
+        ret.put("time_column", "EVENT_DATE");
+        ret.put("grain", "week");
+        ret.put("through", "2026-06-30");
+        ret.put("timezone", "Europe/Berlin");
+        ret.put("from", "2026-01-01");
+        ret.put("mode", "unbounded");
+        ret.put("max_periods", 12);
+        var r = com.gamma.pipeline.exec.CohortStep.parseRetention(
+                timeSeriesSavedAs(dir.resolve("r"), "retention", "transform.cohort.retention", ret));
+        assertEquals(com.gamma.analytics.time.TimeGrain.WEEK, r.params().grain());
+        assertEquals(java.time.ZoneId.of("Europe/Berlin"), r.params().zone());
+        assertEquals(java.time.LocalDateTime.of(2026, 6, 30, 0, 0), r.params().through());
+        assertEquals(java.time.LocalDateTime.of(2026, 1, 1, 0, 0), r.params().from());
+        assertEquals(com.gamma.analytics.cohort.Retention.Mode.UNBOUNDED, r.params().mode());
+        assertEquals(12, r.params().maxPeriods());
+
+        Map<String, Object> fun = new LinkedHashMap<>();
+        fun.put("entity_column", "ID");
+        fun.put("step_column", "PRICE");
+        fun.put("time_column", "EVENT_DATE");
+        fun.put("steps", List.of("visit", "signup", "buy"));
+        fun.put("within", "48h");
+        var f = com.gamma.pipeline.exec.CohortStep.parseFunnel(
+                timeSeriesSavedAs(dir.resolve("f"), "funnel", "transform.cohort.funnel", fun));
+        assertEquals(List.of("visit", "signup", "buy"), f.params().steps());
+        assertEquals(java.time.Duration.ofHours(48), f.params().within());
+    }
+
     private static Map<String, Object> timeSeriesSavedAs(Path dir, String kind, String type, Map<String, Object> edited)
             throws Exception {
         java.nio.file.Files.createDirectories(dir);

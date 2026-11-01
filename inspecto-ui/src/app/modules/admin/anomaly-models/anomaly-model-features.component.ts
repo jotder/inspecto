@@ -134,7 +134,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                         <p class="text-secondary text-xs">Only rows matching every filter are measured.</p>
                         @for (fg of filtersOf(g).controls; track fg; let j = $index) {
                             <div
-                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+                                class="mt-2 grid grid-cols-1 items-start gap-x-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
                                 role="group"
                                 [formGroupName]="j"
                                 [attr.aria-label]="'Feature ' + (i + 1) + ' filter ' + (j + 1)"
@@ -149,8 +149,9 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                                     formControlName="op"
                                     [options]="filterOps"
                                 ></inspecto-option-picker>
+                                <!-- Value and the remove button go on the next line, so Operator keeps half the width ("equals (=)" clipped at 1024 px) -->
                                 @if (takesValue(fg)) {
-                                    <mat-form-field subscriptSizing="dynamic">
+                                    <mat-form-field subscriptSizing="dynamic" class="sm:col-span-2">
                                         <mat-label>Value</mat-label>
                                         <input
                                             matInput
@@ -162,7 +163,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                                         }
                                     </mat-form-field>
                                 } @else {
-                                    <span></span>
+                                    <span class="sm:col-span-2"></span>
                                 }
                                 <button
                                     mat-icon-button
@@ -174,7 +175,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                                     <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                                 @if (filterMissing(fg).length) {
-                                    <p class="text-warn text-xs sm:col-span-4" role="alert">
+                                    <p class="text-warn text-xs sm:col-span-3" role="alert">
                                         Choose: {{ filterMissing(fg).join(', ') }}
                                     </p>
                                 }

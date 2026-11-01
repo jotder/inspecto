@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.demo-auth` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `DEMO-AUTH-SUBJECT-DISPLAY-NAME-1` | P3 | defect | a Demo Auth Subject carries no display name, so a new Investigation records no owner name (T-186) and File ▸ Open… shows the login id. | — |
+_No open rows._

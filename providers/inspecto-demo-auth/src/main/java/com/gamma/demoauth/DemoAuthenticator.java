@@ -60,8 +60,10 @@ public final class DemoAuthenticator implements Authenticator {
         }
         capabilities.removeAll(AccessGrants.deniedCapabilities(ex, held));
         ComponentAccess.heldRoles(ex, Set.copyOf(held));
+        // DEMO-AUTH-SUBJECT-DISPLAY-NAME-1: the name is the Subject's displayName COMPONENT (what the session and T-186's owner
+        // name read); left only in attributes, every Demo User showed as their login id.
         return Optional.of(new Subject(user.id(), Set.copyOf(capabilities), held.isEmpty() ? Set.of() : unscoped ? null : Set.copyOf(scopes),
-                Map.of("displayName", user.displayName(), "demoUser", true)));
+                Map.of("displayName", user.displayName(), "demoUser", true), null, user.displayName()));
     }
 
     /**

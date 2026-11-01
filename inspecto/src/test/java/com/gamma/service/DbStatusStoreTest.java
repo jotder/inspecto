@@ -281,4 +281,57 @@ class DbStatusStoreTest {
     void reopeningAnExistingDatabaseIsIdempotent() {
         assertDoesNotThrow(() -> new DbStatusStore(conn), "CREATE INDEX IF NOT EXISTS re-runs cleanly");
     }
+
+    /** A source of {@code n} batch rows and one unpack row, for the bulk-path tests below. */
+    private static com.gamma.etl.StatusStore source(int n) {
+        return new com.gamma.etl.StatusStore() {
+            @Override public Set<String> committedBatches(PipelineConfig c) { return Set.of("b0"); }
+            @Override public List<Map<String, String>> batches(PipelineConfig c) {
+                return java.util.stream.IntStream.range(0, n)
+                        .mapToObj(i -> Map.of("consignment_id", "b" + i, "status", "SUCCESS")).toList();
+            }
+            @Override public List<Map<String, String>> files(PipelineConfig c) { return List.of(); }
+            @Override public List<Map<String, String>> lineage(PipelineConfig c, String batchId) {
+                return List.of(Map.of("rows", "3"));   // no consignment_id: batch_id is NULL
+            }
+            @Override public List<Map<String, String>> quarantine(PipelineConfig c) { return List.of(); }
+            @Override public List<Map<String, String>> unpack(PipelineConfig c) { return List.of(Map.of("member", "m")); }
+        };
+    }
+
+    /**
+     * OPSTORE-BULK-INSERT-1: on DuckDB the sync writes through an Appender, which must stay inside the sync's
+     * transaction. A failure on the LAST table (an unpack table with a column the Appender does not fill)
+     * must roll back the earlier tables' DELETE and appended rows alike: the old projection survives intact.
+     */
+    @Test
+    void aFailedBulkSyncRollsBackEveryTable(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(
+                TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write().toString());
+        db.sync(source(2), List.of(cfg));
+        assertEquals(2, db.batches(cfg).size());
+        assertNull(db.lineage(cfg, null).get(0).get("consignment_id"), "a row with no batch id projects as NULL");
+
+        try (var st = conn.createStatement()) {
+            st.execute("DROP TABLE inspecto_status_unpack");
+            st.execute("CREATE TABLE inspecto_status_unpack (pipeline VARCHAR, seq BIGINT, payload VARCHAR, extra VARCHAR NOT NULL)");
+        }
+        db.sync(source(5), List.of(cfg));   // fails on the unpack table: logged, rolled back
+
+        assertEquals(2, db.batches(cfg).size(), "the earlier tables' rows were rolled back with the failure");
+        assertEquals(Set.of("b0"), db.committedBatches(cfg));
+    }
+
+    /** The bulk path at a size the old per-row insert took seconds over: rows land in order, a re-sync replaces them. */
+    @Test
+    void aLargeSyncRoundTripsAndAReSyncReplaces(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(
+                TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write().toString());
+        db.sync(source(20_000), List.of(cfg));
+        List<Map<String, String>> rows = db.batches(cfg);
+        assertEquals(20_000, rows.size());
+        assertEquals("b19999", rows.get(19_999).get("consignment_id"), "seq order is the source order");
+        db.sync(source(3), List.of(cfg));
+        assertEquals(3, db.batches(cfg).size(), "a re-sync replaces, never appends");
+    }
 }

@@ -69,6 +69,9 @@ Packages under `platform/inspecto-analytics/src/main/java/com/gamma/analytics`:
 - **Forecasting.** `SEASONAL_NAIVE` and additive `HOLT_WINTERS` with declared parameters (nothing
   fitted), as a JVM kernel and as SQL, plus prediction intervals. Serves
   `transform.timeseries.forecast`.
+- **Change points and cohorts.** Regime-change and drift flags over a residual series, cohort
+  retention and an ordered funnel, each as a JVM kernel and as SQL. Serve
+  `transform.timeseries.changepoint`, `transform.cohort.retention` and `transform.cohort.funnel`.
 - **Similarity kit.** Jaro, Jaro-Winkler, Levenshtein, Jaccard and normalization, each with a
   DuckDB form. Serves Screening and the `transform.similarity` Step.
 - **Accuracy, seasonality, holdout.** Accuracy measures, a rolling-origin backtest, seasonality

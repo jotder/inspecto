@@ -154,9 +154,40 @@ public class DuckDbBench {
                     }
                 }
                 m.put("resync_rps", rate(resync * 200L, t));
+                // OPSTORE-BULK-INSERT-1 bulk shapes, as DbDedupLedger.claim / DbStatusStore.sync now write on DuckDB
+                c.setAutoCommit(true);
+                m.put("ledger_bulk_rps", ledgerBulk(c, big, 20_000_000));
+                m.put("ledger_bulk_dupe_rps", ledgerBulk(c, big, 20_000_000));   // every key conflicts
+                c.setAutoCommit(false);
+                t = System.nanoTime();
+                try (PreparedStatement d = c.prepareStatement("DELETE FROM rows_t WHERE pipeline = ?")) {
+                    for (int r = 0; r < resync; r++) {
+                        d.setString(1, "p" + r % 5); d.executeUpdate();
+                        try (org.duckdb.DuckDBAppender a = c.unwrap(org.duckdb.DuckDBConnection.class).createAppender("", "rows_t")) {
+                            for (int i = 0; i < 200; i++) { a.beginRow(); a.append("p" + r % 5); a.append(i); a.append("payload " + i); a.endRow(); }
+                        }
+                        c.commit();
+                    }
+                }
+                m.put("resync_bulk_rps", rate(resync * 200L, t));
             }
             return m;
         };
+    }
+
+    /** Appender into a TEMP staging table, then one INSERT … SELECT … ON CONFLICT DO NOTHING RETURNING (the won keys). */
+    static double ledgerBulk(Connection c, int rows, int off) throws SQLException {
+        long t = System.nanoTime();
+        try (Statement st = c.createStatement()) {
+            st.execute("CREATE TEMP TABLE stage (k VARCHAR)");
+            try (org.duckdb.DuckDBAppender a = c.unwrap(org.duckdb.DuckDBConnection.class).createAppender("temp", "main", "stage")) {
+                for (int i = 0; i < rows; i++) { a.beginRow(); a.append("file-" + (i + off)); a.endRow(); }
+            }
+            drain(st, "INSERT INTO ledger SELECT k, 'pipe', 'md5', 'claimed', now() FROM (SELECT DISTINCT k FROM temp.main.stage)"
+                    + " ON CONFLICT DO NOTHING RETURNING k");
+            st.execute("DROP TABLE temp.main.stage");
+        }
+        return rate(rows, t);
     }
 
     static double ledger(Connection c, String ins, int rows, int off, boolean batch) throws SQLException {

@@ -414,10 +414,29 @@ public final class PipelineConfig {
          * spelling - always {@code steps:}.
          */
         public static final String CORRELATION = "correlation";
+        /**
+         * Change points in a residual series ({@code transform.timeseries.changepoint}, ANALYTICS-STEPS-TS-1). Keys:
+         * {@code order_column}, {@code residual_column}, {@code sigma} or {@code sigma_column}, optional {@code group_by},
+         * {@code z}, {@code regime_run}, {@code cusum_k}, {@code cusum_h}, {@code warmup}, {@code rebase}. No legacy
+         * spelling - always {@code steps:}.
+         */
+        public static final String CHANGEPOINT = "changepoint";
+        /**
+         * Cohort retention ({@code transform.cohort.retention}, ANALYTICS-STEPS-TS-1) - one row per cohort per period.
+         * Keys: {@code entity_column}, {@code time_column}, {@code grain}, {@code through}, optional {@code timezone},
+         * {@code from}, {@code mode}, {@code max_periods}. No legacy spelling - always {@code steps:}.
+         */
+        public static final String RETENTION = "retention";
+        /**
+         * An ordered conversion funnel ({@code transform.cohort.funnel}, ANALYTICS-STEPS-TS-1) - one row per step. Keys:
+         * {@code entity_column}, {@code step_column}, {@code time_column}, {@code steps}, optional {@code within}. No
+         * legacy spelling - always {@code steps:}.
+         */
+        public static final String FUNNEL = "funnel";
 
         /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them
-         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST}, {@link #SIMILARITY}, {@link #RANK}, {@link #SAMPLE}, {@link #PIVOT}, {@link #ENTITY_LINK}, {@link #OUTLIER}, {@link #BINNING} and {@link #CORRELATION} last: none has a legacy projection at all). */
-        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY, RANK, SAMPLE, PIVOT, ENTITY_LINK, OUTLIER, BINNING, CORRELATION);
+         *  ({@link #LOOKUP}, {@link #SQL}, {@link #RUNNING}, {@link #HASH}, {@link #MASK}, {@link #EXPLODE}, {@link #UNPIVOT}, {@link #RESAMPLE}, {@link #SHIFT}, {@link #FORECAST}, {@link #SIMILARITY}, {@link #RANK}, {@link #SAMPLE}, {@link #PIVOT}, {@link #ENTITY_LINK}, {@link #OUTLIER}, {@link #BINNING}, {@link #CORRELATION}, {@link #CHANGEPOINT}, {@link #RETENTION} and {@link #FUNNEL} last: none has a legacy projection at all). */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, PROFILE, ROUTE, LOOKUP, SQL, RUNNING, HASH, MASK, EXPLODE, UNPIVOT, RESAMPLE, SHIFT, FORECAST, SIMILARITY, RANK, SAMPLE, PIVOT, ENTITY_LINK, OUTLIER, BINNING, CORRELATION, CHANGEPOINT, RETENTION, FUNNEL);
 
         public Step {
             config = (config == null) ? Map.of() : Map.copyOf(config);

@@ -93,7 +93,8 @@ public final class PipelineSchemas {
             PipelineConfig.Step.EXPLODE, PipelineConfig.Step.UNPIVOT, PipelineConfig.Step.RESAMPLE,
             PipelineConfig.Step.SHIFT, PipelineConfig.Step.FORECAST, PipelineConfig.Step.SIMILARITY,
             PipelineConfig.Step.RANK, PipelineConfig.Step.PIVOT, PipelineConfig.Step.ENTITY_LINK,
-            PipelineConfig.Step.OUTLIER, PipelineConfig.Step.BINNING, PipelineConfig.Step.CORRELATION);
+            PipelineConfig.Step.OUTLIER, PipelineConfig.Step.BINNING, PipelineConfig.Step.CORRELATION,
+            PipelineConfig.Step.CHANGEPOINT, PipelineConfig.Step.RETENTION, PipelineConfig.Step.FUNNEL);
 
     /** The schemas a pipeline declares, in the order the Catalog lays them out. */
     public static List<Entry> entries(PipelineConfig cfg) {

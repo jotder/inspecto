@@ -33,6 +33,38 @@ faster, 4–8 concurrent readers about 10–20 % slower; row-at-a-time JDBC inse
 hundreds of rows/s on BOTH versions (`OPSTORE-BULK-INSERT-1`). The decision, every measurement and the trial history
 are in the archived [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md).
 
+### Bulk inserts into the operational stores (`OPSTORE-BULK-INSERT-1`, 2026-11-01)
+
+A row per JDBC statement into a file-backed DuckDB runs at hundreds of rows/s, batched or not. The real per-call
+batch sizes decided where a bulk path pays:
+
+| Writer | Rows per call | DuckDB path now |
+|---|---|---|
+| `DbDedupLedger.claim` | every distinct key of one Consignment's window (thousands to millions) | Appender into a per-call TEMP staging table, then ONE `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING RETURNING key_hash`; `RETURNING` yields only the inserted rows, which is the won set |
+| `DbStatusStore.sync` | every status row of every Pipeline, after each committing poll | Appender straight into each table, inside the sync's transaction (a failed sync still rolls back every table) |
+| `RowShaper.windowedDedup` lost-key scratch table (in-memory) | every lost key (all of them on a re-ingest) | Appender |
+| `DbEventStore.append` | ONE event, audit-chained | unchanged: nothing to batch |
+
+Postgres keeps its statements: the claim stays one row per autocommit statement (the pool is truly concurrent, and a
+multi-row claim could deadlock two overlapping claimers), and the sync keeps its batched `INSERT`. The DuckDB source is
+one `synchronized` connection, so claims on it are serial in-process, and the file lock keeps other processes out.
+Exactly one claimer wins each key; pinned by `DbDedupLedgerTest.concurrentBulkClaimsOfOverlappingKeysYieldOneWinnerPerKey`
+(4 threads, overlapping slices, file-backed; it fails when the bulk path reports its whole input as won) and run on
+Postgres by `PostgresStateStoreTest` / `PostgresSchemaPerSpaceStoresTest`.
+
+Measured 2026-11-01, DuckDB 2.0.0, `tools/bench-duckdb.ps1 -Workloads store -Warmup 0 -Reps 2 -Scale 0.2` (10,000-row
+ledger steps, 20 × 200-row re-syncs; rates are per row, so scale does not change them). Range over the two reps:
+
+| Shape | Before (row per statement) | After (bulk) |
+|---|---|---|
+| ledger claim, new keys | `ledger_batch_rps` 224–244 rows/s | `ledger_bulk_rps` 74,930–88,532 rows/s |
+| ledger claim, every key a duplicate | `ledger_dupe_rps` 182–225 rows/s | `ledger_bulk_dupe_rps` 228,689–245,654 rows/s |
+| status re-sync (DELETE + insert, commit each) | `resync_rps` 1,419–1,924 rows/s | `resync_bulk_rps` 28,705–30,322 rows/s |
+
+`upsert_rps` (215–257) and `events_batch_rps` (450–640) are unchanged: the one product upsert,
+`DbConsignmentOutputStore.record`, writes one row per output file of a Consignment (a handful per call), and events
+arrive one per `append`, so neither batch justifies a bulk path.
+
 ### Decimal widening audit (`DUCKDB-2-DECIMAL-WIDENING-AUDIT-1`, 2026-10-31)
 
 **The rule, measured** on the 1.5.6.0 and 2.0.0.0 JDBC drivers side by side:
