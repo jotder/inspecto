@@ -39,7 +39,9 @@ Package `com.gamma.demoauth`, registered in
    known Space (the identity is global; the bound Space decides which role names it grants).
 3. Roles filtered to those the Space's effective role table defines; capabilities are their union minus
    Access Profile denials; data scopes are the union, or unscoped if any held role is unscoped.
-4. Subject attributes: `displayName`, `demoUser: true`. Held roles are published for component sharing.
+4. Subject `displayName`: the Demo User's name, which the session and an Investigation's owner name read
+   (`DEMO-AUTH-SUBJECT-DISPLAY-NAME-1`, 2026-11-01: before that it sat only in the attributes, so every Demo User showed as their login
+   id). Subject attributes: `displayName`, `demoUser: true`. Held roles are published for component sharing.
 
 `principals(configRoot)` returns the same identities `authenticate` accepts, for approver and sharing pickers.
 

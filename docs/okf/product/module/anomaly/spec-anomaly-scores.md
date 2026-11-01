@@ -290,9 +290,13 @@ Polished 2026-10-14 (SPA side of `ANOMALY-UI-FINDINGS-1`): the panel (and the Ri
 date-time spelling with the raw value in a `title`; the sparkline draws one point per `period_start` (the latest run wins);
 a constant day series gets a padded y axis (value ± max(1, 10 %)) instead of -200..200; counts read "1 feature" / "1 factor";
 the edit dialog lists every Dataset without probing and reads columns only for the Datasets the model's Features reference (or a user picks), once per open, from the list it already holds (no per-Dataset GET, so a one-Dataset model opens with 1 list + 1 probe; a 404 probe
-still shows in the browser console, which a page cannot suppress) and lays Feature fields out two per row.
+still shows in the browser console, which a page cannot suppress) and lays Feature fields out two per row. A Feature
+filter row gives Column and Operator half the width each, with Value and the remove button on the next line (2026-11-01: in four
+columns the Operator select clipped "equals (=)" at 1024 px).
 
-The layout was checked live 2026-10-17. What remains of `ANOMALY-UI-FINDINGS-1` is a live check of the sign-in return path under a real token lapse / 401.
+The layout was checked live 2026-10-17, and again 2026-11-01 at 1024 px: opening the dialog makes one Dataset-list GET and
+no Schema probe; no Feature select clips (the longest operator, "is one of (comma-separated)", included); the
+preview's Reason column holds 256 px inside the horizontally scrolling table. What remains of `ANOMALY-UI-FINDINGS-1` is a live check of the sign-in return path under a real token lapse / 401.
 
 Sign-in return path (2026-10-31): only a LOST session records the page to return to (the route guard, a failed
 refresh, an unexpected 401). A deliberate sign-out does not: `SessionService.logout()` calls `onAuthLost(false)`, so

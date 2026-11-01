@@ -239,6 +239,18 @@ describe('AnomalyModelFormDialog', () => {
         expect(f['unit']).toBe(5);
     });
 
+    it('gives a filter row’s Column and Operator half the width each, with Value on the next line', async () => {
+        const { fixture } = setup(WITH_FILTERS);
+        await flush();
+        fixture.detectChanges();
+        const row = (fixture.nativeElement as HTMLElement).querySelector(
+            '[role="group"][aria-label="Feature 1 filter 1"]',
+        ) as HTMLElement;
+        // jsdom has no layout: pin the tracks. Operator in a 1fr of four columns clipped "equals (=)" at 1024 px.
+        expect(row.className).toContain('sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]');
+        expect(row.querySelector('mat-form-field')!.classList).toContain('sm:col-span-2');
+    });
+
     it('writes edited filters per operator and leaves no key for an empty list or a blank unit', async () => {
         const { fixture, cmp, update } = setup(EXISTING);
         await flush();
