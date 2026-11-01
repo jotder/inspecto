@@ -213,7 +213,7 @@ output:
   `@`, `?`, `#`, whitespace: DuckDB dials the authority it parses from `ENDPOINT`, so
   `evil:80/x.allowed.com` would pass an allow-list pattern yet dial `evil` — verification finding) and then
   passed through `EgressGate` (DuckDB's S3 client dials from native code, past every Java-side egress hop); `httpfs` loaded; then `CREATE OR REPLACE SECRET inspecto_output_store
-  (TYPE s3, …, SCOPE '<prefix>')` — temporary, in memory, shown redacted by `duckdb_secrets()`. The seal adds the
+  (TYPE s3, …, SCOPE '<prefix>/')` (the trailing `/` matters: DuckDB matches a scope as a string prefix) — temporary, in memory, shown redacted by `duckdb_secrets()`. The seal adds the
   prefix to `allowed_directories`; `ingestAllowedDirs` leaves the URI out of the local list.
 * **What the write looks like** is `PartitionWriter.writeToObjectStore`: no staging, no reveal, a repeat write
   accumulates (`spec-db-layer.md` § the output registry).
@@ -222,16 +222,32 @@ output:
   refused there.
 * **Refused by name** (each a `SQLException` at `configure`, so the batch fails before any I/O), decided
   under operator delegation 2026-11-01, pending confirmation: no / unregistered / non-`s3` / tunnelled or
-  proxied / keyless Connection; a `sinks:` list; `produces: reference`; `output.ducklake.enabled`. Readers of
+  proxied / keyless Connection; a `sinks:` list; `produces: reference`. Readers of
   an object-store pipeline's output (DB browser, join reference, enrichment) skip it, and the seal then
-  refuses the read. Left open on the row: DuckLake registration (so `-Dinspecto.topology=partitioned`
-  cannot use an object store yet), fan-out, reference stores, readers.
+  refuses the read. Left open on the row: fan-out, reference stores, readers.
+* **DuckLake registration (built 2026-11-01).** `output.ducklake.enabled` is accepted with an object-store
+  database, so `-Dinspecto.topology=partitioned` (which requires registration) can use one. The registrar
+  opens its own, unsealed connection, which held no credentials; `ConsignmentIngestor.finalizeSource` now
+  passes it a `DuckLakeRegistrar.ConnectionSetup` from `ObjectStoreDatabase.registrarSetup`, run after the
+  extensions load and before the `ATTACH`: the same checks as `prepare` (containment, shape, Connection,
+  bare host, `EgressGate`), then the same prefix-scoped `inspecto_output_store` secret. ⛔ Because that
+  connection has no seal, every written file is first judged by `PathJail.requireObjectStore` against the
+  database prefix alone; a file outside it (a sibling prefix, `..`, another bucket, a local path) fails the
+  batch before registration — decided under operator delegation 2026-11-01, pending confirmation, as is the
+  consequence that a partition value whose key segment falls outside the containment rule's character set
+  fails a registered batch rather than registering it. The setup is built only when the lake is enabled, so
+  an unregistered pipeline is unchanged. The lake's own `data_path` / catalog credentials are untouched:
+  the secret is scoped to the database prefix, so a lake whose `data_path` is in a bucket outside that prefix still needs its
+  own credentials, as before.
 * **The Connection's `base_path` is not consulted** — the allow-list bounds where; the Connection supplies
   only the endpoint and credentials.
 
-Tests: `ObjectStoreIngestTest` (14 — every refusal one key away from the accepted shape; the live case runs a
+Tests: `ObjectStoreIngestTest` (18 — every refusal one key away from the accepted shape; the live case runs a
 CSV pipeline into MinIO and an `fn: custom` expression reading the same bucket outside the prefix lands
-nothing; SKIPS without `INSPECTO_TEST_S3_ENDPOINT`/`_KEY`/`_SECRET`, and a skip is not a pass),
+nothing; a second live case registers the bucket output in a local-file DuckLake catalog and reads both rows
+back from the lake — red when the setup is not passed; `aWrittenFileOutsideThePrefixIsNotRegistered` is red
+when the per-file containment check is removed; both run live 2026-11-01 against MinIO, none skipped. ⚠ A
+shared Postgres catalog under `partitioned` was not run live; SKIPS without `INSPECTO_TEST_S3_ENDPOINT`/`_KEY`/`_SECRET`, and a skip is not a pass),
 `ConfigSafetyValidatorTest.outputConnectionIsRequiredForAnObjectStoreDatabaseAndRefusedForALocalOne`.
 
 ## Quarantine outcomes

@@ -6,12 +6,13 @@ import com.gamma.auth.secrets.SecretResolver;
 import com.gamma.config.safety.EgressGate;
 import com.gamma.config.safety.PathJail;
 import com.gamma.etl.DuckDbExtension;
+import com.gamma.etl.DuckLakeRegistrar;
 import com.gamma.etl.PipelineConfig;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Map;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static com.gamma.util.SqlIdent.sqlStr;
@@ -25,8 +26,9 @@ import static com.gamma.util.SqlIdent.sqlStr;
  * prefix and nothing else ({@code SqlSandbox.sealAllowing}).
  *
  * <p>Refused by name (pending operator confirmation, decided 2026-11-01 under delegation — the conservative
- * reading): several {@code sinks:}, {@code produces: reference} (its versioned store and merge read the store
- * through {@code java.nio}), and DuckLake registration (the registrar's own connection holds no credentials yet).
+ * reading): several {@code sinks:} and {@code produces: reference} (its versioned store and merge read the store
+ * through {@code java.nio}). DuckLake registration of the output is built: {@link #registrarSetup} gives the
+ * registrar's own connection the same prefix-scoped secret.
  * The Connection's {@code base_path} is not consulted: the operator allow-list ({@code -Dassist.safety.object_roots})
  * is what bounds where a pipeline may write, and the Connection supplies only the endpoint and credentials.
  */
@@ -40,6 +42,53 @@ final class ObjectStoreDatabase {
 
     /** @return the contained database prefix ({@code s3://bucket/key}, no trailing {@code /}) to admit on the seal */
     static String prepare(Connection conn, PipelineConfig cfg) throws SQLException {
+        Store store = resolve(cfg);
+        // LOAD is file access: after the seal it is refused like any other.
+        store.createSecret(conn, "writing to");
+        return store.root();
+    }
+
+    /**
+     * The registrar's connection setup for this batch's output: the same checks as {@link #prepare}, then the
+     * same prefix-scoped secret on the registrar's own (unsealed) connection, so the {@code INSERT … SELECT}
+     * from the written Parquet can read the bucket. ⛔ Every file must lie under the contained prefix: that
+     * connection has no seal, so a path outside the prefix would be read with whatever it can reach.
+     */
+    static DuckLakeRegistrar.ConnectionSetup registrarSetup(PipelineConfig cfg, List<String> files) throws SQLException {
+        Store store = resolve(cfg);
+        for (String f : files) {
+            try {   // the containment rule itself, segment-wise: '..' or a sibling prefix never passes
+                PathJail.requireObjectStore(List.of(store.root()), f, "a written file");
+            } catch (PathJail.Escape refused) {
+                throw refuse("not registering in DuckLake: " + refused.getMessage());
+            }
+        }
+        return conn -> store.createSecret(conn, "registering in DuckLake the output of");
+    }
+
+    /** A contained, gated object-store database and the credentials that reach it. */
+    private record Store(String root, ConnectionProfile p, String secret) {
+        void createSecret(Connection conn, String purpose) throws SQLException {
+            DuckDbExtension.ensureLoaded(conn, "httpfs", purpose + " an object-store dirs.database (" + root + ")");
+            String endpoint = p.host() + (p.port() > 0 ? ":" + p.port() : "");
+            boolean ssl = !"http".equalsIgnoreCase(p.options().getOrDefault("protocol", "https"));
+            try (Statement st = conn.createStatement()) {
+                // A temporary (in-memory) secret: it dies with the connection and is never written to disk.
+                // duckdb_secrets() shows it redacted.
+                st.execute("CREATE OR REPLACE SECRET " + STORE_SECRET_NAME + " (TYPE s3"
+                        + ", KEY_ID " + sqlStr(p.username())
+                        + ", SECRET " + sqlStr(secret)
+                        + ", ENDPOINT " + sqlStr(endpoint)
+                        + ", REGION " + sqlStr(p.options().getOrDefault("region", "us-east-1"))
+                        + ", URL_STYLE 'path', USE_SSL " + ssl
+                        // Trailing '/': DuckDB matches a scope as a plain string prefix, so without it the
+                        // secret would also serve the sibling prefix '<root>X/' (verification finding).
+                        + ", SCOPE " + sqlStr(root + "/") + ")");
+            }
+        }
+    }
+
+    private static Store resolve(PipelineConfig cfg) throws SQLException {
         String database = cfg.dirs().database();
         String root;
         try {
@@ -53,10 +102,6 @@ final class ObjectStoreDatabase {
         if (cfg.producesReference())
             throw refuse("dirs.database '" + database + "' is an object-store location, and a produces: reference "
                     + "pipeline keeps its versioned store on a local directory");
-        Map<String, Object> duckLake = cfg.sinks().get(0).duckLake();
-        if (duckLake != null && Boolean.parseBoolean(String.valueOf(duckLake.get("enabled"))))
-            throw refuse("dirs.database '" + database + "' is an object-store location, and registering its "
-                    + "output in DuckLake is not built yet — disable output.ducklake for this pipeline");
 
         String id = cfg.output().connection();
         if (id == null || id.isBlank())
@@ -84,22 +129,7 @@ final class ObjectStoreDatabase {
         // The S3 client DuckDB uses dials from native code, past every Java-side egress hop, so the Safety
         // Policy is applied here, once, before any request can be made.
         EgressGate.current().require(p.host(), p.port(), "object-store dirs.database (" + root + ")");
-        // LOAD is file access: after the seal it is refused like any other.
-        DuckDbExtension.ensureLoaded(conn, "httpfs", "writing to an object-store dirs.database (" + root + ")");
-        String endpoint = p.host() + (p.port() > 0 ? ":" + p.port() : "");
-        boolean ssl = !"http".equalsIgnoreCase(p.options().getOrDefault("protocol", "https"));
-        try (Statement st = conn.createStatement()) {
-            // A temporary (in-memory) secret: it dies with the connection and is never written to disk.
-            // duckdb_secrets() shows it redacted.
-            st.execute("CREATE OR REPLACE SECRET " + STORE_SECRET_NAME + " (TYPE s3"
-                    + ", KEY_ID " + sqlStr(p.username())
-                    + ", SECRET " + sqlStr(secret)
-                    + ", ENDPOINT " + sqlStr(endpoint)
-                    + ", REGION " + sqlStr(p.options().getOrDefault("region", "us-east-1"))
-                    + ", URL_STYLE 'path', USE_SSL " + ssl
-                    + ", SCOPE " + sqlStr(root) + ")");
-        }
-        return root;
+        return new Store(root, p, secret);
     }
 
     private static SQLException refuse(String why) {
