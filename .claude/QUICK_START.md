@@ -11,6 +11,9 @@ Toolchain: JDK `C:\.jdks\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mv
 # Authoritative verify — full reactor, offline
 mvn -o clean test
 
+# Fresh checkout: install every module without tests (~3 min, 57 modules)
+mvn -o -B -DskipTests clean install -Pedition-advanced
+
 # Build fat JAR only (skip tests)
 mvn -o clean package -q          # → inspecto/target/inspecto-processor-*.jar
 
