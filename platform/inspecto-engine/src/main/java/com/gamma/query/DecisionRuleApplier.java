@@ -148,7 +148,7 @@ public final class DecisionRuleApplier {
                     // exactly as the remainder's fan-out does (operator, 2026-10-06).
                     if (cfg.sinks().size() <= 1) {
                         List<PartitionOutput> routedOut = PartitionWriter.write(c, routedTable,
-                                Paths.get(dbDir, dest).toString(),
+                                com.gamma.config.safety.PathJail.childOf(dbDir, dest),
                                 cfg.output().format(), cfg.output().compression(), baseName, partCols);
                         return new Result(routedOut, LineageCollector.collect(
                                 c, routedTable, batchId, srcIdToFile, routedOut, partCols));

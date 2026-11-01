@@ -256,9 +256,9 @@ public final class PartitionWriter {
      *
      * <p>⛔ This is reachable only by a caller that already holds a connection configured for the store
      * (endpoint and credentials are session settings), and only for a location under an operator-allowed
-     * prefix ({@link com.gamma.config.safety.PathJail#requireObjectStore}). The ingest lane still refuses a
-     * URI {@code dirs.database} at its seal — credentials and the seal's URL allow-list are the open part of
-     * SCALEOUT-OBJSTORE-DATABASE-DIR-1.
+     * prefix ({@link com.gamma.config.safety.PathJail#requireObjectStore}). On the ingest lane that connection
+     * is prepared by {@code ObjectStoreDatabase} (the {@code output.connection}'s secret, scoped to the prefix)
+     * and sealed to the prefix alone (SCALEOUT-OBJSTORE-DATABASE-DIR-1).
      */
     private static List<PartitionOutput> writeToObjectStore(Connection conn, String projection,
                                                             String databaseDir, OutputFormat fmt,

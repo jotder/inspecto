@@ -159,7 +159,7 @@ final class UnionModeIngester {
                         // One write per SEGMENT — the segment key is its scope, so the batch's branch
                         // ledger keeps each segment's sinks distinct (see the chunked path's note).
                         var written = ConsignmentIngestStrategy.writeAndTraceEach(conn, destTable, partitionColumns(segSchema),
-                                cfg, Paths.get(cfg.dirs().database(), segKey).toString(),
+                                cfg, com.gamma.config.safety.PathJail.childOf(cfg.dirs().database(), segKey),
                                 survivors, batch, segSrcToFile, segKey, null);
 
                         allOutputs.addAll(written.outputs());

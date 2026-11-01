@@ -74,9 +74,14 @@ final class IngestSinkWriter implements PipelineExecutor.SinkWriter {
         PipelineConfig.Sink dest = destinationOf(sink);
         // The same re-rooting rule as writeAndTrace's fan-out: dbDir's suffix beyond dirs.database
         // (e.g. the table subdir) is preserved under the destination's own database root.
-        java.nio.file.Path rel = java.nio.file.Paths.get(cfg.dirs().database())
-                .relativize(java.nio.file.Paths.get(dbDir));
-        String destDir = java.nio.file.Paths.get(dest.database()).resolve(rel).toString();
+        // An object-store dbDir has exactly one destination, dirs.database itself (ObjectStoreDatabase refuses a
+        // sinks: list), so there is nothing to re-root — and a URI is no Path to relativize.
+        String destDir = dbDir;
+        if (!com.gamma.config.safety.PathJail.isUri(dbDir)) {
+            java.nio.file.Path rel = java.nio.file.Paths.get(cfg.dirs().database())
+                    .relativize(java.nio.file.Paths.get(dbDir));
+            destDir = java.nio.file.Paths.get(dest.database()).resolve(rel).toString();
+        }
 
         List<PartitionOutput> outs = PartitionWriter.write(conn, inputTable, destDir,
                 dest.format(), dest.compression(), baseName, partCols,

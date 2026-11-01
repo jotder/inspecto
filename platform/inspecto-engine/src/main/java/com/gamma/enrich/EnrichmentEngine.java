@@ -374,8 +374,11 @@ public final class EnrichmentEngine {
      */
     static List<java.nio.file.Path> allowedDirs(EnrichmentConfig cfg, List<PipelineConfig> pipelines, File db) {
         LinkedHashSet<java.nio.file.Path> dirs = new LinkedHashSet<>();
+        // An object-store location is no Path (Linux would read it as a local 's3:' dir); left off, the seal
+        // refuses the read.
         java.util.function.Consumer<String> add = d -> {
-            if (d != null && !d.isBlank()) dirs.add(Paths.get(d).toAbsolutePath().normalize());
+            if (d != null && !d.isBlank() && !com.gamma.config.safety.PathJail.isUri(d))
+                dirs.add(Paths.get(d).toAbsolutePath().normalize());
         };
         if (db != null) add.accept(db.getAbsoluteFile().getParent());
         add.accept(System.getProperty(DuckDbUtil.PROP_TEMP_DIRECTORY));

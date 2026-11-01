@@ -207,6 +207,7 @@ public final class ConfigSafetyValidator {
             if ("dirs.database".equals(f) && v != null && PathJail.isUri(v.trim())) checkObjectStore(f, v, out);
             else checkDataHome(f, v, p, configDir, out);
         }
+        checkOutputConnection(RawConfig.str(raw, "dirs.database"), RawConfig.str(raw, "output.connection"), out);
         checkDataHome("output.ducklake.data_path", RawConfig.str(raw, "output.ducklake.data_path"), p, configDir, out);
         // ROADMAP §3.5 "jail the database temp directory". The fallback `dirs.temp` is in PIPELINE_DIRS,
         // but `ConsignmentIngestStrategy.scratchDir` PREFERS this explicit spill dir and returned it raw,
@@ -645,6 +646,23 @@ public final class ConfigSafetyValidator {
         } catch (PathJail.Escape refused) {
             out.add(Finding.error(field, refused.getMessage()));
         }
+    }
+
+    /**
+     * An object-store {@code dirs.database} is reached through a named Connection ({@code output.connection},
+     * plan §5.4 route (a)), and only then: the field means nothing for a local directory, so it is refused
+     * there rather than silently ignored. Whether the id is registered, and is an {@code s3} Connection, is
+     * checked where the run resolves it ({@code ObjectStoreDatabase}); this gate has no registry.
+     */
+    static void checkOutputConnection(String database, String connection, List<Finding> out) {
+        boolean objectStore = database != null && PathJail.isUri(database.trim());
+        boolean named = connection != null && !connection.isBlank();
+        if (objectStore && !named)
+            out.add(Finding.error("output.connection", "dirs.database is an object-store location, so "
+                    + "output.connection must name the s3 Connection whose endpoint and credentials reach it"));
+        else if (!objectStore && named)
+            out.add(Finding.error("output.connection", "names a Connection, but dirs.database is a local "
+                    + "directory — output.connection is only for an s3:// dirs.database"));
     }
 
     /** How a kind of path key resolves before it is jailed - the loader's own resolver, never a copy of it. */
