@@ -816,6 +816,36 @@
     "note" : "`transform.stats.correlation` — Pearson (default) or Spearman (`method: spearman`: Pearson of the within-group average ranks, ties share their average rank) plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows (2026-10-17 Pearson, 2026-10-18 Spearman, ANALYTICS-CORE-1 S3)",
     "addable" : true
   }, {
+    "id" : "transform.timeseries.changepoint",
+    "family" : "BI",
+    "label" : "Change-point, regime & drift detector",
+    "emoji" : "📉",
+    "icon" : "heroicons_outline:bell-alert",
+    "status" : "delivered",
+    "nodeType" : "transform.timeseries.changepoint",
+    "note" : "`transform.timeseries.changepoint` — over a residual series (actual minus expected) and its scale sigma: band breaches, regime changes (a run of K outside points) and drift (two-sided CUSUM), every row kept with 0/1 flags; the Business Assurance forecast template's rule (2026-11-01, ANALYTICS-STEPS-TS-1)",
+    "addable" : true
+  }, {
+    "id" : "transform.cohort.retention",
+    "family" : "BI",
+    "label" : "Cohort retention matrix",
+    "emoji" : "👥",
+    "icon" : "heroicons_outline:user-group",
+    "status" : "delivered",
+    "nodeType" : "transform.cohort.retention",
+    "note" : "`transform.cohort.retention` — acquisition cohorts by hour..year on a stated clock, exact or on-or-after retention per period as of a stated date; a period not yet observable is absent, never 0 (2026-11-01, ANALYTICS-STEPS-TS-1)",
+    "addable" : true
+  }, {
+    "id" : "transform.cohort.funnel",
+    "family" : "BI",
+    "label" : "Ordered conversion funnel",
+    "emoji" : "🪜",
+    "icon" : "heroicons_outline:queue-list",
+    "status" : "delivered",
+    "nodeType" : "transform.cohort.funnel",
+    "note" : "`transform.cohort.funnel` — 2..12 ordered steps per entity, earliest-first from the first step-1 event, with an optional window; entities per step and conversion from the previous and the first step (2026-11-01, ANALYTICS-STEPS-TS-1)",
+    "addable" : true
+  }, {
     "id" : "enrichment.reference",
     "family" : "ENR",
     "label" : "Reference-table enrichment (`*_enrich.toon`, Stage-2)",

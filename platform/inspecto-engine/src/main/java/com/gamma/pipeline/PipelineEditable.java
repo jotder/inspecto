@@ -1265,7 +1265,9 @@ public final class PipelineEditable {
                     || PipelineConfig.Step.SIMILARITY.equals(kind) || PipelineConfig.Step.RANK.equals(kind)
                     || PipelineConfig.Step.SAMPLE.equals(kind) || PipelineConfig.Step.PIVOT.equals(kind)
                     || PipelineConfig.Step.ENTITY_LINK.equals(kind) || PipelineConfig.Step.OUTLIER.equals(kind)
-                    || PipelineConfig.Step.BINNING.equals(kind) || PipelineConfig.Step.CORRELATION.equals(kind)) return false;
+                    || PipelineConfig.Step.BINNING.equals(kind) || PipelineConfig.Step.CORRELATION.equals(kind)
+                    || PipelineConfig.Step.CHANGEPOINT.equals(kind) || PipelineConfig.Step.RETENTION.equals(kind)
+                    || PipelineConfig.Step.FUNNEL.equals(kind)) return false;
             int position = PipelineConfig.Step.KINDS.indexOf(kind);
             if (position <= previous) return false;
             previous = position;

@@ -28,12 +28,14 @@ ratcheting duplication guard (Must items M1–M10).
 - **Coulds:** C1 windowed and ratio Measures, C2 k-means, C3 logistic regression, C4 isolation forest
   (`ANOMALY-ML-SCORING-1`), C5 hour-of-week seasonality, C6 change-point kernel, C8 function catalogue
   (`GET /analytics/functions`), C9 cohort retention and funnel.
+- **Steps for C6 and C9 (2026-11-01, `ANALYTICS-STEPS-TS-1`):** `transform.timeseries.changepoint`,
+  `transform.cohort.retention`, `transform.cohort.funnel` (`steps:` kinds `changepoint`, `retention`, `funnel`) —
+  [spec § Change-point and cohort Steps](spec.md#change-point-and-cohort-steps).
 
 ## Left
 
 - Operator confirmation of decisions D-AN10…D-AN35 (assistant-decided).
 - Register the lane A and B kernels in the C8 catalogue (only `KernelFunctions` is listed today).
-- `ANALYTICS-STEPS-TS-1` (P3): Steps for change-point and cohort / funnel.
 - The Anomaly Model form does not author `method` / `forest` (D-AN29).
 - Hand-wrapped scratch-name sites listed on the row; `PartitionCompactor` `union_by_name` (operator-owned).
 - C7 graph traversal in SQL — blocked on DuckDB 2.0 adoption; it is candidate C1 / C2 of

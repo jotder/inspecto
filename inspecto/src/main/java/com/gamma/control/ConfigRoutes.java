@@ -655,6 +655,23 @@ final class ConfigRoutes {
                         columns = null;
                     }
                 }
+            } else if (PipelineConfig.Step.CHANGEPOINT.equals(kind)) {
+                // every inbound column survives; the four 0/1 flags are added
+                if (columns != null)
+                    for (String f : com.gamma.pipeline.exec.TimeSeriesStep.CHANGEPOINT_FLAGS)
+                        columns.add(new TypeFlow.Column(f, "INTEGER"));
+            } else if (PipelineConfig.Step.RETENTION.equals(kind)) {
+                // summarising: the kernel's fixed table
+                if (columns != null)
+                    columns = new ArrayList<>(List.of(new TypeFlow.Column("cohort", "TIMESTAMP"),
+                            new TypeFlow.Column("period", "INTEGER"), new TypeFlow.Column("size", "BIGINT"),
+                            new TypeFlow.Column("active", "BIGINT"), new TypeFlow.Column("rate", "DOUBLE")));
+            } else if (PipelineConfig.Step.FUNNEL.equals(kind)) {
+                // summarising: the kernel's fixed table
+                if (columns != null)
+                    columns = new ArrayList<>(List.of(new TypeFlow.Column("step", "INTEGER"),
+                            new TypeFlow.Column("name", "VARCHAR"), new TypeFlow.Column("entities", "BIGINT"),
+                            new TypeFlow.Column("from_previous", "DOUBLE"), new TypeFlow.Column("from_first", "DOUBLE")));
             } else if (PipelineConfig.Step.HASH.equals(kind)) {
                 // names survive a hash; with keep_original each column gains a <col>_hash beside it
                 if (columns != null && "true".equalsIgnoreCase(String.valueOf(cfg.get("keep_original")))
@@ -850,6 +867,58 @@ final class ConfigRoutes {
                 return com.gamma.pipeline.exec.TimeSeriesStep.forecastTypeRefusal(spec.timeColumn(),
                         time.isEmpty() || "VARCHAR".equalsIgnoreCase(time) ? "DATE" : time, spec.valueColumn(),
                         value.isEmpty() || "VARCHAR".equalsIgnoreCase(value) ? "DOUBLE" : value);
+            }
+            case PipelineConfig.Step.CHANGEPOINT -> {
+                com.gamma.pipeline.exec.TimeSeriesStep.Changes spec;
+                try {
+                    spec = com.gamma.pipeline.exec.TimeSeriesStep.parseChangePoint(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.TimeSeriesStep.columnRefusal("transform.timeseries.changepoint",
+                        spec.inputColumns(), List.of(), columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                // VARCHAR fails OPEN, as for forecast: a mapping-derived column is typed VARCHAR here whatever it computes.
+                Map<String, String> types = new java.util.LinkedHashMap<>();
+                for (TypeFlow.Column c : columns) {
+                    String t = c.type() == null ? "" : c.type();
+                    types.put(c.name(), t.isEmpty() || "VARCHAR".equalsIgnoreCase(t) ? "DOUBLE" : t);
+                }
+                return com.gamma.pipeline.exec.TimeSeriesStep.changePointRefusal(spec, types);
+            }
+            case PipelineConfig.Step.RETENTION -> {
+                com.gamma.pipeline.exec.CohortStep.Cohorts spec;
+                try {
+                    spec = com.gamma.pipeline.exec.CohortStep.parseRetention(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.TimeSeriesStep.columnRefusal("transform.cohort.retention",
+                        spec.inputColumns(), List.of(), columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                String type = declaredType(columns, spec.timeColumn());
+                // VARCHAR fails OPEN, as for resample: a mapping-derived column is typed VARCHAR here whatever it computes.
+                return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type) ? null
+                        : com.gamma.pipeline.exec.TimeSeriesStep.typeRefusal("transform.cohort.retention",
+                                spec.timeColumn(), spec.params().zone(), type);
+            }
+            case PipelineConfig.Step.FUNNEL -> {
+                com.gamma.pipeline.exec.CohortStep.Steps spec;
+                try {
+                    spec = com.gamma.pipeline.exec.CohortStep.parseFunnel(cfg);
+                } catch (IllegalArgumentException malformed) {
+                    return malformed.getMessage();
+                }
+                if (columns == null) return null;
+                String refusal = com.gamma.pipeline.exec.TimeSeriesStep.columnRefusal("transform.cohort.funnel",
+                        spec.inputColumns(), List.of(), columns.stream().map(TypeFlow.Column::name).toList());
+                if (refusal != null) return refusal;
+                String type = declaredType(columns, spec.timeColumn());
+                // VARCHAR fails OPEN, as for resample: a mapping-derived column is typed VARCHAR here whatever it computes.
+                return type.isEmpty() || "VARCHAR".equalsIgnoreCase(type) ? null
+                        : com.gamma.pipeline.exec.CohortStep.funnelTypeRefusal(spec.timeColumn(), type);
             }
             case PipelineConfig.Step.HASH -> {
                 // ⛔ A salt / key in config is refused by name: the key is the Space's, and an authored one would

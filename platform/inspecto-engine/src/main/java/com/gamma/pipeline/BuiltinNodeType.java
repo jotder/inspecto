@@ -200,6 +200,17 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_FORECAST("transform.timeseries.forecast", NodeCategory.TRANSFORM, "Forecast",
             "Seasonal naive or Holt-Winters forecast of a regular series, with a prediction band per level.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "forecast"),
+    // ANALYTICS-STEPS-TS-1: the change-point kernel (ChangePoint) over a residual series, through TimeSeriesStep; the
+    // cohort kernels (Retention, Funnel) through CohortStep. steps: kinds `changepoint`, `retention`, `funnel`.
+    TRANSFORM_CHANGEPOINT("transform.timeseries.changepoint", NodeCategory.TRANSFORM, "Change points",
+            "Flags band breaches, regime changes and drift in a residual series (actual minus expected); every row kept.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "changepoint"),
+    TRANSFORM_RETENTION("transform.cohort.retention", NodeCategory.TRANSFORM, "Cohort retention",
+            "One row per acquisition cohort per period: cohort size, entities still active, and the rate, as of a stated date.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "retention"),
+    TRANSFORM_FUNNEL("transform.cohort.funnel", NodeCategory.TRANSFORM, "Funnel",
+            "One row per funnel step: entities that reached it in order, and the conversion from the previous and first step.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.STEP, "funnel"),
     // Similarity score between two columns (catalog quality.match.fuzzy, ANALYTICS-CORE-1 S1): the Analytics Kernel's
     // SimilaritySql through SimilarityStep. A candidate, never an identity (D-M1). steps: kind `similarity`.
     TRANSFORM_SIMILARITY("transform.similarity", NodeCategory.TRANSFORM, "Similarity score",
