@@ -178,8 +178,10 @@ export class InvestigationSessionStore {
             s.kind === 'seed'
                 ? [{ op: 'seed', ids: s.ids, ...(s.entityType ? { entityType: s.entityType } : {}) }]
                 : s.kind === 'hide'
-                  ? [] // the preview takes seeds and expands only; a hide only marks entities
-                  : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
+                  ? [] // a hide only marks entities, so the preview never needs it
+                  : s.kind === 'exclude'
+                    ? [{ op: 'exclude', ids: s.ids, reason: s.reason }]
+                    : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
         );
     }
 
@@ -254,8 +256,8 @@ export class InvestigationSessionStore {
             const r =
                 step.kind === 'seed'
                     ? await this.replaySeed(step)
-                    : step.kind === 'hide'
-                      ? await this.replayHide(step)
+                    : step.kind === 'hide' || step.kind === 'exclude'
+                      ? await this.replayCleanUp(step)
                       : await this.replayExpand(step, b);
             recorded += r.recorded;
             if (this.activeId() !== id) return { created: true, recorded, message: '' };
@@ -280,15 +282,22 @@ export class InvestigationSessionStore {
     }
 
     /**
-     * LA-INVESTIGATE-UX-2: an unsaved Clean up, as the saved one records it — a `hide`, then an `annotate` with the reason.
-     * The ids are spoken in this Investigation's own (`exploreAliases`) and kept to what its Working Set holds.
+     * LA-INVESTIGATE-UX-2: an unsaved Clean up, as the saved one records it — a `hide`, then an `annotate` with the reason;
+     * or, with "Exclude instead", one `exclude` carrying the reason. The ids are spoken in this Investigation's own
+     * (`exploreAliases`) and kept to what its Working Set holds.
      */
-    private async replayHide(step: Extract<UnsavedStep, { kind: 'hide' }>): Promise<{ ok: boolean; recorded: number }> {
+    private async replayCleanUp(
+        step: Extract<UnsavedStep, { kind: 'hide' | 'exclude' }>,
+    ): Promise<{ ok: boolean; recorded: number }> {
         const ws = this.workingSet();
         const back = new Map(Object.entries(ws?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
         const held = new Set((ws?.entities ?? []).map((e) => e.id));
         const ids = [...new Set(step.ids.map((v) => back.get(v) ?? v))].filter((id) => held.has(id));
         if (!ids.length) return { ok: true, recorded: 0 };
+        if (step.kind === 'exclude') {
+            const ok = await this.apply({ op: 'exclude', ids, reason: step.reason });
+            return { ok, recorded: ok ? 1 : 0 };
+        }
         if (!(await this.apply({ op: 'hide', ids }))) return { ok: false, recorded: 0 };
         const noted = await this.apply({ op: 'annotate', ids, note: step.reason });
         return { ok: noted, recorded: noted ? 2 : 1 };

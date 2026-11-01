@@ -244,18 +244,25 @@ afterAll(() => installDomainProfiles([], null));
  * \`admit(id)\` per id at the next hop (by default \`<id>.n\`). Synthetic values only.
  */
 function fakeUnsaved(admit: (id: string) => string[] = (id) => [`${id}.n`]) {
-    return vi.fn((req: { steps: { op: string; ids?: string[] }[] }) => {
+    return vi.fn((req: { steps: { op: string; ids?: string[]; reason?: string }[] }) => {
         const entities = new Map<string, number>();
+        const excluded = new Map<string, string>(); // an exclude drops its ids and keeps them out of later expands
         const links: { source: string; target: string; kind: string; count: number; admittedBy: number }[] = [];
         const steps: { step: number; op: string; needsApproval: boolean; admitted: string[] }[] = [];
         req.steps.forEach((st, i) => {
             const before = new Set(entities.keys());
             if (st.op === 'seed') {
                 for (const id of st.ids ?? []) if (!entities.has(id)) entities.set(id, 0);
+            } else if (st.op === 'exclude') {
+                for (const id of st.ids ?? []) {
+                    entities.delete(id);
+                    excluded.set(id, st.reason ?? '');
+                }
             } else {
                 const hop = Math.max(0, ...entities.values()) + 1;
                 for (const id of st.ids ?? [])
                     for (const n of admit(id)) {
+                        if (excluded.has(n)) continue;
                         if (!entities.has(n)) entities.set(n, hop);
                         links.push({ source: id, target: n, kind: 'link', count: 1, admittedBy: i + 1 });
                     }
@@ -266,7 +273,7 @@ function fakeUnsaved(admit: (id: string) => string[] = (id) => [`${id}.n`]) {
             workingSet: {
                 entities: [...entities].map(([id, hop]) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false })),
                 links,
-                excluded: [],
+                excluded: [...excluded].map(([id, reason]) => ({ id, step: 1, reason })),
                 hash: 'h',
             },
             steps,
@@ -5214,6 +5221,40 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect([c.investigation.unsaved()!.steps.length, hidden(), shown()]).toEqual([2, false, before]);
         expect(c.redoUnsaved()).toBe(true);
         expect([c.investigation.unsaved()!.steps.length, hidden(), shown()]).toEqual([3, true, before - 1]);
+    });
+
+    it('LA-INVESTIGATE-UX-2 item 5: an unsaved Exclude instead drops the entities and their links, and keeps them out of later expands', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const previewUnsaved = fakeUnsaved((id) => [`${id}.n`, 'SHARED']);
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ws = () => c.investigation.unsavedWs()!;
+        expect(ws().entities.map((e) => e.id)).toContain('SHARED');
+        c.cleanUpUnsaved({ ids: ['SHARED'], reason: 'Clean up: entity type device', exclude: true });
+        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({ kind: 'exclude', ids: ['SHARED'], reason: 'Clean up: entity type device' });
+        expect(ws().entities.map((e) => e.id)).not.toContain('SHARED');
+        expect(ws().links.some((l) => l.source === 'SHARED' || l.target === 'SHARED')).toBe(false);
+        expect(ws().excluded.map((x) => [x.id, x.reason])).toEqual([['SHARED', 'Clean up: entity type device']]);
+        expect(c.growExclude.lastChange()?.text).toBe('Excluded 1 (not saved yet).');
+        // the next degree sends the exclude first, with its reason, so the server never admits SHARED again
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        const sentSteps = previewUnsaved.mock.calls.at(-1)![0].steps;
+        expect(sentSteps[0]).toEqual({ op: 'exclude', ids: ['SHARED'], reason: 'Clean up: entity type device' });
+        expect(sentSteps.map((s) => s.op)).toEqual(['exclude', 'seed', 'expand']);
+        expect(ws().entities.map((e) => e.id)).not.toContain('SHARED');
+        expect(ws().excluded.map((x) => x.id)).toEqual(['SHARED']);
+        // Undo takes the Expand back, then the exclude
+        expect(c.undoUnsaved()).toBe(true);
+        expect(c.undoUnsaved()).toBe(true);
+        expect(ws().entities.map((e) => e.id)).toContain('SHARED');
     });
 
     it('LA-UNSAVED-INVESTIGATION-1: Close with unsaved steps asks Save, Discard or Cancel', async () => {

@@ -31,7 +31,7 @@ tags: [api, routes, generated]
 | GET | `/inv/entity-types` | List the Entity Types in force with their bindings and cached headline | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
 | GET | `/inv/entity-types/{entityTypeId}/profile` | Read the Entity Type profile: aggregates over every column bound to the type | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityPageRoutes.java` |
 | GET | `/inv/exclusion-lists` | The exclusion lists an Investigation can apply | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/ExclusionListRoutes.java` |
-| POST | `/inv/expand/preview` | Unsaved Investigation preview: the Working Set its seed / expand steps would build (stores nothing) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
+| POST | `/inv/expand/preview` | Unsaved Investigation preview: the Working Set its seed / expand / exclude steps would build (stores nothing) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | GET | `/inv/graph/algorithms` | The graph-algorithm catalogue and run limits | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |
 | GET | `/inv/graph/runs` | List the caller's graph runs | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |
 | POST | `/inv/graph/runs` | Start a graph run over an Investigation's Working Set | inv | `canRunLinkGraphAnalysis` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java` |

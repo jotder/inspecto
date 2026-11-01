@@ -1184,6 +1184,24 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         expect(out).toEqual({ created: true, recorded: 4, message: '' });
     });
 
+    it('LA-INVESTIGATE-UX-2 item 5: an unsaved exclude goes to the preview with its reason and Save replays it as one exclude', async () => {
+        const t = setup();
+        const sent = server(t);
+        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'N', purpose: 'P' }, [
+            { kind: 'seed', ids: ['a'] },
+            { kind: 'expand', from: 'outer', ids: [], req: RING },
+            { kind: 'exclude', ids: ['a-n', 'gone'], reason: 'Clean up: dangling leaves' },
+        ]);
+        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).at(-1)).toEqual({
+            op: 'exclude',
+            ids: ['a-n', 'gone'],
+            reason: 'Clean up: dangling leaves',
+        });
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent.slice(2)).toEqual([{ op: 'exclude', ids: ['a-n'], reason: 'Clean up: dangling leaves' }]);
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+    });
+
     it('a step refused partway stops the replay: the steps before it are saved, the rest named as not recorded', async () => {
         const t = setup();
         const sent = server(t, 2);

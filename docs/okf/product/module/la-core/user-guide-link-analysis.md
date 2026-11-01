@@ -739,8 +739,8 @@ close button, then:
 * **Expand**, the same one control as in a saved Investigation ([§7.1](#71-expand)). Each Expand is a step;
 * **Start entities ▸ Start from selected**: the selected entities and their links join the graph as a start;
 * **Clean up** ([§7.4](#74-clean-up)), the same one-press buttons: each hides on screen and is a step that Save records
-  as a `hide` with its reason. *Exclude instead of hide* waits for Save (*Save first to exclude: while unsaved, Clean up
-  hides.*);
+  as a `hide` with its reason. With *Exclude instead of hide* the entities leave the graph with their links and stay
+  out of every later Expand; Save records it as one `exclude` with its reason;
 * one line: Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set, so **Save first**.
 
 An Expand that the Space would hold for a second person's approval cannot run unsaved: it says *This Expand needs

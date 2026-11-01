@@ -1244,9 +1244,18 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
   `UnsavedStep {kind: 'hide', ids, reason}`. This is exact without a server change because the evaluator's `hide` only
   flags entities (they stay in the set, so later previews seeded with the whole set agree, and `mergeWorkingSets` keeps
   the flag). Save replays it as `hide` + `annotate(reason)` with the ids mapped through `exploreAliases` and kept to the
-  replayed set; `unsavedOps` never sends it to `POST /inv/expand/preview`. ⚠ *Exclude instead* is disabled while unsaved:
-  an `exclude` keeps entities out of later expands, which the preview route (`UNSAVED_OPS = seed, expand`) cannot
-  evaluate, so the screen would draw what Save would not record.
+  replayed set; `unsavedOps` never sends it to `POST /inv/expand/preview`.
+- **Exclude instead while unsaved (LA-INVESTIGATE-UX-2 item 5, as built 2026-11-01).** `POST /inv/expand/preview` takes
+  `exclude` steps too (`UNSAVED_OPS = seed, expand, exclude`): each goes through the append's own `params` (reason
+  required, at most 200 chars; a `merged` exclude is 422 because no resolve is in force unsaved) and the same evaluator,
+  in log order, so the excluded entities and their links leave the set and every later expand drops rows touching them.
+  The excludes are capped apart from the reads (`UNSAVED_MAX_STEPS` 4 seeds / expands, `UNSAVED_MAX_EXCLUDES` 32), and the
+  answer's `workingSet.excluded` ids are masked like the rest. The Studio records `UnsavedStep {kind: 'exclude', ids,
+  reason}`; `cleanUpUnsaved(…, exclude)` drops the entities and their links from the drawn set (as the evaluator does),
+  and `walkUnsaved` sends every recorded exclude FIRST, then the seed of the drawn set and the degree, so a later Start
+  of an excluded value brings it back as a seed after an exclude does. Save replays it as one `exclude` with the reason,
+  ids mapped through `exploreAliases` and kept to the replayed set. Known limit: the Studio does not fold excludes, so a 33rd unsaved exclude makes the next Expand's preview 422 (Save, then go on). Tests: `ControlApiUnsavedPreviewTest` (parity with
+  a created Investigation, log order, aliases only on a masked Space, malformed excludes 422).
 - **Pick neighbours… on the node menu (LA-INVESTIGATE-UX-2).** Shown for one Working Set entity on an Investigation's
   canvas (`nodeMenuEntity`); it selects the node, sets `InvestigationSessionStore.neighboursRequested` and opens the
   tab, whose Act instance opens and reads the list once `selectedInSet()[0]` is that id (the tab may not exist when the
