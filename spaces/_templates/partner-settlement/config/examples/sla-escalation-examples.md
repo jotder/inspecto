@@ -5,6 +5,10 @@
 > `canAdminister` routes, and no import lands them). The numbers are a starting point for a 24x7 operation, not a
 > recommendation - set your own service levels before applying them.
 
+The pack's own dispute bodies (the CASE workflow, a Case SLA Policy and an age Escalation Rule) are in `config/governance/`;
+the runbook section "Disputes as Cases" applies them. The Case SLA example below is an alternative to
+`case-sla-policy.json` with the same id `case`, not an addition.
+
 Apply with `POST /components/sla-policy` and `POST /components/escalation-rule` (Settings > Incident governance), as an
 administrator. The calendar zone is an explicit IANA zone; change it to yours. Targets are working minutes in that
 calendar. A Case is swept exactly like an Incident: the policy stamps its deadlines, a breach is raised once, and

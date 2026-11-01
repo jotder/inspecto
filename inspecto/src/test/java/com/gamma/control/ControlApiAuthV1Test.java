@@ -45,6 +45,8 @@ class ControlApiAuthV1Test {
         if ("Bearer limited".equals(auth)) return Optional.of(new Subject("guest", Set.of()));
         if ("Bearer named".equals(auth))
             return Optional.of(new Subject("f3a9-uuid", Set.of(), null, java.util.Map.of(), null, "Ana <b>Lopez</b>"));
+        if ("Bearer machine".equals(auth))   // what OidcAuthenticator builds from a client-credentials token
+            return Optional.of(new Subject("client:la-integration", Set.of(), null, java.util.Map.of(), null, null, "svc-uuid"));
         return Optional.empty();
     };
 
@@ -142,6 +144,32 @@ class ControlApiAuthV1Test {
             assertEquals("canAuthorWorkbench",
                     deniedEvent(c, "/components/widget", 403).path("attributes").path("capability").asText(),
                     "the refusal names the capability that was missing");
+        }
+    }
+
+    /** OIDC-CC-MACHINE-ACTOR-1 (review G7): a machine call is recorded under its client id as a service, with the
+     *  token's {@code sub} (a service-account UUID on Keycloak) kept beside it; a person's row carries neither. */
+    @Test
+    void aMachineCallIsAuditedAsAServiceUnderItsClientId(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(403, post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}",
+                    "Authorization", "Bearer machine").statusCode());
+            assertEquals(403, post(c.port, "/components/widget", "{\"id\":\"w1\",\"vizType\":\"bar\"}",
+                    "Authorization", "Bearer limited").statusCode());
+            JsonNode machine = null, person = null;
+            for (JsonNode e : JSON.valueToTree(c.svc.events().page(200, null, null).stream().map(Event::toMap).toList())) {
+                if (!"ACCESS_DENIED".equals(e.path("type").asText())) continue;
+                String actor = e.path("attributes").path("actor").asText();
+                if (actor.equals("client:la-integration")) machine = e.path("attributes");
+                if (actor.equals("guest")) person = e.path("attributes");
+            }
+            assertNotNull(machine, "the machine's refusal is recorded under its client id");
+            assertEquals("service", machine.path("actor_type").asText());
+            assertEquals("svc-uuid", machine.path("idp_subject").asText());
+            assertNotNull(person);
+            assertEquals("user", person.path("actor_type").asText());
+            assertFalse(person.has("idp_subject"), "a person's id is already the token's sub");
         }
     }
 

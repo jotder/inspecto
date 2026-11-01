@@ -481,6 +481,10 @@ MINTED access token (`unknown` if it cannot), and — only when an operator-supp
 F3 client IP — `geo_country` plus `geo_db_build`, never a city. Trigger T5 alerts on a new country per subject.
 As built: [events & metrics](../event/spec-events-metrics.md) § *Security triggers*.
 
+**A machine call names its client** (`OIDC-CC-MACHINE-ACTOR-1`, 2026-11-01). A client-credentials Subject's id is
+`client:<client id>` and `RequestAttrs.actorType` says `service`; `AuditTrail` adds the IdP's `sub` as `idp_subject`.
+Which tokens count as a machine's: [oidc admin guide](../oidc/admin-guide.md) section 5.
+
 **Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
 code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.

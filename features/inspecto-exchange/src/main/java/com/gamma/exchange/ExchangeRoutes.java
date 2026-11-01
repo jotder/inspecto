@@ -148,7 +148,7 @@ public final class ExchangeRoutes implements RouteModule {
         ExchangeSnapshotSweep.recordOutcome(itemDir, trigger, meta, null, startedAt);
         Event.Builder b = Event.builder(EventType.EXCHANGE_REFRESHED).source("exchange")
                 .message("refreshed dataset " + owner + "/" + item + " → " + meta.version())
-                .actor(ApiContext.actor(e)).actorType("user")
+                .actor(ApiContext.actor(e)).actorType(ApiContext.actorType(e))
                 .attr("owner", owner).attr("kind", "dataset").attr("item", item)
                 .attr("version", meta.version()).attr("rows", meta.rows());
         EventLog.current().emit(b);
@@ -665,7 +665,7 @@ public final class ExchangeRoutes implements RouteModule {
     private static void signal(HttpExchange e, String type, String message,
                                String owner, String consumer, String kind, String item) {
         Event.Builder b = Event.builder(type).source("exchange").message(message)
-                .actor(ApiContext.actor(e)).actorType("user")
+                .actor(ApiContext.actor(e)).actorType(ApiContext.actorType(e))
                 .attr("owner", owner).attr("kind", kind).attr("item", item);
         if (consumer != null) b.attr("consumer", consumer);
         EventLog.current().emit(b);

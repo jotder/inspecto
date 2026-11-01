@@ -266,7 +266,7 @@ class OidcMachineTrustTest {
         assertTrue(authenticate(authenticator(null), other).isPresent(), "no allowlist: today's behaviour");
         Authenticator pinned = authenticator(full());
         assertTrue(authenticate(pinned, other).isEmpty(), "client not on the allowlist");
-        assertEquals("svc-uuid", authenticate(pinned, allowed).orElseThrow().id());
+        assertEquals("client:la-integration", authenticate(pinned, allowed).orElseThrow().id(), "a listed client is a machine");
         assertTrue(authenticate(pinned, allowed).isEmpty(), "the same machine token, replayed");
     }
 

@@ -1892,7 +1892,10 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   Investigation form cap it at that same Space value, never at a number of their own. **What changes:** the
   title and purpose every read shows (log header, list, embed). The sealed header is never rewritten — the edit is a `details` record
   beside it (`investigation-details.json`, or the `details` column on Postgres; the same record keeps the creator's display name, written at create, which **File ▸ Open…** shows — T-186) — so a Dossier issued before the edit still verifies, and a Dossier
-  built now states the purpose and title sealed at create. **Two edits at once** (`LA-INVESTIGATION-EDIT-HARDENING-1`, 2026-10-29): an
+  built now states the purpose and title sealed at create. **The Dossier does not show the edit** (decided 2026-11-01,
+  assistant-decided under operator delegation, pending confirmation): it states only the sealed title and purpose, on both
+  backends, and the edit lives in the `details` record and the `LINK_INVESTIGATION_EDITED` audit event; adding an unsealed
+  "edited" field beside a sealed manifest would let a reader take an unverified value for evidence. **Two edits at once** (`LA-INVESTIGATION-EDIT-HARDENING-1`, 2026-10-29): an
   edit writes only the fields it was given, as one read-modify-write per Investigation (the store's lock: the JVM monitor plus the
   `.store.lock` file lock on the filesystem, the Investigation row lock `FOR NO KEY UPDATE` on Postgres), so one lead's new name never
   undoes another's new purpose. An edit racing a delete answers **404**, never 500. **A corrupt `investigation-details.json`** (not a JSON
@@ -3226,6 +3229,7 @@ The Investigation sidecar records now sit behind `InvestigationStore` (`inspecto
 
 * **Investigation store on Postgres — proven 2026-10-05** — `PgInvestigationStore` (optional `inspecto-la-store-pg`, `-Dinvestigations.backend=db`) passed the shared 29-case contract (32 with its PG-only cases) and the two-JVM race harness (4/4: append, decide, mask key, promote) on a real PG 18.6; no race found. Run recipe: javadoc of `PgInvestigationStoreContractTest` (env `INSPECTO_TEST_PG_URL`, `-DforkCount=0`, session timezone via `MAVEN_OPTS`). Design: `archived-documents/plans-archive/investigation-store-design.md` 13.6.
   **End to end 2026-10-13:** the contract ran 45/45 (0 skipped) and an Enterprise `la-app` bundle on `-Dinvestigations.backend=db` seeded and smoke-tested `la-showcase` (17/17, again after a restart); recipe in `okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md` section A.
+  **Rename route 2026-11-01** (`LA-INVESTIGATION-EDIT-HARDENING-1`): the module ran 57/57, 0 skipped, on PG 18 (contract 47, race 4, embed grants 6), including `updateDetailsIsOneReadModifyWriteAndAnAbsentInvestigationWritesNothing` (8 writers × 25 edits, none lost). That contract case runs its edit-racing-a-delete half only on a backend that deletes; Postgres refuses delete 503 until `LA-INVESTIGATION-DELETE-PG-1`.
 
 ## Consolidated as-built facts (moved from the retired plan docs, 2026-10-05)
 
