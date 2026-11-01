@@ -9,6 +9,19 @@ timestamp: 2026-07-16T00:00:00Z
 
 # Stream & Reference Onboarding
 
+> **File first: Add data in the console (`ONBOARDING-FIRST-RUN-1` slice C3, 2026-11-01).** The primary start is
+> **Add data** at `/add-data` (screen title *Onboard a file*): the one Add data screen Inspecto LA uses
+> (`@inspecto/link-analysis/add-data`, OF-1) over the shared `/onboard/files` draft and commit — no new route.
+> The console passes `whatColumnsHold="optional"` (the entity step starts closed), `exploreRoute=/studio/link-analysis`
+> and `editorRoute=/pipelines`. Under the screen, a card per Dataset with `origin: import` offers *Add a file* and
+> *Run now*; on Standard and up the card's *Open in editor* opens the import's Pipeline in the guided editor
+> (`/pipelines?guided=1&open=<pipeline>`), on Basic *Keep this up to date* shows locked with its reason there instead,
+> and *Read from a database or a remote system* is locked on Basic (DT-4). Home's first-run panel leads with
+> **Add data** (offered to everyone; the screen itself says why when the person may not upload, A-15); the create
+> dialog below (*Onboard a Stream*) stays the **advanced start** (OF-3), linked under it and from Add data for those
+> with `connections.onboard`. Not built yet: drop zones on Home / Catalog / the empty Datasets pane, the Getting
+> started panel and console Space guide (C4), and the console Dataset page (C5) — `docs/BACKLOG.md`.
+
 > 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e, plan
 > archived).** Onboarding a data origin now means: this **create dialog**, then the **guided pipeline
 > editor** — [pipelines](../../module/etl/user-guide-pipeline-editor.md). The route `/catalog/onboard/:name(/:stage)` is a redirect
