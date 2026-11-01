@@ -126,7 +126,7 @@ mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar
 pom, a shared artifactId, a managed dependency, or a shared record must be verified with
 `-Pedition-advanced`. Read the reactor summary for **SKIPPED**, not only FAILURE — "25 modules"
 means listed, not built.
-Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. Always
+Toolchain: JDK `C:\.jdks\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. Always
 run **offline (`-o`)**. **Every JVM launch needs `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI),
 including test invocations. Tests spin up real `SourceService`/`ControlApi` on an ephemeral port and
 drive the HTTP surface — extend that pattern (see `inspecto/src/test/java/com/gamma/control/`).

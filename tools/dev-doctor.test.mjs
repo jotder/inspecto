@@ -4,13 +4,13 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import {
     javaMajor, checkJava, checkMaven, checkNode, checkCodegraph, checkGit, checkDocker, checkDuckdbCache,
-    checkUnreadable, checkLocalOnly, claudeProjectDir, runAll, exitCode,
+    checkUnreadable, checkLocalOnly, claudeProjectDir, runAll, exitCode, mavenLocalRepo,
 } from './dev-doctor.mjs';
 
 const ROOT = 'C:\\repo', HOME = 'C:\\home';
 const ok = (out = '') => ({ ok: true, out }), no = { ok: false, out: '' };
 /** A healthy machine; override cmds (key = `cmd args`), files, dirs, env. */
-const probe = ({ cmds = {}, files = [], missing = [], dirs, env = {}, nodeVersion = 'v22.3.0' } = {}) => {
+const probe = ({ cmds = {}, files = [], missing = [], dirs, env = {}, nodeVersion = 'v22.3.0', settings = null } = {}) => {
     const base = {
         'java -version': ok('openjdk version "27.0.1" 2026-10-01'),
         [`${join('C:\\jdk27', 'bin', 'java')} -version`]: ok('openjdk version "27" 2026'),
@@ -26,6 +26,7 @@ const probe = ({ cmds = {}, files = [], missing = [], dirs, env = {}, nodeVersio
         root: ROOT, home: HOME, nodeVersion, env: { JAVA_HOME: 'C:\\jdk27', ...env },
         run: (c, a) => base[[c, ...a].join(' ')] ?? no,
         exists: (p) => !missing.some((m) => p.includes(m)) || files.includes(p),
+        readText: (p) => (p === join(HOME, '.m2', 'settings.xml') ? settings : null),
         listDirs: dirs ?? ((p) => (p === ROOT ? ['a', '.git'] : p === join(ROOT, 'a') ? ['b'] : [])),
     };
 };
@@ -61,6 +62,31 @@ test('old Maven and missing ~/.m2 artifacts are RED with install fixes', () => {
     const r = checkMaven(p);
     assert.deepEqual(st(r), ['fail', 'fail', 'fail']);
     assert.match(r[1].fix, /jotder\/inspect-agent.*mvn -DskipTests install/);
+});
+
+test('no settings.xml: the Maven repo checked is ~/.m2/repository, named in the detail', () => {
+    const repo = join(HOME, '.m2', 'repository');
+    const p = probe({ missing: ['eoiagent'], files: [join(repo, 'com', 'eoiagent')] });
+    const r = checkMaven(p);
+    assert.deepEqual(st(r), ['ok', 'ok', 'ok']);
+    assert.equal(r[1].detail, `present in ${repo}`);
+});
+
+test('settings.xml <localRepository> is the repo checked; a commented-out one is ignored', () => {
+    const settings = '<settings><!-- <localRepository>/path/to/local/repo</localRepository> -->\n'
+        + '  <localRepository> C:/.m2/repository </localRepository></settings>';
+    const p = probe({ settings, missing: ['eoiagent', 'inspector'], files: [join('C:/.m2/repository', 'com', 'eoiagent')] });
+    assert.equal(mavenLocalRepo(p), 'C:/.m2/repository');
+    const r = checkMaven(p);
+    assert.deepEqual(st(r), ['ok', 'ok', 'fail']);
+    assert.match(r[1].detail, /present in C:\/\.m2\/repository/);
+    assert.match(r[2].detail, /in C:\/\.m2\/repository/);
+});
+
+test('settings.xml ${user.home} expands to the home dir', () => {
+    const p = probe({ settings: '<settings><localRepository>${user.home}/maven-repo</localRepository></settings>' });
+    assert.equal(mavenLocalRepo(p), `${HOME}/maven-repo`);
+    assert.equal(mavenLocalRepo(probe({ settings: '<settings/>' })), join(HOME, '.m2', 'repository'));
 });
 
 test('node 20, no npm, no node_modules are RED', () => {

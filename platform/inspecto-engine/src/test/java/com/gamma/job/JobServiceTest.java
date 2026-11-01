@@ -1243,6 +1243,56 @@ class JobServiceTest {
     }
 
     @Test
+    void anAllGateKeepsItsProgressAcrossARestart(@TempDir Path dir) throws Exception {
+        // on_pipeline_gate=all: half the roster committed, the service restarts (a new JobService over the same
+        // audit directory), the other half commits -> the gate fires. It did not before: the pending set was in memory.
+        JobConfig j = maintenance("merger", null, "a_etl, b_etl",
+                Map.of("task", "heartbeat", "on_pipeline_gate", "all"));
+        String audit = dir.resolve("audit").toString();
+        ConsignmentEventBus first = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler(); JobService js = new JobService(List.of(j), first, s, null, audit, null, null, null)) {
+            js.start();
+            first.publish(new ConsignmentEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
+            Thread.sleep(300);
+            assertTrue(js.lastRunOf("merger").isEmpty(), "half the roster must not fire the job");
+        }
+        ConsignmentEventBus second = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler(); JobService js = new JobService(List.of(j), second, s, null, audit, null, null, null)) {
+            js.start();
+            second.publish(new ConsignmentEvent("b_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));
+            JobRun run = await(() -> js.lastRunOf("merger").orElse(null));
+            assertEquals("SUCCESS", run.status(), run.message());
+            assertTrue(run.trigger().startsWith("event:b_etl"), "the completing commit fires it: " + run.trigger());
+        }
+        // the firing re-armed the gate on disk too: after another restart a_etl alone must not fire a new run
+        ConsignmentEventBus third = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler(); JobService js = new JobService(List.of(j), third, s, null, audit, null, null, null)) {
+            js.start();
+            third.publish(new ConsignmentEvent("a_etl", "b3", "SUCCESS", List.of(), 1L, 1L, 0));
+            Thread.sleep(300);
+            assertTrue(js.runsFor("merger").stream().noneMatch(r -> r.trigger().startsWith("event:")),
+                    "a fired gate must not come back as pending after a restart");
+        }
+    }
+
+    @Test
+    void anAllGateStartsEmptyWhenItsProgressFileIsUnreadableOrForeign(@TempDir Path dir) throws Exception {
+        // a corrupt progress file costs only a full cycle: bad lines are skipped, nothing fires early.
+        Path audit = dir.resolve("audit");
+        java.nio.file.Files.createDirectories(audit);
+        java.nio.file.Files.writeString(audit.resolve("job-gate-pending.tsv"), "no tab here\n\t\nmerger\t\n\tb_etl\n");
+        JobConfig j = maintenance("merger", null, "a_etl, b_etl",
+                Map.of("task", "heartbeat", "on_pipeline_gate", "all"));
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler(); JobService js = new JobService(List.of(j), bus, s, null, audit.toString(), null, null, null)) {
+            js.start();
+            bus.publish(new ConsignmentEvent("b_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
+            Thread.sleep(300);
+            assertTrue(js.lastRunOf("merger").isEmpty(), "garbage in the file must not count as committed upstreams");
+        }
+    }
+
+    @Test
     void aFlowJobSuccessChainsADownstreamJob(@TempDir Path dir) throws Exception {
         // chaining OUT of a pipeline: PipelineJobRunner publishes a ConsignmentEvent(jobName) on success, so a
         // downstream on_pipeline job fires — the pipeline job is a first-class upstream in the event graph.

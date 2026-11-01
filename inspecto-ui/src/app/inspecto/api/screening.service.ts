@@ -55,6 +55,14 @@ export interface ScreeningHit {
     integrity?: 'invalid';
 }
 
+/** One page of `GET /screening/hits` (at most 100 by default); `total` counts every hit the filter matches. */
+export interface ScreeningHitPage {
+    hits: ScreeningHit[];
+    /** Pass back as `cursor` for the next page; null on the last page. */
+    nextCursor: string | null;
+    total: number;
+}
+
 /** The request of `POST /screening/check`: 1..1000 subjects, 1..20 Entity List ids, optional limits. */
 export interface ScreeningCheckRequest {
     subjects: { key?: string; name?: string; identifier?: string }[];
@@ -103,8 +111,9 @@ export interface ScreeningListOption {
 export class ScreeningService {
     private readonly http = inject(HttpClient);
 
-    hits(state?: ScreeningHitState): Observable<{ hits: ScreeningHit[] }> {
-        return this.http.get<{ hits: ScreeningHit[] }>(apiUrl('/screening/hits'), { params: toParams({ state }) });
+    /** One page, newest first; pass the previous page's `nextCursor` for the next one. */
+    hits(state?: ScreeningHitState, cursor?: string): Observable<ScreeningHitPage> {
+        return this.http.get<ScreeningHitPage>(apiUrl('/screening/hits'), { params: toParams({ state, cursor }) });
     }
 
     hit(id: string): Observable<ScreeningHit> {

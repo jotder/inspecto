@@ -13,7 +13,7 @@ Routes for Screening. Design and internals: [Screening architecture](architectur
 | Route | Gate | Notes |
 |---|---|---|
 | `POST /screening/check` | read-shaped | `{subjects[], lists[], threshold?, maxMatches?}`; a POST so names never ride in a URL |
-| `GET /screening/hits?state=` | read | newest first |
+| `GET /screening/hits?state=&limit=&cursor=` | read | one page newest first, `{hits, nextCursor, total}`; `limit` 1..500 (default 100) |
 | `GET /screening/hits/{id}` | read | one hit |
 | `GET /screening/hits/{id}/reveal` | reveal | unmasked value for a permitted caller |
 | `POST /screening/hits/{id}/decide` | `canWorkIncidents` | `{decision, reason, version}` |

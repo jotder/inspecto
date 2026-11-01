@@ -2,10 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { LensService, ScreeningHit, ScreeningService } from 'app/inspecto/api';
+import { LensService, ScreeningHit, ScreeningHitPage, ScreeningService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
@@ -38,7 +38,7 @@ async function create(
 ) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
-        hits: vi.fn(() => of({ hits: [HIT] })),
+        hits: vi.fn(() => of({ hits: [HIT], nextCursor: null, total: 1 })),
         hit: vi.fn(() => of(HIT)),
         decide: vi.fn(() => of({ ...HIT, state: 'dismissed', version: 2, decidedBy: 'ops-1' })),
         reveal: vi.fn(() => of({ id: HIT.id, subjectName: 'Vladimir Putin', subjectIdentifier: 'NID-1', entry: 'vladimir putin' })),
@@ -76,6 +76,52 @@ describe('ScreeningComponent', () => {
         expect(el.textContent).toContain('99 %');
         expect(buttons(el)).toEqual(expect.arrayContaining(['Escalate', 'Dismiss', 'Confirm match']));
         await expectNoA11yViolations(el);
+    });
+
+    it('pages through the server cursor, appending, and starts again from the first page on a filter change', async () => {
+        const second: ScreeningHit = { ...HIT, id: 'sh-20261009110000-000001' };
+        const hits = vi.fn((_state?: string, cursor?: string) =>
+            of(
+                cursor === 'c2'
+                    ? { hits: [second], nextCursor: null, total: 2 }
+                    : { hits: [HIT], nextCursor: 'c2', total: 2 },
+            ),
+        );
+        const { fixture } = await create({ hits });
+        const c = fixture.componentInstance;
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('1 of 2 hits loaded, newest first');
+        expect(el.textContent).toContain('there may be more');
+
+        c.loadMore();
+        fixture.detectChanges();
+        expect(hits).toHaveBeenLastCalledWith('open', 'c2');
+        expect(c.hits().map((h) => h.id)).toEqual([HIT.id, second.id]);
+        expect(c.nextCursor()).toBeNull();
+        expect(el.textContent).not.toContain('hits loaded');
+        c.loadMore();
+        expect(hits).toHaveBeenCalledTimes(2);
+
+        c.setFilter('all');
+        fixture.detectChanges();
+        expect(hits).toHaveBeenLastCalledWith(undefined);
+        expect(c.hits().map((h) => h.id)).toEqual([HIT.id]);
+        expect(c.nextCursor()).toBe('c2');
+        await expectNoA11yViolations(el);
+    });
+
+    it('drops a page that arrives after a filter change, even when both lists share its cursor', async () => {
+        const late = new Subject<ScreeningHitPage>();
+        const hits = vi.fn((_state?: string, cursor?: string) =>
+            cursor ? late : of({ hits: [HIT], nextCursor: 'c2', total: 2 }),
+        );
+        const { fixture } = await create({ hits });
+        const c = fixture.componentInstance;
+        c.loadMore();
+        c.setFilter('all');   // its first page ends on the same cursor
+        late.next({ hits: [{ ...HIT, id: 'sh-20261009110000-000001' }], nextCursor: null, total: 2 });
+        expect(c.hits().map((h) => h.id)).toEqual([HIT.id]);
+        expect(c.nextCursor()).toBe('c2');
     });
 
     it('requires a reason, then decides with the hit version and shows the server answer', async () => {

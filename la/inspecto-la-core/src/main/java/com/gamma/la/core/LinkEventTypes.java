@@ -66,6 +66,10 @@ public final class LinkEventTypes {
      *  {@code entityType}/{@code sections}/{@code datasets}/{@code cached}/{@code truncated} carry the reach. */
     public static final String LINK_ENTITY_TYPE_PROFILED = "LINK_ENTITY_TYPE_PROFILED";
 
+    /** An unused Entity Type was deleted from the Space's stated list ({@code DELETE /inv/entity-types/{id}},
+     *  LA-ENTITY-TYPE-RETIRE-1). {@code entityType}/{@code remaining} carry the act. */
+    public static final String LINK_ENTITY_TYPE_DELETED = "LINK_ENTITY_TYPE_DELETED";
+
     /** One Entity's profile was read ({@code GET /inv/entities/{type}/{key}/profile}). {@code entityType}/{@code found}/
      *  {@code datasets}/{@code assessed} carry the reach; the key is never recorded (raw or alias). */
     public static final String LINK_ENTITY_PROFILED = "LINK_ENTITY_PROFILED";

@@ -191,6 +191,10 @@ shows and sets this.
 * **New Entity Type** — a **Name**, an **Example value** (shows *Kept as …*) and **Compare values as**: *Upper case,
   spaces trimmed*, *Digits only*, *Phone number* or *Case ignored*. A name the Space already has is refused before
   anything is written.
+* **Delete** — the bin button on an Entity Type's own page (and **Delete** beside each type in ⚙ Settings → Entity
+  Types) removes a type nothing uses, after a confirm naming it. It cannot be undone. A type still used is kept and the
+  page says by what: the Dataset columns that hold it, a live Entity List of that type, or the number of Investigations
+  that name it (a step, or the endpoint types set when it was created). Change or retire those first; the last Entity Type of a Space cannot be deleted.
 
 These changes need the right to edit Datasets when you sign in; without it they are greyed out with the reason.
 
@@ -244,7 +248,7 @@ last section in this browser. Running the graph model closes it; closing it over
 
 | Group | Sections |
 |---|---|
-| **This graph** | **Graph model** (Dataset, the two entity columns, link type, mappings, attribute columns, root, depth and direction; **Run query** and **Refresh** at the foot; the Space's Industry pack is shown read-only at the top) · **Entity Types** (the types the graph is drawn as, **New Entity Type**, **Retire**) · **Display rules** (node colour rules by attribute) |
+| **This graph** | **Graph model** (Dataset, the two entity columns, link type, mappings, attribute columns, root, depth and direction; **Run query** and **Refresh** at the foot; the Space's Industry pack is shown read-only at the top) · **Entity Types** (the types the graph is drawn as, **New Entity Type**, **Delete**) · **Display rules** (node colour rules by attribute) |
 | **Data** | **Entity Lists** · **Identities** (identity resolution) · **Add data** (upload a CSV to a Collector that accepts uploads) |
 | **This Investigation** (only while one is open) | **Investigation settings**: Case, Members, Share and embed, Drafts, Replay and drift, Pin to a Widget, Oversight and approvals, Measures and templates, Dossier, References |
 

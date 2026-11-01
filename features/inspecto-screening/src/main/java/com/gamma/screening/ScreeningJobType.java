@@ -22,7 +22,6 @@ import com.gamma.sql.SqlSandboxPolicy;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -137,8 +136,8 @@ public final class ScreeningJobType implements JobTypeProvider {
             source.put("dataset", p.dataset());
             int screened = 0, matched = 0, raised = 0;
             synchronized (ScreeningHits.lock()) {
-                Map<String, Object> index = ScreeningHits.dedupeIndex(writeRoot);
-                Set<Object> known = new HashSet<>(index.values());
+                Map<String, Object> index = ScreeningHits.index(writeRoot);
+                Set<Object> known = ScreeningHits.keys(index);
                 for (Map<String, Object> row : rows.rows()) {
                     Object key = row.get(p.keyField());
                     if (key == null) continue;
@@ -158,7 +157,7 @@ public final class ScreeningJobType implements JobTypeProvider {
                                 Instant.parse(String.valueOf(hit.get("raisedAt"))),                   // would overwrite a hit
                                 ScreeningHits.random));
                         ScreeningHits.save(writeRoot, hit);
-                        index.put(String.valueOf(hit.get("id")), dedupe);
+                        index.put(String.valueOf(hit.get("id")), ScreeningHits.entry(writeRoot, hit));
                         raised++;
                     }
                 }

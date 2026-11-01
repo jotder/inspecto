@@ -16,7 +16,7 @@ tags: [api, routes, generated]
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
 | POST | `/screening/check` | Screen subjects against Entity Lists (Match Scores; persists nothing) | screening | — | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java` |
-| GET | `/screening/hits` | List Screening Hits, newest first | screening | — | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java` |
+| GET | `/screening/hits` | List Screening Hits, newest first, one page at a time | screening | — | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java` |
 | GET | `/screening/hits/{hitId}` | One Screening Hit | screening | — | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java` |
 | POST | `/screening/hits/{hitId}/decide` | Decide a Screening Hit (confirm, dismiss or escalate) | screening | `canWorkIncidents` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java` |
 | GET | `/screening/hits/{hitId}/reveal` | Reveal a Screening Hit's raw subject and matched entry | screening | `canRevealLinkEntities` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java` |

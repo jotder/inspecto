@@ -1702,6 +1702,39 @@
         "x-optional-module" : true
       }
     },
+    "/inv/entity-types/{entityTypeId}" : {
+      "delete" : {
+        "tags" : [ "inv" ],
+        "summary" : "Delete an Entity Type nothing uses",
+        "operationId" : "deleteInvEntityType",
+        "description" : "LA-ENTITY-TYPE-RETIRE-1. Removes the type from the Space's stated Entity Types (link-analysis.toon); deleting one of the inherited defaults states the rest. Gated on canAuthorWorkbench (the capability that states the types through PUT /settings/link-analysis), then a write root (503), then the type in force (404). 409 CONFLICT, naming what uses it, while any registered Dataset has a column whose classification the type claims (every Dataset is checked; a column in a Dataset the caller cannot view is counted, not named), any live Entity List is of the type, or any Investigation's header (endpoint types), main log or open Draft names it as entityType / sourceType / targetType; also 409 for the last type in force. Answers {deleted, entityTypesInForce}. Audited as LINK_ENTITY_TYPE_DELETED.",
+        "parameters" : [ {
+          "name" : "entityTypeId",
+          "in" : "path",
+          "required" : true,
+          "description" : "The Entity Type id.",
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "{deleted, entityTypesInForce}."
+          },
+          "403" : {
+            "description" : "The caller lacks canAuthorWorkbench."
+          },
+          "404" : {
+            "description" : "No such Entity Type in force."
+          },
+          "409" : {
+            "description" : "Still used by a Dataset column, a live Entity List or an Investigation, or the last type in force."
+          },
+          "503" : {
+            "description" : "No write root, or the Link Analysis settings could not be read."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/entity-types/{entityTypeId}/profile" : {
       "get" : {
         "tags" : [ "inv" ],

@@ -209,11 +209,12 @@ system: the evidence cannot say something the code does not.
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:79` |
 | POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java:28` |
 | POST | `/inv/deep-links/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:79` |
-| POST | `/inv/entities/([^/]+)/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:50` |
-| POST | `/inv/entities/([^/]+)/suggest` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:51` |
+| POST | `/inv/entities/([^/]+)/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:53` |
+| POST | `/inv/entities/([^/]+)/suggest` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:54` |
 | POST | `/inv/entity-identities` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:94` |
 | POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:98` |
 | POST | `/inv/entity-identities/import` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java:96` |
+| DELETE | `/inv/entity-types/([^/]+)` | gated | `canAuthorWorkbench` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java:50` |
 | POST | `/inv/expand/preview` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:162` |
 | POST | `/inv/graph/runs` | gated | `canRunLinkGraphAnalysis` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:126` |
 | POST | `/inv/graph/runs/([^/]+)/cancel` | exempt | self-service | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GraphRunRoutes.java:131` |
@@ -361,8 +362,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:119` |
 | POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:117` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:55` |
-| POST | `/screening/check` | exempt | read-shaped | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:56` |
-| POST | `/screening/hits/([^/]+)/decide` | gated | `canWorkIncidents` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:61` |
+| POST | `/screening/check` | exempt | read-shaped | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:60` |
+| POST | `/screening/hits/([^/]+)/decide` | gated | `canWorkIncidents` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:65` |
 | PUT | `/settings/approval` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:69` |
 | PUT | `/settings/approvers` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ApproverRosterRoutes.java:41` |
 | PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:83` |

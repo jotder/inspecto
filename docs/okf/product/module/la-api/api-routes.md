@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-97 route(s) registered; 97 in the OpenAPI contract, 0 not.
+98 route(s) registered; 98 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -29,6 +29,7 @@ tags: [api, routes, generated]
 | GET | `/inv/entity-identities/group` | GET /inv/entity-identities/group (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java` |
 | POST | `/inv/entity-identities/import` | POST /inv/entity-identities/import (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java` |
 | GET | `/inv/entity-types` | List the Entity Types in force with their bindings and cached headline | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
+| DELETE | `/inv/entity-types/{entityTypeId}` | Delete an Entity Type nothing uses | inv | `canAuthorWorkbench` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
 | GET | `/inv/entity-types/{entityTypeId}/profile` | Read the Entity Type profile: aggregates over every column bound to the type | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityPageRoutes.java` |
 | GET | `/inv/exclusion-lists` | The exclusion lists an Investigation can apply | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/ExclusionListRoutes.java` |
 | POST | `/inv/expand/preview` | Unsaved Investigation preview: the Working Set its seed / expand / exclude steps would build (stores nothing) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |

@@ -101,6 +101,11 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("audit-anchors.jsonl", "the signed audit anchors (AuditAnchors, ASSURE-AUDIT-CHAIN-1) in "
                 + "<config root>.secrets/ beside the Pending Change key — a SIBLING of the config tree, so no import "
                 + "reaches it; each line is MAC'd, so a planted one reads as integrity: invalid");
+        ALLOWED.put("dedupe-index.json", "the screening Run's dedupe index (ScreeningHits, SCREENING-1 D6) in "
+                + "<write root>/screening-hits/ - a RESERVED directory, so no import reaches it; the index is signed, "
+                + "so a planted one is refused and rebuilt from the hits");
+        ALLOWED.put("job-gate-pending.tsv", "a Job's on_pipeline_gate=all pending set (JobService, JOB-GATE-PERSIST-1) "
+                + "in the audit directory - the RESERVED audit/, so no import reaches it");
         ALLOWED.put("manifest.json", "the LA index manifest (IndexManifest, D-3) in <write root>/la-index/<dataset>/<mappingHash>/"
                 + "vNNNNNN/ — a derived artefact written by the index builder, outside the config tree, under a path built "
                 + "from a validated dataset id and mapping hash; a planted file there is refused by the manifest's own "

@@ -23,6 +23,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
+import { formatNumber } from 'app/inspecto/viz/number-format';
 import { CheckNameDialog } from './check-name.dialog';
 
 /** Which Screening Hits the pane lists. */
@@ -87,6 +88,11 @@ export class ScreeningComponent implements OnInit {
 
     readonly filter = signal<ScreeningFilter>('open');
     readonly hits = signal<ScreeningHit[]>([]);
+    /** The server's cursor for the next page (null = every matching hit is loaded) and the matching count. */
+    readonly nextCursor = signal<string | null>(null);
+    readonly total = signal<number | null>(null);
+    /** Bumped by every {@link load}, so a page requested for an earlier list is dropped. */
+    private generation = 0;
     readonly loading = signal(false);
     readonly error = signal<string | null>(null);
     readonly unavailable = signal(false);
@@ -101,6 +107,12 @@ export class ScreeningComponent implements OnInit {
     readonly revealed = signal<ScreeningReveal | null>(null);
     readonly revealing = signal(false);
     readonly revealError = signal<string | null>(null);
+
+    /** "100 of 100,000 hits loaded, newest first" while more pages remain. */
+    readonly loadedCaption = computed(
+        () =>
+            `${formatNumber(this.hits().length)} of ${formatNumber(this.total() ?? 0)} hits loaded, newest first`,
+    );
 
     readonly canReveal = computed(() => {
         const h = this.selected();
@@ -162,21 +174,49 @@ export class ScreeningComponent implements OnInit {
         this.load();
     }
 
+    /** The first page of the current filter (a filter change, a refresh, or after a decision). */
     load(): void {
+        this.generation++;
         this.loading.set(true);
         this.error.set(null);
         const f = this.filter();
         this.api.hits(f === 'all' ? undefined : f).subscribe({
             next: (r) => {
                 this.hits.set(r.hits);
+                this.nextCursor.set(r.nextCursor);
+                this.total.set(r.total);
                 this.loading.set(false);
             },
             error: (err) => {
                 this.hits.set([]);
+                this.nextCursor.set(null);
+                this.total.set(null);
                 this.loading.set(false);
                 // An absent optional module is a deployment state, not a failure.
                 if (err?.status === 503) this.unavailable.set(true);
                 else this.error.set(apiErrorMessage(err, 'The Screening Hits could not be read'));
+            },
+        });
+    }
+
+    /** Append the next page after the server's cursor. */
+    loadMore(): void {
+        const cursor = this.nextCursor();
+        if (!cursor) return;
+        this.loading.set(true);
+        const f = this.filter();
+        const gen = this.generation;
+        this.api.hits(f === 'all' ? undefined : f, cursor).subscribe({
+            next: (r) => {
+                if (gen !== this.generation) return;   // a filter change or refresh replaced the list meanwhile
+                this.hits.update((h) => [...h, ...r.hits]);
+                this.nextCursor.set(r.nextCursor);
+                this.total.set(r.total);
+                this.loading.set(false);
+            },
+            error: (err) => {
+                this.loading.set(false);
+                this.toastr.error(apiErrorMessage(err, 'More Screening Hits could not be read'));
             },
         });
     }

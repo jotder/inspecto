@@ -44,6 +44,7 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/entities/([^/]+)/([^/]+)/profile"},
             {"POST", "/inv/entities/([^/]+)/resolve"},           // rate-classed like the GET it serves (operator 2026-10-15)
             {"POST", "/inv/entities/([^/]+)/suggest"},           // LA-ONBOARD-1 OB-9: the Start box type-ahead reads every bound link column
+            {"DELETE", "/inv/entity-types/([^/]+)"},             // LA-ENTITY-TYPE-RETIRE-1: its use check reads every Investigation's log
             // LA-EDITIONS-1 §4 inbound: a third-party product calls these machine to machine, so a flood is throttled per Subject
             // (429; the inbound create is idempotent, so a retry is safe). The deep-link resolve is classed like the resolve above.
             {"POST", "/inv/inbound/investigations"},

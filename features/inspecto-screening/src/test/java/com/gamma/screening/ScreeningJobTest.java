@@ -99,8 +99,8 @@ class ScreeningJobTest {
 
             Map<String, Map<String, Object>> hits = hitsBySubject(cfg);
             assertEquals(3, hits.size(), hits.keySet().toString());
-            Map<String, Object> index = ScreeningHits.dedupeIndex(cfg);
-            for (Map<String, Object> h : hits.values()) assertEquals(h.get("dedupeKey"), index.get(h.get("id")));
+            Map<String, Object> index = ScreeningHits.index(cfg);
+            for (Map<String, Object> h : hits.values()) assertEquals(h.get("dedupeKey"), ((Map<?, ?>) index.get(h.get("id"))).get("key"));
             assertTrue(java.nio.file.Files.isRegularFile(cfg.resolve(ScreeningHits.DIR).resolve(ScreeningHits.INDEX)),
                     "the Run saves its dedupe index");
             assertEquals("vladimir putin", hits.get("c1").get("entry"));
@@ -130,7 +130,11 @@ class ScreeningJobTest {
                     "a dismissed hit stays dismissed");
 
             // The index covers every hit now, so a Run never reads a hit document again (D6).
-            Files.writeString(ScreeningLists.hitFile(cfg, String.valueOf(hits.get("c2").get("id"))), "not json");
+            // (Its file time is kept: a document whose time moved since it was indexed is read again, D8.)
+            java.nio.file.Path c2 = ScreeningLists.hitFile(cfg, String.valueOf(hits.get("c2").get("id")));
+            var at = Files.getLastModifiedTime(c2);
+            Files.writeString(c2, "not json");
+            Files.setLastModifiedTime(c2, at);
             assertTrue(js.triggerRun("nightly", null).isPresent());
             JobRun third = await(() -> js.lastRunOf("nightly").orElse(null), second.runId());
             assertEquals("SUCCESS", third.status(), "a Run read a hit the index covers: " + third.message());

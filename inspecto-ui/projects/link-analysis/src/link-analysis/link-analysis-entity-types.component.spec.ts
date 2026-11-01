@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -25,15 +26,15 @@ const SERVED: LinkAnalysisLimits = {
     entityTypesInForce: [type('account'), type('device')],
 };
 
-function make(opts: { canEdit?: boolean; confirm?: boolean; save?: ReturnType<typeof vi.fn> } = {}) {
-    const save = opts.save ?? vi.fn((b: unknown) => of(b as LinkAnalysisLimits));
+function make(opts: { canEdit?: boolean; confirm?: boolean; del?: ReturnType<typeof vi.fn> } = {}) {
+    const del = opts.del ?? vi.fn(() => of(SERVED));
     TestBed.configureTestingModule({
         imports: [LinkAnalysisEntityTypesComponent],
         providers: [
             provideNoopAnimations(),
             {
                 provide: LinkAnalysisSettingsService,
-                useValue: { limits: signal(SERVED), get: vi.fn(() => of(SERVED)), save },
+                useValue: { limits: signal(SERVED), get: vi.fn(() => of(SERVED)), deleteEntityType: del },
             },
             { provide: LensService, useValue: { canAuthorWorkbench: () => opts.canEdit ?? true } },
             {
@@ -44,31 +45,39 @@ function make(opts: { canEdit?: boolean; confirm?: boolean; save?: ReturnType<ty
     });
     const fixture = TestBed.createComponent(LinkAnalysisEntityTypesComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, save };
+    return { fixture, el: fixture.nativeElement as HTMLElement, del };
 }
 
 describe('LinkAnalysisEntityTypesComponent (⚙ Settings → Entity Types, sweep S3)', () => {
-    it('lists the types in force and retires one by stating the rest', async () => {
-        const { fixture, el, save } = make();
+    it('lists the types in force and deletes one through the delete route (LA-ENTITY-TYPE-RETIRE-1)', async () => {
+        const { fixture, el, del } = make();
         expect(el.textContent).toContain('ACCOUNT');
         expect(el.textContent).toContain('DEVICE');
-        await fixture.componentInstance.retire('device', 'DEVICE');
-        expect(save).toHaveBeenCalledTimes(1);
-        const body = save.mock.calls[0][0] as { entityTypes: EntityTypeConfig[] };
-        expect(body.entityTypes.map((t) => t.id)).toEqual(['account']);
+        const button = el.querySelector('[data-testid="la-entity-type-delete-device"]') as HTMLButtonElement;
+        expect(button.textContent).toContain('Delete');
+        expect(button.getAttribute('aria-label')).toBe('Delete the Entity Type DEVICE');
+        await fixture.componentInstance.remove('device', 'DEVICE');
+        expect(del).toHaveBeenCalledWith('device');
         await expectNoA11yViolations(el);
     });
 
-    it('a declined confirm writes nothing; a refused write says why', async () => {
+    it("a declined confirm deletes nothing; a 409 shows the server's reason", async () => {
         const declined = make({ confirm: false });
-        await declined.fixture.componentInstance.retire('device', 'DEVICE');
-        expect(declined.save).not.toHaveBeenCalled();
+        await declined.fixture.componentInstance.remove('device', 'DEVICE');
+        expect(declined.del).not.toHaveBeenCalled();
         TestBed.resetTestingModule();
-        const refused = make({ save: vi.fn(() => throwError(() => new Error('in use'))) });
-        await refused.fixture.componentInstance.retire('account', 'ACCOUNT');
+        const reason = "Entity Type 'account' is still used by Dataset column calls_ds.acct";
+        const refused = make({
+            del: vi.fn(() =>
+                throwError(
+                    () =>
+                        new HttpErrorResponse({ status: 409, error: { error: { code: 'CONFLICT', message: reason } } }),
+                ),
+            ),
+        });
+        await refused.fixture.componentInstance.remove('account', 'ACCOUNT');
         refused.fixture.detectChanges();
-        expect(refused.fixture.componentInstance.error()).not.toBe('');
-        expect(refused.el.querySelector('inspecto-alert')).not.toBeNull();
+        expect(refused.el.querySelector('inspecto-alert')?.textContent).toContain('calls_ds.acct');
     });
 
     it('says how values are compared in plain words, never the normaliser id (T-190)', () => {
@@ -77,9 +86,9 @@ describe('LinkAnalysisEntityTypesComponent (⚙ Settings → Entity Types, sweep
         expect(el.textContent).not.toContain('upper-trim');
     });
 
-    it('without the right to change settings there is no New or Retire', () => {
+    it('without the right to change settings there is no New or Delete', () => {
         const { el } = make({ canEdit: false });
         expect(el.querySelector('[data-testid="la-entity-type-new"]')).toBeNull();
-        expect(el.querySelector('[data-testid^="la-entity-type-retire-"]')).toBeNull();
+        expect(el.querySelector('[data-testid^="la-entity-type-delete-"]')).toBeNull();
     });
 });

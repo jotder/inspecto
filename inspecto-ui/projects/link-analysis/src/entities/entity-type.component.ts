@@ -1,10 +1,14 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatExpansionModule } from '@angular/material/expansion';
-import { ActivatedRoute } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ColDef } from 'ag-grid-community';
-import { catchError, map, of, startWith, switchMap } from 'rxjs';
-import { apiErrorMessage } from '@inspecto/core/api';
+import { catchError, firstValueFrom, map, of, startWith, switchMap } from 'rxjs';
+import { LensService, apiErrorMessage } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoPageHeaderComponent } from '@inspecto/core/components/page-header.component';
@@ -18,6 +22,7 @@ import {
     ProfileRelationship,
     ProfileSentinel,
 } from '@inspecto/link-analysis/api/entity-profile.service';
+import { LinkAnalysisSettingsService } from '@inspecto/link-analysis/link-analysis/link-analysis-settings.service';
 import { EntityBarListComponent, EntityDayCalendarComponent } from './entity-charts.component';
 import { EntityLookupComponent } from './entity-lookup.component';
 import {
@@ -51,7 +56,10 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        MatButtonModule,
         MatExpansionModule,
+        MatIconModule,
+        MatTooltipModule,
         InspectoAlertComponent,
         ChipComponent,
         InspectoPageHeaderComponent,
@@ -67,8 +75,27 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
             subtitle="Entity Type Profile: what the Space's Datasets say about this type, in aggregate."
             [backLink]="base"
             backLabel="Entities"
-        ></inspecto-page-header>
+        >
+            <ng-container actions>
+                @if (canDelete() && typeId()) {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        data-testid="entity-type-delete"
+                        [disabled]="deleting()"
+                        [attr.aria-label]="'Delete the Entity Type ' + title()"
+                        [matTooltip]="'Delete the Entity Type ' + title()"
+                        (click)="remove()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
+                    </button>
+                }
+            </ng-container>
+        </inspecto-page-header>
         <div class="flex flex-col gap-4 p-6">
+            @if (deleteError(); as e) {
+                <inspecto-alert variant="error" title="Not deleted" data-testid="delete-error">{{ e }}</inspecto-alert>
+            }
             @if (typeId()) {
                 <inspecto-la-entity-lookup [type]="typeId()" [base]="base"></inspecto-la-entity-lookup>
             }
@@ -352,7 +379,15 @@ export class EntityTypeComponent implements OnInit {
     private readonly svc = inject(EntityProfileService);
     private readonly route = inject(ActivatedRoute);
     private readonly destroyRef = inject(DestroyRef);
+    private readonly router = inject(Router);
+    private readonly settings = inject(LinkAnalysisSettingsService);
+    private readonly confirm = inject(InspectoConfirmService);
+    private readonly lens = inject(LensService);
     protected readonly base = entitiesBase(this.route, 1);
+    /** Deleting writes the stated Entity Types, which needs `canAuthorWorkbench` (LA-ENTITY-TYPE-RETIRE-1). */
+    readonly canDelete = computed(() => this.lens.canAuthorWorkbench());
+    readonly deleting = signal(false);
+    readonly deleteError = signal('');
 
     private readonly load = signal<Load>(null);
     readonly typeId = signal('');
@@ -509,5 +544,25 @@ export class EntityTypeComponent implements OnInit {
                 takeUntilDestroyed(this.destroyRef),
             )
             .subscribe((l) => this.load.set(l));
+    }
+
+    /** Delete this type after a destructive confirm, then back to Entities; a 409 shows what still uses it. */
+    async remove(): Promise<void> {
+        const id = this.typeId();
+        const ok = await this.confirm.confirmDestructive(
+            `Delete the Entity Type "${this.title()}"? It cannot be undone. A type still used by a Dataset column, an Entity List or an Investigation is not deleted.`,
+            { title: 'Delete Entity Type', confirmText: 'Delete' },
+        );
+        if (!ok) return;
+        this.deleting.set(true);
+        this.deleteError.set('');
+        try {
+            await firstValueFrom(this.settings.deleteEntityType(id));
+            await this.router.navigate(this.base);
+        } catch (e) {
+            this.deleteError.set(apiErrorMessage(e, 'The Entity Type could not be deleted.'));
+        } finally {
+            this.deleting.set(false);
+        }
     }
 }

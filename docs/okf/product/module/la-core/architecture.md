@@ -486,6 +486,22 @@ key (message never names it). Rate class expensive; audited as `LINK_CASE_HISTOR
   first, with their link rows and first / last seen, plus `distinct` (Entities matching; a value that normalises to nothing
   is no Entity). A masked type lists nothing, and is counted only for an EMPTY prefix - a count per prefix would spell a raw
   value out character by character. The prefix travels in the body; the read is a `read-shaped` exemption like resolve.
+* **Delete if unused** (LA-ENTITY-TYPE-RETIRE-1, operator decision 2026-11-01; no Retire state): `DELETE /inv/entity-types/{id}`,
+  gated `canAuthorWorkbench` (the capability that states the types through `PUT /settings/link-analysis`) → 503 write root →
+  404 not in force → 409 while anything uses it or for the last type → `LinkAnalysisSettings.deleteEntityType`, a
+  read-modify-write under `LaLimits.WRITE_LOCK` that states the types in force minus it (deleting an inherited default states
+  the rest, as the Industry Pack labels them in force - so a later Domain Profile switch no longer relabels them) and keeps
+  every other key. **What counts as a use** (`EntityProfileRoutes.uses`, recorded decision): a column of
+  ANY registered Dataset whose classification the type claims - every Dataset, not the caller's R3 view; a column the caller
+  cannot view is counted, never named; a **live** Entity List of the type (a retired list can seed nothing again, so it does
+  not block); an Investigation whose header (its endpoint types), main log or an open Draft's log names the id under an
+  `entityType` / `sourceType` / `targetType` key anywhere in an entry (seed, Seed by list, expand, connect), undone steps
+  included because replay reads every entry; matched in any case, as masking reads a sealed type (a seed keeps the type as
+  sent). Investigation Templates are not checked.
+  Not a lock across stores: a use created between the check and the write is not caught. `PUT /settings/link-analysis` can
+  still drop a type from the stated list without this check (that is how New Entity Type writes); the SPA deletes only
+  through the route. Audited `LINK_ENTITY_TYPE_DELETED`; rate class expensive (it reads every Investigation's log).
+  Test: `ControlApiEntityTypeDeleteTest` (falsified: without the use check the three 409 probes answer 200).
 Audited as `LINK_ENTITY_TYPES_LISTED`, `LINK_ENTITY_TYPE_PROFILED`, `LINK_ENTITY_PROFILED`, `LINK_ENTITY_KEY_RESOLVED`,
 `LINK_ENTITY_SUGGESTED` (never a key, a prefix or a value). Rate class: the list exempt; both profiles, resolve and suggest expensive.
 
@@ -714,7 +730,7 @@ optional pack field; no route was added.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-28 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` and `InvestigationDataChangesRoutes` in geo-link (its other two, `EmbedExpirySweepModule` and `IntegrationWebhooks`, serve no route), **104**<!--count:la-routes--> routes (**97**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+28 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` and `InvestigationDataChangesRoutes` in geo-link (its other two, `EmbedExpirySweepModule` and `IntegrationWebhooks`, serve no route), **105**<!--count:la-routes--> routes (**98**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
