@@ -120,7 +120,7 @@ every Incident that carries a `dispute_key` into one Case per partner and cycle;
   received; a statement-less cycle is `unbilled` up to and including `statement_due` and `statement_late` after it, the same day the
   `missing_statement` finding starts. The KPI tiles count one currency (`kpi_currency`, default USD) and add payables and receivables as
   amounts at stake; the bar Widgets show every currency. The pack reports accruals, never posts them.
-- **The evidence pack (S7, PS-S7-1, decided under delegation, pending confirmation).** Two Report Templates of Regulatory Reporting,
+- **The evidence pack (S7; PS-S7-1 operator-confirmed 2026-11-01, the rest decided under delegation, pending confirmation).** Two Report Templates of Regulatory Reporting,
   `settlement-dispute-pack` (JSON) and `settlement-dispute-pack-csv`, in `config/regulatory-report-templates/`, drafted from the
   dispute Case: the Case and its Incident timeline, plus the `settlement_dispute` rows whose `dispute_key` a member Incident
   carries in its Alert Rule key (the Report Template `rows` source, a generic Regulatory Reporting seam added for this slice).

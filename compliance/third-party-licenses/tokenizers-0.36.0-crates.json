@@ -52,7 +52,7 @@
     "rust-std": "the Rust standard library (std, core, alloc and their dependencies), MIT OR Apache-2.0; compiler_builtins carries LLVM compiler-rt code, Apache-2.0 WITH LLVM-exception"
   },
   "nonPermissive": {
-    "option-ext@0.2.0": "MPL-2.0 (weak, file-level copyleft). Pulled in by dirs-sys@0.5.0 (hf-hub, on every platform). Not decided here: operator / legal call."
+    "option-ext@0.2.0": "MPL-2.0 (weak, file-level copyleft). Pulled in by dirs-sys@0.5.0 (hf-hub, on every platform). Accepted by the operator 2026-11-01 for the Linux/macOS native bundle."
   },
   "crates": {
     "adler2@2.0.1": {

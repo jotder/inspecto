@@ -1897,7 +1897,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   title and purpose every read shows (log header, list, embed). The sealed header is never rewritten — the edit is a `details` record
   beside it (`investigation-details.json`, or the `details` column on Postgres; the same record keeps the creator's display name, written at create, which **File ▸ Open…** shows — T-186) — so a Dossier issued before the edit still verifies, and a Dossier
   built now states the purpose and title sealed at create. **The Dossier does not show the edit** (decided 2026-11-01,
-  assistant-decided under operator delegation, pending confirmation): it states only the sealed title and purpose, on both
+  assistant-decided under operator delegation, operator-confirmed 2026-11-01): it states only the sealed title and purpose, on both
   backends, and the edit lives in the `details` record and the `LINK_INVESTIGATION_EDITED` audit event; adding an unsealed
   "edited" field beside a sealed manifest would let a reader take an unverified value for evidence. **Two edits at once** (`LA-INVESTIGATION-EDIT-HARDENING-1`, 2026-10-29): an
   edit writes only the fields it was given, as one read-modify-write per Investigation (the store's lock: the JVM monitor plus the

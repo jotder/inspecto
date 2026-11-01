@@ -52,7 +52,7 @@ itself when raised from one), `evidence` (`ATTACHMENT` notes of the subject and 
 contentType, caption, author, createdAt`), `rows` (only with a `rows` block, below) and `input`. Through a list a path maps over the items. A template that does
 not validate is listed by `GET /regulatory-reports/templates` with ALL its problems and can draft nothing.
 
-**Dataset rows (`rows`, 2026-11-01, `PACK-PARTNER-SETTLEMENT-1` S7, PS-S7-1 pending operator confirmation).** An
+**Dataset rows (`rows`, 2026-11-01, `PACK-PARTNER-SETTLEMENT-1` S7, PS-S7-1 operator-confirmed 2026-11-01).** An
 Incident raised by a per-key Alert Rule carries only its key columns, as attributes `key.<column>`, which a dotted source path cannot
 address. A template `rows: {dataset, matchOn}` block makes the server read the rows of that Dataset whose `matchOn` column (cast to
 text) equals a `key.<matchOn>` value of a member Incident (or of the Incident the report is raised from), through the Dataset's

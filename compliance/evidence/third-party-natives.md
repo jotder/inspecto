@@ -67,8 +67,8 @@ How it was established, on a networked shift:
 - **Licences found:** MIT OR Apache-2.0 and its spellings, MIT, Apache-2.0, Unicode-3.0, ISC, BSD-2/3-Clause, Zlib, 0BSD,
   BSL-1.0 options, Unlicense OR MIT and CDLA-Permissive-2.0 (`webpki-roots`), all permissive. ⚠ **One is not:** `option-ext`
   0.2.0 is **MPL-2.0** (weak, file-level copyleft). `dirs-sys` 0.5.0 (under `hf-hub`) pulls it in, on every platform.
-  **Open for the operator** (row `NATIVE-LICENCE-LINUX-MACOS-1`, not decided here):
-  (a) whether the MPL-2.0 crate is acceptable as shipped;
+  **For the operator** (row `NATIVE-LICENCE-LINUX-MACOS-1`):
+  (a) ✅ the MPL-2.0 crate is **accepted as shipped, operator 2026-11-01**;
   (b) only `Apache-2.0.txt` ships for the tokenizers natives, and the MIT, BSD, ISC, Unicode, Zlib, CDLA, Oniguruma and esaxx
   notices are not reproduced;
   (c) `tokenizers.dll` is built with MSVC (`VCRUNTIME140.dll`), and it imports none of the three MinGW DLLs that ship beside
