@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: settlement_accrual
+controls:
+  x[1]{field}:
+    agreement_id
+  y[1]{field,agg}:
+    accrual_total,sum
+options:
+  title: Accruals by agreement (unbilled plus dispute provision, settlement currency)

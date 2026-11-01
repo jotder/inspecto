@@ -18,15 +18,16 @@ Wholesale finance and revenue-assurance teams at operators and MVNOs that settle
 ## What is included
 
 - Seven Pipelines for the partners, the agreements, the FX rates, the holidays, the statement, finance payments and the independently re-rated usage.
-- A settlement-cycle calendar with business-day due dates, ten chained Jobs from statement integrity to settlement positions and a roll-forward, two Reconciliations (voice, SMS) and one Alert Rule per agreement.
+- A settlement-cycle calendar with business-day due dates, twelve chained Jobs from statement integrity to settlement positions, a roll-forward, aging and accruals, two Reconciliations (voice, SMS) and one Alert Rule per agreement.
 - Findings that name their reason: amount, cut-off, FX, missing statement, unrated usage, missing FX rate.
 - Settlement positions per netting group and cycle (payable, receivable, net, in both currencies) and a roll-forward of the balance, with every converted line carrying its FX rate.
 - Disputes as Cases: each variance line is an Incident, one Case per partner and cycle, a reminder before the contractual dispute window closes, and a dispute workflow (disputed, agreed or rejected, credit pending) an administrator applies once.
+- Aging and accruals: open balances and disputes by age, an Alert when a payment is due, accruals for statements not yet received with a provision on what is disputed, and a settlement dashboard.
 - A synthetic corpus with planted variances and the look-alikes that must stay silent, and golden tests with mutation checks.
 
 ## What it does not do
 
-It posts no payment, accrual or ledger entry and fetches no market FX rate. Aging, accruals and the evidence pack sent to the partner follow in later slices; roaming (TAP) and MVNO constructs are demand-gated. No real partner statement has been used: the statement format is a synthetic proposal to be fitted to a real file in the first customer pass.
+It posts no payment, accrual or ledger entry (accruals are reported for finance) and fetches no market FX rate. The evidence pack sent to the partner follows in a later slice; roaming (TAP) and MVNO constructs are demand-gated. No real partner statement has been used: the statement format is a synthetic proposal to be fitted to a real file in the first customer pass.
 
 ## How it fits with the Editions
 
