@@ -63,7 +63,7 @@
 param(
     [switch]$NoBuild,   # skip mvn build; use existing JAR in target/
     [switch]$NoUi,      # skip the Angular UI build/bundle (inspecto-ui/ is optional)
-    [switch]$NoRuntime, # skip embedding a trimmed Java runtime (target server must then provide Java 24+)
+    [switch]$NoRuntime, # skip embedding a trimmed Java runtime (target server must then provide Java 27+)
     # PKG-LINUX-RUNTIME-WARNS-1: a failed linux_amd64 CROSS-build (Windows host + Linux jmods cache) is a
     # THROW by default — a release must not quietly lose a platform. Pass this to downgrade it to a warning
     # and ship only the host platform's zip.
@@ -2235,7 +2235,7 @@ if (-not $NoRuntime) {
         Write-Host "  (no Linux jmods cache found under .graalvm-cache — skipping inspecto-deploy-linux_amd64.zip)" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "  (-NoRuntime: skipping embedded JVM; target server must provide Java 24+)" -ForegroundColor Yellow
+    Write-Host "  (-NoRuntime: skipping embedded JVM; target server must provide Java 27+)" -ForegroundColor Yellow
     # No runtime to read a platform from: the zip is for the HOST platform's system java, so it keeps the
     # host's extension set. This is the one place the host OS decides the label.
     $hostPlatform = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'windows_amd64' } else { 'linux_amd64' }
@@ -2929,5 +2929,5 @@ if (-not $NoRuntime) {
     }
     Write-Host "The run/serve/ura launchers auto-prefer the embedded runtime when present."
 } else {
-    Write-Host "Java 24+ required on the target server.  No other dependencies needed."
+    Write-Host "Java 27+ required on the target server.  No other dependencies needed."
 }

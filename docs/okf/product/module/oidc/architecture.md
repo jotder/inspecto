@@ -33,7 +33,7 @@ A profile-gated Maven module (`inspecto-oidc`, in the `edition-standard`/`editio
   [build & test](../../layer/platform/spec-build-test.md).
 * **jlink** — ✅ **PKG-4 closed 2026-07-07**: the embedded runtime's module set is verified sufficient
   for Nimbus JOSE+JWT (`inspecto/package.ps1:19-25`; `REQUIREMENTS.md:254`, `:398`), so a Professional
-  bundle may embed it. `-NoRuntime` is now only an option (the target must then supply Java 24+), used
+  bundle may embed it. `-NoRuntime` is now only an option (the target must then supply Java 27+), used
   by the CI release and while the jlink *step* is re-proven on a host with no stale JVM holding
   `runtime/bin/server/jvm.dll` ([build & test](../../layer/platform/spec-build-test.md)).
 

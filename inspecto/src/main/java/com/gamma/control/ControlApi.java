@@ -760,7 +760,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  the exchange. The attribute map is private to the exchange only by DEFAULT — see the note on
      *  ApiContext's attribute block. Wherever it falls back to the shared {@code HttpContext} map (any
      *  pre-JDK-26 runtime, or a current one started with {@code -Djdk.httpserver.attributes=context} —
-     *  and the -NoRuntime bundle explicitly supports "Java 24+"), one map is shared by every request this
+     *  and the -NoRuntime bundle runs on any Java 27+ the customer supplies), one map is shared by every request this
      *  server handles: request A authenticates, request B hits a public path (nothing stamped, no 401),
      *  and B's {@code ATTR_SUBJECT} reads A's Subject — flowing into requireCapability, actor() and
      *  authorize(). Clearing the roster at dispatch start makes a shared-map runtime behave like a
