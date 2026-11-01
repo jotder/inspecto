@@ -243,13 +243,23 @@ public final class PipelineConfig {
         }
     }
 
-    /** Output format/compression and the optional {@code output.ducklake} map ({@code null} if absent). */
+    /**
+     * Output format/compression and the optional {@code output.ducklake} map ({@code null} if absent).
+     * {@code connection} is {@code output.connection}: the id of the Connection whose endpoint and
+     * credentials reach an object-store {@code dirs.database} ({@code SCALEOUT-OBJSTORE-DATABASE-DIR-1},
+     * plan §5.4 route (a)) — an id, never a secret; {@code null} for a local database.
+     */
     @PublicApi(since = "2.0.0")
     public record Output(String format, String compression, Map<String, Object> duckLake,
-                         String filenameColumn) {
+                         String filenameColumn, String connection) {
         /** The pre-B4 shape — no filename column. */
         public Output(String format, String compression, Map<String, Object> duckLake) {
-            this(format, compression, duckLake, null);
+            this(format, compression, duckLake, null, null);
+        }
+
+        /** A local-database output — no Connection. */
+        public Output(String format, String compression, Map<String, Object> duckLake, String filenameColumn) {
+            this(format, compression, duckLake, filenameColumn, null);
         }
     }
 
@@ -1792,7 +1802,7 @@ public final class PipelineConfig {
                 b.ignoreErrors, b.nullPadding,
                 new CsvSettings.Rejects(b.storeRejects, b.rejectsTable, b.rejectsScan, b.rejectsLimit),
                 b.sourceTimezone);
-        this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn);
+        this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn, b.outputConnection);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.profile, b.route);
         this.explicitSteps = b.steps != null && !b.steps.isEmpty();
@@ -2574,6 +2584,7 @@ public final class PipelineConfig {
         String outputFormat  = "PARQUET";   // absent output.format: Parquet keeps the declared types; CSV reads back as text
         String compression;
         Map<String, Object> duckLakeCfg;
+        String outputConnection;            // output.connection: a Connection id for an object-store dirs.database
         /** Explicit {@code sinks:} destinations; empty ⇒ synthesise the single-{@code output:} shorthand. */
         List<Sink> sinks = new ArrayList<>();
         List<Step> steps = new ArrayList<>();   // explicit `steps:` only; empty ⇒ project from the legacy blocks

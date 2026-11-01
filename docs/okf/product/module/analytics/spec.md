@@ -791,7 +791,7 @@ Java compiler, its TypeScript twin (`viz/query-spec.ts`) and the contract JSON c
 **Contract.** `measure-grammar.contract.json` gains `asOfAggregations`, `window` (`keys`, `maxDays`), `ratio.idSeparator`
 and a golden `windowed` corpus (8 events, 4 customers, asOf 2026-06-30; the edges are in it: the as-of day itself is in,
 `asOf − 30` is out, a day after the as-of is out, an event 90 days back shows only in the open window, a zero
-denominator is NULL). Tests: `MeasureWindowTest` (compiled text and parameter order, open window, ratio SQL, every refusal,
+denominator is NULL). **First consumer (2026-11-01):** the `predict.segment` Job (`PREDICTIVE-SEGMENT-RFM-1`) reads `recency`, `count` / `countDistinct` and `sum` under one window as of its `as_of` and bins them with this module's quantile `Binning` — [`spec-segmentation.md`](../predictive/spec-segmentation.md). Tests: `MeasureWindowTest` (compiled text and parameter order, open window, ratio SQL, every refusal,
 the seams `withLimit` / `withOrderBy` / `withDataset`, and the corpus RUN on DuckDB), `MeasureGrammarContractTest`
 (the new pins), `ControlApiBiQueryMaskingTest#aRatioOrWindowOverAMaskedColumnIsRefusedForAViewer`, and the vitest
 `windowed and ratio measures` block in `query-spec.spec.ts` (the same corpus run offline to the same figures).

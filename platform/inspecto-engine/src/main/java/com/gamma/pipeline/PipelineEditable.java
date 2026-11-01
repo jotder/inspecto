@@ -1172,9 +1172,13 @@ public final class PipelineEditable {
             boolean authoredSinks = existing.get("sinks") instanceof List<?> l && !l.isEmpty();
             if (!(authoredSinks && destByDatabase.size() > 1)) {
                 Map<String, Object> layer = authoredSinks ? new LinkedHashMap<>(output) : Map.of();
+                // output.connection (an object-store dirs.database's Connection) is not modeled by any
+                // node, so it is kept verbatim rather than dropped by the rebuild.
+                Object connection = output.get("connection");
                 output.clear();
                 for (String k : SINK_OUTPUT_LAYER)
                     putIfPresent(output, k, primarySink.cfg(k) != null ? primarySink.cfg(k) : layer.get(k));
+                putIfPresent(output, "connection", connection);
             }
             replaceOrRemove(dirs, "database", primarySink.cfg("database"));
             replaceOrRemove(dirs, "backup", primarySink.cfg("backup"));

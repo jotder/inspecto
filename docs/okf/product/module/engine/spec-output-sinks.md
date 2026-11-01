@@ -193,6 +193,47 @@ Tests: `DuckLakeRegistrarPerSinkTest` (7), `SinkDuckLakeSharedTableTest` (8, `pr
 read `lake_a → A=3`, `lake_out → B=5` after the fix; it is not in the reactor, for the network-INSTALL
 reason `DuckLakeRegistrarTest` records.
 
+## Object-store `dirs.database` (shipped 2026-11-01 — `SCALEOUT-OBJSTORE-DATABASE-DIR-1`)
+
+The ingest lane writes Stage-1 output to an `s3://bucket/prefix` `dirs.database` that lies under the operator
+allow-list `-Dassist.safety.object_roots` (containment rule: module.config `spec-config-safety.md`
+§ *Object-store containment*). Scale-out plan §5.4 bullet 6, credentials route (a):
+
+```
+dirs:
+  database: s3://inspecto-lakehouse/space-a/orders
+output:
+  connection: lake_s3          # an s3 Connection (*_connection.toon): host/port, username = access key,
+                               # password = ${ENV:…} secret, options.region, options.protocol http|https
+```
+
+* **Where it happens.** `ConsignmentIngestStrategy.configure` calls `ObjectStoreDatabase.prepare` BEFORE the
+  seal (LOAD is file access and is refused after it): containment re-checked; the Connection resolved from
+  `ConnectionRegistry` (this Space); its host refused unless it is a bare DNS name or IPv4 address (no `:`, `/`,
+  `@`, `?`, `#`, whitespace: DuckDB dials the authority it parses from `ENDPOINT`, so
+  `evil:80/x.allowed.com` would pass an allow-list pattern yet dial `evil` — verification finding) and then
+  passed through `EgressGate` (DuckDB's S3 client dials from native code, past every Java-side egress hop); `httpfs` loaded; then `CREATE OR REPLACE SECRET inspecto_output_store
+  (TYPE s3, …, SCOPE '<prefix>')` — temporary, in memory, shown redacted by `duckdb_secrets()`. The seal adds the
+  prefix to `allowed_directories`; `ingestAllowedDirs` leaves the URI out of the local list.
+* **What the write looks like** is `PartitionWriter.writeToObjectStore`: no staging, no reveal, a repeat write
+  accumulates (`spec-db-layer.md` § the output registry).
+* **Sub-directories** (`table:`, segment keys, Decision Rule routes) join through `PathJail.childOf`, a
+  `/`-join for a URI; the joined key is judged by `requireObjectStore` at the write, so a `..` table name is
+  refused there.
+* **Refused by name** (each a `SQLException` at `configure`, so the batch fails before any I/O), decided
+  under operator delegation 2026-11-01, pending confirmation: no / unregistered / non-`s3` / tunnelled or
+  proxied / keyless Connection; a `sinks:` list; `produces: reference`; `output.ducklake.enabled`. Readers of
+  an object-store pipeline's output (DB browser, join reference, enrichment) skip it, and the seal then
+  refuses the read. Left open on the row: DuckLake registration (so `-Dinspecto.topology=partitioned`
+  cannot use an object store yet), fan-out, reference stores, readers.
+* **The Connection's `base_path` is not consulted** — the allow-list bounds where; the Connection supplies
+  only the endpoint and credentials.
+
+Tests: `ObjectStoreIngestTest` (14 — every refusal one key away from the accepted shape; the live case runs a
+CSV pipeline into MinIO and an `fn: custom` expression reading the same bucket outside the prefix lands
+nothing; SKIPS without `INSPECTO_TEST_S3_ENDPOINT`/`_KEY`/`_SECRET`, and a skip is not a pass),
+`ConfigSafetyValidatorTest.outputConnectionIsRequiredForAnObjectStoreDatabaseAndRefusedForALocalOne`.
+
 ## Quarantine outcomes
 
 * `QUARANTINED_UNREADABLE` — the ingester threw (file unreadable/undecodable).

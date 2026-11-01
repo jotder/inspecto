@@ -129,6 +129,22 @@ public final class SqlSandbox implements AutoCloseable {
      * ({@code SEC-DRYRUN-EXPR-UNSEALED-1}: a {@code path:} reference is one file, not its directory).
      */
     public static void sealAllowing(Connection conn, List<Path> dirs, List<Path> files) throws SQLException {
+        sealAllowing(conn, dirs, files, List.of());
+    }
+
+    /**
+     * As {@link #sealAllowing(Connection, List, List)}, plus {@code objectPrefixes}: object-store prefixes
+     * ({@code s3://bucket/key}, already contained by {@code PathJail.requireObjectStore}) added to
+     * {@code allowed_directories} with a trailing {@code /} (redundant: DuckDB 2.0.0.0 already treats an entry
+     * as a directory, so {@code s3://b/p} never admits {@code s3://b/pX} either way — the suffix only makes the
+     * intent explicit; {@code SCALEOUT-OBJSTORE-DATABASE-DIR-1}). Measured on DuckDB 2.0.0.0 against MinIO:
+     * with external access off, a COPY or read under the prefix works, and a sibling prefix, another bucket
+     * and any {@code http://} URL are refused by DuckDB itself.
+     * ⚠ DuckDB's check is lexical, so {@code s3://b/p/../q} passes it; the store then judges that key as
+     * written (MinIO answers 403, AWS treats {@code ..} as a literal key segment under the prefix).
+     */
+    public static void sealAllowing(Connection conn, List<Path> dirs, List<Path> files, List<String> objectPrefixes)
+            throws SQLException {
         try (Statement st = conn.createStatement()) {
             if (!files.isEmpty()) {
                 StringBuilder list = new StringBuilder("[");
@@ -139,13 +155,17 @@ public final class SqlSandbox implements AutoCloseable {
                 }
                 st.execute("SET allowed_paths=" + list.append(']'));
             }
-            if (!dirs.isEmpty()) {
+            if (!dirs.isEmpty() || !objectPrefixes.isEmpty()) {
                 StringBuilder list = new StringBuilder("[");
                 for (Path d : dirs) {
                     String dir = d.toAbsolutePath().normalize().toString().replace('\\', '/');
                     if (!dir.endsWith("/")) dir += "/";
                     if (list.length() > 1) list.append(", ");
                     list.append(SqlIdent.sqlStr(dir));
+                }
+                for (String prefix : objectPrefixes) {
+                    if (list.length() > 1) list.append(", ");
+                    list.append(SqlIdent.sqlStr(prefix.endsWith("/") ? prefix : prefix + "/"));
                 }
                 st.execute("SET allowed_directories=" + list.append(']'));
             }

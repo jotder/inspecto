@@ -81,6 +81,16 @@ public final class PathJail {
         return value != null && URI_SCHEME.matcher(value.trim()).find();
     }
 
+    /**
+     * {@code child} under {@code dir}: a {@code /}-joined key for an object-store location ({@link #isUri}), else
+     * {@link Paths#get}. The URI branch neither normalises nor contains — {@link #requireObjectStore} judges the
+     * joined key where it is written ({@code PartitionWriter}), so a {@code ..} child is refused there.
+     */
+    public static String childOf(String dir, String child) {
+        if (!isUri(dir)) return Paths.get(dir, child).toString();
+        return (dir.endsWith("/") ? dir : dir + "/") + child;
+    }
+
     /** The operator-only allow-list of object-store prefixes (SCALEOUT-OBJSTORE-DATABASE-DIR-1). */
     public static final String OBJECT_ROOTS_PROPERTY = "assist.safety.object_roots";
 

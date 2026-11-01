@@ -1532,6 +1532,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             if (cur.isEmpty()) return;
             PipelineConfig cfg = cur.get();
             if (!cfg.producesReference() || !cfg.reference().load().versionedStore()) return;
+            // a reference store is never an object-store location (the ingest lane refuses that shape)
+            if (com.gamma.config.safety.PathJail.isUri(cfg.dirs().database())) return;
             // D4: scd2 defaults to keep-forever (-1 = merge files, drop no version) so as-of stays
             // answerable over the whole history; -Dreference.compact.history.days sets a horizon instead.
             // upsert has no history worth keeping, so it collapses to the current versions.

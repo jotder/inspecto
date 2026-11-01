@@ -1,0 +1,13 @@
+id: addon.predictiveAnalytics
+kind: addon
+title: Predictive Analytics
+offeringAddon: predictiveAnalytics
+billable: true
+orderCode: INS-AO-PREDICTIVE-ANALYTICS
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/addon/predictiveAnalytics/index.md

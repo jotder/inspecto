@@ -1,0 +1,7 @@
+job:
+  name: ps_dispute_case
+  type: caserule.evaluate
+  description: "Group the dispute Incidents (ps_dispute_line, ps_dispute_window) into one Case per partner and cycle with the Case Rule ps_dispute_case"
+  rule: ps_dispute_case
+  cron: "0 6 * * *"
+  enabled: true

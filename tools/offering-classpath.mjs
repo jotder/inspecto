@@ -55,7 +55,7 @@ export const CLASSPATH_ORDER = [
     'inspecto-policy',
     'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',
     'inspecto-entity-list', 'inspecto-la-storage', 'inspecto-la-core', 'inspecto-la-api', 'inspecto-la-store-pg', 'inspecto-geo-link',
-    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly',
+    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive',
     'inspecto-agent', 'inspecto-intelligence',
 ];
 

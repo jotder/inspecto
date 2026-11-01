@@ -174,6 +174,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | `intelligence` - AI assist and intelligence | features | optional | — | — | — | ✅ | ✅ |
 | `observability` - Observability (metrics endpoint + events feed API) | features | optional | — | — | ✅ | ✅ | ✅ |
 | `ops` - Case management and objects | features | optional | — | — | ✅ | ✅ | ✅ |
+| `predictive` - Predictive Analytics | features | optional | — | — | ✅ | ✅ | ✅ |
 | `reconciliation` - Reconciliation | features | optional | — | — | ✅ | ✅ | ✅ |
 | `regulatory-reporting` - Regulatory Reporting | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `scoring` - Scoring | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
@@ -209,6 +210,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | laInvestigations | `ops` | — | built | built | built |
 | linkAnalysis | `la-storage`, `la-core`, `la-api`, `geo-link` | built | built | built | built |
 | multiEntity | `exchange` | — | built | built | built |
+| predictiveAnalytics | `predictive` | — | built | built | built |
 | premiumConnectors | `connectors-kafka` | — | built | built | built |
 | reconciliation | `reconciliation` | — | built | built | built |
 | regulatoryReporting | `regulatory-reporting` | — | built | built | built |
@@ -230,10 +232,10 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 
 | | Basic | Standard | Advanced | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 23 | 41 | 44 | 44 |
+| First-party jars (processor + connectors + optional + core thin) | 23 | 42 | 45 | 45 |
 | of which core thin jars | 16 | 16 | 16 | 16 |
-| Optional modules beyond Basic | 0 | 18 | 21 | 21 |
-| Total on the classpath (+ third-party sidecars) | 23 | 42 | 45 | 45 |
+| Optional modules beyond Basic | 0 | 19 | 22 | 22 |
+| Total on the classpath (+ third-party sidecars) | 23 | 43 | 46 | 46 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier

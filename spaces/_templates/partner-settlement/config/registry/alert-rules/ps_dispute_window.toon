@@ -1,0 +1,8 @@
+name: ps_dispute_window
+dataset: settlement_dispute
+measure: sum(window_alert)
+by[1]: dispute_key
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "The contractual dispute window of a partner cycle with dispute lines closes within window_alert_days (Job ps_dispute, default 5) of the as-of day. One Incident per partner and cycle, grouped into that cycle's dispute Case. It reads the data, not the Case: a Case already DISPUTED is reminded too. Runbook: config/runbooks/partner-settlement-runbooks.md."

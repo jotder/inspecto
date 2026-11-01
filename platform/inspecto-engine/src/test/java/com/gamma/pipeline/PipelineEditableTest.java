@@ -54,6 +54,21 @@ class PipelineEditableTest {
                 "single-schema quarantine dir has no owning node and must be preserved");
     }
 
+    /** output.connection has no node (SCALEOUT-OBJSTORE-DATABASE-DIR-1): the output rebuild keeps it verbatim. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void outputConnectionSurvivesTheOutputRebuild(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        ((Map<String, Object>) raw.get("output")).put("connection", "lake_s3");
+
+        Map<String, Object> lowered = PipelineEditable.lower(
+                PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw)), raw, true);
+
+        assertEquals("lake_s3", ((Map<?, ?>) lowered.get("output")).get("connection"));
+    }
+
     // ── CONSIGNMENT-HOME-1 (2026-09-02): the planner caps moved from the sink to the collector ──
 
     /** A file still on the legacy processing.batch: map lifts onto the acquisition node's `consignment`

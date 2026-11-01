@@ -1,9 +1,8 @@
 # Partner settlement runbooks
 
-> **Slices S1 to S4** (open work: `docs/superpower/telco-packs-plan.md`): the References, statement ingestion, the
-> compare, and the netting positions with the roll-forward. There is no dispute Case workflow, aging or accrual here yet; a finding
-> opens an Incident through the Reconciliation and the Alert Rule, and the Case, the evidence pack and the aged balances arrive with
-> the next slices.
+> **Slices S1 to S5** (open work: `docs/superpower/telco-packs-plan.md`): the References, statement ingestion, the
+> compare, the netting positions with the roll-forward, and disputes as Cases. There is no aging or accrual here yet, and no
+> evidence pack; those arrive with the next slices.
 
 **Every number here is synthetic.** No real partner statement, TAP file or wholesale invoice has been seen: the statement layout
 is one canonical Schema, and mapping a partner's own layout into it is a Pipeline mapping, outside this pack. A finding is a
@@ -11,7 +10,7 @@ difference between what a partner says is owed and what we price ourselves, neve
 
 ## What runs
 
-Nine chained `sql.template` Jobs (each runs when the previous one succeeds; the first runs daily at 01:00) and two `recon.run` Jobs
+Ten chained `sql.template` Jobs (each runs when the previous one succeeds; the first runs daily at 01:00), the Case Rule Job `ps_dispute_case` (06:00) and two `recon.run` Jobs
 (05:30):
 
 | Job | Writes | What it does |
@@ -22,8 +21,9 @@ Nine chained `sql.template` Jobs (each runs when the previous one succeeds; the 
 | `ps_expected` | `settlement_expected` | Our independently re-rated usage per agreement, direction, service, destination class and day, in the agreement's settlement currency, with the tolerance in force that day. |
 | `ps_billed` | `settlement_billed` | The partner's usage lines at the same grain and currency. `amount` is snapped to our expected amount when the variance is inside the tolerance (so the Reconciliation compares at tolerance 0); `amount_billed` is always the true billed amount. |
 | `ps_findings` | `settlement_findings` | `amount_mismatch`, `cutoff_difference`, `fx_difference` (finding class `variance`); `missing_statement`, `unrated_usage`, `fx_rate_missing` (class `data_quality`). |
+| `ps_dispute` | `settlement_dispute` | One row per dispute line: every `amount_mismatch` and `fx_difference` finding, with `dispute_key` (partner, cycle start, cycle end), `disputed_amount` (the absolute variance in the settlement currency), the agreement's `currency` and `netting_group`, the cycle's `dispute_window_end`, `days_to_window_end` and `window_alert` (1 when the window closes within `window_alert_days`, default 5, of `as_of`, both days included). |
 | `ps_movement` | `settlement_movement` | Every money movement at line level: each current statement line and each finance payment, credit or debit note, in the settlement currency, with both currencies, the FX rate, its date and its type, and a `status` (`ok`, `fx_missing`, `unknown_agreement`). Signed from our side: positive is what we owe. |
-| `ps_position` | `settlement_position` | Per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay) and `net_direction`, `orig_net` (the net in each original currency), the statement and line counts, and `lines_unconverted`. |
+| `ps_position` | `settlement_position` | Per netting group, cycle month and settlement currency: `payable`, `receivable`, `net` (positive = we pay) and `net_direction`, `orig_net` (the net in each original currency), the statement and line counts, `lines_unconverted`, and `disputed_amount` / `disputed_lines` beside the net (never netted into it). |
 | `ps_rollforward` | `settlement_rollforward` | Per netting group and settlement currency, one row for every month from the first movement to the as-of month: `opening` + `invoiced` - `paid` + `adjustments` = `closing`. A month with no movement carries the balance. |
 | `ps_voice`, `ps_sms` | Break state | One Reconciliation per service family on `settlement_expected` vs `settlement_billed`: Break lifecycle, recurrence and the Incident. |
 
@@ -66,7 +66,7 @@ agreement and cycle; a row with a blank `amount_expected` must carry a `reason` 
 ## Positions and the roll-forward
 
 Both read what the partner's current statements say is owed and what finance recorded as paid, never our own pricing, so a position
-is not an agreed balance: a flagged variance is in `settlement_findings`, and no dispute is read or netted away here.
+is not an agreed balance: a flagged variance is in `settlement_findings`, and the disputed amount rides beside the net, never in it.
 
 - **The feed `settlement_payment`** is finance's record, read and never written: `payment_id`, `agreement_id`, `partner_id`,
   `direction` (`we_pay`: money left us, or a note that reduces what we owe; `they_pay`: money came to us), `payment_date`, `kind`
@@ -87,6 +87,32 @@ is not an agreed balance: a flagged variance is in `settlement_findings`, and no
   in `settlement_movement` and in no balance. Read `settlement_movement` filtered on `status` after every run.
 - **No opening balance feed.** The first month of a series opens at zero; a balance that existed before the first statement must be fed
   as an adjustment note.
+
+## Disputes as Cases
+
+A dispute is the Case, a dispute line is its Incident. `ps_dispute_line` (CRITICAL: only a CRITICAL Alert opens an Incident, and the line must be one) raises one Incident per row of
+`settlement_dispute`, keyed by `dispute_key` and `item_key`; the Case Rule `ps_dispute_case` (`config/ops/`, run daily at 06:00 by
+the Job `ps_dispute_case`) groups every Incident that carries a `dispute_key` into one Case per partner and cycle, category
+`partner-settlement`. `ps_dispute_window` (CRITICAL) raises one Incident per partner cycle whose dispute window closes within the lead
+time, and it joins that cycle's Case. It reads the data, not the Case: a Case already `DISPUTED` is reminded too; resolve the
+reminder. A `cutoff_difference` is a timing convention and never a dispute line; the data-quality findings stay on
+`ps_findings_found`.
+
+**Apply the dispute governance once, as an administrator** (decision PS-O5: a Space Template never carries a workflow, an SLA
+Policy or an Escalation Rule; every import refuses them). The bodies ship in `config/governance/`:
+
+| Body | Route | What it sets |
+|---|---|---|
+| `case-workflow.json` | `POST /components/workflow` | The CASE workflow `OPEN → INVESTIGATING → DISPUTED → AGREED \| REJECTED`, `AGREED → CREDIT_PENDING → CLOSED`, `REJECTED → ESCALATED \| CLOSED`, plus every built-in state and move. ⚠ One workflow per object type per Space: it governs every Case in the Space, which is why it keeps the built-in path. |
+| `case-sla-policy.json` | `POST /components/sla-policy` | An internal response target for every Case: one working day to respond, 20 working days to resolve, Monday to Friday 09:00-17:00 UTC. Illustrative: set your own. The contractual deadline is the data's `dispute_window_end`, not this clock. |
+| `case-escalation-age.json` | `POST /components/escalation-rule` | Notify when a `partner-settlement` Case is three days old and still `OPEN`, `INVESTIGATING` or `ESCALATED` (not yet sent to the partner, or escalated again after a rejection). |
+
+Without these, the Cases still open and group, on the built-in CASE workflow (no `DISPUTED` state) and with no SLA.
+
+**Impact** (PS-D6, an analyst action through `PUT /objects/{id}/impact` on the Case, in the settlement currency): `suspected` = the
+amount disputed with the partner (when the Case reaches `DISPUTED`; `settlement_dispute.disputed_amount` summed over its lines is the
+starting figure), `confirmed` = the credit the partner accepted (`AGREED`), `recovered` = the credit note received (recorded on the
+closed Case), `prevented` = a variance caught before we paid. The pack never writes the Impact itself.
 
 ## Limits
 

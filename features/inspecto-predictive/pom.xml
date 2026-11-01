@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-predictive</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Predictive Analytics (optional)</name>
+    <description>
+        OPTIONAL add-on module (PREDICTIVE-ANALYTICS-1, add-on predictiveAnalytics, Standard and above per OD-5). First
+        slice PREDICTIVE-SEGMENT-RFM-1: the segmentation-model component kind (SegmentationModel, validated fail closed
+        by SegmentationKindValidator, with the reserved customer_segments_ output stores), the pure RFM segmenter
+        (RfmSegmenter: quantile bins from the Analytics Kernel, a declared label table) and the predict.segment Job
+        Type (SegmentJobType / SegmentEvaluator) writing customer_segments_{model} and _latest through the score output
+        contract. The RFM inputs are windowed Measures (MeasureCompiler window + recency, ANALYTICS-CORE-1 C1). No
+        routes yet (PREDICTIVE-SURFACE-1). Package com.gamma.predictive. THIN: no shade. Built only under the
+        edition-standard / -advanced / -preview profiles.
+    </description>
+
+    <dependencies>
+        <!-- The core: the Job SPI, ComponentStore, DatasetRelation, QueryExecutor, MeasureCompiler, ScoreOutputWriter,
+             ComponentKindValidator and DuckDB. Compile scope, as inspecto-anomaly does. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- The Analytics Kernel: quantile Binning and the score output contract (ScoreKind, ScoreColumns, EntityCap). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
+
+        <!-- TestConfigs + PipelineConfigBatchTest.miniSchema() for the real-HTTP save-gate test's Space -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

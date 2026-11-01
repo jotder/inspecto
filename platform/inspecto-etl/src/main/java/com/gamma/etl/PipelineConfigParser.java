@@ -977,6 +977,7 @@ final class PipelineConfigParser {
             b.filenameColumn = trimToNull(out.get("filename_column"));
             if (b.filenameColumn != null)
                 Identifiers.validate(b.filenameColumn, "output.filename_column");
+            b.outputConnection = trimToNull(out.get("connection"));
         }
 
         // ── sinks (plural destinations) ─────────────────────────────────────────
@@ -1464,7 +1465,8 @@ final class PipelineConfigParser {
         java.nio.file.Path poll = Paths.get(pollDir).toAbsolutePath().normalize();
         for (String key : new String[]{"database", "backup", "temp", "errors", "quarantine", "markers"}) {
             Object val = dirs.get(key);
-            if (val == null) continue;
+            // An object-store dirs.database is no Path and cannot be inside a local poll dir.
+            if (val == null || ("database".equals(key) && PathJail.isUri(val.toString()))) continue;
             java.nio.file.Path dir = Paths.get(val.toString()).toAbsolutePath().normalize();
             // ⚠ This is an ANTI-containment business rule ("don't write output into the inbox"), not a
             // security boundary — hence the inverted sense. It reuses PathJail.contains only for the
