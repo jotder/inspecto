@@ -12,10 +12,12 @@ user's token. A machine token that is signed by the trusted issuer, has a `sub`,
 roles map to capabilities exactly as a person's do ([la-core architecture §6.4](../la-core/architecture.md), *Auth*). So the
 real question is whether a deployment may give such a token a role. The answer is yes, for one named integration at a time,
 under the **deployment conditions** below. Without them the token can get much more than one integration role. Five BACKLOG
-rows (end of this page) would move the conditions from the runbook into code; two are still open. `OIDC-KEYCLOAK-AZP-ROLES-1`
+rows (end of this page) would move the conditions from the runbook into code; one is still open. `OIDC-KEYCLOAK-AZP-ROLES-1`
 was fixed on 2026-11-01, so condition 2 is now held by code. `OIDC-CC-CLIENT-PIN-1` and `OIDC-CC-LIFETIME-REPLAY-1` were
 built on 2026-11-01 as opt-in settings ([admin guide](admin-guide.md) section 5): with `-Dauth.oidc.clients` set, conditions
-1 and 5 are held by code, and a client not on the list is refused (G2).
+1 and 5 are held by code, and a client not on the list is refused (G2). `OIDC-CC-MACHINE-ACTOR-1` was built on 2026-11-01,
+so condition 6 is held by code (G7). `OIDC-CC-INTEGRATION-ROLE-1` waits on operator decisions, so conditions 3 and 4 stay
+deployment rules.
 
 **Deployment conditions (all required):**
 
@@ -33,8 +35,10 @@ built on 2026-11-01 as opt-in settings ([admin guide](admin-guide.md) section 5)
 5. Set `-Dauth.oidc.maxTokenLifetime=PT5M` (or less) and `-Dauth.oidc.refuseReplay=true`, and give the client an IdP
    access-token lifetime within it. A longer-lived machine token, or one sent a second time on the same node, is then
    refused (G4, G6). Replay refusal is per node; sender-constrained tokens (DPoP / mTLS) are not built.
-6. Map the IdP's `sub` for the service account to the client in the audit runbook. The actor recorded is `sub`, which on
-   Keycloak is the service-account user's UUID, not the client id (G7).
+6. ~~Map the IdP's `sub` for the service account to the client in the audit runbook.~~ No longer required (G7 built
+   2026-11-01): a machine token (`gty: client_credentials`, or a client listed under condition 1) is recorded as actor
+   `client:<client id>` with `actor_type: service`, and the token's `sub` rides on the row as `idp_subject`. A Keycloak
+   client-credentials token may carry no `gty`, so on Keycloak condition 1 is what makes the token a machine's.
 
 ## Checklist
 
@@ -55,12 +59,12 @@ inbound trust.
 | 3a | Inbound requests carry a nonce or timestamp checked inside a tolerance window | **PASS per node when `auth.oidc.refuseReplay` is set, since 2026-11-01** (was GAP G6) | **Built (opt-in):** for a listed machine client, `jti` is required and accepted once per node until `exp` + 60 s; it needs the lifetime ceiling, which bounds the cache. Behind a load balancer a token can still be used once per node, and there is still no proof of possession (DPoP / mTLS, not built). `OidcMachineTrustTest.aReplayedJtiIsRefused`, `.aMachineTokenWithoutJtiIsRefusedUnderReplayRefusal`. *As found:* nothing checks `jti` or a nonce, and there is no proof of possession (DPoP or mTLS binding). A captured bearer token works again until `exp`, plus Nimbus's 60 s clock skew (`OidcAuthenticator.java:49-50`). Throwaway test: one token with one `jti`, sent twice, was accepted both times. What limits the harm today: TLS, a short IdP lifetime (condition 5), and the inbound call being idempotent (3c). |
 | 3b | Outbound webhooks sign the timestamp | PASS | `X-Inspecto-Signature` = HMAC-SHA256 over `X-Inspecto-Timestamp + "." + body` (`la/inspecto-geo-link/src/main/java/com/gamma/geolink/IntegrationWebhooks.java:46-62`). Covered by `IntegrationWebhooksTest` (an independent HMAC vector). |
 | 3c | Idempotency keys honoured on both sides | PASS | Inbound: the Investigation id comes from `ext-` + sha256(system, id) (`InvestigationInboundRoutes.java:151-152`), with header CREATE_NEW, so a replay creates nothing new. Generic: the `Idempotency-Key` replay cache is keyed per caller and per issuer (`inspecto/src/main/java/com/gamma/control/ControlApi.java:970-991`, `Subject.stampIssuer`, called at `OidcAuthenticator.java:173`). Outbound: one `Idempotency-Key` for every retry (la-core architecture §6.5). |
-| 4a | Every machine call names the client id as actor | **GAP G7** | The actor is `Subject.id()`, which is the token's `sub` (`spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/RequestAttrs.java:148-149`, `OidcAuthenticator.java:159`). `actorType` is `"user"` for every authenticated Subject (`RequestAttrs.java:159-160`). On Keycloak a service account's `sub` is a user UUID, and the client id is in `azp` / `client_id`, which nothing records. Throwaway test: `s.id()` was the UUID. Whether WSO2 sets `sub` to the client id depends on the application's settings, so this cannot be relied on. A machine call is recorded as a user, under an id that only the IdP can resolve. |
+| 4a | Every machine call names the client id as actor | **PASS since 2026-11-01** (was GAP G7) | **Built:** a machine token (`gty` `client_credentials` / `client-credentials`, or a client in `-Dauth.oidc.clients`) becomes a Subject with id `client:<client id>` (`azp`, else `client_id`) and `machine()` true (`MachineTrust.machineClient`); `RequestAttrs.actorType` says `service` and `AuditTrail` adds `idp_subject` = the token's `sub`. A person's token and a gateway assertion are unchanged. `OidcMachineActorTest`, `ControlApiAuthV1Test.aMachineCallIsAuditedAsAServiceUnderItsClientId`. *As found:* The actor was `Subject.id()`, which is the token's `sub` (`spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/RequestAttrs.java:148-149`, `OidcAuthenticator.java:159`). `actorType` is `"user"` for every authenticated Subject (`RequestAttrs.java:159-160`). On Keycloak a service account's `sub` is a user UUID, and the client id is in `azp` / `client_id`, which nothing records. Throwaway test: `s.id()` was the UUID. Whether WSO2 sets `sub` to the client id depends on the application's settings, so this cannot be relied on. A machine call is recorded as a user, under an id that only the IdP can resolve. |
 | 4b | Remote case id and our delivery id cross-recorded | PASS | Inbound: `(reference.system, reference.id)` becomes an external reference on the Investigation. Hand-off: the remote case id at `caseIdPointer` is linked as an external reference `{system, type: case}`. Webhooks: `X-Inspecto-Delivery-Id` / `Idempotency-Key` = the source event id, plus `LINK_WEBHOOK_DELIVERED` / `_FAILED` on the Space's ledger (la-core architecture §6.4 and §6.5). |
 | 5a | Client secrets only behind `SecretResolver` references | N/A inbound · PASS outbound | Inbound trust holds no client secret: tokens are checked against the issuer's public JWKS. Outbound: a Connection with a literal token is refused at send (`HostOutboundPort.java:73-74`). |
 | 5b | Rotation without downtime | PASS (one hardening note) | `RemoteJWKSet` fetches the JWKS again when it sees an unknown `kid`, so an IdP key rollover needs no restart (`OidcAuthenticator.java:231`). Hardening note (filed under G2's row): an explicit `auth.oidc.jwksUri` is not required to be https. Only the discovery URL is (`OidcConfig.java:224-228`), so a plain-http JWKS would let anyone on the path supply the signing keys. **Built 2026-11-01 (opt-in):** with `auth.oidc.clients` set, boot refuses an effective `jwksUri` that is not https (loopback http allowed, `OidcConfig.requireHttps`). The gateway JWKS is not checked. |
 | 5c | Nothing logged | PASS | Every failure to verify returns empty without logging (`OidcAuthenticator.java:177-179`). No log statement in the module or in `AuthRoutes` writes a token or the `Authorization` header (grep, 2026-11-01). The boot warnings name only property keys (`:112`, `OidcConfig.java:237`). |
-| 6 | A machine principal never holds `canRevealLinkEntities` by default | PASS (by configuration only) | A token with no roles gets no capabilities (throwaway test), and an unknown role grants nothing (`RoleMapper.java:43-46`). In the seed, only `admin` and `super` hold the reveal capability (`Roles.java:262-270`). But Inspecto has no machine principal to refuse it to (G3), and until G5 was fixed (2026-11-01) a Keycloak client could claim `super`. Condition 4 is required. |
+| 6 | A machine principal never holds `canRevealLinkEntities` by default | PASS (by configuration only) | A token with no roles gets no capabilities (throwaway test), and an unknown role grants nothing (`RoleMapper.java:43-46`). In the seed, only `admin` and `super` hold the reveal capability (`Roles.java:262-270`). Since 2026-11-01 a Subject says it is a machine (`Subject.machine()`), but no gate refuses it anything yet (G3), and until G5 was fixed (2026-11-01) a Keycloak client could claim `super`. Condition 4 is required. |
 
 **Space binding (asked in the task, not in the checklist): GAP G9.** A token is not bound to a Space. Every authenticated
 Subject may address any `/spaces/{id}/…` (`ControlApi.bindSpace`, `inspecto/src/main/java/com/gamma/control/ControlApi.java:1009-1030`).
@@ -90,6 +94,6 @@ and audience (`OidcAuthenticator.java:95-97`, `:150-153`), so every finding abov
 |---|---|---|
 | G5 | `OIDC-KEYCLOAK-AZP-ROLES-1` (P2) — closed 2026-11-01 | defect |
 | G1, G2, 5b note | `OIDC-CC-CLIENT-PIN-1` — closed 2026-11-01 (opt-in) | feature |
-| G3, G9 | `OIDC-CC-INTEGRATION-ROLE-1` | feature |
-| G7 | `OIDC-CC-MACHINE-ACTOR-1` | feature |
+| G3, G9 | `OIDC-CC-INTEGRATION-ROLE-1` — waits on operator decisions (grant, allowlist or denylist, Space binding) | feature |
+| G7 | `OIDC-CC-MACHINE-ACTOR-1` — closed 2026-11-01 | feature |
 | G4, G6 | `OIDC-CC-LIFETIME-REPLAY-1` — closed 2026-11-01 (opt-in; DPoP / mTLS not built) | feature |

@@ -32,14 +32,26 @@ import java.util.Set;
  * {@code name} claim, else {@code given_name}+{@code family_name}, else {@code preferred_username} — or
  * {@code null}. <b>Display-only, untrusted text</b>: it identifies nobody, grants nothing, and must never
  * be matched, logged as identity, or used in place of {@link #id()}.
+ *
+ * <p><b>Machine (OIDC-CC-MACHINE-ACTOR-1).</b> A Subject authenticated from a client-credentials token is a machine:
+ * its {@link #id()} is {@code client:<client id>}, so the audit trail and every owner field name the integration
+ * rather than a service-account UUID, and {@link #machineSub()} keeps the token's {@code sub} for the audit row.
+ * {@code null} for a person, whose id already is the {@code sub}.
  */
 public record Subject(String id, Set<String> capabilities, Set<String> dataScopes,
-                      Map<String, Object> attributes, String email, String displayName) {
+                      Map<String, Object> attributes, String email, String displayName, String machineSub) {
 
     public Subject {
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
         email = email == null || email.isBlank() ? null : email.trim();
         displayName = displayName == null || displayName.isBlank() ? null : displayName.trim();
+        machineSub = machineSub == null || machineSub.isBlank() ? null : machineSub;
+    }
+
+    /** A person — every pre-machine caller. */
+    public Subject(String id, Set<String> capabilities, Set<String> dataScopes, Map<String, Object> attributes,
+                   String email, String displayName) {
+        this(id, capabilities, dataScopes, attributes, email, displayName, null);
     }
 
     /** No display name — every pre-R2-16 caller. */
@@ -66,6 +78,11 @@ public record Subject(String id, Set<String> capabilities, Set<String> dataScope
     /** Whether this caller's data visibility is restricted ({@link #dataScopes()} non-null). */
     public boolean scoped() {
         return dataScopes != null;
+    }
+
+    /** Whether this caller is a machine (a client-credentials token), not a person. */
+    public boolean machine() {
+        return machineSub != null;
     }
 
     /** Record which issuer minted the token this request's Subject came from - the namespace its {@link #id()}

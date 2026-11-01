@@ -127,3 +127,10 @@ INSPECTO_JAVA_OPTS=-Dauth.oidc.clients=la-integration -Dauth.oidc.maxTokenLifeti
   per node: behind a load balancer a token can still be used once on each node.
 * Not pinned: the gateway trust path (`auth.oidc.gateway.*`), whose assertion the gateway mints for its own callers.
 * The role a machine client holds is still a deployment condition: see the review's conditions 3 and 4.
+* **Audit.** A machine call is recorded as actor `client:<client id>` (`azp`, else `client_id`) with `actor_type: service`,
+  and the token's `sub` (on Keycloak the service-account user's UUID) as `idp_subject` on the same row. A token is a
+  machine's when its client is listed in `auth.oidc.clients`, or, list or not, when it carries `gty: client_credentials`
+  (Auth0: `client-credentials`). Keycloak may send no `gty`, so list the client there. The same `client:<client id>` is
+  the owner of what the machine creates (an inbound Investigation's lead, for example). A person's token is unchanged.
+  Upgrading: what a machine created before 2026-11-01, and its earlier audit rows, stay under the old `sub` (the
+  service-account UUID). Nothing is migrated; reassign the lead by hand if the machine must read it back.
