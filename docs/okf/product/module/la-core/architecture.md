@@ -1209,7 +1209,9 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
 - **Groups.** `investigation-filter.ts` names the six groups (`FILTER_GROUP_FIELDS`), their defaults and
   `changedGroups()` (blank = default); `la-fold` gained `changed` (a dot), `dense`, `startOpen` and `rememberKey`
   (localStorage `la.fold.*`, try/catch). Depth counts as changed only while it is not bound to the last Expand
-  (LA-DEGREES-TRIM-1 keeps that binding).
+  (LA-DEGREES-TRIM-1 keeps that binding). The binding survives a reload (LA-DEGREES-TRIM-2): each `expand` of one
+  Expand carries the same optional `group` param (client-made, stored as given, ignored by the evaluator), and the
+  newest steps sharing the newest expand's group are the last Expand; a log without groups binds nothing.
 - **Quick windows.** The rung's `window` control also takes `last7 | last30 | last90`; `rungOf(…, windowEnd)` sends them
   as `[end − N days, end + 1 s)` (the server's range is half-open). The end is `windowEnd` (the preset window end) or
   `InvestigationSessionStore.latestEvent`, read once on demand by `loadLatestEvent()`; unknown → no window is sent and

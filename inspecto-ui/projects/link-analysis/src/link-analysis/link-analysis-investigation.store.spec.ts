@@ -1264,6 +1264,10 @@ describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSA
         const out = await t.store.saveUnsaved('n', 'p');
         expect(sent.map((o) => o['ids'])).toEqual([['a'], ['a'], ['b', 'c']]); // degree 3 stopped early on screen: not sent
         expect(out).toEqual({ created: true, recorded: 3, message: '' });
+        // LA-DEGREES-TRIM-2: both degrees carry ONE group, so a reload knows they were one Expand; the seed carries none
+        expect(sent[0]['group']).toBeUndefined();
+        expect(typeof sent[1]['group']).toBe('string');
+        expect(sent[2]['group']).toBe(sent[1]['group']);
     });
 
     it('the server admits fewer than the screen drew: a degree it never admitted expands from what it did admit, and Save completes', async () => {

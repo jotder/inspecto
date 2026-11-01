@@ -4577,7 +4577,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             return true;
         });
         await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
-        expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500 }]);
+        expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500, group: expect.any(String) }]);
         // Hold off goes through hubs: a sealed override, so it asks first; No sends nothing
         const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
         await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 }, from: null });

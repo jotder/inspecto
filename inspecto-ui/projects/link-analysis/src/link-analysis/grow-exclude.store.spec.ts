@@ -58,7 +58,8 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
         apply: vi.fn(async (op: InvestigationOpRequest) => {
             applied.push(op);
             const answer = steps[Math.min(at++, steps.length - 1)];
-            session.lastStep.set(answer.status === 'pending' ? answer : { ...answer, step: record(op.op) });
+            const group = 'group' in op ? op.group : undefined;
+            session.lastStep.set(answer.status === 'pending' ? answer : { ...answer, step: record(op.op, group ? { group } : undefined) });
             return true;
         }),
         // the real undo takes back the NEWEST effective op step, and refuses (409) when it is not the one named
@@ -83,7 +84,7 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
         }),
     };
     /** Append an effective op entry to the log (what the real store's refresh would read back). */
-    function record(op: string): number {
+    function record(op: string, params?: InvestigationLogEntry['params']): number {
         const all = session.log()?.entries ?? [];
         const n = Math.max(0, ...all.map((e) => e.step)) + 1;
         session.log.set({
@@ -91,7 +92,7 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
             total: n,
             truncated: false,
             ...session.log(),
-            entries: [...all, { step: n, kind: 'op', op: op as InvestigationLogEntry['op'], undoneBy: null, author: null, at: '', workingSetHash: '', text: '' }],
+            entries: [...all, { step: n, kind: 'op', op: op as InvestigationLogEntry['op'], params, undoneBy: null, author: null, at: '', workingSetHash: '', text: '' }],
         });
         return n;
     }
@@ -151,10 +152,11 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         const third = step({ delta: { ...first.delta, admitted: ['f'], linksAdded: 2 } });
         const { store, applied, session } = create({}, [first, second, third]);
         expect(await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {})).toBe(true);
+        const group = expect.any(String); // LA-DEGREES-TRIM-2: one Expand's id, on each degree
         expect(applied).toEqual([
-            { op: 'expand', ids: ['a'], budget: 100, direction: 'either', hubThreshold: 500 },
-            { op: 'expand', ids: ['b'], budget: 100, direction: 'either', hubThreshold: 500 },
-            { op: 'expand', ids: ['d', 'e'], budget: 100, direction: 'either', hubThreshold: 500 },
+            { op: 'expand', ids: ['a'], budget: 100, direction: 'either', hubThreshold: 500, group },
+            { op: 'expand', ids: ['b'], budget: 100, direction: 'either', hubThreshold: 500, group },
+            { op: 'expand', ids: ['d', 'e'], budget: 100, direction: 'either', hubThreshold: 500, group },
         ]);
         expect(store.lastChange()?.text).toBe('Expanded 3 degrees: 5 numbers and 7 calls added; 1 busy number held.');
         expect(await store.undoLast()).toBe(true);
@@ -226,6 +228,63 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             expect(store.lastExpandDegrees()).toBe(2);
             store.bindLastExpand(3); // would take the seed in
             expect(store.lastExpandDegrees()).toBe(2);
+        });
+    });
+
+    describe('Degrees bound to the last Expand of a reopened Investigation (LA-DEGREES-TRIM-2)', () => {
+        const three = () => [step(), step({ delta: { ...step().delta, admitted: ['d'] } }), step({ delta: { ...step().delta, admitted: ['e'] } })];
+        /** A saved step log as a reload reads it: nothing was recorded in this browser. */
+        const reopened = (groups: (string | undefined)[]) => {
+            const lane = create();
+            lane.session.log.set({
+                header: {} as never,
+                total: groups.length + 1,
+                truncated: false,
+                entries: [{ op: 'seed' }, ...groups.map((group) => ({ op: 'expand', params: group ? { group } : undefined }))].map(
+                    (e, i) => ({ step: i + 1, kind: 'op', undoneBy: null, author: null, at: '', workingSetHash: '', text: '', ...e }) as InvestigationLogEntry,
+                ),
+            });
+            return lane;
+        };
+
+        it('every degree of one Expand carries one group; a raise keeps it; a fresh Expand has its own', async () => {
+            const { store, applied } = create({}, three());
+            await store.growInvestigation(CTX, { ...REQ, degrees: 2 }, {});
+            await store.growInvestigation(CTX, REQ, {}, true);
+            await store.growInvestigation(CTX, REQ, {});
+            const groups = applied.map((o) => ('group' in o ? o.group : undefined));
+            expect(groups[0]).toEqual(expect.any(String));
+            expect(groups.slice(0, 3)).toEqual([groups[0], groups[0], groups[0]]);
+            expect(groups[3]).toEqual(expect.any(String));
+            expect(groups[3]).not.toBe(groups[0]);
+        });
+
+        it('binds to the newest group after a reload, and lowering undoes only that Expand’s outer degrees', async () => {
+            const { store, session } = reopened(['g1', 'g2', 'g2', 'g2']);
+            expect(store.lastExpandDegrees()).toBe(3); // steps 3-5; the older Expand g1 (step 2) is not part of it
+            expect(await store.trimLastExpand(1)).toBe(true);
+            expect(session.undo.mock.calls).toEqual([[5], [4]]);
+            expect(store.lastExpandDegrees()).toBe(1);
+        });
+
+        it('a raise after a reload joins the reopened Expand under its group', async () => {
+            const { store, applied } = reopened(['g2', 'g2']);
+            await store.growInvestigation(CTX, REQ, {}, true);
+            expect(applied.map((o) => ('group' in o ? o.group : undefined))).toEqual(['g2']);
+            expect(store.lastExpandDegrees()).toBe(3);
+        });
+
+        it('a step log saved before groups existed still opens, and the stepper stays unbound as before', async () => {
+            const { store, session } = reopened([undefined, undefined]);
+            expect(store.lastExpandDegrees()).toBeNull();
+            expect(await store.trimLastExpand(1)).toBe(false);
+            expect(session.undo).not.toHaveBeenCalled();
+        });
+
+        it('is unbound when the newest step is not an Expand', async () => {
+            const { store, session } = reopened(['g1', 'g1']);
+            await session.apply({ op: 'hide', ids: ['x'] });
+            expect(store.lastExpandDegrees()).toBeNull();
         });
     });
 
