@@ -10,7 +10,7 @@ timestamp: 2026-11-01T00:00:00Z
 
 > **What this page is.** The durable record of slices **S0 to S7** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
 > 2026-10-21, S5, S6 and S7 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
-> [admin guide](admin-guide.md). **Open work** (S8, W1 to W3, the open decisions, the unsigned contract with the re-rating
+> [admin guide](admin-guide.md). **Open work** (W1 to W3, the open decisions, the unsigned contract with the re-rating
 > pack) lives in [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history: the archived original
 > [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md)
 > (sections 16 and 17 are the as-built narratives).
@@ -19,7 +19,7 @@ timestamp: 2026-11-01T00:00:00Z
 
 The `telco-ra` Job `ra_settlement` is a `sql.template` control, **not a Reconciliation**: voice only, one flat rate per partner
 (`ic_rates`, not effective-dated), minutes rounded up per started minute, daily grain, one global `tolerance_pct`. The matrix row Q
-calls it "partner-statement reconciliation"; that wording is corrected at S8. Competitors' common shape (published claims, Subex,
+calls it "partner-statement reconciliation"; that wording was corrected at S8 (2026-11-01; row C was also corrected to name `PACK-RERATING-1`). Competitors' common shape (published claims, Subex,
 TEOCO, LATRO, Mobileum, Araxxe): ingest the partner's invoice, price our own traffic at the contract, compare, raise a dispute, track
 it to a credit note. No real partner statement, TAP file or wholesale invoice has been seen; every format is synthetic.
 

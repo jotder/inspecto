@@ -45,6 +45,7 @@ Each pack page names the modules the pack switches on and walks the end-to-end s
 | Payment Fraud | card and wallet fraud patterns | [payment-fraud](../../solution-pack/payment-fraud/architecture.md) |
 | AML | laundering typologies, screening, suspicious transaction reports | [aml](../../solution-pack/aml/architecture.md) |
 | Mobile Money | trust-account and settlement proof, agent abuse | [mobile-money](../../solution-pack/mobile-money/architecture.md) |
+| Partner Settlement | partner statements against re-rated usage, netting, disputes and accruals | [partner-settlement](../../solution-pack/partner-settlement/architecture.md) |
 | Business Assurance | seasonal and trend deviations in revenue and margin | [business-assurance](../../solution-pack/business-assurance/architecture.md) |
 | Link Analysis | relationship investigations across the above | [link-analysis](../../solution-pack/la-showcase/architecture.md) |
 
