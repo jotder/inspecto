@@ -213,7 +213,7 @@ Delivered: the Report Templates `settlement-dispute-pack` (JSON) and `settlement
 `settlement_expected` and `settlement_billed`), and a generic Regulatory Reporting seam: the Report Template `rows` block
 (`rows: {dataset, matchOn}`, [Regulatory Reporting spec](../../module/regulatory-reporting/spec.md)).
 
-**Decisions made inside S7, assistant-decided 2026-11-01 under delegation, PENDING OPERATOR CONFIRMATION:**
+**Decisions made inside S7, assistant-decided 2026-11-01 under delegation; PS-S7-1 operator-confirmed 2026-11-01, PS-S7-2…5 PENDING OPERATOR CONFIRMATION:**
 
 | ID | Decision | How to reverse |
 |---|---|---|

@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Customer Segments — the Segmentation Model kind and the predict.segment Job (declared RFM)
-description: As built for PREDICTIVE-SEGMENT-RFM-1 (2026-11-01) — the first slice of the Predictive Analytics add-on. The segmentation-model component kind (declared RFM bins and a label table), the predict.segment Job that assigns every entity a Customer Segment from windowed Measures, the output stores, the save gates, the determinism and recompute contract, the decisions taken (D-PS1…D-PS8, pending operator confirmation) and what is not built.
+description: As built for PREDICTIVE-SEGMENT-RFM-1 (2026-11-01) — the first slice of the Predictive Analytics add-on. The segmentation-model component kind (declared RFM bins and a label table), the predict.segment Job that assigns every entity a Customer Segment from windowed Measures, the output stores, the save gates, the determinism and recompute contract, the decisions taken (D-PS1…D-PS8, operator-confirmed 2026-11-01) and what is not built.
 resource: docs/okf/product/module/anomaly/plan-predictive-analytics.md
 tags: [predictive, segmentation, rfm, customer-segment, job, analytics]
 timestamp: 2026-11-01T00:00:00Z
@@ -117,7 +117,7 @@ the authoring route, bundle import, BI template apply, the Space Template stager
   id = `physicalRef` = `customer_segments_<model>` or `…_latest` of a saved model (the read Dataset a dashboard or an
   Alert Rule uses).
 
-## Decisions (D-PS1…D-PS8 — assistant-decided under operator delegation, 2026-11-01, pending operator confirmation)
+## Decisions (D-PS1…D-PS8 — assistant-decided under operator delegation, 2026-11-01; operator-confirmed 2026-11-01)
 
 * **D-PS1** Output prefix `customer_segments_`, not the design's `segments_`: *Segment* alone is the ingester record kind,
   and a store name would bring the word back.
