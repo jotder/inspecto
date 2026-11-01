@@ -71,6 +71,23 @@ public final class DuckLakeRegistrar {
     /** As above, idempotent per {@code consignmentId} ({@code null} derives the key from the file set). */
     public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg,
                                 String consignmentId) {
+        register(outputPaths, tableName, cfg, consignmentId, null);
+    }
+
+    /**
+     * Statements run on the registrar's own connection after the extensions load and before the
+     * {@code ATTACH}. The ingest lane passes one for an object-store {@code dirs.database}: the written Parquet
+     * sits in a bucket, and this connection otherwise holds no credentials to read it
+     * ({@code SCALEOUT-OBJSTORE-DATABASE-DIR-1}).
+     */
+    @FunctionalInterface
+    public interface ConnectionSetup {
+        void apply(Connection conn) throws java.sql.SQLException;
+    }
+
+    /** As above, running {@code setup} (may be {@code null}) on the registrar connection before the attach. */
+    public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg,
+                                String consignmentId, ConnectionSetup setup) {
         if (outputPaths.isEmpty()) return;
         List<Registration> plan = plan(outputPaths, cfg);
         // G9 backstop for a lane the pipeline registry does not guard (the job lane, the CLI entry points):
@@ -86,7 +103,7 @@ public final class DuckLakeRegistrar {
             requireRegistrationConfigured(r.duckLake(), multi ? r.sink().database() : null);
         for (Registration r : plan)   // per-sink key: sinks sharing a lake and table must not skip each other
             registerOne(r.files(), tableName, r.duckLake(),
-                    sinkKey(consignmentId, r.sink().database()));
+                    sinkKey(consignmentId, r.sink().database()), setup);
     }
 
     /** One destination's share of a batch: the sink, its effective lake ({@code null} if none), its files. */
@@ -129,7 +146,7 @@ public final class DuckLakeRegistrar {
     }
 
     private static void registerOne(List<String> outputPaths, String tableName, Map<String, Object> dl,
-                                    String consignmentId) {
+                                    String consignmentId, ConnectionSetup setup) {
         if (dl == null) return;
         if (!Boolean.parseBoolean(String.valueOf(dl.getOrDefault("enabled", false)))) return;
 
@@ -138,7 +155,7 @@ public final class DuckLakeRegistrar {
         String schema     = (String) dl.getOrDefault("schema", "main");
         String table      = (tableName != null) ? tableName : (String) dl.get("table");
 
-        registerInto(outputPaths, table, catalogUrl, dataPath, schema, consignmentId);
+        registerInto(outputPaths, table, catalogUrl, dataPath, schema, consignmentId, setup);
     }
 
     /**
@@ -173,6 +190,13 @@ public final class DuckLakeRegistrar {
     public static void registerInto(List<String> outputPaths, String table,
                                     String catalogUrl, String dataPath, String schemaOrNull,
                                     String consignmentId) {
+        registerInto(outputPaths, table, catalogUrl, dataPath, schemaOrNull, consignmentId, null);
+    }
+
+    /** As above, running {@code setup} (may be {@code null}) on the registrar connection before the attach. */
+    public static void registerInto(List<String> outputPaths, String table,
+                                    String catalogUrl, String dataPath, String schemaOrNull,
+                                    String consignmentId, ConnectionSetup setup) {
         if (outputPaths.isEmpty()) return;
         String schema = (schemaOrNull == null || schemaOrNull.isBlank()) ? "main" : schemaOrNull;
 
@@ -204,6 +228,7 @@ public final class DuckLakeRegistrar {
                 if (backend != null) {
                     DuckDbExtension.ensureLoaded(conn, backend, "the DuckLake catalog backend in catalog_url");
                 }
+                if (setup != null) setup.apply(conn);
                 stmt.execute(String.format(
                         "ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s'%s)",
                         catalogUrl, dataPath.replace("\\", "/"), attachOptions()));

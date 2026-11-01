@@ -23,5 +23,5 @@ Routes for Regulatory Reporting. Design and internals: [Regulatory Reporting arc
 
 Draft gates, in order: capability -> write root 503 -> unknown body key 422 -> template unknown or broken 422 ->
 not exactly one of `caseId` / `incidentId` 422 -> unread or non-scalar input 422 -> no operational objects 503 ->
-subject absent or out of scope 404 -> a member Incident out of scope 403 -> drop directory refused 422 -> render
+subject absent or out of scope 404 -> a member Incident out of scope 403 -> (a template with `rows`) its Dataset absent or not visible 404, unbindable or over 1000 rows 422 -> drop directory refused 422 -> render
 refused 422 -> saved `draft`.

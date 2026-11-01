@@ -12,7 +12,7 @@
 | Pack (board row) | Space Template | Built | Open slices | Open decisions | Hub |
 |---|---|---|---|---|---|
 | Bypass / SIM-box (`TELCO-BYPASS-SIMBOX-1`, matrix gap E) | `telco-bypass` | B0 measured; B1 to B3 (signals, Risk Score, lists, SIM Alert, cluster stage, box Incident and Case) | B4 to B7 (B5 demand-gated) | D-BP10 | [telco-bypass](../okf/product/solution-pack/telco-bypass/index.md) |
-| Partner settlement (`PACK-PARTNER-SETTLEMENT-1`, gap Q) | `partner-settlement` | S0 to S6 (References, ingestion, compare, netting, roll-forward, disputes as Cases, aging and accruals) | S7, S8; W1 to W3 demand-gated | PS-O1 to PS-O4, PS-O6, PS-O7 (§2.3; PS-O5 answered at S5 and PS-S6-1 to PS-S6-10 at S6, pending confirmation), the §4 contract | [partner-settlement](../okf/product/solution-pack/partner-settlement/index.md) |
+| Partner settlement (`PACK-PARTNER-SETTLEMENT-1`, gap Q) | `partner-settlement` | S0 to S7 (References, ingestion, compare, netting, roll-forward, disputes as Cases, aging and accruals, the evidence pack) | S8; W1 to W3 demand-gated | PS-O1 to PS-O4, PS-O6, PS-O7 (§2.3; PS-O5 answered at S5 and PS-S6-1 to PS-S6-10 at S6, pending confirmation), the §4 contract | [partner-settlement](../okf/product/solution-pack/partner-settlement/index.md) |
 | Re-rating (`PACK-RERATING-1`, gap C) | `telco-rerating` | R0 measured; R1 to R3 (hygiene, ambiguity, causes, root causes, plan inference) | R4, R6; R5 demand-gated; R7 only if G-K trips | D-RR10, the §4 contract | [telco-rerating](../okf/product/solution-pack/telco-rerating/index.md) |
 
 All three are configuration-only content packs (`minEdition: standard`, listed in `offerings/standard.toon` `contentPacks`, Product
@@ -103,13 +103,13 @@ to reverse each).
 
 ### 2.1 Open slices
 
-S5 and S6 are built (hub [as-built record](../okf/product/solution-pack/partner-settlement/plan-as-built.md)): S5's data half and
+S5, S6 and S7 are built (hub [as-built record](../okf/product/solution-pack/partner-settlement/plan-as-built.md)): S5's data half and
 S6 test in `features/inspecto-reconciliation`, S5's Case half in `features/inspecto-case-management` (the reconciliation test
-classpath has no object engine). S7 needs Regulatory Reporting: check that module's test classpath first.
+classpath has no object engine), S7's templates in `features/inspecto-regulatory-reporting` (PS-S7-1, a Report Template `rows`
+source, pending operator confirmation).
 
 | Slice | Content | Done when (verifiable) | Tests |
 |---|---|---|---|
-| **S7 evidence pack** | Report Template `settlement-dispute-pack` (Regulatory Reporting, CSV and JSON, four-eyes, file-drop; PS-D8), rendered from the Case: statement header and disputed lines, our re-rated lines with `rate_id` and `rating_run_id`, the variance and its reason, the agreement version and tolerance, the FX row, the Incident timeline. A PDF dispute letter is demand-gated. | The CSV / JSON names the rate and run id of every disputed line; a line with no re-rating run is refused (422), not exported blank. | template-render unit test; four-eyes path asserted. |
 | **S8 docs and registration** | The glossary entries of §2.4; the matrix rows C and Q corrected (`ra_settlement` is a SQL control with a flat rate, not a Reconciliation, and the old board row bundled gaps Q and C); hub docs refreshed; `offerings/*.toon` and `tools/check-offerings.mjs`. | All guards green: vocabulary, doc links, offerings, product map. | the guards named. |
 | **W1…W3 wholesale, MVNO, roaming** | Demand-gated; W1 first (PS-D10). See §2.2. | A named prospect or the operator's call. | per slice at that time. |
 

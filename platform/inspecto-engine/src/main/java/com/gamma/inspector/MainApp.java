@@ -263,7 +263,7 @@ public class MainApp {
     // ── usage ─────────────────────────────────────────────────────────────────
 
     private static void printUsage() {
-        System.out.println("URA File Management Suite — Java 24 (Virtual Threads)");
+        System.out.println("URA File Management Suite — Java 27 (Virtual Threads)");
         System.out.println();
         System.out.println("Usage:");
         System.out.println("  ura [--dry-run] <command> <pipeline.toon> [args...]");

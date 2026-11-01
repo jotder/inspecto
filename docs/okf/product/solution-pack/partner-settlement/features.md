@@ -32,11 +32,12 @@ Wholesale finance and revenue-assurance teams at operators and MVNOs that settle
 - Aging per agreement and statement cycle: finance's payments and notes applied oldest cycle first, the open balance and the open disputed amount in configurable age buckets (0-30, 31-60, 61-90, 90+ days by default), and an Alert when an open balance reaches its payment due date
 - Accruals, reported and never posted: our expected amount for a cycle whose statement has not arrived (unbilled before its due date, late after it) and a configurable provision on the disputed amount (default 100 %)
 - A `settlement_overview` dashboard: open disputed amount, open balance aged over 60 days and accrued unbilled as KPI tiles, and the open balance by age, the disputes by partner and the accruals by agreement as bars — [analytics](../../module/analytics/index.md)
+- A dispute evidence pack (JSON or CSV) drafted from the dispute Case through Regulatory Reporting: every disputed line with our rate ids and re-rating run, the statement version, the agreement version and tolerance and both FX rows, refused when a line has no re-rating run, approved by a second person and dropped as a file — [regulatory-reporting](../../module/regulatory-reporting/index.md)
 - Zero-row schema seeds, a runbook and a synthetic corpus with planted variances and look-alikes
 
 ## Not yet
 
-The evidence pack, wholesale / MVNO constructs and roaming (TAP). The KPI tiles count one currency (USD by default). It posts no payment, accrual or ledger entry and fetches no market FX rate. No real partner statement has been seen: the statement Schema is a synthetic proposal.
+A PDF dispute letter, wholesale / MVNO constructs and roaming (TAP). The KPI tiles count one currency (USD by default). It posts no payment, accrual or ledger entry and fetches no market FX rate. No real partner statement has been seen: the statement Schema is a synthetic proposal.
 
 ## Related hubs
 

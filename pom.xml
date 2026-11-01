@@ -277,7 +277,7 @@
     <properties>
         <!-- MODULE-REORG-1 P3a: the build identity stamped into every jar manifest (Inspecto-Build-Id); see maven-jar-plugin below. -->
         <inspecto.build.id>dev</inspecto.build.id>
-        <!-- Target JDK 24. Uses `release` so the build cannot accidentally rely on a newer JDK's API
+        <!-- Target JDK 27 (since 2026-09-17; a -NoRuntime host needs Java 27+). Uses `release` so the build cannot accidentally rely on a newer JDK's API
              than the target. NOTE: the lean ETL core (inspecto) runs on JDK 24 cleanly. The
              optional inspecto-agent module depends on eoiagent (agent-kernel's replacement,
              2026-07-07 — the kernel is discontinued and its reasoning layer is vendored in-tree at

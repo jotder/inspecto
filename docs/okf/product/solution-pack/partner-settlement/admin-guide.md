@@ -67,6 +67,14 @@ Cases still work; check for an existing authored CASE workflow first (`GET /api/
 The SLA targets and the escalation age are illustrative: set your own. With an Approval Policy on these kinds the save is held for a
 checker (`202 pending`).
 
+## The dispute evidence pack
+
+The two Report Templates ship in the Space (`config/regulatory-report-templates/`) and need the Regulatory Reporting add-on
+(Professional and up); without it they are inert files. They read the Dataset `settlement_dispute` through the template `rows`
+block (`matchOn: dispute_key`), so the drafter must be able to see that Dataset. Delivery drops into
+`regulatory-submissions/settlement-dispute-pack` (and `-csv`) under the write root: put that directory where the settlement desk
+picks files up, or edit `delivery.dir`. The layout is illustrative; replace the fields with what your partners accept.
+
 ## Tuning and as-of
 
 There are no thresholds in the SQL. `ps_calendar`, `ps_expected` and `ps_rollforward` read the Job parameter `as_of` (default today); `ps_dispute` reads it too, with `window_alert_days` (default 5): the lead time before `dispute_window_end` at which

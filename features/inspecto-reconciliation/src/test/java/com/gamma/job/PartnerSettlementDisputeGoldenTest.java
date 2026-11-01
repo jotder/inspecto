@@ -114,6 +114,53 @@ class PartnerSettlementDisputeGoldenTest {
         }
     }
 
+    /**
+     * S7: every dispute line carries the evidence the {@code settlement-dispute-pack} templates file, and every {@code rows.<column>}
+     * a shipped template reads is a column the Job writes. The run and rate ids are the corpus's own latest run of the line's day
+     * (the stale May run must lose), the agreement version is the corpus agreement in force, the statement id the restated one.
+     */
+    @Test
+    void everyDisputeLineCarriesTheEvidenceTheDisputePackFiles() throws Exception {
+        List<Map<String, Object>> rows = base.read("settlement_dispute", null, "item_key");
+        Set<String> columns = rows.get(0).keySet();
+        Path templates = Path.of("../../spaces/_templates/partner-settlement/config/regulatory-report-templates");
+        for (String id : List.of("settlement-dispute-pack", "settlement-dispute-pack-csv")) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(",rows\\.([a-z_]+),").matcher(Files.readString(templates.resolve(id + ".toon")));
+            int read = 0;
+            while (m.find()) {
+                read++;
+                assertTrue(columns.contains(m.group(1)), id + " reads rows." + m.group(1) + ", which ps_dispute does not write: " + columns);
+            }
+            assertEquals(30, read, id + ": the line fields");
+        }
+        for (Map<String, Object> r : rows) {
+            String key = (String) r.get("item_key");
+            String[] k = key.split("\\|");
+            LocalDate day = LocalDate.parse(k[4]);
+            List<PartnerSettlementCorpus.Rerated> mine = corpus.rerated.stream().filter(x -> x.agreement().equals(k[0])
+                    && x.direction().equals(k[1]) && x.service().equals(k[2]) && x.dest().equals(k[3]) && x.day().equals(day)).toList();
+            PartnerSettlementCorpus.Rerated latest = mine.stream().max(Comparator.comparing(PartnerSettlementCorpus.Rerated::ratedAt)).orElseThrow();
+            assertEquals(latest.runId(), r.get("rating_run_id"), key + ": the latest re-rating run");
+            assertEquals(String.join(",", new TreeSet<>(mine.stream().filter(x -> x.runId().equals(latest.runId()))
+                    .map(PartnerSettlementCorpus.Rerated::rateId).toList())), r.get("rate_ids"), key);
+            PartnerSettlementCorpus.Agreement a = corpus.agreements.stream()
+                    .filter(x -> x.id().equals(k[0]) && x.covers(day)).findFirst().orElseThrow();
+            assertEquals(a.from(), r.get("agreement_version"), key);
+            assertEquals(a.tolType(), r.get("tolerance_type"), key);
+            assertEquals(0, a.tolerance().compareTo((BigDecimal) r.get("tolerance")), key);
+            assertNotNull(r.get("tolerance_amount"), key);
+            assertNotNull(r.get("our_fx_rate"), key);
+            assertNotNull(r.get("statement_id"), key + ": every corpus dispute line is on a statement");
+        }
+        Map<String, Object> fx = rows.stream().filter(r -> "fx_difference".equals(r.get("reason"))).findFirst().orElseThrow();
+        assertEquals("EUR", fx.get("invoiced_currency"), fx.toString());
+        assertEquals(0, new BigDecimal("0.93").compareTo((BigDecimal) fx.get("partner_fx_rate")), "the partner's FX row beside ours: " + fx);
+        assertEquals(0, new BigDecimal("0.91").compareTo((BigDecimal) fx.get("our_fx_rate")), fx.toString());
+        Map<String, Object> july = rows.stream().filter(r -> String.valueOf(r.get("item_key")).startsWith("AG-VOICE-A1|")
+                && String.valueOf(r.get("item_key")).endsWith("2026-07-15")).findFirst().orElseThrow();
+        assertEquals(2L, ((Number) july.get("statement_version")).longValue(), "the restated July statement: " + july);
+    }
+
     @Test
     void theShippedAlertRulesRaiseOneKeyPerLineAndNothingForAQuietWindow() throws Exception {
         Set<String> want = new TreeSet<>();

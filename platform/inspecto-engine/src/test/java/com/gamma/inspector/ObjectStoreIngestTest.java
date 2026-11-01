@@ -204,11 +204,59 @@ class ObjectStoreIngestTest {
         }), "produces: reference");
     }
 
+    // ── DuckLake registration of the bucket output ─────────────────────────────────────────
+
+    private PipelineConfig withLake(Path dir) throws Exception {
+        return cfg(dir, m -> ((Map<String, Object>) m.get("output")).put("ducklake",
+                Map.of("enabled", true, "catalog_url", dir.resolve("lake.ducklake").toString(),
+                        "data_path", dir.resolve("lake").toString(), "table", "t")));
+    }
+
     @Test
-    void duckLakeRegistrationIsRefused(@TempDir Path dir) throws Exception {
-        assertRefused(cfg(dir, m -> ((Map<String, Object>) m.get("output")).put("ducklake",
-                Map.of("enabled", true, "catalog_url", "lake.ducklake", "data_path", dir.resolve("lake").toString(),
-                        "table", "t"))), "DuckLake");
+    void duckLakeRegistrationIsAcceptedOnTheWriteSide(@TempDir Path dir) throws Exception {
+        assumeHttpfs();
+        PipelineConfig cfg = withLake(dir);
+        File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "objstore_lake_");
+        try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
+            ConsignmentIngestStrategy.configure(conn, cfg, tempDb, List.of());
+        } finally {
+            DuckDbUtil.deleteTempDb(tempDb);
+        }
+    }
+
+    @Test
+    void theRegistrarConnectionGetsThePrefixScopedSecret(@TempDir Path dir) throws Exception {
+        assumeHttpfs();
+        var setup = ConsignmentIngestor.objectStoreSetup(withLake(dir), List.of(root + "/db/p=1/a.parquet"));
+        assertNotNull(setup);
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:")) {
+            setup.apply(c);
+            String secrets = query(c, "SELECT secret_string FROM duckdb_secrets() WHERE name = '"
+                    + ObjectStoreDatabase.STORE_SECRET_NAME + "'");
+            assertTrue(secrets.contains("scope=" + root + "/db/"), secrets);
+            // DuckDB matches a scope as a string prefix: a sibling prefix must not get the credentials.
+            assertEquals(ObjectStoreDatabase.STORE_SECRET_NAME + "\n",
+                    query(c, "SELECT name FROM which_secret('" + root + "/db/a.parquet', 's3')"));
+            assertEquals("", query(c, "SELECT name FROM which_secret('" + root + "/dbX/a.parquet', 's3')"));
+        }
+    }
+
+    @Test
+    void noRegistrarSetupWithoutAnEnabledLake(@TempDir Path dir) throws Exception {
+        assertNull(ConsignmentIngestor.objectStoreSetup(cfg(dir, m -> {}), List.of(root + "/db/a.parquet")));
+    }
+
+    /** ⛔ The registrar's connection is unsealed: a file outside the prefix is refused before it is read. */
+    @Test
+    void aWrittenFileOutsideThePrefixIsNotRegistered(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = withLake(dir);
+        assertNotNull(ConsignmentIngestor.objectStoreSetup(cfg, List.of(root + "/db/a.parquet")), "accepted twin");
+        for (String outside : List.of(root + "X/a.parquet", root + "/db/../../elsewhere/a.parquet",
+                "s3://other-bucket/a.parquet", dir.resolve("a.parquet").toString())) {
+            java.io.IOException e = assertThrows(java.io.IOException.class, () -> ConsignmentIngestor.objectStoreSetup(
+                    cfg, List.of(root + "/db/a.parquet", outside)), outside);
+            assertTrue(e.getMessage().contains("not registering in DuckLake"), outside + ": " + e.getMessage());
+        }
     }
 
     // ── the live lane ──────────────────────────────────────────────────────────
@@ -244,6 +292,39 @@ class ObjectStoreIngestTest {
              ResultSet rs = s.executeQuery("SELECT count(*) FROM glob('" + root + "/leak/**')")) {
             rs.next();
             assertEquals(0, rs.getLong(1), "an expression reading outside the prefix must land nothing");
+        }
+    }
+
+    @Test
+    void aPipelineRegistersItsBucketOutputInDuckLake(@TempDir Path dir) throws Exception {
+        String endpoint = env("INSPECTO_TEST_S3_ENDPOINT", "inspecto.test.s3.endpoint");
+        assumeTrue(endpoint != null && env("INSPECTO_TEST_S3_KEY", "inspecto.test.s3.key") != null,
+                "no object store configured — set INSPECTO_TEST_S3_ENDPOINT / _KEY / _SECRET");
+        Path lake = dir.resolve("lake");
+        String catalog = lake.resolve("cat.ducklake").toString().replace('\\', '/');
+        String data = Files.createDirectories(lake.resolve("data")).toString().replace('\\', '/');
+        PipelineConfig cfg = pipeline(dir.resolve("reg"), "upper(CUSTOMER)", """
+                  ducklake:
+                    enabled: true
+                    catalog_url: "%s"
+                    data_path: "%s"
+                    table: orders
+                """.formatted(catalog, data));
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.SINK_DUCKLAKE));
+        try {
+            CollectorProcessor.run(cfg);
+        } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
+        }
+        // Registration is non-fatal on a single topology, so only the lake's own contents prove it ran.
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement s = c.createStatement()) {
+            DuckDbExtension.ensureLoaded(c, "ducklake", "test");
+            s.execute("ATTACH 'ducklake:" + catalog + "' AS lake (DATA_PATH '" + data + "')");
+            try (ResultSet rs = s.executeQuery("SELECT count(*), max(LEAK) FROM lake.main.orders")) {
+                rs.next();
+                assertEquals(2, rs.getLong(1), "both bucket rows are registered in the lake");
+                assertEquals("GLOBEX", rs.getString(2));
+            }
         }
     }
 
@@ -307,6 +388,11 @@ class ObjectStoreIngestTest {
 
     /** A CSV pipeline over the bucket ({@code <root>/<dir name>}) whose LEAK column is {@code expression}. */
     private PipelineConfig pipeline(Path dir, String expression) throws Exception {
+        return pipeline(dir, expression, "");
+    }
+
+    /** As above, with {@code outputExtra} appended under {@code output:}. */
+    private PipelineConfig pipeline(Path dir, String expression, String outputExtra) throws Exception {
         Path conf = Files.createDirectories(dir.resolve("space/config/orders"));
         Files.writeString(conf.resolve("orders_schema.toon"), """
                 raw:
@@ -344,12 +430,12 @@ class ObjectStoreIngestTest {
                   status_dir: %1$s/data/orders/status
                 output:
                   connection: %4$s
-                processing:
+                %5$sprocessing:
                   file_pattern: "glob:**/*.csv"
                   schema_file: orders_schema.toon
                   csv_settings:
                     delimiter: ","
-                """.formatted(d, root, dir.getFileName(), CONN), StandardCharsets.UTF_8);
+                """.formatted(d, root, dir.getFileName(), CONN, outputExtra), StandardCharsets.UTF_8);
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
         Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
         Files.writeString(inbox.resolve("orders_1.csv"), "ORDER_ID,CUSTOMER\n1001,acme\n1002,globex\n",

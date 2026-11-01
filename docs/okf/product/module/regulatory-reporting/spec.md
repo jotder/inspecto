@@ -41,13 +41,29 @@ fields[N]{name,source,required,maxLength}:
   incident/title,incidents.title,false,400   (group/leaf: one repeating group per list item)
   narrative,input.narrative,true,20000       (input.<key>: the maker types it)
   schema,"const:inspecto-sample-sar/1",true,0
+rows:                                        (optional, 2026-11-01: Dataset rows behind the member Incidents)
+  dataset: settlement_dispute                (a Dataset id)
+  matchOn: dispute_key                       (a column; matched against each member Incident's `key.<matchOn>`)
 ```
 
 The **report context** a source path walks: `report {id, createdAt, author}`, `subject` (the Case / Incident's object
 view, timestamps ISO-8601, `impact` included), `incidents` (a Case's `CONTAINS` members, oldest first; the Incident
 itself when raised from one), `evidence` (`ATTACHMENT` notes of the subject and every member: `objectId, name, uri,
-contentType, caption, author, createdAt`) and `input`. Through a list a path maps over the items. A template that does
+contentType, caption, author, createdAt`), `rows` (only with a `rows` block, below) and `input`. Through a list a path maps over the items. A template that does
 not validate is listed by `GET /regulatory-reports/templates` with ALL its problems and can draft nothing.
+
+**Dataset rows (`rows`, 2026-11-01, `PACK-PARTNER-SETTLEMENT-1` S7, PS-S7-1 pending operator confirmation).** An
+Incident raised by a per-key Alert Rule carries only its key columns, as attributes `key.<column>`, which a dotted source path cannot
+address. A template `rows: {dataset, matchOn}` block makes the server read the rows of that Dataset whose `matchOn` column (cast to
+text) equals a `key.<matchOn>` value of a member Incident (or of the Incident the report is raised from), through the Dataset's
+relation with the keys bound, `ORDER BY ALL`; a field reads them as `rows.<column>` (a `group/leaf` field repeats per row). Both
+names are plain identifiers checked at load, and a `rows.*` source without the block is a load problem. Fail closed: the Dataset
+absent or not visible to the drafter 404; no data yet 409; unbindable or over 1000 rows 422 (never truncated); no key on any member Incident gives
+no rows, so a required row field refuses. The rows join the source fingerprint (`sourceChanged`). A report whose template reads
+`rows` (recorded at draft as `rowsDataset`, MAC-covered, so a later template edit cannot release it) is withheld from a reader
+without `canRevealLinkEntities` (`content`, `subjectTitle`, `inputs` removed, `keyMasked`), because masking by object keys cannot
+cover row columns; so is any report whose template no longer loads (a tightening for every template). A Dataset with no data yet is
+409 (`ServerFaults.datasetRead`, server paths scrubbed). Code: `ReportTemplate.Rows`, `ReportRows`.
 
 **Rendering refuses, never patches** (`ReportRenderer`): a required field that resolves empty, a value over its
 `maxLength` (never truncated), a source landing on an object, a control character XML 1.0 cannot carry, or a document
@@ -80,7 +96,8 @@ visible exactly when its Case / Incident is (`ObjectRoutes.visibleTo`: SEC-7d sc
 **Draft gates, in order:** capability → write root 503 → unknown body key 422 → template unknown / not loading 422 → not
 exactly one of `caseId` / `incidentId` 422 → an input the template does not read, non-scalar, or over 20 000 chars 422 →
 no object engine 503 → subject absent or out of scope 404 → a member Incident out of the caller's scope **403** (a
-partial filing is refused, never silently thinned) → drop directory refused by the path jail 422 → render refused 422
+partial filing is refused, never silently thinned) → (with `rows`) the Dataset absent or not visible 404, unbindable or over 1000
+rows 422 → drop directory refused by the path jail 422 → render refused 422
 → saved `draft`.
 
 **Decide gates, in order** (the Action Request pattern): capability → authenticated Subject 403 → write root 503 → a
