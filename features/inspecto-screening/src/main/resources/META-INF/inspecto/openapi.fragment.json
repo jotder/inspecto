@@ -34,9 +34,9 @@
     "/screening/hits" : {
       "get" : {
         "tags" : [ "screening" ],
-        "summary" : "List Screening Hits, newest first",
+        "summary" : "List Screening Hits, newest first, one page at a time",
         "operationId" : "getScreeningHits",
-        "description" : "SCREENING-1. Hits raised by screening.run Jobs. Optional query 'state' = open|escalated|confirmed|dismissed. A record that fails its integrity check is listed with integrity: invalid.",
+        "description" : "SCREENING-1 (D8). Hits raised by screening.run Jobs, newest first by id, paged from the signed hit index: only the page's documents are read, and each is verified (a record that fails its integrity check is listed with integrity: invalid). Optional query 'state' = open|escalated|confirmed|dismissed; 'limit' 1..500 (default 100); 'cursor' = the nextCursor of the previous page. 'total' counts the hits matching 'state'.",
         "parameters" : [ {
           "name" : "state",
           "in" : "query",
@@ -45,13 +45,31 @@
             "type" : "string",
             "enum" : [ "open", "escalated", "confirmed", "dismissed" ]
           }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 500,
+            "default" : 100
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "required" : false,
+          "description" : "The nextCursor of the previous page (opaque).",
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "responses" : {
           "200" : {
-            "description" : "Envelope-wrapped: data = {hits[{id, state, version, listId, purpose, entry, method, score, threshold, subjectKey, subjectName, subjectIdentifier, source, raisedAt, raisedBy, decidedBy?, decidedAt?, reason?, history[]}]}"
+            "description" : "Envelope-wrapped: data = {hits[{id, state, version, listId, purpose, entry, method, score, threshold, subjectKey, subjectName, subjectIdentifier, source, raisedAt, raisedBy, decidedBy?, decidedAt?, reason?, history[]}], nextCursor (null on the last page), total}; metadata.pagination carries the same cursor, nextCursor, limit and total."
           },
           "422" : {
-            "description" : "Unknown state."
+            "description" : "Unknown state, a limit outside 1..500, or a cursor this listing did not return."
           },
           "503" : {
             "description" : "No write root."

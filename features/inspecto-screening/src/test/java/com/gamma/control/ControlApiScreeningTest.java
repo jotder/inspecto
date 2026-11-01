@@ -244,6 +244,52 @@ class ControlApiScreeningTest {
         });
     }
 
+    /** SCREENING-1 D8: the listing pages through a cursor, filters by state from the index, and refuses bad paging. */
+    @Test
+    void theListingPagesByCursorAndFiltersByState(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        List<String> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) ids.add(ScreeningLists.seedHit(cfg, "c" + i, "Putin, Vladimir", "sanctions", "vladimir putin", 0.98));
+        ids.sort(java.util.Comparator.reverseOrder());
+        withSpaces(spaces, port -> {
+            String base = "/spaces/acme/screening/hits";
+            JsonNode all = data(send(port, "GET", base, null, DEV), 200);
+            assertEquals(5, all.get("hits").size(), "the default page holds them all");
+            assertEquals(5, all.get("total").asInt());
+            assertTrue(all.get("nextCursor").isNull());
+
+            List<String> walked = new java.util.ArrayList<>();
+            String cursor = null;
+            int pages = 0;
+            do {
+                HttpResponse<String> r = send(port, "GET", base + "?limit=2" + (cursor == null ? "" : "&cursor=" + cursor), null, DEV);
+                JsonNode page = data(r, 200);
+                assertTrue(page.get("hits").size() <= 2);
+                page.get("hits").forEach(h -> walked.add(h.get("id").asText()));
+                assertEquals(5, page.get("total").asInt());
+                JsonNode meta = JSON.readTree(r.body()).at("/metadata/pagination");
+                assertEquals(page.get("nextCursor"), meta.get("nextCursor"), "the envelope carries the same cursor");
+                cursor = page.get("nextCursor").isNull() ? null : page.get("nextCursor").asText();
+                pages++;
+            } while (cursor != null && pages < 10); // bounded: a cursor that never advances must fail, not hang
+            assertEquals(ids, walked, "newest first, each hit once");
+            assertEquals(3, pages);
+
+            data(send(port, "POST", base + "/" + ids.get(1) + "/decide", decide("escalate", 1), OPS), 200);
+            JsonNode escalated = data(send(port, "GET", base + "?state=escalated", null, DEV), 200);
+            assertEquals(1, escalated.get("total").asInt());
+            assertEquals(ids.get(1), escalated.at("/hits/0/id").asText());
+            JsonNode open = data(send(port, "GET", base + "?state=open&limit=10", null, DEV), 200);
+            assertEquals(4, open.get("total").asInt());
+            assertFalse(open.toString().contains(ids.get(1)), "the decided hit left the open queue");
+
+            for (String bad : List.of("limit=0", "limit=501", "limit=abc", "limit=2.5", "cursor=garbage",
+                    "cursor=" + Cursor.encode(List.of("../roles")), "cursor=" + Cursor.encode(List.of(ids.get(0), "x"))))
+                assertEquals(422, send(port, "GET", base + "?" + bad, null, DEV).statusCode(), bad);
+            assertEquals(200, send(port, "GET", base + "?limit=500", null, DEV).statusCode());
+        });
+    }
+
     /** An open hit has no escalator, so one person may confirm it; the Case is still opened. */
     @Test
     void anOpenHitConfirmedByOnePersonOpensACase(@TempDir Path spaces) throws Exception {

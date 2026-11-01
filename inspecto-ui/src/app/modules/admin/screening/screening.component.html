@@ -33,6 +33,11 @@
                 error()
             }}</inspecto-alert>
         } @else {
+            @if (total() !== null && nextCursor() !== null) {
+                <p class="text-secondary mt-4 mb-0 text-xs">
+                    {{ loadedCaption() }}
+                </p>
+            }
             <div class="mt-4">
                 <inspecto-data-table
                     stateKey="screening-hits"
@@ -40,6 +45,9 @@
                     [rows]="hits()"
                     [columns]="columnDefs"
                     [loading]="loading()"
+                    [serverPage]="true"
+                    [hasMore]="nextCursor() !== null"
+                    (loadMore)="loadMore()"
                     (rowClick)="open($event)"
                     noRowsTitle="No Screening Hits here"
                     noRowsHint="A Screening Job raises a hit when a name or identifier in its Dataset matches an Entity List entry."

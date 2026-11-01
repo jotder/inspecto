@@ -59,7 +59,7 @@ AML function pack (`PACK-AML-1`) builds on it. Vocabulary: `docs/GLOSSARY.md` §
 | Route | Gate | What |
 |---|---|---|
 | `POST /screening/check` | read-shaped exemption | `{subjects[1..1000]:[{key?, name?, identifier?}], lists[1..20], threshold? (0.5..1, default 0.85), maxMatches? (1..20, default 5)}` → `{threshold, results:[{key, name, identifier, matches:[{listId, purpose, entry, method, score}]}]}`, best first. Persists nothing; a POST so names never ride in a URL. Unknown list 422. |
-| `GET /screening/hits?state=` | Space access | every hit, newest first; `state` = `open · escalated · confirmed · dismissed` (else 422). |
+| `GET /screening/hits?state=&limit=&cursor=` | Space access | one page, newest first (by id): `{hits, nextCursor, total}`, and the same `cursor / nextCursor / limit / total` under the v1 envelope's `metadata.pagination`. `state` = `open · escalated · confirmed · dismissed`; `limit` 1..500, default 100; `cursor` = the previous page's `nextCursor` (null on the last page). A bad `state`, `limit` or `cursor` is a 422 (a cursor that does not decode to one hit id is refused, never read as "start again"). `total` counts the hits matching `state`. |
 | `GET /screening/hits/{id}` | Space access | one hit; an id that is not `sh-<14 digits>-<6 hex>` is a 404 and never names a file. |
 | `POST /screening/hits/{id}/decide` | `canWorkIncidents` | `{decision: confirm · dismiss · escalate, reason (1..1000), version}` → the hit. |
 
@@ -86,14 +86,25 @@ screened subjects, matches and new hits. Test: `ScreeningJobTest`.
   subjectIdentifier, source {job, runId, dataset}, raisedAt, raisedBy, decidedBy, decidedAt, reason, history[]`.
 - **Identity**: `dedupeKey = sha256(listId, entry, subjectKey)`; a Run never raises a second hit for a key that has one in
   any state, so a dismissed false positive stays dismissed until the list entry changes.
-- **Dedupe index** (D6, 2026-11-01): `screening-hits/dedupe-index.json`, hit id → `dedupeKey`, signed with the same key
-  under domain `screening-hit-index`. A Run lists the directory's file names, keeps the index entries whose document
-  still exists, reads only the documents the index does not cover, and saves the index back with the hits it raised.
-  An index whose MAC does not verify or that cannot be parsed is rebuilt from the documents (one slow Run, never a
-  wrong one); re-keying an entry would suppress another subject's hit, so the MAC matters. It sits inside
-  `screening-hits/`, so import, export and backup treat it like the hits; no lockstep change was needed. ⚠ The index is
-  trusted for the ids it covers: a hit document edited on disk after it was indexed keeps its indexed key (the MAC
-  defends the import door, not a local administrator).
+- **Hit index** (D6 2026-11-01, widened by D8 the same day): `screening-hits/dedupe-index.json`, hit id →
+  `{key: dedupeKey, state, mtime}`, signed with the same key under domain `screening-hit-index`. `state` is the state the
+  document claims; `mtime` is the document file's modification time in µs. `ScreeningHits.index` walks the directory once
+  (names and file times), keeps the entries whose document still exists with the same file time, and reads only the
+  documents it does not cover: new ones, and ones rewritten since they were indexed. A Run dedupes from it and saves it
+  back with the hits it raised; a decision records its hit's new entry (`reindex`, under the hit lock, best effort: if
+  that write fails the decision stands and the moved file time makes the next read re-read the document); the listing
+  pages and filters from it and, when it had to read documents (a lost or lagging index), saves it back best effort
+  without the lock — safe because an entry such a save drops is only read again, never misfiled. An index whose MAC does not verify or that cannot be parsed is rebuilt
+  from the documents (one slow pass, never a wrong one); re-keying an entry would suppress another subject's hit, so
+  the MAC matters. An entry from before D8 (a bare key) is not covered and its document is read again until the next
+  Run or decision saves the index. It sits inside `screening-hits/`, so import, export and backup treat it like the
+  hits; no lockstep change was needed. ⚠ A document edited on disk while its file time is set back keeps its indexed
+  entry (the MAC defends the import door, not a local administrator); a listed hit is still read and verified, so such
+  an edit shows as `integrity: invalid` wherever it is listed.
+- **Listing** (D8, 2026-11-01): `ScreeningHits.page` sorts the index's ids newest first, keeps those whose indexed state
+  matches the filter, resumes after the cursor's id (binary search) and reads and verifies only the page's documents;
+  a document that no longer claims the filtered state (a decision between the index read and the document read) is
+  left out of that page. The listing takes no lock, so a Run in progress never blocks the pane.
 - **Hit ids** are `sh-<UTC second>-<24 random bits>`. A Run takes an id no hit already holds (`ScreeningHits.freshId`
   against the index): before 2026-11-01, two hits of one Run drawing the same id in the same second overwrote each
   other (about 0.5 expected in a 100 000-hit Run).
@@ -105,6 +116,9 @@ screened subjects, matches and new hits. Test: `ScreeningJobTest`.
 ## The SPA pane (`/screening`, nav *Operations ▸ Screening Hits*)
 `modules/admin/screening/` over `ScreeningService` (`inspecto/api`). The nav entry carries `navFeature: 'screening'`,
 so it hides when `/bootstrap` `features.screening` is not `true`. Open / Escalated / All filter, a data-table of hits
+fetched one server page (100) at a time: the data-table's *Load more* strip appends the next page through `nextCursor`,
+a caption reads *N of T hits loaded, newest first* while pages remain, and a filter change, refresh or decision starts
+again from the first page
 (Match Score as a percentage, state as a status badge: open info, escalated warning, confirmed error, dismissed
 success), and a detail card with the score, subject, source run and history. The decision row (Escalate / Dismiss /
 Confirm match, a required reason, the hit's `version` sent with it) shows only with `LensService.canWorkIncidents()`,
@@ -149,9 +163,13 @@ The Check a name result has one row per name: a name with no match shows *Checke
   entry, while a look-alike-only or Latin-mixed token (`Pаvel`) keeps the look-alike fold.
 - A Run dedupes through the index (D6, built 2026-11-01): measured on Windows, reading every hit document took 62 s at
   5 000 hits, 253 s at 20 000 and 1 030 s at 100 000, all under the hit lock; the indexed pass over 100 000 hits takes
-  0.5 s. Re-measure with `-Dscreening.measure=<hits>` on `ScreeningHitsScaleMeasureTest` (opt-in, skipped otherwise). ⚠ Still open: `GET /screening/hits` (the pane)
-  reads and verifies EVERY hit document on each call and is unpaginated, at the same ~12.5 ms a document cold, so
-  20 000 hits take about 4 minutes to list; it needs its own summary index or paging.
+  0.5 s. Re-measure with `-Dscreening.measure=<hits>` on `ScreeningHitsScaleMeasureTest` (opt-in, skipped otherwise).
+- The listing pages from the same index (D8, built 2026-11-01, pending operator confirmation). Measured at 100 000 hits
+  on a busy Windows box (the UI suite running alongside, so slower than the D6 run): reading every document 1 730 s
+  (what each listing did before D8); with the widened index the Run's indexed pass 1.5 s, the first page of 100
+  2.9 s, a page of the 1 % `state=escalated` hits 3.1 s, a 500-hit page deep in the list 9.5 s, and a decision's index
+  write 2.4 s. Every listing and decision still walks the directory and parses the whole index (≈1.5 s at 100 000);
+  past a few hundred thousand hits that walk is the next cost.
 - `check` cannot raise hits (D4, decided 2026-10-14: stays read-only; raising belongs to the Job under `canWorkIncidents`); no Space-level threshold default (D5: not until a customer asks; SCR-D2 declined a settings file); an initial-letter difference that is not a known transliteration is never compared (D7: needs a full cross-join). Decisions D1-D7 (recommendation and cost each) are on the `SCREENING-1` row. Re-driven 2026-10-14 on an Enterprise Demo Auth bundle: items 9, 10, 11 and Muhammad / Mohamed PASS; presenting verdict GO beats 6 and 7 built the same day.
 
 ## Demo script and rehearsal (2026-10-14, Enterprise Demo Auth bundle, Space `screening-demo` from the `aml` template)

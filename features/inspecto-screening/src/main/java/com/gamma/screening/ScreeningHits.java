@@ -233,32 +233,122 @@ public final class ScreeningHits {
     }
 
     /**
-     * The Run's dedupe index (SCREENING-1 D6): {@code <write-root>/screening-hits/dedupe-index.json}, hit id →
-     * {@code dedupeKey}, signed under its own domain. A Run reads this one file and only the hit documents it does
-     * not cover, instead of every document (measured 2026-11-01 at ~12.5 ms a document cold on Windows: 20 000 hits
-     * took 253 s under the hit lock). An index whose MAC does not verify, or that cannot be parsed, is rebuilt from
-     * the documents; an id whose document is gone is dropped. Lives inside {@code screening-hits/}, so import,
-     * export and backup treat it as they treat the hits. Call under {@link #lock()}; the caller saves it back with
-     * {@link #saveIndex} once it has added the hits it raised.
+     * The hit index (SCREENING-1 D6, D8): {@code <write-root>/screening-hits/dedupe-index.json}, hit id →
+     * {@code {key: dedupeKey, state, mtime}}, signed under its own domain. {@code state} is the state the document
+     * claims and {@code mtime} its file's modification time (µs). A Run dedupes from it and the listing pages and
+     * filters from it, each reading this one file plus only the documents it does not cover, instead of every
+     * document (measured 2026-11-01 at ~12.5 ms a document cold on Windows: 20 000 hits took 253 s). A document
+     * whose file time differs from its entry's — rewritten by a decision whose index write was lost, or edited by
+     * hand — is not covered and is read again, so the index can lag a document but never misfile it for long. An
+     * index whose MAC does not verify, or that cannot be parsed, is rebuilt from the documents; an id whose document
+     * is gone is dropped. Lives inside {@code screening-hits/}, so import, export and backup treat it as they treat
+     * the hits. Reading needs no lock; a writer calls it under {@link #lock()} and saves it back with
+     * {@link #saveIndex}.
      */
-    static Map<String, Object> dedupeIndex(Path root) throws IOException {
+    static Map<String, Object> index(Path root) throws IOException {
+        return index(root, new int[1]);
+    }
+
+    /** {@link #index(Path)}, counting in {@code reread[0]} the documents it had to read. */
+    private static Map<String, Object> index(Path root, int[] reread) throws IOException {
         Path d = dir(root);
         if (!Files.isDirectory(d)) return new LinkedHashMap<>();
-        Set<String> ids = new java.util.HashSet<>();
-        try (Stream<Path> s = Files.list(d)) {
-            for (Path p : s.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
-                String id = p.getFileName().toString().replaceFirst("\\.json$", "");
-                if (SAFE_ID.matcher(id).matches()) ids.add(id);
+        Map<String, Long> stamps = new java.util.HashMap<>();
+        // One directory pass that also yields each file's time (cached by the directory read on Windows).
+        Files.walkFileTree(d, Set.of(), 1, new java.nio.file.SimpleFileVisitor<>() {
+            @Override
+            public java.nio.file.FileVisitResult visitFile(Path p, java.nio.file.attribute.BasicFileAttributes a) {
+                String name = p.getFileName().toString();
+                String id = name.endsWith(".json") ? name.substring(0, name.length() - 5) : "";
+                if (SAFE_ID.matcher(id).matches()) stamps.put(id, a.lastModifiedTime().to(java.util.concurrent.TimeUnit.MICROSECONDS));
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public java.nio.file.FileVisitResult visitFileFailed(Path p, IOException e) throws IOException {
+                // A save's temp file renamed away mid-walk (POSIX reads attributes per entry): not a hit, skip it.
+                if (e instanceof java.nio.file.NoSuchFileException) return java.nio.file.FileVisitResult.CONTINUE;
+                throw e;
+            }
+        });
+        Map<String, Object> entries = readIndex(root);
+        entries.keySet().retainAll(stamps.keySet());
+        for (Map.Entry<String, Long> s : stamps.entrySet()) {
+            if (entries.get(s.getKey()) instanceof Map<?, ?> e && e.get("mtime") instanceof Number t
+                    && t.longValue() == s.getValue()) continue;
+            Map<String, Object> rec = read(root, s.getKey());
+            reread[0]++;
+            if (rec == null) entries.remove(s.getKey());
+            else entries.put(s.getKey(), entry(rec, s.getValue()));
+        }
+        return entries;
+    }
+
+    /** The index entry of {@code rec} just saved: its key, state and file time. */
+    static Map<String, Object> entry(Path root, Map<String, Object> rec) throws IOException {
+        return entry(rec, Files.getLastModifiedTime(file(root, String.valueOf(rec.get("id"))))
+                .to(java.util.concurrent.TimeUnit.MICROSECONDS));
+    }
+
+    private static Map<String, Object> entry(Map<String, Object> rec, long mtime) {
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("key", rec.get("dedupeKey"));
+        e.put("state", rec.get("state"));
+        e.put("mtime", mtime);
+        return e;
+    }
+
+    /** The dedupe keys an index holds. */
+    static Set<Object> keys(Map<String, Object> index) {
+        Set<Object> out = new java.util.HashSet<>();
+        for (Object e : index.values()) if (e instanceof Map<?, ?> m) out.add(m.get("key"));
+        return out;
+    }
+
+    /** Record {@code rec}, just saved, in the index. Call under {@link #lock()}. */
+    static void reindex(Path root, Map<String, Object> rec) throws IOException {
+        Map<String, Object> index = index(root);
+        index.put(String.valueOf(rec.get("id")), entry(root, rec));
+        saveIndex(root, index);
+    }
+
+    /** One page of hits: the documents themselves, read and verified, and the id to resume after (null = last). */
+    record Page(List<Map<String, Object>> hits, String next, int total) {}
+
+    /**
+     * Hits newest first (by id), optionally only those whose index state is {@code state}, after the id
+     * {@code after} (null = from the newest), at most {@code limit}. Only the page's documents are read; each is
+     * verified as {@link #read} does, and one whose document no longer claims {@code state} is left out (a decision
+     * landed between the index and the read). {@code total} counts the matching hits by the index. When the index had
+     * to read documents (it was lost, or lagged), the listing saves it back, best effort and without the lock: an
+     * entry a concurrent writer adds and this save drops is only read again next time, never misfiled.
+     */
+    static Page page(Path root, String state, String after, int limit) throws IOException {
+        int[] reread = new int[1];
+        Map<String, Object> index = index(root, reread);
+        if (reread[0] > 0) {
+            try {
+                saveIndex(root, index);
+            } catch (IOException | RuntimeException ignored) {
+                // the next read re-reads those documents again; nothing is wrong, only slower
             }
         }
-        Map<String, Object> keys = readIndex(root);
-        keys.keySet().retainAll(ids);
-        for (String id : ids) {
-            if (keys.containsKey(id)) continue;
-            Map<String, Object> rec = read(root, id);
-            if (rec != null) keys.put(id, rec.get("dedupeKey"));
+        List<String> ids = new ArrayList<>();
+        for (Map.Entry<String, Object> e : index.entrySet())
+            if (state == null || e.getValue() instanceof Map<?, ?> m && state.equals(m.get("state"))) ids.add(e.getKey());
+        ids.sort(Comparator.reverseOrder());
+        int from = 0;
+        if (after != null) {
+            int at = java.util.Collections.binarySearch(ids, after, Comparator.reverseOrder());
+            from = at >= 0 ? at + 1 : -at - 1;
         }
-        return keys;
+        int to = Math.min(ids.size(), from + limit);
+        List<Map<String, Object>> hits = new ArrayList<>();
+        for (String id : ids.subList(from, to)) {
+            Map<String, Object> rec = read(root, id);
+            if (rec != null && (state == null || state.equals(rec.get("state")))) hits.add(rec);
+        }
+        return new Page(hits, to < ids.size() ? ids.get(to - 1) : null, ids.size());
     }
 
     /** The index's entries, or empty when it is absent, unreadable or fails its MAC (then it is rebuilt). */
@@ -281,7 +371,7 @@ public final class ScreeningHits {
         return ok ? new LinkedHashMap<>((Map<String, Object>) doc.get("keys")) : new LinkedHashMap<>();
     }
 
-    /** Persist the dedupe index, signed. */
+    /** Persist the hit index, signed. */
     static void saveIndex(Path root, Map<String, Object> keys) throws IOException {
         Path f = dir(root).resolve(INDEX);
         Files.createDirectories(f.getParent());

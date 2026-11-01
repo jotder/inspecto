@@ -31,6 +31,13 @@ Domain-neutral: the AML pack (`PACK-AML-1`) builds on it.
   took ~12.5 ms a document cold on Windows, 1 030 s at 100 000 hits, all under the hit lock; the indexed pass takes 0.5 s. A Run now reads one signed
   index file plus only the hits it does not cover. The same change keeps a Run from reusing a hit id another hit
   already holds (a same-second id used to overwrite that hit).
+- 2026-11-01: the paged hit listing (D8; assistant-decided under operator delegation, pending confirmation).
+  `GET /screening/hits` read and verified every hit document per call (1 730 s at 100 000 hits on a busy Windows
+  box); it now pages by cursor (`limit` 1..500, default 100) and filters by state from the D6 index, widened to
+  `{key, state, mtime}`, and reads only the page's documents: 2.9 s for the first page at 100 000 hits. Chosen
+  conservatively: a cursor rather than an offset (newest-first ids stay stable as hits arrive), the returned hits
+  still verified one by one, a bad cursor refused rather than restarted, and no lock on reads. The pane appends
+  pages through the data-table's Load more.
 
 ## Left
 

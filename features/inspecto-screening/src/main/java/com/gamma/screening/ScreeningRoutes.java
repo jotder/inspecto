@@ -29,7 +29,9 @@ import java.util.Set;
  *   <li>{@code POST /screening/check} {@code {subjects:[{key?, name?, identifier?}], lists[], threshold?, maxMatches?}}
  *       → {@code {threshold, results:[{key, name, identifier, matches:[…]}]}}. Read-shaped (a {@code CapabilityManifest}
  *       exemption): it persists nothing, and it is a POST so names never ride in a URL.</li>
- *   <li>{@code GET /screening/hits?state=} → {@code {hits:[…]}}, newest first; {@code GET /screening/hits/{id}}.</li>
+ *   <li>{@code GET /screening/hits?state=&limit=&cursor=} → {@code {hits:[…], nextCursor, total}}, newest first, a
+ *       page of at most {@code limit} (default 100, 1..500) from the hit index (SCREENING-1 D8); only the page's
+ *       documents are read and verified. {@code GET /screening/hits/{id}}.</li>
  *   <li>{@code POST /screening/hits/{id}/decide} {@code {decision: confirm|dismiss|escalate, reason, version}} → the
  *       hit. {@code canWorkIncidents} (SCR-D13). Four-eyes (SCREENING-1-D1): whoever escalated a hit cannot confirm
  *       it. A confirm opens an Incident and a Case for the subject (SCREENING-1-D2) and stamps their ids on the hit.</li>
@@ -37,13 +39,15 @@ import java.util.Set;
  *
  * <p><b>Gates.</b> decide: {@code canWorkIncidents} (the wrapper) → no write root 503 → body 422 → unknown hit 404 →
  * forged / edited record 409 → stale {@code version} 409 → not allowed from its state 409 → save under the store
- * lock. No path-jail 403 can trigger from a caller: the id must match {@code sh-<14 digits>-<6 hex>} (else 404).
+ * lock, then the hit index (best effort). list: no write root 503 → bad {@code state} / {@code limit} / {@code cursor}
+ * 422. No path-jail 403 can trigger from a caller: the id must match {@code sh-<14 digits>-<6 hex>} (else 404).
  */
 public final class ScreeningRoutes implements RouteModule {
 
     static final int MAX_SUBJECTS = 1_000;
     static final int MAX_LISTS = 20;
     static final int MAX_VALUE_LENGTH = 512;
+    static final int DEFAULT_LIMIT = 100, MAX_LIMIT = 500;
 
     @Override
     public Set<String> featureIds() {
@@ -103,11 +107,38 @@ public final class ScreeningRoutes implements RouteModule {
         if (state != null && !ScreeningHits.STATES.contains(state))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'state' must be one of "
                     + new java.util.TreeSet<>(ScreeningHits.STATES));
+        int limit = limit(ApiContext.query(ex, "limit"));
+        String cursor = ApiContext.query(ex, "cursor");
+        String after = null;
+        if (cursor != null) {
+            List<String> key = com.gamma.control.Cursor.decode(cursor);
+            if (key.size() != 1 || !ScreeningHits.SAFE_ID.matcher(key.get(0)).matches())
+                throw bad("'cursor' is not a cursor this listing returned; start again without one");
+            after = key.get(0);
+        }
+        ScreeningHits.Page page = ScreeningHits.page(root, state, after, limit);
         List<Map<String, Object>> out = new ArrayList<>();
         Set<String> hidden = hiddenLists(ex, root);
-        for (Map<String, Object> rec : ScreeningHits.list(root))
-            if (state == null || state.equals(rec.get("state"))) out.add(shown(rec, hidden));
-        return Map.of("hits", out);
+        for (Map<String, Object> rec : page.hits()) out.add(shown(rec, hidden));
+        String next = page.next() == null ? null : com.gamma.control.Cursor.encode(List.of(page.next()));
+        ApiContext.pagination(ex, cursor, next, limit, page.total());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("hits", out);
+        body.put("nextCursor", next);
+        body.put("total", page.total());
+        return body;
+    }
+
+    /** {@code limit}: absent = {@link #DEFAULT_LIMIT}; else an integer in 1..{@link #MAX_LIMIT}. */
+    static int limit(String raw) {
+        if (raw == null) return DEFAULT_LIMIT;
+        try {
+            int n = Integer.parseInt(raw.trim());
+            if (n >= 1 && n <= MAX_LIMIT) return n;
+        } catch (NumberFormatException ignored) {
+            // refused below
+        }
+        throw bad("'limit' must be an integer in 1.." + MAX_LIMIT);
     }
 
     private Object one(ApiContext api, HttpExchange ex, String id) throws IOException {
@@ -236,6 +267,11 @@ public final class ScreeningRoutes implements RouteModule {
                 if (opened != null) ScreeningCases.discard(svc, opened, actor,
                         failure instanceof RuntimeException r ? r : new IllegalStateException(failure));
                 throw failure;
+            }
+            try {
+                ScreeningHits.reindex(root, rec);
+            } catch (IOException | RuntimeException lost) {
+                // The decision stands: its document's new file time makes the next index read re-read it.
             }
         }
         Map<String, Object> attrs = new LinkedHashMap<>();
