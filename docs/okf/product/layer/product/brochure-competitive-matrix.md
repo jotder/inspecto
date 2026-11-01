@@ -32,7 +32,7 @@ backlog row that would.
 |---|---|---|---|---|---|---|---|---|---|
 | A | Revenue assurance (billing, usage, interconnect controls) | Y | Y | Y | Y | Y | Y | **Y** | `telco-ra` Space Template |
 | B | Generic reconciliation engine | Y | P | P | Y | Y | P | **Y** | Reconciliation add-on |
-| C | Re-rating / tariff validation | Y | P | Y | Y | P | Y | **P** | SQL controls in `telco-ra` only · `PACK-PARTNER-SETTLEMENT-1` (re-rating) |
+| C | Re-rating / tariff validation | Y | P | Y | Y | P | Y | **P** | `telco-rerating` Space Template: per-call re-rating against the tariff table, the explanation and the root-cause snapshot (R1 to R3 built); rate structure, allowances and the re-rated-versus-billed Reconciliation open · `PACK-RERATING-1` |
 | D | Fraud management (rules over CDRs / events) | Y | Y | Y | Y | P | N | **Y** | Alerts + `telco-fraud` Space Template |
 | E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | CDR-based only · `TELCO-BYPASS-SIMBOX-1` |
 | F | Signalling detection (SS7 / Diameter / SIP, probes, firewalls) | Y | P | Y | P | P | N | **N** | out of scope (network probes) |
@@ -46,7 +46,7 @@ backlog row that would.
 | N | Case management / investigation | P | Y | Y | Y | P | P | **Y** | Incidents + Case Management add-ons |
 | O | Workflow and SLA | N | P | P | P | P | N | **Y** | Workflow & SLA add-on |
 | P | Business assurance (margin, forecast, KPI drift) | Y | Y | Y | Y | Y | P | **Y** | `business-assurance` Space Template |
-| Q | Partner / settlement / wholesale | P | Y | P | P | Y | P | **P** | partner-statement reconciliation in `telco-ra` · `PACK-PARTNER-SETTLEMENT-1` |
+| Q | Partner / settlement / wholesale | P | Y | P | P | Y | P | **P** | `partner-settlement` Space Template: versioned partner statements reconciled against re-rated usage, netting and Settlement Positions, disputes as Cases with an evidence pack, aging and accruals; wholesale, MVNO and roaming not built (`telco-ra`'s `ra_settlement` is a SQL control with a flat rate, not a Reconciliation) · `PACK-PARTNER-SETTLEMENT-1` |
 | R | Mobile money / fintech assurance | Y | Y | Y | Y | N | Y | **Y** | `mobile-money` Space Template (wallet / bank / partner Reconciliation, agent fraud, KYC, provisioning) · `payment-fraud` (card-centric) |
 | S | AML typologies, sanctions / PEP screening | Y | N | N/P | P | N | N | **Y** | `aml` Space Template (structuring, threshold crossing, smurfing fan-in, watch-list traffic; shipped 2026-10-10) + Screening add-on (fuzzy name matching against Entity Lists, signed hits, four-eyes on `confirmed`; shipped 2026-10-09) |
 | T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **P** | Regulatory Reporting add-on MVP (shipped 2026-10-09): Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log; regulator-specific SAR / STR formats are templates to author, not shipped · `REGULATORY-SAR-STR-TEMPLATES-1` |

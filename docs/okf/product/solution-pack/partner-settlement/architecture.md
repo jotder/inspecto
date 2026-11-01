@@ -3,7 +3,7 @@
 > **Level 2 solution page.** Content pack: Space Template `partner-settlement`
 > (`spaces/_templates/partner-settlement/template.toon`). **Slices S0 to S7 of `PACK-PARTNER-SETTLEMENT-1` are built: the
 > References, statement ingestion, the compare, netting positions with a roll-forward, disputes as Cases, aging with accruals
-> and the dashboard, and the dispute evidence pack.** Docs and registration (S8) and W1 to W3 are open ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S7 in the
+> and the dashboard, and the dispute evidence pack.** Docs and registration (S8) are done 2026-11-01; W1 to W3 are open ([open work](../../../../superpower/telco-packs-plan.md); decisions, corpus and traps of S0 to S7 in the
 > [as-built record](plan-as-built.md)). Checked against the template on 2026-11-01.
 
 ## Business problem
@@ -96,7 +96,7 @@ every Incident that carries a `dispute_key` into one Case per partner and cycle;
   country's holidays; the settlement calendar is separate from the Workflow and SLA business calendar. A cycle change between two
   versions inside one cycle is not supported.
 - **Vocabulary.** *Settlement Agreement*, *Settlement Statement*, *Settlement Cycle*, *Settlement Position* and *Dispute* are
-  proposed in the [open-work plan](../../../../superpower/telco-packs-plan.md) (section 2.4) and enter the glossary with slice S8; the UI and these docs use the plan's words.
+  glossary terms (`docs/GLOSSARY.md`, *Partner settlement terms*, added at S8 2026-11-01); the UI and these docs use them.
 - **Netting and the roll-forward (S4).** Netting happens inside one settlement currency: agreements of one netting group in
   different settlement currencies give separate positions (cross-currency netting needs a position currency and a reverse-rate
   convention, an open decision). A statement belongs to the month its cycle ends in, a payment or note to the month of its date. The
@@ -130,7 +130,7 @@ every Incident that carries a `dispute_key` into one Case per partner and cycle;
   with no re-rating run (`rate_ids` or `rating_run_id` blank) refuses the draft (422), never exports blank. Four-eyes and the file
   drop are Regulatory Reporting's own; a maker without `canRevealLinkEntities` cannot read a rows report back (it is withheld). No PDF
   letter (demand-gated, PS-D8).
-- **Not built (later slices).** Docs and registration (S8); wholesale, MVNO and roaming (W1 to W3, demand-gated).
+- **Not built (later slices).** Wholesale, MVNO and roaming (W1 to W3, demand-gated).
 
 ## Verification
 

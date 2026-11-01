@@ -12,7 +12,7 @@
 | Pack (board row) | Space Template | Built | Open slices | Open decisions | Hub |
 |---|---|---|---|---|---|
 | Bypass / SIM-box (`TELCO-BYPASS-SIMBOX-1`, matrix gap E) | `telco-bypass` | B0 measured; B1 to B3 (signals, Risk Score, lists, SIM Alert, cluster stage, box Incident and Case) | B4 to B7 (B5 demand-gated) | D-BP10 | [telco-bypass](../okf/product/solution-pack/telco-bypass/index.md) |
-| Partner settlement (`PACK-PARTNER-SETTLEMENT-1`, gap Q) | `partner-settlement` | S0 to S7 (References, ingestion, compare, netting, roll-forward, disputes as Cases, aging and accruals, the evidence pack) | S8; W1 to W3 demand-gated | PS-O1 to PS-O4, PS-O6, PS-O7 (§2.3; PS-O5 answered at S5 and PS-S6-1 to PS-S6-10 at S6, pending confirmation), the §4 contract | [partner-settlement](../okf/product/solution-pack/partner-settlement/index.md) |
+| Partner settlement (`PACK-PARTNER-SETTLEMENT-1`, gap Q) | `partner-settlement` | S0 to S8 (References, ingestion, compare, netting, roll-forward, disputes as Cases, aging and accruals, the evidence pack, docs and registration) | W1 to W3 demand-gated | PS-O1 to PS-O4, PS-O6, PS-O7 (§2.3; PS-O5 answered at S5 and PS-S6-1 to PS-S6-10 at S6, pending confirmation), the §4 contract | [partner-settlement](../okf/product/solution-pack/partner-settlement/index.md) |
 | Re-rating (`PACK-RERATING-1`, gap C) | `telco-rerating` | R0 measured; R1 to R3 (hygiene, ambiguity, causes, root causes, plan inference) | R4, R6; R5 demand-gated; R7 only if G-K trips | D-RR10, the §4 contract | [telco-rerating](../okf/product/solution-pack/telco-rerating/index.md) |
 
 All three are configuration-only content packs (`minEdition: standard`, listed in `offerings/standard.toon` `contentPacks`, Product
@@ -106,11 +106,10 @@ to reverse each).
 S5, S6 and S7 are built (hub [as-built record](../okf/product/solution-pack/partner-settlement/plan-as-built.md)): S5's data half and
 S6 test in `features/inspecto-reconciliation`, S5's Case half in `features/inspecto-case-management` (the reconciliation test
 classpath has no object engine), S7's templates in `features/inspecto-regulatory-reporting` (PS-S7-1, a Report Template `rows`
-source, pending operator confirmation).
+source, pending operator confirmation). S8 (docs and registration) is done 2026-11-01: the §2.4 terms are in `docs/GLOSSARY.md`, matrix rows C and Q are corrected, the pack has a row in the solution overview, and `offerings/standard.toon` already listed the pack.
 
 | Slice | Content | Done when (verifiable) | Tests |
 |---|---|---|---|
-| **S8 docs and registration** | The glossary entries of §2.4; the matrix rows C and Q corrected (`ra_settlement` is a SQL control with a flat rate, not a Reconciliation, and the old board row bundled gaps Q and C); hub docs refreshed; `offerings/*.toon` and `tools/check-offerings.mjs`. | All guards green: vocabulary, doc links, offerings, product map. | the guards named. |
 | **W1…W3 wholesale, MVNO, roaming** | Demand-gated; W1 first (PS-D10). See §2.2. | A named prospect or the operator's call. | per slice at that time. |
 
 ### 2.2 Wholesale, MVNO and roaming (W1 to W3)
@@ -137,7 +136,7 @@ The research note behind C5, C8, C9, C18 is in a git-excluded working set (`grou
 | **PS-O6** | The real statement layout (flat or header plus lines) | decided once a real file is seen; today flat, a header is flattened in the Pipeline mapping |
 | **PS-O7** | The class of `restated_statement` | today `info`, neither variance nor data quality |
 
-### 2.4 Vocabulary to add to `docs/GLOSSARY.md` at S8
+### 2.4 Vocabulary (added to `docs/GLOSSARY.md` at S8, 2026-11-01)
 
 | Term | Meaning | Not |
 |---|---|---|
