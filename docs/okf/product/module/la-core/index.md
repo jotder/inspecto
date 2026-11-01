@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `OIDC-CC-INTEGRATION-ROLE-1` | P3 | feature | a machine principal gets one narrow integration grant in one Space, never a human capability. | operator |
+| `LA-ENTITY-TYPE-RETIRE-1` | P3 | defect | an Entity Type cannot be retired or deleted from the Studio (found in the MFS hand-test sweep 2026-10-27 as S3; re-driven 2026-11-01 on 8… | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
