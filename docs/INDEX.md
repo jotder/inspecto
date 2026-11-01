@@ -22,6 +22,7 @@
 
 ## Start here (session essentials, ~800 tokens)
 
+- [`../README.md`](../README.md) — the engineering front door: what Inspecto is, repo layout, build, where docs live
 - `CLAUDE.md` — project rules (vocabulary, doc lifecycle, skills/agents, branch policy)
 - `.claude/COMMON_MISTAKES.md` — ⚠️ read FIRST
 - `.claude/QUICK_START.md` — essential commands
