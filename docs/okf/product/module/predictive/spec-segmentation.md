@@ -135,9 +135,9 @@ the authoring route, bundle import, BI template apply, the Space Template stager
 
 ## Not built
 
-* Read / preview routes, the Studio pane, entity panel — `PREDICTIVE-SURFACE-1`.
-* Key masking on read and evidence: there is no read route yet and no evidence rows are stored; masking lands with the
-  routes (design §4.4).
+* The preview route and the Studio pane — `PREDICTIVE-STUDIO-PREVIEW-1` (the read route and entity panel shipped: [spec-surface](spec-surface.md)).
+* Evidence rows: none are stored (keys are masked on read by the route, [spec-surface](spec-surface.md)); the
+  design §4.4 evidence masking lands with them.
 * Filters on the read, authored bin edges, average-based monetary, k-means segments (`PREDICTIVE-KMEANS-1`), drift
   between runs (`PREDICTIVE-VALIDATE-DRIFT-1`).
 * A compliance review of profiling individuals (OD-14) gates any customer-facing template, not this engine slice.

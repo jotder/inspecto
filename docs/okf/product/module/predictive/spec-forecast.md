@@ -156,7 +156,7 @@ by model, Dataset and error class only).
 
 ## Not built
 
-* Read / preview routes, the forecast chart, the Studio pane, provenance labels — `PREDICTIVE-SURFACE-1`.
+* The preview route, the Studio pane, provenance labels — `PREDICTIVE-STUDIO-PREVIEW-1` (the read route and forecast chart shipped: [spec-surface](spec-surface.md)).
 * A degradation flag or Signal, drift across runs — `PREDICTIVE-VALIDATE-DRIFT-1`; fitted smoothing parameters
   (grid search) — gated on OD-6 / OD-9.
 * Month grain, a declared season, a rolling-origin backtest, multiplicative or damped Holt-Winters.

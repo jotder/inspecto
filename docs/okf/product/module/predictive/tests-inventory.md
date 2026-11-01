@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.predictive`](../../../../../product-map/module/predictive.toon).
 
-20 test class(es): 17 unit, 3 real-HTTP control-plane, 0 IT.
+22 test class(es): 18 unit, 4 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -33,12 +33,14 @@ mvn -o test -pl features/inspecto-predictive -Dtest=ChurnJobTest,ChurnJobTypeTck
 | `ChurnScorerTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ChurnScorerTest.java` | The pure Churn Score maths ({@link ChurnScorer}) against hand-computed figures ({@link ChurnCorpus}'s header). |
 | `ControlApiChurnModelTest` | `com.gamma.predictive` | real-HTTP control-plane test | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ControlApiChurnModelTest.java` | The {@code churn-model} save gate over real HTTP with an ARMED Subject: the module's validator is discovered |
 | `ControlApiForecastModelTest` | `com.gamma.predictive` | real-HTTP control-plane test | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ControlApiForecastModelTest.java` | The {@code forecast-model} save gate over real HTTP with an ARMED Subject: the module's validator is discovered |
+| `ControlApiPredictionReadTest` | `com.gamma.predictive` | real-HTTP control-plane test | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ControlApiPredictionReadTest.java` | {@code GET /predictions/{kind}/{model}/{entityKey}} over real HTTP with an ARMED Subject, over stores written by the |
 | `ControlApiSegmentationModelTest` | `com.gamma.predictive` | real-HTTP control-plane test | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ControlApiSegmentationModelTest.java` | The {@code segmentation-model} save gate over real HTTP with an ARMED Subject: the module's validator is discovered |
 | `ForecasterTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ForecasterTest.java` | Golden answers for the forecast maths: synthetic series whose forecast, backtest error and interval are known in |
 | `ForecastJobTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ForecastJobTest.java` | The {@code predict.forecast} Job through a real {@link JobService} over the synthetic {@link ForecastCorpus}: the |
 | `ForecastJobTypeTckTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ForecastJobTypeTckTest.java` | {@link ForecastJobType} against the platform's JobTypeProvider TCK. |
 | `ForecastKindValidatorTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ForecastKindValidatorTest.java` | The {@code forecast-model} save gates that need the Space, and the reserved {@code forecasts_} prefix. Each refused |
 | `ForecastModelTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/ForecastModelTest.java` | The {@code forecast-model} structural gates. Each refused model differs from an accepted corpus model by one key, |
+| `PredictiveAbsentSurfaceParityTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/PredictiveAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule} |
 | `RfmSegmenterTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/RfmSegmenterTest.java` | Binning and labelling by hand: quantile edges, the score direction, ties, and recompute from a stored row. |
 | `SegmentationKindValidatorTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/SegmentationKindValidatorTest.java` | The {@code segmentation-model} save gates that need the Space, and the reserved {@code customer_segments_} prefix. |
 | `SegmentationModelTest` | `com.gamma.predictive` | unit | `features/inspecto-predictive/src/test/java/com/gamma/predictive/SegmentationModelTest.java` | The {@code segmentation-model} structure: defaults, the label table, and every fail-closed refusal. |

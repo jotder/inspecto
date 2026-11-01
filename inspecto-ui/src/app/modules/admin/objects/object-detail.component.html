@@ -175,6 +175,8 @@
                                 [model]="obj().attributes!['key.model']"
                                 [entityKey]="obj().attributes!['key.entity_key']"
                             />
+                            <!-- PREDICTIVE-SURFACE-1: the entity's Customer Segment / Churn Score; hides when none -->
+                            <inspecto-prediction-panel class="mt-6 block" [entityKey]="obj().attributes!['key.entity_key']" />
                         }
                         @if (attributeRows.length) {
                             <div class="mt-6">

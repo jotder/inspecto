@@ -35,6 +35,10 @@ export type ComponentType =
     | 'risk-score'
     // An Anomaly Model (ANOMALY-DETECTION-1) — the `anomaly.score` Job's `model` names one.
     | 'anomaly-model'
+    // Predictive models (PREDICTIVE-*): the predict.segment / predict.churn / predict.forecast Jobs name one.
+    | 'segmentation-model'
+    | 'churn-model'
+    | 'forecast-model'
     // The Case desk's Findings fields (one per ObjectType, id = the lowercased type). Authored ONLY from the
     // Cases pane's Findings-fields dialog, never the Components pane (D8) — and its writes are gated on
     // `canManageIncidents`, not `canAuthorWorkbench` (D1).

@@ -237,6 +237,9 @@ public final class CapabilityManifest {
             // Preview: scores one entity and writes nothing; UNSAVED content additionally needs canAuthorWorkbench,
             // checked in the handler (as the Risk Score preview).
             new Entry("POST", "/anomaly-scores/preview", Roles.CAN_WORK_INCIDENTS),
+            // PredictionRoutes (PREDICTIVE-SURFACE-1) — an entity's Customer Segment / Churn Score or a series' forecast,
+            // the same read gate as scores (OD-8); the row PDP applies beneath the gate.
+            new Entry("GET", "/predictions/([^/]+)/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
             // ScreeningRoutes (SCREENING-1) — deciding a Screening Hit is working a triage item (SCR-D13).
             new Entry("POST", "/screening/hits/([^/]+)/decide", Roles.CAN_WORK_INCIDENTS),
             new Entry("GET", "/screening/hits/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),

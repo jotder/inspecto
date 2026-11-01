@@ -13676,6 +13676,50 @@
         }
       }
     },
+    "/predictions/{kind}/{model}/{entityKey}" : {
+      "get" : {
+        "tags" : [ "predictions" ],
+        "summary" : "The latest prediction of one entity (or forecast series) under a saved Predictive model",
+        "operationId" : "getPrediction",
+        "description" : "PREDICTIVE-SURFACE-1. Gated on canWorkIncidents. kind is segmentation-model, churn-model or forecast-model; for a forecast entityKey is the series key. An unknown kind or model, a model that no longer parses, a row the policy engine denies, or no row for the key are all 404 (existence-hiding). Every row carries its stored explanation, from which it recomputes. The key is returned as the Space masked: token (keyMasked: true) unless the caller holds canRevealLinkEntities.",
+        "parameters" : [ {
+          "name" : "kind",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "segmentation-model", "churn-model", "forecast-model" ]
+          }
+        }, {
+          "name" : "model",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^[A-Za-z0-9][A-Za-z0-9_]*$"
+          }
+        }, {
+          "name" : "entityKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "maxLength" : 256
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {kind, model, entityType, entityKey, keyMasked, asOf, modelVersion, runId, scoredAt} plus, for segmentation-model, {segment, recencyScore, frequencyScore, monetaryScore, recencyDays, frequency, monetary, explanation, history[{asOf, runId, segment}]}; for churn-model, {score (null when insufficient), band, logit, historyDays, explanation, history[{asOf, runId, score, band}]} (history = the last 30 runs, newest first); for forecast-model, points[{status, step, bucket, forecast, lower, upper, backtestMae, backtestSmape, backtestRelMae, historyBuckets, explanation}] for the latest run in step order (one insufficient point with null values when the series is under two seasons)."
+          },
+          "403" : {
+            "description" : "The caller lacks canWorkIncidents."
+          },
+          "404" : {
+            "description" : "No visible prediction for that kind, model and key."
+          }
+        }
+      }
+    },
     "/public/investigations/{token}" : {
       "get" : {
         "tags" : [ "inv" ],

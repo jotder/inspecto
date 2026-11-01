@@ -170,7 +170,7 @@ while an approval policy governs `alert-rule` or `dataset`, never overwriting an
 
 ## Not built
 
-* Read / preview routes, the Studio pane, the entity panel, provenance labels — `PREDICTIVE-SURFACE-1`.
+* The preview route, the Studio pane, provenance labels — `PREDICTIVE-STUDIO-PREVIEW-1` (the read route and entity panel shipped: [spec-surface](spec-surface.md)).
 * Backtest (AUC / lift), the outcome Dataset, drift — `PREDICTIVE-VALIDATE-DRIFT-1`; fitted coefficients —
   `PREDICTIVE-CHURN-FITTED-1` (gated on OD-6 / OD-9).
 * A shipped Space Template with a pending churn rule (the mechanism is built and tested; no template uses it).

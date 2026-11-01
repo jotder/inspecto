@@ -27,8 +27,8 @@
         logistic score with per-input contributions, insufficient below minHistoryDays. Third slice
         PREDICTIVE-FORECAST-1: the forecast-model kind (ForecastModel / ForecastKindValidator, reserved forecasts_
         stores) and the predict.forecast Job Type (ForecastJobType / ForecastEvaluator / Forecaster): seasonal-naive and
-        Holt-Winters per series with an interval and the stored backtest error. No
-        routes yet (PREDICTIVE-SURFACE-1). Package com.gamma.predictive. THIN: no shade. Built only under the
+        Holt-Winters per series with an interval and the stored backtest error. PredictionRoutes
+        (GET /predictions/{kind}/{model}/{entityKey}). Package com.gamma.predictive. THIN: no shade. Built only under the
         edition-standard / -advanced / -preview profiles.
     </description>
 
@@ -57,6 +57,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- ModuleRoutesParity: module.toon provides.routes = what PredictionRoutes registers -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -38,4 +38,5 @@ Marketing, revenue and planning teams that want stable, named customer groups fo
 - `forecast-model` config kind and `predict.forecast` Job Type — [spec](spec-forecast.md)
 - Output Datasets `forecasts_<model>` (history) and `_latest`: one row per series per future bucket with `lower` /
   `upper` and `backtest_mae`, `backtest_smape`, `backtest_rel_mae`
-- Not yet: a churn backtest, a forecast degradation flag, the Studio pane, chart and read routes (see Open work)
+- `GET /predictions/{kind}/{model}/{entityKey}`, the entity prediction panel and the forecast chart — [spec](spec-surface.md)
+- Not yet: a churn backtest, a forecast degradation flag, the Studio panes and the preview route (see Open work)
