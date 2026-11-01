@@ -485,7 +485,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
     const key = (l: WorkingSet['links'][number]) => `${l.source}\u0000${l.target}\u0000${l.kind}`;
     const links = new Map(prev.links.map((l) => [key(l), l]));
     for (const l of next.links) if (!links.has(key(l))) links.set(key(l), l);
-    return { entities: [...entities.values()], links: [...links.values()], excluded: [], hash: '' };
+    return { entities: [...entities.values()], links: [...links.values()], excluded: prev.excluded, hash: '' };
 }
 @Component({
     selector: 'inspecto-link-analysis',
@@ -2381,20 +2381,29 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /**
      * LA-INVESTIGATE-UX-2: a Clean up while unsaved. The entities are marked hidden on the drawn Working Set (a `hide` only
-     * marks them, so what is drawn stays what Save records) and the hide is recorded as one unsaved step.
+     * marks them, so what is drawn stays what Save records) and the hide is recorded as one unsaved step. With "Exclude
+     * instead" (item 5) they leave the Working Set with every link they touch, as the evaluator's `exclude` drops them, and
+     * the recorded `exclude` goes to every later preview, so the server keeps them out of the later expands.
      */
-    cleanUpUnsaved({ ids, reason }: { ids: string[]; reason: string }): void {
+    cleanUpUnsaved({ ids, reason, exclude = false }: { ids: string[]; reason: string; exclude?: boolean }): void {
         const u = this.investigation.unsaved();
         const ws = this.unsavedWs();
         const hide = new Set(ids);
         if (!u || !ws || !hide.size) return;
         const before = this.unsavedCanvas();
-        const next: WorkingSet = { ...ws, entities: ws.entities.map((e) => (hide.has(e.id) ? { ...e, hidden: true } : e)) };
-        this.investigation.recordUnsaved({ kind: 'hide', ids: [...hide], reason });
+        const next: WorkingSet = exclude
+            ? {
+                  ...ws,
+                  entities: ws.entities.filter((e) => !hide.has(e.id)),
+                  links: ws.links.filter((l) => !hide.has(l.source) && !hide.has(l.target)),
+                  excluded: [...ws.excluded, ...[...hide].map((id) => ({ id, step: u.steps.length + 1, reason }))],
+              }
+            : { ...ws, entities: ws.entities.map((e) => (hide.has(e.id) ? { ...e, hidden: true } : e)) };
+        this.investigation.recordUnsaved({ kind: exclude ? 'exclude' : 'hide', ids: [...hide], reason });
         this.drawUnsaved(next, u.binding);
         this.commitUnsaved(before);
         const after = this.graph();
-        const text = `Hid ${hide.size.toLocaleString('en-GB')} (not saved yet).`;
+        const text = `${exclude ? 'Excluded' : 'Hid'} ${hide.size.toLocaleString('en-GB')} (not saved yet).`;
         this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
         this.drawAnnouncement.set(text);
     }
@@ -2403,6 +2412,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * Walk an unsaved Expand degree by degree through the server's preview (\`POST /inv/expand/preview\`, the step route's own
      * code, with the presets and the fold filters of \`req\`): each request sends the Working Set so far as ONE seed and the
      * ONE degree it walks next - never the history, so its cost does not grow with it - and merges what that degree admitted.
+     * The unsaved Clean up excludes go first, with their reasons, so the degree never admits an excluded entity.
      * Each degree expands from what the previous one admitted, less the busy entities held. On a masked Space every id is
      * an alias the Space served. Null when a degree would be held for four-eyes approval (it cannot run unsaved).
      */
@@ -2423,6 +2433,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             const held = [...new Set([...ws.entities.map((e) => e.id), ...extra])];
             const res = await this.investigation.previewUnsaved(
                 [
+                    ...(this.investigation.unsaved()?.steps ?? []).filter((s) => s.kind === 'exclude'),
                     { kind: 'seed', ids: held },
                     { kind: 'expand', from: 'ids', ids: frontier, req, walked: [frontier] },
                 ],

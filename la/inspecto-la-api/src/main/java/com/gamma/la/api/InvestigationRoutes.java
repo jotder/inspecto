@@ -695,19 +695,28 @@ public final class InvestigationRoutes implements RouteModule {
         return read(api, ex, inv, expandRung(api, ex, inv, params, fr, before, ""), null, before.entities.keySet());
     }
 
-    /** The ops an unsaved Investigation can take before it is saved (LA-UNSAVED-INVESTIGATION-1): starts and Expands. */
-    private static final Set<String> UNSAVED_OPS = Set.of("seed", "expand");
     /**
-     * The longest step list one preview evaluates. The Studio sends the current Working Set as one seed plus the ONE degree it
-     * walks next (never the whole history), and a start sends its seed plus the ring: four leaves room, no more.
+     * The ops an unsaved Investigation can take before it is saved (LA-UNSAVED-INVESTIGATION-1): starts and Expands, and
+     * (LA-INVESTIGATE-UX-2 item 5) the excludes of a Clean up, so excluded entities stay out of the later expands.
+     */
+    private static final Set<String> UNSAVED_OPS = Set.of("seed", "expand", "exclude");
+    /**
+     * The most seeds and expands one preview evaluates. The Studio sends the current Working Set as one seed plus the ONE degree
+     * it walks next (never the whole history), and a start sends its seed plus the ring: four leaves room, no more.
      */
     static final int UNSAVED_MAX_STEPS = 4;
+    /**
+     * The most excludes one preview takes (LA-INVESTIGATE-UX-2): the Studio resends every unsaved Clean up's exclude, with its
+     * reason, before the degree it walks. An exclude reads nothing, so these are counted apart from {@link #UNSAVED_MAX_STEPS}.
+     */
+    static final int UNSAVED_MAX_EXCLUDES = 32;
 
     /**
      * {@code POST /inv/expand/preview} (LA-UNSAVED-INVESTIGATION-1) - the unsaved Investigation's dry run: the binding a
      * create would take ({@code dataset, sourceCol, targetCol, linkKindCol?, timeCol?, timeColZone?, eventsCol?,
-     * entityType?/sourceType?/targetType?}) and {@code steps}, the {@code seed} / {@code expand} bodies the step route would
-     * append, in order. Every step is validated, read and evaluated by the SAME code an append runs ({@link #params},
+     * entityType?/sourceType?/targetType?}) and {@code steps}, the {@code seed} / {@code expand} / {@code exclude} bodies the
+     * step route would append, in order (an {@code exclude} drops its entities and keeps them out of every later expand,
+     * exactly as on a saved Investigation: the same {@link #params} and the same evaluator). Every step is validated, read and evaluated by the SAME code an append runs ({@link #params},
      * {@link #requireBindings}, {@link #expandFrontier}, {@link #sensitivity}, {@link #expandRead}, the evaluator): the
      * answer is the Working Set those steps would build - so the screen draws exactly what Save records - plus, per step,
      * the entities it admitted. An expand the four-eyes thresholds make sensitive is not read: the walk stops there with
@@ -725,9 +734,12 @@ public final class InvestigationRoutes implements RouteModule {
         String kindCol = ident(body, "linkKindCol", false);
         String timeCol = ident(body, "timeCol", false);
         String eventsCol = ident(body, "eventsCol", false);
-        if (!(body.get("steps") instanceof List<?> steps) || steps.isEmpty() || steps.size() > UNSAVED_MAX_STEPS)
+        if (!(body.get("steps") instanceof List<?> steps) || steps.isEmpty()
+                || steps.stream().filter(s -> !(s instanceof Map<?, ?> m && "exclude".equals(m.get("op")))).count() > UNSAVED_MAX_STEPS
+                || steps.stream().filter(s -> s instanceof Map<?, ?> m && "exclude".equals(m.get("op"))).count() > UNSAVED_MAX_EXCLUDES)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'steps': 1 to " + UNSAVED_MAX_STEPS
-                    + " seed / expand bodies - send the Working Set as one seed and the next degree, not the whole history");
+                    + " seed / expand bodies and at most " + UNSAVED_MAX_EXCLUDES + " excludes - send the Working Set as one seed, "
+                    + "the excludes and the next degree, not the whole history");
         String[] endpointTypes = endpointTypes(writeRoot, body);
 
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);   // unknown / not viewable: 404
@@ -788,6 +800,8 @@ public final class InvestigationRoutes implements RouteModule {
             Map<String, Object> entry = entry(log.size() + 1, "op", ex);
             entry.put("op", op);
             entry.put("params", params);
+            // a merged exclude needs a resolve in force, and an unsaved Investigation has none: refused as an append refuses it
+            if (op.equals("exclude") && Boolean.TRUE.equals(params.get("merged"))) requireResolution(state, "step " + (i + 1) + ": ");
             if (op.equals("expand")) {
                 for (String id : strings(params.get("ids")))
                     if (!state.entities.containsKey(id))
@@ -836,6 +850,10 @@ public final class InvestigationRoutes implements RouteModule {
             Map<String, Object> l = (Map<String, Object>) o;
             l.put("source", mask.out(String.valueOf(l.get("source"))));
             l.put("target", mask.out(String.valueOf(l.get("target"))));
+        }
+        for (Object o : (List<Object>) ws.get("excluded")) {
+            Map<String, Object> x = (Map<String, Object>) o;
+            x.put("id", mask.out(String.valueOf(x.get("id"))));
         }
         Map<String, Object> answer = new LinkedHashMap<>();
         answer.put("workingSet", ws);

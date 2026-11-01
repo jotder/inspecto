@@ -59,7 +59,6 @@ import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.compo
 import { stepReadSuffix } from './index-source';
 import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf, stepName } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
-import { UNSAVED_EXCLUDE } from './unsaved-investigation';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import {
     InvestigationSnapshotOpComponent,
@@ -253,8 +252,7 @@ export class LinkAnalysisInvestigationComponent {
     readonly unsavedUndo = output<void>();
     readonly unsavedRedo = output<void>();
     /** A Clean up while unsaved: the page hides these on the drawn Working Set and records the step. */
-    readonly unsavedCleanUp = output<{ ids: string[]; reason: string }>();
-    readonly unsavedExcludeWhy = UNSAVED_EXCLUDE;
+    readonly unsavedCleanUp = output<{ ids: string[]; reason: string; exclude: boolean }>();
 
     readonly canUndoNow = computed(() => (this.isUnsaved() ? this.unsavedCanUndo() : this.canWrite() && this.store.canUndo()));
     readonly canRedoNow = computed(() => (this.isUnsaved() ? this.unsavedCanRedo() : this.canWrite() && this.store.canRedo()));
@@ -301,9 +299,7 @@ export class LinkAnalysisInvestigationComponent {
     }
 
     readonly cleanupExclude = signal(false);
-    /** While unsaved Clean up hides: an exclude waits for Save. */
-    private readonly excluding = computed(() => this.cleanupExclude() && !this.isUnsaved());
-    readonly verb = computed(() => (this.excluding() ? 'Exclude' : 'Hide'));
+    readonly verb = computed(() => (this.cleanupExclude() ? 'Exclude' : 'Hide'));
     /** The Working Set Clean up counts: the saved one, or the unsaved one the canvas draws. */
     private readonly cleanupWs = computed(() => (this.isUnsaved() ? this.store.unsavedWs() : this.store.workingSet()));
     readonly weakEvents = new FormControl(2, { nonNullable: true });
@@ -336,10 +332,10 @@ export class LinkAnalysisInvestigationComponent {
     async cleanUp(ids: string[], reason: string): Promise<void> {
         if (!this.canWrite() || !ids.length) return;
         if (this.isUnsaved()) {
-            this.unsavedCleanUp.emit({ ids, reason });
+            this.unsavedCleanUp.emit({ ids, reason, exclude: this.cleanupExclude() });
             return;
         }
-        const exclude = this.excluding();
+        const exclude = this.cleanupExclude();
         if (this.grow) await this.grow.cleanUp(ids, reason, exclude);
         else await this.store.apply(exclude ? { op: 'exclude', ids, reason } : { op: 'hide', ids });
     }

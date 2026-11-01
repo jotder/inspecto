@@ -50,6 +50,8 @@ class ControlApiUnsavedPreviewTest {
             "('HUB9','X3','voice',TIMESTAMP '2026-09-02 10:00:00')", "('HUB9','X4','voice',TIMESTAMP '2026-09-06 10:00:00')",
             "('HUB9','X5','voice',TIMESTAMP '2026-09-06 11:00:00')", "('B2','C3','sms',TIMESTAMP '2026-09-07 10:00:00')");
     private static final String BINDING = "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"";
+    /** {@code InvestigationRoutes.UNSAVED_MAX_EXCLUDES}, restated: that class is package-private to {@code com.gamma.la.api}. */
+    private static final int MAX_EXCLUDES = 32;
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
@@ -251,6 +253,75 @@ class ControlApiUnsavedPreviewTest {
         }
     }
 
+    /**
+     * LA-INVESTIGATE-UX-2 item 5: an unsaved exclude, with its reason, drops its entities and keeps them out of the later
+     * expands, exactly as the same steps recorded in a created Investigation do (parity), applied in log order.
+     */
+    @Test
+    void anExcludeKeepsItsEntitiesOutOfLaterExpands(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            String seed = "{\"op\":\"seed\",\"ids\":[\"A1\"]}";
+            String exclude = "{\"op\":\"exclude\",\"ids\":[\"HUB9\"],\"reason\":\"Clean up: dangling leaves\"}";
+            String expand = "{\"op\":\"expand\",\"ids\":[\"A1\"],\"hubThreshold\":10}";
+            parity(c, "x1", List.of(seed, expand, exclude, "{\"op\":\"expand\",\"ids\":[\"B2\"],\"hubThreshold\":10}"));
+            parity(c, "x2", List.of(seed, exclude, expand));
+            JsonNode p = preview(c, "[" + String.join(",", seed, exclude, expand) + "]");
+            assertEquals(Set.of("A1", "B2"), ids(p.get("workingSet")), "HUB9 stays out of the later expand, and with it X1..X5");
+            assertEquals("HUB9", p.at("/workingSet/excluded/0/id").asText());
+            assertEquals("Clean up: dangling leaves", p.at("/workingSet/excluded/0/reason").asText(), "the reason travels with it");
+            assertEquals("exclude", p.at("/steps/1/op").asText());
+            assertEquals(0, p.at("/steps/1/admitted").size());
+            // log order: an exclude AFTER the expand removes what it admitted, and a seed after it brings the entity back
+            JsonNode after = preview(c, "[" + String.join(",", seed, expand, exclude) + "]");
+            assertEquals(Set.of("A1", "B2"), ids(after.get("workingSet")));
+            JsonNode back = preview(c, "[" + String.join(",", seed, exclude, "{\"op\":\"seed\",\"ids\":[\"HUB9\"]}") + "]");
+            assertEquals(Set.of("A1", "HUB9"), ids(back.get("workingSet")));
+            assertEquals(0, back.at("/workingSet/excluded").size());
+        }
+    }
+
+    @Test
+    void aMaskedSpaceTakesAndAnswersAnExcludeAsAliasesOnly(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            HttpResponse<String> raw = post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[{\"op\":\"exclude\",\"ids\":[\"B2\"],\"reason\":\"r\"}]}");
+            assertEquals(422, raw.statusCode(), raw.body());
+            assertFalse(raw.body().contains("masked:"), "no alias comes back for a raw exclude: " + raw.body());
+            List<String> near = aliasesNear(c, "A1");   // A1, HUB9 and B2 as the explorer served them
+            String seeds = "[\"" + String.join("\",\"", near) + "\"]";
+            String gone = near.get(0);
+            List<String> rest = near.subList(1, near.size());
+            HttpResponse<String> ok = post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[{\"op\":\"seed\",\"ids\":" + seeds + "},"
+                    + "{\"op\":\"exclude\",\"ids\":[\"" + gone + "\"],\"reason\":\"Clean up\"},"
+                    + "{\"op\":\"expand\",\"ids\":[\"" + String.join("\",\"", rest) + "\"],\"hubThreshold\":10}]}");
+            JsonNode p = data(ok, 200);
+            assertEquals(gone, p.at("/workingSet/excluded/0/id").asText(), "the excluded id is answered as its alias");
+            assertFalse(ids(p.get("workingSet")).contains(gone));
+            for (String forbidden : List.of("HUB9", "B2", "\"A1\"", "X1", "C3")) assertFalse(ok.body().contains(forbidden), ok.body());
+        }
+    }
+
+    @Test
+    void aMalformedExcludeIsRefusedAsTheAppendRefusesIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            String seed = "{\"op\":\"seed\",\"ids\":[\"A1\"]},";
+            for (String[] bad : List.of(
+                    new String[]{"{\"op\":\"exclude\",\"ids\":[\"A1\"]}", "requires a 'reason'"},
+                    new String[]{"{\"op\":\"exclude\",\"reason\":\"r\"}", "requires 'ids'"},
+                    new String[]{"{\"op\":\"exclude\",\"ids\":[\"A1\"],\"reason\":\"" + "r".repeat(201) + "\"}", "at most 200 chars"},
+                    new String[]{"{\"op\":\"exclude\",\"ids\":[\"A1\"],\"reason\":\"r\",\"merged\":true}", "no resolve is in force"})) {
+                HttpResponse<String> r = post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[" + seed + bad[0] + "]}");
+                assertEquals(422, r.statusCode(), bad[0] + " -> " + r.body());
+                assertTrue(r.body().contains(bad[1]), r.body());
+            }
+            String ex = "{\"op\":\"exclude\",\"ids\":[\"X1\"],\"reason\":\"r\"}";
+            String many = String.join(",", java.util.Collections.nCopies(MAX_EXCLUDES + 1, ex));
+            HttpResponse<String> r = post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[" + seed + many + "]}");
+            assertEquals(422, r.statusCode(), "excludes are capped too: " + r.body());
+            String max = String.join(",", java.util.Collections.nCopies(MAX_EXCLUDES, ex));
+            data(post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[" + seed + max + ",{\"op\":\"expand\",\"ids\":[\"A1\"]}]}"), 200);
+        }
+    }
+
     @Test
     void oneRequestIsCappedInStepsAndInRows(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
@@ -271,8 +342,8 @@ class ControlApiUnsavedPreviewTest {
             String ok = "[{\"op\":\"seed\",\"ids\":[\"A1\"]}]";
             assertEquals(422, post(c, "/inv/expand/preview", "{\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"steps\":" + ok + "}").statusCode(), "no dataset");
             assertEquals(422, post(c, "/inv/expand/preview", "{" + BINDING + "}").statusCode(), "no steps");
-            assertEquals(422, post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[{\"op\":\"exclude\",\"ids\":[\"A1\"],\"reason\":\"r\"}]}").statusCode(),
-                    "only seed / expand");
+            assertEquals(422, post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[{\"op\":\"hide\",\"ids\":[\"A1\"]}]}").statusCode(),
+                    "only seed / expand / exclude");
             assertEquals(422, post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[{\"op\":\"seed\",\"ids\":[\"A1\"]},{\"op\":\"expand\",\"ids\":[\"C3\"]}]}")
                     .statusCode(), "an expand from an entity not in the Working Set, as the append refuses it");
             assertEquals(422, post(c, "/inv/expand/preview", "{" + BINDING + ",\"steps\":[{\"op\":\"seed\",\"ids\":[\"A1\"]},{\"op\":\"expand\",\"direction\":\"sideways\"}]}")

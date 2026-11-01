@@ -214,7 +214,7 @@ Phases P0–P5 are complete (2026-07-21, plus polish), and the layer is organise
 driver calls authorize** (an unconfigured action class reads as `OFF`, with kill-switch → mode → budget
 precedence). ⚠ Note the irony this creates for the board: `AGT-5`'s edition cell says "L3 = S+",
 but nothing in the code edition-gates L3 — it is exactly the **`-D` capability switch** that EDG-01
-rejected as an edition mechanism, and the live plan puts L2 at Professional+ and L3 at Enterprise while the
+rejected as an edition mechanism, and the live plan puts L2 at Standard+ and L3 at Advanced while the
 original ladder gated L3 on Decision Rules the as-built policy engine does not use. Four sources, four
 gatings — and none is moot now: `/assist/*` ships on Standard+ since `PKG-5` and `/agent/*` on Advanced
 since `ASSURE-INTELLIGENCE-BUNDLE-1` (§3.10).
@@ -236,7 +236,7 @@ the sentence under it says "all four".
 
 **The autonomy ladder** is the safety model: **Explain** (read) → **Draft** (write nothing, produce a
 proposal) → **Act-with-approval** (L2, a human gate) → **bounded autonomy** (L3, opt-in, budgeted, with
-a kill switch). L3 is documented as Professional+ and opt-in.
+a kill switch). L3 is documented as Standard+ and opt-in.
 
 ### 3.6 The gated write path
 
@@ -444,7 +444,7 @@ So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent)
 | **`AGT-6a` tool `args` runtime validation** — declined in favour of a contract test; revisit when the belt is bigger | §6 |
 | **`AGT-5` embedding recall** — parked; the Case store is a 256-cap ring | §6 |
 | Predictive maintenance (AGT-5 territory) deliberately deferred from the maintenance tier | §3 P3 |
-| Hosted providers (Professional+) and the optional S8 signal slice | §3 P3 |
+| Hosted providers (Standard+) and the optional S8 signal slice | §3 P3 |
 
 ### 5.2 UNTRACKED — found 2026-09-08, no board row yet
 
@@ -465,7 +465,7 @@ So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent)
    rows claim `All`; no bundle carries the code."* Re-derived against the table in §2: **only `AGT-3`
    still reads `All`**, and its own cell explains why that is vacuous (what it promises is an absence) —
    `AGT-1`/`AGT-2`/`AGT-4`/`AGT-5` each carry a 🔴 *no edition* correction and `AGT-6a`/`AGT-6b` read `—`.
-   And "no bundle carries the code" stopped being true at `PKG-5`: `inspecto-agent` ships Professional+ (§3.10).
+   And "no bundle carries the code" stopped being true at `PKG-5`: `inspecto-agent` ships Standard+ (§3.10).
    The narrower remainder — `inspecto-intelligence` bundled by nothing — was resolved 2026-09-29 by
    `ASSURE-INTELLIGENCE-BUNDLE-1`: it ships on Advanced (§3.10).
 2. 🔴 **`EOI-7`'s claim contradicts the build.** "No SNAPSHOT anywhere" versus a parent pom pinning
@@ -529,7 +529,7 @@ So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent)
     actions and feedback routes. All three need the §3.10 caveat.
 21. **The roadmap still tells a reader to adopt the discontinued agent library**, two months after it
     was vendored in-tree.
-22. **Hosted providers are simultaneously deferred and refused.** They are listed as a Professional+
+22. **Hosted providers are simultaneously deferred and refused.** They are listed as a Standard+
     deferral, while the intelligence agent runs on an offline deployment profile in which a hosted
     provider falls back to an offline stub. One of the two statements has to go.
 

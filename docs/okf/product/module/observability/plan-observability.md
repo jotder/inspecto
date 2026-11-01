@@ -73,17 +73,17 @@ has been amended in the same commit as this file.**
 
 | ID | Requirement (as it holds) | MoSCoW | Status of record | Edition of record |
 |---|---|---|---|---|
-| **OPS-1** | One **Signal** ledger; Events, Alerts and Notifications are *views* over it; live tail, saved views, CSV export | Must | ✅ SHIPPED (R4 unification 2026-07; Signal-primary flip 2026-07-18). **CORRECTION:** "live tail" is **client polling** (2–60 s, paused while the tab is hidden), not a push stream, with the server's SSE `GET /signals/stream` now consumed too — the Events pane subscribes through `EventsService.stream()` and keeps polling as the fallback (`CONSUMER-PAIRS-1`); there is no `/events/stream` | **Recording: All. Reading: S/E.** The feed routes (`/events*`) are the optional `inspecto-observability` module (EDG-01 cell 6, 2026-09-08); Personal answers `503` naming the module and the SPA shows an explained state. The board's bare `All` is half true |
-| **OPS-2** | **Metrics**, Prometheus-compatible — throughput, error rate, lag, run durations | Must | ✅ SHIPPED. **CORRECTION:** the cell said the exposition is "core and ungated in every bundle; the gating is EDG-01 debt". **False since 2026-09-07** — EDG-01 cell 5 moved `GET /metrics` into `inspecto-observability`; on Personal the path answers `503` with no `# HELP` leak. `MetricRegistry` stays core. "Deliberately unauthenticated" is *true* (`ControlApi.PUBLIC_PATHS`) and is precisely **why** the ungated Personal exposure was the P1 that started EDG-01 | **S/E** for the scrape. `GET /metrics/acquisition` (JSON, core, **authenticated** — not in `PUBLIC_PATHS`) is **All**. ⚠ `BACKLOG.md` §5 said this row "says `All`" — it says `S/E`; struck 2026-09-08 |
-| **OPS-3** | Three-layer audit: file/batch audit ledgers, provenance rows, an **append-only who-did-what Audit Log** | Must | ✅ SHIPPED. **CORRECTIONS (three):** (a) the log is **append-only by construction of the write path, and tamper-EVIDENT since 2026-09-27** (`ASSURE-AUDIT-CHAIN-1`: a per-Space hash chain plus MAC-signed daily anchors, checked by `GET /audit/verify`, `AuditVerifier`) — but not tamper-proof or immutable (`compliance/controls-matrix.md` AU-9). (b) **Sign-ins are audited**: besides mutating `POST/PUT/PATCH/DELETE`, export `GET`s and access-denied attempts, the `/auth/*` session routes write typed rows through `AuditTrail.authentication()` (category `authentication`, actions `auth.exchange` / `refresh` / `logout`). *(Both corrected 2026-11-01: this cell said neither existed.)* (c) The audit CSV export is **core** `GET /audit/export?format=csv` since 2026-09-08 (`AuditLogRoutes`), no longer a branch of `/events/export` | **All** (recording *and* reading — the one observability read that stays on Personal; EDITIONS §Audit) |
+| **OPS-1** | One **Signal** ledger; Events, Alerts and Notifications are *views* over it; live tail, saved views, CSV export | Must | ✅ SHIPPED (R4 unification 2026-07; Signal-primary flip 2026-07-18). **CORRECTION:** "live tail" is **client polling** (2–60 s, paused while the tab is hidden), not a push stream, with the server's SSE `GET /signals/stream` now consumed too — the Events pane subscribes through `EventsService.stream()` and keeps polling as the fallback (`CONSUMER-PAIRS-1`); there is no `/events/stream` | **Recording: All. Reading: S/E.** The feed routes (`/events*`) are the optional `inspecto-observability` module (EDG-01 cell 6, 2026-09-08); Basic answers `503` naming the module and the SPA shows an explained state. The board's bare `All` is half true |
+| **OPS-2** | **Metrics**, Prometheus-compatible — throughput, error rate, lag, run durations | Must | ✅ SHIPPED. **CORRECTION:** the cell said the exposition is "core and ungated in every bundle; the gating is EDG-01 debt". **False since 2026-09-07** — EDG-01 cell 5 moved `GET /metrics` into `inspecto-observability`; on Basic the path answers `503` with no `# HELP` leak. `MetricRegistry` stays core. "Deliberately unauthenticated" is *true* (`ControlApi.PUBLIC_PATHS`) and is precisely **why** the ungated Basic exposure was the P1 that started EDG-01 | **S/E** for the scrape. `GET /metrics/acquisition` (JSON, core, **authenticated** — not in `PUBLIC_PATHS`) is **All**. ⚠ `BACKLOG.md` §5 said this row "says `All`" — it says `S/E`; struck 2026-09-08 |
+| **OPS-3** | Three-layer audit: file/batch audit ledgers, provenance rows, an **append-only who-did-what Audit Log** | Must | ✅ SHIPPED. **CORRECTIONS (three):** (a) the log is **append-only by construction of the write path, and tamper-EVIDENT since 2026-09-27** (`ASSURE-AUDIT-CHAIN-1`: a per-Space hash chain plus MAC-signed daily anchors, checked by `GET /audit/verify`, `AuditVerifier`) — but not tamper-proof or immutable (`compliance/controls-matrix.md` AU-9). (b) **Sign-ins are audited**: besides mutating `POST/PUT/PATCH/DELETE`, export `GET`s and access-denied attempts, the `/auth/*` session routes write typed rows through `AuditTrail.authentication()` (category `authentication`, actions `auth.exchange` / `refresh` / `logout`). *(Both corrected 2026-11-01: this cell said neither existed.)* (c) The audit CSV export is **core** `GET /audit/export?format=csv` since 2026-09-08 (`AuditLogRoutes`), no longer a branch of `/events/export` | **All** (recording *and* reading — the one observability read that stays on Basic; EDITIONS §Audit) |
 | **OPS-4** | Durable **Run reporting** — success rate, p50/p95 | Should | ✅ SHIPPED. **CORRECTION:** "off by default" is true of **one of three** ledgers only. The **batch-audit report** (`GET /status`, `/report`, `/runs/{name}/report`, p50/p95/**p99**, `?from&to`) reads the status store, whose backend default is **`db` since 2026-08-31** — always on. The **file run log** (`jobs_audit/jobs_runs.csv` + JSONL) is always on. Only the **job-run DB projection** (`/jobs/metrics|runs|failures`, T27) is off (`-Djobs.backend` default `none`, `404` until set) | All |
 | **OPS-5** | Per-edge **Provenance** + conservation invariant → Alerts + an edge-weight overlay | Should | 🟡 PARTIAL — built, tested, **default off** (`-Dprovenance.backend` default `none`; `/provenance*` answers `404` until `duckdb`); verified against synthetic data only; the live soak is BACKLOG §2. **CORRECTION:** there is **no Sankey component** — the pipeline editor paints per-edge record counts as weight labels on the canvas edges (T17). The wording "Sankey overlay" is the design's name for that; the row keeps it, this file names what shipped | All |
 | **OPS-6** | Record-level lineage & replay | **Won't (now)** | — per-batch ancestry is the accepted grain (`/runs/{name}/lineage`, `/lineage?store=`) | — |
 
 **Edition-board corrections carried in this commit**
 
-* `EDITIONS.md` **`JOB-03`** promised the whole task library on Personal (✅). Three tasks are *not* on
-  Personal by design — `backup`/`backup_verify`/`restore` (`inspecto-backup`, cell 2) and `incident_purge`
+* `EDITIONS.md` **`JOB-03`** promised the whole task library on Basic (✅). Three tasks are *not* on
+  Basic by design — `backup`/`backup_verify`/`restore` (`inspecto-backup`, cell 2) and `incident_purge`
   (`inspecto-ops`, cell 7) are **unknown tasks, refused loudly** there. The P cell is now 🟡.
 * `EDITIONS.md` **`SEC-09`** "tamper-evident" → "append-only (not tamper-evident)". The `SEC` spec §5 had
   already recorded the mismatch and assigned it to `OPS`.
@@ -119,10 +119,10 @@ oldest and forgets on restart; **`parquet`** — `ParquetEventStore`, rolling Hi
 in-memory store oldest-first so nothing emitted before the configured backend attached is lost.
 
 🔴 **The default is a per-EDITION choice made in the launcher, not in the engine** (`EVENTS-DURABLE-1`,
-2026-09-11). The engine default stays `memory`, because Personal's promise is zero files and zero
+2026-09-11). The engine default stays `memory`, because Basic's promise is zero files and zero
 configuration — but a ring that empties on restart cannot carry the **tamper-evident, append-only** audit
-trail Professional+ sells, and `AuditTrail` emits `EventType.AUDIT` straight into `EventLog`. So the
-Standard/Enterprise launchers emitted by `inspecto/package.ps1` now pass **`-Devents.backend=parquet`**,
+trail Standard+ sells, and `AuditTrail` emits `EventType.AUDIT` straight into `EventLog`. So the
+Standard/Advanced launchers emitted by `inspecto/package.ps1` now pass **`-Devents.backend=parquet`**,
 selected off the same `inspecto-oidc.jar` presence check that turns on OIDC. `-Devents.dir` is
 deliberately left unset: it falls back to `SpaceRoot.eventsDir()`, so discover mode keeps **one trail per
 space** rather than pooling every space's audit into one directory. Both halves are pinned by
@@ -256,7 +256,7 @@ successful state-changing request (`POST`/`PUT`/`PATCH`/`DELETE` — `PATCH` onl
 classifier admitted three methods, so the admin-only `PATCH /objects/{id}` priority / severity / assignee edit
 left no row), export `GET`s, and non-GET attempts on
 forbidden routes, classified fail-closed to `AUDIT` / `ACCESS_DENIED`, with actor, action, target, IP and
-user agent as attributes. Actor comes from `ApiContext.actor`; on Personal (no authenticator) it is the
+user agent as attributes. Actor comes from `ApiContext.actor`; on Basic (no authenticator) it is the
 default `appUser`. **Scope boundary, stated, do not overclaim:** the credential check itself (MFA,
 password, lockout) belongs to the IdP and is **not** in it. ✅ Since 2026-09-17 the *session lifecycle* IS:
 `auth.exchange` / `auth.refresh` / `auth.logout` (`AuditTrail.authentication`, category `authentication`),
@@ -422,7 +422,7 @@ artifacts (`-Djobs.runlog.maxEntries`, default 10,000); `runlog_prune` is its re
 | `retire_superseded` | the **bytes** of output revisions the outputs catalog marks `SUPERSEDED` | core | ⚠ **the one retention task a correctness fix depends on** — without it every full recompute leaves a complete extra copy forever; since 2026-08-29 the runner **WARNs** after a recompute when no enabled job exists |
 | `storage_report`, `storage_trend` | per-axis usage (+ a queryable `maintenance_storage` sample on a real run); two-point growth slope, breach ETA, archive candidates | core | trend emits `maintenance.storage.trend` (WARN) inside `warn_days` |
 | `db_maintenance`, `scheduler_audit`, `metadata_validate`, `file_repository_audit`, `materialize` | CHECKPOINT/VACUUM via host seams; cron sanity; broken refs/duplicates/missing data; repository consistency; view materialisation | core | |
-| `backup`, `backup_verify`, `restore` | timestamped zip + SHA-256 sidecar manifest via `Checksums`; hash-first verify (fail-closed); manifest-validated restore with **zip-slip jail** and conflict preview — archive-based, the whole config tree, *not* bundle import | **`inspecto-backup`** (`BackupTaskProvider`) | Professional+/Enterprise (`OPS-06`, cell 2, 2026-09-07). On Personal: *unknown maintenance task*, refused loudly. Pinned by `NoBackupTaskShipsInThePersonalBuildTest` |
+| `backup`, `backup_verify`, `restore` | timestamped zip + SHA-256 sidecar manifest via `Checksums`; hash-first verify (fail-closed); manifest-validated restore with **zip-slip jail** and conflict preview — archive-based, the whole config tree, *not* bundle import | **`inspecto-backup`** (`BackupTaskProvider`) | Standard+/Advanced (`OPS-06`, cell 2, 2026-09-07). On Basic: *unknown maintenance task*, refused loudly. Pinned by `NoBackupTaskShipsInThePersonalBuildTest` |
 | `incident_purge` | Archived Incidents with notes, links, tag edges — **the only task that deletes operator business records** | **`inspecto-ops`** (`OpsMaintenanceTasks`) | MNT-14; `retention_days` required, `max_count` default 1000; legal hold fail-safe and re-checked inside `purge()`; G3 — the audit history survives. **Nothing schedules it, and nothing should** |
 
 The **`MaintenanceTaskProvider`** ServiceLoader seam (`platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceTaskProvider.java`):
@@ -441,7 +441,7 @@ for every write task; tasks with no preview do nothing on a dry run.
 `backup_verify_job`, `chained_backup_job_template` (the MNT-13 nightly chain: each link
 `on_signal: job.run.completed` + `when: "$signal.job == <prev> && $signal.outcome == SUCCESS"`),
 `db_maintenance_job`, `orders_summary_followup_job`, `orders_weekly_compact_job`, `retention_job_template`,
-`runlog_retention_job`, `scheduler_audit_job`. ⚠ On a **Personal** install the demo chain **stops at
+`runlog_retention_job`, `scheduler_audit_job`. ⚠ On a **Basic** install the demo chain **stops at
 `config_backup` with a FAILED run** — the edition boundary working, not a defect (`OPS-06`, runbook).
 Runbook: `docs/okf/product/module/backup/admin-guide-backup-restore.md`.
 
@@ -480,7 +480,7 @@ host's — the rules are `DAT`'s.
 
 | Flag | Default | Reader |
 |---|---|---|
-| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Professional+; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
+| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Standard+; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
 | `-Devents.db.url` / `.user` / `.password` | `SpaceRoot.eventsDbUrl()` — `<space>/duckdb/inspecto-events.db` | `OperationalDb.Family.EVENTS`, `DbEventStore` |
 | `-Dstatus.backend` | `db` | `OperationalDb.java`, `ServiceStores.java` |
 | `-Djobs.backend` | `none` | `ServiceStores.java`, `DbJobRunStore.java`, `HealthDetails.java` |
@@ -501,9 +501,9 @@ host's — the rules are `DAT`'s.
 |---|---|---|
 | **Events** (`/events`, `events.component.ts`) | `/events/search` (level/type/pipeline/q/correlationId, offset paging), live tail by `visibleInterval` polling (2/5/10/30/60 s), `/events/export` → client Blob, `/events/views` CRUD, `EventDetailDialog` re-filters by correlation/type, "What led to this" → `AiStatusDialog` | `features.events=false` → explained state, no call; Ops lens home falls back to `/pipelines` (`OPS_HOME_WITHOUT_EVENTS`, `app.routes.ts`) |
 | **Audit log** (`audit-logs.component.ts`) | core `/audit/search` for `AUDIT` + `ACCESS_DENIED` via `forkJoin`; columns Time, Actor, Action, Category, Target, IP, Message | **not** gated on `features.events` — reads core routes on every edition |
-| **Overview** (`/overview`, `dashboard.component.ts`) | `/ready`, `/status`, `/report` (p50/p95/p99, outcomes), `/metrics/acquisition` KPIs, raw `/metrics` text behind a `showMetrics` toggle, recent events | each fetch degrades independently; the events tile is skipped when `eventsEnabled` is false; the raw-metrics toggle meets a `503` on Personal (§5) |
+| **Overview** (`/overview`, `dashboard.component.ts`) | `/ready`, `/status`, `/report` (p50/p95/p99, outcomes), `/metrics/acquisition` KPIs, raw `/metrics` text behind a `showMetrics` toggle, recent events | each fetch degrades independently; the events tile is skipped when `eventsEnabled` is false; the raw-metrics toggle meets a `503` on Basic (§5) |
 | **Runs / Run detail** (`/runs`, `/runs/:name`) | `RunRoutes` list/trigger/pause/resume/reprocess; tabs batches/files/lineage/quarantine/commits/report; `InboxStatus` current/step gauges; "Failed consignments retry automatically" notice; "View the rejected rows" | Business lens read-only (2026-07-03) |
-| **Jobs** (`/jobs`, `jobs.component.ts`) | schedules mode (list/trigger/enable/reschedule/edit/delete) and **reporting** mode (`/jobs/metrics|runs|failures`, 5 s live tail); the authoring form takes its **task picker from `GET /jobs/types`** — which maintenance tasks appear is entirely what the backend registered, so backup/restore vanish on Personal with no UI change | reporting 404 → `reportDisabled` explained |
+| **Jobs** (`/jobs`, `jobs.component.ts`) | schedules mode (list/trigger/enable/reschedule/edit/delete) and **reporting** mode (`/jobs/metrics|runs|failures`, 5 s live tail); the authoring form takes its **task picker from `GET /jobs/types`** — which maintenance tasks appear is entirely what the backend registered, so backup/restore vanish on Basic with no UI change | reporting 404 → `reportDisabled` explained |
 | **Processing status** (`processing-status.component.ts`) | `/status`, `/status/problem-files`; row action opens Run detail | |
 | **Scheduler settings** (`settings/scheduler.component.ts`) | `GET|PUT /system/scheduler`; `memoryLimit` validated by the server-served DuckDB grammar; provenance chips | saves gated on `canOperateRuns` |
 | **Operational DB** (`settings/operational-db.component.ts`) | `GET /system/operational-db`, `POST …/test`; no PUT | `canConfigureAccess` |
@@ -705,7 +705,7 @@ the form authors the kind), and per-measure limits.
 | 2026-08-30 | The audit-retention window is **one year**; applied by a partition delete, never a SQL `DELETE` | operator; `controls-matrix.md` G5 |
 | 2026-08-31 | `-Dstatus.backend` default flipped to **`db`** | `OperationalDb.java`; `operations-reference.md` §Status backend |
 | 2026-09-02 | `event_prune` shipped (COMPLY-3); `partition_prune` followed 2026-09-06 | `jobs.md`, `EDITIONS.md` JOB-03 |
-| 2026-09-07 | EDG-01 cell 2: backup tasks moved to `inspecto-backup` via `MaintenanceTaskProvider`; duplicate claims refused fail-closed; Personal refuses loudly, never a silent SKIPPED | operator; `EDITIONS.md` OPS-06 |
+| 2026-09-07 | EDG-01 cell 2: backup tasks moved to `inspecto-backup` via `MaintenanceTaskProvider`; duplicate claims refused fail-closed; Basic refuses loudly, never a silent SKIPPED | operator; `EDITIONS.md` OPS-06 |
 | 2026-09-07 | EDG-01 cell 5: only the `/metrics` **exposition** gated (`inspecto-metrics`); `MetricRegistry` stays core; path stays public — "a scraper carries no token" | `EDITIONS.md` CP-13 |
 | 2026-09-07 | EDG-01 mechanism: **ServiceLoader modules, ⛔ not `-D` capability switches** — a switch leaves the code in a bundle that ships no authenticator and binds every interface | operator; `EDITIONS.md` §EDG-01 |
 | 2026-09-07 | `living-operational-system.md` distilled to the OKF north star with **no as-built column** ("a state column rots") | `BACKLOG.md` §5 |
@@ -736,7 +736,7 @@ the form authors the kind), and per-measure limits.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
-> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `GET /signals/stream` **ADOPT** — the Events pane subscribes, polling stays as the fallback → `BACKLOG.md` §3 `CLIENT-HALVES-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `GET /signals/stream` **ADOPT** — the Events pane subscribes, polling stays as the fallback → `CLIENT-HALVES-1` (row closed; the Events pane subscribes to `/signals/stream`).
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
@@ -752,7 +752,7 @@ the form authors the kind), and per-measure limits.
    way `incident_purge` is.
 3. ✅ **CLOSED 2026-09-27 — tamper-evidence shipped** (`ASSURE-AUDIT-CHAIN-1`: hash chain, signed daily
    anchors, `GET /audit/verify`; AU-9 evidence §6).
-4. **The Overview's raw-metrics toggle on Personal** calls `/metrics` and receives `503`; the tile has a
+4. **The Overview's raw-metrics toggle on Basic** calls `/metrics` and receives `503`; the tile has a
    per-call `catchError` but whether it renders the *explained* state (module absent) rather than a
    generic failure was not verified.
 5. **Three Ops Lens screens have no OKF Feature page**: Audit log, Processing status, and the Scheduler /
@@ -780,7 +780,7 @@ the form authors the kind), and per-measure limits.
 | Archive-is-terminal for Incidents | **Superseded** by D5 (2026-07-25) | it would make "archived" mean "kept forever" |
 | Four per-store `JobService` hooks for the purge cascade, "fail-closed on partial attachment" | **Premise wrong** | `ObjectService` already holds all four stores; per-store nullable hooks would *reintroduce* the half-cascade hazard — ⛔ do not add them |
 | A computed / semaphore-derived DuckDB cap; a `max_temp_directory_size` default; capping preview connections | **Refused** by D11, still standing | `d11-resource-caps-plan.md` (archive); BACKLOG §6 |
-| `-D` capability switches for edition gating | **Refused** 2026-09-07 | a switch leaves the code in the Personal bundle — ServiceLoader modules instead |
+| `-D` capability switches for edition gating | **Refused** 2026-09-07 | a switch leaves the code in the Basic bundle — ServiceLoader modules instead |
 | Gating the audit CSV alone (an `if` inside core `/events/export`) | **Refused** 2026-09-08 | §Assembly bans conditionals inside core routes; the feed moved whole and a core `AuditLogRoutes` was added |
 | `scheduler` / `trigger` as Component kinds | **Deliberately not kinds** | cron and event are mutually exclusive job fields with no second consumer |
 | A full `ConsignmentEventBus` → Signal migration | **Not attempted** | `ConsignmentAuditWriter` emits additively; the run-claim seam makes a bus migration hazardous |
@@ -845,5 +845,5 @@ pages for *what is*.
 * **Guards** — `node tools/check-vocabulary.mjs`, `node tools/check-doc-links.mjs`,
   `node tools/check-gate-tally.mjs` from the repo root; the pre-push hook re-runs the vocabulary guard.
 * **Falsify, don't read** — the two claims most worth re-probing on a running server: `curl -i
-  localhost:8080/metrics` on a Personal bundle must be `503`, never `# HELP`; `curl -i
+  localhost:8080/metrics` on a Basic bundle must be `503`, never `# HELP`; `curl -i
   localhost:8080/api/v1/health/details` without a token on Standard must be `401`, while `/health` is `200`.

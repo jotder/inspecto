@@ -19,7 +19,7 @@ timestamp: 2026-07-16T00:00:00Z
 >   **zero** Java readers, and so does its sibling **`-Dassist.read.token`**, so every example that set them
 >   authenticated nothing while reading exactly as though it did. The launch examples no longer pass them,
 >   the `CONTROL_TOKEN=…` invocations are plain `serve.sh` / `serve.bat`, and the curls now send
->   `Authorization: Bearer $TOKEN` — the header shape was always right for Standard/Enterprise; only the
+>   `Authorization: Bearer $TOKEN` — the header shape was always right for Standard/Advanced; only the
 >   value's provenance was a lie.
 >   ⚠ **What `serve.sh` actually reads was ALSO wrong here**, and is corrected from the generated launcher
 >   rather than from this page's memory: `PORT`, `SPACES_ROOT`, `CORS_ORIGIN`, `AUTH_OIDC_*` — never
@@ -30,8 +30,6 @@ timestamp: 2026-07-16T00:00:00Z
 > - ⚠ **`java -jar` and `mvn clean package`** are both wrong for this repo: the launcher uses `-cp`
 >   (RUNSH-CP-1) and packaging is `-pl inspecto,:inspecto-connectors -am -DskipTests -q`. See
 >   [build & test](spec-build-test.md).
-> - ⚠ The **`Issue Tracker`** section heading (§ below) predates the shipped Issue → **Incident** rename;
->   the same file already says Incident elsewhere.
 >
 > For the curated flag table read [Operations](admin-guide-launch-flags.md); for build, reactor and `package.ps1` read
 > [Build & Test](spec-build-test.md). Fix a cross-cutting fact **there**, not here. *(Moved from the retired root-level `admin-guide-launch-flags.md` (docs consolidation, 2026-07-16).)*
@@ -376,14 +374,14 @@ in every edition. `-Dcontrol.bind=127.0.0.1` restricts it to loopback; an unreso
 boot** rather than falling back to the wider address, so an operator who asked for loopback can never
 silently get more. Both the HTTP and HTTPS paths honour it.
 
-⚠ **Combine that default with the auth model below before exposing a Personal install.** Personal ships
+⚠ **Combine that default with the auth model below before exposing a Basic install.** Basic ships
 no `Authenticator` at all, so left on the default it serves an unauthenticated control plane — config-write
 routes included — to every host that can reach the port. The `-Dassist.write.root` gate is the only thing
 in front of those routes, and an operator may well have set it. **Set `-Dcontrol.bind=127.0.0.1`, or
 firewall the port, for any single-user install.**
 
 The wildcard default is deliberate, not an oversight: narrowing it would make every already-deployed
-Standard/Enterprise install unreachable on upgrade. `ControlApiBindTest` pins it so a later "hardening"
+Standard/Advanced install unreachable on upgrade. `ControlApiBindTest` pins it so a later "hardening"
 fails a test instead of surprising an operator. ⛔ `EDITIONS.md` asserted "bind localhost only" for years
 without the code enforcing it — the claim was the defect, and it now states the exposure instead.
 
@@ -397,7 +395,7 @@ list its address, or every request audits and throttles as the proxy. ⛔ Until 
 entry was believed from any caller, so the audit IP and the throttle key were caller-chosen.
 Pinned by `TrustedProxiesTest` + `ControlApiClientIpTest`.
 
-**Auth model (editions realignment, 2026-06-16).** The common core is **auth-free**: on the Personal
+**Auth model (editions realignment, 2026-06-16).** The common core is **auth-free**: on the Basic
 edition every route is open — no token, guard, or login (the old `CONTROL`/`assist.*` token scopes were
 removed). The **Standard** edition re-adds authentication out-of-band via the `Authenticator` / `Subject` /
 `TokenRelay` SPIs (`com.gamma.control`), implemented by the `inspecto-oidc` module (OIDC resource
@@ -512,8 +510,8 @@ day. The rollup (counts, percentiles, first/last time) is computed over just the
 identically over the file and DB backends.
 
 > **Where `$TOKEN` comes from, once:** an access token issued by your IdP. `Authorization` is enforced by
-> the **Standard/Enterprise security module** (`ControlApi:356`) — configured through `AUTH_OIDC_*` — so on
-> **Personal** there is nothing to send and the header is simply ignored. ⛔ It is *not* produced by
+> the **Standard/Advanced security module** (`ControlApi:356`) — configured through `AUTH_OIDC_*` — so on
+> **Basic** there is nothing to send and the header is simply ignored. ⛔ It is *not* produced by
 > `CONTROL_TOKEN` or `-Dcontrol.token`: those have no readers and never authenticated anything. Every curl
 > below uses the same `$TOKEN`.
 
@@ -556,10 +554,11 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/enrichment/EVENT
 ### Config-driven jobs — cron / event / manual (`JobService`)
 
 Beyond the fixed poll cycle, define arbitrary **jobs** in `*_job.toon` files (scanned from
-the same paths as pipelines). One uniform scheduler runs four kinds of work — `ingest`
-(a Stage-1 pipeline), `enrich` (a Stage-2 job), `report` (emit a report snapshot to the
-`inspecto.events` log), and `maintenance` (built-in housekeeping) — each triggered by a cron
-expression, an upstream batch-commit event, and/or a manual `POST`.
+the same paths as pipelines). One uniform scheduler runs every Job Type — the built-in `enrich`
+(a Stage-2 job), `report` (emit a report snapshot to the `inspecto.events` log), `maintenance`
+(built-in housekeeping) and `pipeline` (an authored Pipeline over data at rest), plus the types modules
+register through `JobTypeProvider` — each triggered by a cron expression, an upstream batch-commit
+event, and/or a manual `POST`. There is no `ingest` Job: ingestion belongs to the Pipeline's poll loop.
 
 ```toon
 # nightly_clean_job.toon  — prune audit CSVs older than 30 days at 02:00 daily
@@ -744,14 +743,15 @@ full-module runs red at an unchanged tree, green 8/8 alone. Reproduced determini
 > single-process file lock is fine for the current single-JVM service, and Postgres is what
 > you switch to when you split into separate processes/nodes.
 
-### Object backend (Alert Center) — database (default), PostgreSQL (Enterprise) or in-memory (`DbObjectStore`)
+### Object backend (Alert Center) — database (default), PostgreSQL (Advanced) or in-memory (`DbObjectStore`)
 
-The Alert Center (Phase 2) records **operational objects** — managed, *mutable* things with a
-lifecycle (an `ALERT` walks `OPEN → ACKNOWLEDGED → RESOLVED`), the counterpart to the immutable
-event log. Because they mutate they live in a table store, not Parquet. Since 2026-09-25
+The object store records **operational objects** — managed, *mutable* things with a lifecycle
+(`INCIDENT`, `CASE` and `TASK`), the counterpart to the immutable event log. Alerts are not objects:
+since MODULE-REORG-P7 they live in their own `AlertStore` (table `inspecto_alerts`, every edition), walk
+`OPEN → ACKNOWLEDGED → RESOLVED`, and an `ALERT` row left in an old object table loads inert. Because they mutate they live in a table store, not Parquet. Since 2026-09-25
 (`OBJECTS-BACKEND-DEFAULT-MEMORY-1`) the default is durable, `-Dobjects.backend=db` — the same
 engine-neutral JDBC-over-DuckDB pattern as the status backend (no extra dependency), in the Space's
-`duckdb/` (legacy single-tenant file `inspecto-ops.db`). The Enterprise `serve.*` passes
+`duckdb/` (legacy single-tenant file `inspecto-ops.db`). The Advanced `serve.*` passes
 `-Dobjects.backend=postgres`, which **refuses the boot** unless every object family resolves to a
 `jdbc:postgresql:` URL (`INSPECTO_DB_URL`, or `-Dobjects*.db.url`) and never degrades to memory.
 `-Dobjects.backend=memory` survives only as an explicit, non-durable opt-in; any other value fails the boot:
@@ -765,14 +765,13 @@ java -cp inspecto.jar com.gamma.control.ControlApi \
 
 It creates table `inspecto_ops_objects` on first connect and does a real `UPDATE` on each
 transition (unlike the status store's DELETE-then-INSERT projection — these objects are the source
-of truth). A fired alert is promoted to an `OPERATIONAL_OBJECT(ALERT)` linked to the triggering
-event, and every transition emits an `OBJECT_OPENED`/`OBJECT_ACTIVITY` event so the change shows in
-the event log. Operate the objects over the Control API (CONTROL scope):
+of truth). Every transition emits an `OBJECT_OPENED`/`OBJECT_ACTIVITY` event so the change shows in
+the event log. A fired Alert is a row in the `AlertStore`, operated over its own routes:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects?type=ALERT&status=OPEN"
-curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/ack
-curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<id>/resolve
+curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/alerts?limit=50"
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/alerts/<id>/ack
+curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/alerts/<id>/resolve
 ```
 
 > **Future / distributed:** like the status backend, point `-Dobjects.db.url` at
@@ -785,16 +784,14 @@ curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/
 
 ### Incident Tracker (Phase 3) — operator-created Incidents + SLA tracking
 
-Issues reuse the **same** `inspecto_ops_objects` table and workflow engine as alerts — only
-`object_type=ISSUE` differs, so there is no new storage or backend to configure. Where an `ALERT` is
-auto-promoted from a fired rule, an `ISSUE` is **operator-created** with `POST /objects` and walks a
-richer lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` (actions `assign`/`start`/
-`resolve`/`close`; only `CLOSED` is terminal). Drive the moves through the generic
+Incidents live in the `inspecto_ops_objects` table (`object_type=INCIDENT`), so there is no extra storage
+or backend to configure. An Incident is **operator-created** with `POST /objects` and walks `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED` (actions `accept`/`resolve`/`archive`, plus
+`reopen` from `RESOLVED|ARCHIVED` back to `DIAGNOSING`). Drive the moves through the generic
 `/objects/{id}/transition` route:
 
 ```bash
 # create an Incident with a 2-hour SLA (dueInMinutes; or pass an absolute dueAt in epoch millis).
-# Standard/Enterprise only — the object routes are the inspecto-ops module and 503 on Personal.
+# Standard/Advanced only — the object routes are the inspecto-ops module and 503 on Basic.
 # title + at least one link are mandatory (create contract, 2026-07-22).
 curl -s -X POST localhost:8080/api/v1/objects \
   -d '{"type":"INCIDENT","title":"reconcile mismatch on pipeX","priority":"MAJOR","assignee":"alice","dueInMinutes":120,"links":[{"to":"<alert-or-run-id>","relationship":"RELATED_TO"}]}'
@@ -827,18 +824,18 @@ curl -s "localhost:8080/api/v1/events/search?type=OBJECT_SLA_BREACH"
 ### Case Management (Phase 4) — correlation links & graph
 
 A `CASE` (`object_type=CASE`, lifecycle `OPEN → INVESTIGATING → ESCALATED → RESOLVED → CLOSED`) groups
-the alerts and issues of one investigation. Phase 4 makes **correlation first-class**: an append-only
-`OBJECT_LINK` graph records directed edges between objects — `Case CONTAINS Issue`, `Issue
+the Incidents of one investigation. Phase 4 makes **correlation first-class**: an append-only
+`OBJECT_LINK` graph records directed edges between objects — `Case CONTAINS Incident`, `Incident
 ESCALATED_FROM Alert`, `Alert CAUSED_BY Event` — so you can pivot from any object to everything related
 to it. Links follow the same `-Dobjects.backend` toggle (durable in their own DuckDB file
 `inspecto-ops-links.db`, or one Postgres alongside the objects).
 
 ```bash
-# create a case, then link the issue it contains
+# create a case, then link the Incident it contains
 curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects \
   -d '{"type":"CASE","title":"Q2 reconciliation incident","severity":"HIGH"}'
 curl -s -H "Authorization: Bearer $TOKEN" -X POST localhost:8080/api/v1/objects/<caseId>/links \
-  -d '{"to":"<issueId>","relationship":"contains","actor":"alice"}'
+  -d '{"to":"<incidentId>","relationship":"contains","actor":"alice"}'
 # the case's neighbourhood, and a 2-hop correlation subgraph (nodes + edges)
 curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<caseId>/links"
 curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<caseId>/graph?depth=2"
@@ -869,7 +866,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<id>/at
 
 ### Observability — metrics & structured events
 
-`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-observability` module** (`pom.xml:93`/`:121`, Professional+Enterprise only): on **Personal the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentModuleRoutes.java:18-25`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
+`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-observability` module** (`pom.xml:93`/`:121`, Standard+Advanced only): on **Basic the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentModuleRoutes.java:18-25`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
 
 ```bash
 curl -s localhost:8080/metrics
@@ -915,8 +912,8 @@ Route that logger to a file or shipper to stream batch events into a log pipelin
 **Acquisition lifecycle events.** When a `source:` block is configured, the `EventLog` emits structured facts
 for the file-acquisition lifecycle (queryable via `GET /events`): `FILE_DISCOVERED` → `FILE_STABLE` →
 `FILE_FETCHED` → `FILE_VALIDATED` → (`FILE_CHANGED`) → `FILE_ARCHIVED`, plus the failure/operational facts
-`FILE_FETCH_FAILED`, `SEQUENCE_GAP`, and `SOURCE_CIRCUIT_OPEN`. A `SEQUENCE_GAP` is automatically promoted to a
-managed ALERT object (trackable in Cases/Issues) by the service tier.
+`FILE_FETCH_FAILED`, `SEQUENCE_GAP`, and `SOURCE_CIRCUIT_OPEN`. A `SEQUENCE_GAP` becomes a stored Alert
+(`GET /alerts`) on every edition.
 
 ### Audit files written to `dirs.status_dir`
 
@@ -1080,7 +1077,7 @@ run.bat <data_source>
 # 6. OR run the always-on control plane + operator console (serves every pipeline under config/)
 bash serve.sh                                             # Linux/Mac → http://localhost:8080/
 serve.bat                                                 # Windows
-# Auth is an edition feature: Personal serves unauthenticated, Standard/Enterprise take AUTH_OIDC_*.
+# Auth is an edition feature: Basic serves unauthenticated, Standard/Advanced take AUTH_OIDC_*.
 ```
 
 ### Containerized deployment (PKG-3, shipped 2026-08-28)
@@ -1108,13 +1105,13 @@ As-built decisions:
   failing at container start.
   🔴 **This bullet was ahead of the code until 2026-09-29:** `package.ps1` still emitted
   `eclipse-temurin:24-jre` and excluded `runtime/`; fixed then (`ASSURE-OPERABILITY-1`).
-- **Verified 2026-09-29 on the fixed Dockerfile** (Docker 29.5.3, Professional bundle packaged with
+- **Verified 2026-09-29 on the fixed Dockerfile** (Docker 29.5.3, Standard bundle packaged with
   `package.ps1 -Edition Standard -NoUi`, `inspecto-deploy-linux_amd64.zip`, `docker build` exit 0):
   `runtime/bin/java -version` in the image → `java version "27" 2026-09-15` (build 27+35-2325); `id` →
   `uid=10001(inspecto) gid=10001(inspecto)`; `docker top` on the running container shows the java process at
   UID/GID **10001**; `GET /health` → 200 `{"status":"UP"}`, `GET /ready` → 200, `HEALTHCHECK` → `healthy`.
   A second run with `--read-only --tmpfs /tmp:exec --cap-drop ALL --security-opt no-new-privileges` and
-  `spaces/demo` mounted booted the Space (13 Pipelines) and answered `/health` + `/ready` 200. ⚠ Professional
+  `spaces/demo` mounted booted the Space (13 Pipelines) and answered `/health` + `/ready` 200. ⚠ Standard
   refuses to start without `AUTH_OIDC_ISSUER` / `AUTH_OIDC_JWKS_URI` (fail-closed); the run passed placeholder
   values — `/health` is public, so no token was validated. Containers were stopped and removed. The
   2026-08-28 line below is the old temurin image.

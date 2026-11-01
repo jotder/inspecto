@@ -32,6 +32,9 @@ describe('unsaved steps in words (LA-UNSAVED-INVESTIGATION-1)', () => {
         expect(unsavedStepLine({ kind: 'hide', ids: ['a', 'b'], reason: 'Clean up: dangling leaves' })).toBe(
             'Hide 2 entities (Clean up: dangling leaves)',
         );
+        expect(unsavedStepLine({ kind: 'exclude', ids: ['a'], reason: 'Clean up: entity type device' })).toBe(
+            'Exclude 1 entity (Clean up: entity type device)',
+        );
     });
 });
 

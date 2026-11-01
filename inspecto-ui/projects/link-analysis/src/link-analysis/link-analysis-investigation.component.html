@@ -554,16 +554,12 @@
                         }
                     </p>
                     <mat-checkbox
-                        [ngModel]="cleanupExclude() && !isUnsaved()"
+                        [ngModel]="cleanupExclude()"
                         (ngModelChange)="cleanupExclude.set($event)"
-                        [disabled]="isUnsaved()"
                         data-testid="cleanup-exclude-instead"
                     >
                         <span class="text-xs">Exclude instead of hide (excluded entities stay out of later expands)</span>
                     </mat-checkbox>
-                    @if (isUnsaved()) {
-                        <p class="text-secondary m-0 text-xs" data-testid="cleanup-unsaved-exclude">{{ unsavedExcludeWhy }}</p>
-                    }
                     @if (!canWrite()) {
                         <p class="text-secondary m-0 text-xs">{{ expandNeeds }}</p>
                     }
@@ -719,7 +715,7 @@
                 <ng-container [ngTemplateOutlet]="cleanupFold" />
                 <p class="text-secondary m-0 text-sm" data-testid="unsaved-save-first">
                     Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set: Save first. Clean up
-                    hides while unsaved.
+                    hides, or excludes, while unsaved.
                 </p>
             } @else if (!store.active()) {
                 <!-- ── start ── -->

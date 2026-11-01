@@ -1498,7 +1498,7 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         await expectNoA11yViolations(el.querySelector('[data-testid="act-bar"]') as HTMLElement);
     });
 
-    it('LA-INVESTIGATE-UX-2: Clean up counts the unsaved Working Set and hands each hide to the page; Exclude waits for Save', async () => {
+    it('LA-INVESTIGATE-UX-2: Clean up counts the unsaved Working Set and hands each hide, or exclude, to the page', async () => {
         const e = (id: string, hop: number) => ({ id, type: 'msisdn', hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
         const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
         const { fixture, store, el, inv } = create();
@@ -1509,11 +1509,19 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         fixture.detectChanges();
         const leaves = el.querySelector('[data-testid="cleanup-leaves"]') as HTMLButtonElement;
         expect(leaves.textContent).toContain('Hide 2 dangling leaves');
-        expect((el.querySelector('[data-testid="cleanup-exclude-instead"] input') as HTMLInputElement).disabled).toBe(true);
-        expect(el.querySelector('[data-testid="cleanup-unsaved-exclude"]')?.textContent).toContain('Save first to exclude');
+        const instead = el.querySelector('[data-testid="cleanup-exclude-instead"] input') as HTMLInputElement;
+        expect(instead.disabled).toBe(false); // item 5: no Save first
         leaves.click();
         await fixture.whenStable();
-        expect(fixture.componentInstance.cleaned).toEqual([{ ids: ['c', 'd'], reason: 'Clean up: dangling leaves' }]);
+        instead.click();
+        fixture.detectChanges();
+        expect(leaves.textContent).toContain('Exclude 2 dangling leaves');
+        leaves.click();
+        await fixture.whenStable();
+        expect(fixture.componentInstance.cleaned).toEqual([
+            { ids: ['c', 'd'], reason: 'Clean up: dangling leaves', exclude: false },
+            { ids: ['c', 'd'], reason: 'Clean up: dangling leaves', exclude: true },
+        ]);
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
         await expectNoA11yViolations(el.querySelector('[data-testid="act-cleanup"]') as HTMLElement);
     });

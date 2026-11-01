@@ -38,7 +38,13 @@ export type UnsavedStep =
      * saved Clean up records it: one `hide`, then one `annotate` carrying the reason. Never sent to the preview (a hide
      * only marks entities, so the drawn set stays exactly what Save records).
      */
-    | { kind: 'hide'; ids: string[]; reason: string };
+    | { kind: 'hide'; ids: string[]; reason: string }
+    /**
+     * LA-INVESTIGATE-UX-2 item 5: a Clean up with "Exclude instead" while unsaved — these entities leave the Working Set and
+     * stay out of later expands. Sent to every later preview (\`POST /inv/expand/preview\` takes \`exclude\` steps) and
+     * replayed at Save as one \`exclude\` op with the reason, as the saved Clean up records it.
+     */
+    | { kind: 'exclude'; ids: string[]; reason: string };
 
 /** What Save binds the Investigation to (the same binding the New form used to create one at once). */
 export interface UnsavedBinding {
@@ -72,9 +78,6 @@ export const UNSAVED_FOUR_EYES_START =
 /** The reason the steps other than Start, Expand and Clean up are not offered while unsaved. */
 export const SAVE_FIRST = 'Save first: this step changes a recorded Working Set.';
 
-/** Why Clean up's "Exclude instead" waits for Save: the unsaved preview reads seeds and expands only. */
-export const UNSAVED_EXCLUDE = 'Save first to exclude: while unsaved, Clean up hides.';
-
 function many(n: number, one: string, more: string): string {
     return `${n.toLocaleString('en-GB')} ${n === 1 ? one : more}`;
 }
@@ -90,6 +93,7 @@ const DIRECTION_WORDS: Record<string, string> = {
 export function unsavedStepLine(s: UnsavedStep): string {
     if (s.kind === 'seed') return `Start from ${many(s.ids.length, 'entity', 'entities')}`;
     if (s.kind === 'hide') return `Hide ${many(s.ids.length, 'entity', 'entities')} (${s.reason})`;
+    if (s.kind === 'exclude') return `Exclude ${many(s.ids.length, 'entity', 'entities')} (${s.reason})`;
     const from = s.from === 'outer' ? 'the outer ring' : many(s.ids.length, 'entity', 'entities');
     const kinds = s.req.linkKinds?.length ? `, ${s.req.linkKinds.join(', ')}` : '';
     const busy = s.req.hold ? '' : ', through busy entities';

@@ -69,10 +69,10 @@ actually does, where the boundary is, and whose responsibility the remainder is.
 | **CMP-02** | Signed releases with a checksum and a detached signature, fail-closed | ✅ SHIPPED 2026-09-02 — and 🔴 **never executed.** The workflow triggers on a version tag and landed 2026-09-06; twenty-eight version tags exist but the newest is 2026-06-03 on the retired line, so **no tag has been cut since the workflow existed**. The editions row says "unexercised until the first tag" and is right; the gap ledger records it closed without that caveat | All |
 | **CMP-03** | Dependency-review guard in continuous integration | ✅ SHIPPED. ⛔ **It is a review device, not a scanner** — it proves nobody looked, never that a version is safe. ⚠ **Scope corrected 2026-09-07**: until then it resolved with no edition profile, so the security module's cryptography tree — the dependency a security reviewer most wants to see — **was never under review while this row already said closed**. It now resolves the enterprise profile, 25 modules rather than 23 | All |
 | **CMP-04** | Audit retention, a one-year window | ✅ SHIPPED 2026-09-02, **operator-scheduled**. A deployment that never authors the job has stated policy only, and the row says so. ⚠ The window is an *upper bound on the store*; it does not override the decision that a purged incident's own history is retained | All |
-| **CMP-05** | Control matrix + auditor evidence | ✅ SHIPPED | — / ✅ / ✅ — "Personal has no compliance scope by definition". ⚠ **That is a product stance, not a build fact**: the matrix and the evidence pack are plain files in the repository, so nothing withholds them from a Personal deployment. The gating is about who is *promised* the posture |
+| **CMP-05** | Control matrix + auditor evidence | ✅ SHIPPED | — / ✅ / ✅ — "Basic has no compliance scope by definition". ⚠ **That is a product stance, not a build fact**: the matrix and the evidence pack are plain files in the repository, so nothing withholds them from a Basic deployment. The gating is about who is *promised* the posture |
 | **CMP-06** | Federal cryptography mode | 🔲 Open — gap G9, demand-gated and deliberately sequenced after the matrix existed | — / 🔲 / 🔲 |
 | **CMP-07** | The access-review residual | ✅ SHIPPED. ✅ **Row corrected 2026-09-07 — it had been stale**: it read planned and cited its gap as open, when that gap had closed on 2026-08-28 and the capability it waited on had shipped five weeks earlier | — / ✅ / ✅ |
-| **CMP-08** | Certifications | 🔲 Not started, **Enterprise only** (operator, 2026-09-02), org-paced | — / — / 🔲 |
+| **CMP-08** | Certifications | 🔲 Not started, **Advanced only** (operator, 2026-09-02), org-paced | — / — / 🔲 |
 | **NFR-7** | Compliance posture | 🟡 PARTIAL, and the cell's phrasing is right: the module shipped, certifications are not started. ⚠ **CORRECTION to how it is read:** the row is not one undifferentiated gap. It is **seven named items**, six of which need an external party or org authorship, and **one of which needs only a named owner and a cadence** (§3.7) | — |
 
 🔴 **One row promises something the code never delivered.** The logging control says auth-gated events
@@ -92,7 +92,7 @@ and mislead a reader a week later. **Cite the symbol, not the line.**
 
 ✅ **The signing pipeline covers all three editions since 2026-09-10** (`STANDARD-BUNDLE-1`, editions §3.7).
 Until then the workflow's step was titled for every edition and followed by exactly two packaging steps,
-Personal and Enterprise (labelled a superset of Standard): no Standard bundle was built, checksummed, signed,
+Basic and Advanced (labelled a superset of Standard): no Standard bundle was built, checksummed, signed,
 given a bill of materials or published, while the editions board marked both supply-chain controls green
 for Standard — a column with no artifact behind it. The Standard step now also **refuses** a bundle that
 carries the policy jar, so the artifact a Standard customer verifies is the edition they bought.
@@ -287,7 +287,8 @@ record one, not a way to invent one.
 ### 3.9 Three controls that do not exist, found from the other side
 
 Three capability specs written in this consolidation each reported a control-shaped mechanism with no
-control. All three are **confirmed** — the matrix and all seven evidence files contain no occurrence of
+control. All three were **confirmed** in 2026-09 — the matrix and the seven evidence files of that time
+(nine on 2026-11-01; `route-gating.md` now names the share and approval routes) contained no occurrence of
 share, anonymous, approval, autonomy, kill switch, accessibility, or any spelling of the accessibility
 tooling. The matrix's incidental hits on "agent" and "dry run" are its dependency check, a maintenance
 task and the secret resolver.
@@ -295,7 +296,7 @@ task and the secret resolver.
 | Mechanism, built and unmapped | Nearest existing control |
 |---|---|
 | **The anonymous public dashboard embed** — inert unless a secret of at least 16 characters is set, a signed token verified in constant time, expiring, one indistinguishable failure code, the query fenced to the shared board's own datasets, and issuing a link gated on a capability | the logical-access criteria, which describe authenticated access only. Nothing covers a token-scoped anonymous read — and 🔴 **there is no rate limit on token guessing and no address allowlist**, which the control plane documents as a deliberate exemption because the token carries its own credential |
-| **The agent's governance** — and it is **more built than "a hole" implies**: an approval bridge that turns a synchronous tool gate into an operator inbox and is fail-closed on timeout or a thrown handler, an injectable dry-run preview, an act tier off unless set, a kill switch checked before mode and mode before budget, and real call sites in the autonomous driver | the system-operations criterion in spirit, and change management by rights. Neither mentions it, and a named project risk cites exactly these as its mitigation. ⚠ Note the compounding fact from the Assistant spec: **the module holding all of it is never packaged**, so the controls are real, unmapped *and* unreachable |
+| **The agent's governance** — and it is **more built than "a hole" implies**: an approval bridge that turns a synchronous tool gate into an operator inbox and is fail-closed on timeout or a thrown handler, an injectable dry-run preview, an act tier off unless set, a kill switch checked before mode and mode before budget, and real call sites in the autonomous driver | the system-operations criterion in spirit, and change management by rights. Neither mentions it, and a named project risk cites exactly these as its mitigation. ⚠ The module holding all of it ships in Standard and Advanced since `PKG-5` (2026-09-12), so the controls are real, reachable and still unmapped |
 | **The accessibility gate** — asserted in roughly 204 of 334 specification files, but 🔴 **adoption is opt-in per file and nothing enforces it**: no step requires a new specification to add the assertion, and seven page-level rules plus contrast are disabled under the test renderer | the change-management row, whose implementation column names the colour-token lint, the unit tests and the build, and stops there |
 
 ⚠ **This is what "found from the other side" is worth.** Each hole was invisible from inside the
@@ -360,7 +361,7 @@ something to link.
 | 2026-09-07 | The dependency review's **scope is corrected to the enterprise profile**, after the security module's cryptography tree was found outside a resolve the row already called closed | gate sweep |
 | 2026-09-07 | The access-review edition cell is corrected; it had been stale for weeks against its own closed gap | gate sweep |
 | 2026-09-08 | The audit export is **kept in the core** when the events feed becomes optional, precisely so this control stays satisfiable on the edition with no events module | edition gating, cell 6 |
-| 2026-09-08 | This spec: the never-executed signing path recorded; the availability row's staleness against its own gap ledger recorded; the three unmapped mechanisms recorded with their nearest controls; the "Personal has no compliance scope" stance distinguished from a build fact | this file §2, §3.8 |
+| 2026-09-08 | This spec: the never-executed signing path recorded; the availability row's staleness against its own gap ledger recorded; the three unmapped mechanisms recorded with their nearest controls; the "Basic has no compliance scope" stance distinguished from a build fact | this file §2, §3.8 |
 | 2026-09-14 | **The assistant's `com.eoiagent` substrate is licensed Apache-2.0, declared upstream** rather than mapped locally — the metadata belongs to the artifact, so asserting it from a consumer's generator was refused. ⚠ A **grant, not a metadata fix**: the upstream repo was public with no licence, i.e. all-rights-reserved, so this conferred rights that did not exist | operator; `jotder/inspect-agent@a24817b` |
 | 2026-09-14 | **A licence gate reads `licenseDeclared`, and the bill of materials must not be judged by counting `NOASSERTION`.** The SPDX document legitimately carries ~192 of them in `downloadLocation` and `licenseConcluded`, which are convention for Maven-resolved dependencies | this file §4.1 |
 
@@ -400,7 +401,7 @@ whichever edition was staged last, which reads exactly like a real failure.
 
 | Item | Row |
 |---|---|
-| 🔴 **The security-incident carry-forwards.** The incident was closed by decommission on 2026-08-29, and two actions due on closure are **not done**: deleting an off-repository pre-rewrite backup bundle that contains five cleartext secrets whose retention condition has lapsed, and confirming that none of those five values was reused | §2 *SEC-INCIDENT-1 carry-forwards* |
+| ✅ **The security-incident carry-forwards — DONE.** The incident was closed by decommission on 2026-08-29; the off-repository pre-rewrite backup bundle was deleted on 2026-08-01 and the no-reuse check completed on 2026-08-02 (operator-confirmed 2026-10-04) | `compliance/controls-matrix.md` row CC6.1 |
 | The advisory-watch process — a named owner and a cadence | the matrix's seventh certification row |
 
 ### 5.3 UNTRACKED — found 2026-09-08, no board row yet
@@ -426,9 +427,9 @@ whichever edition was staged last, which reads exactly like a real failure.
    artifact, and the editions row already flags it while the gap ledger does not.
 3. **The availability criterion is stale against its own gap ledger** (§2). A one-line fix, listed
    because rule 4 is the file's own standard.
-4. **"Personal has no compliance scope" is a stance stated as a build fact.** The matrix and the
+4. **"Basic has no compliance scope" is a stance stated as a build fact.** The matrix and the
    evidence pack are files in the repository; nothing withholds them. Either the row says "not promised
-   for Personal", or the distinction stays invisible to a reader comparing it with the module-gated
+   for Basic", or the distinction stays invisible to a reader comparing it with the module-gated
    rows above it.
 5. **The evidence pack has no index and no dating convention.** Seven files, each cited from the matrix,
    none listing when it was last verified against the code. The matrix dates its rows; the pack does

@@ -53,14 +53,14 @@ it.
 | Tags as a cross-entity label graph over Datasets, Dashboards, Widgets, saved views | `MET` — `tags.md`. INC owns the Incident/Case adopter and Tag Rules |
 | Who may author an Alert Rule or configure a channel (`canAuthorAlertRules`, `canAuthorWorkbench`) | `SEC` — the capability seam |
 | The Assistant's tools, model settings, the agent runtime | `AGT` — Assistant. INC owns the *Diagnosis* product surface and its (absent) Incident hand-off |
-| Which bundle carries `inspecto-ops` and `inspecto-notify-channels` | `PKG` — Editions & packaging. INC states *what* Personal loses, not how a module joins a profile |
+| Which bundle carries `inspecto-ops` and `inspecto-notify-channels` | `PKG` — Editions & packaging. INC states *what* Basic loses, not how a module joins a profile |
 
 ## 2. Requirements of record
 
 Five requirements from `REQUIREMENTS.md` §3.8 (that section was stripped to an index on 2026-09-09 — this file is their only home now). **Four of the five status or edition cells are wrong when read
 against the build** — the largest correction rate of the three specs so far, and the reason it is worth
 writing: three of the four went wrong on the same day, when EDG-01 cell 7 moved the whole objects domain
-out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but none of these. ⚠
+out of Basic (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but none of these. ⚠
 **`EDITIONS.md`'s feature × edition matrix is authoritative for the Edition column**; this table mirrors it.
 
 | ID | Requirement | MoSCoW | Status | Edition |
@@ -99,16 +99,16 @@ out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but
   rule can be authored only as TOON.
 
 **Two edition-matrix rows this spec corrects in `EDITIONS.md`:** `JOB-01` lists `caserule.evaluate` and
-`objects.analytics` and `JOB-03` lists `incident_purge`, all three ✅ for Personal — but all three are
-registered by `inspecto-ops` (`OpsJobTypes`, `OpsMaintenanceTasks`) and are **unknown Job Types on a Personal
+`objects.analytics` and `JOB-03` lists `incident_purge`, all three ✅ for Basic — but all three are
+registered by `inspecto-ops` (`OpsJobTypes`, `OpsMaintenanceTasks`) and are **unknown Job Types on a Basic
 build**. Cell 7 amended its two named neighbours and not these; the same class of miss
 `PROJECT_NOTES.md` warned about ("read what the neighbouring matrix rows promise").
 
 **One standing note no status token can carry:** ⛔ **`/alerts*` is not in the gated set.** `AlertService`
 lives in `inspecto-engine`, `AlertRoutes` in core, and the fired-alert feed is a bounded in-memory ring, so
-every edition evaluates rules and serves `GET /alerts`. What Personal loses is the **Incident** half: no
+every edition evaluates rules and serves `GET /alerts`. What Basic loses is the **Incident** half: no
 Incident is promoted (`IncidentAccess` returns empty). A sequence gap or a conservation imbalance is a stored Alert on
-every edition (`EventAlertBridge`, 2026-10-08), so `SP-CTL-02` is ✅ on Personal too. **Working a fired Alert (2026-10-07):** rule-fired Alerts live in the Alert-owned
+every edition (`EventAlertBridge`, 2026-10-08), so `SP-CTL-02` is ✅ on Basic too. **Working a fired Alert (2026-10-07):** rule-fired Alerts live in the Alert-owned
 store, not as objects, so an operator works one with `POST /alerts/{id}/ack` and `POST /alerts/{id}/resolve` (core
 `AlertRoutes`, `canWorkIncidents`, every edition) — the `id` and lifecycle `state` ride each `GET /alerts` entry; an unknown
 id is 404, a move illegal from the Alert's state (a second ack, anything after RESOLVED) is 422.
@@ -117,7 +117,7 @@ id is 404, a move illegal from the Alert's state (a second ack, anything after R
 
 ### 3.1 The chain, and where each link lives
 
-| Link | Module | Personal |
+| Link | Module | Basic |
 |---|---|---|
 | Alert Rules, evaluation, fired-alert feed, `ALERT_FIRED` | `inspecto-engine` `com.gamma.alert` + core `AlertRoutes` | ✅ |
 | `ObjectType` | `inspecto-workflow` `com.gamma.workflow` (Base leaf module, MODULE-REORG-1 P7 slice 1) | present |
@@ -315,7 +315,7 @@ exemptions, sizing). ⛔ Not the assistant's `runbook_operator` agent runbook (�
 Every path that opens an Incident automatically does so through **`IncidentAccess`**
 (`platform/inspecto-engine/src/main/java/com/gamma/objects/IncidentAccess.java`) — a Platform Service `incidents`,
 relocated to core and **narrowed** in EDG-01 cell 7 to return `Optional<String>` (the id) rather than the
-object; the dry-run substitute records and opens nothing; on Personal it is empty and every caller
+object; the dry-run substitute records and opens nothing; on Basic it is empty and every caller
 degrades to "no object".
 
 | Path | Where | Rule |
@@ -520,7 +520,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
     No separate Case sweep exists or is needed. **`reassign` vs the IAM (operator 2026-10-03):** `PrincipalDirectory`
     (`inspecto-auth-spi`, an edition SPI) is asked on every write door (`ComponentRoutes.validateKind`, so the route,
     a version restore and a Space-Template seed alike). With a directory registered, an unknown user id OR a lookup
-    that throws is refused 422 (fail closed); with none registered — the offline editions, Personal / Standard / the
+    that throws is refused 422 (fail closed); with none registered — the offline editions, Basic / Standard / the
     demo build — the id-shape check alone applies, the same standing as `POST /objects/{id}/assign`. ⚠ The core ships
     NO implementation: no SCIM / user-lookup client exists in `inspecto-oidc` (it only validates tokens), so on
     every shipped edition today the check is the id shape. It is checked at SAVE time only: a user deleted from the
@@ -618,7 +618,7 @@ exact-key index would miss `00…` / separator spellings. The in-memory store ke
 `truncated: true` + a `message` and the response the `X-Inspecto-Truncated: true` header (`total` is then a lower
 bound). The route is on the standard per-subject rate-limit bucket (`ControlApi.isRateLimited`, 429 `RATE_LIMITED`); a stored value with
 separators inside the digits is not found. Not covered: an LA Investigation linked to a Case
-(`PUT /inv/investigations/{id}/case`) — that link lives in the Professional LA module, which `inspecto-ops` cannot see.
+(`PUT /inv/investigations/{id}/case`) — that link lives in the Standard LA module, which `inspecto-ops` cannot see.
 No read audit (no object read is audited today).
 **Masked keys:** the same read is on the engine seam as `ObjectAccess.byEntity(writeRoot, exchange, type, key, status,
 limit)` (`ObjectServiceAccess` → `EntityHistory.query`, the route's own code: same matching, visibility and `truncated`),
@@ -755,7 +755,7 @@ Shipped 2026-06-29 as an **in-process MVP**, deliberately without a broker: `Not
 
 - **Channels.** `NotificationChannel` is a `ServiceLoader` SPI; in-app is intrinsic, **email and webhook are
   an edition seam** — `SmtpEmailChannel` (`notify.smtp.{host,from,to,user,pass}`) and `WebhookChannel`
-  (`notify.webhook.{url,token}`) live in `inspecto-notify-channels` since EDG-01 cell 1 and **Personal
+  (`notify.webhook.{url,token}`) live in `inspecto-notify-channels` since EDG-01 cell 1 and **Basic
   registers zero channels**. Persisted destinations are a `channel` `ComponentStore` kind
   (`GET/POST/PUT/DELETE /notifications/channels[/{id}]`, `canAuthorWorkbench`, `kind=EMAIL` with an invalid
   target `422` at CRUD time) read live by dispatch; a `kind` with no discovered transport delivers nothing.
@@ -794,9 +794,9 @@ The UI (`/diagnoses`, `DiagnosisDetailDialog`) shows root cause, a heuristic-onl
 Diagnosis from a failing Run — it is reactive to failure events only. The requirement's "producing an
 Incident" is unbuilt (§2, §5).
 
-### 3.10 What Personal loses, and how
+### 3.10 What Basic loses, and how
 
-`ObjectAccess` (core SPI, `Optional.empty()` on Personal) is provided by `OpsEngineProvider`, which
+`ObjectAccess` (core SPI, `Optional.empty()` on Basic) is provided by `OpsEngineProvider`, which
 `inspecto-ops` registers under the **`com.gamma.service.ObjectEngineProvider`** service file — that file, plus
 the module's `RouteModule`, `JobTypeProvider` and `MaintenanceTaskProvider` registrations, is the whole switch. Because the objects domain was **constructed by mandatory core**, cell 7
 also needed a host-declared `ObjectEngineProvider` handle beside the seam — opening the stores needs
@@ -872,9 +872,9 @@ earlier one, both appear.
 | 2026-09-06 | **Alert Rules widened to Measures** (BI-5): one record, two shapes; a thresholded Measure is a KPI alert | One rule kind for both senses of "a number crossed a line" |
 | 2026-09-06 | Bounce/complaint handling **stays manual until receipts persist**; no auto-disable of a channel | One bad address must not silence a channel |
 | 2026-09-07 | Suppression: complaint permanent, hard bounce TTL, **soft bounce never**, armed **only over a durable store**; unsuppress is an override row | An evicting cache cannot distinguish "clean" from "forgot"; pruning receipts would mask a dead address |
-| 2026-09-26 (operator) | **Working an Incident or Case is its own capability, `canWorkIncidents`**: `ack` / `resolve` / `transition` / `assign` moved from `canAdminister` (2026-09-15, `ROUTE-UNGATED-DEFAULT-1` step 2b) to it, seeded to `operations`, `support`, `power` and `admin` (`super` holds everything). Merge / split / `PATCH /objects/{id}` / Case-Rule evaluate **stay `canAdminister`**. Those four routes record the authenticated Subject as the actor; a body `actor` counts only without one (Personal). The SPA shows the lifecycle verbs only with `LensService.canWorkIncidents()` (action node `incidents.work`), and Accept self-assigns through `/assign`, not the PATCH | Only Admin/Super held `canAdminister`, so a fraud analyst on `operations` could not close their own Case and `power` could not work an Incident at all. Moving an object's state is the analyst's daily work; reshaping which Incidents a Case holds, or editing its fields wholesale, is not. Pinned by `ControlApiTriageGateTest` (seeded-role Subjects: 401 / 403 `business` / 200 `operations`, and a Case OPEN → investigate → resolve with Disposition CONFIRMED audited under the Subject) |
+| 2026-09-26 (operator) | **Working an Incident or Case is its own capability, `canWorkIncidents`**: `ack` / `resolve` / `transition` / `assign` moved from `canAdminister` (2026-09-15, `ROUTE-UNGATED-DEFAULT-1` step 2b) to it, seeded to `operations`, `support`, `power` and `admin` (`super` holds everything). Merge / split / `PATCH /objects/{id}` / Case-Rule evaluate **stay `canAdminister`**. Those four routes record the authenticated Subject as the actor; a body `actor` counts only without one (Basic). The SPA shows the lifecycle verbs only with `LensService.canWorkIncidents()` (action node `incidents.work`), and Accept self-assigns through `/assign`, not the PATCH | Only Admin/Super held `canAdminister`, so a fraud analyst on `operations` could not close their own Case and `power` could not work an Incident at all. Moving an object's state is the analyst's daily work; reshaping which Incidents a Case holds, or editing its fields wholesale, is not. Pinned by `ControlApiTriageGateTest` (seeded-role Subjects: 401 / 403 `business` / 200 `operations`, and a Case OPEN → investigate → resolve with Disposition CONFIRMED audited under the Subject) |
 | 2026-09-26 (operator) | **Narrow postmortem + category routes on `canWorkIncidents`** (`INCIDENT-FINISH-GATE-1`, "narrow route"): `PUT /objects/{id}/postmortem` (body `{postmortem:{…}}` → `attributes.postmortem`, the JSON blob the I1 resolution gate reads) and `PUT /objects/{id}/category` (body `{category:"…"}` → `attributes.category`). Each writes ONLY its one key, refuses any other with 422 (400 for a missing/malformed value), runs behind the scope guard, and is audited as an `OBJECT_ACTIVITY` event (`action` = the key) under `ApiContext.actor`. The postmortem panel and Accept's categorise step call them; priority / severity / assignee / tags / escalate / team / target date stay on the `canAdminister` PATCH | Resolving needs the postmortem and Accept needs a category, so without these an analyst could move an Incident but not finish it. Following the `PUT /objects/{id}/findings` precedent keeps the PATCH from becoming the analyst's catch-all. Pinned by `ControlApiIncidentFinishGateTest` (401 / 403 `business` / 200 `operations`, a foreign key → 422, and IDENTIFIED → DIAGNOSING → RESOLVED with a postmortem by an `operations` Subject) |
-| 2026-09-26 | **The SPA shows each disposition control only with the capability its route takes** (`CASE-UI-GATE-LEFTOVERS-1`): Priority, an Incident's Escalate flag, Merge, Split and the Case team / target-date fields render only with `LensService.canAdminister()`. **A comment's `author` is the signed-in Subject** on `POST /objects/{id}/comments` and `POST /notes/{kind}/{id}/comments`; the body's `author` counts only with no Subject (Personal) | A control the server refuses is a dead button; a body field must not re-attribute a Subject's words, as it may not re-attribute a lifecycle move. ⚠ Tagging still rides the PATCH and still shows to everyone — not in this call |
+| 2026-09-26 | **The SPA shows each disposition control only with the capability its route takes** (`CASE-UI-GATE-LEFTOVERS-1`): Priority, an Incident's Escalate flag, Merge, Split and the Case team / target-date fields render only with `LensService.canAdminister()`. **A comment's `author` is the signed-in Subject** on `POST /objects/{id}/comments` and `POST /notes/{kind}/{id}/comments`; the body's `author` counts only with no Subject (Basic) | A control the server refuses is a dead button; a body field must not re-attribute a Subject's words, as it may not re-attribute a lifecycle move. ⚠ Tagging still rides the PATCH and still shows to everyone — not in this call |
 | 2026-09-26 | **Typed impact on Incident and Case, one home** (WS-10, `ASSURE-IMPACT-LEDGER-1`): `attributes.impact` via `PUT /objects/{id}/impact` on `canWorkIncidents`; `outstanding` derived on read; the Findings `impactAmount` section and flat copy retired; a terminal object's impact is closed (409) | A narrow PUT follows the postmortem / category / findings precedent, where extending the PATCH would hand the analyst `canAdminister`'s fields. A stored `outstanding` drifts the first time `recovered` changes without it. Two homes for a Case's money (Findings `impactAmount` + the typed block) would disagree the day one is edited. Freezing a terminal object keeps a closed ledger closed — **amended the same day**: late recoveries (`recovered` / `prevented` only) stay writable on a RESOLVED Incident and a CLOSED Case, because money comes back after the outcome is decided; an ARCHIVED Incident stays fully closed. The PATCH refuses `impact` and `disposition`, and a reopen clears the Disposition |
 | 2026-09-26 | **An Incident resolves only with a Disposition** (WS-10): the ladder gains `DUPLICATE` and `ACCEPTED_RISK` (one list, `FindingsSpec.DISPOSITIONS`, shared by Cases' Findings); the value rides the resolve body and is gated in `ObjectService.commit` beside I1 | Resolved-with-no-outcome Incidents make every found / recovered / prevented KPI unreadable. Gated in `commit` so no route or caller can bypass it, as I1 is. Case stays soft (§6.2) — not in scope of the call |
 | 2026-09-29 (operator, `IMPORT-RESIDUALS-1` (5)) | **Archiving an undecided Incident stamps `ARCHIVED_UNDECIDED`**: `ObjectService.commit` sets it when an Incident moves to ARCHIVED with no Disposition, and records it as `disposition` on that move's `OBJECT_ACTIVITY` event; one archived WITH a Disposition keeps it; a reopen clears it as any reopen does. It is on `FindingsSpec.DISPOSITIONS` (and the SPA's `incident-disposition.ts`) but never chosen — `CHOOSABLE_DISPOSITIONS` excludes it, so a resolve sending it is 422 and a Case's Findings do not offer it. Archive stays ungated otherwise (still the Trash) | An archived Incident with a blank outcome was unreadable in every found / prevented KPI and indistinguishable from a data gap; stamping keeps archive a one-click dismissal while making "nobody decided" an explicit, countable value. The analytics ledger reads the stored value, so it needed no change. Pinned by `ObjectServiceTest.archivingAnUndecidedIncidentStampsArchivedUndecided` / `archivingAResolvedIncidentKeepsItsDisposition` / `aResolveCannotChooseArchivedUndecided`, `ControlApiIncidentFinishGateTest` (HTTP 422) and `resolve.dialog.spec.ts` |
@@ -886,10 +886,10 @@ earlier one, both appear.
 
 | Date | Decision | Why |
 |---|---|---|
-| 2026-09-02 | **CP-12 split**: the in-app feed stays in every edition; delivery channels are CP-15 (Professional+) | The feed is the product's nervous system; a transport is a deployment |
+| 2026-09-02 | **CP-12 split**: the in-app feed stays in every edition; delivery channels are CP-15 (Standard+) | The feed is the product's nervous system; a transport is a deployment |
 | 2026-09-07 (operator) | Gating is **`ServiceLoader` modules**, never `-D` switches | A switch leaves the code in the bundle |
-| 2026-09-07 | Cell 1: channels move to `inspecto-notify-channels`; Personal registers **zero** | `SmtpEmailChannel` had reached Personal through the connector sidecar, which is not edition-gated |
-| 2026-09-08 (operator) | Cell 7: the **whole `com.gamma.ops` domain** becomes `inspecto-ops`; `OPS-01` and `SP-CTL-02` amended; ⛔ `/alerts*` stays | Operational objects are a multi-operator workflow; Personal is single-user. A gap still raises the *event* everywhere |
+| 2026-09-07 | Cell 1: channels move to `inspecto-notify-channels`; Basic registers **zero** | `SmtpEmailChannel` had reached Basic through the connector sidecar, which is not edition-gated |
+| 2026-09-08 (operator) | Cell 7: the **whole `com.gamma.ops` domain** becomes `inspecto-ops`; `OPS-01` and `SP-CTL-02` amended; ⛔ `/alerts*` stays | Operational objects are a multi-operator workflow; Basic is single-user. A gap still raises the *event* everywhere |
 | 2026-09-08 | `features.ops` is **derived** from whether `POST /objects` registered | The flag cannot disagree with the build (contrast `authMode`, `SEC` §2) |
 
 ## 5. Not built
@@ -931,7 +931,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | ~~**`QueueStore` Db parity**~~ ✅ **MOOT 2026-09-14** | `RETIRE-HALVES-1` | There is no `QueueStore` to give Db parity to |
 | ~~**An analyst can MOVE an Incident but not always COMPLETE one**~~ ✅ **FIXED 2026-09-26 — see §4, narrow postmortem + category routes** | `INCIDENT → RESOLVED` needs the four postmortem sections (`ObjectService.commit`); the panel and Accept's categorize step used to save through the `canAdminister` PATCH | Kept for the trail: they now ride `PUT /objects/{id}/postmortem` and `PUT /objects/{id}/category` on `canWorkIncidents` (operator, 2026-09-26) |
 | **Measure rules in the authoring form** | `AlertRule` has `dataset` + `measure`; `ALERT_RULE_ATTRIBUTES` has neither | The 2026-09-06 widening is TOON-only; the pane cannot express the glossary's own definition |
-| **`JOB-01` / `JOB-03` promise Personal three ops jobs** | `OpsJobTypes`, `OpsMaintenanceTasks` in `inspecto-ops` | Corrected in `EDITIONS.md` with this spec (notes on both rows) — recorded here because it is the cell-7 miss class, and the next gating cell will hit it again |
+| **`JOB-01` / `JOB-03` promise Basic three ops jobs** | `OpsJobTypes`, `OpsMaintenanceTasks` in `inspecto-ops` | Corrected in `EDITIONS.md` with this spec (notes on both rows) — recorded here because it is the cell-7 miss class, and the next gating cell will hit it again |
 | **`ChannelConfig.template`** — a destination cannot override the rule-level template | `events-metrics.md` "still open"; the plan it rode is archived | The slice's home (`event-signal-backbone-plan` S2) is in the archive and no row survived it |
 | **Studio-Dataset binding of `objects.analytics`** | `case-analytics-dataset-plan.md` is DRAFT, no code, uncited | The Parquet exists; nothing reads it as a Dataset |
 | **Notification Center / preferences have no `okf/frontend` page**; `alerts.md` and `diagnoses.md` are stubs | `features/index.md` "not yet documented" | The UI half of INC has less concept coverage than any other area so far |
@@ -963,7 +963,7 @@ with none cannot count as resolved. The Case's Disposition stays soft: it was no
 
 Redis / RabbitMQ / Kafka were considered and refused: the in-process virtual-thread executor over an
 append-only `EventStore` is the house idiom and the target user counts do not justify a broker. Email is an
-**edition seam**, never core — a transport is a deployment concern and Personal ships none.
+**edition seam**, never core — a transport is a deployment concern and Basic ships none.
 
 ### 6.4 Auto-disable on bounce; collapsing hard and soft bounce; pruning receipts to unsuppress — REFUSED (2026-09-06/07)
 
@@ -1003,7 +1003,7 @@ postmortems and Incidents do not get Contents, split/merge or a Team.
 
 ### 6.9 `-D` switches for edition gating; scheduling `incident_purge` — REFUSED (operator, 2026-09-07 / 2026-07-27)
 
-Recorded here because both are INC consequences: a switch leaves the objects domain in the Personal bundle,
+Recorded here because both are INC consequences: a switch leaves the objects domain in the Basic bundle,
 and a default purge deletes business records.
 
 ### 6.10 Superseded designs — what replaced them
@@ -1024,7 +1024,7 @@ and a default purge deletes business records.
 | `DecisionConsequence` | `Consequence` (aliased for back-compat) | archived `decision-network-plan.md` |
 | The operations reference's curl walkthrough (`type=ISSUE`, `assign` → `start`, `-Dcontrol.token`, now removed) | rewritten with this spec: `INCIDENT`, `accept` → `resolve`, no token plane | `operations-reference.md` |
 | `USER_GUIDE.md`'s "open → in-progress → resolved" and "list-and-detail" | corrected with this spec | `USER_GUIDE.md` |
-| `STAKEHOLDER_OVERVIEW.md`'s "Issue & case management … open → assigned → in-progress → resolved → closed", "(cases/issues)", unconditional Personal availability | plan §8 cluster — reconciled at step 6, not here | — |
+| `STAKEHOLDER_OVERVIEW.md`'s "Issue & case management … open → assigned → in-progress → resolved → closed", "(cases/issues)", unconditional Basic availability | plan §8 cluster — reconciled at step 6, not here | — |
 
 ## 7. As-built mechanism (pointers only)
 
@@ -1049,7 +1049,7 @@ and a default purge deletes business records.
 ### 8.1 The objects domain — `features/inspecto-ops/src/test/` (39 files; runs only under `-Pedition-standard|enterprise`)
 
 ⚠ **The default `mvn -o clean test` does not compile `inspecto-ops`.** A green default build proves nothing
-about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 at HEAD.
+about the rows below; Standard is 31 modules / 4106 tests, Advanced 32 / 4126 at HEAD.
 
 | Class | Proves |
 |---|---|
@@ -1062,7 +1062,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `AlertServicePersistenceTest` | fired alerts persisted as objects when the module is present |
 | `ControlApiFindingsSpecTest` | `GET /findings/{type}`, the `422` value gate, frontend-only keys refused |
 | `ControlApiFindingsImpactFieldTest` | The built-in Case Findings Impact field: 422 on a dropped / re-keyed / retyped / re-tiered / required spec (generic and per-type), a relabel accepted; a Findings save writes `Impact.confirmed` (rest kept, never in the blob, audited) and `objects/analytics` sums it; 403 without `canWorkIncidents` on a change, 200 on an unchanged re-send; 422 with no currency or a negative amount; the PATCH refuses it |
-| `ControlApiImpactTest` | `PUT /objects/{id}/impact`: 401 / 403 `business` (before existence-hiding) / 400 / 422 (ten invalid bodies, an Alert) / 409 `ARCHIVED` then writable after `reopen` / 404; `outstanding` derived and never stored; audit `before`/`after` under the Subject; per-currency analytics. The Personal 503 is `NoOperationalObjectsShipInThePersonalBuildTest` |
+| `ControlApiImpactTest` | `PUT /objects/{id}/impact`: 401 / 403 `business` (before existence-hiding) / 400 / 422 (ten invalid bodies, an Alert) / 409 `ARCHIVED` then writable after `reopen` / 404; `outstanding` derived and never stored; audit `before`/`after` under the Subject; per-currency analytics. The Basic 503 is `NoOperationalObjectsShipInThePersonalBuildTest` |
 | `ControlApiObjectsByEntityTest` | `GET /objects/by-entity`: 401, 422 per bad input, empty result, every `matchedOn` path, token-boundary columns, unknown prefixes, status filter, scope hiding, the truncation flag, 429 |
 | `FindByAttributeFragmentParityTest` | in-memory and DuckDB stores scan the same newest-first capped window |
 | `ControlApiObjectsTest` · `ControlApiObjectsPageTest` · `ControlApiScopedObjectsTest` | the create contract (≥1 link, `400`/`404`), paging, SEC-7d data scopes |
@@ -1090,7 +1090,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `RcaTemplateTest` · `CollectorServiceRcaTest` | `inspecto-engine` · `inspecto` | RCA templates and their registry |
 | `FailureReactorTest` · `ModelDiagnoserTest` | `inspecto-agent` | failure subscription, off-thread diagnosis, the ring |
 | `SmtpEmailChannelTest` · `WebhookChannelTest` | `inspecto-notify-channels` | the transports (edition profile only) |
-| `NoChannelShipsInThePersonalBuildTest` | `inspecto` | Personal registers zero `NotificationChannel` providers |
+| `NoChannelShipsInThePersonalBuildTest` | `inspecto` | Basic registers zero `NotificationChannel` providers |
 
 ### 8.3 UI specs — `inspecto-ui/src/app/` (vitest)
 
@@ -1123,10 +1123,10 @@ destinations**, and — by decision — no scheduled `incident_purge`.
 
 ### 8.6 Guards
 
-`render-processor-board --check` used to pin `SP-CTL-02`'s Personal cell 🟡 through the `PARTIAL_ON_PERSONAL`
+`render-processor-board --check` used to pin `SP-CTL-02`'s Basic cell 🟡 through the `PARTIAL_ON_PERSONAL`
 override (the gap event fired everywhere; the ALERT object did not; the set is EMPTY since 2026-10-08, the bridge is core) — the
 generator could not express that until 2026-09-08 and its "just regenerate" advice would have flipped an
-operator-approved decision back to ✅. `NoChannelShipsInThePersonalBuildTest` and the cell-7 Personal
+operator-approved decision back to ✅. `NoChannelShipsInThePersonalBuildTest` and the cell-7 Basic
 baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guards in test clothing.
 
 ### 8.7 Named coverage gaps (verified absent, not assumed)
@@ -1134,7 +1134,7 @@ baseline (23 modules / 3777 tests, `features.ops = false`) are the edition guard
 | Gap | Evidence |
 |---|---|
 | **No test exercises Diagnosis → Incident** | there is no such path to test (§3.9) |
-| **No test that a Personal bundle answers all 49 object paths `503`** | `AbsentModuleRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
+| **No test that a Basic bundle answers all 49 object paths `503`** | `AbsentModuleRoutes` is exercised by the cell-7 baseline run, not by a route-by-route assertion |
 | ~~**`mail.send` on a transport-less bundle has no failing test**~~ ✅ **STALE 2026-09-17** | ~~its success is the recorded behaviour~~ — it returns **SKIPPED** since `ad29e683`, so the recorded behaviour changed and this line no longer describes the code |
 | **No end-to-end SMTP or webhook delivery against a real endpoint** | both transports are tested against in-process fakes; delivery-status webhooks against synthetic signatures |
 | **No committed Case Rule or Tag Rule** | `*_case_rule.toon` / `*_tag_rule.toon`: zero files (§8.5) |
