@@ -1,7 +1,7 @@
 # Quick Start Commands
 
 Inspecto (`inspecto`) — Java 27 / Maven reactor (`inspecto-parent`).
-Toolchain: JDK `C:\sandbox\.graalvm-cache\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`.
+Toolchain: JDK `C:\.jdks\jdk-27-win`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`.
 
 ---
 

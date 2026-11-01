@@ -120,7 +120,7 @@ users[2]{id,displayName,title,roles}:
 ### How to run it
 
 ```powershell
-$env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"   # the JDK-27 toolchain
+$env:JAVA_HOME = "C:\.jdks\jdk-27-win"   # the JDK-27 toolchain
 pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth
 ```
 
@@ -184,7 +184,7 @@ edition label is "anything but `auth.mode=none`", not the jar set.
 ### 1. Build + package
 
 ```powershell
-$env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"
+$env:JAVA_HOME = "C:\.jdks\jdk-27-win"
 mvn -o clean package -DskipTests -Pedition-advanced -B   # superset: builds security AND policy
 pwsh -File inspecto/package.ps1 -Edition Advanced        # or -Edition Standard (no policy engine)
 ```

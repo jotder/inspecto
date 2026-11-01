@@ -129,7 +129,7 @@ tail -f $B/run-500000000.log | grep --line-buffered "SCALE"
 **Windows (PowerShell)**
 
 ```powershell
-$env:JAVA_HOME = 'C:\sandbox\.graalvm-cache\jdk-27-win'; $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
+$env:JAVA_HOME = 'C:\.jdks\jdk-27-win'; $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 $B = 'D:\la-bench'; New-Item -ItemType Directory -Force "$B\idx" | Out-Null
 foreach ($N in 500000000, 1000000000) {
   $mem = if ($N -eq 500000000) { '24GB' } else { '48GB' }

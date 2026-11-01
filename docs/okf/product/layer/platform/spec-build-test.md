@@ -18,7 +18,7 @@ mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar (proce
 
 Always offline (`-o`). Tests spin up a real `CollectorService`/[`ControlApi`](../../module/processor/api-control-api.md) on
 an ephemeral port. (Java **27** toolchain + Maven, `release=27` — moved 2026-09-17. The local JDK is
-`C:\sandbox\.graalvm-cache\jdk-27-win` (Oracle 27+35-2325) and CI sets up **Oracle** JDK 27, not Temurin:
+`C:\.jdks\jdk-27-win` (Oracle 27+35-2325) and CI sets up **Oracle** JDK 27, not Temurin:
 Adoptium had published no 27 build as of 2026-09-17. ⚠ The GraalVM cache still holds 25.0.3 (Windows) /
 25.1.3 (Linux); the Linux entry is the jmods source for the cross-built runtime and is NOT the toolchain.
 See the `build-verify` skill for exact local paths.)
