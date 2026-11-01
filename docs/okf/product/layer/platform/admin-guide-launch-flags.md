@@ -17,14 +17,14 @@ separate pre-ETL tool suite — search/copy/extract/backup/prepare-inbox/create-
 | Flag | Purpose |
 |---|---|
 | `-Dcontrol.port=<n>` | HTTP port for the control API (default `8080`). |
-| `-Dcontrol.bind=<host-or-IP>` | 🔴 **Listen address. Unset = EVERY interface, in every edition** (`ControlApi.java:292-293`) — a deliberate call, not an oversight, because narrowing it would strand existing installs on upgrade. Personal ships **no `Authenticator`**, so a Personal install left on the default binds an **unauthenticated** control plane to every interface. Set `-Dcontrol.bind=127.0.0.1`, or firewall the port, for any single-user install. An unresolvable value **fails the boot** rather than falling back (`:295-296`). |
+| `-Dcontrol.bind=<host-or-IP>` | 🔴 **Listen address. Unset = EVERY interface, in every edition** (`ControlApi.java:292-293`) — a deliberate call, not an oversight, because narrowing it would strand existing installs on upgrade. Basic ships **no `Authenticator`**, so a Basic install left on the default binds an **unauthenticated** control plane to every interface. Set `-Dcontrol.bind=127.0.0.1`, or firewall the port, for any single-user install. An unresolvable value **fails the boot** rather than falling back (`:295-296`). |
 | `-Dspaces.root=<dir>` | [Multi-space](../../module/processor/architecture-multi-space.md) root. **Default `<install_dir>/spaces`** (the working directory's `spaces/`) when unset and no config args are given (`SPACE-DATA-ROOT-1`, 2026-10-30); unset WITH config args ⇒ single-tenant, one `default` space built from those args. The `spaces` you see in a bundle is `serve.sh:8`/`serve.bat:9`'s shell default, not a JVM one. A bundle ships **no Spaces** there (only `_templates`): drop your Space folder(s) in, or set `SPACES_ROOT`; an empty root boots and Space-scoped routes answer 503 until one is attached. |
 | `-Dspaces.data.root=<mount>` | Convention data root: every Space without `data_root:` in its `space.toon` keeps its `data/`, `audit/` and `duckdb/` under `<mount>/<id>` (a big disk, NFS, SMB, s3fs or CSI mount); its config stays in the Space folder. Unset ⇒ state stays in the Space folder. See [Spaces](../../module/config/architecture-spaces.md). |
 | `-Dui.dir=./ui` | Serve the bundled Angular SPA; omit to disable UI serving. |
 | `-Dcontrol.cors=<origin>` | CORS origin allow-list for the control plane. |
 | `-Dassist.write.root=<dir>` | Enable config/pipeline/connection write-back; absent → mutations return `503` (see [auth & security](../../module/access/admin-guide-auth-security.md)). |
 | `-Dacquire.ledger.backend=db` | Use the durable [DB acquisition ledger](../../module/acquire/architecture-framework.md) instead of in-memory. |
-| `-Dauth.mode=none\|oidc` | **Label only** — read at `BootstrapRoutes.java:55,83` to fill `/bootstrap`'s `edition`/`features.authMode`; **nothing branches on it**. The switch is the classpath: `Authenticators.active()` is a `ServiceLoader` lookup, empty on Personal, so dispatch skips auth entirely. `serve.sh`/`serve.bat` set it beside `inspecto-oidc.jar`, which is what actually decided the edition. |
+| `-Dauth.mode=none\|oidc` | **Label only** — read at `BootstrapRoutes.java:55,83` to fill `/bootstrap`'s `edition`/`features.authMode`; **nothing branches on it**. The switch is the classpath: `Authenticators.active()` is a `ServiceLoader` lookup, empty on Basic, so dispatch skips auth entirely. `serve.sh`/`serve.bat` set it beside `inspecto-oidc.jar`, which is what actually decided the edition. |
 
 Plus `--enable-native-access=ALL-UNNAMED` is always required (see [build & test](spec-build-test.md)).
 
@@ -32,7 +32,7 @@ Plus `--enable-native-access=ALL-UNNAMED` is always required (see [build & test]
 
 The living production-investigation guide (process/events/metrics/state/Control API/troubleshooting) is
 `docs/ADVANCED_GUIDE.md`. Observability primitives: [events & metrics](../../module/event/spec-events-metrics.md)
-(`/metrics` Prometheus text, `/events/search` — both OPTIONAL modules since EDG-01, 503 on Personal; the core audit read is `/audit/search`). Performance tuning: [`tests-performance.md`](tests-performance.md);
+(`/metrics` Prometheus text, `/events/search` — both OPTIONAL modules since EDG-01, 503 on Basic; the core audit read is `/audit/search`). Performance tuning: [`tests-performance.md`](tests-performance.md);
 the full utilities/batching/output/deployment reference is [`admin-guide-operations-reference.md`](admin-guide-operations-reference.md).
 
 ## Offline vulnerability scan (ASSURE-OPERABILITY-1, D-P3)
@@ -119,7 +119,7 @@ last error: <msg>`; it also makes the overall status `DOWN`), the gauge `inspect
   (A first cut on 2026-10-03 made `/ready` 503 — reverted the same day by this decision.)
 - ⛔ Live verdicts are a **separate map** from the open-time records (`StoreHealth.live`): `StoreHealth.record`
   throws on DEGRADED under `-Dinspecto.topology=partitioned`, which on the heartbeat thread would cancel the renewer.
-- The heap lease (the default) registers no check, so Personal and single-node installs see no change.
+- The heap lease (the default) registers no check, so Basic and single-node installs see no change.
 - **Failure kind + down duration (operator option C, 2026-10-04).** The detail reads `unreachable since <instant>
   (no successful tick for <n>s, kind DNS|REFUSED|TIMEOUT|AUTH|OTHER) - last error: <msg>`; the kind comes from
   `DbRunLease.failureKind` (exception chain, then message/SQLState). The log flip line carries the kind too. The
@@ -149,7 +149,7 @@ liveness/readiness delays are therefore 0. The image tag defaults to the chart's
 (`4.0.0-SNAPSHOT`, the reactor version), never `latest`.
 
 ⛔ **Not multi-replica safe.** Each pod owns a private Spaces volume and the default run lease is
-per-process. Scale-out is the Enterprise partitioned topology, not this chart.
+per-process. Scale-out is the Advanced partitioned topology, not this chart.
 
 ⚠ **Validation was a YAML sanity check only** — `helm` is not installed on the build host. `Chart.yaml`
 and `values.yaml` parse and carry the expected keys; the templates were checked for balanced `{{ }}` and
@@ -159,5 +159,5 @@ on a host that has it before first use.
 
 ✅ **Image blocker fixed and PROVEN 2026-09-29:** `inspecto/package.ps1` step 6b-2 had still written
 `FROM eclipse-temurin:24-jre` with `runtime/` excluded; it now emits the digest-pinned `debian:stable-slim` +
-the bundle's own jlinked runtime, non-root. Built from a freshly packaged **Professional** bundle (`-NoUi`) and
+the bundle's own jlinked runtime, non-root. Built from a freshly packaged **Standard** bundle (`-NoUi`) and
 run — see [admin-guide-operations-reference.md](admin-guide-operations-reference.md), *Containerized deployment*, for the evidence.

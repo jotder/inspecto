@@ -195,10 +195,9 @@ file-writing Job types. `BI-QUERY-MASKING-1` closed 2026-10-23 after its securit
   alphabet: `Identifiers.validateSchema` refuses it at config load for the single schema, the `schemas[]` selector and the
   plugin-segment forms alike, and a pipeline that fails to load is `unreadable`, which fails closed to `UNKNOWN`
   lineage (every evidence column masked). Pinned by `EvidenceMaskerTest.aClassifiedRawFieldWithANonWordNameFailsClosedBecauseItsPipelineDoesNotLoad`,
-  so loosening the identifier rule cannot silently reopen it; no code was changed. ⚠ Two real holes in the same lineage
-  code were found by that review and are carried by the board row `LINEAGE-SCHEMA-CLASS-LOST-1` (not fixed here): a
-  pipeline that fails to load is flagged `unreadable` only when its file NAME contains the store name, and a rename
-  through `mapping.rules` (a `mapping_file` / sibling `*_mapping.csv`) keeps the class on the raw name only.
+  so loosening the identifier rule cannot silently reopen it; no code was changed. Two real holes in the same lineage
+  code found by that review were fixed as `LINEAGE-SCHEMA-CLASS-LOST-1` (2026-11-01, facts in the `module.access` hub,
+  `architecture-overview.md` §9).
 - **The public share on an install where nobody signs in.** The sign-in `MaskingDefault` makes an unstated mode `none` there
   ("anyone could reveal anyway", `LA-ONBOARD-1` OB-6), which handed classified keys raw to an anonymous link holder.
   `BiResultMasking.forPublicShare` reads the mode the Space STATES, else the shipped `typed`; a stated `none` keeps raw shares

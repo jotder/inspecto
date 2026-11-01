@@ -29,8 +29,9 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 > 🔴 **This banner read "The plan stays in `superpower/`" until 2026-09-09**, and that sentence is why an
 > earlier attempt to archive the plan was reverted. It is **superseded by operator decision** the same day:
 > a plan whose decisions are signed, whose design is distilled and whose open items are filed is
-> provenance, and the **board** owns the remainder. Phases 0–5 are still unbuilt — that is now §3 P2
-> `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (was *Deployment topology gaps*) and `SPEC-DEPLOY-ROWS-1`, not a reason for the document to stay current.
+> provenance, and the **board** owns the remainder. Phases 0–5 are still unbuilt — that is now the board's
+> *Deployment topology live validation* row (`DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1`, which once carried it, closed
+> 2026-09-27 as a DuckDB memory fix), not a reason for the document to stay current.
 >
 > ✅ **The loudest finding in this area was not about editions at all — and is now fixed (2026-09-09).**
 > The bill of materials that ships inside every signed bundle **declared the wrong module set** — four
@@ -208,9 +209,9 @@ refusable. The blocker was that `CollectorService.start()` called `ServiceLoader
 **unguarded**: an unloadable jar raises `UnsupportedClassVersionError`, an `Error` that `ServiceLoader`
 propagates rather than wrapping, so staging the assistant would have made **the whole server fail to boot**
 on a Java 24 host because an *optional* component could not load. `com.gamma.spi.OptionalSpi` now
-treats unloadable as an absence at all six discovery sites, and the floor question dissolves: the bundle's
-stated Java requirement stays **24**, and on an older host the product starts normally with the assistant
-simply absent. → §3.6
+treats unloadable as an absence at all six discovery sites, and the floor question dissolves: an optional
+module that cannot load is simply absent. (The compile target has since moved to **27**, which is now the
+whole product's floor.) → §3.6
 
 ⚠ **One module is unreachable and undocumented.** A vendor-transform plugin under the decoder tree
 registers roughly forty legacy transform functions through a real provider seam, discovered by a registry
@@ -319,24 +320,22 @@ a Linux bundle can silently not exist.
 
 | Number | What it governs |
 |---|---|
-| **24** | The compile target for the whole reactor, and therefore the floor a skip-runtime deployment must meet |
-| **25** | The floor the assistant modules' upstream dependency imposes — its bytecode cannot load on 24 |
-| **25** | What the pipelines build on, and what the module cache actually holds |
+| **27** | The compile target for the whole reactor (`maven.compiler.release`, class files v71; it was 24 when this section was written), and therefore the floor a skip-runtime deployment must meet |
+| **25** | The floor the assistant modules' upstream dependency imposes — now below the compile target, so it no longer binds separately |
+| **27** | What the build needs (`JAVA_HOME` must be JDK 27; `tools/dev-doctor.mjs` checks it) |
 
-⚠ **Two documents claim 26.** The parent build file says "the bundled JDK 26 qualifies" and the build
-concept page says a "Java 26 toolchain". The cache holds 25. The *conclusion* survives — 25 satisfies the
-assistant modules' floor — but the number is wrong in both places, and one of them is the file that sets
-the floor.
+✅ **The two documents that once claimed 26** (the parent build file and the build concept page) no longer do.
 
 🔴 **That framing was wrong, and it is what kept `PKG-5` refused for months.** "Bundling would raise the
 bundle's floor from 24 to 25" assumes the floor is a property of the BUNDLE. It is a property of the
 **module**, and it binds only a host that actually loads it. Since 2026-09-12 an optional module that
 cannot link is skipped with a warning (`com.gamma.spi.OptionalSpi`) and its routes answer 503 — the
-ordinary absence contract. So the assistant ships in Standard and Advanced, the bundle's **stated system
-requirement stays 24**, and a customer on 24 gets the product without the assistant instead of a product
-that will not start. ⛔ Do not re-refuse this on floor grounds.
+ordinary absence contract. So the assistant ships in Standard and Advanced, and an optional module that
+cannot load gives the product without that module instead of a product that will not start. ⛔ Do not
+re-refuse this on floor grounds. (Since the compile target moved to 27 the whole product needs 27, so the
+assistant's 25 floor no longer differs from the bundle's.)
 
-⚠ The two documents claiming 26 are still wrong, and that is a separate correction (§2 `PKG-4`).
+The parent build file's "JDK 26" was corrected to 25 on 2026-09-09.
 
 ### 3.7 Release integrity, the bill of materials, and the missing edition
 
@@ -726,8 +725,8 @@ Nothing a shift can close from this checkout.
 ⚠ **These acceptance criteria existed only in `deployment-topology-plan.md` §7.** That plan's *topology*
 design was distilled into §§3.9–§3.13 when this spec was written, but its **deliverable table was not** —
 so `SCR-1` through `SCR-11` appeared nowhere outside the plan, and archiving it would have lost the
-definition of "done" for every unbuilt script. Board rows: `SPEC-DEPLOY-ROWS-1` (the family) and
-§3's `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (was *Deployment topology gaps*) (`GAP-3`/`GAP-9`/`GAP-10`).
+definition of "done" for every unbuilt script. Board row: *Deployment topology live validation*
+(`GAP-3`/`GAP-9`/`GAP-10`; the earlier pointer `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` is a closed DuckDB row).
 
 | ID | Deliverable | Tier | Acceptance |
 |---|---|---|---|
@@ -869,7 +868,7 @@ citations elsewhere in this spec still resolve.
 | **Launch-flag capability switches** as the gating mechanism | ⛔ **REFUSED** 2026-09-07 | A switch leaves the code in the Basic bundle. Basic has no authenticator and binds every interface, so a mis-set flag re-exposes an unauthenticated surface. Packaging boundary, not policy boundary |
 | **Edition conditionals in the core** | ⛔ **BANNED**, standing | An edition difference is a build decision — a module or a flag — never core logic. This is what forced the events surface to move whole (§4) |
 | **Edition git branches** | ⛔ **REFUSED**, standing | Versions are branches; editions are flavours of one commit. There is no Basic or Standard branch and never will be |
-| **A Basic Maven profile** | **NEVER EXISTED** — corrected 2026-09-07 | The parent declares exactly two profiles. Maven warns on an unknown one and builds the default, so the wrong instruction produced the right result |
+| **A Basic Maven profile** | **NEVER EXISTED** — corrected 2026-09-07 | The parent declares three edition profiles (`edition-standard`, `edition-advanced`, `edition-preview`) plus `coverage`, and no Basic one. Maven warns on an unknown one and builds the default, so the wrong instruction produced the right result |
 | **"Basic binds localhost only"** | **SUPERSEDED** 2026-08-29 | The code never enforced it. The claim was the defect, not the behaviour |
 | **A framework migration** | ⛔ **REFUSED** | At five to fifteen users a framework buys nothing the identity provider and a few small libraries do not, and a lean dependency tree is a compliance asset |
 | **In-app login, user management, directory or assertion integration** | ⛔ **REFUSED** | Identity is delegated to the customer's provider; the product only validates the resulting token (§3.9) |
@@ -905,7 +904,7 @@ this area has three sites whose line citations drifted (§3.2).
 | Concern | Where it lives | Gap |
 |---|---|---|
 | The edition switch and staging | `inspecto/package.ps1` — the edition guard, the module list, and the per-jar shape assertions | ⚠ Its header names three of twelve staged jars |
-| The profiles | `pom.xml` — two profile identifiers, module lists only | — |
+| The profiles | `pom.xml` — three edition profile identifiers (module lists only) plus `coverage` | — |
 | The bill of materials | `tools/sbom.mjs`, over the set in `tools/bundle-modules.mjs` | ⚠ Needs the reactor installed to resolve (§5.3 item 1) |
 | Its drift guard | `tools/check-sbom-modules.mjs`, wired into `ci.yml` | — |
 | The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ **89**<!--count:locked-dependencies--> locked coordinates (this cell read 95 until 2026-09-15 — the lock had moved and nothing derived the prose); originally 95 across 25 modules against four prose sites saying 94 |
@@ -919,7 +918,7 @@ this area has three sites whose line citations drifted (§3.2).
 | Object engine contribution | `ObjectEngineProvider` in the service package, deliberately not beside its seam (§4) | — |
 | The memory-limit resolver | `DuckDbUtil.memoryLimit` — falls through to nothing when nothing is installed | 🔴 Contradicts a signed decision (§5.3 item 18) |
 | The falsification tests | four `No*ShipsInThePersonalBuild*Test` classes, plus module-side halves for events and metrics | 🔴 Gating cell 7 has none |
-| The examples suite | `inspecto/examples/` — 30 examples, tracked and staged | ⚠ One runs in any pipeline |
+| The examples suite | `inspecto/examples/` — 49 examples in seven groups (144 `.toon` files), tracked and staged | ⚠ One runs in any pipeline |
 | The assembly concept | [`editions-model.md`](architecture-editions-model.md) | ⚠ Says "five" then lists seven; the shade claim is corrected in this commit |
 | The authentication story | [`auth-security.md`](../../module/access/admin-guide-auth-security.md) | — |
 | Bundling and reactor sizes | [`build-test.md`](spec-build-test.md) | ⚠ Its jar *table* omits what its own prose gets right |

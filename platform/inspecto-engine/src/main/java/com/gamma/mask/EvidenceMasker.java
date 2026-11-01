@@ -1,6 +1,7 @@
 package com.gamma.mask;
 
 import com.gamma.catalog.PipelineSchemas;
+import com.gamma.etl.RecordTransform;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
@@ -199,7 +200,8 @@ public final class EvidenceMasker {
     /**
      * What the pipeline schemas behind {@code stores} classify, lower-cased stored column to class. Only raw
      * {@code raw.fields[].classification} values {@code masked} accepts count. A class follows the schema's
-     * {@code mapping.fields[]} to the stored column: a {@code keep}/rename of a classified raw column, and any rule
+     * {@code mapping.fields[]} (or a legacy {@code mapping.rules[]}, converted as ingest converts it) to the stored
+     * column: a {@code keep}/rename of a classified raw column, and any rule
      * whose text ({@code from} or {@code args}) names one (a hash, a substring, a concatenation), classify the
      * target; a target named like a classified raw column does too. When several classified inputs feed one column
      * it takes the STRICTEST class ({@link ColumnClassification}, operator 2026-10-04). Fails closed to
@@ -234,8 +236,23 @@ public final class EvidenceMasker {
                 if (sensitiveRaw.isEmpty()) continue;
                 if (f.reshaped()) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
                 sensitiveRaw.forEach((col, cl) -> put(out, col, cl, masked));   // a stored column named like the raw one
-                if (!(e.schema().get("mapping") instanceof Map<?, ?> mapping) || mapping.get("fields") == null) continue;
-                if (!(mapping.get("fields") instanceof List<?> rules)) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
+                if (!(e.schema().get("mapping") instanceof Map<?, ?> mapping)) continue;
+                Object rows = mapping.get("fields");
+                // a legacy mapping.rules (processing.mapping_file, a sibling *_mapping.csv) renames exactly as the
+                // fields[] it is converted to at ingest (DataTransformer.recordFields): same precedence, same rows
+                if (!(rows instanceof List<?> fl && !fl.isEmpty() && RecordTransform.isFieldList(fl))
+                        && mapping.get("rules") instanceof List<?> legacy && !legacy.isEmpty()) {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, Object>> converted = RecordTransform.fromMappingRules((List<Map<String, Object>>) legacy);
+                        rows = converted;
+                    } catch (RuntimeException ex) {
+                        out.put(UNKNOWN_LINEAGE, "UNKNOWN");
+                        continue;
+                    }
+                }
+                if (rows == null) continue;
+                if (!(rows instanceof List<?> rules)) { out.put(UNKNOWN_LINEAGE, "UNKNOWN"); continue; }
                 for (Object o : rules) {
                     if (!(o instanceof Map<?, ?> rule) || str(rule.get("name")) == null) {
                         out.put(UNKNOWN_LINEAGE, "UNKNOWN");

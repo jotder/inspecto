@@ -110,7 +110,7 @@ This is the part most likely to be got wrong, so it is stated as a table.
 | Mechanism | Source of truth | What it does | Where |
 |---|---|---|---|
 | **Module presence** | `bootstrap.features.*`, each derived from whether a **real** handler registered | **Hides whole nav entries** — an absent module 503s on every path, so an entry would only explain itself | the navigation service drops ids |
-| **Capabilities** | `bootstrap.session.capabilities`, ten names published by the server | Constrains **which Lenses are selectable**, and hides or disables **controls inside a visible pane** | `LensService` computeds, called by each pane |
+| **Capabilities** | `bootstrap.session.capabilities`, drawn from the 22 names of `CapabilityManifest` (2026-11-01) | Constrains **which Lenses are selectable**, and hides or disables **controls inside a visible pane** | `LensService` computeds, called by each pane |
 | **Action grants** | pushed per Lens from Access Profiles | A second, finer gate *underneath* capabilities | the access state service feeds `LensService` |
 | **The Lens** | the browser | Presentation only — **it never hides a screen** | templates |
 | **Access Profiles** | authored per space | The one thing that *can* hide a nav subtree per Lens — and it is a curation tool, deliberately **not** a permission system | the access tree-table |
@@ -127,8 +127,8 @@ required. There is **no capability guard and no structural directive**, so every
 to remember its own check, and a new pane that forgets one is not caught by anything. That is the single
 highest-value hardening available in this area (§5.2).
 
-⚠ **Only three of the four feature flags filter navigation** — geo/link, events and ops. The exchange
-flag gates in-pane affordances only and never hides an entry. Do not write "all four".
+⚠ **Not every feature flag filters navigation.** The exchange flag gates in-pane affordances only and
+never hides an entry; `authMode`, `loopbackOnly` and `multiSpace` describe the install, not a module.
 
 🔴 **The per-request `permissions[]` array is structurally unreachable, and this area is why.** The
 envelope carries a per-resource permission set, and the version-one interceptor unwraps every response
@@ -169,15 +169,15 @@ purpose** — it is pre-sign-in *context*, not inventory, and it is the sign-in 
 `GET /settings/branding` sits behind the auth gate and would 401 on exactly that screen. Both directions
 are pinned by `ControlApiAuthV1Test`.
 
-⚠ **The SPA reads about half of it.** Its own bootstrap interface takes the edition, four feature flags,
-the session and the auth block — and nothing else. Config specs are still fetched **per type** from the
+⚠ **The SPA reads about half of it.** Its own bootstrap interface takes the edition, the `features` map
+(seventeen keys on 2026-11-01), the session and the auth block — and nothing else. Config specs are still fetched **per type** from the
 spec route, and the space list still comes from the spaces routes, so the aggregation's benefit is only
 partly realised.
 
-🔴 **The edition string is inert twice over.** It is computed from the auth-mode flag — `personal` when
-that is unset, `standard` otherwise — and that flag is a **label with nothing branching on it**. So a
-Personal bundle started with single sign-on configured reports `standard`, regardless of which modules
-are present. And the SPA **types the field without ever reading it**. The trustworthy signals are the
+⚠ **The edition string is derived, not declared.** `BootstrapRoutes.edition()` answers `basic` when
+nobody signs in, `advanced` when an access decider (the policy module) is active, and `standard` otherwise —
+`basic | standard | advanced`, never the retired names. The auth-mode flag no longer feeds it. The trustworthy
+signals are still the
 feature flags, each derived from whether a handler actually registered, which is exactly why the edition
 programme chose module presence over a switch.
 
@@ -379,7 +379,7 @@ the router.
 
 **Counting routes is itself a trap, which is why `UI-5` has four answers.** The shell's own route file
 declares **44** uncommented paths (39 shell children plus four top-level), with a further eight inside a
-commented-out legacy block that a naive count includes. Across all **48** route files there are **108**
+commented-out legacy block that a naive count includes. Across all **48** route files (51 on 2026-11-01) there were **108**
 non-comment path entries, counting parents, children, parameterised routes and redirects. Three current
 pages say "~35 screens" and an archived review says 47 lazy routes. **State which unit you mean.**
 
@@ -398,8 +398,9 @@ installed disables the affordance and says so in place. It is the same reasoning
 
 Two surfaces with confusingly similar names. The **settings drawer** is a slide-out **launcher**: pure
 navigation, no requests. The **settings pane** is the master-detail surface at `/settings/<section>`,
-switching content on the route parameter, with **12 sections**: config, connections, notifications,
-operational database, scheduler, spaces, access, models, icons, map, transfer and design.
+switching content on the route parameter, with **17 sections** (2026-11-01): config, connections, notifications, operational database, scheduler,
+egress, approvers, modules, incident governance, spaces, access, models, icons, map, link analysis, transfer
+and design.
 
 ### 3.11 The two panes this area owns
 
@@ -480,7 +481,7 @@ test suite, with one board row between them. Everything in §5.2 is consequently
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
-> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** the SPA **sends `If-Match`** from both config-writing panes and gates affordances on `permissions[]` once the interceptor exposes it → `BACKLOG.md` §3 `CLIENT-HALVES-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** the SPA **sends `If-Match`** from both config-writing panes and gates affordances on `permissions[]` once the interceptor exposes it → `CLIENT-HALVES-1` (row closed; no longer on the board).
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —

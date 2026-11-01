@@ -64,32 +64,32 @@ above the generated commit list.
 - `POST /public/delivery-status/{adapterId}` refuses a body over **256 KiB** with **413
   `PAYLOAD_TOO_LARGE`** (a new, additive `ErrorCode`) and is throttled per caller IP (burst 60, then 5/s)
   with **429 `RATE_LIMITED`**. Providers retry a 429; a batch over 256 KiB must be split provider-side.
-- **Breaking (Professional/Enterprise):** `DELETE /notifications/{id}` and `PUT /notifications/preferences`
+- **Breaking (Standard/Advanced):** `DELETE /notifications/{id}` and `PUT /notifications/preferences`
   now require **`canAdminister`** (403 `PERMISSION_DENIED` otherwise). They were exempt as per-caller, but
-  the feed archive and the preference grid are one shared state per Space. Personal (no authenticator) is
+  the feed archive and the preference grid are one shared state per Space. Basic (no authenticator) is
   unchanged.
 - **Behaviour change (every edition, 2026-09-25):** notification **read state is per caller**. `POST
   /notifications/{id}/read` and `POST /notifications/read-all` stay open to any authenticated caller (no
   capability) and mark only the caller's own state; `GET /notifications`, the `/notifications/stream` frames
   and `/notifications/unread-count` report `state` / `readAt` as the caller sees them, plus a new additive
   boolean **`read`**. New route **`POST /notifications/{id}/unread`** (404 unknown id). A client that read
-  another user's mark through the shared `state` no longer can. On Personal the caller is `appUser` (or the
+  another user's mark through the shared `state` no longer can. On Basic the caller is `appUser` (or the
   honour-system `X-Actor`).
-- **Behaviour change (Professional/Enterprise, 2026-09-25 — ses-sns §7):** notification **preferences are
+- **Behaviour change (Standard/Advanced, 2026-09-25 — ses-sns §7):** notification **preferences are
   per caller**. `PUT /notifications/preferences` is open to any authenticated caller again and writes only
   that caller's override (a `null` cell resets it); the deployment default moved to the **new `PUT
   /notifications/preferences/default` (`canAdminister`)** and new `GET /notifications/preferences/default`.
   `GET /notifications/preferences` returns the caller's effective grid, and every grid row gains additive
   `source` (`inherited` | `overridden`) and `editable` maps per channel. An admin client that edited the
   shared grid through `PUT /notifications/preferences` must move to `/default`. The feed, SSE frames and
-  unread count hide a category the caller turned in-app off for. Personal is unchanged (the PUT writes the
+  unread count hide a category the caller turned in-app off for. Basic is unchanged (the PUT writes the
   single grid).
-- **Breaking (Professional/Enterprise, 2026-09-26):** `POST /objects/{id}/ack`, `/resolve`, `/transition` and
+- **Breaking (Standard/Advanced, 2026-09-26):** `POST /objects/{id}/ack`, `/resolve`, `/transition` and
   `/assign` require the new **`canWorkIncidents`** instead of `canAdminister` (403 `PERMISSION_DENIED`
   otherwise). The seeded `operations`, `support`, `power` and `admin` roles hold it; an **authored
   `roles.toon`** that gave a role `canAdminister` so it could work Incidents must add `canWorkIncidents`.
   With an authenticated Subject those four routes record the Subject as the actor and ignore a body `actor`.
-  Merge, split, `PATCH /objects/{id}` and the Case-Rule evaluate are unchanged (`canAdminister`). Personal
+  Merge, split, `PATCH /objects/{id}` and the Case-Rule evaluate are unchanged (`canAdminister`). Basic
   (no authenticator) is unchanged.
 - **Breaking (every edition):** `X-Forwarded-For` is **ignored by default** — the client IP recorded in the
   audit trail and used as the unauthenticated rate-limit key is the socket peer unless the peer is listed
@@ -119,11 +119,11 @@ above the generated commit list.
   and `resource_kinds` = `[ambiguous-key]`); a `when` reference the engine never binds (`[unknown-ref]` —
   a root other than `subject.`/`env.`/`resource.`, `subject.<k>` outside `id, capabilities, dataScopes,
   roles` + the `roles.toon identity.attributeClaims` allowlist, `env.<k>` outside `action, route, space`);
-  an untargeted `deny` with no `when` (`[deny-everything]`); and, on Enterprise, a draft that would deny the
+  an untargeted `deny` with no `when` (`[deny-everything]`); and, on Advanced, a draft that would deny the
   saver's own next `PUT /access/policies` (`[would-lock-out]` — nothing is written).
 - ⚠ **Upgrade:** the same checks run on the on-disk `access-policies.toon`. A doc that loaded before with a
   stray key (`wen:`), or that references a claim not allowlisted in `roles.toon`, is now **unreadable** —
-  on Enterprise every authenticated request is denied (fail-closed) until it is fixed on disk. The
+  on Advanced every authenticated request is denied (fail-closed) until it is fixed on disk. The
   `GET /access/policies` `error` names the policy and the check for `canConfigureAccess` holders. Fix the
   doc (or allowlist the claim) before upgrading.
 - `PUT /access/roles` 422s a claim-allowlist change that would make the policies doc unreadable.
@@ -177,9 +177,9 @@ above the generated commit list.
   and the pack stays pinned until the batch ends). A Pipeline whose ingester class nothing loaded provides
   now fails its Run with `streaming ingester <fqcn> is not on the classpath and no loaded parser names it…`
   instead of `Cannot instantiate streaming ingester` wrapping a `ClassNotFoundException`.
-- **New refusal (Professional/Enterprise):** `POST /parsers/{id}/preview` for a parser a Job Pack
+- **New refusal (Standard/Advanced):** `POST /parsers/{id}/preview` for a parser a Job Pack
   contributed returns **403 `PERMISSION_DENIED`** without **`canAuthorWorkbench`**. Built-in and classpath
-  parsers stay open; Personal (no authenticator) is unchanged. `CapabilityManifest` records the route under
+  parsers stay open; Basic (no authenticator) is unchanged. `CapabilityManifest` records the route under
   the new exemption category `provenance-gated`.
 
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**

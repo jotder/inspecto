@@ -164,7 +164,7 @@ asn1 · plugin`. Three engines sit behind them:
 | **text_regex** | `read_text` + SQL regex | `record_split: blank_line | <literal>` (2026-08-28) — this is what makes **LDIF block records live** |
 | **xlsx** / excel | DuckDB `excel` extension, **three-layer fail-closed load**; `all_varchar` stamped by ingest | `read_xlsx` `columns` does not exist on 1.5.2.1 — refused, not faked |
 | **parquet** | native | a built-in with **no board row anywhere** |
-| **asn1** | `Asn1ParserPlugin` → `Asn1RecordIngester` (module `inspecto-telecom-asn1`, Professional+, not Personal; over `providers/asn-parser/asn-decoders`) | served 2026-07-31; grammar optional for preview, required for ingest; `frontend: asn1` synthesises the plugin and refuses a co-present `parsing.plugin` |
+| **asn1** | `Asn1ParserPlugin` → `Asn1RecordIngester` (module `inspecto-telecom-asn1`, Standard+, not Basic; over `providers/asn-parser/asn-decoders`) | served 2026-07-31; grammar optional for preview, required for ingest; `frontend: asn1` synthesises the plugin and refuses a co-present `parsing.plugin` |
 | **plugin** | any `StreamingFileIngester` FQCN | `XmlRecordIngester` (2026-08-30) is the tree → segments bridge |
 
 **`ParserPlugin`** (`com.gamma.parse`, `inspecto-engine`, `@PublicApi(since = "4.0.0")`) is the self-describing

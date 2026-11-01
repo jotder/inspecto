@@ -2,7 +2,7 @@
 type: Capability
 area: AGT · EOI
 title: Assistant (AGT + EOI) — capability spec
-description: The requirement-of-record and as-built specification for the Assistant — the reflex assist agent's seven skills, model transport and the air-gap invariant, the deliberative embedded-intelligence layer with its tool belt and autonomy ladder, the gated write path, and the eoiagent runtime it depends on. Includes the finding that no shipped bundle carries any of it.
+description: The requirement-of-record and as-built specification for the Assistant — the reflex assist agent's seven skills, model transport and the air-gap invariant, the deliberative embedded-intelligence layer with its tool belt and autonomy ladder, the gated write path, and the eoiagent runtime it depends on. Includes which bundles carry it (the assist agent from Standard, the intelligence agent from Advanced).
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.13 AGT-1..AGT-6b and §3.14 EOI-1..EOI-7 (this file corrects them, see §2)
@@ -20,11 +20,11 @@ supersedes-rows: REQUIREMENTS §3.13 AGT-1..AGT-6b and §3.14 EOI-1..EOI-7 (this
 > **separate repository** whose rows are this Assistant's runtime. Both ID ranges keep their numbers.
 >
 > 🔴 **Read §3.10 before you read anything else as a promise.** Every `AGT` row is marked SHIPPED with an
-> edition of `All`, and **no artifact `package.ps1` produces contains any of this code.** The assist
-> routes answer `503` in every bundle, by design. "SHIPPED" here is true only in the sense of *built and
-> tested in the reactor* — it is not reachable by an operator. This is the same distinction the repo has
-> already had to learn twice, for `@PublicApi` (intent, not exposure) and for `inspecto-connectors`
-> (in the reactor, in no deployment).
+> edition of `All`, but the bundles are narrower: `inspecto/package.ps1` stages `inspecto-agent.jar` (the
+> `/assist/*` routes) on **Standard and Advanced** (`PKG-5`) and `inspecto-intelligence.jar` (the `/agent/*`
+> routes) on **Advanced only** (`ASSURE-INTELLIGENCE-BUNDLE-1`). On Basic, and for `/agent/*` on Standard,
+> the routes answer `503` by design. *(Corrected 2026-11-01, `DOCS-AGENT-WRITTEN-REVIEW-1`: this banner said
+> no bundle carried any of the code.)*
 
 ## 1. Purpose & scope
 
@@ -69,11 +69,11 @@ and — under an explicit human gate — acts.
 
 | ID | Requirement (as it holds) | MoSCoW | Status of record | Edition of record |
 |---|---|---|---|---|
-| **AGT-1** | **Assistant** skills — seven, read-only/draft-only, abstain-only escalation | Must | ✅ Built and tested. The seven are `DiagnoseAndAlertSkill`, `ExplainEntitySkill`, `KpiToSqlSkill`, `NlToScheduleSkill`, `ReportNarrativeSkill`, `ReportSqlSkill`, `SuggestConfigSkill` | 🔴 **CORRECTION — no edition.** The row says `All`; `EDITIONS` `CP-14` says `—/—/—` and is right. See §3.10 |
-| **AGT-2** | Pluggable model transport: eoiagent gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | ✅ Built and tested | 🔴 **CORRECTION — no edition** (§3.10) |
+| **AGT-1** | **Assistant** skills — seven, read-only/draft-only, abstain-only escalation | Must | ✅ Built and tested. The seven are `DiagnoseAndAlertSkill`, `ExplainEntitySkill`, `KpiToSqlSkill`, `NlToScheduleSkill`, `ReportNarrativeSkill`, `ReportSqlSkill`, `SuggestConfigSkill` | 🔴 **CORRECTION — Standard+, not `All`** (`EDITIONS` `CP-14`, `PKG-5`). See §3.10 |
+| **AGT-2** | Pluggable model transport: eoiagent gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | ✅ Built and tested | 🔴 **CORRECTION — Standard+**; `inspecto-agent-hosted` ships in nothing (§3.10) |
 | **AGT-3** | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds | Must | ✅ Built and tested, and the invariant is asserted by a test ⚠ **Named for grep:** the assertion lives in `EgressGuardTest` (`features/inspecto-agent/src/test/java/com/gamma/agent/EgressGuardTest.java`). | **All** — this one *is* edition-wide, but trivially: the guarantee is that the code is **absent**, and in a stock bundle the whole layer is absent (§3.10) |
-| **AGT-4** | Model Settings pane + per-tier connectivity probes | Should | ✅ Built and tested | 🔴 **CORRECTION — the pane ships, the thing it configures does not** (§3.10) |
-| **AGT-5** | Embedded intelligence: context grounding, tool belt, autonomy ladder | Should | ✅ P0–P5 complete 2026-07-21 + polish. The belt is **23 tools**, pinned by `InspectoPackTest`'s `assertEquals(23, tools.size())` — the board is right and the concept page is not (§3.5) | 🔴 **CORRECTION — no edition.** The row's `All (L3 = S+, opt-in)` describes a gating that no bundle can reach (§3.10) |
+| **AGT-4** | Model Settings pane + per-tier connectivity probes | Should | ✅ Built and tested | 🔴 **CORRECTION — Standard+**; on Basic the pane ships without the agent it configures (§3.10) |
+| **AGT-5** | Embedded intelligence: context grounding, tool belt, autonomy ladder | Should | ✅ P0–P5 complete 2026-07-21 + polish. The belt is **23 tools**, pinned by `InspectoPackTest`'s `assertEquals(23, tools.size())` — the board is right and the concept page is not (§3.5) | 🔴 **CORRECTION — Advanced** (`ASSURE-INTELLIGENCE-BUNDLE-1`). The row's `All (L3 = S+, opt-in)` describes a gating no code enforces (§3.5, §3.10) |
 | **AGT-6a** | "AI behind every screen" — inline natural-language authoring on every pane, reusing the shipped draft tools | Should | 🟡 **CORRECTION — more is shipped than "PLANNED" suggests.** The mechanism is live: `<inspecto-ai-assist>` runs six draft tools on **five real panes** (pipeline editor, Query Library, Expectations, Dashboard Builder, Link-Analysis query panel), and `<inspecto-ai-explain>` is adopted by **twelve** panes. Deterministic single-tool dispatch shipped 2026-07-26. The live plan is blunter than the board: it records **D1–D4 and D8–D11 answered** and **all of A1–A5 shipped**, and stays open only for the `kpi_report_builder` host. The board still says "ready to schedule pending D1–D4". What remains is the *ambition* — every screen — not the capability | — |
 | **AGT-6b** | Multi-step agent graphs — model-composed plans beyond the seeded runbooks | Could | 🟡 PLANNED, demand-gated. ⚠ Its stated upstream prerequisite (a per-tool dry-run seam) was **discharged 2026-09-08**, so the row is now actionable and no longer externally gated | — |
 | **EOI-1** | Embeddable framework-free Java agent library | Must | ✅ SHIPPED upstream | — (separate repo) |
@@ -118,8 +118,8 @@ older `com.gamma.agent.kernel.tool.ToolRegistry` (the reflex skills' path, e.g. 
 
 ### 3.1b Draft skills answer with an ARTIFACT (`AGT-ARTIFACT-1`, 2026-09-15)
 
-`AgentAskResult.artifact` had a live client consumer (Agent Chat mounts `<inspecto-a2ui-render>`) and NO producer:
-the pinned eoiagent jars never construct an `InlineArtifact` — every `AgentAnswer` is built with a null artifact —
+`AgentAskResult.artifact` had a live client consumer (Agent Chat mounts `<inspecto-a2ui-render>`) and, until this
+change, NO producer: the pinned eoiagent jars never construct an `InlineArtifact` — every `AgentAnswer` is built with a null artifact —
 so the producer lives here and cannot read the draft off the answer. `DraftArtifacts.recording(tool)` wraps the
 draft skills (`component_draft`, `query_author`, `projection_author`, `kpi_report_builder`) in
 `InspectoToolProvider.tools()`; an `ok` result carrying `draft` is remembered per `RunId` (the id eoiagent threads
@@ -163,7 +163,7 @@ guarantee.
 
 `GET|POST /assist/settings` reads and live-reconfigures the model tiers under the write-root gate, and
 `POST /assist/settings/test` probes each tier so the pane can show per-tier connectivity rather than one
-aggregate "AI is up". ⚠ In a stock bundle the pane's own routes are part of the 503 surface (§3.10).
+aggregate "AI is up". ⚠ On Basic, which bundles no agent, the pane's own routes are part of the 503 surface (§3.10).
 
 #### 3.4a How a tier resolves to a concrete model — and why it is NOT hardware-detected
 
@@ -214,10 +214,10 @@ Phases P0–P5 are complete (2026-07-21, plus polish), and the layer is organise
 driver calls authorize** (an unconfigured action class reads as `OFF`, with kill-switch → mode → budget
 precedence). ⚠ Note the irony this creates for the board: `AGT-5`'s edition cell says "L3 = S+",
 but nothing in the code edition-gates L3 — it is exactly the **`-D` capability switch** that EDG-01
-rejected as an edition mechanism, and the live plan puts L2 at Professional+ and L3 at Enterprise while the
+rejected as an edition mechanism, and the live plan puts L2 at Standard+ and L3 at Advanced while the
 original ladder gated L3 on Decision Rules the as-built policy engine does not use. Four sources, four
-gatings — moot for `/agent/*`, which is bundled by nothing, but **no longer moot for `/assist/*`**, which
-ships on Professional+ since `PKG-5` (§3.10).
+gatings — and none is moot now: `/assist/*` ships on Standard+ since `PKG-5` and `/agent/*` on Advanced
+since `ASSURE-INTELLIGENCE-BUNDLE-1` (§3.10).
 
 **The tool belt is 23 tools, and the canonical source is a test.** `InspectoPackTest` asserts
 `assertEquals(23, tools.size())`, so the number is pinned even though no single enum lists it.
@@ -236,7 +236,7 @@ the sentence under it says "all four".
 
 **The autonomy ladder** is the safety model: **Explain** (read) → **Draft** (write nothing, produce a
 proposal) → **Act-with-approval** (L2, a human gate) → **bounded autonomy** (L3, opt-in, budgeted, with
-a kill switch). L3 is documented as Professional+ and opt-in.
+a kill switch). L3 is documented as Standard+ and opt-in.
 
 ### 3.6 The gated write path
 
@@ -264,13 +264,12 @@ human-initiated, and a general event-triggered consequence gate is refused (§6)
   AG-UI shape (a thin edge adapter, "AG-UI-shaped, domain-named", never adopted wholesale). ⚠ **"AG-UI"
   here is this repo's own SSE + artifact protocol, not the third-party specification** — no such
   dependency exists.
-  🔴 **The channel is half-wired, and the halves are the opposite way round from the backend note.**
-  `AgentAskResult.artifact` has **no live producer** (the backend side is proven only by
-  direct-construction tests), but the client **consumer is real and mounted**: `A2uiRenderComponent`
-  renders an `A2uiArtifact` for both the Assist console and Agent Chat, fed by the stream's `artifact`
-  frame, behind a **closed client allowlist** (`text`, `kpi`, `chart`, `data-table`, fail-closed). The
-  Assist console even **synthesises** an artifact from a skill's prose when the server sends none. So the
-  render path is exercised in production; what is missing is a server that emits the real thing.
+  **Both halves of the channel are wired.** The producer is `AGT-ARTIFACT-1` (§3.1b): the draft skills'
+  result is attached as `AgentAskResult.artifact` and emitted as the stream's `artifact` frame
+  (`InspectoIntelligenceAgent`). The client consumer, `A2uiRenderComponent`, renders an `A2uiArtifact` for
+  both the Assist console and Agent Chat behind a **closed client allowlist** (`text`, `kpi`, `chart`,
+  `data-table`, `draft`, fail-closed). The Assist console still **synthesises** an artifact from a skill's
+  prose when the server sends none. *(Corrected 2026-11-01: this said the channel had no producer.)*
 * **S5 — the agent context fabric.** The context broker grounds an answer in real metadata rather than
   the model's memory. ⚠ **`SignalIngress` is tested but deliberately unwired**, and its severity floor
   (ERROR and above) differs from the context broker's (WARN and above) — the mismatch is the reason it
@@ -309,10 +308,10 @@ Two chat surfaces, deliberately separate, matching the two layers of §3.1:
   route (with a natural-language `derive` mode). **Draft-only: applying is always the pane's own
   write.** Five live hosts: `pipeline_author` in the pipeline editor, `query_author` in the Query
   Library, `suggest_expectations` in the Expectation form, `kpi_report_builder` in the Dashboard
-  Builder, `projection_author` in the Link-Analysis query panel. ⚠ **`component_draft` is the sixth tool
-  and has no host**: it was adopted on the Components pane's `schema` kind and **retired 2026-07-31**
-  when unification deleted that registry component. The adapter and the backend tool are intact, with
-  nowhere to attach — which is exactly what the board's P3 row says.
+  Builder, `projection_author` in the Link-Analysis query panel. `component_draft`, the sixth tool, is
+  hosted again: the Components pane's component form (`component-form.dialog`) and the schema editor
+  (`schema-editor.dialog`) both mount it. *(Corrected 2026-11-01: this said it had no host after its
+  2026-07-31 retirement from the `schema` kind.)*
 
 **The inline explain-a-failure path** is a third component: a status dialog reached from Alerts,
 Processing status, Events and the Incident/Case detail. On Events it prefers a `correlationId`, which
@@ -352,14 +351,16 @@ exists; the row's framing predates the move.
 modules** — they compile and their tests run on every build. ⚠ **Corrected 2026-09-15: the two are no
 longer packaged alike, and this passage claimed they were for three days after that stopped being true.**
 
-- **`inspecto-agent` ships in Standard and Enterprise** since `PKG-5` (2026-09-12). `package.ps1:270` puts
-  it in the `$modules` build list for both, `:345-348` requires the shaded sidecar, `:518-520` stages
-  `inspecto-agent.jar`, and `:527` **fails the build** when the `AssistAgent` service entry is missing. So
-  `/assist/*` is live on Professional+.
-- **`inspecto-intelligence` is bundled by nothing.** The string `intelligence` appears nowhere in
-  `package.ps1`, so `/agent/*` (`AgentRoutes`) answers **`503`** in every artifact.
+- **`inspecto-agent` ships in Standard and Advanced** since `PKG-5` (2026-09-12) — `bundleModules`
+  (`tools/bundle-modules.mjs`, `from: 'standard'`) and `offerings/standard.toon` list it; `package.ps1`
+  requires the shaded sidecar, stages `inspecto-agent.jar`, and **fails the build** when the `AssistAgent`
+  service entry is missing. So `/assist/*` is live on Standard+.
+- **`inspecto-intelligence` ships in Advanced** since `ASSURE-INTELLIGENCE-BUNDLE-1` (2026-09-29) —
+  `from: 'advanced'`, `offerings/advanced.toon`; `package.ps1` stages the shaded `inspecto-intelligence.jar`.
+  On Basic and Standard, `/agent/*` (`AgentRoutes`) answers **`503`**. *(Corrected 2026-11-01: this said the
+  module was bundled by nothing.)*
 
-For that second module the original mechanism still holds: the core fat JAR carries the two SPI
+Where a module is not bundled the original mechanism holds: the core fat JAR carries the two SPI
 *interfaces* (`com.gamma.assist.spi.AssistAgent`, `com.gamma.intelligence.spi.IntelligenceAgent`) and
 **no implementor and no `META-INF/services` entry**, so `ServiceLoader` finds nothing — the documented
 absent-module behaviour, the same pattern the editions board uses as its reference example.
@@ -385,10 +386,10 @@ effect in a stock bundle is **five navigation entries that can only ever explain
 which is the same "affordance that exists to explain itself" shape the Studio spec flagged for the
 investigation studios. The difference is that those hide; these do not.
 
-So the honest reading of §2 is: `AGT-1` through `AGT-5` are **built, tested, and unreachable**. The
-editions board is right (`CP-14` = `—/—/—`); the requirements board's `All` describes an availability no
-customer has. `AGT-3`'s air-gap guarantee is the one row that is vacuously satisfied everywhere, because
-what it promises is absence.
+So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent) reach operators on
+**Standard+**, and `AGT-5` (the intelligence agent) on **Advanced**. The editions board states this
+(`CP-14` = `—/✅/✅`); the requirements board's `All` overstates it, because Basic carries neither.
+*(Corrected 2026-11-01: this said all five rows were unreachable and `CP-14` was `—/—/—`.)*
 
 ## 4. Decisions (dated one-liners)
 
@@ -443,7 +444,7 @@ what it promises is absence.
 | **`AGT-6a` tool `args` runtime validation** — declined in favour of a contract test; revisit when the belt is bigger | §6 |
 | **`AGT-5` embedding recall** — parked; the Case store is a 256-cap ring | §6 |
 | Predictive maintenance (AGT-5 territory) deliberately deferred from the maintenance tier | §3 P3 |
-| Hosted providers (Professional+) and the optional S8 signal slice | §3 P3 |
+| Hosted providers (Standard+) and the optional S8 signal slice | §3 P3 |
 
 ### 5.2 UNTRACKED — found 2026-09-08, no board row yet
 
@@ -464,10 +465,9 @@ what it promises is absence.
    rows claim `All`; no bundle carries the code."* Re-derived against the table in §2: **only `AGT-3`
    still reads `All`**, and its own cell explains why that is vacuous (what it promises is an absence) —
    `AGT-1`/`AGT-2`/`AGT-4`/`AGT-5` each carry a 🔴 *no edition* correction and `AGT-6a`/`AGT-6b` read `—`.
-   And "no bundle carries the code" stopped being true at `PKG-5`: `inspecto-agent` ships Professional+ (§3.10).
-   ⚠ What survives is narrower and is stated in §3.10: `inspecto-intelligence` is bundled by nothing, so
-   `/agent/*` is 503 everywhere. The product decision on whether *that* module is meant to ship is real;
-   the requirements-board repair is not owed.
+   And "no bundle carries the code" stopped being true at `PKG-5`: `inspecto-agent` ships Standard+ (§3.10).
+   The narrower remainder — `inspecto-intelligence` bundled by nothing — was resolved 2026-09-29 by
+   `ASSURE-INTELLIGENCE-BUNDLE-1`: it ships on Advanced (§3.10).
 2. 🔴 **`EOI-7`'s claim contradicts the build.** "No SNAPSHOT anywhere" versus a parent pom pinning
    `0.2.0-SNAPSHOT` of an unpublished upstream. The row needs rewriting to the actual state, and the
    reproducibility question — a build that depends on a moving branch head — deserves its own row.
@@ -479,10 +479,8 @@ what it promises is absence.
    pinned by a test; the page says 9, 18, 19 and 21 in different sections and never mentions
    `projection_author` or `config_schema`. A page that grows by appendix accumulates counts instead of
    correcting them.
-5. **`AgentAskResult.artifact` has no producer, while the client consumer is live.** The render path is
-   mounted on two surfaces and the Assist console synthesises artifacts to fill the gap. Either wire a
-   real producer or record the channel as reserved — but note the asymmetry, because the backend
-   concept page reads as if the whole channel were unproven.
+5. ✅ **CLOSED 2026-09-15 — `AGT-ARTIFACT-1` built the producer** (§3.1b): the draft skills' result is
+   now `AgentAskResult.artifact`, emitted as the stream's `artifact` frame.
 6. **`SignalIngress` is tested and deliberately unwired**, on a severity-floor mismatch. That is a
    decision, but it is recorded only in a concept page's gotcha list; it should be a row or a stated
    refusal.
@@ -531,7 +529,7 @@ what it promises is absence.
     actions and feedback routes. All three need the §3.10 caveat.
 21. **The roadmap still tells a reader to adopt the discontinued agent library**, two months after it
     was vendored in-tree.
-22. **Hosted providers are simultaneously deferred and refused.** They are listed as a Professional+
+22. **Hosted providers are simultaneously deferred and refused.** They are listed as a Standard+
     deferral, while the intelligence agent runs on an offline deployment profile in which a hosted
     provider falls back to an offline stub. One of the two statements has to go.
 
@@ -539,7 +537,7 @@ what it promises is absence.
 
 | Item | Verdict | Why / where |
 |---|---|---|
-| Bundling the agent modules in any artifact | **Refused — the intended default** | agent-absent is a valid deployment; ⛔ no packaging switch until the Java floor is resolved (`PKG-5`) |
+| Bundling the agent modules in any artifact | **Superseded** — `PKG-5` (2026-09-12) bundles `inspecto-agent` on Standard+, `ASSURE-INTELLIGENCE-BUNDLE-1` (2026-09-29) bundles `inspecto-intelligence` on Advanced | agent-absent stays a valid deployment (Basic); `inspecto-agent-hosted` still ships in nothing |
 | A tier-bump or human handoff from the reflex layer | **Refused by design** | abstain-only; `applyVia` is always `null` |
 | Data values in `GET /assist/metrics` | **Refused** | counts only |
 | Wholesale AG-UI adoption | **Refused 2026-07-19 (D3)** | thin edge adapter only, domain-named |

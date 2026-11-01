@@ -2226,6 +2226,7 @@ public final class InvestigationRoutes implements RouteModule {
             case "expand" -> {
                 expandParams(body, p, lim);
                 merged(body, p);
+                expandGroup(body, p);
             }
             case "connect" -> connectParams(body, p, lim);
             case "exclude" -> {
@@ -2371,6 +2372,18 @@ public final class InvestigationRoutes implements RouteModule {
         if (m == null || Boolean.FALSE.equals(m)) return;
         if (!Boolean.TRUE.equals(m)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'merged' must be a boolean, got " + m);
         p.put("merged", true);
+    }
+
+    /**
+     * LA-DEGREES-TRIM-2: the client's id for the one Expand this step is a degree of (every degree of it carries the same
+     * one), stored as given and never read by the evaluator. Sealed only when stated, so an expand without it seals as before.
+     */
+    private static void expandGroup(Map<String, Object> body, Map<String, Object> p) {
+        Object g = body.get("group");
+        if (g == null) return;
+        if (!(g instanceof String s) || s.isBlank() || s.length() > 64)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'group' must be a non-blank string of at most 64 chars");
+        p.put("group", s);
     }
 
     /** An exclusion's required reason ({@code exclude}, {@code excludeBy}): one without it cannot be challenged. */
