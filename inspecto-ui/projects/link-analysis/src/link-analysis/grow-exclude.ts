@@ -188,6 +188,7 @@ export function growExpandBody(
     frontier: string[],
     req: GrowRequest,
     presets: ExpandRung,
+    group?: string,
 ): Extract<InvestigationOpRequest, { op: 'expand' }> {
     const { includeHubs: _i, expandHubs: _e, ...merged } = { ...presets, ...(req.rung ?? {}) };
     const kinds = req.linkKinds ?? merged.linkKinds ?? null;
@@ -199,7 +200,13 @@ export function growExpandBody(
         direction: req.direction,
         ...(kinds?.length ? { linkKinds: kinds } : {}),
         ...(req.hold ? { hubThreshold: req.threshold } : { includeHubs: true }),
+        ...(group ? { group } : {}),
     };
+}
+
+/** LA-DEGREES-TRIM-2: a fresh id for one Expand, put on each of its degrees' `expand` steps. */
+export function newExpandGroup(): string {
+    return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 /** Effective (not undone) op entries, oldest first. */

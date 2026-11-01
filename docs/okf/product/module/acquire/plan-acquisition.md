@@ -76,7 +76,7 @@ against source:
 
 ⚠ **`ACQ-1` carries an edition nuance the matrix column cannot express.** Connections are `All`, but two
 of `SecretResolver`'s five reference forms — `${FILE:…}` and `${KEYSTORE:…}` — are **Standard +
-Enterprise only** (SEC-07): they are served by `inspecto-secrets`'s `SecretsProvider`, so a Personal
+Advanced only** (SEC-07): they are served by `inspecto-secrets`'s `SecretsProvider`, so a Basic
 bundle refuses the scheme *by name* and a connection test surfaces that as the failure. See §3.
 
 🔴 **What none of these rows said, and every one of them depended on:** for 85 days the remote
@@ -425,7 +425,7 @@ archive_path: …, tags: {…}, on_unsupported: WARN_AND_CONTINUE }` — `on_uns
 
 ### 3.9 The connector SPI, and the ten resolvable schemes
 
-⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Professional and above — Personal has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(A ninth entry exists under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` — and is test-only; do not count it.)*
+⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(A ninth entry exists under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` — and is test-only; do not count it.)*
 
 ⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](../etl/spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
 
@@ -453,7 +453,7 @@ Seven schemes are registered by `inspecto-connectors`
 | `S3Connector` + `AwsSigV4` | `s3` | **SDK-free** — raw REST on the JDK `HttpClient` |
 | `AzureBlobConnector` + `AzureSharedKey` | `azure` | **SDK-free** |
 | `GcsConnector` + `GcpServiceAccountToken` | `gcs` | **SDK-free** (gson for JSON) |
-| `KafkaConnector` (module `inspecto-connectors-kafka`, package `com.gamma.acquire.kafka`; Professional and above) | `kafka` | kafka-clients |
+| `KafkaConnector` (module `inspecto-connectors-kafka`, package `com.gamma.acquire.kafka`; Standard and above) | `kafka` | kafka-clients |
 
 ⚠ Two precisions the sources get wrong in opposite directions. (a) `connectors-runbook.md` (its opening paragraph) and
 `modules/connectors.md:16` once called S3/GCS/Azure "future"; they ship — the current text of both files is
@@ -538,7 +538,7 @@ cadence, or a `POST /collectors/{id}/notify` wake-up. (B) a continuous `trigger:
 `PipelineScheduler` — a virtual thread per stream Collector holding the consumer open and handing ingest
 runs to the per-pipeline coalescer — **deferred**, not refused: build it only when an operator names a
 latency target the cadence cannot meet (Q2 named none). It is A plus a different trigger, so everything
-above still applies; its cost is new lifecycle wiring (space close, and the run lease under Enterprise
+above still applies; its cost is new lifecycle wiring (space close, and the run lease under Advanced
 scale-out). (C) a long-running Job — **refused**, see §6.8. The at-least-once fixes (§3.7 and the fence)
 were needed under every option, so they landed inside the row rather than as a separate P1 (Q1).
 
@@ -555,7 +555,7 @@ the lane spin. A connector that cannot count (`-1`, every non-Kafka one) drains 
 `PipelineScheduler.reconcileStreamLanes` runs on every acquisition tick (so hot-reload, pause and activation
 start or stop lanes), `forget` closes a lane, and `CollectorService.close` closes them all. `STREAM` stays
 LOOP-scheduled: the ordinary ticks keep running as the floor, and a lane only makes drains happen sooner.
-⚠ The lane is per process: under Enterprise scale-out every pod runs one, and the `acquireGuard`/run lease
+⚠ The lane is per process: under Advanced scale-out every pod runs one, and the `acquireGuard`/run lease
 make the extra ones no-ops rather than duplicates. **Measured** (MockConsumer, N=200, T=1 s, 569 events in 20
 random bursts): event → committed slice frontier p50 563 ms, **p95 1030 ms**. Through a real `CollectorService`
 with real ingest (`faketest` connector, T=1 s): file arrival → committed batch 1.6 s. ⛔ **Not measured: the
@@ -596,11 +596,11 @@ exposing the value:
 Anything not matching `${…}` is returned unchanged (a tolerated-but-discouraged literal), and a
 resolved value is **never logged**.
 
-⚠ **SEC-07 (2026-09-06): `${FILE}` and `${KEYSTORE}` are Standard + Enterprise only.** They are served by
+⚠ **SEC-07 (2026-09-06): `${FILE}` and `${KEYSTORE}` are Standard + Advanced only.** They are served by
 the `SecretsProvider` SPI in the core, whose implementation is `inspecto-secrets`'s
 `FileKeystoreSecretsProvider`, discovered by ServiceLoader
 (`providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.auth.secrets.SecretsProvider`). A bundle
-without that module — Personal — **refuses the scheme with an `IllegalStateException` naming the edition,
+without that module — Basic — **refuses the scheme with an `IllegalStateException` naming the edition,
 never a silent `null`**; a connection test surfaces that refusal as its failure. A Vault/KMS scope is the
 Enterprise follow-on. ⚠ `connectors-runbook.md` (formerly `integrations.md`) once listed only 2 of the 5 forms and omitted this gate; its
 current text is correct — prefer it over any older account.
@@ -772,7 +772,7 @@ Only decisions that still bind are listed; where one reversed an earlier one, bo
 |---|---|---|
 | 2026-08-11 | `PipelineConfig.collector` is **singular, permanently** | Every stateful subsystem — ledger, watermark, dedup, gap detection — is keyed on one collector id. A list would force a ledger re-key, which is a migration, not a feature |
 | 2026-09-07 | The connector sidecar is **NOT edition-gated** | Remote acquisition is core, not a paid tier. `inspecto-connectors.jar` rides every bundle; the ~32 MB was accepted deliberately (CONNECTORS-BUNDLE-1) |
-| 2026-09-06 | **SEC-07** — `${FILE}` / `${KEYSTORE}` are Standard + Enterprise; the SPI core stays in `inspecto-acquire` | Keeps the lean core free of a secrets client while letting Personal refuse the scheme **by name** rather than failing obscurely. Vault deferred to policy, not code |
+| 2026-09-06 | **SEC-07** — `${FILE}` / `${KEYSTORE}` are Standard + Advanced; the SPI core stays in `inspecto-acquire` | Keeps the lean core free of a secrets client while letting Basic refuse the scheme **by name** rather than failing obscurely. Vault deferred to policy, not code |
 | 2026-06-24 → reversed | Connections as a standalone `inspecto-connect` repo with a cross-repo `@PublicApi` | See §6.2 — reversed in fact, and this spec is where that reversal is finally recorded |
 
 ### Connectivity, probe & secrets
@@ -921,7 +921,7 @@ performs write-and-delete, where the blast radius is a temp file we own.
 
 ### 6.6 Edition-gating the connector sidecar — REFUSED
 
-~32 MB, accepted. Remote acquisition is core capability, not a paid tier; gating it would make Personal
+~32 MB, accepted. Remote acquisition is core capability, not a paid tier; gating it would make Basic
 a demo rather than a product (2026-09-07).
 
 ### 6.7 "A connector is not a Step" — the standing answer to an apparent contradiction

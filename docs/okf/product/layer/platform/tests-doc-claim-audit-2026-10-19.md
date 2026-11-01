@@ -148,26 +148,44 @@ describe a state that has since shipped.
 ### Verified stale and NOT yet fixed — work list
 
 1. **"Not built / not shipped" claims that have since shipped** (highest value):
-   `agent/plan-assistant` (bundles do ship `inspecto-agent` / `inspecto-intelligence`; `AgentAskResult.artifact`
-   has a producer; `component_draft` has hosts); `plan-observability` (audit hash chain, `/audit/verify`,
-   sign-in audit events, the `/signals/stream` EventSource consumer); `access/plan-security` and
-   `admin-guide-auth-security` (HTTPS test, policy-editor browser pass, maker-checker, OIDC discovery, the
-   `id_token_hint` cookie, the `auth` block in `/bootstrap`); `plan-data-plane` and `plan-studio` (the SPA does
-   call `POST /queries/{id}/run`; Materialize button and job exist); `plan-incidents`, `admin-guide-operations-reference`
-   (escalation rules mutate an Incident and emit `OBJECT_ESCALATED`).
-2. **Routes that no longer exist**: `admin-guide-operations-reference` documents `/pipelines/{name}/…` (now
-   `/runs/{id}/…`), an `ALERT` object type, an `ISSUE` lifecycle and `ingest` Job kind; a `batch_id` column in
-   the status CSV (now `consignment_id`).
-3. **Edition model**: `/bootstrap` reports `basic | standard | advanced`; the retired names Personal /
-   Professional / Enterprise survive in most plans; `plan-editions` module and jar counts, Java floor (compile
-   target is 27), profile count, example count.
-4. **Counts that drifted**: `plan-control-api` (OpenAPI 466 paths / 556 operations; WriteGates 241 calls in 69
-   files; PublicApi `since` values; ETag call sites); `plan-tooling` (40 `check-*.mjs`, 3 CI jobs, 12 skills,
-   49 `.claude` files); `plan-surfaces` (21 capabilities, 14 feature flags, 17 Settings sections, 51 route
-   files); `plan-compliance` (9 evidence files, 60 files import `WriteGates`, 89 artifacts).
+   ✅ **FIXED 2026-11-01** (re-verified against code first): `agent/plan-assistant` (bundles: `inspecto-agent`
+   Standard+, `inspecto-intelligence` Advanced; `AgentAskResult.artifact` has a producer; `component_draft` has
+   hosts — 17 claims); `plan-observability` (audit hash chain, `/audit/verify`, sign-in audit events, the
+   `/signals/stream` EventSource consumer — 7); `plan-data-plane` and `plan-studio` (the SPA calls
+   `POST /queries/{id}/run` via *Run saved*; Materialize button and job exist — 10); `plan-incidents`,
+   `admin-guide-operations-reference` (Escalation Rules mutate an Incident and emit `OBJECT_ESCALATED` — 2).
+   ⏸ **Open, owned by the access lane:** `access/plan-security` and `admin-guide-auth-security` (HTTPS test,
+   policy-editor browser pass, maker-checker, OIDC discovery, the `id_token_hint` cookie, the `auth` block in
+   `/bootstrap`).
+2. **Routes that no longer exist**: ✅ **FIXED 2026-11-01** in `admin-guide-operations-reference`:
+   `/pipelines/{name}/…` → `/runs/{runId}/…` (route table and prose; `GET|POST /pipelines` → `/runs` for the
+   run list and live registration — 4 claims) and the `batch_id` columns → `consignment_id` (status CSV,
+   batches CSV, commit log — 3). ✅ **FIXED 2026-11-01 (batch 2):** Alerts live in `AlertStore` / `/alerts*`,
+   not as `ALERT` objects (`ObjectType` = `INCIDENT | CASE | TASK`); the Incident lifecycle is
+   `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`; there is no `ingest` Job (`JobType` + `JobTypeProvider`);
+   a `SEQUENCE_GAP` becomes a stored Alert; Case links name Incidents, and the stale "Issue Tracker heading"
+   note went — 9 claims, all in `admin-guide-operations-reference`.
+3. **Edition model**: ✅ **FIXED 2026-11-01 (batch 2):** Personal / Professional / Enterprise → Basic / Standard /
+   Advanced in 16 plan / admin-guide docs (156 lines; lines that cite the old names as history kept them);
+   `plan-editions` Java floor (compile target 27 — the table and two "stays 24" statements, the stale "two
+   documents claim 26"), profile count (three edition profiles + `coverage`, ×2), example count (49 examples,
+   144 `.toon`); `plan-surfaces` `/bootstrap` edition derivation (`basic | standard | advanced` from
+   `BootstrapRoutes.edition()`). Module and jar counts were already guarded (21 / 28). ⏸ Still open:
+   `layer/product/plan-maturity-assessment`, where "Enterprise" is often the market word — fix by hand.
+4. **Counts that drifted**: ✅ **FIXED 2026-11-01 (batch 2), re-measured that day:** `plan-control-api`
+   (OpenAPI 487 paths / 581 operations, 147 hand-written + 434 generated of which 186 optional-module;
+   `@PublicApi` 244 files, 256 of 286 `since` values `4.0.0`; `WriteGates` 71 main files / 253 call lines);
+   `plan-tooling` (61 `check-*.mjs`, 3 CI jobs, `.claude/` = 3 entry docs + memory, 4 agents, 5 hooks, 12
+   skills, 50 tracked files); `plan-surfaces` (22 capabilities, 17 `features` keys, 17 Settings sections, 51
+   route files); `plan-compliance` (9 evidence files; the assistant module is packaged since `PKG-5`) — 16 claims.
+   Not changed: ETag call sites and the `WriteGates` importer count (no such count left in the docs),
+   `plan-compliance`'s 89 locked dependencies (guarded, correct).
 5. **Stale `file:line` citations**, everywhere. Cite the symbol, not the line; drop the numbers on the next touch.
-6. **Dangling BACKLOG pointers**: `CLIENT-HALVES-1`, `SPEC-STALEREF-1`, `SPEC-NOPROOF-1`, `OPENAPI-GEN-1`,
-   `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (wrong row), `SEC-INCIDENT-1`.
+6. **Dangling BACKLOG pointers**: ✅ **FIXED 2026-11-01 (batch 2):** `CLIENT-HALVES-1` (×4 — row closed),
+   `OPENAPI-GEN-1` (shipped 2026-09-15), `SEC-INCIDENT-1` (`plan-compliance` §5.2 said the carry-forwards were
+   not done; the controls matrix CC6.1 records both done), `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` in
+   `plan-editions` (×2 → the *Deployment topology live validation* row) — 8 claims. ⏸ Still open:
+   `SPEC-STALEREF-1` / `SPEC-NOPROOF-1` in the "filed as cross-cutting rows" blockquotes of ~12 plans.
 7. **Batch 2 (config, connectors, engine, etl)**: `plan-metamodel` (30 writable kinds not 24; delete protection also owner-only, stranded-objects and runbook-link 409s; schemas already use `mapping.fields[]`; the Components pane does send `If-Match`; `transform.mask` enforces classification; `findings-spec` editor and Entity Projection are built); `plan-spaces` (13 templates not 2 or 5; telco-fraud is `minEdition: standard`; test counts; zero Spaces is a clean state); `plan-pipeline-execution` (23 built-in maintenance tasks + 5 contributed; six trigger kinds; DuckDB memory default exists; `JobDeadline`, replay-rejects, retry block, scaffold-step and Platform Services stages 2/3 all shipped; parity gate met); `plan-pipeline-authoring` (SQL is guarded on save; 46 node types; Step-kind registry seam is live); `plan-warehouse-targets` (`sinks:` fan-out, `objectstore.export` and `publish.postgres` are built); `plan-ingestion` (Expectations UI exists; 144 example `.toon`); `connectors` runbook (seven schemes, secrets from `inspecto-secrets`); `entity-store/admin-guide` (`masking_mode`); `entity-list/plan` (`LA17-NORMALISER-CHANGE-1` closed).
 8. **Minor**: `admin-guide-gotchas` (JToon tabular round-trip, `dirs.*` jail, `source:` vs `collector:`),
    `admin-guide-local-testing` (demo-users template, Postgres default on Advanced, edition detection),

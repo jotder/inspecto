@@ -15,6 +15,7 @@ import {
     PackTerms,
     frontierCapStop,
     growExpandBody,
+    newExpandGroup,
     growIds,
     heldReason,
     listsInForce,
@@ -204,13 +205,28 @@ export class GrowExcludeStore {
      */
     private readonly expandRun = signal<{ id: string; steps: number[] } | null>(null);
 
-    /** The Degrees of the last Expand while its steps are still the newest effective ones; null = the stepper is not bound. */
-    readonly lastExpandDegrees = computed<number | null>(() => {
-        const run = this.expandRun();
-        if (!run || run.id !== this.investigation.activeId()) return null;
+    /**
+     * The last Expand's steps while they are still the newest effective ones, with the `group` its newest step carries.
+     * LA-DEGREES-TRIM-2: without a run recorded in this browser (a reopened Investigation) it is the newest effective
+     * steps sharing the newest `expand`'s group; a step log recorded before groups existed binds nothing.
+     */
+    private readonly boundRun = computed<{ id: string; steps: number[]; group?: string } | null>(() => {
+        const id = this.investigation.activeId();
+        if (!id) return null;
         const ops = (this.investigation.log()?.entries ?? []).filter((e) => e.kind === 'op' && e.undoneBy == null);
-        return ops.slice(-run.steps.length).map((e) => e.step).join(',') === run.steps.join(',') ? run.steps.length : null;
+        const last = ops.at(-1);
+        const group = last?.op === 'expand' ? last.params?.group : undefined;
+        const run = this.expandRun();
+        if (run?.id === id && ops.slice(-run.steps.length).map((e) => e.step).join(',') === run.steps.join(','))
+            return { ...run, group };
+        if (!group) return null;
+        let i = ops.length;
+        while (i > 0 && ops[i - 1].op === 'expand' && ops[i - 1].params?.group === group) i--;
+        return { id, steps: ops.slice(i).map((e) => e.step), group };
     });
+
+    /** The Degrees of the last Expand while its steps are still the newest effective ones; null = the stepper is not bound. */
+    readonly lastExpandDegrees = computed<number | null>(() => this.boundRun()?.steps.length ?? null);
 
     /** After Save replayed an unsaved Expand as `degrees` steps: those newest steps are the last Expand. */
     bindLastExpand(degrees: number): void {
@@ -225,8 +241,8 @@ export class GrowExcludeStore {
      * naming it (a colleague's newer step is refused, never undone). The log keeps them as undone steps - it is append-only.
      */
     async trimLastExpand(degrees: number): Promise<boolean> {
-        const run = this.expandRun();
-        const have = this.lastExpandDegrees();
+        const run = this.boundRun();
+        const have = run?.steps.length;
         if (!run || !have || degrees < 1 || degrees >= have) return false;
         const drop = run.steps.slice(degrees);
         let done = 0;
@@ -255,14 +271,16 @@ export class GrowExcludeStore {
         const inv = this.investigation;
         const t = ctx.terms;
         let frontier = growIds(ctx, req);
-        const joined = extend && this.lastExpandDegrees() ? this.expandRun()!.steps : []; // read before the walk adds steps
+        const bound = extend ? this.boundRun() : null; // read before the walk adds steps
+        const joined = bound?.steps ?? [];
+        const group = bound?.group ?? newExpandGroup(); // a raise keeps the Expand's group, so a reload still sees one Expand
         const made: number[] = [];
         let admitted = 0;
         let links = 0;
         let held = 0;
         let stop = '';
         for (let d = 1; d <= req.degrees && frontier.length; d++) {
-            const body = growExpandBody(frontier, req, inv.withPresets(presets, {}));
+            const body = growExpandBody(frontier, req, inv.withPresets(presets, {}), group);
             if (!(await inv.apply(body))) {
                 if (!made.length) return false;
                 stop = ` Degree ${d} was refused: ${inv.error()}`;

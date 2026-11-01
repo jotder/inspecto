@@ -105,7 +105,9 @@ sentence this whole area turns on: **a clean run says nothing about what it decl
 
 ### 3.2 The guard roster
 
-This is the inventory that existed nowhere. **Twenty-five guard scripts, plus two inline pipeline checks** —
+This is the inventory that existed nowhere. ⚠ **Counts as of 2026-09; on 2026-11-01 `tools/` holds 61
+`check-*.mjs` scripts and `ci.yml` has three jobs (`guards`, `test`, `launchers-windows`)** — the list below is
+the original roster, not the whole set. **Twenty-five guard scripts, plus two inline pipeline checks** —
 twenty-two under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
 `check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-board-heads` · `check-coverage` ·
 `check-dependencies` · `check-sbom-modules` · `check-launchers`, and ten more listed here but not yet
@@ -298,8 +300,9 @@ current*; that sentence is **flatly false** — most of its files are cited from
 least two dozen as authority. Deleting it was proposed and **refuted**, and is now a gated step.
 
 **The shared setup lives in the repository, not a user profile**, so every shift gets an identical
-environment. It holds four session-entry documents, three read-only explorer agents, five hooks, nine
-skills, the permission and hook settings, and a development launch configuration. One hook does the thing
+environment. It holds three session-entry documents, the team memory (`.claude/memory/`), four agents
+(two read-only explorers, `verify-runner` and `verification`), five hooks, twelve skills, the permission and
+hook settings, and a development launch configuration (50 tracked files, 2026-11-01). One hook does the thing
 without which no local guard runs at all: it sets the hook path idempotently every session. ⚠ Two
 documents state the opposite of the tracking rule, saying this tree is ignored when 32 files are tracked.
 And a clone used outside the session tooling still needs the hook path set by hand, with nothing checking
@@ -494,7 +497,7 @@ name claims every edition is signed when **two of three** are, with no artifact 
 | Build and test practice | [`build-test.md`](spec-build-test.md); [`testing-and-build.md`](../product/tests-testing-build.md); [`design-system-tokens.md`](../product/spec-design-tokens.md) |
 | Branch and release policy | `docs/BRANCHING.md`; [`branching-release.md`](spec-branching-release.md) |
 | The docs lifecycle | `CLAUDE.md` §Documentation lifecycle; `docs/INDEX.md` |
-| The shared setup | `.claude/` — four entry documents, three agents, five hooks, nine skills, settings, launch configuration |
+| The shared setup | `.claude/` — three entry documents, team memory, four agents, five hooks, twelve skills, settings, launch configuration |
 | The guard roster in prose | `docs/PROJECT_NOTES.md` — the only prior inventory, and never a table |
 
 **Gap rows.** The doctrine page is a **rules register, not an inventory**: it never enumerates the roster

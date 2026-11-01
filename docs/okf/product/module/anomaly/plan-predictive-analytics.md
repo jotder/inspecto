@@ -117,7 +117,7 @@ without it; separable; absence breaks no security promise; carries its own risk:
   `<inspecto-anomaly-panel>`), a forecast chart (`<inspecto-chart>`, already draws the anomaly series band). `navFeature:
   predictive` hides everything when the module is absent (503 / unknown kind = absent).
 - **Editions / Offering:** add-on `predictiveAnalytics` in `offerings/standard.toon` (`status: planned` then `built`),
-  so Professional, Enterprise, Preview; **not Personal** (as D-AD4), unless OD-5 chooses otherwise; needs the
+  so Standard, Advanced, Preview; **not Basic** (as D-AD4), unless OD-5 chooses otherwise; needs the
   `tools/check-offerings.mjs` and bundle-module list entries anomaly had. Content ships as **Space Templates** (the unit of
   sale includes content): later `PACK-SALES-MARKETING-1` is a *function pack* (domain-neutral templates that `requires`
   `predictive` + BI) plus a retail industry pack - zero platform edits, by the binding pack rule.
@@ -240,8 +240,8 @@ validators; a new method is a field, not a new kind.
 only (clearest value, least label risk); (c) churn only. *Recommend (a)* if a pack demo is the goal, *(b)* if the least
 statistical exposure matters most.
 
-**OD-5 Edition and Offering placement.** (a) own add-on `predictiveAnalytics`, Professional and up, not Personal;
-(b) Enterprise only; (c) include in Personal for single-analyst forecasting. *Recommend (a)*, matching D-AD4.
+**OD-5 Edition and Offering placement.** (a) own add-on `predictiveAnalytics`, Standard and up, not Basic;
+(b) Advanced only; (c) include in Basic for single-analyst forecasting. *Recommend (a)*, matching D-AD4.
 
 **OD-6 Does the platform ever train?** (a) never in v1 - coefficients and parameters are authored config (S2-S4, S6);
 (b) yes for k-means and logistic regression in the JVM (S8-S10); (c) yes via an external runtime. *Recommend (a) for v1,
@@ -293,7 +293,7 @@ run S0 (decisions + glossary) only when the operator schedules the module.
 
 ## 9a. Decisions taken 2026-10-12 (operator interview)
 
-* **OD-1, OD-2, OD-3, OD-5** accepted as recommended: terms **Customer Segment** / **Segmentation Model**, **Churn Model**, **Forecast Model** with the umbrella **Prediction** (recorded in `GLOSSARY.md` section 4 on 2026-10-12); one new optional module `inspecto-predictive`; three component kinds; own add-on `predictiveAnalytics`, Professional and up, not Personal.
+* **OD-1, OD-2, OD-3, OD-5** accepted as recommended: terms **Customer Segment** / **Segmentation Model**, **Churn Model**, **Forecast Model** with the umbrella **Prediction** (recorded in `GLOSSARY.md` section 4 on 2026-10-12); one new optional module `inspecto-predictive`; three component kinds; own add-on `predictiveAnalytics`, Standard and up, not Basic.
 * **OD-4, OD-6, OD-9** all three thin 'declared' first slices (RFM segmentation, churn score with AUTHORED coefficients, forecasting with a stored backtest); the platform never trains in v1; no new dependency (hand-written JVM/DuckDB kernels); platform-fitted models are decided after S6; external ML runtimes refused.
 * **OD-7, OD-8, OD-14** maker-checker on every model save and on promotion of a fitted version (a promotion writer needs an operator-approved inventory row when built); reuse the existing gates and mask keys like scores; a compliance sign-off gates any customer-facing template, not the engine module.
 * **OD-17** priority stays P3 and design-only: S0 (decisions + glossary) is DONE with this record; no kernel work until the operator schedules the module.

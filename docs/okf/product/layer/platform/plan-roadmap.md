@@ -14,7 +14,7 @@
 | T2 | **Breadth of ingestion** | Object storage and more native formats widen the addressable feed set. | Next |
 | T3 | **Self-service authoring** | Visual Pipelines + AI assist move authoring from expert-only to operator-owned. | Now → Next |
 | T4 | **Trust & transparency** | Provenance/lineage + conservation checks as a default operational guarantee. | Now |
-| T5 | **Scale-out optionality** | Keep Enterprise distributed seams open without compromising the lean single-node core. | Later |
+| T5 | **Scale-out optionality** | Keep Advanced distributed seams open without compromising the lean single-node core. | Later |
 
 ---
 
@@ -43,16 +43,16 @@ one (the stream consumer) was filed as `STREAM-CONSUMER-1` and closed 2026-09-24
 and only `AUTHORING-REDESIGN-1` remains on the board (§3.4). ⛔ The board (`../../../../BACKLOG.md` §0) owns the
 queue order; this page records direction.
 
-### 3.1 `inspecto-security` module — Professional edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**
+### 3.1 `inspecto-security` module — Standard edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**
 
 > **Delivered.** `inspecto-security/` implements the core `Authenticator` / `Subject` / `TokenRelay` SPIs —
 > `OidcAuthenticator` (Nimbus JOSE+JWT, JWKS-validated), `RoleMapper`, `OidcTokenRelay` (renamed 2026-07-25, D15: no vendor of record) — joining the
 > reactor only under the `edition-standard` Maven profile. The browser never holds tokens (BFF exchange +
 > httpOnly `inspecto_rt` cookie with an `Origin` CSRF check); HTTPS is served by the pure-JDK `HttpsServer`.
 > **RBAC/ABAC completed 2026-07-24:** data-driven roles + a capability manifest, Access-Profile enforcement,
-> component sharing, WSO2 gateway trust, and the Enterprise **`inspecto-policy`** module
+> component sharing, WSO2 gateway trust, and the Advanced **`inspecto-policy`** module
 > (`-Pedition-advanced`) for authored Access Policies, seeded space isolation, and decision audit.
-> Personal remains genuinely auth-free. As-built:
+> Basic remains genuinely auth-free. As-built:
 > [`../../module/access/admin-guide-auth-security.md`](../../module/access/admin-guide-auth-security.md); residual
 > non-blocking opens in [`../../../../BACKLOG.md`](../../../../BACKLOG.md) §6.
 
@@ -63,7 +63,7 @@ The single most important item for commercialization.
 - **Approach:** incremental hardening on the framework-free core — **explicitly not** a Spring/Quarkus migration. At target user counts a framework buys nothing the IAM + small libraries don't, and a lean dependency tree is a compliance asset.
 - **Packaging:** delivered as the `inspecto-oidc` Maven module (formerly `inspecto-security`), assembled into the Professional build via a profile; Personal simply doesn't bundle it.
 - **Dependency:** unblocks revenue. Should precede anything that needs per-tenant or per-role gating.
-- **Exit criteria:** a Professional build authenticates against a reference IAM, enforces a role matrix, serves over HTTPS, and produces an actor-attributed audit log — with the Personal build unchanged and still auth-free.
+- **Exit criteria:** a Standard build authenticates against a reference IAM, enforces a role matrix, serves over HTTPS, and produces an actor-attributed audit log — with the Basic build unchanged and still auth-free.
 
 ### 3.2 Object-storage & network-share connectors (T2) · Effort: **M–L** · ✅ **SHIPPED (object storage) 2026-07-22**
 
@@ -109,7 +109,7 @@ The single most important item for commercialization.
 
 | ID | Item | Effort | Trigger |
 |---|---|---|---|
-| L1 | **Enterprise distributed tier** — shared-state backends (Postgres status store, object-store events, shared secrets), distributed scheduler coordination, work distribution, per-tenant ABAC | XL | A deployment whose scale or multi-tenancy actually exceeds the single-node design |
+| L1 | **Advanced distributed tier** — shared-state backends (Postgres status store, object-store events, shared secrets), distributed scheduler coordination, work distribution, per-tenant ABAC | XL | A deployment whose scale or multi-tenancy actually exceeds the single-node design |
 | L2 | **Richer "AI behind every screen" UX** — inline natural-language authoring across the console | M | ✅ **SHIPPED as AGT-6a — A1–A5, 2026-07-26/28** (plan archived 2026-09-09: [`../../../../archived-documents/plans-archive/agt-6-plan.md`](../../../../archived-documents/plans-archive/agt-6-plan.md) §3). 🔴 Corrected 2026-09-09 — this row still read "Promoted, MoSCoW `Should`" with no mention that it had shipped. The residue is breadth (12 panes measured; none adopted since 2026-07-26), not capability** — no longer demand-gated: it reuses the shipped L1 draft tools (no new backend capability) and local models suffice, so GPU availability is not a gate. Still listed here pending a horizon refresh of this table. |
 | L3 | **Multi-step agent graphs** — provision → watch → roll back orchestration | L | **= AGT-6b**, scoped in [`../../../../archived-documents/plans-archive/agt-6-plan.md`](../../../../archived-documents/plans-archive/agt-6-plan.md) §4. Demand beyond the three code-defined seeded runbooks — **plus** one upstream prerequisite: the eoiagent per-tool `DryRunProvider` seam, without which a model-composed plan cannot be previewed per step. |
 | ~~L4~~ | ✅ **Push/event-notification discovery — SHIPPED 2026-07-08 as `ACQ-6`, not Later.** `POST /collectors/{id}/notify` triggers an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. 🔴 Corrected 2026-09-09 (docs-consolidation step 6): this row's stated trigger — "a source that emits change notifications" — had already been met and the work delivered fourteen months of roadmap-time earlier than this table claims. | — | — |
@@ -159,7 +159,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 
 | Theme | Measure |
 |---|---|
-| Commercial readiness | A Professional build deployable against a reference IAM with a working role matrix and HTTPS; Personal build unchanged. |
+| Commercial readiness | A Standard build deployable against a reference IAM with a working role matrix and HTTPS; Basic build unchanged. |
 | Breadth of ingestion | Number of source backends and parsing frontends onboarding with zero core change. |
 | Self-service | Share of feeds authored/operated entirely from the console vs. hand-edited config. |
 | Trust & transparency | Provenance enabled on production Pipelines; conservation alerts surfaced and triaged as managed objects. |
@@ -172,7 +172,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 - **Separate edition branches/forks** — editions are build flavors; there is one mainline.
 - **A web-framework migration (Spring/Quarkus)** — the framework-free core is a feature (small SBOM, fewer CVEs), not a gap.
 - **Fine-tuning / model training** — off-the-shelf instruct models + retrieval + grammar-constrained decoding instead.
-- **Distributed-by-default execution** — against the crash-isolated single-JVM ethos; available as the opt-in Enterprise tier only.
+- **Distributed-by-default execution** — against the crash-isolated single-JVM ethos; available as the opt-in Advanced tier only.
 
 ---
 
