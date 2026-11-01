@@ -424,7 +424,7 @@ lower-is-better, `_rps`/`_qps` higher-is-better.
 | `scan` | `tools/bench/DuckDbBench.java` | 5M-row parquet Dataset: filter+aggregate, high-cardinality group-by, count distinct, top-N |
 | `readers` | `DuckDbBench.java` | 1/4/8 concurrent readers (`duplicate()` connections) on one file-backed database |
 | `csv` | `DuckDbBench.java` | 2M-row `read_csv`, transform SQL, `COPY ... PARTITION_BY` parquet (the `DuckDbCsvIngester` shape) |
-| `store` | `DuckDbBench.java` | file-backed INSERT / `ON CONFLICT` throughput in the dedup-ledger, status, events and status re-sync shapes (same SQL idioms as the `Db*Store` classes, not the classes themselves) |
+| `store` | `DuckDbBench.java` | file-backed INSERT / `ON CONFLICT` throughput in the dedup-ledger, status, events and status re-sync shapes (same SQL idioms as the `Db*Store` classes, not the classes themselves); `ledger_bulk_*` and `resync_bulk_rps` are the Appender shapes `DbDedupLedger.claim` and `DbStatusStore.sync` use on DuckDB since `OPSTORE-BULK-INSERT-1` |
 | `la1m`, `la10m`, `la100m` | `IndexScaleBench` via `mvn -o -pl :inspecto-la-storage` | index build (once per label), one-hop (1 and 20 keys), hub key, depth-2 walk; p50/p95 per rep. 1M/10M reuse the `-ScaleDir` data and build a per-label index under `<OutDir>`; `la100m` is **read-only** on the existing `idx-100000000` |
 | `engine` | `PluginIngestBenchmark` via `mvn -o -pl :inspecto-engine` | the engine's real streaming ingest, transform and partitioned parquet write, union and generation modes (1M rows x `-Scale`) |
 

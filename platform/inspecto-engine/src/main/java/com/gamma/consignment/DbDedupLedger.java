@@ -129,11 +129,22 @@ public final class DbDedupLedger implements AutoCloseable {
      *
      * <p>The insert is {@code ON CONFLICT DO NOTHING}, so a concurrent claim of the same key resolves in
      * the database rather than in a race between two reads.
+     *
+     * <p>On DuckDB (OPSTORE-BULK-INSERT-1) the hashes go through an Appender into a per-call TEMP staging
+     * table and ONE {@code INSERT … SELECT … ON CONFLICT DO NOTHING RETURNING key_hash} claims them all:
+     * {@code RETURNING} yields only the rows actually inserted, which is exactly the won set. A
+     * row-per-statement insert into a file-backed DuckDB runs at a few hundred rows/s, and one call carries
+     * every distinct key of a Consignment's window. Postgres keeps the per-row statement: its pool is truly
+     * concurrent, and per-row autocommit cannot deadlock two overlapping claims.
      */
     public Set<String> claim(String pipeline, java.time.LocalDate windowStart,
                              String consignmentId, List<String> keyHashes) throws SQLException {
         Set<String> won = new LinkedHashSet<>();
         if (keyHashes.isEmpty()) return won;
+        if (!src.isPostgres()) {
+            src.run(conn -> claimBulk(conn, pipeline, windowStart, consignmentId, keyHashes, won));
+            return won;
+        }
         String sql = "INSERT INTO inspecto_dedup_keys "
                 + "(pipeline, key_hash, window_start, consignment_id, first_seen) "
                 + "VALUES (?, ?, ?, ?, now()) ON CONFLICT DO NOTHING";
@@ -150,6 +161,47 @@ public final class DbDedupLedger implements AutoCloseable {
             }
         });
         return won;
+    }
+
+    /**
+     * The DuckDB claim: Appender into a TEMP staging table, then one set insert. The DuckDB source hands out
+     * ONE synchronized connection, so no other claim runs on it meanwhile; the staging name is still unique
+     * per call so a leftover from a failed drop can never be read as this call's input.
+     */
+    private static void claimBulk(Connection conn, String pipeline, java.time.LocalDate windowStart,
+                                  String consignmentId, List<String> keyHashes, Set<String> won) throws SQLException {
+        String stage = "dedup_stage_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE TEMP TABLE " + stage + " (key_hash VARCHAR)");
+        }
+        try {
+            try (org.duckdb.DuckDBAppender app = conn.unwrap(org.duckdb.DuckDBConnection.class)
+                    .createAppender("temp", "main", stage)) {
+                for (String h : keyHashes) {
+                    app.beginRow();
+                    app.append(h);
+                    app.endRow();
+                }
+            }
+            // DISTINCT: one window's list can repeat a hash (two event dates in one window).
+            try (PreparedStatement ps = conn.prepareStatement("INSERT INTO inspecto_dedup_keys "
+                    + "(pipeline, key_hash, window_start, consignment_id, first_seen) "
+                    + "SELECT ?, key_hash, ?, ?, now() FROM (SELECT DISTINCT key_hash FROM temp.main." + stage + ") "
+                    + "ON CONFLICT DO NOTHING RETURNING key_hash")) {
+                ps.setString(1, pipeline);
+                ps.setObject(2, windowStart);
+                ps.setString(3, consignmentId);
+                Set<String> inserted = new java.util.HashSet<>();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) inserted.add(rs.getString(1));
+                }
+                for (String h : keyHashes) if (inserted.contains(h)) won.add(h);   // the caller's order, as before
+            }
+        } finally {
+            try (Statement st = conn.createStatement()) {
+                st.execute("DROP TABLE IF EXISTS temp.main." + stage);
+            }
+        }
     }
 
     /**

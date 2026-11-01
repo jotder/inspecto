@@ -261,6 +261,9 @@ CREATE TABLE IF NOT EXISTS inspecto_ops_notes (
 File: `inspecto-status.db` (legacy `ucc-status.db` auto-renamed on open)
 
 Five append-only projection tables. `payload` is the JSON record; `seq` orders events within a pipeline.
+`sync` rewrites each pipeline's rows in one transaction; on DuckDB the rows go through an Appender, which writes
+inside that transaction, so a failed sync still rolls back every table (`OPSTORE-BULK-INSERT-1`, pinned by
+`DbStatusStoreTest.aFailedBulkSyncRollsBackEveryTable`). Postgres keeps the batched `INSERT`.
 
 #### `inspecto_run_lease` — cross-process run exclusion (`DbRunLease`, phase B, 2026-09-12)
 
@@ -898,6 +901,11 @@ NOTHING` and returns only the hashes it won, so **first committed wins** — the
 racing Consignments, not a check-then-insert. Keys are **hashed, never verbatim** (operator decision
 2026-09-01 — an MSISDN table is a data-protection surface the other ledgers don't have), so the table
 cannot say WHICH key collided; the losing rows still leave on the `duplicate` relation.
+On DuckDB a claim is ONE statement (`OPSTORE-BULK-INSERT-1`, 2026-11-01): the hashes go through an Appender into
+a per-call TEMP staging table, then `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING RETURNING key_hash` inserts
+them all, and `RETURNING` (only the inserted rows) is the won set. One call carries every distinct key of a
+Consignment's window, and a row per statement ran at a few hundred rows/s. Postgres keeps the row-per-statement
+claim: its pool is truly concurrent and per-row autocommit cannot deadlock two overlapping claims.
 `retract(consignment_id)` releases a superseded Consignment's claims (`ReprocessCommand` step 4b —
 without it a reprocess would re-ingest into "already seen" and drop every row permanently);
 `prune(cutoff)` advances the window by the claims' own `window_start` (event time, never mtime) via the

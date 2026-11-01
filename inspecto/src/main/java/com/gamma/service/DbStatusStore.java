@@ -7,6 +7,8 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
 import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
+import org.duckdb.DuckDBAppender;
+import org.duckdb.DuckDBConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -267,6 +269,17 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     }
 
     private void insertCommits(Connection conn, String pipeline, Set<String> ids) throws SQLException {
+        if (!src.isPostgres()) {
+            try (DuckDBAppender app = appender(conn, T_COMMITS)) {
+                for (String id : ids) {
+                    app.beginRow();
+                    app.append(pipeline);
+                    app.append(id);
+                    app.endRow();
+                }
+            }
+            return;
+        }
         try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT INTO " + T_COMMITS + " (pipeline, batch_id) VALUES (?, ?)")) {
             for (String id : ids) {
@@ -291,6 +304,20 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
     private void insertRows(Connection conn, String table, String pipeline,
                             List<Map<String, String>> rows, String batchIdKey) throws SQLException {
         boolean withBatchId = batchIdKey != null;
+        if (!src.isPostgres()) {
+            try (DuckDBAppender app = appender(conn, table)) {
+                long seq = 0;
+                for (Map<String, String> row : rows) {
+                    app.beginRow();
+                    app.append(pipeline);
+                    if (withBatchId) app.append(row.get(batchIdKey));
+                    app.append(seq++);
+                    app.append(render(row));
+                    app.endRow();
+                }
+            }
+            return;
+        }
         String sql = withBatchId
                 ? "INSERT INTO " + table + " (pipeline, batch_id, seq, payload) VALUES (?, ?, ?, ?)"
                 : "INSERT INTO " + table + " (pipeline, seq, payload) VALUES (?, ?, ?)";
@@ -391,6 +418,15 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                 return rs.next();
             }
         }
+    }
+
+    /**
+     * DuckDB bulk path (OPSTORE-BULK-INSERT-1): a batched {@code INSERT} into a file-backed DuckDB runs at a
+     * few hundred rows/s and a sync rewrites every row of every pipeline. The Appender writes inside the
+     * connection's open transaction, so {@link #sync}'s rollback still discards it. Column order is the DDL's.
+     */
+    private static DuckDBAppender appender(Connection conn, String table) throws SQLException {
+        return conn.unwrap(DuckDBConnection.class).createAppender("", table);
     }
 
     private static String name(PipelineConfig cfg) {

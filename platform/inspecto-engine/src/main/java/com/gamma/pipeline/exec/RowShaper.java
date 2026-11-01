@@ -596,8 +596,9 @@ public final class RowShaper {
             if (lost.isEmpty()) return;
             String lostTbl = table(prefix, "lost");
             exec(conn, "CREATE TABLE " + q(lostTbl) + " (kh VARCHAR)");
-            try (var ps = conn.prepareStatement("INSERT INTO " + q(lostTbl) + " VALUES (?)")) {
-                for (String h : lost) { ps.setString(1, h); ps.executeUpdate(); }
+            // Appender, not a row per statement (OPSTORE-BULK-INSERT-1): a re-ingest loses every key.
+            try (var app = conn.unwrap(org.duckdb.DuckDBConnection.class).createAppender("", lostTbl)) {
+                for (String h : lost) { app.beginRow(); app.append(h); app.endRow(); }
             }
             try {
                 exec(conn, "INSERT INTO " + q(dup) + " SELECT * EXCLUDE(__kh, __ed) FROM " + q(keyed)
