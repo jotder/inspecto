@@ -1,0 +1,8 @@
+id: module.predictive
+kind: module
+title: Predictive Analytics
+parent: layer.features
+module: predictive
+billable: false
+status: ga
+docs: docs/okf/product/module/predictive/index.md

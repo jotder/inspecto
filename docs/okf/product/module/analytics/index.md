@@ -37,7 +37,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ANALYTICS-CORE-1` | P2 | feature | one home for data operations and statistics; minimise duplicate data-operations code across modules. | — |
 | `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the looping / graph-style query candidates now that 2.0.0.0 is pinned: C1 / C2 USING KEY recursion behind SqlGraphEngine (Analytics C7),… | — |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
-| `PREDICTIVE-SEGMENT-RFM-1` | P3 | feature | a Segmentation Model component kind and a predict.segment Job: declared RFM bins and a label table; its Instance is a Customer Segment as… | — |
 | `PREDICTIVE-CHURN-DECLARED-1` | P3 | feature | a Churn Model kind: a declared-coefficient logistic score with contributions, insufficient when history is short, and an afterScore pendi… | — |
 | `PREDICTIVE-FORECAST-1` | P3 | feature | a Forecast Model kind: seasonal-naive and Holt-Winters with an interval and the backtest error stored. | — |
 | `PREDICTIVE-SURFACE-1` | P3 | feature | the read and preview routes (four gates), Studio panes, the entity panel and the forecast chart for the Predictive add-on. | — |

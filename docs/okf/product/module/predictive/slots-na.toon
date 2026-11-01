@@ -1,0 +1,3 @@
+plan: the design of record is plan-predictive-analytics.md in the module/anomaly hub (PREDICTIVE-ANALYTICS-1, parked); this hub holds the as-built slices
+user-guide: no screens yet; the Studio pane and read routes are PREDICTIVE-SURFACE-1
+api: the module has no routes yet; they are PREDICTIVE-SURFACE-1

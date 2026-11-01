@@ -76,6 +76,9 @@ public final class ComponentStore {
                     // Anomaly Model (ANOMALY-DETECTION-1): per-entity robust baselines over Measure features, scored by
                     // the anomaly.score Job (com.gamma.anomaly.AnomalyModel validates it at save; module inspecto-anomaly).
                     "anomaly-model",
+                    // Segmentation Model (PREDICTIVE-SEGMENT-RFM-1): declared RFM bins + a label table, run by the
+                    // predict.segment Job (com.gamma.predictive.SegmentationModel validates it at save; module inspecto-predictive).
+                    "segmentation-model",
                     // Notification channel destinations (NotificationRoutes /notifications/channels* admin
                     // CRUD, 2026-07-18): the managed record of where a channel delivers; live delivery still
                     // resolves channels from notify.* JVM flags (ChannelConfig).

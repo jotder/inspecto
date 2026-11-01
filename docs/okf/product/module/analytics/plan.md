@@ -25,7 +25,7 @@ ratcheting duplication guard (Must items M1–M10).
   [`check-data-ops-duplication.mjs`](../../../../../tools/check-data-ops-duplication.mjs) (`--ratchet`).
 - **Shoulds S1–S8:** similarity kit, entity grouping, distribution Steps, rank / sample / pivot, forecasting base,
   temporal motif matcher, the `analytics` Platform Service, aggregation moved to SQL.
-- **Coulds:** C1 windowed and ratio Measures, C2 k-means, C3 logistic regression, C4 isolation forest
+- **Coulds:** C1 windowed and ratio Measures (first consumer: Customer Segments, `PREDICTIVE-SEGMENT-RFM-1`, 2026-11-01 — [`spec-segmentation.md`](../predictive/spec-segmentation.md)), C2 k-means, C3 logistic regression, C4 isolation forest
   (`ANOMALY-ML-SCORING-1`), C5 hour-of-week seasonality, C6 change-point kernel, C8 function catalogue
   (`GET /analytics/functions`), C9 cohort retention and funnel.
 - **Steps for C6 and C9 (2026-11-01, `ANALYTICS-STEPS-TS-1`):** `transform.timeseries.changepoint`,
