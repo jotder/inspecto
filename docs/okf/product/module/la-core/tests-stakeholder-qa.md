@@ -121,10 +121,11 @@ Confidence: PROVEN.
 There is deliberately no purge today: the Investigation store is append-only evidence, with no retention period,
 purge task or legal-hold record (operator decision D-U8, 2026-09-24). Drafts are different: they hibernate after
 60 minutes and expire after 30 days by default, as a discard, with at most 50 open per Space. If a regulator
-requires deletion, that decision is to be reopened, copying the existing incident purge pattern. There is also no
-Investigation delete route today.
-Evidence: feature page D-U8; backend §3.3 (Draft defaults) and §6.2 ("no Investigation delete or close route").
-Confidence: DOCUMENTED. A retention and deletion capability for Investigations is NOT YET built.
+requires deletion, that decision is to be reopened, copying the existing incident purge pattern. A lead can delete
+one Investigation by hand (`DELETE /inv/investigations/{id}`, `LA-INVESTIGATION-DELETE-1`; refused while it is linked
+to an open Case or holds a pending approval, and audited).
+Evidence: feature page D-U8; backend §3.3 (Draft defaults) and §6 (the Investigations row).
+Confidence: DOCUMENTED. A retention period or scheduled purge for Investigations is NOT YET built.
 
 **Q12. What copies of the data can leave the system, and are they masked?**
 Exports a person can make are the Dossier (JSON or self-contained HTML), the sealed Dossier bundle with references, and

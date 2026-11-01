@@ -55,7 +55,7 @@ import {
     windowLabel,
 } from './investigate-number';
 import { laLimit } from './la-limits';
-import { growExpandBody } from './grow-exclude';
+import { growExpandBody, newExpandGroup } from './grow-exclude';
 import {
     UnsavedBinding,
     UnsavedInvestigation,
@@ -309,6 +309,7 @@ export class InvestigationSessionStore {
         // cannot apply the profile presets (window, minimum events, row budget, fan-out), so the server may have admitted
         // fewer: each list is spoken in this Investigation's ids (\`exploreAliases\`), kept to what the Working Set holds,
         // and a degree whose values the server never admitted expands from what the server's previous degree admitted.
+        const group = newExpandGroup(); // LA-DEGREES-TRIM-2: every degree of this Expand carries it
         if (step.walked) {
             let recorded = 0;
             let admitted = step.from === 'outer' ? this.outerFrontier(step, b) : [];
@@ -319,7 +320,7 @@ export class InvestigationSessionStore {
                 const named = [...new Set(values.map((v) => back.get(v) ?? v))].filter((id) => held.has(id));
                 const ids = named.length ? named : admitted;
                 if (!ids.length) break;
-                if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
+                if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}), group)))) return { ok: false, recorded };
                 recorded++;
                 const done = this.lastStep();
                 if (done?.status === 'pending') return { ok: 'held', recorded };
@@ -332,7 +333,7 @@ export class InvestigationSessionStore {
         let frontier = step.ids;
         if (step.from === 'outer') frontier = this.outerFrontier(step, b);
         for (let d = 1; d <= step.req.degrees && frontier.length; d++) {
-            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}))))) return { ok: false, recorded };
+            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}), group)))) return { ok: false, recorded };
             recorded++;
             const done = this.lastStep();
             if (done?.status === 'pending') return { ok: 'held', recorded };

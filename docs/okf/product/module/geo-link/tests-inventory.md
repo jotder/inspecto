@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-121 test class(es): 18 unit, 103 real-HTTP control-plane, 0 IT.
+122 test class(es): 18 unit, 104 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -76,6 +76,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiInvestigationEntityListOpsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEntityListOpsTest.java` | LA-17 step 4 — the Entity List ops {@code excludeBy} and {@code seedBy} over real HTTP, against the op contract |
 | `ControlApiInvestigationEventsWeightTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEventsWeightTest.java` | The Investigation's optional {@code eventsCol} over real HTTP: on a pre-aggregated Dataset (one row per pair and kind, with |
 | `ControlApiInvestigationEvidentialControlsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationEvidentialControlsTest.java` | LA-19 — the evidential controls that are decided: the {@code annotate} op (per-entity annotation) and the coverage |
+| `ControlApiInvestigationExpandGroupTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationExpandGroupTest.java` | LA-DEGREES-TRIM-2, over real HTTP: the {@code group} the client puts on every {@code expand} of one Expand is stored as |
 | `ControlApiInvestigationFourEyesRaceTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationFourEyesRaceTest.java` | D-U7 four-eyes under a race, over real HTTP: several approvers decide ONE pending request at the same instant and exactly one |
 | `ControlApiInvestigationHopLadderTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationHopLadderTest.java` | LA-13 — the hop ladder and the time model over real HTTP: every rung field of plan §2.4, the {@code window} op, |
 | `ControlApiInvestigationHubDegreeTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationHubDegreeTest.java` | The supernode degree surfaced and served from the edge index, over real HTTP: |

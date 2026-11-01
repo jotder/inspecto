@@ -452,7 +452,8 @@ export interface InvestigationHeader {
 /** One op's body. Ids are RAW Dataset values — the server compares `CAST(col AS VARCHAR)` exactly. */
 export type InvestigationOpRequest =
     | { op: 'seed'; ids: string[]; entityType?: string }
-    | ({ op: 'expand'; ids?: string[] } & ExpandRung)
+    /** `group` (LA-DEGREES-TRIM-2): the same id on every degree of one Expand, stored as given, so a reload knows them. */
+    | ({ op: 'expand'; ids?: string[]; group?: string } & ExpandRung)
     | { op: 'window'; window: InvestigationWindow | 'full' }
     | { op: 'exclude'; ids: string[]; reason: string }
     | { op: 'hide' | 'keep'; ids: string[] }
@@ -784,6 +785,8 @@ export interface InvestigationLogEntry {
         min?: number;
         max?: number;
         label?: string;
+        /** An expand's Expand id (LA-DEGREES-TRIM-2); absent on steps recorded before it. */
+        group?: string;
     } & Omit<ExpandRung, 'window'> & {
             window?: 'inherit' | 'full' | InvestigationWindow | null;
         };
