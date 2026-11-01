@@ -58,6 +58,7 @@ public final class OidcAuthenticator implements Authenticator {
     private final String gatewayHeader;
     private final String rolesClaim;
     private final RoleMapper.Keycloak keycloak;   // null = not the keycloak preset (or rolesClaim set explicitly)
+    private final MachineTrust machineTrust;      // null = no -Dauth.oidc.clients: every client of the issuer
 
     /** No-arg constructor required by {@code ServiceLoader}; reads {@code -Dauth.oidc.*}. */
     public OidcAuthenticator() {
@@ -69,7 +70,8 @@ public final class OidcAuthenticator implements Authenticator {
                 System.getProperty("auth.oidc.gateway.issuer"),
                 System.getProperty("auth.oidc.gateway.audience"),
                 System.getProperty("auth.oidc.gateway.header", "X-JWT-Assertion"),
-                keycloakRoles());
+                keycloakRoles(),
+                MachineTrust.fromSystemProperties());
     }
 
     /** Explicit-config seam (tests use an in-memory {@code ImmutableJWKSet} — no network dependency). */
@@ -89,8 +91,17 @@ public final class OidcAuthenticator implements Authenticator {
     OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim,
                       JWKSource<SecurityContext> gatewayJwkSource, String gatewayIssuer, String gatewayAudience,
                       String gatewayHeader, RoleMapper.Keycloak keycloak) {
+        this(jwkSource, issuer, audience, rolesClaim, gatewayJwkSource, gatewayIssuer, gatewayAudience,
+                gatewayHeader, keycloak, null);
+    }
+
+    /** Full seam plus the client pin for machine tokens ({@code null} = off: any client of the issuer, as before). */
+    OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim,
+                      JWKSource<SecurityContext> gatewayJwkSource, String gatewayIssuer, String gatewayAudience,
+                      String gatewayHeader, RoleMapper.Keycloak keycloak, MachineTrust machineTrust) {
         this.rolesClaim = rolesClaim;
         this.keycloak = keycloak;
+        this.machineTrust = machineTrust;
         this.processor = processor(jwkSource, issuer, audience);
         this.gatewayProcessor = gatewayJwkSource == null ? null
                 : processor(gatewayJwkSource, requireValue(gatewayIssuer, "auth.oidc.gateway.issuer"),
@@ -158,6 +169,10 @@ public final class OidcAuthenticator implements Authenticator {
             JWTClaimsSet claims = proc.process(token.trim(), null);
             String subjectId = claims.getSubject();
             if (subjectId == null || subjectId.isBlank()) return Optional.empty();
+            // OIDC-CC-CLIENT-PIN-1 / -LIFETIME-REPLAY-1: only after the signature is verified, so a forged
+            // token can never fill the replay cache. Bearer path only: a gateway assertion is the gateway's.
+            if (proc == processor && machineTrust != null && !machineTrust.admits(claims, java.time.Instant.now()))
+                return Optional.empty();
             // RBAC R1: the role → grant table is per-request — the bound space's authored roles.toon
             // overlaid on the seed (ControlApi stamps the config root on the exchange pre-auth).
             var defs = Roles.effective(ex);

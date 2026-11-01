@@ -33,13 +33,21 @@ Proven live against WSO2 Identity Server 7.3.0 and Keycloak
 ## Decided
 
 * **No IdP of record** (`access/admin-guide-auth-security.md`; not BACKLOG D15, which is the scale-out ZK call): the module stays vendor-neutral; the provider is configuration.
-* **Audience is warn-only**, not mandatory, so existing deployments keep booting (`warnIfNoAudience`).
+* **Audience is warn-only**, not mandatory, so existing deployments keep booting (`warnIfNoAudience`) — except
+  when `auth.oidc.clients` is set, which requires it.
+* **Machine-client trust is opt-in** (`OIDC-CC-CLIENT-PIN-1`, `OIDC-CC-LIFETIME-REPLAY-1`, 2026-11-01): a machine
+  token is one whose `azp` / `client_id` is listed in `auth.oidc.clients`, not a claim heuristic. The SPA client
+  (`auth.oidc.clientId`) is always admitted and never checked for lifetime or replay, so people's sign-in is
+  unchanged. Settings that would guard nothing (a ceiling or replay refusal without the list) refuse boot. The
+  gateway path is not pinned, and replay refusal is per node; DPoP / mTLS waits for demand.
 * **Fail closed at boot** when issuer or JWKS URI is missing, the provider value is unknown, or discovery fails.
 
 ## Left
 
 * Inbound OIDC client-credentials trust for Link Analysis integration: reviewed 2026-11-01, verdict
   **enable with conditions** ([security review](tests-security-review-oidc-client-credentials.md)). A machine token is
-  already accepted like a user's, so the conditions are deployment rules until the filed rows (in Open work) put them in code.
+  already accepted like a user's. Audience, client allowlist, https JWKS, lifetime ceiling and replay refusal are in
+  code as opt-in settings since 2026-11-01; the role and actor conditions stay deployment rules until the filed rows
+  (in Open work) put them in code.
 * A live check of the SPA's sign-in return path under a real token lapse needs a running provider
   (`ANOMALY-UI-FINDINGS-1`).

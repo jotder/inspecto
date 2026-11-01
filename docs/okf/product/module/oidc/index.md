@@ -34,7 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `OIDC-CC-CLIENT-PIN-1` | P3 | feature | pin which clients may call: audience required, a client allowlist, and an https JWKS when machine tokens are trusted. | — |
 | `OIDC-CC-INTEGRATION-ROLE-1` | P3 | feature | a machine principal gets one narrow integration grant in one Space, never a human capability. | — |
 | `OIDC-CC-MACHINE-ACTOR-1` | P3 | feature | the audit trail names the client id for a machine call, not a service-account UUID recorded as a user. | — |
-| `OIDC-CC-LIFETIME-REPLAY-1` | P3 | feature | an upper bound on token lifetime, and optional replay refusal, for machine tokens. | — |
