@@ -104,6 +104,11 @@ class DemoAuthHttpTest {
             assertEquals(200, probe.statusCode(), "a signed-in Demo User reaches an authenticated read: " + probe.body());
             HttpResponse<String> who = send(port, "GET", "/spaces/acme/bootstrap", analyst, null);
             assertTrue(who.body().contains("\"actor\":\"ra.analyst\""), "the actor is the Demo User: " + who.body());
+            // DEMO-AUTH-SUBJECT-DISPLAY-NAME-1: the Subject carries the Demo User's name, so every reader of
+            // Subject.displayName() (the session, an Investigation's recorded owner name - T-186) names them
+            // (the session's own field, which follows the actor - the picker lists every Demo User's name as well)
+            assertTrue(who.body().contains("\"actor\":\"ra.analyst\",\"displayName\":\"Demo RA Analyst\""),
+                    "the Subject's display name: " + who.body());
 
             String rule = "{\"name\":\"r1\",\"dataset\":\"d\",\"measure\":\"count\",\"comparator\":\"gt\",\"threshold\":1,\"severity\":\"WARNING\"}";
             assertEquals(403, send(port, "POST", "/spaces/acme/alerts/rules", analyst, rule).statusCode(),
