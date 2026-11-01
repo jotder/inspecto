@@ -144,6 +144,41 @@ class EvidenceMaskerTest {
         assertTrue(String.valueOf(m.mask("cust", "plan", "gold")).startsWith("masked:"), "even an unrelated column");
     }
 
+    // ── LINEAGE-SCHEMA-CLASS-LOST-1: a class survives a mapping.rules rename and a mis-named broken pipeline ──
+
+    @Test
+    void aRenameThroughASiblingMappingCsvKeepsTheClassLikeMappingFields(@TempDir Path space) throws Exception {
+        // the same m <- MSISDN rename as custMasker, but from cust_mapping.csv (read into mapping.rules, no fields)
+        Path config = Files.createDirectories(space.resolve("config"));
+        custMasker(config, "MSISDN", "");
+        Path schema = config.resolve("cust/cust_schema.toon");
+        String text = Files.readString(schema);
+        Files.writeString(schema, text.substring(0, text.indexOf("  fields[2]:\n    - name: m")));
+        Files.writeString(config.resolve("cust/cust_mapping.csv"),
+                "targetColumn,sourceExpression,transformType\nm,MSISDN,DIRECT\nplan,PLAN,DIRECT\n");
+        assertEquals(Map.of("m", "MSISDN", "msisdn", "MSISDN"), EvidenceMasker.schemaClassification(
+                config, java.util.Set.of("cust"), EvidenceMasker.SENSITIVE::contains));
+    }
+
+    @Test
+    void aBrokenPipelineWhoseFileNameDoesNotNameTheStoreStillFailsClosed(@TempDir Path space) throws Exception {
+        // ingest_pipeline.toon (name: cust) fails to load on a type typo in another field: it may be cust's
+        Path config = Files.createDirectories(space.resolve("config"));
+        custMasker(config, "MSISDN", "");
+        Files.move(config.resolve("cust/cust_pipeline.toon"), config.resolve("cust/ingest_pipeline.toon"));
+        Path schema = config.resolve("cust/cust_schema.toon");
+        Files.writeString(schema, Files.readString(schema).replace("PLAN,\"1\",VARCHAR", "PLAN,\"1\",VARCHR"));
+        assertEquals(Map.of(EvidenceMasker.UNKNOWN_LINEAGE, "UNKNOWN"), EvidenceMasker.schemaClassification(
+                config, java.util.Set.of("cust"), EvidenceMasker.SENSITIVE::contains));
+        // ...while a broken pipeline that declares another name is ruled out: cust is not over-masked by it
+        Path other = Files.createDirectories(space.resolve("other"));
+        custMasker(other, "MSISDN", "");
+        Files.writeString(other.resolve("cust/ingest_pipeline.toon"), Files.readString(other.resolve("cust/cust_pipeline.toon"))
+                .replace("name: cust", "name: billing").replace("schema_file: cust_schema.toon", "schema_file: nope.toon"));
+        assertEquals(Map.of("m", "MSISDN", "msisdn", "MSISDN"), EvidenceMasker.schemaClassification(
+                other, java.util.Set.of("cust"), EvidenceMasker.SENSITIVE::contains));
+    }
+
     // ── AUTHORING-REDESIGN-1 (e), operator 2026-10-11 (B): a sql Step's column classification is ADDITIVE only ──
 
     /** A sql Step after the mapping whose fields[] row {@code label} carries {@code stepClass}. */

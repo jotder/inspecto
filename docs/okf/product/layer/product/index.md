@@ -36,7 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | — |
-| `LINEAGE-SCHEMA-CLASS-LOST-1` | P2 | defect | a classified raw field can lose its class in the pipeline-schema lineage, so BI / share / evidence masking serves the stored column raw t… | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |

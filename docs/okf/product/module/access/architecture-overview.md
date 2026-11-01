@@ -116,6 +116,20 @@ Moved to [Identity and Access — API](api-access.md).
   networks; the default listens on every interface.
 - **Fail-closed documents**: an unreadable `roles.toon` suspends all role grants; an unreadable
   `access-policies.toon` denies every decision until fixed.
+- **Masking lineage fails closed on a broken pipeline (`LINEAGE-SCHEMA-CLASS-LOST-1`, 2026-11-01).** The pipeline-schema
+  lineage behind BI / share / evidence masking (`EvidenceMasker.schemaClassification` over `PipelineSchemas.forStore`)
+  marks a store `unreadable` (`{*=UNKNOWN}`, every column masked) when ANY `*_pipeline.toon` fails to load, unless that
+  file's TOON decodes and the identity it declares (`id`, else `name` lower-cased with spaces as `_`) and its `stream`
+  both name another store (`PipelineSchemas.claimsAnotherStore`). It used to check only whether the file NAME contained
+  the store, so `ingest_pipeline.toon` (`name: cust`) with a typo read as "no schema" and served raw. ⚠ The identity
+  derivation mirrors `PipelineConfigParser.parse`; change them together. A space with one undecodable or nameless
+  broken pipeline therefore masks every store's lineage-classified Datasets until the file is fixed (deliberate).
+- **A rename through `mapping.rules` carries the class (`LINEAGE-SCHEMA-CLASS-LOST-1`).** A legacy `mapping.rules[]`
+  (`processing.mapping_file`, or a sibling `*_mapping.csv`) is converted with `RecordTransform.fromMappingRules`, with
+  the precedence of `DataTransformer.recordFields` (a non-empty catalog `fields[]` wins), so `m <- MSISDN` gives
+  `{m=MSISDN, msisdn=MSISDN}` either way; a rule that cannot be converted fails closed. Tests:
+  `EvidenceMaskerTest.aRenameThroughASiblingMappingCsvKeepsTheClassLikeMappingFields`,
+  `…aBrokenPipelineWhoseFileNameDoesNotNameTheStoreStillFailsClosed`.
 - **Demo auth is not security**: anyone reaching the port can sign in as any Demo User. It refuses to load off
   loopback; a Demo User roster conflict disables sign-in with a `409` while the server keeps running.
 - **Discovery drift**: [Security §6.2](plan-security.md) records OIDC discovery as refused, but

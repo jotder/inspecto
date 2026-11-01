@@ -1,5 +1,6 @@
 package com.gamma.catalog;
 
+import com.gamma.config.io.ConfigCodec;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
 
@@ -116,8 +117,9 @@ public final class PipelineSchemas {
 
     /**
      * The pipelines under {@code configRoot} ({@code *_pipeline.toon}, outside {@code registry}) whose Stream or
-     * own name is {@code origin}. A file that fails to load and whose name contains the origin counts as
-     * {@code unreadable}: fail closed rather than read it as "no schema".
+     * own name is {@code origin}. A file that fails to load counts as {@code unreadable} unless its declared
+     * identity provably names another store ({@link #claimsAnotherStore}): fail closed rather than read it as
+     * "no schema". Never decided from the file name, which need not name the pipeline.
      */
     public static Found forStore(Path configRoot, String origin) {
         List<Entry> entries = new ArrayList<>();
@@ -140,7 +142,7 @@ public final class PipelineSchemas {
             try {
                 cfg = PipelineConfig.loadForValidation(f.toString());
             } catch (Exception e) {
-                if (f.getFileName().toString().toLowerCase(Locale.ROOT).contains(o)) unreadable = true;
+                if (!claimsAnotherStore(f, o)) unreadable = true;
                 continue;
             }
             if (!o.equalsIgnoreCase(cfg.identity().pipelineName()) && !o.equalsIgnoreCase(cfg.stream())) continue;
@@ -150,6 +152,29 @@ public final class PipelineSchemas {
             for (StepOutput so : stepOutputs(cfg)) stepColumns.addAll(so.columns());
         }
         return new Found(entries, reshaped, unreadable, List.copyOf(stepColumns));
+    }
+
+    /**
+     * Whether a pipeline file that failed to load is provably NOT {@code origin}'s: its TOON decodes and the
+     * identity and Stream it declares (derived as {@code PipelineConfigParser.parse} derives them: {@code id},
+     * else {@code name} lower-cased with spaces as {@code _}; {@code stream}, else that identity) both differ.
+     * Anything less (an undecodable file, no {@code name}) cannot be ruled out (LINEAGE-SCHEMA-CLASS-LOST-1).
+     */
+    private static boolean claimsAnotherStore(Path file, String origin) {
+        Map<String, Object> raw;
+        try {
+            raw = ConfigCodec.toMap(Files.readString(file));
+        } catch (Exception e) {
+            return false;
+        }
+        String id = raw.get("id") == null ? "" : String.valueOf(raw.get("id")).trim();
+        if (id.isEmpty()) {
+            if (raw.get("name") == null || String.valueOf(raw.get("name")).isBlank()) return false;
+            id = String.valueOf(raw.get("name")).toLowerCase().replace(' ', '_');
+        }
+        Object s = raw.get("stream");
+        String stream = s == null || s.toString().isBlank() ? id : s.toString().trim().toLowerCase().replace(' ', '_');
+        return !origin.equalsIgnoreCase(id) && !origin.equalsIgnoreCase(stream);
     }
 
     private static String firstNonBlank(String... vals) {

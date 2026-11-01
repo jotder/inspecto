@@ -492,7 +492,9 @@ are the values four-eyes approved (below).
   schemas.
   - A schema's `raw.fields[].classification` (sensitive classes only) follows its `mapping.fields[]`: a `keep` or
     rename of a classified raw column, and any rule whose `from` or `args` text names one (`md5(MSISDN)`,
-    `substr(msisdn,1,3)`, a concatenation), classify the target column. A stored column named like a classified
+    `substr(msisdn,1,3)`, a concatenation), classify the target column. A legacy `mapping.rules[]` (from
+    `processing.mapping_file` or a sibling `*_mapping.csv`) is converted first, as `DataTransformer.recordFields`
+    converts it at ingest (`LINEAGE-SCHEMA-CLASS-LOST-1`). A stored column named like a classified
     raw column is classified too.
   - **Strictest wins (operator 2026-10-04).** When several classified inputs feed one column (`concat(msisdn,
     imsi)`), or lineage and the Dataset's own label disagree, the column takes the most restrictive class. The order
@@ -501,7 +503,9 @@ are the values four-eyes approved (below).
     Type claims), then `MSISDN > IMSI > ACCOUNT > PII`, then by name. A Dataset labelling a lineage-MSISDN column
     `INTERNAL` no longer publishes it. The origin rule (`physicalRef` + `sourceName`) is `EvidenceMasker.datasetStores`,
     shared by publication, evidence and Link Analysis (`EngineDatasetProvider.schemaClassification`).
-  - **Fails closed** to *classified-unknown* when a pipeline that may be the store's cannot be loaded, its mapping
+  - **Fails closed** to *classified-unknown* when a pipeline that may be the store's cannot be loaded (any
+    `*_pipeline.toon` that fails to load, unless its decoded `id` / `name` / `stream` provably name another store; the
+    file name is never consulted, `LINEAGE-SCHEMA-CLASS-LOST-1`), its mapping
     cannot be read, or it has a step that rewrites the columns (`summarize`, `sql`, `lookup`, `join`, `route`)
     while a raw column is classified. The Dataset is then refused unless `include_sensitive` names `<dataset>.*`
     and the author holds `canAdminister`. The inherited set is part of the four-eyes approval fingerprint.
