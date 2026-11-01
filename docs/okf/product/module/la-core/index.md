@@ -47,3 +47,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
 | `LA-INVESTIGATE-UX-2` | P3 | feature | residuals of the Investigation tab redesign (LA-INVESTIGATE-UX-1, 2026-10-31). | — |
 | `LA-DEGREES-TRIM-2` | P3 | feature | bind the Degrees stepper to the last Expand of a reopened saved Investigation (residual of LA-DEGREES-TRIM-1, 2026-10-30). | — |
+| `LA-DOC-CODE-SYNC-1` | P2 | defect | reconcile Link Analysis code and hub docs (okf/product/module/la-core/): (1) code defect in LinkAnalysisComponent.openNodeDetail (link-an… | — |
