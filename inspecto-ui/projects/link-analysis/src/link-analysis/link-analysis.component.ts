@@ -1749,9 +1749,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         );
     });
 
-    /** The displayed graph as rows — search-narrowed, so canvas and table show the same result. */
+    /**
+     * What the canvas draws (the Working Set over an open Investigation) as rows, search-narrowed - the canvas's
+     * text alternative since Show as list was removed (operator 2026-11-02).
+     */
     readonly tableRows = computed<Record<string, unknown>[]>(() => {
-        const g = this.displayed();
+        const g = this.canvasData();
         if (!g) return [];
         const q = this.search().trim();
         const match = q ? new Set(searchNodes(g, q)) : null;
@@ -4273,7 +4276,6 @@ Its prior copies stay in its version history.`,
             ?.focus();
     }
 
-
     onNodeClick(id: string): void {
         // A super-node exists only in `displayed()`, so the lookup below would miss it and the click
         // would do nothing at all. Clicking a stand-in means "show me what you are standing in for".
@@ -4661,15 +4663,22 @@ Its prior copies stay in its version history.`,
             });
     }
 
-    /** Bottom-panel row click — focus the element on the canvas (rows carry their graph id). */
+    /**
+     * Bottom-panel row (click, or Enter on the focused row). A node row is an explicit choice, so it picks the
+     * Investigation entity and selects the node as a canvas click does; a link row emphasises the link.
+     */
     onTableRow(row: Record<string, unknown>): void {
         const id = String(row['id'] ?? '');
         if (!id) return;
         if (this.tableMode() === 'nodes') {
-            this.focusNode(id);
+            if (this.investigation.active()) {
+                const picked = this.canvasData()?.nodes.find((n) => n.id === id);
+                if (picked && this.investigation.selected()?.id !== id) this.investigation.selected.set(picked);
+            }
+            this.onNodeClick(id);
             return;
         }
-        const edge = this.displayed()?.edges.find((e) => e.id === id);
+        const edge = this.canvasData()?.edges.find((e) => e.id === id);
         if (edge) this.emphasis.set({ nodeIds: [edge.source, edge.target], edgeIds: [id] });
     }
 

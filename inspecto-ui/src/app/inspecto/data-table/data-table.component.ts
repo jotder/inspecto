@@ -221,6 +221,9 @@ export class DataTableComponent {
      *  selection. Document-level so triage needs no click into the grid first; typed input and open
      *  dialogs are exempt. Arrow keys stay ag-Grid-native (they work once the grid has focus). */
     readonly keyNav = input(false);
+    /** Opt-in: **Enter** on a focused grid row emits {@link rowClick}, as a click does - the grid's own keyboard path,
+     *  scoped to the grid (unlike {@link keyNav}'s document-level keys). */
+    readonly enterOpens = input(false);
     /** Declared column types (e.g. a Dataset's schema) for the Pro filter/SQL builder's type handling —
      *  overrides pure value-inference from `rows`. Omitted ⇒ inferred (existing behavior, unaffected). */
     readonly columnMeta = input<ColumnMeta[] | undefined>(undefined);
@@ -528,6 +531,12 @@ export class DataTableComponent {
         const target = (e as RowClickedEvent).event?.target as HTMLElement | null;
         if (target?.closest?.('.ag-selection-checkbox')) return;
         if (e.data) this.rowClick.emit(e.data);
+    }
+
+    onCellKeyDown(e: { data?: Record<string, unknown>; event?: Event | null }): void {
+        if (!this.enterOpens() || (e.event as KeyboardEvent | null)?.key !== 'Enter' || !e.data) return;
+        e.event?.preventDefault();
+        this.rowClick.emit(e.data);
     }
 
     onSelectionChanged(e: { api: GridApi }): void {

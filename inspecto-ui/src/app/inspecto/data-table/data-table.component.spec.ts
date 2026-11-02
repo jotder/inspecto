@@ -433,6 +433,21 @@ describe('DataTableComponent', () => {
         expect(grid.selectedIndexes()).toEqual([]);
     });
 
+    it('enterOpens: Enter on a focused grid row emits rowClick; other keys, and the option off, do nothing', async () => {
+        const f = await create('standard');
+        const c = f.componentInstance;
+        const opened: Record<string, unknown>[] = [];
+        c.rowClick.subscribe((r: Record<string, unknown>) => opened.push(r));
+        const row = { id: 1, name: 'alpha' };
+        const key = (k: string) => ({ data: row, event: new KeyboardEvent('keydown', { key: k }) });
+        c.onCellKeyDown(key('Enter'));
+        expect(opened).toEqual([]); // off by default
+        f.componentRef.setInput('enterOpens', true);
+        c.onCellKeyDown(key('a'));
+        c.onCellKeyDown(key('Enter'));
+        expect(opened).toEqual([row]);
+    });
+
     it('keyNav stays inert while typing, while a dialog is open, and when not opted in', async () => {
         const f = await create('standard');
         makeVisible(f.nativeElement as HTMLElement);

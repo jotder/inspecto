@@ -1117,7 +1117,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /**
      * Mirror the page's selection into G6's `selected` element state. The box select sets it itself, but Select all, a
-     * clear, a selection that lost nodes to a hide, and a node-list pick all arrive through the `selection` input; without
+     * clear, a selection that lost nodes to a hide, and a table-row pick all arrive through the `selection` input; without
      * this, dragging one selected node would move only that node (`drag-element` groups by the state, not by our input).
      */
     private syncSelectionState(): void {

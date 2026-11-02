@@ -2684,6 +2684,30 @@ describe('LinkAnalysisComponent', () => {
             const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
             expect(view.textHint).toBe('The table (Show the table: Links and Nodes) is its text version.');
         });
+
+        it('lists what the canvas draws (the Working Set over an open Investigation), and a node row selects it as a canvas click does', async () => {
+            const { fixture } = create({ stubGraph: true });
+            fixture.detectChanges();
+            await runQuery(fixture);
+            const c = fixture.componentInstance;
+            c.investigation.activeId.set('inv-9');
+            c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+            c.investigation.workingSet.set({
+                entities: [{ id: 'w1' }, { id: 'w2' }],
+                links: [{ source: 'w1', target: 'w2', kind: 'k', count: 1 }],
+                excluded: [],
+                hash: 'h',
+            } as never);
+            fixture.detectChanges();
+            c.tableMode.set('nodes');
+            const ids = c.tableRows().map((r) => r['id']);
+            expect(ids).toEqual(c.canvasData()!.nodes.map((n) => n.id));
+            expect(ids).not.toContain('a'); // the query graph's nodes are not what the canvas draws
+            const click = vi.spyOn(c, 'onNodeClick');
+            c.onTableRow(c.tableRows()[0]);
+            expect(c.investigation.selected()?.id).toBe(ids[0]);
+            expect(click).toHaveBeenCalledWith(ids[0]);
+        });
     });
 
     describe('sealTemporal (LA-INVESTIGATION-OPS-DEFERRED-1)', () => {

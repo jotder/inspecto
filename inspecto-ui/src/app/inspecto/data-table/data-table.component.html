@@ -185,6 +185,7 @@
         [loading]="loading()"
         [overlayNoRowsTemplate]="noRows()"
         (rowClicked)="onRowClicked($event)"
+        (cellKeyDown)="onCellKeyDown($event)"
         (selectionChanged)="onSelectionChanged($event)"
         (firstDataRendered)="refresh($event)"
         (rowDataUpdated)="refresh($event)"
