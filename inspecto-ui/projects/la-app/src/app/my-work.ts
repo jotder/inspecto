@@ -45,6 +45,16 @@ export function caseRows(
         .sort((a, b) => b.at - a.at || a.name.localeCompare(b.name));
 }
 
+/** The cases whose name, description or lists hold every word of `query` (case-insensitive); all when it is blank. */
+export function filterCases(rows: readonly CaseRow[], query: string): CaseRow[] {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return [...rows];
+    return rows.filter((r) => {
+        const text = `${r.name} ${r.description} ${r.lists}`.toLowerCase();
+        return words.every((w) => text.includes(w));
+    });
+}
+
 function listsLine(v: LinkAnalysisView, title: (id: string) => string): string {
     if (!caseListIds(v).length) return '';
     const parts = [

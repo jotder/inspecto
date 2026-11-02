@@ -26,7 +26,11 @@ function create(opts: { views?: unknown; datasets?: unknown; lists?: unknown; ba
             {
                 provide: LinkAnalysisService,
                 useValue: {
-                    fromContent: (id: string, c: Record<string, unknown>) => ({ id, name: c['name'], lists: c['lists'] }),
+                    fromContent: (id: string, c: Record<string, unknown>) => ({
+                        id,
+                        name: c['name'],
+                        lists: c['lists'],
+                    }),
                 },
             },
         ],
@@ -50,7 +54,12 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
             ]),
             lists: of({ lists: [{ id: 'suspects', title: 'Suspects' }] }),
             datasets: of([
-                { type: 'dataset', name: 'transfers', ref: '', content: { origin: 'import', importPipeline: 'transfers' } },
+                {
+                    type: 'dataset',
+                    name: 'transfers',
+                    ref: '',
+                    content: { origin: 'import', importPipeline: 'transfers' },
+                },
                 { type: 'dataset', name: 'mule_transfers', ref: '', content: {} },
             ]),
             batches: () => of([{ status: 'SUCCESS', end_time: '2026-10-01T08:00:00Z', total_output_rows: '2104' }]),
@@ -58,10 +67,14 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         const link = el.querySelector('[data-testid="la-cases"] a') as HTMLAnchorElement;
         expect(link.textContent?.trim()).toBe('Ring');
         expect(link.getAttribute('href')).toBe('/link-analysis?view=ring');
-        expect(el.querySelector('[data-testid="la-cases"]')?.textContent).toContain('Saved 21 Oct 2026 · Lists: started from Suspects');
+        expect(el.querySelector('[data-testid="la-cases"]')?.textContent).toContain(
+            'Saved 21 Oct 2026 · Lists: started from Suspects',
+        );
         expect(batches).toHaveBeenCalledTimes(1); // only the imported Dataset's Pipeline is read
         expect(batches).toHaveBeenCalledWith('transfers');
-        expect(el.querySelector('[data-testid="la-changes"]')?.textContent).toContain('transfers: imported 1 Oct 2026, +2,104 rows');
+        expect(el.querySelector('[data-testid="la-changes"]')?.textContent).toContain(
+            'transfers: imported 1 Oct 2026, +2,104 rows',
+        );
         await expectNoA11yViolations(el);
     });
 
@@ -94,5 +107,35 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
             b.getAttribute('aria-label'),
         );
         expect(terms).toEqual(['What is an Entity List?']);
+    });
+
+    it('pages the saved views 5 at a time, most recent first, and the search narrows them', () => {
+        const views = Array.from({ length: 12 }, (_, i) => ({
+            type: 'link-analysis-view',
+            name: `v${i}`,
+            ref: '',
+            content: { name: i === 3 ? 'SIM swap ring' : `View ${i}` },
+            modified: `2026-10-${String(10 + i).padStart(2, '0')}T09:00:00Z`,
+        }));
+        const { f, el } = create({ views: of(views) });
+        const names = () =>
+            Array.from(el.querySelectorAll('[data-testid="la-cases"] a')).map((a) => a.textContent?.trim());
+        expect(names()).toEqual(['View 11', 'View 10', 'View 9', 'View 8', 'View 7']);
+        expect(el.querySelector('[data-testid="la-cases-pager"]')?.textContent).toContain('1–5 of 12');
+
+        (el.querySelector('[aria-label="Next page of saved views"]') as HTMLButtonElement).click();
+        f.detectChanges();
+        expect(names()[0]).toBe('View 6');
+
+        f.componentInstance.setPageSize(25);
+        f.detectChanges();
+        expect(names().length).toBe(12);
+
+        f.componentInstance.search('sim  SWAP');
+        f.detectChanges();
+        expect(names()).toEqual(['SIM swap ring']);
+        f.componentInstance.search('nothing here');
+        f.detectChanges();
+        expect(el.querySelector('[data-testid="la-cases-no-match"]')).not.toBeNull();
     });
 });
