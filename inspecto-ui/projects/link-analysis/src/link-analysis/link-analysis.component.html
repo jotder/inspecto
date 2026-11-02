@@ -858,6 +858,20 @@
                         >
                             <mat-icon svgIcon="heroicons_outline:eye-slash" aria-hidden="true"></mat-icon>
                         </button>
+                        @if (!investigation.canvas()) {
+                            <button
+                                mat-icon-button
+                                type="button"
+                                (click)="removeSelected()"
+                                [disabled]="!selectedOnCanvas().length"
+                                [disabledInteractive]="true"
+                                [matTooltip]="selectedOnCanvas().length ? 'Remove the selected nodes and the ones left unlinked (Delete)' : 'Select nodes to remove'"
+                                aria-label="Remove the selected nodes"
+                                data-testid="la-selection-remove"
+                            >
+                                <mat-icon svgIcon="heroicons_outline:trash" aria-hidden="true"></mat-icon>
+                            </button>
+                        }
                         @if (investigation.canvas()) {
                             <button
                                 mat-icon-button
@@ -1330,6 +1344,13 @@
                                 <span>Exclude{{ nodeMenuTargets().length > 1 ? ' ' + nodeMenuTargets().length : '' }}…</span>
                                 <span class="text-secondary ml-3 text-xs" aria-hidden="true">X</span>
                             </button>
+                            @if (!investigation.canvas()) {
+                                <button mat-menu-item type="button" (click)="removeSelected(nodeMenuTargets())" data-testid="la-node-menu-remove">
+                                    <mat-icon svgIcon="heroicons_outline:trash" aria-hidden="true"></mat-icon>
+                                    <span>Remove{{ nodeMenuTargets().length > 1 ? ' ' + nodeMenuTargets().length : '' }}</span>
+                                    <span class="text-secondary ml-3 text-xs" aria-hidden="true">Del</span>
+                                </button>
+                            }
                             <button mat-menu-item type="button" (click)="toggleCollapse(nodeMenuTargets())" data-testid="la-node-menu-collapse">
                                 <mat-icon svgIcon="heroicons_outline:arrows-pointing-in" aria-hidden="true"></mat-icon>
                                 <span>Collapse / unfold</span>

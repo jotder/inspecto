@@ -177,8 +177,8 @@ export class InvestigationSessionStore {
         return steps.flatMap((s): InvestigationOpRequest[] =>
             s.kind === 'seed'
                 ? [{ op: 'seed', ids: s.ids, ...(s.entityType ? { entityType: s.entityType } : {}) }]
-                : s.kind === 'hide'
-                  ? [] // a hide only marks entities, so the preview never needs it
+                : s.kind === 'hide' || s.kind === 'remove'
+                  ? [] // a hide only marks entities, and a remove keeps nothing out: the preview needs neither
                   : s.kind === 'exclude'
                     ? [{ op: 'exclude', ids: s.ids, reason: s.reason }]
                     : (s.walked ?? [s.ids]).map((ids) => growExpandBody(ids, s.req, this.withPresets(b.presets, {}))),
@@ -256,7 +256,7 @@ export class InvestigationSessionStore {
             const r =
                 step.kind === 'seed'
                     ? await this.replaySeed(step)
-                    : step.kind === 'hide' || step.kind === 'exclude'
+                    : step.kind === 'hide' || step.kind === 'exclude' || step.kind === 'remove'
                       ? await this.replayCleanUp(step)
                       : await this.replayExpand(step, b);
             recorded += r.recorded;
@@ -287,7 +287,7 @@ export class InvestigationSessionStore {
      * (`exploreAliases`) and kept to what its Working Set holds.
      */
     private async replayCleanUp(
-        step: Extract<UnsavedStep, { kind: 'hide' | 'exclude' }>,
+        step: Extract<UnsavedStep, { kind: 'hide' | 'exclude' | 'remove' }>,
     ): Promise<{ ok: boolean; recorded: number }> {
         const ws = this.workingSet();
         const back = new Map(Object.entries(ws?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
@@ -299,6 +299,7 @@ export class InvestigationSessionStore {
             return { ok, recorded: ok ? 1 : 0 };
         }
         if (!(await this.apply({ op: 'hide', ids }))) return { ok: false, recorded: 0 };
+        if (step.kind === 'remove') return { ok: true, recorded: 1 }; // no reason to note
         const noted = await this.apply({ op: 'annotate', ids, note: step.reason });
         return { ok: noted, recorded: noted ? 2 : 1 };
     }

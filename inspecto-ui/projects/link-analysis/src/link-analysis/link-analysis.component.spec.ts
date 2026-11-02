@@ -3765,6 +3765,7 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
             'Expand',
             'Collapse or unfold the selected nodes',
             'Hide the selected nodes',
+            'Remove the selected nodes',
             'Attach to Case',
         ]); // Clean up sits beside the group, so its panel stays reachable below 1,300 px
         expect(edits.querySelector('[aria-label^="Exclude"]')).toBeNull();
@@ -5271,6 +5272,41 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.undoUnsaved()).toBe(true);
         expect(c.undoUnsaved()).toBe(true);
         expect(ws().entities.map((e) => e.id)).toContain('SHARED');
+    });
+
+    it('an unsaved Remove drops the node and the ones it leaves unlinked, keeps nothing out, and a later Expand brings it back', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const previewUnsaved = fakeUnsaved((id) => [`${id}.n`, 'SHARED']);
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ids = () => c.investigation.unsavedWs()!.entities.map((e) => e.id).sort();
+        expect(ids()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'SHARED']);
+        // the hub goes, and both its neighbours - each linked only to it - go with it
+        const hub = c.graph()!.nodes.find((n) => n.data.label === 'MULE-HUB-01')!;
+        c.removeSelected([hub.id]);
+        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({ kind: 'remove', ids: expect.arrayContaining(['MULE-HUB-01', 'MULE-HUB-01.n', 'SHARED']) });
+        expect(ids()).toEqual([]);
+        expect(c.investigation.unsavedWs()!.excluded).toEqual([]);
+        expect(c.growExclude.lastChange()?.text).toContain('Removed 3');
+        // Undo puts all three back
+        expect(c.undoUnsaved()).toBe(true);
+        expect(ids()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'SHARED']);
+        // remove SHARED alone: nothing else is orphaned (the hub still links its .n)
+        const shared = c.graph()!.nodes.find((n) => n.data.label === 'SHARED')!;
+        c.removeSelected([shared.id]);
+        expect(ids()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n']);
+        // the next Expand sends no exclude, so the server admits SHARED again
+        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        expect(previewUnsaved.mock.calls.at(-1)![0].steps.map((s) => s.op)).toEqual(['seed', 'expand']);
+        expect(ids()).toContain('SHARED');
     });
 
     it('LA-UNSAVED-INVESTIGATION-1: Close with unsaved steps asks Save, Discard or Cancel', async () => {

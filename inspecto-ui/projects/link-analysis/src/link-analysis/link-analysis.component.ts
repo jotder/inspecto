@@ -55,6 +55,7 @@ import {
 import { GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { DeepLinkService } from '@inspecto/link-analysis/open/open-link';
 import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
+import { withOrphans } from './remove-nodes';
 import { indexSourceNote } from './index-source';
 import { DISABLED_REASON } from './disabled-reasons';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
@@ -4107,6 +4108,64 @@ Its prior copies stay in its version history.`,
         this.clearSelection();
     }
 
+    /**
+     * "Remove" (Delete key, node menu): the picked nodes and the orphans they leave come off the canvas; a later Expand
+     * may draw them again (Exclude is the one that keeps them out). Unsaved: one recorded `remove` step, so Undo and
+     * Redo take it like an Expand. Explorer: the drawn graph loses them, with Undo on the change line. Not offered
+     * inside a saved Investigation, whose Clean up records hides and excludes.
+     */
+    removeSelected(nodeIds?: string[]): void {
+        if (this.investigation.canvas() !== null) return;
+        const picked = this.excludeTargets(nodeIds).filter((n) => n.data.kind !== SUPER_NODE_KIND);
+        const t = this.growTerms();
+        if (!picked.length) {
+            this.toastr.info(`Select the ${t.nodes} to remove first.`);
+            return;
+        }
+        const u = this.investigation.unsaved();
+        const ws = this.unsavedWs();
+        let removed: number;
+        if (u && ws) {
+            const gone = new Set(withOrphans(this.rawNamed(picked.map((n) => n.id)), ws.links));
+            const before = this.unsavedCanvas();
+            const next: WorkingSet = {
+                ...ws,
+                entities: ws.entities.filter((e) => !gone.has(e.id)),
+                links: ws.links.filter((l) => !gone.has(l.source) && !gone.has(l.target)),
+            };
+            removed = ws.entities.length - next.entities.length;
+            this.investigation.recordUnsaved({ kind: 'remove', ids: [...gone] });
+            this.drawUnsaved(next, u.binding);
+            this.commitUnsaved(before);
+        } else {
+            const g = this.graph();
+            if (!g) return;
+            const gone = new Set(withOrphans(picked.map((n) => n.id), g.edges));
+            const prev = { graph: g, expanded: this.expandedNodeIds() };
+            this.graph.set({ ...g, nodes: g.nodes.filter((n) => !gone.has(n.id)), edges: g.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)) });
+            this.expandedNodeIds.update((ids) => ids.filter((id) => !gone.has(id)));
+            removed = g.nodes.length - this.graph()!.nodes.length;
+            const after = this.graph();
+            this.clearSelection();
+            const text = `Removed ${removed.toLocaleString('en-GB')} ${removed === 1 ? t.node : t.nodes}; an Expand may bring them back.`;
+            this.growExclude.lastChange.set({
+                text,
+                valid: () => this.graph() === after,
+                undo: () => {
+                    this.graph.set(prev.graph);
+                    this.expandedNodeIds.set(prev.expanded);
+                },
+            });
+            this.drawAnnouncement.set(text);
+            return;
+        }
+        this.clearSelection();
+        const after = this.graph();
+        const text = `Removed ${removed.toLocaleString('en-GB')} ${removed === 1 ? t.node : t.nodes}; an Expand may bring them back (not saved yet).`;
+        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
+        this.drawAnnouncement.set(text);
+    }
+
     /** "Exclude selected" (Investigation only): the same Exclude… dialog as X and the node menu, the reason asked inline. */
     excludeSelected(): void {
         if (this.investigation.canvas() === null || !this.writesToInvestigation()) return;
@@ -5930,11 +5989,12 @@ Its prior copies stay in its version history.`,
         if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return false;
         const key = e.key.toLowerCase();
         const recorded = this.investigation.canvas() !== null;
-        if (!['g', 'x', ...(recorded ? ['e', 'k', 'h'] : [])].includes(key)) return false;
+        if (!['g', 'x', ...(recorded ? ['e', 'k', 'h'] : ['delete'])].includes(key)) return false;
         if (!this.canvasKeyTarget(target)) return false;
         e.preventDefault();
         const picked = this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND);
         if (key === 'x') this.openExclude();
+        else if (key === 'delete') this.removeSelected();
         else if (key === 'k') void this.keepSelected();
         else if (key === 'h') void this.hideSelected();
         else if (recorded && picked.length) {

@@ -44,7 +44,13 @@ export type UnsavedStep =
      * stay out of later expands. Sent to every later preview (\`POST /inv/expand/preview\` takes \`exclude\` steps) and
      * replayed at Save as one \`exclude\` op with the reason, as the saved Clean up records it.
      */
-    | { kind: 'exclude'; ids: string[]; reason: string };
+    | { kind: 'exclude'; ids: string[]; reason: string }
+    /**
+     * Remove while unsaved: these entities (the picked ones and the orphans they left) leave the Working Set. Never sent to
+     * the preview - each Expand seeds from the Working Set, so a later one may admit them again. Save replays it as a
+     * `hide`, the nearest recorded op, so the saved Investigation still shows them gone.
+     */
+    | { kind: 'remove'; ids: string[] };
 
 /** What Save binds the Investigation to (the same binding the New form used to create one at once). */
 export interface UnsavedBinding {
@@ -94,6 +100,7 @@ export function unsavedStepLine(s: UnsavedStep): string {
     if (s.kind === 'seed') return `Start from ${many(s.ids.length, 'entity', 'entities')}`;
     if (s.kind === 'hide') return `Hide ${many(s.ids.length, 'entity', 'entities')} (${s.reason})`;
     if (s.kind === 'exclude') return `Exclude ${many(s.ids.length, 'entity', 'entities')} (${s.reason})`;
+    if (s.kind === 'remove') return `Remove ${many(s.ids.length, 'entity', 'entities')}`;
     const from = s.from === 'outer' ? 'the outer ring' : many(s.ids.length, 'entity', 'entities');
     const kinds = s.req.linkKinds?.length ? `, ${s.req.linkKinds.join(', ')}` : '';
     const busy = s.req.hold ? '' : ', through busy entities';
