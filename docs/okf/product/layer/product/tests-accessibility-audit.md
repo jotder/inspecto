@@ -109,6 +109,10 @@ jsdom — which is why they are the natural scope of the real-browser pass in §
   canvas has a text alternative, a *Show as list* toggle that swaps it for a keyboard-navigable grid of the nodes it
   draws (Enter selects through the same path as a canvas click) with the selected node's links beneath, and the
   Analysis / View / Investigation switch is a `tablist` with `tabpanel` panes. The G6 canvas `tabindex` is `0` live.
+  **Superseded 2026-11-02 (operator):** the *Show as list* toggle and its list view were removed; the canvas's text
+  alternative is now the dock table (**Show the table**: *Links* and *Nodes*, an ag-Grid, a node row selects the node
+  as a canvas click does), and the canvas figure's name says so. The selected node's own link list went with the list
+  view; the *Links* table with the search box covers it. Not re-audited with axe after this change.
   A fifth pass on 2026-10-05 fixed the one empty `.ag-header-row` that was ours (`inspecto-data-table` loading with no
   rows now shows a skeleton, not a cell-less grid, pinned by a jsdom axe spec); the ag-Grid loading-overlay
   scroll region (host columns, loading, no rows) was then closed too (2026-10-09): `showLoadingPlaceholder` now shows the

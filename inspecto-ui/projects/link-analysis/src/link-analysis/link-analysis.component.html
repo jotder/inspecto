@@ -680,18 +680,6 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:viewfinder-circle"></mat-icon>
                 </button>
-                <button
-                    mat-icon-button
-                    (click)="listMode.set(!listMode())"
-                    [attr.aria-pressed]="listMode()"
-                    [matTooltip]="listMode() ? 'Show graph' : 'Show as list'"
-                    [attr.aria-label]="listMode() ? 'Show graph' : 'Show as list'"
-                    data-testid="graph-list-toggle"
-                >
-                    <mat-icon
-                        [svgIcon]="listMode() ? 'heroicons_outline:share' : 'heroicons_outline:list-bullet'"
-                    ></mat-icon>
-                </button>
                 <!-- Export group: one rail icon, the four formats as menu items -->
                 <button
                     mat-icon-button
@@ -1269,8 +1257,7 @@
                             [display]="displayOptions()"
                             [tooltips]="true"
                             [entityIcons]="true"
-                            textHint="Use Show as list for a text version."
-                            [attr.inert]="listMode() ? '' : null"
+                            textHint="The table (Show the table: Links and Nodes) is its text version."
                             [layout]="layoutId()"
                             [plugins]="canvasPlugins()"
                             [interaction]="canvasInteraction()"
@@ -1453,7 +1440,6 @@
                         <!-- overlays: legend (top-left) and working set (top-right), each minimisable -->
                         <inspecto-link-analysis-legend
                             class="absolute left-2 top-2 z-10"
-                            [attr.inert]="listMode() ? '' : null"
                             [items]="legendItems()"
                             [typeLabels]="kindLabels()"
                             [edgeKinds]="legendLinkKinds()"
@@ -1490,7 +1476,6 @@
                         </div>
                         <inspecto-link-analysis-working-set
                             class="absolute right-2 top-2 z-10"
-                            [attr.inert]="listMode() ? '' : null"
                             [stats]="workingSet()"
                             [truncated]="truncated()"
                             [splitIdentityCount]="splitIdentities().length"
@@ -1502,16 +1487,6 @@
                             [onScreen]="onScreenCounts()"
                             (openChange)="setOverlayOpen('workingSet', $event)"
                         ></inspecto-link-analysis-working-set>
-                        <!-- The text alternative of the canvas: the SAME canvasData(), as a keyboard-navigable list. -->
-                        @if (listMode()) {
-                            <inspecto-link-analysis-node-list
-                                class="absolute inset-0 z-20 overflow-auto p-2"
-                                style="background: var(--gamma-bg-default)"
-                                [graph]="canvasData()"
-                                [omittedLinks]="omittedLinks()"
-                                (nodeSelect)="onListNodeSelect($event)"
-                            ></inspecto-link-analysis-node-list>
-                        }
                     </div>
                 } @else if (loading()) {
                     <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>

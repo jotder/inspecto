@@ -190,7 +190,6 @@ import {
 } from '@inspecto/link-analysis/graph/graph-filter';
 import { ConditionGroup, emptyGroup } from '@inspecto/core/query/query-types';
 import { LinkAnalysisFilterComponent, LocalMatch } from './link-analysis-filter.component';
-import { LinkAnalysisNodeListComponent } from './link-analysis-node-list.component';
 import {
     LinkAnalysisAdvancedSearchDialog,
     LinkAnalysisAdvancedSearchData,
@@ -535,7 +534,6 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
-        LinkAnalysisNodeListComponent,
         LinkAnalysisFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
@@ -752,8 +750,6 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
     /** The side the one toolbox instance draws: Server on the Server tab, else Browser (it stays mounted, hidden). */
     readonly toolboxSide = computed<'browser' | 'server'>(() => (this.toolboxTab() === 'server' ? 'server' : 'browser'));
-    /** The graph canvas's text alternative: the displayed graph as a keyboard-navigable node / link list. */
-    readonly listMode = signal(false);
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
     readonly investigation = inject(InvestigationSessionStore);
     private readonly cdr = inject(ChangeDetectorRef);
@@ -4277,18 +4273,6 @@ Its prior copies stay in its version history.`,
             ?.focus();
     }
 
-    /**
-     * A node chosen in the list view (click, Enter or Space). The list is an explicit choice, not a pointer on a
-     * moving canvas, so it picks the Investigation entity AND opens the detail at once — the canvas's second-click
-     * convention made Enter on a fresh row only select it (live run 5).
-     */
-    onListNodeSelect(id: string): void {
-        if (this.investigation.active()) {
-            const picked = this.canvasData()?.nodes.find((n) => n.id === id);
-            if (picked && this.investigation.selected()?.id !== id) this.investigation.selected.set(picked);
-        }
-        this.onNodeClick(id);
-    }
 
     onNodeClick(id: string): void {
         // A super-node exists only in `displayed()`, so the lookup below would miss it and the click

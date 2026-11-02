@@ -2618,7 +2618,6 @@ describe('LinkAnalysisComponent', () => {
                 'Undo display change (Ctrl+Z)',
                 'Redo display change (Ctrl+Y)',
                 'Fit to screen',
-                'Show as list',
                 'Export',
             ]) {
                 expect(
@@ -2674,122 +2673,16 @@ describe('LinkAnalysisComponent', () => {
         });
     });
 
-    describe('graph as a list (LA-A11Y-AUDIT-1: the canvas text alternative)', () => {
-        const ready = async () => {
+    describe('the canvas text alternative is the table (Rows: Links and Nodes; Show as list removed 2026-11-02)', () => {
+        it('has no Show as list toggle, and the canvas figure points to the table', async () => {
             const { fixture } = create({ stubGraph: true });
             fixture.detectChanges();
             await runQuery(fixture);
             fixture.detectChanges();
             const el = fixture.nativeElement as HTMLElement;
-            const toggle = (): HTMLButtonElement =>
-                el.querySelector('[data-testid="graph-list-toggle"]') as HTMLButtonElement;
-            const rowIds = (): (string | undefined)[] =>
-                Array.from(el.querySelectorAll<HTMLElement>('table[role="grid"] tbody tr')).map(
-                    (r) => r.dataset['nodeId'],
-                );
-            return { fixture, c: fixture.componentInstance, el, toggle, rowIds };
-        };
-        const openWorkingSet = (c: LinkAnalysisComponent, ids: string[]): void => {
-            c.investigation.activeId.set('inv-9');
-            c.investigation.log.set({
-                header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
-                entries: [],
-            } as never);
-            c.investigation.workingSet.set({
-                entities: ids.map((id) => ({ id })),
-                links: ids.length > 1 ? [{ source: ids[0], target: ids[1], kind: 'k', count: 1 }] : [],
-                excluded: [],
-                hash: 'h',
-            } as never);
-        };
-
-        it('the toggle is a pressed button that swaps the canvas for the list and keeps focus on itself', async () => {
-            const { fixture, el, toggle, rowIds } = await ready();
-            expect(toggle().getAttribute('aria-pressed')).toBe('false');
-            expect(toggle().getAttribute('aria-label')).toBe('Show as list');
-            expect(el.querySelector('inspecto-link-analysis-node-list')).toBeNull();
-            toggle().focus();
-            toggle().click();
-            fixture.detectChanges();
-            expect(toggle().getAttribute('aria-pressed')).toBe('true');
-            expect(toggle().getAttribute('aria-label')).toBe('Show graph');
-            expect(document.activeElement).toBe(toggle());
-            expect(rowIds()).toEqual(['a', 'b', 'c', 'd', 'e']);
-            // the canvas behind the list is out of the tab order and the accessibility tree
-            expect(el.querySelector('inspecto-graph-view')!.hasAttribute('inert')).toBe(true);
-            toggle().click();
-            fixture.detectChanges();
-            expect(el.querySelector('inspecto-link-analysis-node-list')).toBeNull();
-            expect(el.querySelector('inspecto-graph-view')!.hasAttribute('inert')).toBe(false);
-            expect(document.activeElement).toBe(toggle());
-        });
-
-        it('the canvas figure points to the list for a text version', async () => {
-            const { fixture } = await ready();
-            const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
-            expect(view.textHint).toBe('Use Show as list for a text version.');
-        });
-
-        it('lists what the canvas draws: over an open Investigation that is the Working Set, not the query graph', async () => {
-            const { fixture, c, toggle, rowIds } = await ready();
-            openWorkingSet(c, ['****0001', '****0002']);
-            toggle().click();
-            fixture.detectChanges();
-            expect(rowIds()).toEqual(c.canvasData()!.nodes.map((n) => n.id));
-            expect(rowIds()).not.toEqual(['a', 'b', 'c', 'd', 'e']);
-            expect(rowIds()).toHaveLength(2);
-            expect((fixture.nativeElement as HTMLElement).textContent).toContain('****0001'); // masked as drawn
-        });
-
-        it('activating a row takes the same path as a canvas click', async () => {
-            const { fixture, c, el, toggle } = await ready();
-            const click = vi.spyOn(c, 'onNodeClick').mockImplementation(() => undefined);
-            toggle().click();
-            fixture.detectChanges();
-            const row = el.querySelector('table[role="grid"] tbody tr[data-node-id="c"]') as HTMLElement;
-            row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-            fixture.detectChanges();
-            expect(click).toHaveBeenCalledWith('c');
-        });
-
-        it('D2: a pure Investigation canvas (no query graph) has the toolbar, lists the Working Set, Enter opens the detail', async () => {
-            const { fixture } = create({ stubGraph: true });
-            fixture.detectChanges();
-            const c = fixture.componentInstance;
-            const el = fixture.nativeElement as HTMLElement;
-            expect(c.graph()).toBeNull();
             expect(el.querySelector('[data-testid="graph-list-toggle"]')).toBeNull();
-            openWorkingSet(c, ['ws-a', 'ws-b']);
-            fixture.detectChanges();
-            for (const label of [
-                'Display options',
-                'Fit to screen',
-            ])
-                expect(el.querySelector(`button[aria-label="${label}"]`)).not.toBeNull();
-            expect(el.querySelector('button[aria-label="Full screen"]')).not.toBeNull();
-            const toggle = el.querySelector('[data-testid="graph-list-toggle"]') as HTMLButtonElement;
-            toggle.click();
-            fixture.detectChanges();
-            const rows = Array.from(el.querySelectorAll<HTMLElement>('table[role="grid"] tbody tr'));
-            expect(rows.map((r) => r.dataset['nodeId'])).toEqual(c.canvasData()!.nodes.map((n) => n.id));
-            expect(rows).toHaveLength(2);
-            const detail = vi
-                .spyOn(c as unknown as { openNodeDetail: (id: string) => void }, 'openNodeDetail')
-                .mockImplementation(() => undefined);
-            rows[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-            fixture.detectChanges();
-            // ONE Enter on a fresh row picks it AND opens the detail (no second-click convention in the list)
-            expect(c.investigation.selected()?.id).toBe(rows[1].dataset['nodeId']);
-            expect(detail).toHaveBeenCalledWith(rows[1].dataset['nodeId']);
-        });
-
-        it('carries the Working Set render-limit notice into the list', async () => {
-            const { fixture, c, el, toggle } = await ready();
-            openWorkingSet(c, ['x']);
-            vi.spyOn(c, 'omittedLinks').mockReturnValue(40);
-            toggle().click();
-            fixture.detectChanges();
-            expect(el.querySelector('[data-testid="node-list-omitted"]')?.textContent).toContain('40 more links');
+            const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+            expect(view.textHint).toBe('The table (Show the table: Links and Nodes) is its text version.');
         });
     });
 

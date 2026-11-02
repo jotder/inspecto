@@ -343,7 +343,7 @@ Conditions are a tree of AND/OR groups; a single bare condition is refused — w
 | Only some kinds of node | **Filter node types**, or the legend's chips |
 | A better layout | **Graph layout** |
 | Links in a time range | **Filter links by time**: pick a time column (only date/time columns are listed), then drag the cutoff; times are UTC. Needs a time column among the Attribute columns |
-| The rows behind the picture | **Show as list**, or the dock's **Rows** tab (**Show the rows**) |
+| The rows behind the picture | The dock's **Rows** tab (**Show the table**): **Links** or **Nodes**; a node row selects that node on the graph |
 | The same entities on a map | Geo Map: selecting an area there highlights the matching entities here, and back |
 
 **Layouts.** *Layered, Grid, Force, Clustering force, Radial, Degree ordered, Circular, Information density,
