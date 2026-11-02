@@ -31,7 +31,7 @@ Add a lesson as a new file here + one line below, in the same change. Personal o
 - [Subagent claims are hypotheses](subagent-claims-are-hypotheses.md) — verify attributions and negatives with one command before relaying
 
 ## Environment & deploy
-- [Preview LA demo](preview-la-demo.md) — only `C:\sandbox\inspecto-preview\inspecto-la`; no zips; restore runtime cacerts
+- [LA demo installs](preview-la-demo.md) — Preview :8080 + Basic :8098 share MFS/IMS/Mobile money via `spaces\<id>.ref`, one at a time; no zips; restore runtime cacerts
 - [OIDC: WSO2 / Keycloak](oidc-wso2-keycloak.md) — provider gotchas, JWT tokens, groups claim, bundle cacerts import
 
 ## Operator preferences

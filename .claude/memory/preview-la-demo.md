@@ -1,13 +1,26 @@
 ---
 name: preview-la-demo
-description: "The demo is ONLY the unzipped Preview la-app bundle at C:\sandbox\inspecto-preview\inspecto-la on :8080 (WSO2 OIDC); update in place, no zips/linux bundles unless asked, and keep the runtime cacerts on redeploy"
+description: "Two LA demo installs share three Spaces (MFS, IMS, Mobile money) via spaces\\<id>.ref - Preview :8080 and Basic :8098, ONE at a time; update in place, no zips unless asked, keep the runtime cacerts on redeploy"
 metadata:
   type: project
 ---
 
-Preview `la-app` bundle at `C:\sandbox\inspecto-preview\inspecto-la` (ONE spaces folder holding every LA demo: la-showcase,
-la-showcase-off, la-claims, la-mobile-money, la-audit, la-daily-feed; non-LA Spaces such as `ims` are parked in
-`inspecto-preview\parked`), started with `serve-preview-la.bat`, WSO2 at https://localhost:9443 (app
+**Two installs, one set of shared Spaces (operator, 2026-11-02).** The real-data Spaces live once in
+`C:\sandbox\spaces\<id>`: `inspecto-mfs` (MFS; `space.toon data_root: "C:/data/inspecto-mfs"` - the 28.9 GB state; the
+repo junction `spaces\inspecto-mfs` -> `C:\sandbox\inspecto-mfs-root\inspecto-mfs` is a stale 1 MB refill, not used),
+`mfs-demo` (IMS, 16 GB) and `la-mobile-money`. Each install boots them through `spaces\<id>.ref` files (one absolute path):
+- **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -DemoAuth -Ui la-app -NoBakeDemo`
+  (demo sign-in); also holds the synthetic LA showcases (la-showcase, la-claims, la-audit, la-daily-feed, ...).
+  Start `& C:\sandbox\inspecto-preview\inspecto-la\start-la-preview.ps1`.
+- **Basic** `C:\sandbox\ims-mfs-demo` on :8098, built `-Edition Basic -Ui la-app` (no sign-in, loopback), only the
+  three refs. Start `& C:\sandbox\ims-mfs-demo\start-la-basic.ps1`. Basic is the LA explorer: Investigations and index
+  builds answer 503 by design, so exploration reads the Dataset (IMS ~9 s for 500 links).
+- ⛔ **ONE AT A TIME.** A Space's DuckDB files open in one process only and its Jobs would run twice; each `start-la-*.ps1`
+  refuses while the other install's JVM runs. Neither launcher is in a bundle: a `/MIR` redeploy must exclude it (and
+  the `.ref` files live under `spaces\`, which every redeploy already excludes).
+
+Earlier layout, kept for the WSO2 variant: Preview `la-app` bundle at `C:\sandbox\inspecto-preview\inspecto-la`,
+started with `serve-preview-la.bat`, WSO2 at https://localhost:9443 (app
 `inspecto_preview_la`; `scripts/wso2-preview-la-setup.mjs` creates its 19 users + role groups — a user's WSO2 groups ARE
 the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux builds are wasted time — only when asked.
 
