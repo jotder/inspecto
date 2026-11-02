@@ -1,0 +1,10 @@
+/*
+ * Inspecto LA reads larger than the console (operator, 2026-11-02: the smallest text was hard to read).
+ * Every type size here is rem-based - the Tailwind scale, the body size and Material's typography levels - so one root
+ * size scales them all by the same factor and keeps the ratio between captions, body and headings: 16 px -> 18 px is
+ * x1.125 (text-xs 10 -> 11.25 px, body 14 -> 15.75 px, page title 22 -> 24.75 px). Rem-based spacing grows with it.
+ * Loaded last and unlayered, so it wins over gamma's `html { font-size: 16px }`. The full console is unchanged.
+ */
+html {
+    font-size: 18px;
+}

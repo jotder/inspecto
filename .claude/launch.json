@@ -119,6 +119,16 @@
         "tools/run-mfs.ps1"
       ],
       "port": 8091
+    },
+    {
+      "name": "inspecto-la-app-ui",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-ui && npx ng serve la-app --port %PORT%"
+      ],
+      "autoPort": true,
+      "port": 4210
     }
   ]
 }

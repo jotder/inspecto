@@ -736,6 +736,10 @@ in use. Look there before picking a class — do not invent a token.
   font-semibold` · card title `text-sm font-semibold` · body `text-base` (14 px) · dense `text-sm` ·
   caption `text-secondary text-xs` · eyebrow `text-xs font-semibold uppercase tracking-wider` · numbers
   `tabular-nums`. ⚠ gamma's scale: `text-xs` is **10 px** and carries no line-height.
+  ⚠ **Inspecto LA (`la-app`) reads 1.125× larger** (operator, 2026-11-02): `projects/la-app/src/styles.scss`, loaded
+  last for la-app only, sets `html { font-size: 18px }`, so every rem size there scales by the same factor (`text-xs`
+  11.25 px, body 15.75 px, `text-title` 24.75 px; rem spacing too) and the full console stays at 16 px. A pixel size
+  (`text-[11px]`) does NOT scale: in the Link Analysis library write rem (`text-[0.6875rem]`) or a scale class.
 - **Cards** `bg-card rounded-2xl p-6 shadow`; popovers `shadow-lg`; chips/dots `rounded-full`.
 - **`text-primary` is scheme-aware TEXT** (2026-09-25): it reads `--gamma-text-primary` (`src/styles/styles.scss`,
   wired as `textColor.primary.DEFAULT` in `tailwind.config.js`) — primary-600 in light, **primary-400 in dark**

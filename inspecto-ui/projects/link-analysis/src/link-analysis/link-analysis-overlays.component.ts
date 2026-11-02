@@ -181,7 +181,7 @@ export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): 
                     <div class="mt-1 flex flex-wrap gap-1" data-testid="legend-unexpanded-aid">
                         <button
                             type="button"
-                            class="rounded-full border px-2 py-0.5 text-[11px]"
+                            class="rounded-full border px-2 py-0.5 text-[0.6875rem]"
                             style="border-color: var(--gamma-border)"
                             data-testid="next-unexpanded"
                             (click)="nextUnexpanded.emit()"
@@ -190,7 +190,7 @@ export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): 
                         </button>
                         <button
                             type="button"
-                            class="rounded-full border px-2 py-0.5 text-[11px]"
+                            class="rounded-full border px-2 py-0.5 text-[0.6875rem]"
                             style="border-color: var(--gamma-border)"
                             data-testid="only-unexpanded"
                             [attr.aria-pressed]="onlyUnexpanded()"
@@ -235,7 +235,7 @@ export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): 
                         }
                     </ul>
                     <!-- LA-UNEXPANDED-MARKER-1 decision: a hide here is the drawing only, never what an expand reads or the log records -->
-                    <div class="text-secondary mt-1 text-[11px]" data-testid="legend-kinds-note">
+                    <div class="text-secondary mt-1 text-[0.6875rem]" data-testid="legend-kinds-note">
                         Hiding only changes the drawing. Expand still follows hidden link kinds.
                     </div>
                 }
@@ -338,26 +338,26 @@ export class LinkAnalysisLegendComponent {
                     <p class="m-0 mt-0.5 font-semibold tabular-nums" data-testid="working-set-on-screen">{{ shown }}</p>
                 }
                 @if (countsNote()) {
-                    <p class="text-secondary m-0 mt-0.5 text-[11px] leading-snug" data-testid="working-set-counts">
+                    <p class="text-secondary m-0 mt-0.5 text-[0.6875rem] leading-snug" data-testid="working-set-counts">
                         {{ countsNote() }}
                     </p>
                 }
                 <dl class="mt-1 grid grid-cols-2 gap-1" aria-label="Graph counts">
                     @for (s of stats(); track s.label) {
                         <div class="rounded-md border px-2 py-1" [title]="s.hint ?? ''">
-                            <dt class="text-secondary truncate text-[10px] font-semibold">{{ s.label }}</dt>
+                            <dt class="text-secondary truncate text-xs font-semibold">{{ s.label }}</dt>
                             <dd class="m-0 truncate font-semibold tabular-nums">{{ s.value }}</dd>
                         </div>
                     }
                 </dl>
                 @if (splitIdentityCount(); as n) {
-                    <p class="text-warn m-0 mt-1 text-[11px] leading-snug" [title]="splitIdentityHint()">
+                    <p class="text-warn m-0 mt-1 text-[0.6875rem] leading-snug" [title]="splitIdentityHint()">
                         {{ n }} possible split {{ n === 1 ? 'identity' : 'identities' }}
                     </p>
                 }
                 <div class="mt-1 flex items-center">
                     @if (customizable()) {
-                        <button type="button" class="text-primary text-[11px] underline" (click)="customize.emit()">
+                        <button type="button" class="text-primary text-[0.6875rem] underline" (click)="customize.emit()">
                             Customise counts
                         </button>
                     }

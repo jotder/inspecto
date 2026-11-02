@@ -843,7 +843,7 @@
                                 [attr.aria-label]="'Expand ' + collapsedRoots().length + ' collapsed branches'"
                             >
                                 <mat-icon svgIcon="heroicons_outline:plus-circle" aria-hidden="true"></mat-icon>
-                                <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none" aria-hidden="true">{{ collapsedRoots().length }}</span>
+                                <span class="text-secondary absolute bottom-0 right-0 text-xs leading-none" aria-hidden="true">{{ collapsedRoots().length }}</span>
                             </button>
                         }
                         <button
@@ -912,7 +912,7 @@
                         >
                             <mat-icon svgIcon="heroicons_outline:paper-clip" aria-hidden="true"></mat-icon>
                             @if (snapshots.count(); as n) {
-                                <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none">{{ n }}</span>
+                                <span class="text-secondary absolute bottom-0 right-0 text-xs leading-none">{{ n }}</span>
                             }
                         </button>
                     </div>
@@ -945,7 +945,7 @@
                             data-testid="la-held-button"
                         >
                             <mat-icon svgIcon="heroicons_outline:pause-circle" aria-hidden="true"></mat-icon>
-                            <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none" aria-hidden="true">{{ heldItems().length }}</span>
+                            <span class="text-secondary absolute bottom-0 right-0 text-xs leading-none" aria-hidden="true">{{ heldItems().length }}</span>
                         </button>
                         <button
                             mat-icon-button
@@ -958,7 +958,7 @@
                             data-testid="la-exclusions-button"
                         >
                             <mat-icon svgIcon="heroicons_outline:archive-box-x-mark" aria-hidden="true"></mat-icon>
-                            <span class="text-secondary absolute bottom-0 right-0 text-[10px] leading-none" aria-hidden="true">{{ hiddenCount().toLocaleString('en') }}</span>
+                            <span class="text-secondary absolute bottom-0 right-0 text-xs leading-none" aria-hidden="true">{{ hiddenCount().toLocaleString('en') }}</span>
                         </button>
                     </div>
 
@@ -1449,7 +1449,7 @@
                         ></inspecto-link-analysis-legend>
                         <!-- render strip: what the render left out and the level-of-detail state; the counts and Limits are on the Graph counts card, the modules in ⚙ Settings -->
                         <div
-                            class="text-secondary absolute bottom-1 left-2 right-2 z-10 flex flex-wrap items-center gap-x-3 text-[11px]"
+                            class="text-secondary absolute bottom-1 left-2 right-2 z-10 flex flex-wrap items-center gap-x-3 text-[0.6875rem]"
                             role="group"
                             aria-label="Render status"
                         >

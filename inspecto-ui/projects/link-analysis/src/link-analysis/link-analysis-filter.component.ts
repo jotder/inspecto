@@ -107,7 +107,7 @@ export interface LocalMatch {
                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
             </button>
         </div>
-        <p class="text-secondary mt-1 text-[11px]">
+        <p class="text-secondary mt-1 text-[0.6875rem]">
             Fields are validated against the relation's columns; values never reach the statement as text.
         </p>
     `,

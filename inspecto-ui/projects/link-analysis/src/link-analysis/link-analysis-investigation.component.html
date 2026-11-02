@@ -259,11 +259,11 @@
                                         @if (e.undoneBy != null) {
                                             <span class="text-secondary text-sm">undone by step {{ e.undoneBy }}</span>
                                         }
-                                        <span class="text-secondary ml-auto text-[11px]">{{ time(e.at) }}</span>
+                                        <span class="text-secondary ml-auto text-[0.6875rem]">{{ time(e.at) }}</span>
                                     </div>
                                     <div class="text-sm" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
                                     @if (readSuffix(e); as how) {
-                                        <div class="text-secondary text-[11px]" data-testid="step-read-source">
+                                        <div class="text-secondary text-[0.6875rem]" data-testid="step-read-source">
                                             {{ how }}
                                         </div>
                                     }
@@ -271,7 +271,7 @@
                                         <div class="text-secondary text-sm">Reason: {{ e.params!.reason }}</div>
                                     }
                                     @if (e.author) {
-                                        <div class="text-secondary text-[11px]">by {{ e.author }}</div>
+                                        <div class="text-secondary text-[0.6875rem]">by {{ e.author }}</div>
                                     }
                                 </li>
                             }

@@ -329,12 +329,12 @@ import {
                         (openChange)="legendOpen.set($event)"
                     />
                 </div>
-                <p class="text-secondary m-0 shrink-0 pt-1 text-[10px] leading-snug" [title]="savedViewNotice">
+                <p class="text-secondary m-0 shrink-0 pt-1 text-xs leading-snug" [title]="savedViewNotice">
                     <span class="text-warn font-semibold">Not evidence</span> — re-projects live
                 </p>
                 @if (layoutCapNotice(); as notice) {
                     <p
-                        class="text-secondary m-0 shrink-0 text-[10px] leading-snug"
+                        class="text-secondary m-0 shrink-0 text-xs leading-snug"
                         role="status"
                         data-testid="la-layout-cap-notice"
                     >
