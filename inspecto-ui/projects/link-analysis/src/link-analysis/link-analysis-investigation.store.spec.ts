@@ -1260,11 +1260,11 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'N', purpose: 'P' }, [
             { kind: 'seed', ids: ['a'] },
             { kind: 'expand', from: 'outer', ids: [], req: RING },
-            { kind: 'remove', ids: ['a-n', 'b-n'] },
+            { kind: 'remove', ids: ['a', 'a-n'] },
         ]);
         expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual(['seed', 'expand']);
-        // the canvas ends with 'b-n' drawn again (a later Expand reached it), so only 'a-n' is hidden at Save
-        t.store.unsavedWs.set({ entities: [{ id: 'a', hop: 0 }, { id: 'b-n', hop: 1 }], links: [], excluded: [], hash: '' } as never);
+        // the canvas ends with 'a' drawn again (a later Expand reached it), so only 'a-n' is hidden at Save
+        t.store.unsavedWs.set({ entities: [{ id: 'a', hop: 0 }], links: [], excluded: [], hash: '' } as never);
         const out = await t.store.saveUnsaved('N', 'P');
         expect(sent.slice(2)).toEqual([{ op: 'hide', ids: ['a-n'] }]);
         expect(out).toEqual({ created: true, recorded: 3, message: '' });
