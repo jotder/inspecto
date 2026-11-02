@@ -723,11 +723,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     });
     /**
      * LA-EDITIONS-1 ED-4: the Investigation surface is included here. False on the Explorer level (Basic, or a sign-in
-     * install without the Investigations add-on, LA-ONBOARD-1 OB-5), whose Investigation routes answer 503: the tab and its
-     * openers stay, and the Investigation actions are shown LOCKED with {@link investigationsLockedReason} (OB-10).
+     * install without the Investigations add-on, LA-ONBOARD-1 OB-5), whose Investigation routes answer 503: the toolbox
+     * then shows only On screen (operator 2026-11-02, replacing OB-10's locked tabs); other Investigation actions are
+     * shown LOCKED with {@link investigationsLockedReason}.
      */
     private readonly laFeatures = inject(LA_FEATURES);
     readonly investigationsEnabled = this.laFeatures.investigations;
+    /** The flag can turn off live (Settings reloads the features): never leave the toolbox on a tab no longer shown. */
+    private readonly keepToolboxTabShown = effect(() => {
+        if (!this.investigationsEnabled() && untracked(this.toolboxTab) !== 'browser') this.toolboxTab.set('browser');
+    });
     /** Why an Investigation action is locked on the Explorer level (`/bootstrap` `featureReasons.investigations`). */
     readonly investigationsLockedReason = computed(() => investigationsLockedReason(this.laFeatures));
     /** LA-PANELS-REDESIGN-1: what runs in the browser, what runs on the server, and the Investigation. */

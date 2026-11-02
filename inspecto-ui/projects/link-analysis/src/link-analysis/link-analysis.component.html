@@ -1691,7 +1691,8 @@
                         </inspecto-link-analysis-toolbox>
 
                         <!-- Investigation (LA-10) — state lives in the pane-provided store, so the dock may collapse.
-                             On the Explorer level the tab stays and its one action is LOCKED with the reason (LA-ONBOARD-1 OB-10). -->
+                             On the Explorer level the tab is not shown (operator 2026-11-02); the locked branch below is only
+                             reached if the flag turns off live, for the moment before the toolbox falls back to On screen. -->
                         @if (toolboxTab() === 'investigation') {
                             @if (investigationsEnabled()) {
                                 <inspecto-link-analysis-investigation
@@ -1792,22 +1793,24 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                     </button>
-                    <button
-                        mat-icon-button
-                        (click)="openAnalysis('server')"
-                        matTooltip="Open the Whole Dataset tools"
-                        aria-label="Open the Whole Dataset tools"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
-                    </button>
-                    <button
-                        mat-icon-button
-                        (click)="openInvestigation()"
-                        matTooltip="Open the Investigation tab"
-                        aria-label="Open the Investigation tab"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:document-magnifying-glass"></mat-icon>
-                    </button>
+                    @if (investigationsEnabled()) {
+                        <button
+                            mat-icon-button
+                            (click)="openAnalysis('server')"
+                            matTooltip="Open the Whole Dataset tools"
+                            aria-label="Open the Whole Dataset tools"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:server-stack"></mat-icon>
+                        </button>
+                        <button
+                            mat-icon-button
+                            (click)="openInvestigation()"
+                            matTooltip="Open the Investigation tab"
+                            aria-label="Open the Investigation tab"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:document-magnifying-glass"></mat-icon>
+                        </button>
+                    }
                 }
             </aside>
         </div>

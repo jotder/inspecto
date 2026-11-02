@@ -1223,6 +1223,15 @@ describe('LinkAnalysisToolboxComponent search around', () => {
         const rows = (el: HTMLElement): string[] =>
             Array.from(el.querySelectorAll('section > button > span.font-medium')).map((s) => s.textContent!.trim());
 
+        it('without the Investigations add-on no card says "Also on Whole Dataset" (that tab is not shown)', () => {
+            const { fixture, c } = make(GRAPH, [], false);
+            TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
+            fixture.detectChanges();
+            const chips = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('section > button inspecto-chip')).map((x) => x.textContent!.trim());
+            expect(chips).not.toContain('Also on Whole Dataset');
+            expect(c.alsoOn('both')).toBe('');
+        });
+
         it('the Browser tab lists what runs in the browser once by question, badged with where it runs and its cap', async () => {
             const { fixture, c } = make(GRAPH, [], true);
             TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
