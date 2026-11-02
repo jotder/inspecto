@@ -641,7 +641,8 @@ export class LinkAnalysisToolboxComponent {
      * only where it is listed carries no chip (T-087: "both / browser / server" told the analyst nothing).
      */
     alsoOn(runsOn: RunsOn): string {
-        if (runsOn !== 'both') return '';
+        // without the Investigations add-on the Whole Dataset tab is not shown, so nothing points at it
+        if (runsOn !== 'both' || !this.investigationsEnabled()) return '';
         return this.side() === 'browser' ? 'Also on Whole Dataset' : 'Also on screen';
     }
 

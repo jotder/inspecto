@@ -737,9 +737,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         { id: 'server', label: 'Whole Dataset' },
         { id: 'investigation', label: 'Investigation' },
     ];
-    /** The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels) - the same on every level. */
+    /**
+     * The toolbox tablist, in order (WAI-ARIA tabs pattern; the panes are its tabpanels). Without the Investigations
+     * add-on (the Explorer level, Basic) only On screen is shown: Whole Dataset and Investigation would be locked panes
+     * (operator 2026-11-02).
+     */
     get toolboxTabs(): readonly { id: ToolboxTab; label: string }[] {
-        return this.allToolboxTabs;
+        return this.investigationsEnabled() ? this.allToolboxTabs : this.allToolboxTabs.filter((t) => t.id === 'browser');
     }
     /** The side the one toolbox instance draws: Server on the Server tab, else Browser (it stays mounted, hidden). */
     readonly toolboxSide = computed<'browser' | 'server'>(() => (this.toolboxTab() === 'server' ? 'server' : 'browser'));
@@ -3641,13 +3645,13 @@ Its prior copies stay in its version history.`,
     /** Open the graph-algorithms toolbox on its Browser tab, or on `side`. */
     openAnalysis(side: 'browser' | 'server' = 'browser'): void {
         this.toolboxDockOpen.set(true);
-        this.toolboxTab.set(side);
+        this.toolboxTab.set(this.investigationsEnabled() ? side : 'browser');
     }
 
     /** LA-10: open the Investigation tab (start one, or work the open one's op log). */
     openInvestigation(): void {
         this.toolboxDockOpen.set(true);
-        this.toolboxTab.set('investigation');
+        this.toolboxTab.set(this.investigationsEnabled() ? 'investigation' : 'browser');
     }
 
     // ── display options ──

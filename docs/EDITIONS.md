@@ -37,7 +37,7 @@ explorer* below.
 | | Link Analysis widgets on dashboards (offer hidden on Basic; routes stay open) | — | ✅ | ✅ | ✅ |
 | | Industry packs (Telecom, Mobile Money) | ✅ | ✅ | ✅ | ✅ |
 | | Masking (the default follows sign-in, never the LA level: `LA-ONBOARD-1` OB-6) | off by default (`none`); a mode the Space states is display only (no sign-in: anyone may reveal) | ✅ enforced, default `typed` (with or without the Investigations add-on) | ✅ | ✅ |
-| Investigate | **Investigations add-on** `INS-AO-LA-INVESTIGATIONS` (`LA-ONBOARD-1` OB-5): billable, enforced at runtime, included by default; every Investigate, Share, Scale and Operate row below needs it. Without it the install runs Link Analysis at the **Explorer** level and shows those actions locked with the reason | — | ✅ default | ✅ default | ✅ default |
+| Investigate | **Investigations add-on** `INS-AO-LA-INVESTIGATIONS` (`LA-ONBOARD-1` OB-5): billable, enforced at runtime, included by default; every Investigate, Share, Scale and Operate row below needs it. Without it the install runs Link Analysis at the **Explorer** level: the toolbox shows only its *On screen* tab (the *Whole Dataset* and *Investigation* tabs and the "Also on Whole Dataset" labels are hidden, operator 2026-11-02); other Investigation actions show locked with the reason | — | ✅ default | ✅ default | ✅ default |
 | | Investigations: sealed op log, replay, compare, temporal findings | — | ✅ | ✅ | ✅ |
 | | Dossier and Dossier bundle with verification | — | ✅ | ✅ | ✅ |
 | | Templates, external references | — | ✅ | ✅ | ✅ |

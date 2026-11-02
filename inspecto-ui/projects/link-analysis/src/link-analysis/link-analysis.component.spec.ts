@@ -2857,7 +2857,7 @@ describe('LinkAnalysisComponent', () => {
     });
 });
 
-describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not hidden (LA-EDITIONS-1 ED-4, LA-ONBOARD-1 OB-10)', () => {
+describe('LinkAnalysisComponent - the Explorer level: only the On screen tab (operator 2026-11-02, replaces ED-4 / OB-10 "locked, not hidden")', () => {
     const REASON = 'Investigations are in Standard and above, with the Investigations add-on.';
     const BASIC: LaFeatures = {
         ...STANDARD_EDITION_FEATURES,
@@ -2865,25 +2865,20 @@ describe('LinkAnalysisComponent - the Explorer level: Investigations locked, not
         featureReasons: signal({ investigations: REASON }),
     };
 
-    it('keeps the Investigation tab; opening it shows Start an Investigation LOCKED with the server reason', async () => {
+    it('shows only On screen; opening the Investigation or the Whole Dataset lands on On screen, never a locked pane', () => {
         const { fixture } = create({ features: BASIC });
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
         const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
-        expect(tabs).toEqual(['On screen', 'Whole Dataset', 'Investigation']);
-        c.openInvestigation(); // what the rail's "Open the Investigation" button calls - no longer a no-op on this level
+        expect(tabs).toEqual(['On screen']);
+        c.openInvestigation();
         fixture.detectChanges();
-        expect(c.toolboxTab()).toBe('investigation');
-        expect(el.querySelector('inspecto-link-analysis-investigation')).toBeNull();
-        const panel = el.querySelector('[data-testid="investigation-locked"]') as HTMLElement;
-        expect(panel.getAttribute('role')).toBe('tabpanel');
-        expect(panel.getAttribute('aria-labelledby')).toBe('la-toolbox-tab-investigation');
-        const action = panel.querySelector('[data-testid="locked-action"]') as HTMLButtonElement;
-        expect(action.textContent).toContain('Start an Investigation');
-        expect(action.getAttribute('aria-disabled')).toBe('true');
-        expect(panel.querySelector('[data-testid="locked-reason"]')?.textContent?.trim()).toBe(REASON);
-        await expectNoA11yViolations(panel);
+        expect(c.toolboxTab()).toBe('browser');
+        c.openAnalysis('server');
+        fixture.detectChanges();
+        expect(c.toolboxTab()).toBe('browser');
+        expect(el.querySelector('[data-testid="investigation-locked"]')).toBeNull();
     });
 
     it('Standard (the flag on) keeps the three tabs', () => {
