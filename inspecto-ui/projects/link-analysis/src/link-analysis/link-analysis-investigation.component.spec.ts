@@ -438,6 +438,31 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         await expectNoA11yViolations(q('act-cleanup'));
     });
 
+    it('LA-INVESTIGATE-CLICKS-2 (1): a window chip reads the days up to the latest event at once; the fields show hints, not values', async () => {
+        const { fixture, store, el, inv } = create({ timeCol: 'at', onlyB: { items: ['b'], truncated: false } });
+        await openInv(store);
+        store.windowEnd.set('2026-10-01T00:00:00Z');
+        fixture.detectChanges();
+        const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+        // an example instant in an empty field reads as a value: the fields say what blank means instead
+        for (const label of ['From', 'To']) expect(penByLabel(q('cleanup-window'), label)!.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+        expect(penByLabel(q('cleanup-window'), 'From')!.textContent).toContain('the start');
+        expect(penByLabel(q('cleanup-window'), 'To')!.textContent).toContain('the end');
+        const chip = q('cleanup-window-last30');
+        expect(chip.getAttribute('aria-pressed')).toBe('false');
+        chip.click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.compareInvestigationWindows).toHaveBeenCalledWith('inv-1', {
+            aFrom: '2026-09-01T00:00:00.000Z',
+            aTo: undefined,
+            bTo: '9999-12-31T00:00:00Z',
+        });
+        expect(q('cleanup-window-last30').getAttribute('aria-pressed')).toBe('true');
+        expect(q('cleanup-window-hide')).not.toBeNull(); // chip, then Hide: two presses
+        await expectNoA11yViolations(q('cleanup-window'));
+    });
+
     it('LA-INVESTIGATE-UX-2 (2): a cut read is refused, not half applied', async () => {
         const { fixture, store, el } = create({ timeCol: 'at', onlyB: { items: ['b'], truncated: true } });
         await openInv(store);

@@ -167,6 +167,9 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                                 <mat-hint data-testid="start-suggest-note">{{ note }}</mat-hint>
                             }
                         </mat-form-field>
+                        @if (prefillNote(); as note) {
+                            <p class="text-secondary m-0 text-xs" role="status" data-testid="start-prefill-note">{{ note }}</p>
+                        }
                         @if (offerReveal()) {
                             <div>
                                 <button
@@ -383,8 +386,11 @@ export class LinkAnalysisStartBoxComponent {
     readonly adding = input(false);
     /** Saving an Investigation needs Incident management; starting unsaved does not (the form says so under Start). */
     readonly canWrite = input(true);
-    /** The picked Dataset's columns (the page reads them); the Time column picker offers them. */
-    readonly columns = input<readonly { name: string; type: string }[]>([]);
+    /**
+     * The picked Dataset's columns (the page probes the store, so `dbType` is the stored type); the Time column picker offers
+     * the TIMESTAMP ones.
+     */
+    readonly columns = input<readonly { name: string; type: string; dbType?: string }[]>([]);
     /** The Dataset whose columns {@link columns} are: the page reads them when this changes. */
     readonly datasetPicked = output<string>();
 
@@ -475,15 +481,17 @@ export class LinkAnalysisStartBoxComponent {
         }),
     );
     /**
-     * The Time column picker: blank = the Dataset's own time column (or none), then the Dataset's date columns, then the
-     * rest - a column of another type may still hold times as text.
+     * The Time column picker: blank = the Dataset's own time column (or none), then the columns stored as TIMESTAMP or
+     * TIMESTAMP WITH TIME ZONE - the only types an Investigation's time windows read (LA-INVESTIGATE-TIMECOL-DATE-1: a DATE,
+     * a string, or a column whose stored type is unknown would make Start fail).
      */
     readonly timeColumnOptions = computed<PickerOption[]>(() => {
         const own = this.picked()?.timeCol;
-        const cols = [...this.columns()].sort((a, b) => Number(b.type === 'date') - Number(a.type === 'date'));
         return [
             { value: '', label: own ? `${own} (the Dataset's)` : 'None' },
-            ...cols.filter((c) => c.name !== own).map((c) => ({ value: c.name, label: c.name, hint: c.type })),
+            ...this.columns()
+                .filter((c) => c.name !== own && isTimestampType(c.dbType))
+                .map((c) => ({ value: c.name, label: c.name, hint: c.dbType!.toUpperCase() })),
         ];
     });
     /** The Degrees stepper (LA-INV-EXPAND-1): the start draws one ring, so 1 … the profile's maximum, at most three. */
@@ -647,10 +655,18 @@ export class LinkAnalysisStartBoxComponent {
             : 'Draws them and their links. Busy entities are held; Expand… goes further.';
     });
 
-    /** LA-INVESTIGATE-UX-1 "Investigate this" on a node: a fresh form starting from that one entity. */
-    prefillEntity(value: string): void {
+    /** Why "Investigate this" left the value as it is (a masked entity: revealed and recorded, or not revealable). */
+    readonly prefillNote = signal('');
+
+    /**
+     * LA-INVESTIGATE-UX-1 "Investigate this" on a node: a fresh form starting from that one entity, of its Entity Type when
+     * known; `note` says why the value is what it is (LA-INVESTIGATE-THIS-MASKED-1).
+     */
+    prefillEntity(value: string, note = '', entityType = ''): void {
         this.resetNew();
+        if (entityType && this.catalogue().types.some((t) => t.id === entityType)) this.form.controls.entityType.setValue(entityType);
         this.form.controls.value.setValue(value);
+        this.prefillNote.set(note);
     }
 
     /** Each File ▸ New starts fresh: the start inputs are cleared (the form stays mounted while an Investigation is open). */
@@ -663,6 +679,7 @@ export class LinkAnalysisStartBoxComponent {
         c.timeCol.setValue('');
         c.timeColZone.setValue('');
         c.degrees.setValue(1);
+        this.prefillNote.set('');
         this.form.markAsPristine();
         this.form.markAsUntouched();
         this.tried.set(false);
@@ -715,4 +732,10 @@ export class LinkAnalysisStartBoxComponent {
                 return { kind: 'dataset', datasetId: v.dataset };
         }
     }
+}
+
+/** The stored types an Investigation's time column may have (the server's `timeColZone` check). */
+function isTimestampType(dbType: string | undefined): boolean {
+    const t = (dbType ?? '').trim().toUpperCase();
+    return t === 'TIMESTAMP' || t === 'TIMESTAMP WITH TIME ZONE' || t === 'TIMESTAMPTZ';
 }

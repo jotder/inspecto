@@ -43,6 +43,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
-| `LA-INVESTIGATE-TIMECOL-DATE-1` | P3 | defect | the New Investigation form offers a DATE column as the Time column, and Start then fails with no message. | — |
-| `LA-INVESTIGATE-THIS-MASKED-1` | P3 | defect | *Investigate this* on a node of an explored graph fails in a Space that masks the Entity Type. | — |
-| `LA-INVESTIGATE-CLICKS-2` | P3 | defect | three Investigation-tab workflows miss their LA-INVESTIGATE-UX-1 click target (live re-measure 2026-11-02, tests-investigation-tab-live-d… | — |

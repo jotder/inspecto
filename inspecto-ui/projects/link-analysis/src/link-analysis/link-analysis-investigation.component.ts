@@ -134,6 +134,7 @@ import { GrowExcludeStore } from './grow-exclude.store';
 import { hintSeen, markHintSeen } from './grow-exclude';
 import { cleanupSets, keepOnlySelected, offPathsBetween, outsideWindow, weaklyLinked } from './investigation-cleanup';
 import { ISO_INSTANT } from './investigation-rung-form';
+import { quickWindow } from './investigation-filter';
 import { NgTemplateOutlet } from '@angular/common';
 import { DISABLED_REASON } from './disabled-reasons';
 import { laLimit } from './la-limits';
@@ -180,6 +181,17 @@ import { laLimit } from './la-limits';
             top: 0;
             z-index: 2;
             background: var(--gamma-bg-card);
+        }
+        .la-toggle {
+            cursor: pointer;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            border-radius: 9999px;
+        }
+        .la-toggle:focus-visible {
+            outline: 2px solid var(--gamma-primary);
+            outline-offset: 2px;
         }
     `,
 })
@@ -388,6 +400,31 @@ export class LinkAnalysisInvestigationComponent {
         } finally {
             this.outsideBusy.set(false);
         }
+    }
+
+    /** LA-INVESTIGATE-CLICKS-2 (1): the Expand filter's quick windows, counted back from the latest event. */
+    readonly outsideChips = [
+        { value: 'last7', days: 7, label: '7 days' },
+        { value: 'last30', days: 30, label: '30 days' },
+        { value: 'last90', days: 90, label: '90 days' },
+    ] as const;
+    /** The chip whose window the fields hold (From = N days before the latest event, To blank), or null. */
+    readonly outsideChipOn = computed(() => {
+        const end = this.store.windowEnd() ?? this.store.latestEvent();
+        const [from, to] = [this.outsideFromValue().trim(), this.outsideToValue().trim()];
+        return to ? null : (this.outsideChips.find((c) => quickWindow(c.days, end)?.from === from)?.value ?? null);
+    });
+
+    /** A chip: From = N days before the latest event (read once), To blank, and the read runs at once. */
+    async outsideChip(days: number): Promise<void> {
+        const from = quickWindow(days, await this.store.loadLatestEvent())?.from;
+        if (!from) {
+            this.outsideError.set('The latest event time is not known, so the last days cannot be counted. Type From instead.');
+            return;
+        }
+        this.outsideFrom.setValue(from);
+        this.outsideTo.setValue('');
+        await this.findOutside();
     }
 
     async cleanUpOutside(ids: string[]): Promise<void> {

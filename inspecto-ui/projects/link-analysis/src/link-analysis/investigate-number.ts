@@ -164,6 +164,12 @@ export function latestTimeSql(sourceName: string, timeCol: string): string {
     return `SELECT strftime(MAX(${q(timeCol)}), '%Y-%m-%dT%H:%M:%S') AS latest FROM ${q(sourceName)}`;
 }
 
+/** The stored DuckDB type of each column, one row keyed by column name (`typeof`; no row on an empty store). */
+export function columnTypesSql(sourceName: string, cols: readonly string[]): string {
+    const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
+    return `SELECT ${cols.map((c) => `typeof(${q(c)}) AS ${q(c)}`).join(', ')} FROM ${q(sourceName)} LIMIT 1`;
+}
+
 /** A zone-less timestamp (a naive DuckDB TIMESTAMP) read as UTC, the Investigation's default zone. */
 const asUtc = (v: string): string => {
     const iso = v.trim().replace(' ', 'T');

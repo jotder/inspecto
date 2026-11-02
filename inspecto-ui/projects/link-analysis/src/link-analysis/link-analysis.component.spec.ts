@@ -34,7 +34,8 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, mergeWorkingSets, nodeDisplayId, snapshotTitle } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
-import { SpacesService } from '@inspecto/core/api';
+import { LensService, SpacesService } from '@inspecto/core/api';
+import { DeepLinkService } from '@inspecto/link-analysis/open/open-link';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -3966,6 +3967,21 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         return { ...made, c, el, select, merge };
     };
 
+    it('LA-INVESTIGATE-CLICKS-2 (2): with the canvas tools folded, the ⋯ menu offers Keep the selected', async () => {
+        const { fixture, c, select } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
+        const keep = vi.spyOn(c, 'keepSelected').mockResolvedValue();
+        select(1);
+        const more = fixture.debugElement.query(By.css('[data-testid="la-canvas-tools-more"]'));
+        more.injector.get(MatMenuTrigger).openMenu();
+        fixture.detectChanges();
+        const item = document.querySelector('[data-testid="la-more-keep"]') as HTMLButtonElement;
+        expect(item?.textContent).toContain('Keep the selected');
+        expect(item.disabled).toBe(false);
+        item.click();
+        expect(keep).toHaveBeenCalled();
+        fixture.destroy();
+    });
+
     it('is available for two typed, readable entities with the capability, inside an Investigation', async () => {
         const { fixture, c, select, merge } = await inInvestigation(['msisdn:+447700900123', 'imsi:234150000000001']);
         select(2);
@@ -5569,6 +5585,103 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const [seed] = c.investigation.unsaved()!.steps;
         expect(seed).toEqual(expect.objectContaining({ kind: 'seed', ids: ['masked:00000000000000aa'] }));
         expect(JSON.stringify(previewUnsaved.mock.calls)).not.toContain('MULE-HUB-01');
+    });
+
+    it('LA-INVESTIGATE-TIMECOL-DATE-1: the Time column choices carry the stored type of each date column, asked of the store', async () => {
+        // /db/table answers the coarse `date` for both: only typeof() tells the DATE from the TIMESTAMP
+        const rows = vi.fn(async () => ({
+            rows: [],
+            truncated: false,
+            columns: [
+                { name: 'note', type: 'string' },
+                { name: 'BOOKED_DATE', type: 'date' },
+                { name: 'BOOKED_AT', type: 'date' },
+            ],
+        }));
+        const sql = vi.fn(async () => ({ rows: [{ BOOKED_DATE: 'DATE', BOOKED_AT: 'TIMESTAMP' }], columns: [], truncated: false }));
+        const { fixture } = create({ datasets: [TRANSFERS], rows: { rows, sql } as unknown as Partial<DatasetRowsService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.readStartColumns('transfers');
+        expect(sql).toHaveBeenCalledWith('transfers', 'SELECT typeof("BOOKED_DATE") AS "BOOKED_DATE", typeof("BOOKED_AT") AS "BOOKED_AT" FROM "transfers" LIMIT 1', 1);
+        expect(c.startColumns()).toEqual([
+            { name: 'note', type: 'string' },
+            { name: 'BOOKED_DATE', type: 'date', dbType: 'DATE' },
+            { name: 'BOOKED_AT', type: 'date', dbType: 'TIMESTAMP' },
+        ]);
+    });
+
+    it('LA-INVESTIGATE-TIMECOL-DATE-1: a start the server refuses (a Time column it cannot use) says why, and records nothing', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const previewUnsaved = vi.fn(() =>
+            throwError(
+                () =>
+                    new HttpErrorResponse({
+                        status: 422,
+                        error: { error: { message: "'timeCol' must be a TIMESTAMP or TIMESTAMP WITH TIME ZONE column; 'BOOKED_DATE' is DATE" } },
+                    }),
+            ),
+        );
+        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService> });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: 'BOOKED_DATE',
+            timeColZone: '',
+            degrees: 1,
+        });
+        expect(previewUnsaved).toHaveBeenCalled();
+        expect(c.investigation.unsaved()).toBeNull();
+        expect(c.startNotice()).toEqual({ variant: 'warning', text: expect.stringContaining("'BOOKED_DATE' is DATE") });
+    });
+
+    describe('LA-INVESTIGATE-THIS-MASKED-1: Investigate this on a masked node', () => {
+        const ALIAS = 'masked:00000000000000aa';
+        const MASKED_GRAPH: G6GraphData = {
+            nodes: [
+                { id: `msisdn:${ALIAS}`, data: { label: ALIAS, kind: 'entity' } },
+                { id: 'msisdn:masked:00000000000000bb', data: { label: 'masked:00000000000000bb', kind: 'entity' } },
+            ],
+            edges: [{ id: 'e', source: `msisdn:${ALIAS}`, target: 'msisdn:masked:00000000000000bb', data: { kind: 'link' } }],
+        };
+        const setUp = async (mayReveal: boolean) => {
+            const { fixture } = create({ graph: MASKED_GRAPH });
+            fixture.detectChanges();
+            await runQuery(fixture);
+            const c = fixture.componentInstance;
+            Object.defineProperty(TestBed.inject(LensService), 'canRevealLinkEntities', { value: () => mayReveal });
+            const resolve = vi
+                .spyOn(TestBed.inject(DeepLinkService), 'resolve')
+                .mockReturnValue(of({ entity: { type: 'msisdn', key: ALIAS, masked: true, revealed: '447700900123' } }));
+            const prefill = vi.spyOn(LinkAnalysisStartBoxComponent.prototype, 'prefillEntity');
+            return { fixture, c, resolve, prefill };
+        };
+
+        it('someone who may reveal gets the real key, through the audited reveal, and is told it was recorded', async () => {
+            const { fixture, c, resolve, prefill } = await setUp(true);
+            await c.investigateNode(`msisdn:${ALIAS}`);
+            for (let i = 0; i < 4; i++) {
+                fixture.detectChanges();
+                TestBed.inject(ApplicationRef).tick(); // afterNextRender
+                await new Promise((r) => setTimeout(r, 5));
+            }
+            expect(resolve).toHaveBeenCalledWith({ entity: `msisdn:${ALIAS}` }, true);
+            expect(prefill).toHaveBeenCalledWith('447700900123', expect.stringContaining('recorded'), 'msisdn');
+        });
+
+        it('someone who may not reveal is never sent the value, nor the alias as a value: the form says why', async () => {
+            const { fixture, c, resolve, prefill } = await setUp(false);
+            await c.investigateNode(`msisdn:${ALIAS}`);
+            for (let i = 0; i < 4; i++) {
+                fixture.detectChanges();
+                TestBed.inject(ApplicationRef).tick(); // afterNextRender
+                await new Promise((r) => setTimeout(r, 5));
+            }
+            expect(resolve).not.toHaveBeenCalled();
+            expect(prefill).toHaveBeenCalledWith('', expect.stringContaining('may not reveal'), 'msisdn');
+        });
     });
 
     it('a start whose ring the Space would hold for four-eyes is refused up front, and draws nothing', async () => {

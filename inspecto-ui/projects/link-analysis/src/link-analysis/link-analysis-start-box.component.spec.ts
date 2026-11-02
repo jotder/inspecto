@@ -99,7 +99,7 @@ class Host {
     readonly catalogue = signal<StartCatalogue>(CATALOGUE);
     readonly lists = signal<EntityListSummary[]>([LIST]);
     readonly dataset = signal<string | null>('transfers');
-    readonly columns = signal<{ name: string; type: string }[]>([]);
+    readonly columns = signal<{ name: string; type: string; dbType?: string }[]>([]);
     readonly adding = signal(false);
     readonly notice = signal<StartNotice | null>(null);
     readonly addData = signal(true);
@@ -421,19 +421,23 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
         await expectNoA11yViolations(el);
     });
 
-    it('the Time column picker offers the Dataset’s own column as the blank choice, date columns first', () => {
+    it('the Time column picker offers the Dataset’s own column as the blank choice, then only TIMESTAMP columns (LA-INVESTIGATE-TIMECOL-DATE-1)', () => {
         const { fixture, box } = createNew();
         fixture.componentInstance.catalogue.set({
             ...CATALOGUE,
             datasets: CATALOGUE.datasets.map((d) => (d.id === 'transfers' ? { ...d, timeCol: 'booked_at' } : d)),
         });
+        // the server takes TIMESTAMP or TIMESTAMP WITH TIME ZONE only: a DATE, a string or an untyped column would break Start
         fixture.componentInstance.columns.set([
-            { name: 'note', type: 'string' },
-            { name: 'booked_at', type: 'date' },
-            { name: 'settled_at', type: 'date' },
+            { name: 'note', type: 'string', dbType: 'VARCHAR' },
+            { name: 'booked_at', type: 'date', dbType: 'TIMESTAMP' },
+            { name: 'booked_date', type: 'date', dbType: 'DATE' },
+            { name: 'declared_only', type: 'date' },
+            { name: 'settled_at', type: 'date', dbType: 'TIMESTAMP WITH TIME ZONE' },
+            { name: 'seen_at', type: 'date', dbType: 'TIMESTAMP' },
         ]);
         fixture.detectChanges();
-        expect(box.timeColumnOptions().map((o) => o.value)).toEqual(['', 'settled_at', 'note']);
+        expect(box.timeColumnOptions().map((o) => o.value)).toEqual(['', 'settled_at', 'seen_at']);
         expect(box.timeColumnOptions()[0].label).toBe("booked_at (the Dataset's)");
         pickerSet(fixture, '[data-testid="new-time-col"]', 'settled_at');
         pickerSet(fixture, '[data-testid="new-time-zone"]', 'Europe/London');
@@ -468,6 +472,18 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
                 degrees: 2,
             },
         ]);
+    });
+
+    it('LA-INVESTIGATE-THIS-MASKED-1: a prefill says why its value is blank, and a new start clears the note', () => {
+        const { fixture, box, el } = createNew('masked');
+        box.prefillEntity('', 'This entity is masked and you may not reveal it.', 'account');
+        fixture.detectChanges();
+        expect(box.form.controls.value.value).toBe('');
+        expect(box.form.controls.entityType.value).toBe('account');
+        expect(q(el, 'start-prefill-note')?.textContent).toContain('you may not reveal it');
+        box.resetNew();
+        fixture.detectChanges();
+        expect(q(el, 'start-prefill-note')).toBeNull();
     });
 
     it('Degrees stops at 3 below a deeper Industry pack, and says it is the form’s own limit', () => {

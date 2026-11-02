@@ -654,19 +654,37 @@
                             <div class="flex flex-col gap-1 self-stretch" role="group" aria-label="Outside a time window" data-testid="cleanup-window">
                                 <p class="text-secondary m-0 text-xs">
                                     Outside a time window: entities none of whose links has an event in [From, To), read from the
-                                    Dataset now. Either end may be blank.
+                                    Dataset now. Either end may be blank; a date and time has a zone, such as 2026-09-01T00:00Z.
                                 </p>
+                                <!-- LA-INVESTIGATE-CLICKS-2 (1): the Expand filter's quick windows; a chip reads at once -->
+                                <div class="flex flex-wrap gap-1" role="group" aria-label="Last days up to the latest event" data-testid="cleanup-window-chips">
+                                    @for (o of outsideChips; track o.value) {
+                                        <button
+                                            type="button"
+                                            class="la-toggle"
+                                            [attr.aria-pressed]="outsideChipOn() === o.value"
+                                            [matTooltip]="'The ' + o.days + ' days up to the latest event'"
+                                            [attr.data-testid]="'cleanup-window-' + o.value"
+                                            [disabled]="outsideBusy()"
+                                            (click)="outsideChip(o.days)"
+                                        >
+                                            <inspecto-chip [variant]="outsideChipOn() === o.value ? 'soft' : 'outline'" [tone]="outsideChipOn() === o.value ? 'primary' : 'neutral'">{{
+                                                o.label
+                                            }}</inspecto-chip>
+                                        </button>
+                                    }
+                                </div>
                                 <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
                                     <inspecto-pen-field
                                         label="From"
                                         [formControl]="outsideFrom"
-                                        placeholder="2026-09-01T00:00:00Z"
+                                        placeholder="Blank: from the start"
                                         [error]="outsideFrom.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''"
                                     />
                                     <inspecto-pen-field
                                         label="To"
                                         [formControl]="outsideTo"
-                                        placeholder="2026-10-01T00:00:00Z"
+                                        placeholder="Blank: to the end"
                                         [error]="outsideTo.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''"
                                     />
                                 </div>

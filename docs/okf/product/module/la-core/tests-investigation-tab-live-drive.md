@@ -39,7 +39,24 @@ before them (the chip's hint says *This Expand only* while the chip stays select
 Investigation's own here, so the step log cannot tell); the header says *this Investigation sets no time window* on an
 Investigation whose time column is `last_seen`.
 
-## 3. W5: is flattening worth it?
+## 3. Re-drive after the fixes (2026-11-02)
+
+`LA-INVESTIGATE-TIMECOL-DATE-1`, `-THIS-MASKED-1` and `-CLICKS-2` fixed (as built in
+[`architecture.md`](architecture.md) §6.9). Same set-up as §1: `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo`
+built from the fix worktree, `serve-demo.bat` on `127.0.0.1:8092`, a COPY of `la-showcase`, Demo User `admin`, 1024 px.
+
+| Defect | Workflow | Result | Evidence |
+|---|---|---|---|
+| TIMECOL-DATE | W1 start on `mule_transfers_dataset`, Time column popup | **PASS** | the popup lists *None* and **BOOKED_AT · TIMESTAMP** only (`BOOKED_DATE` and the text columns are gone; `BOOKED_AT`, not declared on the Dataset, is now offered). Start from MULE-HUB-01 with `BOOKED_AT`: `POST …/inv/expand/preview` 200, *Drew 1 entity and 14 linked subscribers*. The first build showed only *None*: `/db/table` sends the coarse `date` for both columns, so the stored type is now read with `typeof()` |
+| THIS-MASKED | right-click a masked node ▸ *Investigate this* | **NOT DRIVEN live** | the pane's synthetic right-click did not reach a G6 node on `telecom_fraud_network` (Find centred the hub; no node menu opened). Covered by the canvas spec: a revealer gets the real key through `POST /inv/deep-links/resolve {reveal: true}`; anyone else gets no request, a blank value and the reason. A person should re-check it once |
+| CLICKS-2 (1) | Clean up ▸ Outside a time window on a saved throwaway (time column `BOOKED_AT`) | **PASS** | the fields read *Blank: from the start* / *Blank: to the end*; *30 days* sets From = 30 days before the latest event (`2026-08-05T00:28:00.000Z`), To blank, the chip pressed, and reads at once: *Hide 0 with no link event in the window* (every one of the 15 entities had an event in the window, so nothing to hide; *7 days* the same). Chip + Hide = 2 presses where there is something to hide |
+| CLICKS-2 (2) | 1024 px, ⋯ ▸ Select all, ⋯ ▸ *Keep the selected (K)* | **PASS** | ⋯ shown (canvas tools folded); the item is enabled with a selection; the counts read *15 kept* |
+| CLICKS-2 (3) | W1 with the Dataset not yet picked | unchanged, 5 · 1 | the baseline; the Dataset pick is the extra press. Accepted, not changed |
+
+The throwaway `inv-5a025dc5-…` was deleted with *Investigation actions ▸ Delete* (its folder is gone; `mule-hub-case` and
+`delivery-gap-case` untouched); the server was stopped with Ctrl+C (graceful: *ControlApi stopped*) and the viewport reset.
+
+## 4. W5: is flattening worth it?
 
 Not on its own. The one-off sits one submenu deep because the node menu's top level is already ten items; lifting
 *Incoming only* to the top would make the menu longer for every right-click to save one press on a rare action. The

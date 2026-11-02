@@ -53,6 +53,7 @@ import {
     needsPermission,
 } from '@inspecto/core/api';
 import { GraphRunResult, GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { DeepLinkService } from '@inspecto/link-analysis/open/open-link';
 import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
 import { indexSourceNote } from './index-source';
 import { DISABLED_REASON } from './disabled-reasons';
@@ -91,6 +92,7 @@ import {
     investigateBinding,
     latestTimeOf,
     latestTimeSql,
+    columnTypesSql,
     missingMappedColumns,
     normaliseMsisdn,
     seedError,
@@ -610,6 +612,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private spaces = inject(SpacesService);
     private readonly session = inject(SessionService);
     private lens = inject(LensService);
+    private deepLinks = inject(DeepLinkService);
     private exchange = inject(ExchangeService);
     /**
      * Offering is gated on the multi-space Exchange being present AND `canOfferDatasets` — the server gates
@@ -2150,12 +2153,22 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
 
     /** The picked Dataset's columns, for the start form's Time column picker. */
-    readonly startColumns = signal<{ name: string; type: string }[]>([]);
+    readonly startColumns = signal<{ name: string; type: string; dbType?: string }[]>([]);
     async readStartColumns(datasetId: string): Promise<void> {
         const ds = (await this.datasetsLoaded).find((d) => d.id === datasetId);
         try {
-            const cols = ds ? await this.datasetRows.columns(ds) : [];
-            this.startColumns.set(cols.map((c) => ({ name: c.name, type: c.type })));
+            // the store probe, not the declared columns (they may be partial); its coarse `date` cannot tell a DATE from a
+            // TIMESTAMP, so the stored types of the date columns are asked for (LA-INVESTIGATE-TIMECOL-DATE-1)
+            const cols = ds ? (await this.datasetRows.rows(ds, 1)).columns : [];
+            const dates = cols.filter((c) => c.type === 'date').map((c) => c.name);
+            const typed =
+                ds?.sourceName && dates.length
+                    ? await this.datasetRows.sql(ds.sourceName, columnTypesSql(ds.sourceName, dates), 1)
+                    : null;
+            const stored = typed && !typed.error ? (typed.rows[0] ?? {}) : {};
+            this.startColumns.set(
+                cols.map((c) => ({ name: c.name, type: c.type, ...(typeof stored[c.name] === 'string' ? { dbType: stored[c.name] as string } : {}) })),
+            );
         } catch {
             this.startColumns.set([]); // the picker offers the Dataset's own time column only
         }
@@ -2266,7 +2279,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const type = binding.projection.entityType;
         const seed: UnsavedStep = { kind: 'seed', ids: found, ...(type ? { entityType: type } : {}) };
         // the ring and the further degrees, read by the server with the presets: the screen is what Save records
-        const walk = await this.walkUnsaved(unsaved, null, found, found, this.startRing(Math.max(1, req.degrees)));
+        let walk: Awaited<ReturnType<LinkAnalysisComponent['walkUnsaved']>>;
+        try {
+            walk = await this.walkUnsaved(unsaved, null, found, found, this.startRing(Math.max(1, req.degrees)));
+        } catch (err) {
+            // a refusal (a Time column the server cannot use, LA-INVESTIGATE-TIMECOL-DATE-1) is said, never swallowed
+            this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Investigation could not start.') });
+            return;
+        }
         if (!walk) {
             this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
             return;
@@ -5861,12 +5881,34 @@ Its prior copies stay in its version history.`,
         () => this.investigationsEnabled() && !this.investigation.active() && !this.investigation.unsaved() && this.nodeMenuTargets().length === 1,
     );
 
-    investigateNode(nodeId: string): void {
+    async investigateNode(nodeId: string): Promise<void> {
         const node = this.canvasData()?.nodes.find((n) => n.id === nodeId);
-        const value = node ? (rawIdsOf(node)[0] ?? node.data.label) : '';
-        if (!value) return;
+        const raw = node ? (rawIdsOf(node)[0] ?? node.data.label) : '';
+        if (!raw) return;
+        const colon = nodeId.indexOf(':');
+        const type = colon > 0 && !nodeId.startsWith('entity:') ? nodeId.slice(0, colon) : '';
         this.openInvestigation();
-        afterNextRender(() => setTimeout(() => this.newInvForm?.prefillEntity(value)), { injector: this.injector });
+        // LA-INVESTIGATE-THIS-MASKED-1: a masked node carries its alias, which Start cannot take as a value. Someone who may
+        // reveal gets the real key through the audited reveal; anyone else is told why the value is blank.
+        let value = raw;
+        let note = '';
+        if (raw.startsWith('masked:')) {
+            value = '';
+            if (!type) note = 'This entity is masked and its Entity Type is not known here, so it cannot fill the form. Type its value.';
+            else if (!this.lens.canRevealLinkEntities())
+                note = 'This entity is masked and you may not reveal its value, so it cannot fill the form. Type the value if you know it.';
+            else
+                try {
+                    const res = await firstValueFrom(this.deepLinks.resolve({ entity: `${type}:${raw}` }, true));
+                    value = res.entity?.revealed ?? '';
+                    note = value
+                        ? 'This entity is masked: its value was revealed to you to start from, and the reveal is recorded.'
+                        : 'This entity is masked and its value could not be revealed. Type the value if you know it.';
+                } catch (err) {
+                    note = apiErrorMessage(err, 'This entity is masked and its value could not be revealed.');
+                }
+        }
+        afterNextRender(() => setTimeout(() => this.newInvForm?.prefillEntity(value, note, type)), { injector: this.injector });
     }
 
 

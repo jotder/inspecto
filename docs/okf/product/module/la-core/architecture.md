@@ -1321,6 +1321,29 @@ How it reads to a user: [user guide §7](user-guide-link-analysis.md#7-expand-an
 - Tests: `investigation-filter.spec.ts`, `investigation-cleanup.spec.ts`, the Redo case in
   `link-analysis-investigation.store.spec.ts`, and the component specs of the tab, the Expand form and the Exclude dialog;
   the `LA-INVESTIGATE-UX-2` cases in the store, tab, canvas and `unsaved-investigation` specs.
+- **Three re-measure defects (as built 2026-11-02, `LA-INVESTIGATE-TIMECOL-DATE-1`, `-THIS-MASKED-1`, `-CLICKS-2`).** No
+  backend change.
+  - *Time column.* Decision: **do not offer** a column the server refuses, rather than support DATE. `timeColZone` in
+    `InvestigationRoutes` accepts only `TIMESTAMP` / `TIMESTAMP WITH TIME ZONE` (a naive TIMESTAMP is read in a zone; a
+    DATE has no instant to compare a window's `[from, to)` with), and every windowed read, the latest-event lookup and
+    the compare route would need a cast to support DATE. `readStartColumns` now reads the store probe
+    (`DatasetRowsService.rows(ds, 1)`), not the declared columns (partial: `BOOKED_AT` is not declared on
+    `mule_transfers_dataset`). `/db/table` answers the coarse `date` for DATE and TIMESTAMP alike (seen live), so the
+    date columns' stored types are asked in one `/db/query` (`columnTypesSql`: `SELECT typeof(..) …  LIMIT 1`; an empty
+    store answers no row, and then no column is offered) and the start form's `timeColumnOptions` keeps only the two
+    timestamp types. The Dataset's own column (blank choice) is not re-checked: a refusal of the start's
+    walk (`walkUnsaved` → `POST /inv/expand/preview` 422) is now caught in `startUnsaved` and shown as the start notice.
+  - *Investigate this on a masked node.* The node carries the exploration alias; Start needs a value. `investigateNode`
+    reveals it through the existing audited `POST /inv/deep-links/resolve {entity: "<type>:<alias>", reveal: true}`
+    (`canRevealLinkEntities`, audited `LINK_ENTITY_REVEALED` with the alias only) and fills the form with the real key and
+    its Entity Type; without the capability no request is made, the value stays blank and the form's
+    `start-prefill-note` says why. The type comes from the typed node id (`<type>:<key>`); an untyped node cannot be
+    revealed and says so.
+  - *Clean up ▸ Outside a time window.* Chips 7 / 30 / 90 days (`outsideChips`, `quickWindow` from the Expand filter):
+    From = N days before `store.loadLatestEvent()`, To blank, and the read runs at once; the field placeholders say what
+    blank means. The folded ⋯ menu has *Keep the selected (K)* (`la-more-keep`) beside Exclude.
+  - Tests: the `LA-INVESTIGATE-TIMECOL-DATE-1`, `-THIS-MASKED-1` and `-CLICKS-2` cases in the start-box, tab and canvas
+    specs.
 
 ### 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 

@@ -466,8 +466,10 @@ Investigation's canvas for everything you can do with it, each a recorded step: 
 thing changed, for this step only), **Shrink** (hide the entities only it links to), **Keep** (**K**), **Hide** (**H**),
 **Select neighbours**, **Exclude…** (**X**), **Collapse / unfold** and, on a busy entity, **Expand anyway**. With no
 Investigation open, right-click offers **Investigate this**: the Investigation tab's start form, filled with that
-entity. With entities selected, **G** (or **E**) expands them with the filter, **K** keeps and **H** hides them; the
-canvas toolbar has **Keep** beside **Hide**. A node no expand has followed yet has
+entity and its Entity Type. On a Space that masks the entity, the node shows only its alias: if you may reveal masked
+entities, the form is filled with the real value through the audited reveal (the form says the reveal is recorded);
+otherwise the value stays blank and the form says why. With entities selected, **G** (or **E**) expands them with the filter, **K** keeps and **H** hides them; the
+canvas toolbar has **Keep** beside **Hide** (when the toolbar is folded into **⋯**, **Keep the selected** is there). A node no expand has followed yet has
 a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
 *Only unexpanded* under that legend row help you go one node at a time.
 
@@ -500,7 +502,9 @@ the 9 selected**. Each is one recorded `hide` with its reason noted; **Exclude i
 carrying that reason. Start entities and kept entities are never taken away. Undo takes it back. The fold works on an
 unsaved Investigation too: each press hides on screen and Save records it as the `hide` and its reason; *Exclude
 instead of hide* needs a saved Investigation. On a saved Investigation with a time column, **Outside a time window**
-takes a From and/or To (ISO with an offset or Z, `[From, To)`): **Find what is outside the window** reads the Dataset
+offers the chips **7 days**, **30 days** and **90 days** (the days up to the latest event, as in the Expand filter's
+Time group): a chip fills From, leaves To blank and reads at once, so the next press is the Hide. Or type a From and/or
+To (ISO with an offset or Z, `[From, To)`; a blank field says what blank means): **Find what is outside the window** reads the Dataset
 now for the entities none of whose links has an event in it, and **Hide 7 with no link event in the window** records
 them as one `hide` whose reason names the window (the Working Set carries link counts, not link times, so the read is
 live and only its answer is recorded). An entity whose links carry no time at all is never counted as outside. A
@@ -726,8 +730,10 @@ for no Name and no Purpose: you work **unsaved** first, and **Save** asks for th
    * a list: the Entity List;
    * a paste: the values;
    * the whole Dataset: nothing more. A warning shows when it is above the node cap.
-4. **Time column**: a popup of the Dataset's columns, date columns first; the blank choice is the Dataset's own time
-   column. It is used for time windows and the coverage check.
+4. **Time column**: a popup of the Dataset's columns stored as TIMESTAMP or TIMESTAMP WITH TIME ZONE (read from the store,
+   so a column the Dataset does not declare is offered too); the blank choice is the Dataset's own time column. A DATE or
+   text column is not offered: time windows read instants. It is used for time windows and the coverage check. If the
+   server still refuses the start (say the Dataset's own column is a DATE), the form says why.
 5. **Time zone**: a popup, for a time column that has none (UTC by default).
 6. **Degrees**: a **− 1 +** stepper, up to 3 and never past the profile's last degree. The start always draws one ring;
    each degree more walks one ring further.

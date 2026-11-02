@@ -1029,6 +1029,16 @@
                             <button
                                 mat-menu-item
                                 type="button"
+                                (click)="keepSelected()"
+                                [disabled]="!selectedOnCanvas().length"
+                                [attr.aria-label]="selectedOnCanvas().length ? null : 'Keep the selected: ' + selectFirst"
+                                data-testid="la-more-keep"
+                            >
+                                Keep the selected (K)
+                            </button>
+                            <button
+                                mat-menu-item
+                                type="button"
                                 (click)="excludeSelected()"
                                 [disabled]="!selectedOnCanvas().length"
                                 [attr.aria-label]="selectedOnCanvas().length ? null : 'Exclude selection: ' + selectFirst"
