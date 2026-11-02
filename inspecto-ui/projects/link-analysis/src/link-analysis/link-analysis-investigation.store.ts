@@ -245,6 +245,8 @@ export class InvestigationSessionStore {
             b.profileId,
         );
         if (!created) return { created: false, recorded: 0, message: this.error() };
+        // what the canvas drew last: a removed entity a later Expand drew again is not hidden by its Remove
+        const drawn = new Set((this.unsavedWs()?.entities ?? []).map((e) => e.id));
         this.unsaved.set(null);
         this.unsavedWs.set(null);
         this.windowEnd.set(b.windowEnd ?? null);
@@ -257,7 +259,7 @@ export class InvestigationSessionStore {
                 step.kind === 'seed'
                     ? await this.replaySeed(step)
                     : step.kind === 'hide' || step.kind === 'exclude' || step.kind === 'remove'
-                      ? await this.replayCleanUp(step)
+                      ? await this.replayCleanUp(step.kind === 'remove' ? { ...step, ids: step.ids.filter((v) => !drawn.has(v)) } : step)
                       : await this.replayExpand(step, b);
             recorded += r.recorded;
             if (this.activeId() !== id) return { created: true, recorded, message: '' };

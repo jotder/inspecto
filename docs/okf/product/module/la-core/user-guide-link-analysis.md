@@ -473,6 +473,12 @@ canvas toolbar has **Keep** beside **Hide** (when the toolbar is folded into **â
 a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
 *Only unexpanded* under that legend row help you go one node at a time.
 
+**Remove** (**Delete**, right-click, or the bin on the canvas toolbar) is offered while you explore, outside an open
+Investigation. It takes the selected nodes off the graph, together with every neighbour left with no link at all once
+they are gone (in either direction; only their direct neighbours are checked). It keeps nothing out: a later Expand
+that reaches a removed node draws it again. **Excludeâ€¦** is the one that keeps a node out. One Undo (Ctrl+Z) puts a
+Remove back. If you then Save the work as an Investigation, each removed node still absent is recorded as a hide.
+
 ### 7.2 Held: busy entities
 
 Busy entities link to thousands of others and hide the real links. Expand holds them: they stay on the graph with a

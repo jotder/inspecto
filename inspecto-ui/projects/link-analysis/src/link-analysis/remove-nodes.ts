@@ -6,10 +6,17 @@
 export function withOrphans(ids: readonly string[], links: readonly { source: string; target: string }[]): string[] {
     const gone = new Set(ids);
     const touched = new Set<string>();
+    /** Links each node keeps to something that stays. */
+    const kept = new Map<string, number>();
     for (const l of links) {
-        if (gone.has(l.source) && !gone.has(l.target)) touched.add(l.target);
-        if (gone.has(l.target) && !gone.has(l.source)) touched.add(l.source);
+        const s = gone.has(l.source);
+        const t = gone.has(l.target);
+        if (s && !t) touched.add(l.target);
+        if (t && !s) touched.add(l.source);
+        if (!s && !t) {
+            kept.set(l.source, (kept.get(l.source) ?? 0) + 1);
+            kept.set(l.target, (kept.get(l.target) ?? 0) + 1);
+        }
     }
-    const orphans = [...touched].filter((id) => !links.some((l) => (l.source === id && !gone.has(l.target)) || (l.target === id && !gone.has(l.source))));
-    return [...gone, ...orphans];
+    return [...gone, ...[...touched].filter((id) => !kept.get(id))];
 }

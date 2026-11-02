@@ -1254,6 +1254,22 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         expect(out).toEqual({ created: true, recorded: 4, message: '' });
     });
 
+    it('Save replays an unsaved Remove as one hide (no annotate), never sends it to the preview, and skips what the canvas drew again', async () => {
+        const t = setup();
+        const sent = server(t);
+        t.store.beginUnsaved({ projection: P, presets: {}, maxDegree: 3 }, { name: 'N', purpose: 'P' }, [
+            { kind: 'seed', ids: ['a'] },
+            { kind: 'expand', from: 'outer', ids: [], req: RING },
+            { kind: 'remove', ids: ['a-n', 'b-n'] },
+        ]);
+        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual(['seed', 'expand']);
+        // the canvas ends with 'b-n' drawn again (a later Expand reached it), so only 'a-n' is hidden at Save
+        t.store.unsavedWs.set({ entities: [{ id: 'a', hop: 0 }, { id: 'b-n', hop: 1 }], links: [], excluded: [], hash: '' } as never);
+        const out = await t.store.saveUnsaved('N', 'P');
+        expect(sent.slice(2)).toEqual([{ op: 'hide', ids: ['a-n'] }]);
+        expect(out).toEqual({ created: true, recorded: 3, message: '' });
+    });
+
     it('LA-INVESTIGATE-UX-2 item 5: an unsaved exclude goes to the preview with its reason and Save replays it as one exclude', async () => {
         const t = setup();
         const sent = server(t);
