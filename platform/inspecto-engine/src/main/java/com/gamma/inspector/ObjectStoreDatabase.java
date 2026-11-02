@@ -56,12 +56,19 @@ final class ObjectStoreDatabase {
      */
     static DuckLakeRegistrar.ConnectionSetup registrarSetup(PipelineConfig cfg, List<String> files) throws SQLException {
         Store store = resolve(cfg);
+        // A prefix test, not the containment rule's key character set (operator 2026-11-02): a partition value
+        // DuckDB percent-encodes ('ts=2026-11-01%2010%3A00%3A00') must register. ⛔ The secret's scope is matched
+        // on the string BEFORE DuckDB normalises '..', so this check is the boundary: '.'/'..' segments are
+        // refused, and so are '\' (SqlViews.pathList rewrites it to '/', turning 'a\..\' into a climb) and glob
+        // bytes (read_parquet expands them). DuckDB's own writer escapes all of these, so real output has none.
         for (String f : files) {
-            try {   // the containment rule itself, segment-wise: '..' or a sibling prefix never passes
-                PathJail.requireObjectStore(List.of(store.root()), f, "a written file");
-            } catch (PathJail.Escape refused) {
-                throw refuse("not registering in DuckLake: " + refused.getMessage());
-            }
+            boolean inside = f.startsWith(store.root() + "/") && f.chars().noneMatch(ch -> "\\*?[]{}".indexOf(ch) >= 0);
+            if (inside)
+                for (String seg : f.substring(store.root().length() + 1).split("/", -1))
+                    if (seg.isEmpty() || seg.equals(".") || seg.equals("..")) inside = false;
+            if (!inside)
+                throw refuse("not registering in DuckLake: written file '" + f + "' is not under the object-store "
+                        + "dirs.database " + store.root() + "/");
         }
         return conn -> store.createSecret(conn, "registering in DuckLake the output of");
     }

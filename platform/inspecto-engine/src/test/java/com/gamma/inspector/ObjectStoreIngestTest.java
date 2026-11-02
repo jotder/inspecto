@@ -251,7 +251,12 @@ class ObjectStoreIngestTest {
     void aWrittenFileOutsideThePrefixIsNotRegistered(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = withLake(dir);
         assertNotNull(ConsignmentIngestor.objectStoreSetup(cfg, List.of(root + "/db/a.parquet")), "accepted twin");
-        for (String outside : List.of(root + "X/a.parquet", root + "/db/../../elsewhere/a.parquet",
+        // Operator 2026-11-02: a partition value outside the containment rule's key character set still registers.
+        assertNotNull(ConsignmentIngestor.objectStoreSetup(cfg, List.of(
+                root + "/db/ts=2026-11-01%2010%3A00%3A00/a.parquet", root + "/db/city=S%C3%A3o%20Paulo/a.parquet")), "timestamp twin");
+        for (String outside : List.of(root + "X/a.parquet", root + "/dbX/a.parquet", root + "/dbXY/a.parquet", root + "/db/../../elsewhere/a.parquet",
+                root + "/db/./a.parquet", root + "/db//a.parquet",
+                root + "/db/a\\..\\..\\elsewhere\\a.parquet", root + "/db/*/a.parquet", root + "/db/[ab]/a.parquet",
                 "s3://other-bucket/a.parquet", dir.resolve("a.parquet").toString())) {
             java.io.IOException e = assertThrows(java.io.IOException.class, () -> ConsignmentIngestor.objectStoreSetup(
                     cfg, List.of(root + "/db/a.parquet", outside)), outside);

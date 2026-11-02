@@ -231,11 +231,16 @@ output:
   passes it a `DuckLakeRegistrar.ConnectionSetup` from `ObjectStoreDatabase.registrarSetup`, run after the
   extensions load and before the `ATTACH`: the same checks as `prepare` (containment, shape, Connection,
   bare host, `EgressGate`), then the same prefix-scoped `inspecto_output_store` secret. ⛔ Because that
-  connection has no seal, every written file is first judged by `PathJail.requireObjectStore` against the
-  database prefix alone; a file outside it (a sibling prefix, `..`, another bucket, a local path) fails the
-  batch before registration — decided under operator delegation 2026-11-01, operator-confirmed 2026-11-01, as is the
-  consequence that a partition value whose key segment falls outside the containment rule's character set
-  fails a registered batch rather than registering it. The setup is built only when the lake is enabled, so
+  connection has no seal, every written file is first checked against the database prefix: it must start
+  with `<prefix>/`, have no empty, `.` or `..` segment, and contain no `\` or glob byte (`* ? [ ] { }`), or the
+  batch fails before registration (a sibling prefix, `..`, another bucket, a local path). Operator decision
+  2026-11-02, replacing the 2026-11-01 use of `PathJail.requireObjectStore` here: a prefix test, not the
+  containment rule's key character set, so a partition value DuckDB percent-encodes
+  (`ts=2026-11-01%2010%3A00%3A00` — the `%` is what the old rule refused) registers. ⛔ This check, not the
+  secret's scope, is the boundary: DuckDB matches the scope on the string BEFORE it normalises `..` (measured:
+  `<prefix>/a/../../other/x` is sent to `/other/x` with the scoped credentials), and `SqlViews.pathList`
+  rewrites `\` to `/`, which is why `\` is refused (verification finding 2026-11-02). DuckDB's own writer
+  escapes all of these bytes, so real output never contains them. The setup is built only when the lake is enabled, so
   an unregistered pipeline is unchanged. The lake's own `data_path` / catalog credentials are untouched:
   the secret is scoped to the database prefix, so a lake whose `data_path` is in a bucket outside that prefix still needs its
   own credentials, as before.
