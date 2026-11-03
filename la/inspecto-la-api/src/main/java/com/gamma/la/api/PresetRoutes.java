@@ -307,11 +307,17 @@ public final class PresetRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException | java.io.IOException e) {
             // the statement timeout surfaces as SQLTimeoutException("INTERRUPT Error: Interrupted!") from DuckDB's JDBC driver
-            if (e instanceof java.sql.SQLTimeoutException || String.valueOf(e.getMessage()).startsWith("INTERRUPT Error"))
+            // the advice follows why the index did not answer: an index that exists but cannot (a cap, a filter) says so -
+            // never a failed read's details, which carry the driver's text
+            if (e instanceof java.sql.SQLTimeoutException || String.valueOf(e.getMessage()).startsWith("INTERRUPT Error")) {
+                String why = String.valueOf(source.get("reason"));
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "This question took longer than this Space allows ("
-                        + fences.timeoutSeconds() + " s) on '" + datasetId + "'. " + (INDEX_SERVED.contains(p.id())
-                        ? "A link index of the Dataset answers it quickly - build one - or ask for fewer rows."
-                        : "Ask for fewer rows, or a shorter window."));
+                        + fences.timeoutSeconds() + " s) on '" + datasetId + "'. " + (!INDEX_SERVED.contains(p.id())
+                        ? "Ask for fewer rows, or a shorter window."
+                        : why.equals(IndexedRead.Reason.index_read_failed.name()) ? "Its link index could not be read; ask for fewer rows."
+                        : source.get("details") != null ? "Its link index could not answer it: " + source.get("details") + "."
+                        : "A link index of the Dataset answers it quickly - build one - or ask for fewer rows."));
+            }
             throw DatasetReadFault.of("preset query failed", datasetId, writeRoot, e);
         }
 

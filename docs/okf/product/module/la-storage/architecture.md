@@ -38,6 +38,25 @@ Gates, staleness decisions and the choice of flat versus index belong to la-api.
    publishes it atomically. `gc` keeps the live version plus `index.keep_versions`, skips pinned and young versions,
    and removes crashed stages.
 
+### Derived tables: two-way pairs and short loops (`LA-INDEX-PAIRS-LOOPS-1`, 2026-11-03)
+
+- Every build (full, append, compact) ends with a `derived` step, before verify, that rewrites `pairs_back(a, b, n_ab,
+  n_ba)` (`a < b`) and `loops(x, y, z, n)` (`x` the smallest id, directed, `n` = links along the loop) from the whole
+  version, deltas included. Loops keep only entities with at most `index.loops_max_degree` link rows in and out
+  (INSTALL, default 50; `0` writes neither). That cap counts `nodes` edges, which sum exactly across deltas; summed
+  distinct links only bound from above and lost loops after an append. Self-links and `''` ids are left out. A table
+  with no rows is an empty directory, and the manifest records the cap as `loopsMaxDegree`.
+- `IndexPlan` treats a version whose `loopsMaxDegree` differs from the cap in force as not up to date, even when no
+  input changed. With no new file it recommends `full` (`derived_tables_outdated`); an append or a compaction rewrites
+  the tables anyway. Without this, an upgraded install or a changed cap kept the old tables until the data changed.
+- *Two-way pairs* and *Short loops* (preset queries, `PresetRoutes`) read those tables through `IndexedRead`. When
+  `maxLinks` is above the build's cap, the Dataset answers and its `source.details` gives the reason. A preset that
+  the statement timeout interrupts answers 422 in a sentence, naming the index's reason when the index exists but
+  cannot answer.
+- Measured on IMS (39.4 M links): the full build took 289 s (`pairs_back` 2.79 M rows, `loops` 524 k rows, about 30 s
+  of that). Reads take 0.18–0.35 s; before, the Dataset path timed out at 10 s or ran out of memory. A cap below the
+  build's is applied through `nodes` and takes about 3.8 s.
+
 ## Read flow
 
 - `IndexReader` opens one sealed connection per request whose `allowed_directories` is the version directory, so a read

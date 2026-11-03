@@ -336,6 +336,33 @@ class ControlApiPresetQueriesTest {
             JsonNode wide = run(c, "short_loops", "graph_ds", "{\"maxLinks\":500}", true);
             assertEquals("dataset", wide.at("/source/kind").asText());
             assertTrue(wide.at("/source/details").asText().contains("at most 50"), wide.toString());
+            // ... and when that Dataset read times out, the sentence gives the index's reason, not "build one" (it exists)
+            ControlApiEntityProfileScaleTest.Faulty f = new ControlApiEntityProfileScaleTest.Faulty();
+            f.error = "INTERRUPT Error: Interrupted!";
+            f.fail = sql -> sql.contains("JOIN __k b");
+            com.gamma.la.core.DatasetProviders.forTest(f);
+            try {
+                HttpResponse<String> r = send(c, "POST", "/inv/presets/short_loops/run",
+                        "{\"dataset\":\"graph_ds\",\"params\":{\"maxLinks\":500}}");
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("took longer than this Space allows"), r.body());
+                assertTrue(r.body().contains("ask for at most 50"), r.body());
+                assertFalse(r.body().contains("build one"), r.body());
+                // an index whose loops table cannot be read: the fallback's timeout says so in a fixed sentence - never the
+                // read's details (the driver's text, a server path)
+                try (java.util.stream.Stream<Path> files = java.nio.file.Files.walk(root.resolve("la-index"))) {
+                    for (Path pq : files.filter(x -> x.toString().contains("loops") && x.toString().endsWith(".parquet")).toList())
+                        java.nio.file.Files.writeString(pq, "not parquet");
+                }
+                HttpResponse<String> broken = send(c, "POST", "/inv/presets/short_loops/run", "{\"dataset\":\"graph_ds\"}");
+                assertEquals(422, broken.statusCode(), broken.body());
+                assertTrue(broken.body().contains("could not be read; ask for fewer rows"), broken.body());
+                assertFalse(broken.body().contains("parquet"), broken.body());
+                assertFalse(broken.body().contains(":\\\\") || broken.body().contains("/tmp") || broken.body().contains("la-index"),
+                        broken.body());
+            } finally {
+                com.gamma.la.core.DatasetProviders.forTest(null);
+            }
         }
     }
 

@@ -492,6 +492,21 @@ class IndexAppendTest {
         assertTrue(IndexPlan.classify(capped, plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", IndexPlan.DEFAULT_MAX_DELTAS + 1).appendable());
         assertEquals(IndexPlan.Action.COMPACT, IndexPlan.classify(manifest(m, covered, eight.subList(0, 2), "sqlhash", "hashfn", "1.0"),
                 plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", 2).recommended());
+
+        // LA-INDEX-PAIRS-LOOPS-1 P2: a version without the derived tables, or with another cap, is not up to date when the
+        // install's index.loops_max_degree asks for them - even with no input changed (an upgraded install); a new file
+        // still appends (the append rewrites them), the delta cap still compacts (so does the compaction)
+        int d = IndexPlan.DEFAULT_MAX_DELTAS;
+        assertFull(IndexPlan.classify(base, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, 50L), "derived_tables_outdated");
+        IndexManifest at50 = base.withLoopsMaxDegree(50L);
+        assertEquals(IndexPlan.Action.NONE, IndexPlan.classify(at50, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, 50L).recommended());
+        assertFull(IndexPlan.classify(at50, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, 20L), "derived_tables_outdated");
+        assertFull(IndexPlan.classify(at50, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, null), "derived_tables_outdated");
+        assertEquals(IndexPlan.Action.NONE, IndexPlan.classify(base, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, null).recommended());
+        assertEquals(IndexPlan.Action.APPEND, IndexPlan.classify(at50, plus, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, 20L).recommended());
+        assertEquals(IndexPlan.Action.COMPACT, IndexPlan.classify(capped, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0", d, 50L).recommended());
+        // the overloads without a cap make no claim about the derived tables
+        assertEquals(IndexPlan.Action.NONE, IndexPlan.classify(at50, covered, "sqlhash", "hashfn", BucketFunction.Sizing.DEFAULT, "1.0").recommended());
     }
 
     private static void assertFull(IndexPlan.Plan p, String reason) {

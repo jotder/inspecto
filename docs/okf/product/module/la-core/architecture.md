@@ -650,7 +650,8 @@ optional pack field; no route was added.
   `full` from the relation SQL; `append` = a delta (`dNNN` files in the same bucket dirs, version N+1 hard-links its
   parent) only when the manifest's input files are an unchanged subset of today's and one is new; `compact` merges
   main + deltas. Delta cap `MAX_DELTAS = 8` (`delta_cap_reached`). FULL-forcing reasons: relation SQL / bucket fn /
-  DuckDB version changed, input files unknown, removed or changed.
+  DuckDB version changed, input files unknown, removed or changed; and, with no new file, a derived-tables cap other than
+  `index.loops_max_degree` (`derived_tables_outdated`).
 * **Staleness** (`IndexStaleness`, la-api) compares input-file fingerprints from `DatasetRelation.inputFiles`
   (platform engine); a view-backed Dataset has no file list (`fingerprintKnown=false`) and is never called stale —
   hence D-ING6: dimension data is joined at read time, never baked into the index.

@@ -1,8 +1,8 @@
 # LA-INDEX-PAIRS-LOOPS-1 — two-way pairs and short loops written by the link index build
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 and P1 BUILT 2026-11-03 (§8, §9); P2 (measure on IMS) open.** Operator ask: make the *Two-way pairs*
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 and P1 BUILT 2026-11-03 (§8, §9); P2 measured 2026-11-03 (§10): reads 0.2-0.4 s, build +~30 s; both follow-ups fixed. SHIPPED 2026-11-03, archived.** Operator ask: make the *Two-way pairs*
 > and *Short loops* preset queries fast on large Datasets. Follows `LA-PRESET-QUERIES-1`
-> ([`la-basic-discovery-plan.md`](la-basic-discovery-plan.md) §7.2), where *Reached by many*, *Reaching many* and
+> ([`la-basic-discovery-plan.md`](../../superpower/la-basic-discovery-plan.md) §7.2), where *Reached by many*, *Reaching many* and
 > *Newcomers* moved to the link index's `nodes` table. Board row `LA-INDEX-PAIRS-LOOPS-1`.
 
 ## 1. The problem, measured
@@ -144,3 +144,21 @@ brute-force answer (including an appended version) and that the route falls back
 - Test: `ControlApiPresetQueriesTest` builds an index over HTTP and compares both presets with the Dataset answers taken
   before it, including a cap below the build's (index) and above it (Dataset).
 - Next: P2 - deploy, let the 02:00 build (or Run now) write the tables on IMS, and measure build time and reads.
+
+## 10. Measured: P2 (2026-11-03, Basic :8098 over IMS, 39.4 M links)
+
+- **Build:** the full build that wrote v000074 took **289 s**; the two previous full builds without the derived tables took
+  258 s and 529 s (the machine is shared, so the spread is load). The derived step measured alone was about 30 s, so the
+  added time is inside the 1-minute budget. Tables: `pairs_back` 2,792,192 rows (22 MB), `loops` 523,709 rows (6 MB), cap 50.
+- **Reads (server round trip, warm):** Two-way pairs **0.27-0.35 s**, Short loops at the build's cap **0.18 s** (both timed
+  out at 10 s, or ran out of memory, from the Dataset). Short loops with `maxLinks` 10 (below the cap, filtered through
+  `nodes`) **3.8 s**. Reached by many 0.54-0.65 s (unchanged).
+- **Above the cap** (`maxLinks` 200) the Dataset answers and times out after 10 s with the sentence - which said "a link index
+  answers it quickly - build one" although one exists. **Fixed:** the sentence now gives the index's own reason ("...at
+  most 50 links in and out; ask for at most 50 to read it") whenever the index exists but cannot answer.
+- **Gap found:** the Job did not build the tables after the upgrade - the planner called the old version up to date (no
+  input changed), so an upgraded install, or a changed `index.loops_max_degree`, got no tables until the data changed.
+  P2 forced the build by touching the input file's modified time. **Fixed:** `IndexPlan.classify` takes the cap in force;
+  a version recording another `loopsMaxDegree` (or none) with no new file is `full` / `derived_tables_outdated` (an append
+  or a compaction rewrites the tables anyway). Used by the scheduled build and the staleness probe's advice.
+- **Shipped 2026-11-03:** the as-built facts live in `okf/product/module/la-storage/architecture.md` (Derived tables).

@@ -196,7 +196,8 @@ public final class ScheduledIndexBuild {
                 List<IndexManifest.InputFile> now = input != null && input.known()
                         ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
                 IndexPlan.Plan plan = IndexPlan.classify(live, now, hashOrNull(provider, content, dataRoot, writeRoot),
-                        BucketFunction.NAME, IndexRoutes.installSizing(), duckdbOrNull(), SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS));
+                        BucketFunction.NAME, IndexRoutes.installSizing(), duckdbOrNull(), SpaceLimits.get(writeRoot, LaLimit.INDEX_MAX_DELTAS),
+                        IndexRoutes.installHost().loopsMaxDegree());
                 switch (plan.recommended()) {
                     case NONE -> {
                         return last != null ? last : done("UP_TO_DATE", "none", "the index already covers the Dataset", live, store.current().orElse(null));
@@ -209,7 +210,7 @@ public final class ScheduledIndexBuild {
             if (mode == IndexBuilder.Mode.FULL && !r.allowFull())
                 return refused("full", FULL_NOT_ALLOWED, live == null
                         ? "the index does not exist yet and a first full build is not allowed (set allow_full to build it)"
-                        : "the server recommends a full build (input removed, rewritten or redefined) and allow_full is not set");
+                        : "the server recommends a full build (input removed, rewritten or redefined, or the derived tables' cap changed) and allow_full is not set");
             last = submitAndWait(svc, principal, r, mapping, mode, relationSql, writeRoot, dataRoot, ix, deadline);
             if (!"BUILT".equals(last.result()) || mode != IndexBuilder.Mode.COMPACT) return last;
         }

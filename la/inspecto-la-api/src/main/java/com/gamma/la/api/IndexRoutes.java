@@ -494,7 +494,8 @@ public final class IndexRoutes implements RouteModule {
     private static Map<String, Object> plan(IndexManifest m, String currentSqlHash, InputFingerprint input, String duck, int maxDeltas) {
         List<IndexManifest.InputFile> now = input != null && input.known()
                 ? input.files().stream().map(f -> new IndexManifest.InputFile(f.path(), f.size(), f.mtimeMillis())).toList() : null;
-        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, installSizing(), duck, maxDeltas);
+        IndexPlan.Plan p = IndexPlan.classify(m, now, currentSqlHash, BucketFunction.NAME, installSizing(), duck, maxDeltas,
+                installHost().loopsMaxDegree());
         Map<String, Object> o = new LinkedHashMap<>();
         o.put("recommended", p.recommended().name().toLowerCase(Locale.ROOT));
         o.put("appendable", p.appendable());

@@ -43,7 +43,7 @@ public final class IndexPlan {
      * @param reasons     why FULL (or COMPACT) is needed, empty otherwise: codes {@code input_files_unknown},
      *                    {@code input_files_removed}, {@code input_files_changed}, {@code relation_sql_changed},
      *                    {@code relation_unresolvable}, {@code bucket_function_changed}, {@code bucket_sizing_changed},
-     *                    {@code duckdb_version_changed},
+     *                    {@code duckdb_version_changed}, {@code derived_tables_outdated},
      *                    {@code delta_cap_reached}
      * @param deltas      deltas the index version already carries
      */
@@ -67,6 +67,16 @@ public final class IndexPlan {
      */
     public static Plan classify(IndexManifest m, List<IndexManifest.InputFile> current, String relationSqlHash, String bucketFn,
                                 BucketFunction.Sizing sizing, String duckdbVersion, int maxDeltas) {
+        return classify(m, current, relationSqlHash, bucketFn, sizing, duckdbVersion, maxDeltas, m.loopsMaxDegree());
+    }
+
+    /**
+     * ... and the derived tables' cap in force ({@code index.loops_max_degree}; null = none written, LA-INDEX-PAIRS-LOOPS-1).
+     * A version built with another cap - or before the tables existed - is not up to date even when no input changed: with no
+     * new file to append, FULL ({@code derived_tables_outdated}), or COMPACT when the delta cap is reached (both rewrite them).
+     */
+    public static Plan classify(IndexManifest m, List<IndexManifest.InputFile> current, String relationSqlHash, String bucketFn,
+                                BucketFunction.Sizing sizing, String duckdbVersion, int maxDeltas, Long loopsMaxDegree) {
         List<String> force = new ArrayList<>();
         if (relationSqlHash == null) force.add("relation_unresolvable");
         else if (!relationSqlHash.equals(m.relationSqlHash())) force.add("relation_sql_changed");
@@ -98,6 +108,8 @@ public final class IndexPlan {
         if (!force.isEmpty()) return new Plan(Action.FULL, false, added, removed, changed, List.copyOf(force), deltas);
         boolean capped = deltas >= maxDeltas;
         if (added.isEmpty()) {
+            if (!capped && !java.util.Objects.equals(loopsMaxDegree, m.loopsMaxDegree()))
+                return new Plan(Action.FULL, false, added, removed, changed, List.of("derived_tables_outdated"), deltas);
             return new Plan(capped ? Action.COMPACT : Action.NONE, false, added, removed, changed,
                     capped ? List.of("delta_cap_reached") : List.of(), deltas);
         }

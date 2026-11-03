@@ -136,7 +136,7 @@ route lists, `link-analysis-presets.component.spec.ts`.
 The core set (every Space; a pack puts its own first) gained four **graph** presets, each a fixed statement over the
 links joined to themselves (`PresetQueries.graphSql`, no graph store): **Two-way pairs** (A to B and B to A, at least
 *n* each way), **Short loops** (A to B to C to A, each loop once with its smallest id first; entities with more than
-`maxLinks` (200, later 50 link rows - see `la-index-pairs-loops-plan.md` §9) distinct counterparts are left out before the joins, the statement timeout bounds the rest),
+`maxLinks` (200, later 50 link rows - see `archived-documents/plans-archive/la-index-pairs-loops-plan.md` §9) distinct counterparts are left out before the joins, the statement timeout bounds the rest),
 **Newcomers** (first seen within the last *N* days of the DATA - its newest link, not the calendar - with at least *n*
 links; needs When) and **Two steps from one entity** (undirected: step 1 with its links, step 2 with the number of
 step-1 entities leading to it; an alias is accepted). Their entity columns are masked like the others. Core order: Reached
@@ -161,8 +161,8 @@ is NOT folded - `out`/`in` hold every link - but its `nodes` table holds per ent
 - With appended deltas an entity has several `nodes` rows; they are summed (5.5 s on IMS) and the link counts are then an
   upper bound (`source.approximate`). Without deltas the rows are read as they are.
 - **Two-way pairs, Short loops** need every link folded: 48 s and out of memory even over the index. Since
-  `LA-INDEX-PAIRS-LOOPS-1` (P0 + P1) the index build writes `pairs_back` and `loops` and the two presets read them
-  ([`la-index-pairs-loops-plan.md`](la-index-pairs-loops-plan.md) §8-9).
+  `LA-INDEX-PAIRS-LOOPS-1` (shipped 2026-11-03) the index build writes `pairs_back` and `loops` and the two presets read them
+  ([`la-index-pairs-loops-plan.md`](../archived-documents/plans-archive/la-index-pairs-loops-plan.md) §8-10).
 - Every answer carries `source` (`{kind: index, version, stale…}` or `{kind: dataset, reason}`); the panel says when the
   index answered and when it is behind.
 - **Counting differs, and is said.** Newcomers from the index counts each side apart: `links` = edges in + out (self-links
