@@ -45,14 +45,27 @@ public final class IndexReader implements AutoCloseable {
     /** The version has a {@code nodes} table (every build writes one) and whether delta files sit beside its main ones. */
     private final boolean hasNodes;
     private final boolean deltas;
+    /** LA-INDEX-PAIRS-LOOPS-1: the derived tables hold at least one file (a table with no rows is an empty directory). */
+    private final boolean hasPairsBack;
+    private final boolean hasLoops;
     /** Non-null for a reader lent by {@link #borrow}: {@link #close()} then returns it to the pool instead of closing it. */
     private Path pooledKey;
 
-    private IndexReader(SqlSandbox sandbox, int buckets, boolean hasNodes, boolean deltas) {
+    private IndexReader(SqlSandbox sandbox, int buckets, boolean hasNodes, boolean deltas, boolean hasPairsBack, boolean hasLoops) {
         this.sandbox = sandbox;
         this.buckets = buckets;
         this.hasNodes = hasNodes;
         this.deltas = deltas;
+        this.hasPairsBack = hasPairsBack;
+        this.hasLoops = hasLoops;
+    }
+
+    /** True when {@code tableDir} holds a parquet file in one of its bucket directories (a view over none fails to bind). */
+    private static boolean hasFiles(Path tableDir) throws IOException {
+        if (!java.nio.file.Files.isDirectory(tableDir)) return false;
+        try (java.util.stream.Stream<Path> files = java.nio.file.Files.walk(tableDir, 2)) {
+            return files.anyMatch(p -> p.getFileName().toString().endsWith(".parquet"));
+        }
     }
 
     // ── the pool: idle sealed readers per version directory (LA-INDEX-READER-POOL-1) ─────────────────────────────
@@ -120,6 +133,7 @@ public final class IndexReader implements AutoCloseable {
     public static IndexReader open(Path versionDir, IndexManifest manifest, SqlSandboxPolicy policy) throws SQLException, IOException {
         if (!BucketFunction.NAME.equals(manifest.bucketFn()))
             throw new IllegalArgumentException("index bucket function '" + manifest.bucketFn() + "' is not '" + BucketFunction.NAME + "'");
+        boolean pairsBack = hasFiles(versionDir.resolve("pairs_back")), loops = hasFiles(versionDir.resolve("loops"));
         SqlSandbox sandbox = SqlSandbox.open(policy);
         try {
             try (Statement st = sandbox.connection().createStatement()) {
@@ -131,6 +145,11 @@ public final class IndexReader implements AutoCloseable {
                     String glob = SqlIdent.pathStr(versionDir.toAbsolutePath().normalize(), "/nodes/*/*.parquet");
                     st.execute("CREATE VIEW n_nodes AS SELECT * FROM " + SqlViews.parquet(glob, false, SqlViews.Hive.TYPED));
                 }
+                for (String table : new String[] {"pairs_back", "loops"})
+                    if (table.equals("pairs_back") ? pairsBack : loops) {
+                        String glob = SqlIdent.pathStr(versionDir.toAbsolutePath().normalize(), "/" + table + "/*/*.parquet");
+                        st.execute("CREATE VIEW d_" + table + " AS SELECT * FROM " + SqlViews.parquet(glob, false, SqlViews.Hive.TYPED));
+                    }
             }
             SqlSandbox.sealAllowing(sandbox.connection(), List.of(versionDir));
         } catch (SQLException | RuntimeException e) {
@@ -138,7 +157,7 @@ public final class IndexReader implements AutoCloseable {
             throw e;
         }
         return new IndexReader(sandbox, manifest.buckets(), java.nio.file.Files.isDirectory(versionDir.resolve("nodes")),
-                manifest.deltas() != null && !manifest.deltas().isEmpty());
+                manifest.deltas() != null && !manifest.deltas().isEmpty(), pairsBack, loops);
     }
 
     /**
@@ -419,6 +438,53 @@ public final class IndexReader implements AutoCloseable {
     public List<NodeStat> newcomers(int days, long minEdges, int limit) throws SQLException {
         return nodeStats("n.first_seen > (SELECT max(last_ts) FROM n_nodes) - to_days(CAST(? AS INTEGER)) AND n.out_edges + n.in_edges >= ?",
                 "n.out_edges + n.in_edges DESC, n.id", List.of(days, minEdges), limit);
+    }
+
+    /** One pair linked both ways ({@code a < b}) and its links each way. */
+    public record TwoWay(String a, String b, long linksAb, long linksBa) { }
+
+    /** One directed loop {@code x -> y -> z -> x} ({@code x} its smallest id) and the links along its three steps. */
+    public record Loop(String x, String y, String z, long links) { }
+
+    /**
+     * The pairs of {@code pairs_back} with at least {@code min} links each way, the busiest pair first, at most {@code limit}
+     * rows. Empty when the table has no file; whether the version wrote it at all is the manifest's to say (the caller checks).
+     */
+    public List<TwoWay> twoWay(long min, int limit) throws SQLException {
+        if (!hasPairsBack) return List.of();
+        List<TwoWay> out = new ArrayList<>();
+        try (PreparedStatement ps = sandbox.preparedStatement("SELECT a, b, n_ab, n_ba FROM d_pairs_back WHERE least(n_ab, n_ba) >= ?"
+                + " ORDER BY n_ab + n_ba DESC, a, b LIMIT ?")) {
+            ps.setLong(1, min);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(new TwoWay(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getLong(4)));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The loops of {@code loops}, the most links first, at most {@code limit} rows. {@code maxRows} null = as built; else only
+     * loops whose three entities have at most that many link rows in and out ({@code nodes} edges summed, exact across deltas)
+     * - meaningful only BELOW the build's cap, which the caller checks.
+     */
+    public List<Loop> loops(Long maxRows, int limit) throws SQLException {
+        if (!hasLoops) return List.of();
+        String quiet = maxRows == null ? "" : " WHERE x IN (SELECT id FROM q) AND y IN (SELECT id FROM q) AND z IN (SELECT id FROM q)";
+        String with = maxRows == null ? "" : "WITH q AS (SELECT id FROM n_nodes WHERE id IS NOT NULL GROUP BY id"
+                + " HAVING sum(out_edges + in_edges) <= ?) ";
+        List<Loop> out = new ArrayList<>();
+        try (PreparedStatement ps = sandbox.preparedStatement(with + "SELECT x, y, z, n FROM d_loops" + quiet
+                + " ORDER BY n DESC, x, y, z LIMIT ?")) {
+            int i = 1;
+            if (maxRows != null) ps.setLong(i++, maxRows);
+            ps.setInt(i, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(new Loop(rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4)));
+            }
+        }
+        return out;
     }
 
     /** Fixed SQL over {@code n_nodes}; {@code where} and {@code order} are this class's own text, every value a bind. */

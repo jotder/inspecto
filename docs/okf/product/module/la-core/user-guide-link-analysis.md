@@ -327,9 +327,11 @@ page ([§3.4](#34-the-data-page-datasets-entities-and-mappings)). The answer is 
 as aliases, exactly as on the graph). **Draw these** starts a graph from the listed entities, the top 25 first, the way
 a paste does. Every question asked is recorded.
 
-On a large Dataset, Reached by many, Reaching many and Newcomers are answered from the Dataset's **link index** when one
-is published (a line under the table says so, and whether the index is behind the data); the others read the Dataset
-itself and can run out of time on tens of millions of links.
+On a large Dataset, Reached by many, Reaching many, Newcomers, Two-way pairs and Short loops are answered from the
+Dataset's **link index** when one is published (a line under the table says so, and whether the index is behind the data).
+Short loops leaves out entities with more than 50 links in and out by default, the limit the index is built with; ask for
+more and the Dataset itself answers. The other questions read the Dataset and can run out of time on tens of millions of
+links: they then say so in a sentence.
 
 **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page, open a short
 *Investigate {number}* form in the Investigation tab that asks only for the purpose.

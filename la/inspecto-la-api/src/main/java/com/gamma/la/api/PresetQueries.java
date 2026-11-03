@@ -176,7 +176,7 @@ final class PresetQueries {
     private static final Preset SHORT_LOOPS = new Preset("short_loops", "Short loops",
             "Three entities linked in a circle (A to B to C and back to A) - round-tripping, layering. Very busy entities are left out so it stays quick.",
             List.of("from", "to"),
-            List.of(new Param("maxLinks", "Leave out entities with more than this many counterparts", "number", "200"), TOP),
+            List.of(new Param("maxLinks", "Leave out entities with more than this many links in and out", "number", "50"), TOP),
             null, null, "short_loops");
 
     /** Entities first seen lately that already have many links. */
@@ -260,7 +260,7 @@ final class PresetQueries {
             case "two_way" -> List.of(new Column("entity", "Entity", true), new Column("counterpart", "Counterpart", true),
                     new Column("links_out", "Links out", false), new Column("links_back", "Links back", false));
             case "short_loops" -> List.of(new Column("entity", "Entity", true), new Column("second", "Then", true),
-                    new Column("third", "Then, back to the first", true));
+                    new Column("third", "Then, back to the first", true), new Column("links", "Links along the loop", false));
             case "newcomers" -> List.of(new Column("entity", "Entity", true), new Column("first_seen", "First seen", false),
                     new Column("links", "Links", false), new Column("counterparts", "Distinct counterparts", false));
             case "two_steps" -> List.of(new Column("entity", "Entity", true), new Column("steps", "Steps away", false),
@@ -292,14 +292,15 @@ final class PresetQueries {
             }
             case "short_loops" -> {
                 binds.add(String.valueOf(n.applyAsDouble("maxLinks")));
-                // each loop once: its smallest id first; busy entities (many counterparts) left out before the joins
-                yield links + ", __e AS (SELECT DISTINCT s, t FROM __l),"
-                        + " __d AS (SELECT v FROM (SELECT s AS v, t AS o FROM __e UNION SELECT t, s FROM __e) GROUP BY v"
-                        + " HAVING count(DISTINCT o) > CAST(? AS DOUBLE)),"
+                // each loop once, its smallest id first, the most links first; busy entities (many links in and out - the
+                // index build's measure, LA-INDEX-PAIRS-LOOPS-1) left out before the joins
+                yield links + ", __e AS (SELECT s, t, count(*) AS n FROM __l GROUP BY s, t),"
+                        + " __d AS (SELECT v FROM (SELECT s AS v FROM __l UNION ALL SELECT t FROM __l) GROUP BY v"
+                        + " HAVING count(*) > CAST(? AS DOUBLE)),"
                         + " __k AS (SELECT * FROM __e WHERE s NOT IN (SELECT v FROM __d) AND t NOT IN (SELECT v FROM __d))"
-                        + " SELECT a.s AS entity, a.t AS second, b.t AS third FROM __k a JOIN __k b ON b.s = a.t"
+                        + " SELECT a.s AS entity, a.t AS second, b.t AS third, a.n + b.n + c.n AS links FROM __k a JOIN __k b ON b.s = a.t"
                         + " JOIN __k c ON c.s = b.t AND c.t = a.s"
-                        + " WHERE b.t <> a.s AND a.s < a.t AND a.s < b.t ORDER BY entity, second, third";
+                        + " WHERE b.t <> a.s AND a.s < a.t AND a.s < b.t ORDER BY links DESC, entity, second, third";
             }
             case "newcomers" -> {
                 binds.add(String.valueOf(wholeDays(n.applyAsDouble("days"))));

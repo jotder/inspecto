@@ -1,6 +1,6 @@
 # LA-INDEX-PAIRS-LOOPS-1 — two-way pairs and short loops written by the link index build
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 BUILT 2026-11-03 (§8); P1, P2 open.** Operator ask: make the *Two-way pairs*
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 and P1 BUILT 2026-11-03 (§8, §9); P2 (measure on IMS) open.** Operator ask: make the *Two-way pairs*
 > and *Short loops* preset queries fast on large Datasets. Follows `LA-PRESET-QUERIES-1`
 > ([`la-basic-discovery-plan.md`](la-basic-discovery-plan.md) §7.2), where *Reached by many*, *Reaching many* and
 > *Newcomers* moved to the link index's `nodes` table. Board row `LA-INDEX-PAIRS-LOOPS-1`.
@@ -124,3 +124,23 @@ brute-force answer (including an appended version) and that the route falls back
   compares a request's `maxLinks` with the build's cap, so P1 must say which measure the parameter means.
 - Not yet: the reads (`IndexReader.twoWay` / `loops`), the presets from the index, the timeout sentence (P1), and the IMS
   measurement (P2).
+
+## 9. As built: P1 (2026-11-03)
+
+- `IndexReader`: views `d_pairs_back` / `d_loops` only when the table holds a file (an empty table is an empty directory);
+  `twoWay(min, limit)` (busiest pair first) and `loops(maxRows, limit)` (most links first; a `maxRows` below the build's
+  cap keeps the loops whose three entities have at most that many `nodes` link rows, summed - exact across deltas).
+- `PresetRoutes.fromDerived`: *Two-way pairs* and *Short loops* read them through `IndexedRead.select` when the manifest
+  records `loopsMaxDegree` and lists the table; `source.table` and `source.loopsMaxDegree` say so. A `maxLinks` above
+  the build's cap reads the Dataset with `source.details` saying why (Q-5); no table (an older index, or cap 0) reads the
+  Dataset (`column_not_indexed`); a failed read too (`index_read_failed`).
+- **One measure on both paths:** *Short loops*' `maxLinks` now means link rows in and out on the Dataset path as well
+  (it counted distinct counterparts), its default is 50 (was 200) to match the build, and it gains a *Links along the loop*
+  column, ordered by it (Q-3), on both paths. The Dataset path leaves self-links out of the count; `nodes` counts them -
+  a difference only for an entity that links to itself.
+- **The timeout sentence:** a preset the Space's statement timeout interrupted answers 422 *"This question took longer than
+  this Space allows (N s) on '<Dataset>'. Build its link index, or ask for fewer rows."* (not covered by a test: the
+  fixture cannot be made slow enough; checked by reading).
+- Test: `ControlApiPresetQueriesTest` builds an index over HTTP and compares both presets with the Dataset answers taken
+  before it, including a cap below the build's (index) and above it (Dataset).
+- Next: P2 - deploy, let the 02:00 build (or Run now) write the tables on IMS, and measure build time and reads.

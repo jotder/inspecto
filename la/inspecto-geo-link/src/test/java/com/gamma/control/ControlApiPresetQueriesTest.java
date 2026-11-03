@@ -290,6 +290,9 @@ class ControlApiPresetQueriesTest {
             JsonNode fanInFlat = run(c, "fan_in", "graph_ds", "{\"min\":2}", true);
             JsonNode fanOutFlat = run(c, "fan_out", "graph_ds", "{\"min\":1}", true);
             JsonNode newFlat = run(c, "newcomers", "graph_ds", "{\"min\":3}", true);
+            JsonNode twoWayFlat = run(c, "two_way", "graph_ds", "{}", true);
+            JsonNode loopsFlat = run(c, "short_loops", "graph_ds", "{}", true);
+            JsonNode tightFlat = run(c, "short_loops", "graph_ds", "{\"maxLinks\":4}", true);
             assertEquals("dataset", fanInFlat.at("/source/kind").asText(), fanInFlat.toString());
             assertEquals("no_index", fanInFlat.at("/source/reason").asText());
 
@@ -313,9 +316,45 @@ class ControlApiPresetQueriesTest {
             assertEquals("Counterparts in + out (each side counted)", fresh.get("columns").get(3).get("label").asText());
             assertEquals(table(newFlat, "entity", "links", "counterparts"), table(fresh, "entity", "links", "counterparts"));
 
-            // Two-way pairs folds every link, which the index does not hold: always the Dataset
-            JsonNode notThere = run(c, "two_way", "graph_ds", "{}", true);
-            assertEquals("dataset", notThere.at("/source/kind").asText());
+            // Two-way pairs and Short loops read the build's derived tables (LA-INDEX-PAIRS-LOOPS-1) and answer as the Dataset does
+            JsonNode twoWay = run(c, "two_way", "graph_ds", "{}", true);
+            assertEquals("index", twoWay.at("/source/kind").asText(), twoWay.toString());
+            assertEquals("pairs_back", twoWay.at("/source/table").asText());
+            assertEquals(table(twoWayFlat, "entity", "counterpart", "links_out", "links_back"),
+                    table(twoWay, "entity", "counterpart", "links_out", "links_back"));
+            JsonNode loops = run(c, "short_loops", "graph_ds", "{}", true);
+            assertEquals("index", loops.at("/source/kind").asText(), loops.toString());
+            assertEquals(50, loops.at("/source/loopsMaxDegree").asInt());
+            assertEquals(List.of(B + "|" + C + "|" + D + "|3|"), table(loops, "entity", "second", "third", "links"));
+            assertEquals(table(loopsFlat, "entity", "second", "third", "links"), table(loops, "entity", "second", "third", "links"));
+            // a cap below the build's narrows the table by the nodes link rows, as the Dataset does (B has 5 links in and out)
+            JsonNode tight = run(c, "short_loops", "graph_ds", "{\"maxLinks\":4}", true);
+            assertEquals("index", tight.at("/source/kind").asText());
+            assertEquals(table(tightFlat, "entity", "second", "third", "links"), table(tight, "entity", "second", "third", "links"));
+            assertEquals(0, tight.get("count").asInt());
+            // above the build's cap the index cannot answer (it left those entities out): the Dataset does, and says why
+            JsonNode wide = run(c, "short_loops", "graph_ds", "{\"maxLinks\":500}", true);
+            assertEquals("dataset", wide.at("/source/kind").asText());
+            assertTrue(wide.at("/source/details").asText().contains("at most 50"), wide.toString());
+        }
+    }
+
+    @Test
+    void aPresetTheStatementTimeoutInterruptedSaysSoInASentence(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            ControlApiEntityProfileScaleTest.Faulty f = new ControlApiEntityProfileScaleTest.Faulty();
+            f.error = "INTERRUPT Error: Interrupted!";   // what DuckDB's statement timeout surfaces as
+            f.fail = sql -> sql.contains("least(a.n, b.n)");
+            com.gamma.la.core.DatasetProviders.forTest(f);
+            try {
+                HttpResponse<String> r = send(c, "POST", "/inv/presets/two_way/run", "{\"dataset\":\"pays_ds\"}");
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("took longer than this Space allows"), r.body());
+                assertTrue(r.body().contains("link index"), "Two-way pairs is one a link index answers: " + r.body());
+                assertFalse(r.body().contains("INTERRUPT"), "the driver's words stay out of the sentence: " + r.body());
+            } finally {
+                com.gamma.la.core.DatasetProviders.forTest(null);
+            }
         }
     }
 

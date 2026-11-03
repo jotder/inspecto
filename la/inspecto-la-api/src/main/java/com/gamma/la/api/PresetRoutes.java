@@ -60,18 +60,21 @@ public final class PresetRoutes implements RouteModule {
         api.post("/inv/presets/([^/]+)/run", (e, m) -> run(api, e, m.group(1), api.body(e)));
     }
 
-    /** The presets the link index's {@code nodes} table can answer without scanning a link. */
-    private static final java.util.Set<String> INDEX_SERVED = java.util.Set.of("fan_in", "fan_out", "newcomers");
+    /** The presets a link index answers without scanning the Dataset: from its {@code nodes} table or its derived tables. */
+    private static final java.util.Set<String> INDEX_SERVED = java.util.Set.of("fan_in", "fan_out", "newcomers", "two_way", "short_loops");
+
+    /** Two-way pairs and Short loops read the build's derived tables (LA-INDEX-PAIRS-LOOPS-1), never {@code nodes}. */
+    private static final java.util.Set<String> DERIVED = java.util.Set.of("two_way", "short_loops");
 
     /** An index answer ({@code rows} set), or only the {@code source} saying why the Dataset answers instead. */
     private record Answer(List<PresetQueries.Column> columns, List<Map<String, Object>> rows, boolean truncated,
                           Map<String, Object> source) {}
 
     /**
-     * Reached by many, Reaching many and Newcomers read the {@code nodes} table of a link index published for the Dataset's From
-     * and To - through {@link IndexedRead#select}, so the Space's index switch and the staleness refusal apply exactly as they do
-     * for exploration. A kinds filter (not in that table), no index, or a refused one: null rows, and the Dataset answers.
-     * {@code null} for every other preset.
+     * Reached by many, Reaching many and Newcomers read the {@code nodes} table, Two-way pairs and Short loops the derived tables
+     * ({@link #fromDerived}), of a link index published for the Dataset's From and To - through {@link IndexedRead#select}, so the
+     * Space's index switch and the staleness refusal apply exactly as they do for exploration. A kinds filter, no index, or a
+     * refused one: null rows, and the Dataset answers. {@code null} for every other preset.
      */
     private static Answer fromIndex(ApiContext api, Path writeRoot, Target t, PresetQueries.Preset p, Map<String, String> given,
                                     int limit) throws SQLException, java.io.IOException {
@@ -84,6 +87,7 @@ public final class PresetRoutes implements RouteModule {
                 t.roles().to(), (m, utc) -> newcomers && m.timeColumn() == null
                         ? IndexedRead.Fitted.no(IndexedRead.Reason.column_not_indexed) : IndexedRead.Fitted.ok(null));
         if (!sel.usable()) return new Answer(null, null, false, sel.flat().source());
+        if (DERIVED.contains(p.id())) return fromDerived(writeRoot, sel, p, given, limit);
         List<IndexReader.NodeStat> stats;
         List<PresetQueries.Column> columns;
         boolean exact;
@@ -133,6 +137,50 @@ public final class PresetRoutes implements RouteModule {
         }
         if (!exact) source.put("approximate", "the index has appended deltas: link counts are summed across them, an upper bound");
         return new Answer(columns, rows, stats.size() > limit, source);
+    }
+
+    /**
+     * Two-way pairs and Short loops from the version's {@code pairs_back} / {@code loops}: only when the manifest says the build
+     * wrote them, and for Short loops only up to the build's cap (Q-5: a larger {@code maxLinks} reads the Dataset, which keeps
+     * entities the build left out). A failed read falls back to the Dataset, as every indexed read does.
+     */
+    private static Answer fromDerived(Path writeRoot, IndexedRead.Selection sel, PresetQueries.Preset p, Map<String, String> given,
+                                      int limit) {
+        boolean loops = p.id().equals("short_loops");
+        String table = loops ? "loops" : "pairs_back";
+        Long cap = sel.manifest().loopsMaxDegree();
+        if (cap == null || !sel.manifest().tables().containsKey(table))
+            return new Answer(null, null, false, IndexedRead.Outcome.flat(IndexedRead.Reason.column_not_indexed,
+                    "this index version has no " + table + " table (built before it existed, or with index.loops_max_degree 0)").source());
+        long asked = loops ? (long) Math.floor(PresetQueries.number(p, given, "maxLinks")) : 0;
+        if (loops && asked > cap)
+            return new Answer(null, null, false, IndexedRead.Outcome.flat(IndexedRead.Reason.column_not_indexed,
+                    "the index keeps loops only among entities with at most " + cap + " links in and out; ask for at most " + cap
+                            + " to read it").source());
+        List<PresetQueries.Column> columns = PresetQueries.graphColumns(p.graph());
+        List<Map<String, Object>> rows = new ArrayList<>();
+        boolean truncated;
+        try (IndexReader rd = IndexReader.borrow(sel.dir(), sel.manifest(), InvRoutes.traversalPolicy(writeRoot))) {
+            if (loops) {
+                List<IndexReader.Loop> got = rd.loops(asked < cap ? asked : null, limit + 1);
+                truncated = got.size() > limit;
+                for (IndexReader.Loop l : got.subList(0, Math.min(limit, got.size())))
+                    rows.add(new LinkedHashMap<>(Map.of("entity", l.x(), "second", l.y(), "third", l.z(), "links", l.links())));
+            } else {
+                List<IndexReader.TwoWay> got = rd.twoWay((long) Math.ceil(PresetQueries.number(p, given, "min")), limit + 1);
+                truncated = got.size() > limit;
+                for (IndexReader.TwoWay w : got.subList(0, Math.min(limit, got.size())))
+                    rows.add(new LinkedHashMap<>(Map.of("entity", w.a(), "counterpart", w.b(), "links_out", w.linksAb(),
+                            "links_back", w.linksBa())));
+            }
+        } catch (SQLException | java.io.IOException | IllegalStateException unreadable) {
+            return new Answer(null, null, false, IndexedRead.Outcome.flat(IndexedRead.Reason.index_read_failed,
+                    "the index could not be read: " + unreadable.getMessage()).source());
+        }
+        Map<String, Object> source = new LinkedHashMap<>(sel.served(rows).source());
+        source.put("table", table);
+        if (loops) source.put("loopsMaxDegree", cap);
+        return new Answer(columns, rows, truncated, source);
     }
 
     /** What a Dataset is, for presets: its relation, its roles, and the Space's pack. */
@@ -258,6 +306,12 @@ public final class PresetRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException | java.io.IOException e) {
+            // the statement timeout surfaces as SQLTimeoutException("INTERRUPT Error: Interrupted!") from DuckDB's JDBC driver
+            if (e instanceof java.sql.SQLTimeoutException || String.valueOf(e.getMessage()).startsWith("INTERRUPT Error"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "This question took longer than this Space allows ("
+                        + fences.timeoutSeconds() + " s) on '" + datasetId + "'. " + (INDEX_SERVED.contains(p.id())
+                        ? "A link index of the Dataset answers it quickly - build one - or ask for fewer rows."
+                        : "Ask for fewer rows, or a shorter window."));
             throw DatasetReadFault.of("preset query failed", datasetId, writeRoot, e);
         }
 
