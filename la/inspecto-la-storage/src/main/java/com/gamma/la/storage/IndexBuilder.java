@@ -102,11 +102,20 @@ public final class IndexBuilder {
      * @param progress    null = none; called on the builder thread
      * @param sizing      the bucket sizing a FULL build applies and records (an append or compact keeps its parent's); null =
      *                    {@link BucketFunction.Sizing#DEFAULT}
+     * @param loopsMaxDegree LA-INDEX-PAIRS-LOOPS-1: write the derived tables {@code pairs_back} and {@code loops}, the loops over
+     *                    entities with at most this many link rows in and out; null = do not write them
      */
     public record Options(Integer buckets, String memoryLimit, Integer threads, CancelToken cancel, Consumer<Progress> progress,
-                          BucketFunction.Sizing sizing) {
+                          BucketFunction.Sizing sizing, Long loopsMaxDegree) {
         public Options {
             if (sizing == null) sizing = BucketFunction.Sizing.DEFAULT;
+            if (loopsMaxDegree != null && loopsMaxDegree < 1) throw new IllegalArgumentException("loopsMaxDegree must be >= 1");
+        }
+
+        /** No derived tables. */
+        public Options(Integer buckets, String memoryLimit, Integer threads, CancelToken cancel, Consumer<Progress> progress,
+                       BucketFunction.Sizing sizing) {
+            this(buckets, memoryLimit, threads, cancel, progress, sizing, null);
         }
 
         /** The shipped bucket sizing. */
@@ -362,6 +371,8 @@ public final class IndexBuilder {
         final Options opt;
         final CancelToken token;
         final Map<String, Long> timings = new LinkedHashMap<>();
+        /** This build wrote the derived tables ({@link #derived}), so the manifest records their cap. */
+        boolean derivedWritten;
         Connection conn;
         Path stage;
 
@@ -564,6 +575,9 @@ public final class IndexBuilder {
             // -- out / in / nodes ---------------------------------------------------------------------------------
             copyTables(stage, n, 2);
 
+            // -- derived (LA-INDEX-PAIRS-LOOPS-1) ----------------------------------------------------------------------
+            derived(stage, n);
+
             // -- verify ---------------------------------------------------------------------------------------------
             t = System.nanoTime();
             progress("verify", 6);
@@ -634,9 +648,44 @@ public final class IndexBuilder {
                     histogram, new IndexManifest.EndpointTypes(st == null ? null : st.asManifest(), dt == null ? null : dt.asManifest()));
         }
 
+        /**
+         * LA-INDEX-PAIRS-LOOPS-1: the derived tables of the edges {@code root} holds, read from its own {@code out} and
+         * {@code nodes} (an APPEND's merged ones included: a delta cannot update them, so every mode recomputes them).
+         * {@code pairs_back(a, b, n_ab, n_ba)}: each pair linked both ways, once ({@code a < b}), with its links each way.
+         * {@code loops(x, y, z, n)}: each directed loop {@code x -> y -> z -> x} once ({@code x} its smallest id), {@code n} the
+         * links along its three steps, over the entities with at most the cap of link rows in and out ({@code nodes} edges: a sum that
+         * stays exact across an APPEND's delta rows, where the distinct-link counts would only be an upper bound).
+         * Self-links and empty ids are left out of both (as {@link #linkStats} leaves them out). Nothing is written when the options ask for no derived tables.
+         */
+        void derived(Path root, int n) throws SQLException {
+            if (opt.loopsMaxDegree() == null) return;
+            long t = System.nanoTime();
+            progress("derived", 5);
+            String out = SqlViews.parquet(SqlIdent.pathStr(root.resolve("out"), "/*/*.parquet"), false, SqlViews.Hive.OFF);
+            String nodes = SqlViews.parquet(SqlIdent.pathStr(root.resolve("nodes"), "/*/*.parquet"), false, SqlViews.Hive.OFF);
+            exec("CREATE TEMP TABLE __la_pairs AS SELECT src AS s, dst AS t, count(*) AS n FROM " + out + " WHERE src <> dst AND src <> '' AND dst <> '' GROUP BY ALL");
+            exec("COPY (SELECT " + BucketFunction.sql("a", n) + " AS bucket, a, b, n_ab, n_ba FROM (SELECT p.s AS a, p.t AS b, p.n AS n_ab,"
+                    + " q.n AS n_ba FROM __la_pairs p JOIN __la_pairs q ON p.s = q.t AND p.t = q.s WHERE p.s < p.t) x ORDER BY bucket, a, b) TO "
+                    + SqlIdent.pathStr(root.resolve("pairs_back")) + " " + COPY_OPTIONS);
+            exec("CREATE TEMP TABLE __la_busy AS SELECT id FROM " + nodes + " WHERE id IS NOT NULL GROUP BY id"
+                    + " HAVING sum(out_edges + in_edges) > " + opt.loopsMaxDegree());
+            exec("CREATE TEMP TABLE __la_quiet AS SELECT p.s, p.t, p.n FROM __la_pairs p ANTI JOIN __la_busy a ON p.s = a.id"
+                    + " ANTI JOIN __la_busy b ON p.t = b.id");
+            exec("DROP TABLE __la_pairs");
+            exec("DROP TABLE __la_busy");
+            exec("COPY (SELECT " + BucketFunction.sql("x", n) + " AS bucket, x, y, z, n FROM (SELECT a.s AS x, a.t AS y, b.t AS z,"
+                    + " a.n + b.n + c.n AS n FROM __la_quiet a JOIN __la_quiet b ON b.s = a.t JOIN __la_quiet c ON c.s = b.t AND c.t = a.s"
+                    + " WHERE b.t <> a.s AND a.s < a.t AND a.s < b.t) x ORDER BY bucket, n DESC, x, y, z) TO "
+                    + SqlIdent.pathStr(root.resolve("loops")) + " " + COPY_OPTIONS);
+            exec("DROP TABLE __la_quiet");
+            derivedWritten = true;
+            timings.put("derived", ms(t));
+        }
+
         /** Writes the manifest, releases the files, deletes the scratch directories and publishes the stage. */
         Result publish(IndexManifest man, Path spill, long number, long total, long kept, long dropped, Map<String, TableStats> stats,
                        int n, long t0) throws Exception {
+            if (derivedWritten) man = man.withLoopsMaxDegree(opt.loopsMaxDegree());
             man.write(stage);
             check();
             close();   // release the files (Windows) and the spill directory before the stage is renamed
@@ -709,6 +758,8 @@ public final class IndexBuilder {
                 for (String table : new String[] {"out", "in", "nodes"}) linkTree(parentDir.resolve(table), stage.resolve(table));
             }
 
+            derived(stage, n);
+
             t = System.nanoTime();
             progress("verify", 6);
             Map<String, TableStats> stats = scan(conn, stage, n, token);
@@ -754,6 +805,8 @@ public final class IndexBuilder {
             timings.put("estimate", ms(t));
 
             copyTables(stage, n, 2);
+
+            derived(stage, n);
 
             t = System.nanoTime();
             progress("verify", 6);
@@ -904,8 +957,10 @@ public final class IndexBuilder {
      */
     private static Map<String, TableStats> scan(Connection c, Path root, int buckets, CancelToken token) throws SQLException {
         Map<String, TableStats> out = new LinkedHashMap<>();
-        for (String table : new String[] {"out", "in", "nodes"}) {
+        for (String table : new String[] {"out", "in", "nodes", "pairs_back", "loops"}) {
             if (token != null && token.isCancelled()) throw new CancelledException();
+            // the derived tables are listed only when this build wrote them (LA-INDEX-PAIRS-LOOPS-1)
+            if (!table.equals("out") && !table.equals("in") && !table.equals("nodes") && !Files.isDirectory(root.resolve(table))) continue;
             List<Path> files = parquetFiles(root.resolve(table), buckets);
             long bytes = 0;
             for (Path f : files) {

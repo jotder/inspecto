@@ -171,13 +171,19 @@ public final class IndexBuildService implements AutoCloseable {
      *
      * @param memoryLimit the DuckDB {@code memory_limit} of the build's connection; null = the shared DuckDB cap
      * @param sizing      the bucket sizing a FULL build applies (an APPEND / COMPACT keeps its parent's)
+     * @param loopsMaxDegree the derived tables' cap ({@code index.loops_max_degree}, LA-INDEX-PAIRS-LOOPS-1); null = none written
      */
-    public record Host(String memoryLimit, BucketFunction.Sizing sizing) {
-        /** The shared DuckDB cap and the shipped sizing. */
+    public record Host(String memoryLimit, BucketFunction.Sizing sizing, Long loopsMaxDegree) {
+        /** The shared DuckDB cap and the shipped sizing, no derived tables. */
         public static final Host DEFAULT = new Host(null, BucketFunction.Sizing.DEFAULT);
 
         public Host {
             if (sizing == null) sizing = BucketFunction.Sizing.DEFAULT;
+        }
+
+        /** No derived tables. */
+        public Host(String memoryLimit, BucketFunction.Sizing sizing) {
+            this(memoryLimit, sizing, null);
         }
     }
 
@@ -544,7 +550,7 @@ public final class IndexBuildService implements AutoCloseable {
             IndexStore store = new IndexStore(indexRoot, r.datasetId, r.mappingHash, r.keepVersions, java.time.Clock.systemUTC());
             Host h = host.get();
             IndexBuilder.Options opt = new IndexBuilder.Options(null, h.memoryLimit(), null, r.token,
-                    p -> r.progress = new Progress(p.phase(), p.step(), p.steps()), h.sizing());
+                    p -> r.progress = new Progress(p.phase(), p.step(), p.steps()), h.sizing(), h.loopsMaxDegree());
             IndexBuilder.Result result = builder.apply(new IndexBuilder.Request(r.datasetId, r.mapping, r.relation.relationSql(),
                     store, r.relation.baseFingerprint(), opt, r.relation.inputFiles(), r.mode, r.relation.deltaSql(), r.relation.readRoots(),
                     r.maxDeltas, r.relation.srcType(), r.relation.dstType()));

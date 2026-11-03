@@ -36,6 +36,7 @@ edited through `PUT /settings/link-analysis/limits` (SPACE) or `PUT /system/link
 | `index.threads` / `index.queue` | INSTALL | 1 / 4 | build workers and waiting line; a full queue is 503 |
 | `index.build_memory_pct` | INSTALL | 80 | DuckDB memory limit of a build, as a share of physical RAM |
 | `index.edges_per_bucket`, `index.min_buckets`, `index.max_buckets` | INSTALL | 4,000,000 / 16 / 1,024 | bucket sizing; a change forces the next build to be `full` |
+| `index.loops_max_degree` | INSTALL | 50 | every build (full, append, compact) also writes `pairs_back` (pairs linked both ways) and `loops` (directed loops of three), the loops only among entities with at most this many link rows in and out (the `nodes` edge counts, exact across appends); `0` writes neither. About 30 s together on 39 M links (measured outside a build); the manifest records the cap as `loopsMaxDegree` (LA-INDEX-PAIRS-LOOPS-1) |
 
 Memory, bucket sizing and pool sizes apply to the next build (`retune`); running builds finish under the old values.
 

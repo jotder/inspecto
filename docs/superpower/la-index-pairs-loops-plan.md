@@ -1,6 +1,6 @@
 # LA-INDEX-PAIRS-LOOPS-1 — two-way pairs and short loops written by the link index build
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6).** Operator ask: make the *Two-way pairs*
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 BUILT 2026-11-03 (§8); P1, P2 open.** Operator ask: make the *Two-way pairs*
 > and *Short loops* preset queries fast on large Datasets. Follows `LA-PRESET-QUERIES-1`
 > ([`la-basic-discovery-plan.md`](la-basic-discovery-plan.md) §7.2), where *Reached by many*, *Reaching many* and
 > *Newcomers* moved to the link index's `nodes` table. Board row `LA-INDEX-PAIRS-LOOPS-1`.
@@ -36,7 +36,7 @@ timeout."
 
 ## 3. Design
 
-**Two new index tables, written by a FULL build after `nodes`** (a new phase `derived`, so `STEPS` 6 → 7), bucketed
+**Two new index tables, written by a FULL build after `nodes`** (a new phase `derived`; as built it reports the unused step 5 of 6, §8), bucketed
 like the others and listed in `manifest.tables` with their row counts:
 
 - **`pairs_back`**: `(a, b, n_ab, n_ba)` with `a < b`: each pair that links both ways, once, with the links each way.
@@ -45,7 +45,7 @@ like the others and listed in `manifest.tables` with their row counts:
 - **`loops`**: `(x, y, z, n)` with `x < y` and `x < z`: each directed loop `x → y → z → x` once, `n` = the links along
   its three steps. Only entities with at most `index.loops_max_degree` distinct counterparts take part (Q-1, default
   50, a new `LaLimit` with the others under `index.*`); the cap is recorded in the manifest (`derived.loopsMaxDegree`)
-  so a reader knows what the table holds.
+  so a reader knows what the table holds (as built: the top-level manifest field `loopsMaxDegree`, §8).
 
 **Reads.** `IndexReader.twoWay(min, limit)` and `IndexReader.loops(maxDegree, limit)` (fixed SQL, bound values, the
 `rankNodes` pattern). `PresetRoutes.fromIndex` serves `two_way` and `short_loops` from them through `IndexedRead.select`,
@@ -99,3 +99,28 @@ brute-force answer (including an appended version) and that the route falls back
 - The other heavy presets (*Biggest senders by amount*, *Money in, then out again*) still read the Dataset.
 - `ims_cdr_dataset`'s guessed roles (From = `served_msisdn`, To = `served_imsi`: two classified columns, not the called
   number) — a role-detection defect, its own row `LA-PRESET-ROLES-1`.
+
+## 8. As built: P0 (2026-11-03)
+
+- `IndexBuilder.Run.derived(root, n)` runs in every mode right before verify (FULL, APPEND over the merged stage, COMPACT),
+  reading the version's own `out` and `nodes`: a temp fold `(s, t, n)` without self-links, then `COPY`s of
+  `pairs_back(a, b, n_ab, n_ba)` and `loops(x, y, z, n)` bucketed by `a` / `x` (loops ordered by `n` desc inside a bucket,
+  Q-3). `scan` lists them in `manifest.tables` when written; `IndexManifest.loopsMaxDegree` (new optional field) records
+  the cap, absent when none were written.
+- **Deviation, assistant-decided:** one setting instead of two - `index.loops_max_degree` (`LaLimit`, INSTALL, default 50)
+  where `0` writes neither table, in place of a separate `index.derived_tables` switch. It reaches the builder as
+  `IndexBuildService.Host.loopsMaxDegree` → `IndexBuilder.Options.loopsMaxDegree` (null = none).
+- **Deviation, assistant-decided:** the loops cap measures an entity by its LINK ROWS in and out (`nodes.out_edges +
+  in_edges`, a self-link on both sides), not distinct counterparts: `nodes` already holds it (recounting distinct
+  counterparts took 40 s on IMS), and unlike the distinct-link counts it sums EXACTLY across an APPEND's delta rows - the
+  first test run caught an appended version leaving out loops a full build kept, because summed distinct counts overstate.
+  It leaves out more entities than "50 counterparts" would (a busy pair counts every link); P2 measures how many on IMS.
+- Test: `IndexAppendTest.theDerivedTablesHoldExactlyTheTwoWayPairsAndTheQuietLoopsInFullAndAppendedBuilds` - both tables
+  equal a plain-Java answer computed from the corpus files (not from the index), after a FULL build and after an APPEND; a
+  build without the cap writes neither and records none.
+- A table with no rows is an EMPTY directory (no parquet file): a P1 reader must check `manifest.tables.<t>.rows` before
+  globbing it. COMPACT shares `derived()` with the tested FULL and APPEND paths but has no test of its own yet.
+- P1 note: the cap counts link rows, while the Dataset path of *Short loops* counts distinct counterparts (`maxLinks`); Q-5
+  compares a request's `maxLinks` with the build's cap, so P1 must say which measure the parameter means.
+- Not yet: the reads (`IndexReader.twoWay` / `loops`), the presets from the index, the timeout sentence (P1), and the IMS
+  measurement (P2).

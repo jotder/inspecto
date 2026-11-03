@@ -70,7 +70,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                             Map<String, TableStats> tables, long droppedNull, List<Delta> deltas, String parent,
                             List<InputFile> inputFiles, String bucketSizing, Map<String, Long> kindEdges,
                             Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan, Map<Long, Long> degreeHistogram,
-                            EndpointTypes endpointTypes) {
+                            EndpointTypes endpointTypes, Long loopsMaxDegree) {
 
     public static final int FORMAT_VERSION = 1;
     public static final String FILE_NAME = "manifest.json";
@@ -141,12 +141,34 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         degreeHistogram = degreeHistogram == null ? null : Collections.unmodifiableMap(new java.util.TreeMap<>(degreeHistogram));
     }
 
+    /** A manifest with no derived tables (what every manifest written before LA-INDEX-PAIRS-LOOPS-1 reads as). */
+    public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
+                         int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset, String relationSqlHash,
+                         String baseFingerprint, String timeColZone, Map<String, TableStats> tables, long droppedNull,
+                         List<Delta> deltas, String parent, List<InputFile> inputFiles, String bucketSizing, Map<String, Long> kindEdges,
+                         Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan, Map<Long, Long> degreeHistogram,
+                         EndpointTypes endpointTypes) {
+        this(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash, dataset, relationSqlHash,
+                baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles, bucketSizing, kindEdges, typeNodes, degree,
+                timeSpan, degreeHistogram, endpointTypes, null);
+    }
+
+    /**
+     * This manifest recording the derived tables (LA-INDEX-PAIRS-LOOPS-1): {@code pairs_back} and {@code loops} were written, the
+     * loops over entities with at most {@code loopsMaxDegree} link rows in and out (the {@code nodes} edge counts).
+     */
+    public IndexManifest withLoopsMaxDegree(long loopsMaxDegree) {
+        return new IndexManifest(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash,
+                dataset, relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles,
+                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree);
+    }
+
     /** This manifest with the given link statistics (the four optional fields) in place of its own. */
     public IndexManifest withLinkStats(Map<String, Long> kindEdges, Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan,
                                        Map<Long, Long> degreeHistogram, EndpointTypes endpointTypes) {
         return new IndexManifest(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash,
                 dataset, relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles,
-                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes);
+                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree);
     }
 
     /** The sizing signature that chose {@code buckets}: the recorded one, else the shipped {@link BucketFunction.Sizing#DEFAULT}. */
@@ -164,6 +186,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         n.put("bucketFn", bucketFn);
         n.put("buckets", buckets);
         if (bucketSizing != null) n.put("bucketSizing", bucketSizing);
+        if (loopsMaxDegree != null) n.put("loopsMaxDegree", loopsMaxDegree);
         n.put("rowGroupSize", rowGroupSize);
         ObjectNode m = n.putObject("mapping");
         m.put("srcColumn", mapping.srcColumn());
@@ -260,7 +283,8 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                 req(n, "mappingHash").asText(), req(n, "dataset").asText(), text(n, "relationSqlHash"),
                 text(n, "baseFingerprint"), text(n, "timeColZone"), tables, n.path("droppedNull").asLong(), deltas,
                 text(n, "parent"), inputFiles, text(n, "bucketSizing"), counts(n, "kindEdges"), counts(n, "typeNodes"),
-                degree, timeSpan, histogram, endpoints);
+                degree, timeSpan, histogram, endpoints,
+                n.hasNonNull("loopsMaxDegree") ? n.get("loopsMaxDegree").asLong() : null);
     }
 
     public void write(Path dir) throws IOException {

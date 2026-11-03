@@ -147,11 +147,12 @@ public final class IndexRoutes implements RouteModule {
         return new IndexBuildService.Limits((int) v.get(LaLimit.INDEX_THREADS), (int) v.get(LaLimit.INDEX_QUEUE), std.runTtlMs(), std.maxRuns());
     }
 
-    /** The build resources in force: {@code index.build_memory_pct} of the RAM this JVM sees, and the bucket sizing. */
+    /** The build resources in force: {@code index.build_memory_pct} of the RAM this JVM sees, the bucket sizing, and the derived tables' cap. */
     static IndexBuildService.Host installHost() {
         LaLimitValues v = LaLimits.forSpace(null);
+        long loops = (long) v.get(LaLimit.INDEX_LOOPS_MAX_DEGREE);   // 0 = no derived tables (LA-INDEX-PAIRS-LOOPS-1)
         return new IndexBuildService.Host(IndexBuildService.memoryLimit((int) v.get(LaLimit.INDEX_BUILD_MEMORY_PCT),
-                DuckDbUtil.physicalMemoryBytes()), sizing(v));
+                DuckDbUtil.physicalMemoryBytes()), sizing(v), loops > 0 ? loops : null);
     }
 
     /** The bucket sizing in force: the install-wide {@code index.edges_per_bucket} / {@code min_buckets} / {@code max_buckets}. */

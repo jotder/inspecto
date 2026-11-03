@@ -280,6 +280,95 @@ class IndexAppendTest {
         }
     }
 
+    // ---------------------------------------------------------------------------------------------------- derived tables
+
+    /** The cap the derived-table tests build with: low enough that the corpus has busy entities left out of the loops. */
+    private static final long LOOPS_CAP = 25;
+
+    private static IndexBuilder.Options derivedOptions() {
+        return new IndexBuilder.Options(null, null, null, null, null, null, LOOPS_CAP);
+    }
+
+    /**
+     * The derived tables computed in plain Java from the corpus files themselves (not from the index): every edge with both ends,
+     * the cap measure as the builder counts it (link rows out plus in, a self-link on both sides), then
+     * {@code a|b|n_ab|n_ba} for the pairs linked both ways and {@code x|y|z|n} for the directed loops among the quiet entities.
+     */
+    private static List<java.util.Set<String>> bruteForce(Path data, List<String> files) throws Exception {
+        Map<String, Long> count = new java.util.HashMap<>();
+        Map<String, Long> rows = new java.util.HashMap<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SELECT s, t FROM (" + relation(data, files) + ") r WHERE s IS NOT NULL AND t IS NOT NULL")) {
+            while (rs.next()) {
+                String a = rs.getString(1), b = rs.getString(2);
+                rows.merge(a, 1L, Long::sum);
+                rows.merge(b, 1L, Long::sum);
+                if (!a.equals(b)) count.merge(a + "\u0000" + b, 1L, Long::sum);
+            }
+        }
+        java.util.Set<String> busy = new java.util.HashSet<>();
+        rows.forEach((id, n) -> { if (n > LOOPS_CAP) busy.add(id); });
+        java.util.Set<String> back = new java.util.TreeSet<>(), loops = new java.util.TreeSet<>();
+        Map<String, List<String>> next = new java.util.HashMap<>();
+        for (var e : count.entrySet()) {
+            String[] ab = e.getKey().split("\u0000");
+            Long ba = count.get(ab[1] + "\u0000" + ab[0]);
+            if (ba != null && ab[0].compareTo(ab[1]) < 0) back.add(ab[0] + "|" + ab[1] + "|" + e.getValue() + "|" + ba);
+            if (!busy.contains(ab[0]) && !busy.contains(ab[1])) next.computeIfAbsent(ab[0], x -> new ArrayList<>()).add(ab[1]);
+        }
+        for (var x : next.entrySet())
+            for (String y : x.getValue())
+                for (String z : next.getOrDefault(y, List.of()))
+                    if (!z.equals(x.getKey()) && x.getKey().compareTo(y) < 0 && x.getKey().compareTo(z) < 0
+                            && next.getOrDefault(z, List.of()).contains(x.getKey()))
+                        loops.add(x.getKey() + "|" + y + "|" + z + "|" + (count.get(x.getKey() + "\u0000" + y)
+                                + count.get(y + "\u0000" + z) + count.get(z + "\u0000" + x.getKey())));
+        return List.of(back, loops);
+    }
+
+    /** What the version holds in {@code pairs_back} and {@code loops}, as {@link #bruteForce} spells it. */
+    private static List<java.util.Set<String>> written(Path version) throws Exception {
+        java.util.Set<String> back = new java.util.TreeSet<>(), loops = new java.util.TreeSet<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            try (java.sql.ResultSet rs = st.executeQuery("SELECT a, b, n_ab, n_ba FROM read_parquet('" + sql(version) + "/pairs_back/*/*.parquet')")) {
+                while (rs.next()) back.add(rs.getString(1) + "|" + rs.getString(2) + "|" + rs.getLong(3) + "|" + rs.getLong(4));
+            }
+            try (java.sql.ResultSet rs = st.executeQuery("SELECT x, y, z, n FROM read_parquet('" + sql(version) + "/loops/*/*.parquet')")) {
+                while (rs.next()) loops.add(rs.getString(1) + "|" + rs.getString(2) + "|" + rs.getString(3) + "|" + rs.getLong(4));
+            }
+        }
+        return List.of(back, loops);
+    }
+
+    @Test
+    void theDerivedTablesHoldExactlyTheTwoWayPairsAndTheQuietLoopsInFullAndAppendedBuilds(@TempDir Path tmp) throws Exception {
+        Path data = tmp.resolve("data");
+        plant(data);
+        List<java.util.Set<String>> want = bruteForce(data, names(0, FILES));
+        assertTrue(want.get(0).size() > 20 && want.get(1).size() > 20, "the corpus has pairs and loops to compare: " + want.get(0).size()
+                + " / " + want.get(1).size());
+
+        IndexBuilder.Result full = build(tmp.resolve("full"), data, IndexBuilder.Mode.FULL, FILES, derivedOptions());
+        assertEquals(want, written(full.directory()));
+        assertEquals(LOOPS_CAP, full.manifest().loopsMaxDegree());
+        assertEquals(want.get(0).size(), full.manifest().tables().get("pairs_back").rows());
+        assertEquals(want.get(1).size(), full.manifest().tables().get("loops").rows());
+        assertEquals(LOOPS_CAP, IndexManifest.read(full.directory()).loopsMaxDegree(), "the cap survives the manifest file");
+
+        // an append recomputes them over the whole version: a delta can close a loop between old links
+        Path inc = tmp.resolve("inc");
+        IndexBuilder.Result base = build(inc, data, IndexBuilder.Mode.FULL, 3, derivedOptions());
+        assertEquals(bruteForce(data, names(0, 3)), written(base.directory()));
+        IndexBuilder.Result appended = buildOver(inc, data, IndexBuilder.Mode.APPEND, names(0, FILES), derivedOptions());
+        assertEquals(want, written(appended.directory()));
+
+        // without the cap nothing is written and the manifest says so
+        IndexBuilder.Result plain = build(tmp.resolve("plain"), data, IndexBuilder.Mode.FULL, FILES, null);
+        assertNull(plain.manifest().loopsMaxDegree());
+        assertFalse(Files.exists(plain.directory().resolve("pairs_back")));
+        assertFalse(plain.manifest().tables().containsKey("loops"));
+    }
+
     @Test
     void compactionMergesTheDeltasIntoOneSortedMainWithTheSameAnswers(@TempDir Path tmp) throws Exception {
         Path data = tmp.resolve("data");

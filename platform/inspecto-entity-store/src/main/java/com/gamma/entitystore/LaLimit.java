@@ -354,6 +354,8 @@ public enum LaLimit {
             "The fewest buckets an index is split into; a change forces full rebuilds."),
     INDEX_MAX_BUCKETS("index.max_buckets", Layer.INSTALL, false, "index", "count", 1_024, 1, 65_536,
             "The most buckets an index is split into; a change forces full rebuilds."),
+    INDEX_LOOPS_MAX_DEGREE("index.loops_max_degree", Layer.INSTALL, false, "index", "count", 50, 0, 100_000,
+            "Every build also writes two-way pairs and short loops; loops only among entities with at most this many link rows in and out. 0 = write neither."),
     RATE_LINK_ANALYSIS_BURST("rate.link_analysis_burst", Layer.INSTALL, false, "rate", "count", 30, 1, 3_000,
             "Expensive Link Analysis requests one user may make in a burst."),
     RATE_LINK_ANALYSIS_PER_S("rate.link_analysis_per_s", Layer.INSTALL, false, "rate", "per_s", 0.5, 0.01, 1_000,
