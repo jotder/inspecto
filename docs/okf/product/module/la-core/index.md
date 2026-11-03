@@ -34,6 +34,10 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-ARRIVAL-LEDGER-1` | P2 | feature | an arrival ledger per Dataset and a three-clock *Data status* (received · covers through · graph indexed through), in every edition (LA-D… | — |
+| `LA-ARRIVAL-MODES-1` | P3 | feature | incremental semantics for import Datasets: *Replace the period it covers*, duplicate-upload refusal (sha256) and a stated schema-drift po… | — |
+| `LA-ARRIVAL-FEEDS-1` | P3 | feature | files from a foreign process, made visible (LA-DATA-ARRIVAL-1 P3, decision D-1). | — |
+| `LA-DATASET-COMPACT-1` | P3 | feature | compaction of an import Dataset's Parquet in every edition, a retention policy on Standard+ (LA-DATA-ARRIVAL-1 P4, decision D-5). | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
