@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { apiUrl } from '@inspecto/core/api/api-base';
+import { ShortReads } from '@inspecto/core/api/short-reads';
 
 /** `PUT /datasets/{id}/columns/{column}`: the column's classification now, and the entry's columns as written. */
 export interface ColumnEntityTypeChange {
@@ -20,12 +21,15 @@ export interface ColumnEntityTypeChange {
 @Injectable({ providedIn: 'root' })
 export class DatasetColumnsService {
     private http = inject(HttpClient);
+    private reads = inject(ShortReads);
 
     /** Set (an Entity Type id) or clear (`null`) what `column` of `dataset` holds. 404 no Dataset; 422 no such column/type. */
     setEntityType(dataset: string, column: string, entityType: string | null): Observable<ColumnEntityTypeChange> {
-        return this.http.put<ColumnEntityTypeChange>(
-            apiUrl(`/datasets/${encodeURIComponent(dataset)}/columns/${encodeURIComponent(column)}`),
-            { entityType },
-        );
+        return this.http
+            .put<ColumnEntityTypeChange>(
+                apiUrl(`/datasets/${encodeURIComponent(dataset)}/columns/${encodeURIComponent(column)}`),
+                { entityType },
+            )
+            .pipe(tap(() => this.reads.clear())); // it rewrites the Dataset entry: a replayed Dataset list would be stale
     }
 }

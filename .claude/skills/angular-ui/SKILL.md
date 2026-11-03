@@ -488,8 +488,9 @@ src/app/
   for a free-text note (Shift+Enter breaks a line), `maxlength`, `placeholder`, `default` (a ghost the → key accepts),
   `required` (the asterisk only), `[error]` (a host-rendered `role="alert"` line) and a public `focus()` for a host
   pointing at a missing value. ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
-  ⚠ **It has no hint slot**: the helper text is a `<p class="text-secondary m-0 text-xs">` under the row, and a
-  hint beside a row that sits in a grid cell must share that cell (wrap row + hint in one `<div>`).
+  **`help`** (2026-11-03, `UI-FORM-ROWS-1`) is the one tiny line under the row, as `option-picker`'s `help`: give it
+  only to a field whose name does not explain itself; an error replaces it. App-wide form style (one row geometry,
+  folds, the `lint:forms` guard) is planned in `docs/superpower/ui-form-rows-plan.md`.
   ⚠ **`[error]` is a plain input, not control state**: the host computes it (`ctl.touched && ctl.hasError(...)`), and
   an `OnPush` host re-renders it only after a template event, so a spec that patches the form from code must
   `markForCheck()` first (`refresh(fixture)` in `inspecto/testing/pen-field.ts`, beside `penEdit`/`penText`/

@@ -114,14 +114,20 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         (q(el, 'mapping-new') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(q(el, 'mapping-form')).not.toBeNull();
+        expect(q(el, 'mapping-form')!.querySelector('[role="alert"]')).toBeNull(); // nothing shows before a save
         c.form.patchValue({ name: '', to: 'from_account' });
         c.saveMapping();
         fixture.detectChanges();
         expect(c.form.controls.name.hasError('required')).toBe(true);
         expect(c.form.controls.to.hasError('same')).toBe(true);
-        // the error renders in the field's error slot, after the submit only
-        const slot = q(el, 'mapping-form')!.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error');
-        expect(slot?.textContent).toContain('A name is required.');
+        // the errors render as the rows' own alert lines, after the submit only
+        const alerts = Array.from(q(el, 'mapping-form')!.querySelectorAll('[role="alert"]')).map(
+            (a) => a.textContent ?? '',
+        );
+        expect(alerts.some((t) => t.includes('A name is required.'))).toBe(true);
+        expect(alerts.some((t) => t.includes('From and To must be two different columns.'))).toBe(true);
+        // property rows, not boxed Material fields
+        expect(q(el, 'mapping-form')!.querySelector('mat-form-field, mat-select')).toBeNull();
 
         c.form.patchValue({ name: 'by_account_channel', to: 'channel' });
         c.form.controls.name.updateValueAndValidity();
@@ -156,6 +162,21 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         });
         req.flush({ name: 'by_channel' });
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('Save with no From and no To says so on both rows, and sends nothing', () => {
+        const { fixture, el, c } = create();
+        c.newMapping(c.bases().find((d) => d.id === 'wallet_txn')!); // a base with no link mapping: From and To start empty
+        fixture.detectChanges();
+        c.form.patchValue({ name: 'abc' });
+        c.saveMapping();
+        fixture.detectChanges();
+        const alerts = Array.from(q(el, 'mapping-form')!.querySelectorAll('[role="alert"]')).map(
+            (a) => a.textContent ?? '',
+        );
+        expect(alerts.some((t) => t.includes('Choose the column each link starts from.'))).toBe(true);
+        expect(alerts.some((t) => t.includes('Choose the column each link goes to.'))).toBe(true);
+        http.expectNone((r) => r.method === 'POST');
     });
 
     it('a Pipeline-fed Dataset gets its own Entities and Mappings, and a Mapping of it saves with it as the base', () => {
@@ -209,6 +230,21 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(drift?.textContent).not.toContain('src_id');
         expect(q(el, 'data-transfers')!.querySelector('[data-testid="mapping-drift"]')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it('the Entities card is one picker row per column, and a pick saves at once', () => {
+        const { el, c } = create();
+        const card = q(el, 'data-transfers')!.querySelector('[data-testid="entities"]')!;
+        expect(card.querySelectorAll('inspecto-option-picker').length).toBe(3);
+        expect(card.querySelector('mat-form-field, mat-select')).toBeNull();
+        expect(card.querySelector('[data-testid="entity-from_account"]')!.textContent).toContain('Account');
+        c.holds().get('transfers')!.get('channel')!.setValue('account');
+        const req = http.expectOne(
+            (r) => r.method === 'PUT' && r.url === apiUrl('/datasets/transfers/columns/channel'),
+        );
+        expect(req.request.body).toEqual({ entityType: 'account' });
+        req.flush({});
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
     });
 
     it('a name a Dataset already has is refused', () => {

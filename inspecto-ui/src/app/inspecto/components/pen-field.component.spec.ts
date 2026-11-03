@@ -48,7 +48,31 @@ class TypingHostComponent {
     offCtl = new FormControl<string | null>({ value: 'off', disabled: true });
 }
 
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [PenFieldComponent, ReactiveFormsModule],
+    template: `<inspecto-pen-field label="Name" help="Lower-case letters" [error]="error" [formControl]="ctl" />`,
+})
+class HelpHostComponent {
+    ctl = new FormControl<string | null>(null);
+    error = '';
+}
+
 describe('PenFieldComponent', () => {
+    it('shows its help as a tiny line under the row; an error replaces it (UI-FORM-ROWS-1)', () => {
+        const fixture = TestBed.createComponent(HelpHostComponent);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const help = el.querySelector('p.text-xs');
+        expect(help?.textContent).toContain('Lower-case letters');
+        expect(help?.getAttribute('role')).toBeNull();
+        fixture.componentInstance.error = 'A name is required.';
+        fixture.detectChanges();
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain('A name is required.');
+        expect(el.textContent).not.toContain('Lower-case letters');
+    });
+
     function setup() {
         const fixture = TestBed.createComponent(HostComponent);
         fixture.detectChanges();
@@ -244,10 +268,16 @@ describe('PenFieldComponent', () => {
     });
 
     describe('one accessible name per field (LA-UI-TEXT-PASS-1 X3)', () => {
-        function names(): { fixture: ReturnType<typeof TestBed.createComponent<TypingHostComponent>>; hosts: HTMLElement[] } {
+        function names(): {
+            fixture: ReturnType<typeof TestBed.createComponent<TypingHostComponent>>;
+            hosts: HTMLElement[];
+        } {
             const fixture = TestBed.createComponent(TypingHostComponent);
             fixture.detectChanges();
-            return { fixture, hosts: Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('inspecto-pen-field')) };
+            return {
+                fixture,
+                hosts: Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('inspecto-pen-field')),
+            };
         }
 
         it('names the value button "<label>: <value>, edit" and hides the pencil from assistive tech', () => {
@@ -271,7 +301,9 @@ describe('PenFieldComponent', () => {
             const { fixture, hosts } = names();
             (hosts[0].querySelector('button:not(.pen-pencil)') as HTMLButtonElement).click();
             fixture.detectChanges();
-            expect(hosts[0].querySelector('input')!.getAttribute('aria-description')).toBe('Enter to save, Escape to cancel');
+            expect(hosts[0].querySelector('input')!.getAttribute('aria-description')).toBe(
+                'Enter to save, Escape to cancel',
+            );
         });
     });
 });

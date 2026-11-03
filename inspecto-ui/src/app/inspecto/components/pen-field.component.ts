@@ -118,6 +118,8 @@ import { MatIconModule } from '@angular/material/icon';
         </div>
         @if (error()) {
             <p class="text-warn m-0 text-xs" role="alert">{{ error() }}</p>
+        } @else if (help()) {
+            <p class="text-secondary m-0 text-xs">{{ help() }}</p>
         }
     `,
 })
@@ -138,6 +140,8 @@ export class PenFieldComponent implements ControlValueAccessor {
     readonly ariaLabel = input('');
     /** Explicit error line (a host validating on submit renders its own message here). */
     readonly error = input('');
+    /** One short line under the row for a field whose name does not explain itself; hidden while an error shows. */
+    readonly help = input('');
 
     protected readonly value = signal<string | number | null>(null);
     protected readonly disabled = signal(false);

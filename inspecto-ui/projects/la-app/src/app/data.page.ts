@@ -1,16 +1,15 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { ComponentsService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { DatasetColumnsService } from '@inspecto/link-analysis/api/dataset-columns.service';
@@ -45,11 +44,10 @@ import {
         ReactiveFormsModule,
         RouterLink,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatSelectModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         ImportDatasetCardComponent,
@@ -115,21 +113,14 @@ import {
                             <p class="text-secondary m-0 text-sm">
                                 What each column holds. A column with no Entity Type is a detail.
                             </p>
-                            <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                            <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                                 @for (col of d.columns; track col.name) {
-                                    <mat-form-field subscriptSizing="dynamic">
-                                        <mat-label>{{ col.name }}</mat-label>
-                                        <mat-select
-                                            [value]="typeOf(col.classification)?.id ?? ''"
-                                            [attr.data-testid]="'entity-' + col.name"
-                                            (selectionChange)="setEntityType(d, col.name, $event.value)"
-                                        >
-                                            <mat-option value="">Nothing: a detail</mat-option>
-                                            @for (t of types(); track t.id) {
-                                                <mat-option [value]="t.id">{{ t.label }}</mat-option>
-                                            }
-                                        </mat-select>
-                                    </mat-form-field>
+                                    <inspecto-option-picker
+                                        [label]="col.name"
+                                        [options]="typeOptions()"
+                                        [formControl]="holds().get(d.id)!.get(col.name)!"
+                                        [attr.data-testid]="'entity-' + col.name"
+                                    ></inspecto-option-picker>
                                 }
                             </div>
                         </div>
@@ -207,74 +198,75 @@ import {
                                     "
                                     data-testid="mapping-form"
                                 >
-                                    <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                                        <mat-form-field>
-                                            <mat-label>Mapping name</mat-label>
-                                            <input matInput formControlName="name" data-testid="mapping-name" />
-                                            @if (form.controls.name.hasError('required')) {
-                                                <mat-error>A name is required.</mat-error>
-                                            } @else if (form.controls.name.hasError('pattern')) {
-                                                <mat-error>A lower-case letter, then letters, digits or _.</mat-error>
-                                            } @else if (form.controls.name.hasError('taken')) {
-                                                <mat-error>A Dataset of that name exists.</mat-error>
+                                    <!-- property rows (label · value · ✎ / ▾), two per line: the whole form at a glance -->
+                                    <div class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
+                                        <inspecto-pen-field
+                                            label="Mapping name"
+                                            formControlName="name"
+                                            data-testid="mapping-name"
+                                            [required]="true"
+                                            [error]="nameError()"
+                                            help="Lower-case letters, digits and _"
+                                        ></inspecto-pen-field>
+                                        <inspecto-pen-field
+                                            label="Description"
+                                            formControlName="description"
+                                        ></inspecto-pen-field>
+                                        <!-- validated on save: the page draws the required line itself (the picker
+                                             shows its own only once its dialog was opened), so no [required] here -->
+                                        <div>
+                                            <inspecto-option-picker
+                                                label="From"
+                                                formControlName="from"
+                                                data-testid="mapping-from"
+                                                [options]="columnOptions(d)"
+                                                help="The column each link starts from"
+                                            ></inspecto-option-picker>
+                                            @if (
+                                                form.controls.from.touched && form.controls.from.hasError('required')
+                                            ) {
+                                                <p class="text-warn m-0 text-xs" role="alert">
+                                                    Choose the column each link starts from.
+                                                </p>
                                             }
-                                        </mat-form-field>
-                                        <mat-form-field>
-                                            <mat-label>Description</mat-label>
-                                            <input matInput formControlName="description" />
-                                        </mat-form-field>
-                                        <mat-form-field>
-                                            <mat-label>From</mat-label>
-                                            <mat-select formControlName="from" data-testid="mapping-from">
-                                                @for (c of d.columns; track c.name) {
-                                                    <mat-option [value]="c.name">{{ c.name }}</mat-option>
-                                                }
-                                            </mat-select>
-                                            @if (form.controls.from.hasError('required')) {
-                                                <mat-error>Choose the column each link starts from.</mat-error>
+                                        </div>
+                                        <inspecto-option-picker
+                                            label="From holds"
+                                            formControlName="fromType"
+                                            [options]="typeOptions()"
+                                            help="Links join where columns hold the same Entity Type"
+                                        ></inspecto-option-picker>
+                                        <div>
+                                            <inspecto-option-picker
+                                                label="To"
+                                                formControlName="to"
+                                                data-testid="mapping-to"
+                                                [options]="columnOptions(d)"
+                                                help="The column each link goes to"
+                                            ></inspecto-option-picker>
+                                            @if (form.controls.to.touched && form.controls.to.hasError('required')) {
+                                                <p class="text-warn m-0 text-xs" role="alert">
+                                                    Choose the column each link goes to.
+                                                </p>
+                                            } @else if (form.controls.to.touched && form.controls.to.hasError('same')) {
+                                                <p class="text-warn m-0 text-xs" role="alert">
+                                                    From and To must be two different columns.
+                                                </p>
                                             }
-                                        </mat-form-field>
-                                        <mat-form-field>
-                                            <mat-label>From holds</mat-label>
-                                            <mat-select formControlName="fromType">
-                                                <mat-option value="">Nothing: a detail</mat-option>
-                                                @for (t of types(); track t.id) {
-                                                    <mat-option [value]="t.id">{{ t.label }}</mat-option>
-                                                }
-                                            </mat-select>
-                                        </mat-form-field>
-                                        <mat-form-field>
-                                            <mat-label>To</mat-label>
-                                            <mat-select formControlName="to" data-testid="mapping-to">
-                                                @for (c of d.columns; track c.name) {
-                                                    <mat-option [value]="c.name">{{ c.name }}</mat-option>
-                                                }
-                                            </mat-select>
-                                            @if (form.controls.to.hasError('required')) {
-                                                <mat-error>Choose the column each link goes to.</mat-error>
-                                            } @else if (form.controls.to.hasError('same')) {
-                                                <mat-error>From and To must be two different columns.</mat-error>
-                                            }
-                                        </mat-form-field>
-                                        <mat-form-field>
-                                            <mat-label>To holds</mat-label>
-                                            <mat-select formControlName="toType">
-                                                <mat-option value="">Nothing: a detail</mat-option>
-                                                @for (t of types(); track t.id) {
-                                                    <mat-option [value]="t.id">{{ t.label }}</mat-option>
-                                                }
-                                            </mat-select>
-                                        </mat-form-field>
+                                        </div>
+                                        <inspecto-option-picker
+                                            label="To holds"
+                                            formControlName="toType"
+                                            [options]="typeOptions()"
+                                        ></inspecto-option-picker>
                                         @for (opt of optional; track opt.key) {
-                                            <mat-form-field>
-                                                <mat-label>{{ opt.label }}</mat-label>
-                                                <mat-select [formControlName]="opt.key">
-                                                    <mat-option value="">None</mat-option>
-                                                    @for (c of d.columns; track c.name) {
-                                                        <mat-option [value]="c.name">{{ c.name }}</mat-option>
-                                                    }
-                                                </mat-select>
-                                            </mat-form-field>
+                                            <inspecto-option-picker
+                                                [label]="opt.label"
+                                                [formControlName]="opt.key"
+                                                [options]="noneOr(d)"
+                                                [help]="opt.help"
+                                                placeholder="None"
+                                            ></inspecto-option-picker>
                                         }
                                     </div>
                                     @if (saveError()) {
@@ -322,10 +314,58 @@ export class DataPageComponent implements OnInit {
     protected readonly addData = ADD_DATA_ROUTE;
     protected readonly line = mappingLine;
     protected readonly optional = [
-        { key: 'kind', label: 'Kind of link' },
-        { key: 'time', label: 'When' },
-        { key: 'amount', label: 'Amount' },
+        { key: 'kind', label: 'Kind of link', help: 'A column naming the kind of each link' },
+        { key: 'time', label: 'When', help: 'The column that dates each link' },
+        { key: 'amount', label: 'Amount', help: 'A number column carried on each link' },
     ] as const;
+
+    /** What a column may hold: an Entity Type, or nothing (a detail). */
+    protected readonly typeOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Nothing: a detail' },
+        ...this.types().map((t) => ({ value: t.id, label: t.label })),
+    ]);
+
+    /** A base's columns to pick From / To from, each with what the base says it holds. */
+    protected columnOptions(d: DataEntry): PickerOption[] {
+        return d.columns.map((c) => ({
+            value: c.name,
+            label: c.name,
+            hint: this.typeOf(c.classification)?.label ?? 'a detail',
+        }));
+    }
+
+    /** An optional column: none, or one of the base's. */
+    protected noneOr(d: DataEntry): PickerOption[] {
+        return [{ value: '', label: 'None' }, ...this.columnOptions(d)];
+    }
+
+    /**
+     * One control per column of every base (what it holds); a change saves at once, as the Entities page does.
+     * Rebuilt whenever the Datasets or the Entity Types are read again, so a control always shows the stored value.
+     */
+    readonly holds = computed(() => {
+        const out = new Map<string, Map<string, FormControl<string>>>();
+        for (const d of this.bases()) {
+            const controls = new Map<string, FormControl<string>>();
+            for (const c of d.columns) {
+                const ctrl = new FormControl(this.typeOf(c.classification)?.id ?? '', { nonNullable: true });
+                ctrl.valueChanges.subscribe((v) => this.setEntityType(d, c.name, v));
+                controls.set(c.name, ctrl);
+            }
+            out.set(d.id, controls);
+        }
+        return out;
+    });
+
+    /** The name's error line, shown once the field was left or a save was tried. */
+    protected nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched || c.disabled) return '';
+        if (c.hasError('required')) return 'A name is required.';
+        if (c.hasError('pattern')) return 'A lower-case letter, then letters, digits or _.';
+        if (c.hasError('taken')) return 'A Dataset of that name exists.';
+        return '';
+    }
 
     /** Every Dataset entry; null while they load. */
     readonly entries = signal<DataEntry[] | null>(null);
