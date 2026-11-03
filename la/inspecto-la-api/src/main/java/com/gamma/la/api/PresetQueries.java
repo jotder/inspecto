@@ -239,6 +239,13 @@ final class PresetQueries {
         return out;
     }
 
+    /** A {@code days} parameter: a whole number of days, 1 to 3660 (ten years). */
+    static int wholeDays(double days) {
+        if (days < 1 || days > 3660 || days != Math.floor(days))
+            throw new IllegalArgumentException("'days' must be a whole number of days, 1 to 3660");
+        return (int) days;
+    }
+
     /** The row cap: the {@code top} parameter, 1..{@link #MAX_ROWS}. */
     static int top(Preset p, Map<String, String> given) {
         if (p.param("top") == null) return MAX_ROWS;
@@ -295,10 +302,7 @@ final class PresetQueries {
                         + " WHERE b.t <> a.s AND a.s < a.t AND a.s < b.t ORDER BY entity, second, third";
             }
             case "newcomers" -> {
-                double days = n.applyAsDouble("days");
-                if (days < 1 || days > 3660 || days != Math.floor(days))
-                    throw new IllegalArgumentException("'days' must be a whole number of days, 1 to 3660");
-                binds.add(String.valueOf((long) days));
+                binds.add(String.valueOf(wholeDays(n.applyAsDouble("days"))));
                 binds.add(String.valueOf(n.applyAsDouble("min")));
                 // "lately" is the last days of the DATA (its newest link), not of the calendar: an old extract still answers
                 yield links + ", __b AS (SELECT s AS e, t AS o, ts FROM __l UNION ALL SELECT t, s, ts FROM __l)"

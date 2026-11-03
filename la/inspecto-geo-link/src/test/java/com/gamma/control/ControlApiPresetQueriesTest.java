@@ -10,6 +10,8 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.service.CollectorService;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,6 +28,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -241,6 +245,77 @@ class ControlApiPresetQueriesTest {
             List<String> steps = new ArrayList<>();
             for (JsonNode r : around.get("rows")) steps.add(r.get("steps").asInt() + ":" + r.get("via").asInt());
             assertEquals(List.of("1:2", "1:1", "2:2", "2:1"), steps);
+        }
+    }
+
+    /** Builds the link index over graph_ds as someone who may, then disarms the authenticator again. */
+    private void buildGraphIndex(Ctx c) throws Exception {
+        Authenticators.forTest(ex -> "Bearer builder".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("analyst-1", Set.of("canBuildLinkIndex"))) : Optional.empty());
+        try {
+            HttpRequest.Builder post = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/inv/index/builds"))
+                    .header("Content-Type", "application/json").header("Authorization", "Bearer builder")
+                    .POST(BodyPublishers.ofString("{\"dataset\":\"graph_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"timeCol\":\"ts\"}"));
+            HttpResponse<String> r = client.send(post.build(), BodyHandlers.ofString());
+            assertEquals(202, r.statusCode(), r.body());
+            String id = JSON.readTree(r.body()).at("/data/buildId").asText();
+            long end = System.nanoTime() + 30_000_000_000L;
+            String status;
+            do {
+                HttpRequest get = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/inv/index/builds/" + id))
+                        .header("Authorization", "Bearer builder").GET().build();
+                status = JSON.readTree(client.send(get, BodyHandlers.ofString()).body()).at("/data/status").asText();
+                if (System.nanoTime() > end) throw new AssertionError("build " + id + " is still " + status);
+                Thread.sleep(10);
+            } while (!status.equals("COMPLETED") && !status.equals("FAILED") && !status.equals("CANCELLED"));
+            assertEquals("COMPLETED", status);
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private static List<String> table(JsonNode answer, String... cols) {
+        List<String> out = new ArrayList<>();
+        for (JsonNode r : answer.get("rows")) {
+            StringBuilder b = new StringBuilder();
+            for (String k : cols) b.append(r.get(k).asText()).append('|');
+            out.add(b.toString());
+        }
+        return out;
+    }
+
+    @Test
+    void withALinkIndexTheEntityPresetsReadItsNodesTableAndAnswerAsTheDatasetDoes(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            JsonNode fanInFlat = run(c, "fan_in", "graph_ds", "{\"min\":2}", true);
+            JsonNode fanOutFlat = run(c, "fan_out", "graph_ds", "{\"min\":1}", true);
+            JsonNode newFlat = run(c, "newcomers", "graph_ds", "{\"min\":3}", true);
+            assertEquals("dataset", fanInFlat.at("/source/kind").asText(), fanInFlat.toString());
+            assertEquals("no_index", fanInFlat.at("/source/reason").asText());
+
+            buildGraphIndex(c);
+
+            JsonNode fanIn = run(c, "fan_in", "graph_ds", "{\"min\":2}", true);
+            assertEquals("index", fanIn.at("/source/kind").asText(), fanIn.toString());
+            assertEquals(List.of(B + "|3|3|", A + "|2|2|", C + "|2|2|"), table(fanIn, "entity", "counterparts", "links"));
+            assertEquals(table(fanInFlat, "entity", "counterparts", "links"), table(fanIn, "entity", "counterparts", "links"));
+            JsonNode fanOut = run(c, "fan_out", "graph_ds", "{\"min\":1}", true);
+            assertEquals(table(fanOutFlat, "entity", "counterparts", "links"), table(fanOut, "entity", "counterparts", "links"));
+            JsonNode capped = run(c, "fan_out", "graph_ds", "{\"min\":1,\"top\":1}", true);
+            assertEquals(1, capped.get("count").asInt());
+            assertTrue(capped.get("truncated").asBoolean(), capped.toString());
+
+            JsonNode fresh = run(c, "newcomers", "graph_ds", "{\"min\":3}", true);
+            assertEquals("index", fresh.at("/source/kind").asText(), fresh.toString());
+            assertEquals("ts", fresh.at("/source/timeColumn").asText());
+            // the index counts each side apart (a counterpart on both sides twice, self-links in): the answer says so
+            assertTrue(fresh.at("/source/counting").asText().contains("both sides twice"), fresh.toString());
+            assertEquals("Counterparts in + out (each side counted)", fresh.get("columns").get(3).get("label").asText());
+            assertEquals(table(newFlat, "entity", "links", "counterparts"), table(fresh, "entity", "links", "counterparts"));
+
+            // Two-way pairs folds every link, which the index does not hold: always the Dataset
+            JsonNode notThere = run(c, "two_way", "graph_ds", "{}", true);
+            assertEquals("dataset", notThere.at("/source/kind").asText());
         }
     }
 

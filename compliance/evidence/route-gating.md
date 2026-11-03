@@ -258,7 +258,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:163` |
 | POST | `/inv/pattern/branching` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java:73` |
 | POST | `/inv/pattern/temporal` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java:74` |
-| POST | `/inv/presets/([^/]+)/run` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PresetRoutes.java:59` |
+| POST | `/inv/presets/([^/]+)/run` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PresetRoutes.java:60` |
 | POST | `/inv/projection` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:97` |
 | POST | `/inv/projection/multi` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:100` |
 | POST | `/inv/projection/neighbors` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java:98` |

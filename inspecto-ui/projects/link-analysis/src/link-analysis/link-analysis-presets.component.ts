@@ -10,7 +10,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { InvService, PresetList, PresetQuery, PresetRunResult } from '@inspecto/link-analysis/api/inv.service';
-import { PRESET_PATTERNS, presetColumns, presetEntityValues, presetParamValues } from './presets';
+import { PRESET_PATTERNS, presetColumns, presetEntityValues, presetParamValues, presetSourceLine } from './presets';
 
 /** What *Draw these* asks the host to start: the Dataset, the entities, and what they are in words. */
 export interface PresetDraw {
@@ -99,6 +99,9 @@ export interface PresetDraw {
                         Only the first {{ r.count }} rows are shown. Raise a minimum or ask for fewer rows.
                     </inspecto-alert>
                 }
+                @if (sourceLine(); as line) {
+                    <p class="text-secondary m-0 text-xs" data-testid="la-presets-source">{{ line }}</p>
+                }
                 <inspecto-data-table
                     [rows]="r.rows"
                     [columns]="columns()"
@@ -158,6 +161,7 @@ export class LinkAnalysisPresetsComponent {
         (this.chosen()?.params ?? []).filter((q) => q.type !== 'kinds' || !!this.list()?.roles.kind),
     );
     readonly columns = computed(() => presetColumns(this.result()));
+    readonly sourceLine = computed(() => presetSourceLine(this.result()));
     readonly drawValues = computed(() => presetEntityValues(this.result()));
 
     private loading?: Subscription;

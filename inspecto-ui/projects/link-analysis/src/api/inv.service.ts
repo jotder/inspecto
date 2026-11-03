@@ -1543,6 +1543,15 @@ export interface PresetRunResult {
     count: number;
     truncated: boolean;
     masking?: { mode: string; masked: boolean; basis?: string };
+    /** What answered: the link index (`version`, `stale`) or the Dataset (`reason` the index did not). */
+    source?: {
+        kind: 'index' | 'dataset';
+        version?: number;
+        stale?: boolean;
+        staleReason?: string;
+        reason?: string;
+        approximate?: string;
+    };
 }
 
 /** `POST …/alert-rules` for a value Measure: fires when ≥ 1 entity breaches (comparator/threshold are the server's). */

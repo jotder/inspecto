@@ -251,6 +251,36 @@ class IndexAppendTest {
     }
 
     @Test
+    void theNodesTableOfAnAppendedVersionIsSummedPerEntityExactForEdgesAnUpperBoundForLinks(@TempDir Path tmp) throws Exception {
+        Path data = tmp.resolve("data");
+        plant(data);
+        IndexBuilder.Result full = build(tmp.resolve("full"), data, IndexBuilder.Mode.FULL, FILES, null);
+        Path inc = tmp.resolve("inc");
+        build(inc, data, IndexBuilder.Mode.FULL, 3, null);
+        IndexBuilder.Result appended = buildOver(inc, data, IndexBuilder.Mode.APPEND, names(0, FILES), null);
+        try (IndexReader a = open(full); IndexReader b = open(appended)) {
+            assertTrue(a.exactLinks());
+            assertFalse(b.exactLinks(), "an appended version sums its delta rows");
+            for (IndexReader.NodeRank rank : IndexReader.NodeRank.values()) {
+                Map<String, IndexReader.NodeStat> want = new java.util.HashMap<>(), got = new java.util.HashMap<>();
+                for (IndexReader.NodeStat n : a.rankNodes(rank, 0, 1_000_000)) want.put(n.id(), n);
+                for (IndexReader.NodeStat n : b.rankNodes(rank, 0, 1_000_000)) got.put(n.id(), n);
+                assertEquals(want.keySet(), got.keySet(), "one row per entity after summing: " + rank);
+                for (var e : want.entrySet()) {
+                    IndexReader.NodeStat w = e.getValue(), g = got.get(e.getKey());
+                    assertEquals(w.outEdges(), g.outEdges(), e.getKey());
+                    assertEquals(w.inEdges(), g.inEdges(), e.getKey());
+                    assertTrue(g.outLinks() >= w.outLinks() && g.inLinks() >= w.inLinks(), "links are an upper bound: " + e.getKey());
+                    assertEquals(w.firstSeen(), g.firstSeen(), e.getKey());
+                }
+            }
+            // the newest-days window answers the same entities either way when it spans the whole corpus
+            assertEquals(a.newcomers(3660, 0, 1_000_000).stream().map(IndexReader.NodeStat::id).sorted().toList(),
+                    b.newcomers(3660, 0, 1_000_000).stream().map(IndexReader.NodeStat::id).sorted().toList());
+        }
+    }
+
+    @Test
     void compactionMergesTheDeltasIntoOneSortedMainWithTheSameAnswers(@TempDir Path tmp) throws Exception {
         Path data = tmp.resolve("data");
         plant(data);

@@ -8,6 +8,7 @@ import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.LinkEventTypes;
+import com.gamma.la.storage.IndexReader;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -57,6 +58,81 @@ public final class PresetRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/inv/presets", (e, m) -> list(api, e));
         api.post("/inv/presets/([^/]+)/run", (e, m) -> run(api, e, m.group(1), api.body(e)));
+    }
+
+    /** The presets the link index's {@code nodes} table can answer without scanning a link. */
+    private static final java.util.Set<String> INDEX_SERVED = java.util.Set.of("fan_in", "fan_out", "newcomers");
+
+    /** An index answer ({@code rows} set), or only the {@code source} saying why the Dataset answers instead. */
+    private record Answer(List<PresetQueries.Column> columns, List<Map<String, Object>> rows, boolean truncated,
+                          Map<String, Object> source) {}
+
+    /**
+     * Reached by many, Reaching many and Newcomers read the {@code nodes} table of a link index published for the Dataset's From
+     * and To - through {@link IndexedRead#select}, so the Space's index switch and the staleness refusal apply exactly as they do
+     * for exploration. A kinds filter (not in that table), no index, or a refused one: null rows, and the Dataset answers.
+     * {@code null} for every other preset.
+     */
+    private static Answer fromIndex(ApiContext api, Path writeRoot, Target t, PresetQueries.Preset p, Map<String, String> given,
+                                    int limit) throws SQLException, java.io.IOException {
+        if (!INDEX_SERVED.contains(p.id())) return null;
+        if (p.param("kinds") != null && !PresetQueries.kinds(PresetQueries.value(p, given, "kinds")).isEmpty())
+            return new Answer(null, null, false, IndexedRead.Outcome.flat(IndexedRead.Reason.filter_not_indexed,
+                    "the index's per-entity table does not split links by kind").source());
+        boolean newcomers = p.id().equals("newcomers");
+        IndexedRead.Selection sel = IndexedRead.select(writeRoot, api.dataRoot(), t.relationSql(), t.datasetId(), t.roles().from(),
+                t.roles().to(), (m, utc) -> newcomers && m.timeColumn() == null
+                        ? IndexedRead.Fitted.no(IndexedRead.Reason.column_not_indexed) : IndexedRead.Fitted.ok(null));
+        if (!sel.usable()) return new Answer(null, null, false, sel.flat().source());
+        List<IndexReader.NodeStat> stats;
+        List<PresetQueries.Column> columns;
+        boolean exact;
+        try (IndexReader rd = IndexReader.borrow(sel.dir(), sel.manifest(), InvRoutes.traversalPolicy(writeRoot))) {
+            exact = rd.exactLinks();
+            long min = (long) Math.ceil(PresetQueries.number(p, given, "min"));
+            if (newcomers) {
+                stats = rd.newcomers(PresetQueries.wholeDays(PresetQueries.number(p, given, "days")), min, limit + 1);
+                // the index counts each side apart: a counterpart on both sides counts twice, per kind of link, self-links in
+                columns = List.of(new PresetQueries.Column("entity", "Entity", true),
+                        new PresetQueries.Column("first_seen", "First seen", false),
+                        new PresetQueries.Column("links", "Links in and out", false),
+                        new PresetQueries.Column("counterparts", "Counterparts in + out (each side counted)", false));
+            } else {
+                stats = rd.rankNodes(p.id().equals("fan_in") ? IndexReader.NodeRank.IN_LINKS : IndexReader.NodeRank.OUT_LINKS, min,
+                        limit + 1);
+                columns = List.of(new PresetQueries.Column("entity", "Entity", true),
+                        new PresetQueries.Column("counterparts", sel.manifest().mapping().kindColumn() == null
+                                ? "Distinct counterparts" : "Distinct counterparts (per kind of link)", false),
+                        new PresetQueries.Column("links", "Links", false));
+            }
+        } catch (SQLException | java.io.IOException | IllegalStateException unreadable) {
+            // as every indexed read does: the Dataset answers, and says why
+            return new Answer(null, null, false, IndexedRead.Outcome.flat(IndexedRead.Reason.index_read_failed,
+                    "the index could not be read: " + unreadable.getMessage()).source());
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (IndexReader.NodeStat n : stats.subList(0, Math.min(limit, stats.size()))) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("entity", n.id());
+            if (newcomers) {
+                r.put("first_seen", n.firstSeen() == null ? null : n.firstSeen().toString());
+                r.put("links", n.outEdges() + n.inEdges());
+                r.put("counterparts", n.outLinks() + n.inLinks());
+            } else {
+                boolean in = p.id().equals("fan_in");
+                r.put("counterparts", in ? n.inLinks() : n.outLinks());
+                r.put("links", in ? n.inEdges() : n.outEdges());
+            }
+            rows.add(r);
+        }
+        Map<String, Object> source = new LinkedHashMap<>(sel.served(rows).source());
+        if (newcomers) {
+            source.put("timeColumn", sel.manifest().mapping().timeColumn());
+            source.put("counting", "as the index counts: links in and out separately, a counterpart on both sides twice, "
+                    + "per kind of link, self-links included");
+        }
+        if (!exact) source.put("approximate", "the index has appended deltas: link counts are summed across them, an upper bound");
+        return new Answer(columns, rows, stats.size() > limit, source);
     }
 
     /** What a Dataset is, for presets: its relation, its roles, and the Space's pack. */
@@ -123,8 +199,15 @@ public final class PresetRoutes implements RouteModule {
         List<PresetQueries.Column> columns;
         List<Map<String, Object>> rows;
         boolean truncated;
+        Map<String, Object> source = Map.of("kind", "dataset");
         try {
-            if (p.measure() != null) {
+            Answer indexed = fromIndex(api, writeRoot, t, p, given, Math.min(PresetQueries.top(p, given), fences.maxEntities()));
+            if (indexed != null) source = indexed.source();
+            if (indexed != null && indexed.rows() != null) {
+                columns = indexed.columns();
+                rows = indexed.rows();
+                truncated = indexed.truncated();
+            } else if (p.measure() != null) {
                 Map<String, Object> block = new LinkedHashMap<>();
                 block.put("name", p.measure());
                 block.put("valueCol", t.roles().amount());
@@ -193,6 +276,7 @@ public final class PresetRoutes implements RouteModule {
         out.put("count", shown.size());
         out.put("truncated", truncated);
         out.put("masking", mask.describe());
+        out.put("source", source);
         try {
             EventSink.current().emit(Event.builder(LinkEventTypes.LINK_PRESET_RUN).source("inv")
                     .message("link.preset.run — " + p.id() + " over " + datasetId)

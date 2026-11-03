@@ -42,12 +42,17 @@ public final class IndexReader implements AutoCloseable {
 
     private final SqlSandbox sandbox;
     private final int buckets;
+    /** The version has a {@code nodes} table (every build writes one) and whether delta files sit beside its main ones. */
+    private final boolean hasNodes;
+    private final boolean deltas;
     /** Non-null for a reader lent by {@link #borrow}: {@link #close()} then returns it to the pool instead of closing it. */
     private Path pooledKey;
 
-    private IndexReader(SqlSandbox sandbox, int buckets) {
+    private IndexReader(SqlSandbox sandbox, int buckets, boolean hasNodes, boolean deltas) {
         this.sandbox = sandbox;
         this.buckets = buckets;
+        this.hasNodes = hasNodes;
+        this.deltas = deltas;
     }
 
     // ── the pool: idle sealed readers per version directory (LA-INDEX-READER-POOL-1) ─────────────────────────────
@@ -122,13 +127,18 @@ public final class IndexReader implements AutoCloseable {
                     String glob = SqlIdent.pathStr(versionDir.toAbsolutePath().normalize(), "/" + table + "/*/*.parquet");
                     st.execute("CREATE VIEW e_" + table + " AS SELECT * FROM " + SqlViews.parquet(glob, false, SqlViews.Hive.TYPED));
                 }
+                if (java.nio.file.Files.isDirectory(versionDir.resolve("nodes"))) {
+                    String glob = SqlIdent.pathStr(versionDir.toAbsolutePath().normalize(), "/nodes/*/*.parquet");
+                    st.execute("CREATE VIEW n_nodes AS SELECT * FROM " + SqlViews.parquet(glob, false, SqlViews.Hive.TYPED));
+                }
             }
             SqlSandbox.sealAllowing(sandbox.connection(), List.of(versionDir));
         } catch (SQLException | RuntimeException e) {
             sandbox.close();
             throw e;
         }
-        return new IndexReader(sandbox, manifest.buckets());
+        return new IndexReader(sandbox, manifest.buckets(), java.nio.file.Files.isDirectory(versionDir.resolve("nodes")),
+                manifest.deltas() != null && !manifest.deltas().isEmpty());
     }
 
     /**
@@ -376,6 +386,64 @@ public final class IndexReader implements AutoCloseable {
             }
         }
         return new KeyLinks(degree, kinds);
+    }
+
+    /**
+     * One entity's row of the {@code nodes} table: its edge rows and its distinct {@code (neighbour, kind)} links on each side,
+     * and the first time it was seen. Over a version with deltas an entity's main and delta rows are SUMMED, so the link counts
+     * are then an upper bound ({@link #exactLinks()} says which).
+     */
+    public record NodeStat(String id, long outEdges, long inEdges, long outLinks, long inLinks, java.time.LocalDateTime firstSeen) { }
+
+    /** Which side's distinct links rank the entities. */
+    public enum NodeRank { IN_LINKS, OUT_LINKS }
+
+    /** False when the version has deltas: an entity's link counts are then summed across files, an upper bound. */
+    public boolean exactLinks() {
+        return !deltas;
+    }
+
+    /**
+     * The entities with the most distinct links on one side, from the {@code nodes} table (no edge scan): at least {@code min},
+     * highest first, then by id, at most {@code limit} rows. Refused when the version has no {@code nodes} table.
+     */
+    public List<NodeStat> rankNodes(NodeRank rank, long min, int limit) throws SQLException {
+        String col = rank == NodeRank.IN_LINKS ? "in_links" : "out_links";
+        return nodeStats("n." + col + " >= ?", "n." + col + " DESC, n.id", List.of(min), limit);
+    }
+
+    /**
+     * The entities first seen within {@code days} days before the newest link of the index (its data, not the calendar) that
+     * already have at least {@code minEdges} edge rows, the busiest first, at most {@code limit} rows.
+     */
+    public List<NodeStat> newcomers(int days, long minEdges, int limit) throws SQLException {
+        return nodeStats("n.first_seen > (SELECT max(last_ts) FROM n_nodes) - to_days(CAST(? AS INTEGER)) AND n.out_edges + n.in_edges >= ?",
+                "n.out_edges + n.in_edges DESC, n.id", List.of(days, minEdges), limit);
+    }
+
+    /** Fixed SQL over {@code n_nodes}; {@code where} and {@code order} are this class's own text, every value a bind. */
+    private List<NodeStat> nodeStats(String where, String order, List<Object> binds, int limit) throws SQLException {
+        if (!hasNodes) throw new IllegalStateException("this index version has no nodes table");
+        String rows = deltas
+                ? "SELECT id, sum(out_edges) AS out_edges, sum(in_edges) AS in_edges, sum(out_links) AS out_links,"
+                  + " sum(in_links) AS in_links, min(first_ts) AS first_seen FROM n_nodes WHERE id IS NOT NULL GROUP BY id"
+                : "SELECT id, out_edges, in_edges, out_links, in_links, first_ts AS first_seen FROM n_nodes WHERE id IS NOT NULL";
+        String sql = "SELECT n.id, n.out_edges, n.in_edges, n.out_links, n.in_links, n.first_seen FROM (" + rows + ") n WHERE " + where
+                + " ORDER BY " + order + " LIMIT ?";
+        List<NodeStat> out = new ArrayList<>();
+        try (PreparedStatement ps = sandbox.preparedStatement(sql)) {
+            int i = 1;
+            for (Object b : binds) ps.setObject(i++, b);
+            ps.setInt(i, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    java.sql.Timestamp ts = rs.getTimestamp(6);
+                    out.add(new NodeStat(rs.getString(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5),
+                            ts == null ? null : ts.toLocalDateTime()));
+                }
+            }
+        }
+        return out;
     }
 
     /** The sealed connection, for the test that proves it cannot read outside the version directory. */

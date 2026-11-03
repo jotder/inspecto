@@ -9,7 +9,7 @@ import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/gri
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvService, PresetList, PresetRunResult } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisPresetsComponent, PresetDraw } from './link-analysis-presets.component';
-import { presetColumns, presetEntityValues, presetNumber, presetParamValues } from './presets';
+import { presetColumns, presetEntityValues, presetNumber, presetParamValues, presetSourceLine } from './presets';
 
 const LIST: PresetList = {
     dataset: 'pays',
@@ -102,6 +102,16 @@ describe('preset helpers', () => {
         ]);
         expect(presetEntityValues(null)).toEqual([]);
         expect(presetParamValues({ min: ' 3 ', top: '', entity: null })).toEqual({ min: '3' });
+    });
+
+    it('says when the link index answered, and when it is behind; the Dataset needs no line', () => {
+        expect(presetSourceLine({ ...ANSWER, source: { kind: 'dataset', reason: 'no_index' } })).toBe('');
+        expect(presetSourceLine({ ...ANSWER, source: { kind: 'index', version: 73, stale: false } })).toBe(
+            'Answered from the link index (version 73).',
+        );
+        expect(presetSourceLine({ ...ANSWER, source: { kind: 'index', version: 4, stale: true, staleReason: '2 files added' } })).toContain(
+            'behind the data (2 files added)',
+        );
     });
 
     it('reads a measure with at most two decimals and leaves entity columns as they are', () => {

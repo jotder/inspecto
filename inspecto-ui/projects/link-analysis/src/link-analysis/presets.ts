@@ -37,6 +37,15 @@ export function presetEntityValues(r: PresetRunResult | null): string[] {
     return [...out];
 }
 
+/** Where the answer came from, in one line: the link index (and whether it is behind), else nothing - the Dataset is the default. */
+export function presetSourceLine(r: PresetRunResult | null): string {
+    const s = r?.source;
+    if (!s || s.kind !== 'index') return '';
+    const behind = s.stale ? ` It is behind the data (${s.staleReason ?? 'files were added since it was built'}).` : '';
+    const approx = s.approximate ? ' Counts are an upper bound: the index has appended parts.' : '';
+    return `Answered from the link index (version ${s.version}).${behind}${approx}`;
+}
+
 /** A number parameter: a plain non-negative number. A window: `<N>h` or `<N>d`. */
 export const PRESET_PATTERNS: Partial<Record<PresetParam['type'], RegExp>> = {
     number: /^\d+(\.\d+)?$/,

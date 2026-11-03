@@ -145,3 +145,28 @@ by many, Reaching many, Two-way pairs, Short loops, Newcomers, Biggest senders, 
 Panel fixes from the live drive: the Dataset is preselected by the Start box's rule (the page's, else a valid pick, else
 the first), and a measure shows at most two decimals (`presetNumber`). Not done: Bridges, Shared counterparts and
 Bursts (listed in the conversation's proposal) - left for P4 or a later row if asked.
+
+### 7.2 Presets read the link index (2026-11-03, operator: "use the index")
+
+Found on the Basic install: over IMS (`ims_links_dataset`, 39.4 M links) EVERY preset read of the Dataset, Reached by many
+included, ran past the Space's 10 s statement timeout, and Short loops ran out of DuckDB memory. The published link index
+is NOT folded - `out`/`in` hold every link - but its `nodes` table holds per entity `out_edges`, `in_edges`, `out_links`,
+`in_links` (distinct `(neighbour, kind)`), `first_ts`, `last_ts`. So:
+
+- **Reached by many, Reaching many, Newcomers** read `nodes` (`IndexReader.rankNodes` / `newcomers`, fixed SQL, bound
+  values) when a CURRENT index exists for the Dataset's From and To, through `IndexedRead.select` - the Space's index switch
+  and the staleness refusal apply as for exploration; a stale-but-servable index answers flagged. Measured on IMS: 0.2 s
+  and 0.5 s. A kinds filter is not in `nodes`, so it reads the Dataset (`source.reason: filter_not_indexed`). Newcomers uses
+  the index's own time column (`source.timeColumn`).
+- With appended deltas an entity has several `nodes` rows; they are summed (5.5 s on IMS) and the link counts are then an
+  upper bound (`source.approximate`). Without deltas the rows are read as they are.
+- **Two-way pairs, Short loops** need every link folded: 48 s and out of memory even over the index. They stay on the
+  Dataset and time out on IMS-sized data. Making them fast needs a folded pair table written at index build - not done.
+- Every answer carries `source` (`{kind: index, version, stale…}` or `{kind: dataset, reason}`); the panel says when the
+  index answered and when it is behind.
+- **Counting differs, and is said.** Newcomers from the index counts each side apart: `links` = edges in + out (self-links
+  included), `counterparts` = `out_links + in_links` (a counterpart on both sides twice, per kind of link); the column
+  label and `source.counting` say so. Reached by many / Reaching many label their count "per kind of link" when the index
+  has a kind column. An index read that fails (no `nodes` table, a read error) falls back to the Dataset with
+  `source.reason: index_read_failed`, as every indexed read does. The summed-delta path is pinned by
+  `IndexAppendTest.theNodesTableOfAnAppendedVersionIsSummedPerEntity…` (edges exact, links an upper bound).
