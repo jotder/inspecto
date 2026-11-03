@@ -48,7 +48,7 @@ export interface LinkAnalysisCommentsData {
                 >.
             </div>
             <form class="mb-4 flex items-start gap-3" (ngSubmit)="addComment()">
-                <mat-form-field class="flex-auto" subscriptSizing="dynamic">
+                <mat-form-field class="flex-auto" subscriptSizing="dynamic"><!-- form-allow: a message composer, not a record value -->
                     <mat-label>Add a comment</mat-label>
                     <textarea
                         matInput

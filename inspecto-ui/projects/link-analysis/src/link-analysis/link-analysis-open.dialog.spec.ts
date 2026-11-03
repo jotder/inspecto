@@ -113,6 +113,17 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         expect(c.viewRows().map((r) => r.view.id)).toEqual(['transfers']);
     });
 
+    it('the Changed filter reads its picker value as a number of days ("0" is any time)', async () => {
+        const { c, settle } = create();
+        await settle();
+        c.days.setValue('1'); // both views changed on 2026-10-20: not today
+        await settle();
+        expect(c.viewRows()).toEqual([]);
+        c.days.setValue('0');
+        await settle();
+        expect(c.viewRows().length).toBe(2);
+    });
+
     it('renames (an update of the same id), duplicates (a create under a fresh id) and deletes (after a confirm)', async () => {
         const { c, components, settle } = create();
         await settle();

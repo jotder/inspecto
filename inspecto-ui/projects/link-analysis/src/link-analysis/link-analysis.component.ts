@@ -67,6 +67,7 @@ import {
     MultiProjectionMappingSummary,
 } from '@inspecto/link-analysis/api/inv.service';
 import { OfferShareDialog, OfferShareResult } from '@inspecto/core/components/offer-share.dialog';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
@@ -519,6 +520,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
+        PenFieldComponent,
         MatMenuModule,
         MatDividerModule,
         MatSliderModule,
@@ -4831,6 +4833,15 @@ Its prior copies stay in its version history.`,
     }
 
     // ── saved views ──
+
+    /** The save-view name row's error line, once the row was left or Save view was pressed. */
+    protected viewNameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A name is required.';
+        if (c.hasError('duplicate')) return 'A view with this name already exists.';
+        return '';
+    }
 
     async saveView(): Promise<void> {
         if (this.viewSaveBlocked()) return;

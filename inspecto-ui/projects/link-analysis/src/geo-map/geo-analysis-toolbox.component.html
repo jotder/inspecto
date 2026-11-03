@@ -16,42 +16,36 @@
                 <mat-button-toggle value="frequent">Frequent locations</mat-button-toggle>
                 <mat-button-toggle value="stay">Stay points</mat-button-toggle>
             </mat-button-toggle-group>
-            <mat-form-field subscriptSizing="dynamic" class="w-32">
-                <mat-label>Radius (m)</mat-label>
-                <input
-                    matInput
-                    type="number"
-                    min="10"
-                    [value]="radiusM()"
-                    (input)="radiusM.set(+$any($event.target).value || 250)"
-                    aria-label="Radius in meters"
-                />
-            </mat-form-field>
+            <inspecto-pen-field
+                class="w-40"
+                label="Radius (m)"
+                type="number"
+                [min]="10"
+                [default]="250"
+                ariaLabel="Radius in meters"
+                [formControl]="params.controls.radiusM"
+            ></inspecto-pen-field>
             @if (analysisTool() === 'coloc') {
-                <mat-form-field subscriptSizing="dynamic" class="w-36">
-                    <mat-label>Window (min)</mat-label>
-                    <input
-                        matInput
-                        type="number"
-                        min="1"
-                        [value]="windowMin()"
-                        (input)="windowMin.set(+$any($event.target).value || 60)"
-                        aria-label="Time window in minutes"
-                    />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="w-44"
+                    label="Window (min)"
+                    type="number"
+                    [min]="1"
+                    [default]="60"
+                    ariaLabel="Time window in minutes"
+                    [formControl]="params.controls.windowMin"
+                ></inspecto-pen-field>
             }
             @if (analysisTool() === 'stay') {
-                <mat-form-field subscriptSizing="dynamic" class="w-36">
-                    <mat-label>Min dwell (min)</mat-label>
-                    <input
-                        matInput
-                        type="number"
-                        min="1"
-                        [value]="dwellMin()"
-                        (input)="dwellMin.set(+$any($event.target).value || 30)"
-                        aria-label="Minimum dwell in minutes"
-                    />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="w-44"
+                    label="Min dwell (min)"
+                    type="number"
+                    [min]="1"
+                    [default]="30"
+                    ariaLabel="Minimum dwell in minutes"
+                    [formControl]="params.controls.dwellMin"
+                ></inspecto-pen-field>
             }
             <button mat-stroked-button (click)="runAnalysis()">
                 <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>

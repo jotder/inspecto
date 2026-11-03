@@ -151,7 +151,7 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                             help="Pick what you are looking for first, then type it."
                             formControlName="entityType"
                         ></inspecto-option-picker>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                        <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a typeahead over the Dataset values -->
                             <mat-label>{{ typeLabel() || 'Value' }}</mat-label>
                             <input
                                 matInput
@@ -217,7 +217,7 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                             [options]="typeOptions()"
                             formControlName="entityType"
                         ></inspecto-option-picker>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                        <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a many-line paste box, not one value -->
                             <mat-label>Values, one per line</mat-label>
                             <textarea
                                 matInput

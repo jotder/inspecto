@@ -54,7 +54,7 @@
                 <mat-menu #searchMenu="matMenu">
                     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div class="p-3" (click)="$event.stopPropagation()">
-                        <mat-form-field subscriptSizing="dynamic" class="w-64">
+                        <mat-form-field subscriptSizing="dynamic" class="w-64"><!-- form-allow: a live search box -->
                             <mat-label>Search points</mat-label>
                             <input
                                 matInput
@@ -78,7 +78,7 @@
                         (click)="$event.stopPropagation()"
                         aria-label="Find place"
                     >
-                        <mat-form-field subscriptSizing="dynamic">
+                        <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a live search box -->
                             <mat-label>Find place</mat-label>
                             <input
                                 matInput
@@ -224,17 +224,15 @@
                             </p>
                         }
                         @if (activeTool() === 'radius') {
-                            <mat-form-field subscriptSizing="dynamic" class="w-36">
-                                <mat-label>Radius (m)</mat-label>
-                                <input
-                                    matInput
-                                    type="number"
-                                    min="10"
-                                    [value]="searchRadiusM()"
-                                    (input)="searchRadiusM.set(+$any($event.target).value || 1000)"
-                                    aria-label="Search radius in meters"
-                                />
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="w-44"
+                                label="Radius (m)"
+                                type="number"
+                                [min]="10"
+                                [default]="1000"
+                                ariaLabel="Search radius in meters"
+                                [formControl]="toolForm.controls.searchRadiusM"
+                            ></inspecto-pen-field>
                             @if (radiusCenter()) {
                                 <p class="text-sm">
                                     <b>{{ radiusHits().length }}</b> points within {{ fmtDistance(searchRadiusM()) }}
@@ -252,16 +250,12 @@
                             </button>
                         }
                         @if (activeTool() === 'note') {
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Note text</mat-label>
-                                <input
-                                    matInput
-                                    [value]="noteText()"
-                                    (input)="noteText.set($any($event.target).value)"
-                                    placeholder="e.g. suspected meeting point"
-                                    aria-label="Note text"
-                                />
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                label="Note text"
+                                placeholder="e.g. suspected meeting point"
+                                help="Then click the map where the note goes"
+                                [formControl]="toolForm.controls.noteText"
+                            ></inspecto-pen-field>
                         }
                         <div class="flex gap-2">
                             @if (toolsActive()) {
@@ -439,20 +433,15 @@
                     (click)="$event.stopPropagation()"
                     aria-label="Save this view"
                 >
-                    <mat-form-field>
-                        <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" />
-                        @if (saveForm.controls.name.hasError('required')) {
-                            <mat-error>A name is required.</mat-error>
-                        }
-                        @if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A view with this name already exists.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field>
-                        <mat-label>Description (optional)</mat-label>
-                        <input matInput formControlName="description" />
-                    </mat-form-field>
+                    <div class="mb-2 flex flex-col gap-1">
+                        <inspecto-pen-field
+                            label="Name"
+                            [required]="true"
+                            formControlName="name"
+                            [error]="viewNameError()"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
+                    </div>
                     <button mat-stroked-button type="submit" [disabled]="saving() || !geo()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
                         Save view

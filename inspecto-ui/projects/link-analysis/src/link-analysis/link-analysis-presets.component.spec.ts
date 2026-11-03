@@ -153,19 +153,19 @@ describe('LinkAnalysisPresetsComponent', () => {
 
     it('refuses a bad number and a missing entity inline, without asking the server', () => {
         const { fixture, el, c, inv } = setup();
-        expect(el.querySelector('mat-error')).toBeNull();
+        expect(el.querySelector('inspecto-pen-field p[role="alert"]')).toBeNull();
         c.params.controls['min'].setValue('-1');
         c.run();
         fixture.detectChanges();
         expect(inv.runPreset).not.toHaveBeenCalled();
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain('A number of 0 or more');
+        expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain('A number of 0 or more');
 
         c.preset.setValue('counterparts');
         fixture.detectChanges();
         c.run();
         fixture.detectChanges();
         expect(inv.runPreset).not.toHaveBeenCalled();
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain('Required');
+        expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain('Required');
     });
 
     it('says when no preset fits the Dataset', () => {

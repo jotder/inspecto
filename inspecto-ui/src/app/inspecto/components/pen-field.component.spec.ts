@@ -38,6 +38,7 @@ class NotesHostComponent {
         <inspecto-pen-field label="From" type="date" [formControl]="dateCtl" />
         <inspecto-pen-field label="Fixed" [readOnly]="true" [formControl]="fixedCtl" />
         <inspecto-pen-field label="Off" [formControl]="offCtl" />
+        <inspecto-pen-field label="Expires" type="datetime-local" [formControl]="whenCtl" />
     `,
 })
 class TypingHostComponent {
@@ -46,6 +47,7 @@ class TypingHostComponent {
     dateCtl = new FormControl<string | null>(null);
     fixedCtl = new FormControl<string | null>('kept');
     offCtl = new FormControl<string | null>({ value: 'off', disabled: true });
+    whenCtl = new FormControl<string | null>(null);
 }
 
 @Component({
@@ -254,6 +256,13 @@ describe('PenFieldComponent', () => {
             press(valueButton(hosts[2]), '2');
             fixture.detectChanges();
             expect(hosts[2].querySelector('input')).toBeNull();
+            // a date-and-time field neither (UI-FORM-ROWS-1 P2); a click opens its native input
+            press(valueButton(hosts[5]), '2');
+            fixture.detectChanges();
+            expect(hosts[5].querySelector('input')).toBeNull();
+            valueButton(hosts[5]).click();
+            fixture.detectChanges();
+            expect((hosts[5].querySelector('input') as HTMLInputElement).type).toBe('datetime-local');
         });
 
         it('a read-only or disabled row does not open', () => {

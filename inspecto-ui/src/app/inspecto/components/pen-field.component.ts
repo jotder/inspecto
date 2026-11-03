@@ -125,7 +125,7 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class PenFieldComponent implements ControlValueAccessor {
     readonly label = input('');
-    readonly type = input<'text' | 'number' | 'date'>('text');
+    readonly type = input<'text' | 'number' | 'date' | 'datetime-local'>('text');
     /** A free-text note: edits in a two-row box (Shift+Enter breaks a line, Enter commits) and reads as wrapped text. */
     readonly multiline = input(false);
     readonly maxlength = input<number | null>(null);
@@ -208,12 +208,12 @@ export class PenFieldComponent implements ControlValueAccessor {
      * Typing on the closed row edits it (LA-ONBOARD-1 phase 0 follow-up): a keyboard user who tabs to the row and types
      * gets an open editor holding that key, as a spreadsheet cell does (the key REPLACES the value; Enter, Space or the
      * pencil open it keeping the value). Only a printable key with no Ctrl / Alt / Meta: shortcuts, Tab, arrows and the
-     * activation keys keep their meaning. A number field takes only a key a number can start with; a date field opens
-     * through its picker, never from one key.
+     * activation keys keep their meaning. A number field takes only a key a number can start with; a date (or date and
+     * time) field opens through its picker, never from one key.
      */
     protected typeToEdit(e: KeyboardEvent): void {
         if (e.key.length !== 1 || e.key === ' ' || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
-        if (this.type() === 'date') return;
+        if (this.type() === 'date' || this.type() === 'datetime-local') return;
         if (this.type() === 'number' && !/[0-9.+-]/.test(e.key)) return;
         if (this.readOnly() || this.disabled()) return;
         e.preventDefault();

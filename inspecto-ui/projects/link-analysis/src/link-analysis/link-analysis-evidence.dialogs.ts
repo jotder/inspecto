@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import { G6GraphData } from '@inspecto/core/graph';
@@ -46,6 +47,11 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
     return parts.length ? parts.join(` ${g.op} `) : 'none';
 }
 
+/** A required row's error line, shown once the row was left or the form submitted. */
+function requiredError(c: AbstractControl, message: string): string {
+    return c.touched && c.hasError('required') ? message : '';
+}
+
 /**
  * **Save this analysis** (spec §3.6 / plan S1.3, UI first). States the one distinction the product must
  * never blur: a saved view re-runs the question; a snapshot freezes the answer. Stranded nodes are
@@ -77,6 +83,7 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
         MatRadioModule,
         InspectoAlertComponent,
         LinkAnalysisCaseFieldComponent,
+        PenFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>Save snapshot</h2>
@@ -86,17 +93,17 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
                     A <b>saved view</b> re-runs the question and may show a different graph tomorrow. A
                     <b>snapshot</b> freezes the answer as it is now, with a fingerprint of its content.
                 </inspecto-alert>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Title</mat-label>
-                    <input matInput formControlName="title" />
-                    @if (form.controls.title.hasError('required')) {
-                        <mat-error>A title is required.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Description</mat-label>
-                    <textarea matInput formControlName="description" rows="2"></textarea>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Title"
+                    [required]="true"
+                    formControlName="title"
+                    [error]="requiredError(form.controls.title, 'A title is required.')"
+                ></inspecto-pen-field>
+                <inspecto-pen-field
+                    label="Description"
+                    [multiline]="true"
+                    formControlName="description"
+                ></inspecto-pen-field>
                 <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm" aria-label="Frozen content">
                     <dt class="text-secondary">Subgraph</dt>
                     <dd class="m-0">
@@ -140,19 +147,18 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
                         ></inspecto-link-analysis-case-field>
                     </div>
                     @if (creatingCase()) {
-                        <mat-form-field subscriptSizing="dynamic" class="w-full">
-                            <mat-label>Case title</mat-label>
-                            <input matInput [formControl]="caseForm.controls.title" />
-                            @if (caseForm.controls.title.hasError('required')) {
-                                <mat-error>A Case needs a title.</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Case title"
+                            [required]="true"
+                            [formControl]="caseForm.controls.title"
+                            [error]="requiredError(caseForm.controls.title, 'A Case needs a title.')"
+                        ></inspecto-pen-field>
                         <p class="text-secondary my-2 text-xs">
                             Each picked node becomes an Incident the new Case contains. A node minted before — the same
                             Entity from the same Dataset — is reused, not duplicated.
                         </p>
                         @if (candidates.length >= 8) {
-                            <mat-form-field subscriptSizing="dynamic" class="w-full">
+                            <mat-form-field subscriptSizing="dynamic" class="w-full"><!-- form-allow: a filter over the list below -->
                                 <mat-label>Filter nodes</mat-label>
                                 <input matInput [value]="pickFilter()" (input)="onFilter($event)" />
                             </mat-form-field>
@@ -205,6 +211,7 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
     `,
 })
 export class LinkAnalysisSnapshotDialog {
+    protected readonly requiredError = requiredError;
     readonly data = inject<SnapshotDialogData>(MAT_DIALOG_DATA);
     private readonly ref = inject<MatDialogRef<LinkAnalysisSnapshotDialog, GraphSnapshot | undefined>>(MatDialogRef);
     private readonly confirm = inject(InspectoConfirmService);
@@ -454,11 +461,10 @@ export interface AttachCaseResult {
         MatButtonModule,
         MatCheckboxModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
         MatRadioModule,
         InspectoAlertComponent,
         LinkAnalysisCaseFieldComponent,
+        PenFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>Attach to Case</h2>
@@ -468,13 +474,12 @@ export interface AttachCaseResult {
                     Seals the analysis on screen ({{ frozenNodes }} nodes) as a snapshot with a fingerprint and attaches it
                     to the Case — one step, no separate save.
                 </p>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Snapshot title</mat-label>
-                    <input matInput formControlName="title" />
-                    @if (form.controls.title.hasError('required')) {
-                        <mat-error>A title is required.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Snapshot title"
+                    [required]="true"
+                    formControlName="title"
+                    [error]="requiredError(form.controls.title, 'A title is required.')"
+                ></inspecto-pen-field>
                 <mat-radio-group formControlName="mode" class="flex flex-col gap-1" aria-label="Which Case">
                     <mat-radio-button value="existing">An existing Case</mat-radio-button>
                     <mat-radio-button value="new" [disabled]="createUnavailable() !== '' || createUncertain()">
@@ -495,13 +500,12 @@ export interface AttachCaseResult {
                     }
                 </div>
                 @if (creatingCase()) {
-                    <mat-form-field subscriptSizing="dynamic" class="w-full">
-                        <mat-label>Case title</mat-label>
-                        <input matInput formControlName="caseTitle" />
-                        @if (form.controls.caseTitle.hasError('required')) {
-                            <mat-error>A Case needs a title.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Case title"
+                        [required]="true"
+                        formControlName="caseTitle"
+                        [error]="requiredError(form.controls.caseTitle, 'A Case needs a title.')"
+                    ></inspecto-pen-field>
                     <ul class="m-0 max-h-48 list-none overflow-auto p-0" aria-label="Graph nodes to add to the Case">
                         @for (c of candidates; track c.nodeId) {
                             <li>
@@ -555,6 +559,7 @@ export interface AttachCaseResult {
     `,
 })
 export class LinkAnalysisAttachCaseDialog {
+    protected readonly requiredError = requiredError;
     readonly data = inject<AttachCaseDialogData>(MAT_DIALOG_DATA);
     private readonly ref = inject<MatDialogRef<LinkAnalysisAttachCaseDialog, AttachCaseResult | undefined>>(MatDialogRef);
     private readonly confirm = inject(InspectoConfirmService);

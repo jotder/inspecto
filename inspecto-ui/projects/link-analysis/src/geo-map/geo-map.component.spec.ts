@@ -310,7 +310,7 @@ describe('GeoMapComponent', () => {
 
         // radius search centered on pt:0 (pt:1 is ~2.4 km away, London far outside)
         c.setTool('radius');
-        c.searchRadiusM.set(5000);
+        c.toolForm.controls.searchRadiusM.setValue(5000);
         c.onMapClick({ lat: 23.81, lon: 90.41 });
         expect(c.radiusHits().map((h) => h.point.id)).toEqual(['pt:0', 'pt:1']);
         expect(c.overlay().features.some((f) => f.geometry.type === 'Polygon')).toBe(true);
@@ -330,7 +330,7 @@ describe('GeoMapComponent', () => {
         c.setTool('note');
         c.onMapClick({ lat: 23.81, lon: 90.41 }); // no text yet → ignored
         expect(c.notes()).toHaveLength(0);
-        c.noteText.set('meeting point');
+        c.toolForm.controls.noteText.setValue('meeting point');
         c.onMapClick({ lat: 23.81, lon: 90.41 });
         expect(c.notes()).toHaveLength(1);
         expect(c.overlay().features.some((f) => f.properties?.['label'] === 'meeting point')).toBe(true);
@@ -378,7 +378,7 @@ describe('GeoMapComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         c.setTool('note');
-        c.noteText.set('drop site');
+        c.toolForm.controls.noteText.setValue('drop site');
         c.onMapClick({ lat: 23.79, lon: 90.4 });
         c.setTool(null);
         c.saveForm.patchValue({ name: 'Annotated' });

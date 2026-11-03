@@ -151,7 +151,7 @@
                 <mat-menu #searchMenu="matMenu">
                     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div class="p-3" (click)="$event.stopPropagation()">
-                        <mat-form-field subscriptSizing="dynamic" class="w-64">
+                        <mat-form-field subscriptSizing="dynamic" class="w-64"><!-- form-allow: a live search box -->
                             <mat-label>Search nodes</mat-label>
                             <input
                                 #searchBox
@@ -325,20 +325,15 @@
                     <p class="m-0 mb-2 text-sm font-semibold">
                         Save view as
                     </p>
-                    <mat-form-field>
-                        <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" />
-                        @if (saveForm.controls.name.hasError('required')) {
-                            <mat-error>A name is required.</mat-error>
-                        }
-                        @if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A view with this name already exists.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field>
-                        <mat-label>Description (optional)</mat-label>
-                        <input matInput formControlName="description" />
-                    </mat-form-field>
+                    <div class="mb-2 flex flex-col gap-1">
+                        <inspecto-pen-field
+                            label="Name"
+                            [required]="true"
+                            formControlName="name"
+                            [error]="viewNameError()"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
+                    </div>
                     <p class="text-secondary m-0 mb-1 text-xs" data-testid="la-case-lists">{{ caseListsLine() }}</p>
                     <p class="text-secondary m-0 mb-2 text-xs leading-snug" data-testid="la-case-not-evidence">
                         <span class="text-warn font-semibold">Not evidence:</span> {{ savedViewNotice }}

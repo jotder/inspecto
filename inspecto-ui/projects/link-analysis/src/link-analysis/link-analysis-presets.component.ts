@@ -2,11 +2,10 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormRecord, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { InvService, PresetList, PresetQuery, PresetRunResult } from '@inspecto/link-analysis/api/inv.service';
@@ -31,10 +30,9 @@ export interface PresetDraw {
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         DataTableComponent,
     ],
     host: { class: 'block' },
@@ -72,18 +70,16 @@ export interface PresetDraw {
             }
             @if (chosen(); as p) {
                 <p class="text-secondary m-0 text-xs">{{ p.description }}</p>
-                <form class="flex flex-wrap items-start gap-3" [formGroup]="params" (ngSubmit)="run()" data-testid="la-presets-form">
+                <form class="flex flex-wrap items-start gap-x-4 gap-y-2" [formGroup]="params" (ngSubmit)="run()" data-testid="la-presets-form">
                     @for (q of shownParams(); track q.name) {
-                        <mat-form-field class="w-56" subscriptSizing="dynamic">
-                            <mat-label>{{ q.label }}</mat-label>
-                            <input matInput [formControlName]="q.name" [attr.data-testid]="'la-presets-param-' + q.name" />
-                            @if (params.controls[q.name]?.hasError('required')) {
-                                <mat-error>Required.</mat-error>
-                            }
-                            @if (params.controls[q.name]?.hasError('pattern')) {
-                                <mat-error>{{ q.type === 'window' ? 'A number of hours or days, e.g. 24h or 30d.' : 'A number of 0 or more.' }}</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            class="w-64"
+                            [label]="q.label"
+                            [formControlName]="q.name"
+                            [attr.data-testid]="'la-presets-param-' + q.name"
+                            [help]="q.type === 'window' ? 'Hours or days, e.g. 24h or 30d' : ''"
+                            [error]="paramError(q.name, q.type)"
+                        ></inspecto-pen-field>
                     }
                     <button mat-flat-button color="primary" type="submit" class="mt-1" [disabled]="busy()" data-testid="la-presets-run">
                         Ask
@@ -207,6 +203,15 @@ export class LinkAnalysisPresetsComponent {
             controls[q.name] = new FormControl<string | null>(q.default || null, v);
         }
         this.params = new FormRecord(controls);
+    }
+
+    /** A parameter row's error line, once the row was left or Ask was pressed. */
+    protected paramError(name: string, type: string): string {
+        const c = this.params.controls[name];
+        if (!c?.touched) return '';
+        if (c.hasError('required')) return 'Required.';
+        if (c.hasError('pattern')) return type === 'window' ? 'A number of hours or days, e.g. 24h or 30d.' : 'A number of 0 or more.';
+        return '';
     }
 
     run(): void {

@@ -21,6 +21,7 @@ import {
 import { needsPermission } from '@inspecto/core/api';
 import { AttributeSpec } from '@inspecto/core/component-model';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoDialogResizeDirective } from '@inspecto/core/components/dialog-resize.directive';
 import { datasetOptionLoader } from '@inspecto/core/components/entity-option-loaders';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -72,8 +73,7 @@ export interface SaveTemplateData {
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
     ],
@@ -135,13 +135,13 @@ export interface SaveTemplateData {
                     </inspecto-alert>
                 }
                 <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="save()">
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Title (optional)</mat-label>
-                        <input matInput formControlName="title" />
-                        @if (form.controls.title.hasError('maxlength')) {
-                            <mat-error>At most 200 characters.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Title"
+                        placeholder="optional"
+                        [maxlength]="200"
+                        formControlName="title"
+                        [error]="form.controls.title.touched && form.controls.title.hasError('maxlength') ? 'At most 200 characters.' : ''"
+                    ></inspecto-pen-field>
                     <!-- UIR-D9: an optional pack, for a Space that mixes verticals; blank = the Space's own -->
                     <inspecto-option-picker
                         label="Industry pack (optional)"
@@ -150,13 +150,13 @@ export interface SaveTemplateData {
                         help="Investigations started from this template read under this pack. Blank: the Space's pack."
                         data-testid="save-template-pack"
                     ></inspecto-option-picker>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Template id (optional — generated when blank)</mat-label>
-                        <input matInput formControlName="id" />
-                        @if (form.controls.id.hasError('pattern')) {
-                            <mat-error>{{ idHint }}</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Template id"
+                        placeholder="generated when blank"
+                        [mono]="true"
+                        formControlName="id"
+                        [error]="form.controls.id.touched && form.controls.id.hasError('pattern') ? idHint : ''"
+                    ></inspecto-pen-field>
                 </form>
             }
             @if (error()) {
@@ -544,8 +544,7 @@ export function alertRuleErrorMessage(err: unknown): string {
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
     ],
@@ -565,27 +564,25 @@ export function alertRuleErrorMessage(err: unknown): string {
                 <inspecto-alert variant="info" title="What a fired Alert discloses">{{ r.disclosure }}</inspecto-alert>
             } @else {
                 <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="bind()">
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Alert Rule name</mat-label>
-                        <input matInput formControlName="name" />
-                        @if (form.controls.name.hasError('required')) {
-                            <mat-error>A name is required.</mat-error>
-                        } @else if (form.controls.name.hasError('pattern')) {
-                            <mat-error>{{ idHint }}</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Alert Rule name"
+                        [required]="true"
+                        [mono]="true"
+                        formControlName="name"
+                        [error]="nameError()"
+                    ></inspecto-pen-field>
                     <inspecto-option-picker
                         label="Fire when the value is"
                         formControlName="comparator"
                         [options]="comparators"
                     ></inspecto-option-picker>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Threshold</mat-label>
-                        <input matInput type="number" formControlName="threshold" />
-                        @if (form.controls.threshold.hasError('required')) {
-                            <mat-error>A threshold is required.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Threshold"
+                        type="number"
+                        [required]="true"
+                        formControlName="threshold"
+                        [error]="form.controls.threshold.touched && form.controls.threshold.hasError('required') ? 'A threshold is required.' : ''"
+                    ></inspecto-pen-field>
                     <inspecto-option-picker
                         label="Severity"
                         formControlName="severity"
@@ -610,6 +607,15 @@ export function alertRuleErrorMessage(err: unknown): string {
     `,
 })
 export class WatchMeasureDialog {
+    /** The name row's error line, once the row was left or Create was pressed. */
+    protected nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A name is required.';
+        if (c.hasError('pattern')) return this.idHint;
+        return '';
+    }
+
     protected readonly measureLabel = investigationMeasureLabel;
     readonly data = inject<WatchMeasureData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<WatchMeasureDialog, InvestigationAlertRuleResult | undefined>);

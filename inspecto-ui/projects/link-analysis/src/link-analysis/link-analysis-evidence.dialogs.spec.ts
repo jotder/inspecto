@@ -120,7 +120,7 @@ describe('LinkAnalysisSnapshotDialog', () => {
         await fixture.componentInstance.save(); // empty title — refused, error rendered
         fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
-        expect(el.querySelector('mat-error')?.textContent).toContain('title');
+        expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain('title');
 
         fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });
         await fixture.componentInstance.save();
@@ -341,7 +341,7 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
         expect(close).not.toHaveBeenCalled();
         expect(el.textContent).toContain('The Case was not created');
         expect(el.textContent).toContain('missing capability canManageIncidents'); // the server's 403, verbatim
-        expect(el.querySelector<HTMLInputElement>('input[formcontrolname="title"]')?.disabled).toBe(true);
+        expect(el.querySelector<HTMLButtonElement>('inspecto-pen-field[formcontrolname="title"] button')?.disabled).toBe(true);
 
         fail = false;
         await fixture.componentInstance.save();

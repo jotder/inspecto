@@ -488,7 +488,7 @@ src/app/
   Pair it with `<inspecto-option-picker>` for a choice and the Link Analysis forms read as ONE idiom: **label ·
   value · ✎**, the input only while the row is edited (Enter / blur commits, Escape drops; a printable key typed on the
   focused CLOSED row opens it holding that key, spreadsheet-style, 2026-10-22). A `ControlValueAccessor`
-  (`formControlName` / `[formControl]` / `[(ngModel)]` as a `matInput` was), `type` `text | number | date`, `multiline`
+  (`formControlName` / `[formControl]` / `[(ngModel)]` as a `matInput` was), `type` `text | number | date | datetime-local`, `multiline`
   for a free-text note (Shift+Enter breaks a line), `maxlength`, `placeholder`, `default` (a ghost the → key accepts),
   `required` (the asterisk only), `[error]` (a host-rendered `role="alert"` line) and a public `focus()` for a host
   pointing at a missing value. ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
@@ -503,7 +503,7 @@ src/app/
   ⛔ **`lint:forms`** (`inspecto-ui/tools/check-form-idiom.mjs`, a CI guard and the pre-commit hook) refuses a new
   `<mat-form-field>` / `<mat-select>` outside `tools/form-idiom-allowlist.txt`, and a listed file that no longer holds
   one: convert a screen, delete its line. A deliberate exception (code / SQL / JSON editor, grid filter, search box)
-  carries `form-allow` and the reason on the tag's line. Plan and rollout: `docs/superpower/ui-form-rows-plan.md`.
+  carries `form-allow` and the reason on the tag's line; so does a message composer or a many-line paste box (P2). Plan and rollout: `docs/superpower/ui-form-rows-plan.md`.
   ⚠ **`[error]` is a plain input, not control state**: the host computes it (`ctl.touched && ctl.hasError(...)`), and
   an `OnPush` host re-renders it only after a template event, so a spec that patches the form from code must
   `markForCheck()` first (`refresh(fixture)` in `inspecto/testing/pen-field.ts`, beside `penEdit`/`penText`/

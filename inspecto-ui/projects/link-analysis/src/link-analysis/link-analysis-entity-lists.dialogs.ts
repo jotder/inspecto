@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -20,10 +20,19 @@ import { expiryInstant, parseEntityListEntries } from './entity-list-entries';
 import { EntityTypeConfig } from './link-analysis-settings.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 import { entityListErrorMessage } from './investigation-state';
 import { isUnavailable } from './link-analysis-template.dialogs';
+
+/** The error line of a required, bounded text row: shown once the row was left or the form submitted. */
+function textError(c: AbstractControl, required: string, max: number): string {
+    if (!c.touched) return '';
+    if (c.hasError('required') || c.hasError('pattern')) return required;
+    if (c.hasError('maxlength')) return `At most ${max} characters.`;
+    return '';
+}
 
 /**
  * D-P10's four purposes in plain words (UC-10 step 2): *Watch these* · *Never follow these* · *Known good* · *Block*. The ONE
@@ -64,10 +73,9 @@ export interface CreateEntityListData {
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>New Entity List</h2>
@@ -81,15 +89,13 @@ export interface CreateEntityListData {
                 </inspecto-alert>
             }
             <form class="flex flex-col gap-2" [formGroup]="form" (ngSubmit)="save()">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Title</mat-label>
-                    <input matInput formControlName="title" />
-                    @if (form.controls.title.hasError('required') || form.controls.title.hasError('pattern')) {
-                        <mat-error>A title is required.</mat-error>
-                    } @else if (form.controls.title.hasError('maxlength')) {
-                        <mat-error>At most 200 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Title"
+                    [required]="true"
+                    [maxlength]="200"
+                    formControlName="title"
+                    [error]="textError(form.controls.title, 'A title is required.', 200)"
+                ></inspecto-pen-field>
                 <inspecto-option-picker
                     label="Purpose"
                     formControlName="purpose"
@@ -106,16 +112,14 @@ export interface CreateEntityListData {
                 @if (submitted() && form.controls.entityType.invalid) {
                     <p class="text-warn m-0 text-xs" role="alert">Choose the Entity Type its members are.</p>
                 }
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Reason</mat-label>
-                    <input matInput formControlName="reason" />
-                    <mat-hint>Recorded with the change.</mat-hint>
-                    @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
-                        <mat-error>A reason is required.</mat-error>
-                    } @else if (form.controls.reason.hasError('maxlength')) {
-                        <mat-error>At most 1000 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Reason"
+                    [required]="true"
+                    [maxlength]="1000"
+                    help="Recorded with the change."
+                    formControlName="reason"
+                    [error]="textError(form.controls.reason, 'A reason is required.', 1000)"
+                ></inspecto-pen-field>
             </form>
             @if (error()) {
                 <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="List not created">
@@ -130,6 +134,7 @@ export interface CreateEntityListData {
     `,
 })
 export class CreateEntityListDialog {
+    protected readonly textError = textError;
     readonly data = inject<CreateEntityListData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<CreateEntityListDialog, EntityListDetail | undefined>);
     private inv = inject(InvService);
@@ -216,21 +221,19 @@ export interface EntityListReasonData {
 @Component({
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, PenFieldComponent],
     template: `
         <h2 mat-dialog-title>{{ data.title }}</h2>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
             <p class="m-0">{{ data.message }}</p>
             <form [formGroup]="form" (ngSubmit)="submit()">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Reason</mat-label>
-                    <input matInput formControlName="reason" />
-                    @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
-                        <mat-error>A reason is required.</mat-error>
-                    } @else if (form.controls.reason.hasError('maxlength')) {
-                        <mat-error>At most {{ data.maxLength }} characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Reason"
+                    [required]="true"
+                    [maxlength]="data.maxLength"
+                    formControlName="reason"
+                    [error]="textError(form.controls.reason, 'A reason is required.', data.maxLength)"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -242,6 +245,7 @@ export interface EntityListReasonData {
     `,
 })
 export class EntityListReasonDialog {
+    protected readonly textError = textError;
     readonly data = inject<EntityListReasonData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<EntityListReasonDialog, string | undefined>);
     private confirm = inject(InspectoConfirmService);
@@ -291,6 +295,7 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
         MatFormFieldModule,
         MatInputModule,
         InspectoAlertComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     template: `
@@ -329,7 +334,7 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
                     <mat-button-toggle value="add">Add</mat-button-toggle>
                     <mat-button-toggle value="remove">Remove</mat-button-toggle>
                 </mat-button-toggle-group>
-                <mat-form-field subscriptSizing="dynamic">
+                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a many-line paste box, not one value -->
                     <mat-label>Entries, one per line</mat-label>
                     <textarea matInput rows="6" formControlName="entries"></textarea>
                     <mat-hint>
@@ -347,24 +352,24 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
                     </ul>
                 }
                 @if (form.controls.mode.value === 'add') {
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Expires (optional)</mat-label>
-                        <input matInput type="datetime-local" formControlName="expires" />
-                        <mat-hint>Blank keeps the entries. An expiring add never shortens a permanent entry.</mat-hint>
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Expires"
+                        type="datetime-local"
+                        placeholder="never"
+                        help="Blank keeps the entries. An expiring add never shortens a permanent entry."
+                        formControlName="expires"
+                    ></inspecto-pen-field>
                     @if (expiryError()) {
                         <p class="text-warn m-0 text-xs" role="alert">{{ expiryError() }}</p>
                     }
                 }
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Reason</mat-label>
-                    <input matInput formControlName="reason" />
-                    @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
-                        <mat-error>A reason is required.</mat-error>
-                    } @else if (form.controls.reason.hasError('maxlength')) {
-                        <mat-error>At most 1000 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Reason"
+                    [required]="true"
+                    [maxlength]="1000"
+                    formControlName="reason"
+                    [error]="textError(form.controls.reason, 'A reason is required.', 1000)"
+                ></inspecto-pen-field>
             </form>
             @if (error()) {
                 <inspecto-alert variant="error" title="Entries not changed">{{ error() }}</inspecto-alert>
@@ -379,6 +384,7 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
     `,
 })
 export class EntityListEntriesDialog {
+    protected readonly textError = textError;
     readonly data = inject<EntityListEntriesData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<EntityListEntriesDialog, EntityListEntriesResult | undefined>);
     private inv = inject(InvService);

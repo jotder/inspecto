@@ -3,9 +3,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 
 import {
     CoLocation,
@@ -17,6 +16,7 @@ import {
     frequentLocations,
     stayPoints,
 } from '@inspecto/link-analysis/geo';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { ColocationGraphDialog } from './colocation-graph.dialog';
 
 /** A result-click focus request — the host owns the MapLibre camera + emphasis, so it does the flying. */
@@ -37,7 +37,7 @@ export interface GeoAnalysisFocus {
     selector: 'inspecto-geo-analysis-toolbox',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatIconModule, MatInputModule],
+    imports: [DecimalPipe, MatButtonModule, MatButtonToggleModule, MatIconModule, PenFieldComponent, ReactiveFormsModule],
     templateUrl: './geo-analysis-toolbox.component.html',
 })
 export class GeoAnalysisToolboxComponent {
@@ -52,9 +52,11 @@ export class GeoAnalysisToolboxComponent {
 
     readonly analysisTool = signal<'stay' | 'frequent' | 'coloc'>('coloc');
     /** Tool parameters (meters / minutes — converted to ms at run time). */
-    readonly radiusM = signal(250);
-    readonly windowMin = signal(60);
-    readonly dwellMin = signal(30);
+    readonly params = new FormGroup({
+        radiusM: new FormControl(250, { nonNullable: true }),
+        windowMin: new FormControl(60, { nonNullable: true }),
+        dwellMin: new FormControl(30, { nonNullable: true }),
+    });
     readonly stays = signal<StayPoint[]>([]);
     readonly freqs = signal<FrequentLocation[]>([]);
     readonly colocs = signal<CoLocation[]>([]);
@@ -65,16 +67,17 @@ export class GeoAnalysisToolboxComponent {
 
     runAnalysis(): void {
         const pts = this.points();
-        const radius = this.radiusM();
+        const { radiusM, windowMin, dwellMin } = this.params.getRawValue();
+        const radius = radiusM || 250;
         switch (this.analysisTool()) {
             case 'stay':
-                this.stays.set(stayPoints(pts, radius, this.dwellMin() * 60_000));
+                this.stays.set(stayPoints(pts, radius, (dwellMin || 30) * 60_000));
                 break;
             case 'frequent':
                 this.freqs.set(frequentLocations(pts, radius));
                 break;
             case 'coloc':
-                this.colocs.set(coLocations(pts, radius, this.windowMin() * 60_000));
+                this.colocs.set(coLocations(pts, radius, (windowMin || 60) * 60_000));
                 break;
         }
         this.analysisRan.set(true);

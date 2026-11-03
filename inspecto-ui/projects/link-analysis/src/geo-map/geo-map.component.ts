@@ -8,6 +8,7 @@ import {
     inject,
     signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { DecimalPipe } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -21,13 +22,14 @@ import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, map } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import {
     GeoBBox,
@@ -140,6 +142,7 @@ interface PointRow {
         InspectoEmptyStateComponent,
         InspectoOptionPickerComponent,
         InspectoSkeletonComponent,
+        PenFieldComponent,
         MapViewComponent,
         DataTableComponent,
         LaHostSlotComponent,
@@ -270,12 +273,16 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     readonly activeTool = signal<'measure' | 'radius' | 'polygon' | 'note' | null>(null);
     readonly measureVertices = signal<{ lat: number; lon: number }[]>([]);
     readonly radiusCenter = signal<{ lat: number; lon: number } | null>(null);
-    readonly searchRadiusM = signal(1000);
+    /** The radius-search and note tools' inputs, as property rows. */
+    readonly toolForm = this.fb.nonNullable.group({ searchRadiusM: 1000, noteText: '' });
+    readonly searchRadiusM = toSignal(
+        this.toolForm.controls.searchRadiusM.valueChanges.pipe(map((m) => m || 1000)),
+        { initialValue: 1000 },
+    );
     readonly polygonVertices = signal<{ lat: number; lon: number }[]>([]);
     /** A closed [lon, lat] ring filtering the displayed subset; `null` = no polygon filter. */
     readonly polygonFilter = signal<[number, number][] | null>(null);
     readonly notes = signal<GeoNote[]>([]);
-    readonly noteText = signal('');
     /** Layer-manager state + an uploaded custom GeoJSON overlay. */
     readonly layerToggles = signal<GeoLayerToggles>({});
     readonly customOverlay = signal<FeatureCollection | null>(null);
@@ -697,7 +704,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
                 this.polygonVertices.set([...this.polygonVertices(), at]);
                 break;
             case 'note': {
-                const text = this.noteText().trim();
+                const text = this.toolForm.controls.noteText.value.trim();
                 if (!text) return;
                 this.notes.set([...this.notes(), { id: `note-${Date.now()}`, lat: at.lat, lon: at.lon, text }]);
                 break;
@@ -846,6 +853,14 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     }
 
     // ── saved views ──
+    protected viewNameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A name is required.';
+        if (c.hasError('duplicate')) return 'A view with this name already exists.';
+        return '';
+    }
+
     async saveView(): Promise<void> {
         if (this.saveForm.invalid) {
             this.saveForm.markAllAsTouched();

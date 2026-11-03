@@ -1,6 +1,6 @@
 # One form idiom: property rows (`UI-FORM-ROWS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8).** Operator ask: *"we need uniform look and feel
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9).** Operator ask: *"we need uniform look and feel
 > for the form items"* - single-line field / value rows with a pencil to edit (as elsewhere), a short description in
 > tiny type under a field whose name does not explain itself, the whole form at one glance without scrolling (fold
 > groups or a wizard for long ones), and every dropdown a popup dialog that can carry hints, search, groups and nested
@@ -149,3 +149,29 @@ boxes; colours and typography beyond the row (the design tokens stay as they are
      is skipped when another row was opened meanwhile.
      Still open and lower: a closed list row shows "—" for both "unset" and "explicitly none"; a placeholder shows
      only in an open row; a multiline or list editor is narrow in two columns.
+
+## 9. As built: P2 (2026-11-04)
+
+- **The Link Analysis library holds no unmarked boxed field.** Its 10 files are off the `lint:forms` allow-list
+  (124 to 114). la-app had none left after the Data page.
+  - Rows (`pen-field`): the geo toolbox's radius, window and dwell; the geo map's radius search and note; both
+    *Save view as* forms (geo map and graph); the Entity List dialogs (title, reason, expiry); the snapshot and
+    attach-to-Case dialogs (titles, description); the Open dialog's rename; the preset query parameters; and the
+    template dialogs (title, id, Alert Rule name, threshold).
+  - Pickers (`option-picker`): the Open dialog's five `mat-select` filters (owner, show, Dataset, sort, changed). Its
+    *Changed* filter now holds a string (`'0'`, `'7'`, ...) read through `Number`, because a picker's values are strings.
+  - Signal-bound toolbar numbers moved to small reactive forms (`params` on the toolbox, `toolForm` on the geo map;
+    `searchRadiusM` is now a `toSignal` of its control), since `pen-field` is a `ControlValueAccessor`.
+- **Kept boxed, each marked `form-allow` with its reason:** live search boxes (points, places, nodes, the Open
+  dialog's search and tag), the snapshot dialog's node filter, the start box's value typeahead, and two kinds the plan
+  had not named: a **message composer** (Comments) and a **many-line paste box** (Entity List entries, the start
+  box's pasted values). Both are text you write or paste, not one value of a record. The rulebook now lists them.
+- **`pen-field` gains `type="datetime-local"`** (the Entity List expiry). It opens on Enter, Space or a click, never
+  on one typed key, as `date` does.
+- Error lines: each host computes its row's line from `touched` (as the Data page does), so nothing shows red before
+  the field was left or the form submitted.
+- Behaviour to know: Enter in an open row commits that row only; it no longer submits the surrounding form (Save
+  view, Rename, the Entity List dialogs). The form's button does. Escape closes only the row, never the menu or
+  dialog around it (checked on Basic, la-mobile-money: *Save view as* menu, Open dialog filters, Edit entries).
+- Still open and lower: a closed *Expires* row shows the raw `2026-11-04T10:00`; the blank filter choices ("Anyone",
+  "Any") draw in the picker's grey placeholder tone.

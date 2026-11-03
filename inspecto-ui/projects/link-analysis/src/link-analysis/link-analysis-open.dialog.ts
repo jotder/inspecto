@@ -5,12 +5,13 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, map } from 'rxjs';
 import { ComponentsService, TagsService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
+import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
+import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InvService, InvestigationListItem } from '@inspecto/link-analysis/api/inv.service';
 import { needsPermission } from './disabled-reasons';
@@ -113,9 +114,10 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>Open</h2>
@@ -135,61 +137,49 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                 }
             </div>
 
-            <div class="flex flex-wrap items-end gap-2">
-                <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic"><!-- form-allow: a search box over the list -->
                     <mat-label>Search name or id</mat-label>
                     <input matInput [formControl]="search" data-testid="la-open-search" />
                 </mat-form-field>
                 @if (tab() === 'views') {
-                    <mat-form-field class="w-40" subscriptSizing="dynamic">
+                    <mat-form-field class="w-40" subscriptSizing="dynamic"><!-- form-allow: a filter over the list -->
                         <mat-label>Tag</mat-label>
                         <input matInput [formControl]="tag" (keydown.enter)="applyTag()" (blur)="applyTag()" />
                     </mat-form-field>
                 } @else {
-                    <mat-form-field class="w-40" subscriptSizing="dynamic">
-                        <mat-label>Owner</mat-label>
-                        <mat-select [formControl]="owner">
-                            <mat-option value="">Anyone</mat-option>
-                            @for (o of owners(); track o) {
-                                <mat-option [value]="o">{{ ownerLabel(o) }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field class="w-44" subscriptSizing="dynamic">
-                        <mat-label>Show</mat-label>
-                        <mat-select [formControl]="status">
-                            <mat-option value="">All</mat-option>
-                            <mat-option value="recent">Recent</mat-option>
-                            <mat-option value="owner">Mine</mat-option>
-                            <mat-option value="case">Via a Case</mat-option>
-                        </mat-select>
-                    </mat-form-field>
+                    <inspecto-option-picker
+                        class="w-48"
+                        label="Owner"
+                        [formControl]="owner"
+                        [options]="ownerOptions()"
+                    ></inspecto-option-picker>
+                    <inspecto-option-picker
+                        class="w-48"
+                        label="Show"
+                        [formControl]="status"
+                        [options]="statusOptions"
+                    ></inspecto-option-picker>
                 }
-                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                    <mat-label>Dataset</mat-label>
-                    <mat-select [formControl]="dataset">
-                        <mat-option value="">Any</mat-option>
-                        @for (d of datasets(); track d) {
-                            <mat-option [value]="d">{{ d }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field class="w-36" subscriptSizing="dynamic">
-                    <mat-label>Sort by</mat-label>
-                    <mat-select [formControl]="sortBy" data-testid="la-open-sort">
-                        <mat-option value="name">Name</mat-option>
-                        <mat-option value="changed">Last changed</mat-option>
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field class="w-36" subscriptSizing="dynamic">
-                    <mat-label>Changed</mat-label>
-                    <mat-select [formControl]="days">
-                        <mat-option [value]="0">Any time</mat-option>
-                        <mat-option [value]="1">Today</mat-option>
-                        <mat-option [value]="7">Last 7 days</mat-option>
-                        <mat-option [value]="30">Last 30 days</mat-option>
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="w-48"
+                    label="Dataset"
+                    [formControl]="dataset"
+                    [options]="datasetOptions()"
+                ></inspecto-option-picker>
+                <inspecto-option-picker
+                    class="w-48"
+                    label="Sort by"
+                    data-testid="la-open-sort"
+                    [formControl]="sortBy"
+                    [options]="sortOptions"
+                ></inspecto-option-picker>
+                <inspecto-option-picker
+                    class="w-48"
+                    label="Changed"
+                    [formControl]="days"
+                    [options]="dayOptions"
+                ></inspecto-option-picker>
             </div>
 
             @if (error()) {
@@ -263,13 +253,14 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                         @if (selectedView(); as r) {
                             @if (renaming()) {
                                 <form class="flex items-start gap-2" [formGroup]="renameForm" (ngSubmit)="rename(r.view)">
-                                    <mat-form-field class="flex-1">
-                                        <mat-label>Name</mat-label>
-                                        <input matInput formControlName="name" data-testid="la-open-rename-input" />
-                                        @if (renameTo.hasError('required')) {
-                                            <mat-error>A name is required.</mat-error>
-                                        }
-                                    </mat-form-field>
+                                    <inspecto-pen-field
+                                        class="flex-1"
+                                        label="Name"
+                                        [required]="true"
+                                        formControlName="name"
+                                        data-testid="la-open-rename-input"
+                                        [error]="renameTo.touched && renameTo.hasError('required') ? 'A name is required.' : ''"
+                                    ></inspecto-pen-field>
                                     <button mat-stroked-button type="submit" [disabled]="busy()">Rename</button>
                                     <button mat-button type="button" (click)="renaming.set(false)">Cancel</button>
                                 </form>
@@ -374,7 +365,8 @@ export class LinkAnalysisOpenDialog {
     readonly owner = new FormControl('', { nonNullable: true });
     readonly status = new FormControl('', { nonNullable: true });
     readonly dataset = new FormControl('', { nonNullable: true });
-    readonly days = new FormControl(0, { nonNullable: true });
+    /** Days back, as the picker's string value ('0' = any time). */
+    readonly days = new FormControl('0', { nonNullable: true });
     readonly sortBy = new FormControl<OpenSort>('changed', { nonNullable: true });
     private readonly sortValue = toSignal(this.sortBy.valueChanges, { initialValue: 'changed' as OpenSort });
     /** The selected Investigation's stored pack, read from its header (the listing does not carry it). */
@@ -385,7 +377,7 @@ export class LinkAnalysisOpenDialog {
     private readonly ownerValue = toSignal(this.owner.valueChanges, { initialValue: '' });
     private readonly statusValue = toSignal(this.status.valueChanges, { initialValue: '' });
     private readonly datasetValue = toSignal(this.dataset.valueChanges, { initialValue: '' });
-    private readonly daysValue = toSignal(this.days.valueChanges, { initialValue: 0 });
+    private readonly daysValue = toSignal(this.days.valueChanges.pipe(map(Number)), { initialValue: 0 });
 
     readonly loading = signal(false);
     readonly busy = signal(false);
@@ -493,6 +485,30 @@ export class LinkAnalysisOpenDialog {
     ownerLabel(owner: string): string {
         return this.ownerNames().get(owner) ?? owner;
     }
+    readonly ownerOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Anyone' },
+        ...this.owners().map((o) => ({ value: o, label: this.ownerLabel(o) })),
+    ]);
+    readonly statusOptions: PickerOption[] = [
+        { value: '', label: 'All' },
+        { value: 'recent', label: 'Recent' },
+        { value: 'owner', label: 'Mine' },
+        { value: 'case', label: 'Via a Case' },
+    ];
+    readonly sortOptions: PickerOption[] = [
+        { value: 'name', label: 'Name' },
+        { value: 'changed', label: 'Last changed' },
+    ];
+    readonly dayOptions: PickerOption[] = [
+        { value: '0', label: 'Any time' },
+        { value: '1', label: 'Today' },
+        { value: '7', label: 'Last 7 days' },
+        { value: '30', label: 'Last 30 days' },
+    ];
+    readonly datasetOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Any' },
+        ...this.datasets().map((d) => ({ value: d, label: d })),
+    ]);
     readonly datasets = computed(() =>
         [
             ...new Set(

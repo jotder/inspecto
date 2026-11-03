@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { EntityTypeConfig } from './link-analysis-settings.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { penEdit, refresh } from '@inspecto/core/testing/pen-field';
 import {
     CreateEntityListDialog,
     EntityListEntriesDialog,
@@ -34,6 +35,16 @@ function configure(data: unknown, inv: Partial<Record<keyof InvService, unknown>
 const http = (status: number, message: string) => () =>
     throwError(() => new HttpErrorResponse({ status, error: { error: { message } } }));
 
+/** Edit the property row bound to `name` as a person does (open, type, Enter). */
+function row(f: ComponentFixture<unknown>, name: string, value: string) {
+    const host = (f.nativeElement as HTMLElement).querySelector<HTMLElement>(`inspecto-pen-field[formcontrolname="${name}"]`)!;
+    penEdit(f, host, value);
+}
+
+/** The error lines the property rows show, in order. */
+const rowErrors = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('inspecto-pen-field p[role="alert"]')).map((e) => e.textContent);
+
 function type(el: HTMLElement, selector: string, value: string) {
     const input = el.querySelector(selector) as HTMLInputElement;
     input.value = value;
@@ -52,22 +63,18 @@ describe('CreateEntityListDialog (LA-17)', () => {
         await expectNoA11yViolations(el);
 
         f.componentInstance.save();
-        f.detectChanges();
-        const errors = Array.from(el.querySelectorAll('.mat-mdc-form-field-subscript-wrapper mat-error')).map(
-            (e) => e.textContent,
-        );
-        expect(errors).toEqual([
+        refresh(f);
+        expect(rowErrors(el)).toEqual([
             expect.stringContaining('A title is required'),
             expect.stringContaining('A reason is required'),
         ]);
-        const pickers = Array.from(el.querySelectorAll('p[role="alert"]')).map((e) => e.textContent);
+        const pickers = Array.from(el.querySelectorAll('form > p[role="alert"]')).map((e) => e.textContent);
         expect(pickers).toEqual([expect.stringContaining('Choose a purpose'), expect.stringContaining('Entity Type')]);
         expect(createEntityList).not.toHaveBeenCalled();
         expect(close).not.toHaveBeenCalled();
 
         // A whitespace-only reason is still no reason.
-        type(el, 'input[formcontrolname="reason"]', '   ');
-        f.detectChanges();
+        row(f, 'reason', '   ');
         expect(f.componentInstance.form.controls.reason.invalid).toBe(true);
     });
 
@@ -162,12 +169,9 @@ describe('EntityListReasonDialog (LA-17)', () => {
         confirm.click();
         f.detectChanges();
         expect(close).not.toHaveBeenCalled();
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain(
-            'A reason is required',
-        );
+        expect(rowErrors(el)).toEqual([expect.stringContaining('A reason is required')]);
 
-        type(el, 'input', '  superseded  ');
-        f.detectChanges();
+        row(f, 'reason', '  superseded  ');
         confirm.click();
         expect(close).toHaveBeenCalledWith('superseded');
     });
@@ -177,11 +181,11 @@ describe('EntityListReasonDialog (LA-17)', () => {
         const f = TestBed.createComponent(EntityListReasonDialog);
         f.detectChanges();
         const el = f.nativeElement as HTMLElement;
-        type(el, 'input', 'x'.repeat(201));
+        row(f, 'reason', 'x'.repeat(201));
         f.componentInstance.submit();
-        f.detectChanges();
+        refresh(f);
         expect(close).not.toHaveBeenCalled();
-        expect(el.querySelector('mat-error')?.textContent).toContain('At most 200 characters');
+        expect(rowErrors(el)).toEqual([expect.stringContaining('At most 200 characters')]);
     });
 });
 
@@ -209,8 +213,8 @@ describe('EntityListEntriesDialog (ASSURE-ENTITY-LISTS-RESIDUALS-1 (2))', () => 
         await expectNoA11yViolations(el);
 
         type(el, 'textarea', '44785..447899');
-        type(el, 'input[formcontrolname="expires"]', '2000-01-01T00:00');
-        type(el, 'input[formcontrolname="reason"]', 'case 7');
+        row(f, 'expires', '2000-01-01T00:00');
+        row(f, 'reason', 'case 7');
         await f.componentInstance.save();
         f.detectChanges();
         const alerts = Array.from(el.querySelectorAll('[role="alert"]')).map((e) => e.textContent);
@@ -230,8 +234,8 @@ describe('EntityListEntriesDialog (ASSURE-ENTITY-LISTS-RESIDUALS-1 (2))', () => 
         f.detectChanges();
         const el = f.nativeElement as HTMLElement;
         type(el, 'textarea', '+447700900123\n+4478*\n10.1.0.0/16');
-        type(el, 'input[formcontrolname="expires"]', '2999-01-01T00:00');
-        type(el, 'input[formcontrolname="reason"]', ' case 7 ');
+        row(f, 'expires', '2999-01-01T00:00');
+        row(f, 'reason', ' case 7 ');
         await f.componentInstance.save();
         expect(changeEntityListMembers).toHaveBeenCalledWith('mules', {
             add: ['+447700900123'],
