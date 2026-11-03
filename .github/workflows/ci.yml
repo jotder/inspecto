@@ -118,6 +118,12 @@ jobs:
       - name: Guard — every BACKLOG row names valid Product Map Items
         run: node tools/check-backlog-items.mjs && node --test tools/check-backlog-items.test.mjs
 
+      # Form-idiom guard (2026-11-03, UI-FORM-ROWS-1). A value is a pen-field row and a choice an option-picker row; a
+      # boxed <mat-form-field> / <mat-select> may stay only in a file on inspecto-ui/tools/form-idiom-allowlist.txt,
+      # and that list only shrinks. Pure Node, no npm ci.
+      - name: Guard — no new boxed form fields (UI form idiom)
+        run: node inspecto-ui/tools/check-form-idiom.mjs && node --test inspecto-ui/tools/check-form-idiom.test.mjs
+
       # Family-count guard (2026-09-12). OperationalDb.Family's size is restated in NINE places outside
       # the enum — two test tripwires and seven sentences across three docs — and the hand sweep was
       # missed TWICE IN TWO SHIFTS (EVENTS took it 12->13, RUN_LEASE 13->14). The tripwires caught both,

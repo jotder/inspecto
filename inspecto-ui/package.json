@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p projects/la-app/tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && tsc -p tsconfig.json --noEmit",
     "lint": "ng lint",
     "lint:tokens": "node tools/check-design-tokens.mjs",
+    "lint:forms": "node tools/check-form-idiom.mjs",
     "lint:denylist": "node tools/check-npm-denylist.mjs",
     "check:bundle-shape": "node tools/check-bundle-shape.mjs",
     "check:theme-tokens": "node tools/check-theme-tokens.mjs",

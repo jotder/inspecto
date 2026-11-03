@@ -198,8 +198,9 @@ export class OptionPickerDialog {
                 content out internally, so a full-width trigger came out with the chevron at the far
                 LEFT and the value pushed to the right edge.
             -->
-            <div class="flex min-h-8 w-full items-center justify-between gap-3">
-                <span class="text-secondary min-w-0 text-sm" [class.sr-only]="hideLabel()" [id]="labelId">
+            <!-- UI-FORM-ROWS-1: the shared row (styles.scss .prop-row) - label, the value right after it, ▾ at the edge -->
+            <div class="prop-row w-full">
+                <span class="prop-label text-secondary" [class.sr-only]="hideLabel()" [id]="labelId">
                     {{ label() }}
                     @if (required()) {
                         <span class="text-warn" aria-hidden="true">*</span>
@@ -207,11 +208,10 @@ export class OptionPickerDialog {
                 </span>
                 <button
                     type="button"
-                    class="hover:bg-hover -my-0.5 flex min-w-0 items-center gap-1 rounded px-2 py-1 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    class="hover:bg-hover -my-0.5 flex min-w-0 flex-1 items-center justify-between gap-1 rounded px-1 py-1 text-left disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                     [class.border]="outlined()"
                     [attr.data-outlined]="outlined() ? '' : null"
                     [style.border-color]="outlined() ? 'var(--gamma-border)' : null"
-                    style="max-width: 70%"
                     [disabled]="disabled()"
                     [attr.aria-labelledby]="labelId"
                     [attr.aria-describedby]="invalid() ? errorId : null"

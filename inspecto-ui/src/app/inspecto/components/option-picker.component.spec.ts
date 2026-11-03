@@ -103,9 +103,12 @@ describe('InspectoOptionPickerComponent', () => {
         const { fixture } = create('json');
         const btn = trigger(fixture);
         expect(btn.classList.contains('border')).toBe(false);
+        // UI-FORM-ROWS-1 Q-1: the shared row (.prop-row) - label first, the value right after it, ▾ at the edge
         const row = btn.parentElement as HTMLElement;
-        expect(row.className).toContain('justify-between');
-        expect(row.querySelector('[id$="-label"]')).toBeTruthy();
+        expect(row.classList.contains('prop-row')).toBe(true);
+        expect(row.querySelector('[id$="-label"]')!.classList.contains('prop-label')).toBe(true);
+        expect(btn.classList.contains('flex-1')).toBe(true);
+        expect(btn.lastElementChild?.tagName.toLowerCase()).toBe('mat-icon');
     });
 
     /** Operator 2026-10-10: a first-time user read the borderless row as plain text. `outlined` is the opt-in outline. */

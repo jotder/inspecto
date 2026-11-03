@@ -230,32 +230,45 @@
             ><code>{{ snippets.grid }}</code></pre>
         </section>
 
-        <!-- ── Reactive form + inline mat-error ─────────────────────────────────────────── -->
+        <!-- ── Form: property rows (UI-FORM-ROWS-1) ─────────────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">
-                <h2 class="text-xl font-semibold">Reactive form</h2>
+                <h2 class="text-xl font-semibold">Form: property rows</h2>
                 <button mat-stroked-button (click)="copy(snippets.form)">
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
                     <span class="ml-1">Copy snippet</span>
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                Reactive forms with inline <code>&lt;mat-error&gt;</code> and <code>markAllAsTouched()</code> on invalid
-                submit. Submit empty or with a bad character to see the errors.
+                The ONE form idiom (<code>UI-FORM-ROWS-1</code>): a typed value is an
+                <code>&lt;inspecto-pen-field&gt;</code> row (label · value · ✎, the input only while edited), a choice
+                an <code>&lt;inspecto-option-picker&gt;</code> row (label · value ▾, the choices in a popup). Both share
+                one geometry (<code>.prop-row</code>). A tiny <code>help</code> line goes under a field whose name does
+                not explain itself; an error replaces it. Rows sit two per line so the whole form fits at a glance. A
+                boxed <code>mat-form-field</code> / <code>mat-select</code> is refused by <code>lint:forms</code>. Press
+                Validate with the id empty or holding a bad character to see the errors.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
-                <form [formGroup]="form" (ngSubmit)="submitForm()" class="flex flex-wrap items-start gap-3">
-                    <mat-form-field class="w-72">
-                        <mat-label>Connection id</mat-label>
-                        <input matInput formControlName="id" placeholder="e.g. prod-sftp" />
-                        @if (form.controls.id.hasError('required')) {
-                            <mat-error>An id is required.</mat-error>
-                        }
-                        @if (form.controls.id.hasError('pattern')) {
-                            <mat-error>Letters, digits, dot, dash, underscore; must start alphanumeric.</mat-error>
-                        }
-                    </mat-form-field>
-                    <button mat-flat-button color="primary" class="mt-1" type="submit">Validate</button>
+                <form [formGroup]="form" (ngSubmit)="submitForm()" class="flex flex-col gap-2">
+                    <div class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
+                        <inspecto-pen-field
+                            label="Connection id"
+                            formControlName="id"
+                            placeholder="e.g. prod-sftp"
+                            [required]="true"
+                            [error]="idError()"
+                            help="The name other screens use for it"
+                        ></inspecto-pen-field>
+                        <inspecto-option-picker
+                            label="Protocol"
+                            formControlName="protocol"
+                            [options]="protocolOptions"
+                            help="How its files are fetched"
+                        ></inspecto-option-picker>
+                    </div>
+                    <div>
+                        <button mat-flat-button color="primary" type="submit">Validate</button>
+                    </div>
                 </form>
             </div>
             <pre

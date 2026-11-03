@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, GridApi } from 'ag-grid-community';
@@ -82,9 +82,9 @@ interface DemoRow {
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
+        PenFieldComponent,
+        InspectoOptionPickerComponent,
         MatTooltipModule,
         AgGridAngular,
         StatusBadgeComponent,
@@ -229,10 +229,23 @@ export class DesignSystemComponent {
         },
     ];
 
-    // ── Reactive form + inline mat-error ─────────────────────────────────────────────────────
+    // ── Form: property rows (UI-FORM-ROWS-1) ─────────────────────────────────────────────────
     readonly form = this.fb.group({
         id: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],
+        protocol: ['sftp'],
     });
+    readonly protocolOptions = [
+        { value: 'sftp', label: 'SFTP', hint: 'Files on a remote server over SSH' },
+        { value: 'local', label: 'Local folder', hint: 'A folder this server can read' },
+    ];
+    /** The id row's error line, once it was left or a save was tried. */
+    idError(): string {
+        const c = this.form.controls.id;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'An id is required.';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash, underscore; must start alphanumeric.';
+        return '';
+    }
     submitForm(): void {
         if (this.form.invalid) {
             this.form.markAllAsTouched();
@@ -623,7 +636,7 @@ progress-list  controls: { x: [{field: 'detector'}], y: [{field: 'alert_id', agg
         empty: `<inspecto-empty-state\n  icon="heroicons_outline:queue-list"\n  title="Nothing yet"\n  message="No events match the current filters."\n  actionLabel="Clear filters"\n  (action)="reset()" />`,
         skeleton: `<inspecto-skeleton width="40%" height="0.875rem" />   <!-- a label -->\n<inspecto-skeleton [lines]="4" />                     <!-- a paragraph -->\n<inspecto-skeleton height="12rem" />                  <!-- a block -->`,
         grid: `<ag-grid-angular\n  class="h-[42rem] w-full"\n  [theme]="themeSvc.theme()"\n  [rowData]="rows"\n  [columnDefs]="columnDefs"\n  [defaultColDef]="defaultColDef"\n  [loading]="loading"\n  [overlayNoRowsTemplate]="emptyOverlay"\n  (firstDataRendered)="refreshActions($event)"\n  (rowDataUpdated)="refreshActions($event)" />`,
-        form: `form = this.fb.group({\n  id: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],\n});\nsubmit() {\n  if (this.form.invalid) { this.form.markAllAsTouched(); return; }\n  // ...\n}`,
+        form: `<!-- a value = pen-field row, a choice = option-picker row; help only where the name needs it -->\n<div class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">\n  <inspecto-pen-field label="Connection id" formControlName="id" [required]="true"\n      [error]="idError()" help="The name other screens use for it" />\n  <inspecto-option-picker label="Protocol" formControlName="protocol" [options]="protocolOptions" />\n</div>\n// idError(): '' until touched, then the first failing rule in words\nsubmit() {\n  if (this.form.invalid) { this.form.markAllAsTouched(); return; }\n  // ...\n}`,
         schemaForm: `// declare the attributes once (tier: required | optional | advanced)\nconst SPECS: AttributeSpec[] = [\n  { key: 'name', label: 'Source id', type: 'identifier', tier: 'required' },\n  { key: 'host', label: 'Host', type: 'string', tier: 'required',\n    dependsOn: { key: 'protocol', equals: 'sftp' } },\n  { key: 'parallel_fetch', label: 'Parallel fetch', type: 'number', tier: 'advanced', default: 4 },\n];\n\n<inspecto-schema-form #sf [specs]="specs" [initial]="existingConfig" />\n// on submit: if (!sf.validate()) return;  const config = sf.value();`,
         aiAssist: `<!-- the ONE inline authoring surface — adopt it, never fork it (AGT-6a A1) -->\n<!-- the pane's own context IS the tool's args, so the operator re-states nothing -->\n<inspecto-ai-assist\n  tool="suggest_expectations"        // any non-mutating tool; mutating ones are refused 403\n  [args]="{ table: table(), column: selectedColumn() }"\n  [current]="editing()?.config ?? null"   // omit/null for a create ⇒ every field reads as added\n  label="Suggest expectations"\n  [disabled]="!selectedColumn()"\n  disabledReason="Select a column first"\n  (applyDraft)="openForm($event.config)" />\n// The surface persists NOTHING. The pane applies the draft through its own\n// validated route, so the human is the audited actor (decision D2).`,
         aiExplain: `<!-- the read-only half — one icon button for a pane header (AGT-6a A4) -->\n<!-- the PANE declares the terms; nothing is typed, nothing is inferred -->\n<inspecto-ai-explain\n  screen="Pipelines"                       // reads as "About Pipelines" in the title + aria-label\n  [terms]="['Pipeline', 'Step', 'Trigger']" />  // canonical GLOSSARY.md spellings, never synonyms\n// No draft, no diff, no Apply — there is no write path at all, so this is NOT\n// gated on canAuthorWorkbench: a Business-lens user is who needs it most.\n// glossary_lookup, falling back to docs_search; a 503 explains itself.`,

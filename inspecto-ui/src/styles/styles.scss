@@ -327,6 +327,24 @@ body.dark {
 .sf-row {
     min-height: 32px;
 }
+/* UI-FORM-ROWS-1 (Q-1, operator 2026-11-03): ONE row for a typed value (`<inspecto-pen-field>`) and a choice
+   (`<inspecto-option-picker>`) - the label at the left in one size, the value right after it, the affordance (✎ / ▾)
+   at the right edge; a help or error line goes under the row in text-xs. Geometry only, no colours. The app's text-sm
+   carries no line-height, so it is set here. */
+.prop-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 32px;
+    min-width: 0;
+}
+.prop-label {
+    flex: 0 0 auto;
+    max-width: 45%;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    overflow-wrap: anywhere; /* a long single-word label breaks inside its 45% instead of running under the value */
+}
 .mat-mdc-form-field.sf-dense .mat-mdc-text-field-wrapper {
     padding: 0 8px;
 }

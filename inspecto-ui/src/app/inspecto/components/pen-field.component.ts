@@ -33,9 +33,9 @@ import { MatIconModule } from '@angular/material/icon';
     providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => PenFieldComponent), multi: true }],
     host: { class: 'block min-w-0' },
     template: `
-        <div class="flex min-h-8 min-w-0 items-center gap-2">
+        <div class="prop-row">
             @if (label()) {
-                <span class="text-secondary shrink-0 text-xs"
+                <span class="prop-label text-secondary"
                     >{{ label() }}
                     @if (required()) {
                         <span class="text-warn"> *</span>

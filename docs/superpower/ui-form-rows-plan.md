@@ -1,6 +1,6 @@
 # One form idiom: property rows (`UI-FORM-ROWS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 open (recommendations in §5).** Operator ask: *"we need uniform look and feel
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 BUILT 2026-11-03 (§7).** Operator ask: *"we need uniform look and feel
 > for the form items"* - single-line field / value rows with a pencil to edit (as elsewhere), a short description in
 > tiny type under a field whose name does not explain itself, the whole form at one glance without scrolling (fold
 > groups or a wizard for long ones), and every dropdown a popup dialog that can carry hints, search, groups and nested
@@ -67,7 +67,7 @@ card was followed by a reload served from the read cache, so the row could snap 
 | **P3** | the admin panes, in batches by use, each batch its own commit; the allow-list shrinks with each | L |
 | **P4** | nested options and per-picker layout in `option-picker`, built when the first screen needs them | S |
 
-## 5. Decisions (recommendations; the operator decides)
+## 5. Decisions (operator 2026-11-03: accepted as recommended)
 
 - **Q-1 Row geometry.** (a) label left in `text-sm`, value right after it, affordance at the right edge ⟵
   *recommended* (the label reads first, the value sits where the eye goes next, and the edit control lines up down the
@@ -85,3 +85,23 @@ card was followed by a reload served from the read cache, so the row could snap 
 
 Vendored gamma / Fuse screens (`src/@gamma/**`, `modules/auth/**`); code, SQL and JSON editors; grid filters and search
 boxes; colours and typography beyond the row (the design tokens stay as they are).
+
+## 7. As built: P0 (2026-11-03)
+
+- **One row geometry** (Q-1): `styles.scss` `.prop-row` / `.prop-label`. The label sits at the left in `text-sm`
+  (line-height set, since the app's `text-sm` carries none), the value right after it, and ✎ / ▾ at the right edge.
+  `pen-field` (whose label was `text-xs`) and `option-picker` (whose value was pushed right, max 70%) both use it now.
+  The option-picker spec that pinned the old right-aligned layout now pins the shared one.
+- **`help`** on both components (pen-field's came with the Data page change).
+- **Guard**: `inspecto-ui/tools/check-form-idiom.mjs` (`npm run lint:forms`) runs in the `ci.yml` guards job, and so
+  in the pre-commit hook, with `check-form-idiom.test.mjs`. It refuses a `<mat-form-field>` / `<mat-select>` in a file
+  not on `tools/form-idiom-allowlist.txt`, and a listed file that no longer holds one, so the list only shrinks. The
+  list was seeded with 127 files; this phase took off the `/design` demo and two files that only named a tag in a comment (the guard now ignores comments): 124. `form-allow` on a tag's
+  line marks a deliberate exception.
+- **Rulebook and gallery**: `.claude/skills/angular-ui/SKILL.md` carries the row, fold and wizard rules and the guard.
+  The `/design` "Reactive form" demo is now "Form: property rows" (a pen-field and a picker with help, two per line).
+- **Moved to P1**: the boolean toggle row. Its only shared form is `schema-form`'s, which P1 converts.
+- Checks: full UI suite 7156 passed; the 5 failures are the known, older `add-data.page.spec.ts` ones. Typecheck,
+  eslint, `lint:tokens` and `lint:forms` are clean, and both apps build. Seen on Basic: the Data page Mapping form's
+  value and choice rows now line up. A long one-word label now breaks inside its 45% (`overflow-wrap`) instead of
+  running under the value (seen in `explore-controls`, which also overlapped before).

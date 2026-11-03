@@ -489,8 +489,17 @@ src/app/
   `required` (the asterisk only), `[error]` (a host-rendered `role="alert"` line) and a public `focus()` for a host
   pointing at a missing value. ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
   **`help`** (2026-11-03, `UI-FORM-ROWS-1`) is the one tiny line under the row, as `option-picker`'s `help`: give it
-  only to a field whose name does not explain itself; an error replaces it. App-wide form style (one row geometry,
-  folds, the `lint:forms` guard) is planned in `docs/superpower/ui-form-rows-plan.md`.
+  only to a field whose name does not explain itself; an error replaces it.
+  **One row geometry (UI-FORM-ROWS-1 P0, operator 2026-11-03):** `pen-field` and `option-picker` both lay out on
+  `styles.scss` `.prop-row` / `.prop-label` - label at the left in `text-sm`, the value right after it, ✎ / ▾ at the
+  right edge. Change the row there, never per component. Put rows two per line (`grid sm:grid-cols-2 gap-x-8`) so a
+  form fits at a glance; past about 12 rows fold into named groups; a wizard only when a step depends on an earlier
+  answer. A host that validates on save draws its own `role="alert"` line under a picker (the picker's own required
+  line shows only once its dialog was opened) and leaves `[required]` off it.
+  ⛔ **`lint:forms`** (`inspecto-ui/tools/check-form-idiom.mjs`, a CI guard and the pre-commit hook) refuses a new
+  `<mat-form-field>` / `<mat-select>` outside `tools/form-idiom-allowlist.txt`, and a listed file that no longer holds
+  one: convert a screen, delete its line. A deliberate exception (code / SQL / JSON editor, grid filter, search box)
+  carries `form-allow` and the reason on the tag's line. Plan and rollout: `docs/superpower/ui-form-rows-plan.md`.
   ⚠ **`[error]` is a plain input, not control state**: the host computes it (`ctl.touched && ctl.hasError(...)`), and
   an `OnPush` host re-renders it only after a template event, so a spec that patches the form from code must
   `markForCheck()` first (`refresh(fixture)` in `inspecto/testing/pen-field.ts`, beside `penEdit`/`penText`/
