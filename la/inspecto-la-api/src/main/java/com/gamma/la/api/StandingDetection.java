@@ -124,7 +124,7 @@ public final class StandingDetection {
         if (live.datasetContent() == null)
             return Verdict.refuse(DATASET_GONE, "Dataset '" + a.dataset() + "' no longer exists");
         // The sweep passes NO capabilities: canConfigureAccess is a live grant it cannot confirm.
-        switch (ComponentAccess.canViewAs(a.ownerId(), Set.of(), live.datasetContent())) {
+        switch (ComponentAccess.canViewAs(a.ownerId(), Set.of(), live.datasetContent(), live.configRoot())) {
             case ALLOWED -> { }
             case ROLE_ONLY -> {
                 return Verdict.refuse(ROLE_SHARE_ONLY, "the Dataset is shared to the owner only through a role share, "

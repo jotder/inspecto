@@ -315,6 +315,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // module's, so installing it from core would teach every Basic bundle to resolve shared refs
         // for a feature it does not have. Absent module ⇒ SharedRefResolver stays NONE ⇒ every
         // shared/<owner>/<item> ref fails to resolve, which is the fail-closed answer.
+        // LA-PIPELINE-MAPPINGS-1 (Q-2): ComponentAccess.canView reads a Mapping's base Dataset from the request's Space
+        com.gamma.access.ComponentAccess.datasetEntries((root, id) -> new com.gamma.pipeline.ComponentStore(root.resolve("registry"))
+                .get("dataset", id).map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(null));
         registerRoutes();
         // S6 — compose the request pipeline once (outermost first): correlation and CORS wrap the error
         // boundary so error/preflight responses still carry the Correlation-ID + CORS headers; path

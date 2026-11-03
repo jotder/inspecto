@@ -23,27 +23,27 @@ class ScheduledIndexBuildTest {
 
     @Test
     void aBlankOwnerOrAMissingDatasetIsRefused() {
-        assertEquals(ScheduledIndexBuild.NO_OWNER, ScheduledIndexBuild.decide(null, Map.of()));
-        assertEquals(ScheduledIndexBuild.NO_OWNER, ScheduledIndexBuild.decide("  ", Map.of()));
-        assertEquals(ScheduledIndexBuild.DATASET_GONE, ScheduledIndexBuild.decide("u1", null));
+        assertEquals(ScheduledIndexBuild.NO_OWNER, ScheduledIndexBuild.decide(null, Map.of(), null));
+        assertEquals(ScheduledIndexBuild.NO_OWNER, ScheduledIndexBuild.decide("  ", Map.of(), null));
+        assertEquals(ScheduledIndexBuild.DATASET_GONE, ScheduledIndexBuild.decide("u1", null, null));
     }
 
     @Test
     void anUnrestrictedDatasetOrOneTheOwnerOwnsOrIsSharedToByUserIdIsAllowed() {
-        assertNull(ScheduledIndexBuild.decide("u1", Map.of()));
-        assertNull(ScheduledIndexBuild.decide("u1", shared("u1")));
+        assertNull(ScheduledIndexBuild.decide("u1", Map.of(), null));
+        assertNull(ScheduledIndexBuild.decide("u1", shared("u1"), null));
         assertNull(ScheduledIndexBuild.decide("u2", shared("u1",
-                Map.of("subjectType", "user", "subjectId", "u2", "access", "view"))));
+                Map.of("subjectType", "user", "subjectId", "u2", "access", "view")), null));
     }
 
     @Test
     void aRoleShareIsRefusedBecauseItCannotBeReResolvedOffARequest() {
         assertEquals(ScheduledIndexBuild.ROLE_SHARE_ONLY, ScheduledIndexBuild.decide("u2", shared("u1",
-                Map.of("subjectType", "role", "subjectId", "analysts", "access", "view"))));
+                Map.of("subjectType", "role", "subjectId", "analysts", "access", "view")), null));
     }
 
     @Test
     void anOwnerWhoLostTheDatasetIsRefused() {
-        assertEquals(ScheduledIndexBuild.DATASET_NOT_SHARED, ScheduledIndexBuild.decide("u2", shared("u1")));
+        assertEquals(ScheduledIndexBuild.DATASET_NOT_SHARED, ScheduledIndexBuild.decide("u2", shared("u1"), null));
     }
 }

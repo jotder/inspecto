@@ -81,10 +81,11 @@ final class DatasetEntryRules {
     static final String BASED_ON = "basedOn";
 
     /**
-     * LA-DATA-PAGE-1 (plan §8): a <b>Mapping</b> is a Dataset entry ({@code origin: mapping}) that reads ANOTHER import
+     * LA-DATA-PAGE-1 (plan §8): a <b>Mapping</b> is a Dataset entry ({@code origin: mapping}) that reads ANOTHER
      * Dataset's stored data its own way - its own Entity Types, link mapping and event date. Its {@code basedOn} must name
-     * an Add data Dataset of this Space (not itself), and its {@code physicalRef} must be exactly that base's: a Mapping
-     * never points at data of its own choosing. Run on every Dataset write with the Space's registry.
+     * a stored Dataset of this Space (not itself, not a Mapping, not computed - Add data or Pipeline-fed since
+     * LA-PIPELINE-MAPPINGS-1), and its {@code physicalRef} must be exactly that base's: a Mapping never points at data of
+     * its own choosing. Who may read it: {@code ComponentAccess.baseVisible}. Run on every Dataset write with the registry.
      *
      * @throws IllegalArgumentException naming the broken rule
      */
@@ -102,8 +103,15 @@ final class DatasetEntryRules {
         Map<String, Object> baseEntry = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry")).get("dataset", base)
                 .map(com.gamma.pipeline.ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException(BASED_ON + " names no Dataset '" + base + "'"));
-        if (!"import".equals(String.valueOf(baseEntry.get("origin"))))
-            throw new IllegalArgumentException("a Mapping reads an Add data Dataset; '" + base + "' is not one");
+        // LA-PIPELINE-MAPPINGS-1 (Q-1): any STORED, plain Dataset - added with Add data or kept up to date by a Pipeline -
+        // never a Mapping, never one computed at read time (it has no stored rows a Mapping could point at)
+        if (ORIGIN_MAPPING.equals(String.valueOf(baseEntry.get("origin"))))
+            throw new IllegalArgumentException("a Mapping reads a stored Dataset; '" + base + "' is itself a Mapping");
+        for (String k : List.of("sql", "view", "sourceName", "calculated"))
+            if (baseEntry.get(k) != null)
+                throw new IllegalArgumentException("a Mapping reads a stored Dataset; '" + base + "' is computed (" + k + ")");
+        if (!(baseEntry.get("physicalRef") instanceof String ref) || ref.isBlank())
+            throw new IllegalArgumentException("a Mapping reads a stored Dataset; '" + base + "' has no stored data (physicalRef)");
         if (!String.valueOf(baseEntry.get("physicalRef")).equals(String.valueOf(content.get("physicalRef"))))
             throw new IllegalArgumentException("a Mapping reads exactly the data of '" + base + "': physicalRef must be '"
                     + baseEntry.get("physicalRef") + "'");

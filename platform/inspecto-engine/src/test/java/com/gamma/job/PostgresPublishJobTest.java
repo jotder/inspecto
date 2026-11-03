@@ -147,6 +147,19 @@ class PostgresPublishJobTest {
         return new PostgresPublishJobType.Author(id, Set.of("analyst"), Set.of(caps), false);
     }
 
+    /** LA-PIPELINE-MAPPINGS-1 (Q-2): a publish reads a Mapping only when its author may read the Mapping's base. */
+    @Test
+    void aMappingIsPublishedOnlyByAnAuthorWhoMayReadItsBase(@TempDir Path dir) throws Exception {
+        ComponentStore store = new ComponentStore(dir.resolve("registry"));
+        store.write("dataset", "private_base", Map.of("physicalRef", "private_base/database", "owner", "u1", "shares", List.of()));
+        Map<String, Object> mapping = Map.of("origin", "mapping", "basedOn", "private_base", "physicalRef", "private_base/database");
+        assertTrue(PostgresPublishJobType.canView(author("u2"), mapping), "the Mapping's own envelope is unrestricted");
+        assertFalse(PostgresPublishJobType.canRead(author("u2"), store, mapping));
+        assertTrue(PostgresPublishJobType.canRead(author("u1"), store, mapping), "the base's owner");
+        assertFalse(PostgresPublishJobType.canRead(author("u1"), store, Map.of("origin", "mapping", "basedOn", "gone")));
+        assertTrue(PostgresPublishJobType.canRead(PostgresPublishJobType.Author.OPEN, store, mapping), "Basic: open");
+    }
+
     @Test
     void fullRefreshPublishesWithCommentsDialsTheCheckedAddressAndDropsSensitiveColumnsByDefault() throws Exception {
         JobRun r = run(Map.of());

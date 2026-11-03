@@ -578,9 +578,25 @@ class ControlApiOnboardFilesTest {
                     .replace(id + "/database", "elsewhere/database"), null).statusCode());
             assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m3\"")
                     .replace("\"basedOn\":\"" + id + "\",", ""), null).statusCode());
-            new ComponentStore(root.resolve("registry")).write("dataset", "piped", Map.of("physicalRef", id + "/database"));
-            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m4\"")
-                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"piped\""), null).statusCode());
+            // LA-PIPELINE-MAPPINGS-1 (Q-1): a Dataset a Pipeline keeps up to date (no origin) is a base like an import...
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            registry.write("dataset", "piped", Map.of("physicalRef", id + "/database"));
+            HttpResponse<String> piped = json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m4\"")
+                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"piped\""), null);
+            assertTrue(piped.statusCode() == 200 || piped.statusCode() == 201, piped.body());
+            // ... but not one computed at read time, one with no stored data, or a Mapping
+            registry.write("dataset", "computed", Map.of("physicalRef", id + "/database", "sql", "SELECT 1"));
+            HttpResponse<String> computed = json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m9\"")
+                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"computed\""), null);
+            assertEquals(422, computed.statusCode(), computed.body());
+            assertTrue(computed.body().contains("is computed (sql)"), computed.body());
+            registry.write("dataset", "pointerless", Map.of("description", "no stored data"));
+            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m10\"")
+                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"pointerless\""), null).statusCode());
+            HttpResponse<String> ofMapping = json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m11\"")
+                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"by_channel\""), null);
+            assertEquals(422, ofMapping.statusCode(), ofMapping.body());
+            assertTrue(ofMapping.body().contains("is itself a Mapping"), ofMapping.body());
             assertEquals(422, json(c, "POST", "/components/dataset", "{\"id\":\"m5\",\"physicalRef\":\"x\",\"basedOn\":\"" + id + "\"}",
                     null).statusCode(), "basedOn is only for a Mapping");
 
@@ -606,6 +622,8 @@ class ControlApiOnboardFilesTest {
             assertEquals(409, held.statusCode(), held.body());
             assertTrue(held.body().contains("by_channel"), held.body());
             data(json(c, "DELETE", "/components/dataset/by_channel", null, null), 200);
+            assertEquals(409, json(c, "DELETE", "/components/dataset/piped", null, null).statusCode(), "m4 reads piped");
+            data(json(c, "DELETE", "/components/dataset/m4", null, null), 200);
             data(json(c, "DELETE", "/components/dataset/piped", null, null), 200);
             data(json(c, "DELETE", "/components/dataset/" + id, null, null), 200);
         }
@@ -625,6 +643,41 @@ class ControlApiOnboardFilesTest {
             assertEquals(404, hidden.statusCode(), hidden.body());
             assertEquals(404, absent.statusCode(), absent.body());
             assertFalse(new ComponentStore(root.resolve("registry")).get("dataset", "peek").isPresent(), "nothing was written");
+        }
+    }
+
+    /**
+     * LA-PIPELINE-MAPPINGS-1 (Q-2): a Mapping never widens who reads its base. An unrestricted Mapping of a base shared away
+     * from the caller reads as absent - by id and in the list - and appears once the base is shared with them.
+     */
+    @Test
+    void aMappingIsReadOnlyByThoseWhoMayReadItsBase(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            registry.write("dataset", "private_base", Map.of("physicalRef", "private_base/database", "owner", "uploader-1",
+                    "shares", List.of()));
+            // written as its base's owner would, with no shares of its own: unrestricted by itself
+            registry.write("dataset", "wide_view", Map.of("origin", "mapping", "basedOn", "private_base",
+                    "physicalRef", "private_base/database", "owner", "uploader-1",
+                    "defaultLinkMapping", Map.of("from", "a", "to", "b")));
+            assertEquals(404, json(c, "GET", "/components/dataset/wide_view", null, AUTHOR).statusCode());
+            assertFalse(json(c, "GET", "/components/dataset", null, AUTHOR).body().contains("wide_view"));
+            assertEquals(200, json(c, "GET", "/components/dataset/wide_view", null, UPLOADER).statusCode(), "the base's owner reads it");
+
+            // the positive twin: shared the base, the same caller reads the same Mapping
+            registry.write("dataset", "private_base", Map.of("physicalRef", "private_base/database", "owner", "uploader-1",
+                    "shares", List.of(Map.of("subjectType", "user", "subjectId", "author-1", "access", "view"))));
+            assertEquals(200, json(c, "GET", "/components/dataset/wide_view", null, AUTHOR).statusCode());
+            assertTrue(json(c, "GET", "/components/dataset", null, AUTHOR).body().contains("wide_view"));
+
+            // a Mapping whose base is gone reads as absent too (fail-closed), never as a Dataset of its own
+            registry.delete("dataset", "private_base");
+            assertEquals(404, json(c, "GET", "/components/dataset/wide_view", null, AUTHOR).statusCode());
+            // ... yet it can still be removed: deleting reads no rows, so its own envelope decides
+            HttpResponse<String> removed = json(c, "DELETE", "/components/dataset/wide_view", null, AUTHOR);
+            assertEquals(200, removed.statusCode(), removed.body());
+            assertFalse(registry.get("dataset", "wide_view").isPresent());
         }
     }
 

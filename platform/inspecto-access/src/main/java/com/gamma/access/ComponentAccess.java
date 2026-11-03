@@ -67,7 +67,63 @@ public final class ComponentAccess {
 
     /** Whether this request may see {@code content} at all (list filtering + read routes). */
     public static boolean canView(HttpExchange ex, Map<String, Object> content) {
-        return level(ex, content) >= VIEW;
+        return level(ex, content) >= VIEW && baseVisible(ex, content);
+    }
+
+    /**
+     * LA-PIPELINE-MAPPINGS-1 (Q-2): a Mapping ({@code origin: mapping}) reads its {@code basedOn} Dataset's rows, so it
+     * never widens who reads them - the base must be visible too (writing one already needs that:
+     * {@code ComponentRoutes.writeComponent}). Resolves a Dataset entry by id under a Space's config
+     * root; installed by the control plane (this module cannot read the registry). Null = the Dataset is absent.
+     */
+    @FunctionalInterface
+    public interface DatasetEntries {
+        Map<String, Object> dataset(java.nio.file.Path configRoot, String id);
+    }
+
+    private static volatile DatasetEntries datasets;
+
+    /** Install the Dataset lookup {@link #canView} uses for a Mapping's base (the control plane, at start). */
+    public static void datasetEntries(DatasetEntries lookup) {
+        datasets = lookup;
+    }
+
+    /**
+     * True unless {@code content} is a Mapping whose base this request may not view, or cannot be resolved: fail-closed
+     * once a Subject is attached; with none (Basic) everything is allowed, as {@link #level}.
+     */
+    public static boolean baseVisible(HttpExchange ex, Map<String, Object> content) {
+        if (!isMapping(content)) return true;
+        if (!(RequestAttrs.attr(ex, RequestAttrs.ATTR_SUBJECT) instanceof Subject)) return true;
+        java.nio.file.Path root = RequestAttrs.attr(ex, Roles.ATTR_CONFIG_ROOT) instanceof java.nio.file.Path p ? p : null;
+        // one registry read per base per request: a list of Datasets judges each Mapping
+        @SuppressWarnings("unchecked")
+        Map<String, Map<String, Object>> seen = RequestAttrs.attr(ex, ATTR_BASES) instanceof Map<?, ?> m
+                ? (Map<String, Map<String, Object>>) m : null;
+        if (seen == null) RequestAttrs.attr(ex, ATTR_BASES, seen = new java.util.HashMap<>());
+        String base = trimOrEmpty(content.get("basedOn"));
+        Map<String, Object> baseEntry = seen.containsKey(base) ? seen.get(base) : base(root, base);
+        seen.put(base, baseEntry);
+        // the base's own envelope only: a Mapping of a Mapping is refused at write time
+        return baseEntry != null && level(ex, baseEntry) >= VIEW;
+    }
+
+    /** Request-scoped cache of the Mapping bases {@link #baseVisible} resolved. Server-internal. */
+    private static final String ATTR_BASES = "inspecto.access.mappingBases";
+
+    private static boolean isMapping(Map<String, Object> content) {
+        return content != null && "mapping".equals(String.valueOf(content.get("origin")));
+    }
+
+    /** The base entry, or null when it cannot be resolved - absent, no lookup, no root, or a malformed id (fail-closed). */
+    private static Map<String, Object> base(java.nio.file.Path root, String base) {
+        DatasetEntries lookup = datasets;
+        if (base.isEmpty() || lookup == null || root == null) return null;
+        try {
+            return lookup.dataset(root, base);
+        } catch (RuntimeException malformed) {   // e.g. a hand-edited basedOn the store refuses as an id
+            return null;
+        }
     }
 
     /** The three answers of {@link #canViewAs}: a caller-less read cannot always say yes or no. */
@@ -109,6 +165,21 @@ public final class ComponentAccess {
         return roleShare ? AsOwner.ROLE_ONLY : AsOwner.DENIED;
     }
 
+    /**
+     * {@link #canViewAs} for a Dataset entry under {@code configRoot}: a Mapping is also judged on its base
+     * (LA-PIPELINE-MAPPINGS-1 Q-2), so a sweep never reads through a Mapping what its owner could not read directly.
+     * An unresolvable base is DENIED.
+     */
+    public static AsOwner canViewAs(String subjectId, Set<String> capabilities, Map<String, Object> content,
+                                    java.nio.file.Path configRoot) {
+        AsOwner own = canViewAs(subjectId, capabilities, content);
+        if (own == AsOwner.DENIED || !isMapping(content)) return own;
+        Map<String, Object> baseEntry = base(configRoot, trimOrEmpty(content.get("basedOn")));
+        AsOwner base = baseEntry == null ? AsOwner.DENIED : canViewAs(subjectId, capabilities, baseEntry);
+        if (base == AsOwner.DENIED) return AsOwner.DENIED;
+        return own == AsOwner.ROLE_ONLY || base == AsOwner.ROLE_ONLY ? AsOwner.ROLE_ONLY : AsOwner.ALLOWED;
+    }
+
     /** 404 (indistinguishable from absence) unless the request may view the component. */
     public static void requireView(HttpExchange ex, String type, String id, Map<String, Object> content) {
         if (!canView(ex, content))
@@ -126,7 +197,9 @@ public final class ComponentAccess {
     /** Delete gate: unrestricted components keep today's behavior; a restricted (shared) component
      *  may only be deleted by its owner / an access admin — an edit share is not ownership. */
     public static void requireDelete(HttpExchange ex, String type, String id, Map<String, Object> content) {
-        requireView(ex, type, id, content);
+        // the envelope alone: deleting reads no rows, so a Mapping whose base is gone or hidden can still be removed
+        if (level(ex, content) < VIEW)
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         if (content.containsKey(SHARES) && level(ex, content) < OWN)
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                     "only the owner may delete shared " + type + " component '" + id + "'");

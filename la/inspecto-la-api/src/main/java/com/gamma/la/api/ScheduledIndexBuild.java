@@ -120,11 +120,12 @@ public final class ScheduledIndexBuild {
     // ── the decision ─────────────────────────────────────────────────────────────────────────────────────
 
     /** The pure authority re-decision: the refusal code, or null when the principal may build over {@code dataset}. */
-    static String decide(String owner, Map<String, Object> datasetContent) {
+    static String decide(String owner, Map<String, Object> datasetContent, Path configRoot) {
         if (owner == null || owner.isBlank()) return NO_OWNER;
         if (datasetContent == null) return DATASET_GONE;
-        // The principal passes NO capabilities: canConfigureAccess is a live grant it cannot confirm.
-        return switch (ComponentAccess.canViewAs(owner, Set.of(), datasetContent)) {
+        // The principal passes NO capabilities: canConfigureAccess is a live grant it cannot confirm. A Mapping is judged
+        // on its base too (LA-PIPELINE-MAPPINGS-1), resolved under configRoot.
+        return switch (ComponentAccess.canViewAs(owner, Set.of(), datasetContent, configRoot)) {
             case ALLOWED -> null;
             case ROLE_ONLY -> ROLE_SHARE_ONLY;
             case DENIED -> DATASET_NOT_SHARED;
@@ -150,7 +151,7 @@ public final class ScheduledIndexBuild {
         if (provider == null) return refused(null, UNDECIDABLE, "no Dataset provider is bound, so the Dataset cannot be read");
 
         Map<String, Object> content = provider.dataset(writeRoot, r.dataset()).orElse(null);
-        String denied = decide(r.owner(), content);
+        String denied = decide(r.owner(), content, writeRoot);
         if (denied != null) return refused(null, denied, describe(denied));
 
         String relationSql;

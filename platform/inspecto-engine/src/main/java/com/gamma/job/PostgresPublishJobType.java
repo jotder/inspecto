@@ -265,13 +265,13 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             List<Path> readRoots = new ArrayList<>(List.of(Path.of(dataDir)));
             for (String id : datasets) {
                 Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content).orElse(null);
-                if (ds != null && canView(author, ds)) readRoots.addAll(DatasetRelation.readRoots(ds, Path.of(dataDir)));
+                if (ds != null && canRead(author, store, ds)) readRoots.addAll(DatasetRelation.readRoots(ds, Path.of(dataDir)));
             }
             try (Connection duck = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)), readRoots)) {
                 for (String id : datasets) {
                     Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content)
                             .orElse(null);
-                    if (ds == null || !canView(author, ds))   // indistinguishable, as the read routes' 404
+                    if (ds == null || !canRead(author, store, ds))   // indistinguishable, as the read routes' 404
                         throw new SecurityException("dataset '" + id + "' does not exist or its author '"
                                 + author.id() + "' may not read it — refused");
                     String table = PostgresPublishSql.tableFor(id);
@@ -355,6 +355,22 @@ public final class PostgresPublishJobType implements JobTypeProvider {
     }
 
     // ── planning ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * {@link #canView}, and for a Mapping its base too (LA-PIPELINE-MAPPINGS-1, as {@code ComponentAccess.baseVisible}): a
+     * publish never reads through a Mapping what its author could not read directly. An unresolvable base refuses.
+     */
+    static boolean canRead(Author a, ComponentStore store, Map<String, Object> content) {
+        if (!canView(a, content)) return false;
+        if (a.open() || !"mapping".equals(String.valueOf(content.get("origin")))) return true;
+        try {
+            Map<String, Object> base = content.get("basedOn") instanceof String id
+                    ? store.get("dataset", id).map(ComponentRegistry.Component::content).orElse(null) : null;
+            return base != null && canView(a, base);
+        } catch (RuntimeException malformed) {   // a basedOn the store refuses as an id
+            return false;
+        }
+    }
 
     /** {@code ComponentAccess.level >= VIEW}, decided for the Job's author. */
     static boolean canView(Author a, Map<String, Object> content) {

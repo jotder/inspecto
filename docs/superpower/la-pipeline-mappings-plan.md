@@ -1,6 +1,6 @@
 # Mappings of Pipeline Datasets (`LA-PIPELINE-MAPPINGS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6).** Operator ask, after a walkthrough of the
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 BUILT 2026-11-03 (§8).** Operator ask, after a walkthrough of the
 > Entities and Data pages in Basic: a saved **Mapping** (a Dataset of its own that reads another Dataset's rows its own
 > way) should work for Datasets that **Pipelines** keep up to date, not only for Datasets added with *Add data*.
 > Board row `LA-PIPELINE-MAPPINGS-1`.
@@ -95,3 +95,36 @@ is marked on the Data page.
 
 Editing a Pipeline Dataset's own entry from the Data page (its Pipeline owns it); Mappings of Mappings; Mappings that
 filter rows (a Mapping reads every row of its base); building link indexes for Mappings automatically.
+
+## 8. As built: P0 (2026-11-03)
+
+- **The base rule** (`DatasetEntryRules.validateMapping`): a base is any Dataset with a `physicalRef` that is not itself
+  a Mapping and has none of `sql`, `view`, `sourceName`, `calculated`. The refusals say which (*"…is itself a
+  Mapping"*, *"…is computed (sql)"*, *"…has no stored data (physicalRef)"*). The `origin: import` requirement is gone.
+- **Reading a Mapping needs its base** (`ComponentAccess.canView` → `baseVisible`): for an `origin: mapping` entry, with a
+  Subject attached, the base named by `basedOn` must resolve under the request's config root (`Roles.ATTR_CONFIG_ROOT`)
+  and be viewable by the caller; otherwise the Mapping reads as absent (404, and left out of lists), as every hidden
+  Dataset does. A Mapping whose base is gone is absent too. With no Subject (Basic) nothing changes. The lookup is a seam
+  (`ComponentAccess.DatasetEntries`) the control plane installs over `ComponentStore`, because `inspecto-access` cannot
+  read the registry. Every one of the ~30 `canView` call sites gets it without change. Bases are read once per request
+  (a request-scoped cache: a list of Datasets would otherwise scan the registry once per Mapping), and a `basedOn` the
+  store refuses as an id reads as absent rather than failing the list. The answer is the R3 404, not the 403 §3.2
+  sketched: a hidden base must not be told apart from an absent one.
+- **Paths that do not go through `canView`, closed too** (verification round 1):
+  - caller-less sweeps - `ComponentAccess.canViewAs(subject, caps, content, configRoot)` also judges a Mapping's base
+    (an unresolvable base is DENIED; a role-only base is ROLE_ONLY); `ScheduledIndexBuild.decide` and
+    `StandingDetection.decide` use it, so an owner who lost the base stops indexing or sweeping through a Mapping;
+  - the `publish.postgres` Job, whose engine-side copy of the view rule cannot reach `inspecto-access`:
+    `PostgresPublishJobType.canRead` adds the same base check through its own `ComponentStore`.
+- **Deleting** judges the Mapping's own envelope only (`requireDelete`): it reads no rows, and a Mapping whose base was
+  removed out of band must stay removable.
+- **Writing a Mapping** already needed a viewable base (`ComponentRoutes.writeComponent`, LA-DATA-PAGE-1: 404 when the
+  base is hidden or absent) - §3.2's "creating or editing requires read access" was already true; nothing added.
+- **Deleting a base** with Mappings was already refused (409, any Dataset type) - now exercised for a Pipeline base.
+- **Moved to P1:** the drifted-column read check (§3.3) needs a real read of a Mapping over data that lost a column; it
+  goes with the Data page mark.
+- Tests: `ControlApiOnboardFilesTest` - a Pipeline-style base accepted, computed / pointer-less / Mapping bases refused
+  with the reason, delete of a Pipeline base held by its Mapping; `aMappingIsReadOnlyByThoseWhoMayReadItsBase` - an
+  unrestricted Mapping of a base shared away is 404 by id and absent from the list, visible once the base is shared,
+  absent again when the base is gone, and still deletable; `ComponentAccessAsOwnerTest.aMappingIsJudgedOnItsBaseToo`;
+  `PostgresPublishJobTest.aMappingIsPublishedOnlyByAnAuthorWhoMayReadItsBase`.

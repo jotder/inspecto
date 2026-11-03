@@ -54,6 +54,32 @@ class ComponentAccessAsOwnerTest {
                 "a blank id never matches a blank share");
     }
 
+    /** LA-PIPELINE-MAPPINGS-1 (Q-2): a sweep judges a Mapping on its base too; an unresolvable base is DENIED. */
+    @Test
+    void aMappingIsJudgedOnItsBaseToo() {
+        java.nio.file.Path root = java.nio.file.Path.of("space");
+        Map<String, Object> privateBase = Map.of("owner", "u1", "shares", List.of());
+        Map<String, Object> roleBase = Map.of("owner", "u1", "shares", List.of(Map.of("subjectType", "role", "subjectId", "a", "access", "view")));
+        ComponentAccess.datasetEntries((r, id) -> r.equals(root) ? switch (id) {
+            case "private_base" -> privateBase;
+            case "role_base" -> roleBase;
+            default -> null;
+        } : null);
+        try {
+            Map<String, Object> mapping = Map.of("origin", "mapping", "basedOn", "private_base");   // unrestricted itself
+            assertEquals(ALLOWED, ComponentAccess.canViewAs("u2", Set.of(), mapping), "the envelope alone widens");
+            assertEquals(DENIED, ComponentAccess.canViewAs("u2", Set.of(), mapping, root));
+            assertEquals(ALLOWED, ComponentAccess.canViewAs("u1", Set.of(), mapping, root), "the base's owner");
+            assertEquals(ROLE_ONLY, ComponentAccess.canViewAs("u2", Set.of(),
+                    Map.of("origin", "mapping", "basedOn", "role_base"), root));
+            assertEquals(DENIED, ComponentAccess.canViewAs("u1", Set.of(), Map.of("origin", "mapping", "basedOn", "gone"), root));
+            assertEquals(DENIED, ComponentAccess.canViewAs("u1", Set.of(), mapping, null), "no root: unresolvable");
+            assertEquals(ALLOWED, ComponentAccess.canViewAs("u2", Set.of(), Map.of(), root), "not a Mapping: unchanged");
+        } finally {
+            ComponentAccess.datasetEntries(null);
+        }
+    }
+
     @Test
     void aRoleShareIsUndecidableNotDenied() {
         Map<String, Object> c = restricted("bob", share("role", "analyst", "view"));
