@@ -40,15 +40,15 @@
             [options]="targetOptionsList()"
         />
         @if (askingNewType()) {
-        <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic">
-            <mat-label>Case type</mat-label>
-            <input matInput [formControl]="newTypeCtrl" (keydown.enter)="openNewType()" placeholder="e.g. sim-box" />
-            @if (newTypeCtrl.hasError('required')) {
-            <mat-error>Name the Case type.</mat-error>
-            } @else if (newTypeCtrl.hasError('pattern')) {
-            <mat-error>Letters, digits, - and _ only, starting with a letter or digit.</mat-error>
-            }
-        </mat-form-field>
+        <!-- (entered): Enter in the OPEN row commits it, then opens the form; the Enter that opens the row does not. -->
+        <inspecto-pen-field
+            class="min-w-48 flex-1"
+            label="Case type"
+            placeholder="e.g. sim-box"
+            [formControl]="newTypeCtrl"
+            [error]="newTypeError()"
+            (entered)="openNewType()"
+        ></inspecto-pen-field>
         <button mat-stroked-button type="button" (click)="openNewType()">Open form</button>
         }
     </div>
@@ -152,21 +152,24 @@
             </inspecto-alert>
             }
             <form [formGroup]="fieldForm" class="flex flex-col gap-3" (submit)="$event.preventDefault()">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input matInput formControlName="label" placeholder="e.g. Root cause category" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Help text</mat-label>
-                    <input matInput formControlName="help" placeholder="Shown under the field" />
-                </mat-form-field>
-
-                <inspecto-option-picker
-                    label="Kind of answer"
-                    formControlName="type"
-                    [options]="controlOptions(f.type)"
-                    [readOnly]="!canEdit() || isLocked(f)"
-                />
+                <div class="flex flex-col gap-1">
+                    <inspecto-pen-field
+                        label="Name"
+                        placeholder="e.g. Root cause category"
+                        formControlName="label"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Help text"
+                        placeholder="Shown under the field"
+                        formControlName="help"
+                    ></inspecto-pen-field>
+                    <inspecto-option-picker
+                        label="Kind of answer"
+                        formControlName="type"
+                        [options]="controlOptions(f.type)"
+                        [readOnly]="!canEdit() || isLocked(f)"
+                    />
+                </div>
 
                 <div class="flex flex-col gap-1">
                     <span id="ff-appears-label" class="text-sm font-medium">Where it appears</span>
@@ -195,10 +198,12 @@
                     </legend>
                     @for (c of choiceControls.controls; track c; let i = $index; let cf = $first; let cl = $last) {
                     <div class="flex items-center gap-1">
-                        <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                            <mat-label>Choice {{ i + 1 }}</mat-label>
-                            <input #choiceInput matInput [formControl]="c" />
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            #choiceInput
+                            class="flex-auto"
+                            [label]="'Choice ' + (i + 1)"
+                            [formControl]="c"
+                        ></inspecto-pen-field>
                         @if (canEdit()) {
                         <button
                             mat-icon-button
@@ -236,21 +241,16 @@
                     }
                 </fieldset>
                 } @if (f.type === 'number') {
-                <div class="flex gap-3">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Smallest allowed</mat-label>
-                        <input matInput type="number" formControlName="min" />
-                    </mat-form-field>
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Largest allowed</mat-label>
-                        <input matInput type="number" formControlName="max" />
-                    </mat-form-field>
+                <div class="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                    <inspecto-pen-field label="Smallest allowed" type="number" formControlName="min"></inspecto-pen-field>
+                    <inspecto-pen-field label="Largest allowed" type="number" formControlName="max"></inspecto-pen-field>
                 </div>
                 } @if (f.type !== 'boolean' && f.type !== 'select') {
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Placeholder</mat-label>
-                    <input matInput formControlName="placeholder" placeholder="Greyed-out hint inside the box" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Placeholder"
+                    placeholder="Greyed-out hint inside the box"
+                    formControlName="placeholder"
+                ></inspecto-pen-field>
                 }
 
                 <div class="flex flex-col gap-2">
@@ -285,10 +285,11 @@
                             [readOnly]="!canEdit()"
                         />
                         } @else {
-                        <mat-form-field class="min-w-40 flex-1" subscriptSizing="dynamic">
-                            <mat-label>Answer</mat-label>
-                            <input matInput formControlName="showWhenValue" />
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            class="min-w-40 flex-1"
+                            label="Answer"
+                            formControlName="showWhenValue"
+                        ></inspecto-pen-field>
                         } }
                     </div>
                     } @else {
@@ -322,10 +323,12 @@
                         @if (usesChoices(f.type) && f.choices.length) {
                         <p class="text-secondary text-xs">Choices are stored as: {{ choiceValues(f).join(', ') }}</p>
                         } @if (usesPattern(f.type)) {
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Pattern (regular expression)</mat-label>
-                            <input matInput formControlName="pattern" placeholder="e.g. ^[A-Z]{3}-[0-9]+$" />
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Pattern (regular expression)"
+                            placeholder="e.g. ^[A-Z]{3}-[0-9]+$"
+                            [mono]="true"
+                            formControlName="pattern"
+                        ></inspecto-pen-field>
                         }
                         <p class="text-secondary text-xs">
                             While this is open, “Kind of answer” also offers ID-style text, List of values and Suggested

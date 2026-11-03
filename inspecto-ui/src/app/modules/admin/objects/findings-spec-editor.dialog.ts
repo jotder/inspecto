@@ -2,7 +2,6 @@ import {
     ChangeDetectionStrategy,
     Component,
     DestroyRef,
-    ElementRef,
     Injector,
     afterNextRender,
     computed,
@@ -16,9 +15,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormArray, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -30,6 +27,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -88,9 +86,7 @@ const NEW_TYPE = '#new';
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatRadioModule,
         MatSlideToggleModule,
         MatTooltipModule,
@@ -99,6 +95,7 @@ const NEW_TYPE = '#new';
         InspectoOptionPickerComponent,
         InspectoSchemaFormComponent,
         InspectoSkeletonComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -167,7 +164,7 @@ export class FindingsSpecEditorDialog {
     /** What the preview holds, carried across every draft edit (a spec swap rebuilds its controls). */
     readonly previewSeed = signal<Record<string, unknown>>({});
     private readonly preview = viewChild<InspectoSchemaFormComponent>('preview');
-    private readonly choiceInputs = viewChildren<ElementRef<HTMLInputElement>>('choiceInput');
+    private readonly choiceInputs = viewChildren<PenFieldComponent>('choiceInput');
 
     readonly controlLabel = controlLabel;
     readonly usesChoices = usesChoices;
@@ -232,6 +229,15 @@ export class FindingsSpecEditorDialog {
         }
         this.askingNewType.set(false);
         await this.switchTo(v || null);
+    }
+
+    /** The Case type row's error line: shown once the row was left or *Open form* pressed. */
+    newTypeError(): string {
+        const c = this.newTypeCtrl;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Name the Case type.';
+        if (c.hasError('pattern')) return 'Letters, digits, - and _ only, starting with a letter or digit.';
+        return '';
     }
 
     /** Open the form for a Case type typed in by the lead (its own form, or a new one seeded from the shared). */
@@ -462,7 +468,7 @@ export class FindingsSpecEditorDialog {
         );
         this.choiceControls.push(this.fb.nonNullable.control(''), { emitEvent: false });
         // Put the cursor in the new box, not the field's Name (FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1).
-        afterNextRender(() => this.choiceInputs().at(-1)?.nativeElement.focus(), { injector: this.injector });
+        afterNextRender(() => this.choiceInputs().at(-1)?.focus(), { injector: this.injector });
     }
 
     moveChoice(index: number, delta: -1 | 1): void {

@@ -53,17 +53,6 @@ src/app/modules/admin/map-settings/map-settings.component.ts
 src/app/modules/admin/menu/menu-node.dialog.ts
 src/app/modules/admin/menu/menu-route.dialog.ts
 src/app/modules/admin/model-settings/model-settings.component.html
-src/app/modules/admin/objects/case-rules.dialog.ts
-src/app/modules/admin/objects/findings-spec-editor.dialog.html
-src/app/modules/admin/objects/impact-panel.component.ts
-src/app/modules/admin/objects/object-create.dialog.ts
-src/app/modules/admin/objects/object-detail.component.html
-src/app/modules/admin/objects/object-mail.component.html
-src/app/modules/admin/objects/postmortem-panel.component.html
-src/app/modules/admin/objects/resolve.dialog.ts
-src/app/modules/admin/objects/split-case.dialog.ts
-src/app/modules/admin/objects/tag-rules.dialog.ts
-src/app/modules/admin/objects/tag.dialog.ts
 src/app/modules/admin/pending-changes/pending-changes.component.html
 src/app/modules/admin/pipelines/pipeline-change-id.dialog.ts
 src/app/modules/admin/pipelines/pipeline-config-definition.component.ts

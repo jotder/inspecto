@@ -3,9 +3,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { currentOperator } from './mail-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -23,30 +22,31 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
         MatButtonModule,
         MatCheckboxModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Split "{{ data.caseObj.title }}"</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2">
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>New case title</mat-label>
-                <input
-                    matInput
-                    [formControl]="form.controls.title"
-                    placeholder="what the carved-out part is about"
-                    required
+            <div class="flex flex-col gap-1">
+                <inspecto-pen-field
                     cdkFocusInitial
-                />
-                @if (form.controls.title.hasError('required') && form.controls.title.touched) {
-                    <mat-error>A title is required.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Assignee (optional)</mat-label>
-                <input matInput [formControl]="form.controls.assignee" />
-            </mat-form-field>
+                    label="New case title"
+                    [required]="true"
+                    placeholder="what the carved-out part is about"
+                    [formControl]="form.controls.title"
+                    [error]="
+                        form.controls.title.touched && form.controls.title.hasError('required')
+                            ? 'A title is required.'
+                            : ''
+                    "
+                ></inspecto-pen-field>
+                <inspecto-pen-field
+                    label="Assignee"
+                    placeholder="optional"
+                    [formControl]="form.controls.assignee"
+                ></inspecto-pen-field>
+            </div>
 
             <div>
                 <div class="mb-1 text-xs font-bold uppercase tracking-wider opacity-60">Members to move</div>

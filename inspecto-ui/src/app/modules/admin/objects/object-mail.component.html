@@ -89,16 +89,14 @@
                     </div>
                     @if (navTagOpen()) {
                         <div class="mb-2 px-2">
-                            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                <mat-label>New tag</mat-label>
-                                <input
-                                    matInput
-                                    [formControl]="navNewTag"
-                                    (keyup.enter)="createNavTag()"
-                                    placeholder="name, then Enter"
-                                    aria-label="New tag name"
-                                />
-                            </mat-form-field>
+                            <!-- (entered): Enter in the OPEN row commits it, then creates the tag; the Enter that opens the row does not. -->
+                            <inspecto-pen-field
+                                label="New tag"
+                                placeholder="name, then Enter"
+                                ariaLabel="New tag name"
+                                [formControl]="navNewTag"
+                                (entered)="createNavTag()"
+                            ></inspecto-pen-field>
                         </div>
                     }
                     @for (t of tags(); track t.tag) {

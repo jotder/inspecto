@@ -1,5 +1,5 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,6 +16,7 @@ import {
     PickerOption,
     pickerOptions,
 } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /**
  * Tag Rules manager (GLOSSARY §9) — Gmail-filter semantics: a saved search that applies a tag.
@@ -28,6 +29,7 @@ import {
     standalone: true,
     imports: [
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
@@ -79,22 +81,17 @@ import {
             <!-- New rule -->
             <section aria-label="New tag rule">
                 <h3 class="mb-2 text-xs font-bold uppercase tracking-wider opacity-60">New rule</h3>
-                <form [formGroup]="form" class="flex flex-col gap-3">
-                    <div class="flex gap-3">
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Rule name</mat-label>
-                            <input
-                                matInput
-                                formControlName="name"
-                                placeholder="e.g. critical-is-urgent"
-                                required
-                                cdkFocusInitial
-                            />
-                            @if (form.controls.name.hasError('required') && form.controls.name.touched) {
-                                <mat-error>Required.</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                <form [formGroup]="form" class="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                    <inspecto-pen-field
+                        cdkFocusInitial
+                        label="Rule name"
+                        [required]="true"
+                        placeholder="e.g. critical-is-urgent"
+                        formControlName="name"
+                        [error]="requiredError(form.controls.name)"
+                    ></inspecto-pen-field>
+                    <div>
+                        <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a typeahead over the tag registry -->
                             <mat-label>Apply tag</mat-label>
                             <input
                                 matInput
@@ -113,38 +110,21 @@ import {
                             }
                         </datalist>
                     </div>
-                    <div class="flex gap-3">
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Search text</mat-label>
-                            <input matInput formControlName="q" placeholder="title / description contains…" />
-                        </mat-form-field>
-                        <inspecto-option-picker
-                            class="flex-1"
-                            label="Status"
-                            [options]="statuses"
-                            formControlName="status"
-                        />
-                    </div>
-                    <div class="flex gap-3">
-                        <inspecto-option-picker
-                            class="flex-1"
-                            label="Priority"
-                            [options]="priorities"
-                            formControlName="priority"
-                        />
-                        <inspecto-option-picker
-                            class="flex-1"
-                            label="Severity"
-                            [options]="severities"
-                            formControlName="severity"
-                        />
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Category starts with</mat-label>
-                            <input matInput formControlName="category" placeholder="e.g. Pipeline / Ingest" />
-                        </mat-form-field>
-                    </div>
+                    <inspecto-pen-field
+                        label="Search text"
+                        placeholder="title / description contains…"
+                        formControlName="q"
+                    ></inspecto-pen-field>
+                    <inspecto-option-picker label="Status" [options]="statuses" formControlName="status" />
+                    <inspecto-option-picker label="Priority" [options]="priorities" formControlName="priority" />
+                    <inspecto-option-picker label="Severity" [options]="severities" formControlName="severity" />
+                    <inspecto-pen-field
+                        label="Category starts with"
+                        placeholder="e.g. Pipeline / Ingest"
+                        formControlName="category"
+                    ></inspecto-pen-field>
                     @if (criteriaMissing()) {
-                        <p class="text-secondary text-sm" role="alert">
+                        <p class="text-secondary text-sm sm:col-span-2" role="alert">
                             Set at least one criterion — an unconstrained rule would tag everything.
                         </p>
                     }
@@ -210,6 +190,11 @@ export class TagRulesDialog {
         severity: [''],
         category: [''],
     });
+
+    /** A required row's error line: shown once the row was left or Save was pressed. */
+    requiredError(c: AbstractControl): string {
+        return c.touched && c.hasError('required') ? 'Required.' : '';
+    }
 
     describe(r: TagRule): string {
         const f = r.filter ?? {};

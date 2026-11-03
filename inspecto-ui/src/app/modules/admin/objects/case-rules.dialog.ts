@@ -1,10 +1,8 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, CaseRule, ObjectsService } from 'app/inspecto/api';
@@ -16,6 +14,7 @@ import {
     PickerOption,
     pickerOptions,
 } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /**
  * Case Rules manager (GLOSSARY §9, C5) — saved searches that auto-group Incidents into a Case: at
@@ -28,12 +27,11 @@ import {
     standalone: true,
     imports: [
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTooltipModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -79,72 +77,53 @@ import {
 
             <section aria-label="New case rule">
                 <h3 class="mb-2 text-xs font-bold uppercase tracking-wider opacity-60">New rule</h3>
-                <form [formGroup]="form" class="flex flex-col gap-3">
-                    <div class="flex gap-3">
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Rule name</mat-label>
-                            <input
-                                matInput
-                                formControlName="name"
-                                placeholder="e.g. critical-cluster"
-                                required
-                                cdkFocusInitial
-                            />
-                            @if (form.controls.name.hasError('required') && form.controls.name.touched) {
-                                <mat-error>Required.</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Raised case title</mat-label>
-                            <input
-                                matInput
-                                formControlName="title"
-                                placeholder="e.g. Critical incident cluster"
-                                required
-                            />
-                            @if (form.controls.title.hasError('required') && form.controls.title.touched) {
-                                <mat-error>Required.</mat-error>
-                            }
-                        </mat-form-field>
-                    </div>
-                    <div class="flex gap-3">
-                        <mat-form-field class="w-28" subscriptSizing="dynamic">
-                            <mat-label>Threshold</mat-label>
-                            <input matInput type="number" formControlName="threshold" min="1" />
-                        </mat-form-field>
-                        <mat-form-field class="w-36" subscriptSizing="dynamic">
-                            <mat-label>Window (min)</mat-label>
-                            <input matInput type="number" formControlName="windowMinutes" min="0" />
-                        </mat-form-field>
-                        <mat-form-field class="w-36" subscriptSizing="dynamic">
-                            <mat-label>Group by key</mat-label>
-                            <input matInput formControlName="groupBy" placeholder="e.g. msisdn" />
-                        </mat-form-field>
-                        <inspecto-option-picker
-                            class="flex-1"
-                            label="Priority"
-                            [options]="priorities"
-                            formControlName="priority"
-                        />
-                    </div>
-                    <div class="flex gap-3">
-                        <inspecto-option-picker
-                            class="flex-1"
-                            label="Incident status"
-                            [options]="statuses"
-                            formControlName="status"
-                        />
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Search text</mat-label>
-                            <input matInput formControlName="q" placeholder="title / description contains…" />
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Category starts with</mat-label>
-                            <input matInput formControlName="category" placeholder="e.g. Pipeline / Ingest" />
-                        </mat-form-field>
-                    </div>
+                <form [formGroup]="form" class="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                    <inspecto-pen-field
+                        cdkFocusInitial
+                        label="Rule name"
+                        [required]="true"
+                        placeholder="e.g. critical-cluster"
+                        formControlName="name"
+                        [error]="requiredError(form.controls.name)"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Raised case title"
+                        [required]="true"
+                        placeholder="e.g. Critical incident cluster"
+                        formControlName="title"
+                        [error]="requiredError(form.controls.title)"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Threshold"
+                        type="number"
+                        [min]="1"
+                        formControlName="threshold"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Window (min)"
+                        type="number"
+                        [min]="0"
+                        formControlName="windowMinutes"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Group by key"
+                        placeholder="e.g. msisdn"
+                        formControlName="groupBy"
+                    ></inspecto-pen-field>
+                    <inspecto-option-picker label="Priority" [options]="priorities" formControlName="priority" />
+                    <inspecto-option-picker label="Incident status" [options]="statuses" formControlName="status" />
+                    <inspecto-pen-field
+                        label="Search text"
+                        placeholder="title / description contains…"
+                        formControlName="q"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Category starts with"
+                        placeholder="e.g. Pipeline / Ingest"
+                        formControlName="category"
+                    ></inspecto-pen-field>
                     @if (criteriaMissing()) {
-                        <p class="text-secondary text-sm" role="alert">
+                        <p class="text-secondary text-sm sm:col-span-2" role="alert">
                             Set at least one incident criterion (priority / status / text / category).
                         </p>
                     }
@@ -203,6 +182,11 @@ export class CaseRulesDialog {
             next: (r) => this.rules.set(r),
             error: () => this.rules.set([]),
         });
+    }
+
+    /** A required row's error line: shown once the row was left or Save was pressed. */
+    requiredError(c: AbstractControl): string {
+        return c.touched && c.hasError('required') ? 'Required.' : '';
     }
 
     describe(r: CaseRule): string {

@@ -61,7 +61,38 @@ class HelpHostComponent {
     error = '';
 }
 
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [PenFieldComponent, ReactiveFormsModule],
+    template: `<inspecto-pen-field label="New tag" [formControl]="ctl" (entered)="entered = entered + 1" />`,
+})
+class EnteredHostComponent {
+    ctl = new FormControl<string | null>(null);
+    entered = 0;
+}
+
 describe('PenFieldComponent', () => {
+    it('entered fires after Enter commits an open row, never on the Enter that opens a closed one (UI-FORM-ROWS-1 P3)', () => {
+        const fixture = TestBed.createComponent(EnteredHostComponent);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const host = fixture.componentInstance;
+        const value = el.querySelector('button') as HTMLButtonElement;
+        value.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        value.click(); // what the browser does with Enter on a button
+        fixture.detectChanges();
+        expect(el.querySelector('input')).not.toBeNull();
+        expect(host.entered).toBe(0);
+        const box = el.querySelector('input') as HTMLInputElement;
+        box.value = 'vip';
+        box.dispatchEvent(new Event('input'));
+        box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+        expect(host.ctl.value).toBe('vip'); // committed before the host acts
+        expect(host.entered).toBe(1);
+    });
+
     it('shows its help as a tiny line under the row; an error replaces it (UI-FORM-ROWS-1)', () => {
         const fixture = TestBed.createComponent(HelpHostComponent);
         fixture.detectChanges();

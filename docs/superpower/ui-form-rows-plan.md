@@ -1,6 +1,6 @@
 # One form idiom: property rows (`UI-FORM-ROWS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9).** Operator ask: *"we need uniform look and feel
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9); P3 in batches from 2026-11-04 (§10).** Operator ask: *"we need uniform look and feel
 > for the form items"* - single-line field / value rows with a pencil to edit (as elsewhere), a short description in
 > tiny type under a field whose name does not explain itself, the whole form at one glance without scrolling (fold
 > groups or a wizard for long ones), and every dropdown a popup dialog that can carry hints, search, groups and nested
@@ -175,3 +175,27 @@ boxes; colours and typography beyond the row (the design tokens stay as they are
   dialog around it (checked on Basic, la-mobile-money: *Save view as* menu, Open dialog filters, Edit entries).
 - Still open and lower: a closed *Expires* row shows the raw `2026-11-04T10:00`; the blank filter choices ("Anyone",
   "Any") draw in the picker's grey placeholder tone.
+
+## 10. As built: P3 (admin panes, in batches)
+
+**Batch 1 - Objects (Incidents and Cases), 2026-11-04.** The 11 files under `modules/admin/objects/` leave the
+allow-list (114 to 103).
+- Rows: the Case Rule and Tag Rule dialogs (two per line), New tag (the tag dialog and the mail view), Resolution
+  (a multiline note), Split case, the Impact panel's amounts, currency, period and basis, the Create dialog's title,
+  description and SLA, the attachment name and URI, every Postmortem field (dates stay text, YYYY-MM-DD, so a loose
+  stored value is not lost), and the Findings spec editor (its new choice is focused through the row's `focus()`).
+- Kept boxed with `form-allow`: the assignee and tag typeaheads, the Tag Rule's *Apply tag* (a typeahead over the tag
+  registry), the linked-entities **multiple** choice (not one value) and the Comments composer.
+- Behaviour to know: Enter in a row commits the row; the Attachments form submits from its button. The Findings
+  editor's preview follows each committed row, not each keystroke. A button that is disabled until a value exists
+  (the tag dialog's +, the Findings Save) still takes ONE mouse click while the row is open: the click's mousedown
+  blurs the row, which commits it and enables the button before the click lands (checked in Chromium). Tab from an
+  open row skips such a button; Enter in the row covers the keyboard.
+- **`pen-field` gains `(entered)`**, fired after Enter commits an open row. New tag (the tag dialog and the mail
+  view) and Case type act on it. A host `(keydown.enter)` was wrong here: the Enter that only OPENS a closed row
+  bubbles to the host too, so it created the tag or showed "Name the Case type." on opening (verification finding).
+- **`cdkFocusInitial` goes on the `<inspecto-pen-field>` host**: the CDK focus trap moves it to the host's first
+  tabbable child, the row's value. The first cut dropped it from six dialogs and focus landed elsewhere (a checkbox,
+  a saved rule); it is back on Rule name, Title, Resolution, New case title and New tag.
+- Lost and lower: the Impact amounts no longer bring up a decimal keypad (`inputmode`), and a row trims its text, so
+  a stored search text, category or pattern loses leading or trailing spaces.

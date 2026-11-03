@@ -491,7 +491,11 @@ src/app/
   (`formControlName` / `[formControl]` / `[(ngModel)]` as a `matInput` was), `type` `text | number | date | datetime-local`, `multiline`
   for a free-text note (Shift+Enter breaks a line), `maxlength`, `placeholder`, `default` (a ghost the → key accepts),
   `required` (the asterisk only), `[error]` (a host-rendered `role="alert"` line) and a public `focus()` for a host
-  pointing at a missing value. ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
+  pointing at a missing value. `(entered)` fires after Enter commits an OPEN row: a host acting on Enter (add the tag)
+  listens there, never on `(keydown.enter)`, which also fires on the Enter that only opens a closed row. Initial focus:
+  put `cdkFocusInitial` on the `<inspecto-pen-field>` host (the focus trap moves it to the row's value; CDK logs a
+  harmless dev-mode warning that the host itself is not focusable).
+  ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
   **`help`** (2026-11-03, `UI-FORM-ROWS-1`) is the one tiny line under the row, as `option-picker`'s `help`: give it
   only to a field whose name does not explain itself; an error replaces it.
   **One row geometry (UI-FORM-ROWS-1 P0, operator 2026-11-03):** `pen-field` and `option-picker` both lay out on

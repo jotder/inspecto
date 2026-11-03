@@ -13,9 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -38,6 +36,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { BulkAction, InspectoBulkActionsComponent } from 'app/inspecto/components/bulk-actions.component';
 import { STATUS_BADGE_BASE, statusBadgeClasses, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -108,13 +107,12 @@ function mailDate(ms: number | undefined): string {
         InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatMenuModule,
         MatTooltipModule,
         DataTableComponent,
         InspectoSplitDirective,
+        PenFieldComponent,
         PostmortemPanelComponent,
     ],
     templateUrl: './object-mail.component.html',

@@ -2,9 +2,8 @@ import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { CHOOSABLE_DISPOSITIONS } from './incident-disposition';
@@ -35,9 +34,8 @@ export interface ResolveResult {
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -59,20 +57,19 @@ export interface ResolveResult {
                         }
                     </div>
                 }
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Resolution</mat-label>
-                    <textarea
-                        matInput
-                        rows="4"
-                        formControlName="comment"
-                        placeholder="what was done, and why the problem is considered fixed"
-                        required
-                        cdkFocusInitial
-                    ></textarea>
-                    @if (form.controls.comment.hasError('required') && form.controls.comment.touched) {
-                        <mat-error>A resolution comment is required.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Resolution"
+                    [multiline]="true"
+                    [required]="true"
+                    placeholder="what was done, and why the problem is considered fixed"
+                    formControlName="comment"
+                    [error]="
+                        form.controls.comment.touched && form.controls.comment.hasError('required')
+                            ? 'A resolution comment is required.'
+                            : ''
+                    "
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">

@@ -8,7 +8,7 @@ import {
     signal,
     ViewEncapsulation,
 } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -44,6 +44,7 @@ import { AiStatusComponent } from 'app/inspecto/ai-assist/ai-status.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { fmtDateTime } from 'app/inspecto/grid';
@@ -95,6 +96,7 @@ interface MemberTimelineEntry {
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
         ImpactPanelComponent,
         ActionRequestsPanelComponent,
@@ -185,6 +187,11 @@ export class ObjectDetailComponent implements OnInit {
         name: ['', Validators.required],
         uri: ['', Validators.required],
     });
+
+    /** A required row's error line: shown once the row was left or the form submitted. */
+    requiredError(c: AbstractControl | null, message: string): string {
+        return c?.touched && c.hasError('required') ? message : '';
+    }
 
     readonly fmt = fmtDateTime;
 

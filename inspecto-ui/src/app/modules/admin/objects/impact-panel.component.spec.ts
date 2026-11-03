@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ObjectsService, OperationalObject } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ToastrService } from 'ngx-toastr';
 import { ImpactPanelComponent } from './impact-panel.component';
 
@@ -92,6 +93,15 @@ describe('ImpactPanelComponent (WS-10)', () => {
         expect(el.textContent).toContain('A currency is required once an amount is set.');
         c.form.patchValue({ confirmed: '-1', currency: 'EUR' });
         expect(c.form.controls.confirmed.hasError('decimal')).toBe(true);
+        refresh(fixture);
+        expect(penError(penByLabel(el, 'Confirmed')!)).toBe('A non-negative amount, up to 6 decimals.');
+    });
+
+    it('draws no error line on a fresh edit', () => {
+        const { c, fixture, el } = create({ ...CASE, impact: undefined });
+        c.startEdit();
+        refresh(fixture);
+        expect(el.querySelectorAll('inspecto-pen-field p[role="alert"]').length).toBe(0);
     });
 
     it('shows the server refusal inline', () => {

@@ -2,8 +2,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
@@ -14,6 +12,7 @@ import {
     OperationalObject,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 
 const AMOUNTS = ['suspected', 'confirmed', 'recovered', 'prevented'] as const;
@@ -34,7 +33,7 @@ const amount: ValidatorFn = (c) => (!c.value || DECIMAL.test(String(c.value).tri
     selector: 'app-impact-panel',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
+    imports: [ReactiveFormsModule, MatButtonModule, InspectoAlertComponent, PenFieldComponent],
     template: `
         <section aria-labelledby="impact-heading" class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
@@ -69,40 +68,37 @@ const amount: ValidatorFn = (c) => (!c.value || DECIMAL.test(String(c.value).tri
                 }
             } @else {
                 <form [formGroup]="form" (ngSubmit)="save()" class="flex flex-col gap-2">
-                    <div class="grid grid-cols-1 gap-x-3 sm:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
                         @for (a of amounts; track a) {
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>{{ labels[a] }}</mat-label>
-                                <input matInput inputmode="decimal" [formControlName]="a" />
-                                @if (form.controls[a].hasError('decimal')) {
-                                    <mat-error>A non-negative amount, up to 6 decimals.</mat-error>
-                                }
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                [label]="labels[a]"
+                                [formControlName]="a"
+                                [error]="fieldError(a, 'decimal', 'A non-negative amount, up to 6 decimals.')"
+                            ></inspecto-pen-field>
                         }
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Currency</mat-label>
-                            <input matInput formControlName="currency" maxlength="3" placeholder="EUR" />
-                            @if (form.controls.currency.hasError('pattern')) {
-                                <mat-error>A three-letter ISO 4217 code, e.g. EUR.</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Period</mat-label>
-                            <input matInput formControlName="period" maxlength="64" placeholder="2026-09" />
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Currency"
+                            [maxlength]="3"
+                            placeholder="EUR"
+                            formControlName="currency"
+                            [error]="fieldError('currency', 'pattern', 'A three-letter ISO 4217 code, e.g. EUR.')"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Period"
+                            [maxlength]="64"
+                            placeholder="2026-09"
+                            formControlName="period"
+                        ></inspecto-pen-field>
                     </div>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Basis</mat-label>
-                        <textarea
-                            matInput
-                            rows="2"
-                            formControlName="basis"
-                            maxlength="2000"
-                            placeholder="how the amounts were worked out"
-                        ></textarea>
-                    </mat-form-field>
-                    <!-- A GROUP error never puts the currency field in an error state, so a <mat-error> there could
-                         not fire — render the line explicitly (the angular-ui explicit-alert rule). -->
+                    <inspecto-pen-field
+                        label="Basis"
+                        [multiline]="true"
+                        [maxlength]="2000"
+                        placeholder="how the amounts were worked out"
+                        formControlName="basis"
+                    ></inspecto-pen-field>
+                    <!-- A GROUP error belongs to no one row, so the line is rendered here (the angular-ui
+                         explicit-alert rule). -->
                     @if (form.hasError('currencyRequired') && form.controls.currency.touched) {
                         <p class="text-warn m-0 text-xs" role="alert">A currency is required once an amount is set.</p>
                     }
@@ -216,6 +212,12 @@ export class ImpactPanelComponent {
             this.object();
             this.editing.set(false);
         });
+    }
+
+    /** A row's error line: `message` once the row was left (or Save pressed) while it fails `code`. */
+    fieldError(name: Amount | 'currency', code: string, message: string): string {
+        const c = this.form.controls[name];
+        return c.touched && c.hasError(code) ? message : '';
     }
 
     startEdit(): void {

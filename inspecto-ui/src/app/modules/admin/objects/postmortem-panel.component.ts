@@ -12,9 +12,7 @@ import {
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
@@ -28,6 +26,7 @@ import {
     OperationalObject,
     WorkflowDef,
 } from 'app/inspecto/api';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -70,11 +69,10 @@ import {
         RouterLink,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatSelectModule,
         MatTooltipModule,
+        PenFieldComponent,
         StatusBadgeComponent,
         CaseContentsComponent,
         InspectoSchemaFormComponent,

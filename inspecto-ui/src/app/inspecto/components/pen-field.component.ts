@@ -8,6 +8,7 @@ import {
     forwardRef,
     inject,
     input,
+    output,
     signal,
     viewChild,
 } from '@angular/core';
@@ -142,6 +143,11 @@ export class PenFieldComponent implements ControlValueAccessor {
     readonly error = input('');
     /** One short line under the row for a field whose name does not explain itself; hidden while an error shows. */
     readonly help = input('');
+    /**
+     * Fired after Enter committed an open row - the hook for a host action on Enter (add the tag, open the new type).
+     * A host `(keydown.enter)` would also fire on the Enter that only OPENS a closed row (UI-FORM-ROWS-1 P3).
+     */
+    readonly entered = output<void>();
 
     protected readonly value = signal<string | number | null>(null);
     protected readonly disabled = signal(false);
@@ -227,6 +233,7 @@ export class PenFieldComponent implements ControlValueAccessor {
             e.preventDefault();
             this.commit();
             this.refocusValue();
+            this.entered.emit();
         } else if (e.key === 'Escape') {
             e.stopPropagation();
             this.editing.set(false);

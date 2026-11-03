@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ComponentDef, ComponentsService, FindingsSpecDef, LensService, ObjectsService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penEdit } from 'app/inspecto/testing/pen-field';
 import { FindingsSpecEditorDialog } from './findings-spec-editor.dialog';
 
 const BUILT_IN: FindingsSpecDef = {
@@ -326,31 +327,31 @@ describe('FindingsSpecEditorDialog', () => {
      * lead: text typed into a choice box that was already on screen before a later *Add choice* must be kept.
      */
     it('keeps what is typed into an earlier choice box after a later Add choice, and focuses each new box', async () => {
-        const { c, el, render, saveButton } = await create();
+        const { c, el, fixture, render, saveButton } = await create();
         c.addField();
         c.fieldForm.controls.label.setValue('Recovery route');
         c.fieldForm.controls.type.setValue('select');
         await render();
         const addChoice = (): HTMLButtonElement =>
             Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Add choice')!;
-        const boxes = (): HTMLInputElement[] => Array.from(el.querySelectorAll('fieldset input')) as HTMLInputElement[];
-        const type = async (box: HTMLInputElement, text: string): Promise<void> => {
-            box.value = text;
-            box.dispatchEvent(new Event('input'));
+        // Each choice is a pen-field row: the new one opens with the caret in it.
+        const rows = (): HTMLElement[] => Array.from(el.querySelectorAll<HTMLElement>('fieldset inspecto-pen-field'));
+        const type = async (row: HTMLElement, text: string): Promise<void> => {
+            penEdit(fixture, row, text);
             await render();
         };
 
         addChoice().click();
         await render();
-        expect(el.ownerDocument.activeElement).toBe(boxes()[0]);
-        await type(boxes()[0], 'bar');
+        expect(el.ownerDocument.activeElement).toBe(rows()[0].querySelector('input'));
+        await type(rows()[0], 'bar');
 
         addChoice().click();
         await render();
-        expect(el.ownerDocument.activeElement).toBe(boxes()[1]);
-        await type(boxes()[1], 'refund');
+        expect(el.ownerDocument.activeElement).toBe(rows()[1].querySelector('input'));
+        await type(rows()[1], 'refund');
 
-        await type(boxes()[0], 'bar sim');
+        await type(rows()[0], 'bar sim');
 
         expect(c.selected()!.choices.map((x) => x.label)).toEqual(['bar sim', 'refund']);
         expect(c.problems()).toEqual([]);

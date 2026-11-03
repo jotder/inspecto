@@ -316,7 +316,7 @@
                 <mat-tab label="Comments">
                     <div class="flex flex-col gap-4 pt-6">
                         <form [formGroup]="commentForm" (ngSubmit)="addComment()" class="flex items-start gap-3">
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
+                            <mat-form-field class="flex-auto" subscriptSizing="dynamic"><!-- form-allow: a message composer -->
                                 <mat-label>Add a comment</mat-label>
                                 <textarea matInput rows="2" formControlName="body" required></textarea>
                                 @if (commentForm.get('body')?.hasError('required')) {
@@ -355,22 +355,24 @@
                         <form
                             [formGroup]="attachForm"
                             (ngSubmit)="addAttachment()"
-                            class="flex flex-wrap items-start gap-3"
+                            class="flex flex-wrap items-start gap-x-8 gap-y-1"
                         >
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Name</mat-label>
-                                <input matInput formControlName="name" placeholder="evidence.log" required />
-                                @if (attachForm.get('name')?.hasError('required')) {
-                                    <mat-error>Name is required.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                                <mat-label>URI</mat-label>
-                                <input matInput formControlName="uri" placeholder="s3://… or https://…" required />
-                                @if (attachForm.get('uri')?.hasError('required')) {
-                                    <mat-error>URI is required.</mat-error>
-                                }
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="min-w-48"
+                                label="Name"
+                                [required]="true"
+                                placeholder="evidence.log"
+                                formControlName="name"
+                                [error]="requiredError(attachForm.get('name'), 'Name is required.')"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                class="min-w-64 flex-auto"
+                                label="URI"
+                                [required]="true"
+                                placeholder="s3://… or https://…"
+                                formControlName="uri"
+                                [error]="requiredError(attachForm.get('uri'), 'URI is required.')"
+                            ></inspecto-pen-field>
                             <button
                                 type="submit"
                                 mat-flat-button

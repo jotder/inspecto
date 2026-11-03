@@ -17,6 +17,7 @@ import { INCIDENT_TAXONOMY, joinCategory } from './incident-taxonomy';
 import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { Router } from '@angular/router';
 
 /**
@@ -32,6 +33,7 @@ import { Router } from '@angular/router';
     imports: [
         InspectoEmptyStateComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatAutocompleteModule,
         MatButtonModule,
@@ -47,17 +49,25 @@ import { Router } from '@angular/router';
         <h2 mat-dialog-title>New {{ data.label }}</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2">
             <form [formGroup]="form" class="flex flex-col gap-3">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Title</mat-label>
-                    <input matInput formControlName="title" placeholder="short summary" required cdkFocusInitial />
-                    @if (form.controls.title.hasError('required') && form.controls.title.touched) {
-                        <mat-error>Title is required.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Description</mat-label>
-                    <textarea matInput rows="3" formControlName="description"></textarea>
-                </mat-form-field>
+                <div class="flex flex-col gap-1">
+                    <inspecto-pen-field
+                        cdkFocusInitial
+                        label="Title"
+                        [required]="true"
+                        placeholder="short summary"
+                        formControlName="title"
+                        [error]="
+                            form.controls.title.touched && form.controls.title.hasError('required')
+                                ? 'Title is required.'
+                                : ''
+                        "
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Description"
+                        [multiline]="true"
+                        formControlName="description"
+                    ></inspecto-pen-field>
+                </div>
 
                 @if (isIncident) {
                     <div class="flex gap-3">
@@ -107,7 +117,7 @@ import { Router } from '@angular/router';
                     />
                 </div>
                 <div class="flex gap-3">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic"><!-- form-allow: a typeahead over known assignees -->
                         <mat-label>Assignee</mat-label>
                         <input matInput formControlName="assignee" [matAutocomplete]="assigneeAc" />
                         <mat-autocomplete #assigneeAc="matAutocomplete">
@@ -116,7 +126,7 @@ import { Router } from '@angular/router';
                             }
                         </mat-autocomplete>
                     </mat-form-field>
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic"><!-- form-allow: a chip typeahead over the tag registry -->
                         <mat-label>Tags</mat-label>
                         <mat-chip-grid #tagGrid aria-label="Tags">
                             @for (t of tags(); track t) {
@@ -151,9 +161,9 @@ import { Router } from '@angular/router';
                         [options]="relationships"
                         formControlName="linkRelationship"
                     />
-                    <mat-form-field class="flex-[2]" subscriptSizing="dynamic">
+                    <mat-form-field class="flex-[2]" subscriptSizing="dynamic"><!-- form-allow: a multiple choice, not one -->
                         <mat-label>Linked entities</mat-label>
-                        <mat-select formControlName="links" multiple required>
+                        <mat-select formControlName="links" multiple required><!-- form-allow: a multiple choice, not one -->
                             @for (o of candidates(); track o.id) {
                                 <mat-option [value]="o.id"
                                     >{{ o.objectType }} · {{ o.title || o.id }} ({{ o.status }})</mat-option
@@ -184,10 +194,12 @@ import { Router } from '@angular/router';
                         (action)="openDecisionRules()"
                     />
                 }
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>SLA (minutes)</mat-label>
-                    <input matInput type="number" formControlName="dueInMinutes" placeholder="optional" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="SLA (minutes)"
+                    type="number"
+                    placeholder="optional"
+                    formControlName="dueInMinutes"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">

@@ -104,17 +104,17 @@
                 }
                 <!-- Team + target date ride the canAdminister PATCH — shown only to those the server lets save them -->
                 @if (canAdminister()) {
-                    <form [formGroup]="teamForm" class="flex flex-col gap-3">
-                        <div class="grid grid-cols-2 gap-3">
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Target date (loose SLA)</mat-label>
-                                <input matInput formControlName="targetDate" placeholder="YYYY-MM-DD" />
-                            </mat-form-field>
-                            <mat-form-field subscriptSizing="dynamic">
-                                <mat-label>Team</mat-label>
-                                <input matInput formControlName="team" placeholder="comma-separated, e.g. alice, bob" />
-                            </mat-form-field>
-                        </div>
+                    <form [formGroup]="teamForm" class="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                        <inspecto-pen-field
+                            label="Target date (loose SLA)"
+                            placeholder="YYYY-MM-DD"
+                            formControlName="targetDate"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Team"
+                            placeholder="comma-separated, e.g. alice, bob"
+                            formControlName="team"
+                        ></inspecto-pen-field>
                     </form>
                 }
                 <div class="flex justify-end">
@@ -135,27 +135,23 @@
                 <!-- Summary -->
                 <section>
                     <h3 class="mb-2 text-sm font-bold uppercase tracking-wider opacity-60">Summary</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Incident Commander</mat-label>
-                            <input matInput formControlName="commander" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Date of Incident</mat-label>
-                            <input matInput formControlName="incidentDate" placeholder="YYYY-MM-DD" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Total Downtime</mat-label>
-                            <input matInput formControlName="downtime" placeholder="X hours Y minutes" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Business Impact</mat-label>
-                            <input
-                                matInput
-                                formControlName="businessImpact"
-                                placeholder="e.g. Y% of transactions failed"
-                            />
-                        </mat-form-field>
+                    <div class="grid gap-x-8 gap-y-1 sm:grid-cols-2">
+                        <inspecto-pen-field label="Incident Commander" formControlName="commander"></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Date of Incident"
+                            placeholder="YYYY-MM-DD"
+                            formControlName="incidentDate"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Total Downtime"
+                            placeholder="X hours Y minutes"
+                            formControlName="downtime"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Business Impact"
+                            placeholder="e.g. Y% of transactions failed"
+                            formControlName="businessImpact"
+                        ></inspecto-pen-field>
                     </div>
                 </section>
 
@@ -174,19 +170,21 @@
                         </button>
                     </div>
                     @for (row of timeline.controls; track row; let i = $index) {
-                        <div [formGroupName]="i" class="mb-2 flex items-start gap-2">
-                            <mat-form-field class="w-32 shrink-0" subscriptSizing="dynamic">
-                                <mat-label>Time</mat-label>
-                                <input matInput formControlName="time" placeholder="12:00 UTC" />
-                            </mat-form-field>
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                                <mat-label>What happened</mat-label>
-                                <input matInput formControlName="text" />
-                            </mat-form-field>
+                        <div [formGroupName]="i" class="mb-1 flex items-center gap-x-6">
+                            <inspecto-pen-field
+                                class="w-44 shrink-0"
+                                label="Time"
+                                placeholder="12:00 UTC"
+                                formControlName="time"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                class="flex-auto"
+                                label="What happened"
+                                formControlName="text"
+                            ></inspecto-pen-field>
                             <button
                                 mat-icon-button
                                 type="button"
-                                class="mt-1"
                                 (click)="removeTimeline(i)"
                                 matTooltip="Remove entry"
                                 aria-label="Remove timeline entry"
@@ -206,10 +204,12 @@
                     <div class="mb-2 flex items-center justify-between gap-2">
                         <h3 class="text-sm font-bold uppercase tracking-wider opacity-60">Cause Analysis</h3>
                         <div class="flex items-center gap-1">
-                            <mat-form-field class="w-40" subscriptSizing="dynamic">
-                                <mat-label>Method</mat-label>
-                                <input matInput [formControl]="form.controls.causeMethod" placeholder="The 5 Whys" />
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="w-56"
+                                label="Method"
+                                placeholder="The 5 Whys"
+                                [formControl]="form.controls.causeMethod"
+                            ></inspecto-pen-field>
                             <button
                                 mat-icon-button
                                 type="button"
@@ -222,12 +222,13 @@
                         </div>
                     </div>
                     @for (row of causeAnalysis.controls; track row; let i = $index) {
-                        <div [formGroupName]="i" class="mb-2 flex items-baseline gap-2">
+                        <div [formGroupName]="i" class="mb-1 flex items-center gap-2">
                             <span class="text-secondary w-4 shrink-0 text-sm font-bold">{{ i + 1 }}.</span>
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                                <mat-label>Why / cause</mat-label>
-                                <input matInput formControlName="why" />
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="flex-auto"
+                                label="Why / cause"
+                                formControlName="why"
+                            ></inspecto-pen-field>
                             <button
                                 mat-icon-button
                                 type="button"
@@ -262,24 +263,23 @@
                         </button>
                     </div>
                     @for (row of actionsArr.controls; track row; let i = $index) {
-                        <div [formGroupName]="i" class="mb-2 flex items-start gap-2">
-                            <mat-checkbox formControlName="done" class="mt-1" aria-label="Task done"></mat-checkbox>
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                                <mat-label>Task</mat-label>
-                                <input matInput formControlName="text" />
-                            </mat-form-field>
-                            <mat-form-field class="w-24 shrink-0" subscriptSizing="dynamic">
-                                <mat-label>Owner</mat-label>
-                                <input matInput formControlName="owner" />
-                            </mat-form-field>
-                            <mat-form-field class="w-32 shrink-0" subscriptSizing="dynamic">
-                                <mat-label>Due</mat-label>
-                                <input matInput formControlName="due" placeholder="YYYY-MM-DD" />
-                            </mat-form-field>
+                        <div [formGroupName]="i" class="mb-1 flex flex-wrap items-center gap-x-6">
+                            <mat-checkbox formControlName="done" aria-label="Task done"></mat-checkbox>
+                            <inspecto-pen-field
+                                class="min-w-48 flex-auto"
+                                label="Task"
+                                formControlName="text"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field class="w-40" label="Owner" formControlName="owner"></inspecto-pen-field>
+                            <inspecto-pen-field
+                                class="w-44"
+                                label="Due"
+                                placeholder="YYYY-MM-DD"
+                                formControlName="due"
+                            ></inspecto-pen-field>
                             <button
                                 mat-icon-button
                                 type="button"
-                                class="mt-1"
                                 (click)="removeAction(i)"
                                 matTooltip="Remove task"
                                 aria-label="Remove corrective action"

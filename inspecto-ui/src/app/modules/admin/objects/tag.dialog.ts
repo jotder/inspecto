@@ -3,12 +3,11 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectsService, OperationalObject, Tag } from 'app/inspecto/api';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { objectTags } from './mail-model';
@@ -35,10 +34,9 @@ type TagState = 'all' | 'some' | 'none';
         MatButtonModule,
         MatCheckboxModule,
         MatDialogModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTooltipModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -57,17 +55,16 @@ type TagState = 'all' | 'some' | 'none';
                 <p class="text-secondary text-sm">No tags yet — create the first one below.</p>
             }
             <div class="mt-2 flex items-center gap-2">
-                <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                    <mat-label>New tag</mat-label>
-                    <input
-                        matInput
-                        [formControl]="newTag"
-                        (keyup.enter)="createTag()"
-                        placeholder="Tag name"
-                        aria-label="New tag name"
-                        cdkFocusInitial
-                    />
-                </mat-form-field>
+                <!-- (entered): Enter in the OPEN row commits it, then creates the tag; the Enter that opens the row does not. -->
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    class="flex-auto"
+                    label="New tag"
+                    placeholder="Tag name"
+                    ariaLabel="New tag name"
+                    [formControl]="newTag"
+                    (entered)="createTag()"
+                ></inspecto-pen-field>
                 <button
                     mat-icon-button
                     type="button"
