@@ -1,6 +1,6 @@
 # LA-BASIC-DISCOVERY-1 — discovery, an entity summary and preset queries in Basic
 
-> **PLAN 2026-11-03 (draft; decisions Q-1…Q-5 proposed, §6).** Operator ask: "entity profiling and some kind of
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6; presets first).** Operator ask: "entity profiling and some kind of
 > discovery in Basic also; the user should be able to query the entity relationship data; some preset queries would be
 > nice." Product hub `docs/okf/product/module/la-core/`. Related: `la-data-arrival-plan.md` (the Data page, Mappings),
 > `docs/EDITIONS.md` (D-LAE4: the Entity profile **pages** are Standard and up). Board rows: `LA-BASIC-DISCOVER-1`,
@@ -80,7 +80,7 @@ On the Basic install, over the IMS and Mobile money Datasets: Discover shows cou
 cash-out within 30 minutes* return rows that **Draw these** turns into a graph; a masked Entity Type never shows a raw
 key; tests per route (real HTTP, masking, limits) and UI specs.
 
-## 6. Decisions (proposed - operator to confirm)
+## 6. Decisions (operator 2026-11-03: accepted as recommended - presets first)
 
 - **Q-1** Discover and the entity summary are **Basic and up** (read-only explorer reading); the full profile pages
   stay Standard (D-LAE4 unchanged). *Recommended.*
