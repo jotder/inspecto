@@ -199,3 +199,23 @@ allow-list (114 to 103).
   a saved rule); it is back on Rule name, Title, Resolution, New case title and New tag.
 - Lost and lower: the Impact amounts no longer bring up a decimal keypad (`inputmode`), and a row trims its text, so
   a stored search text, category or pattern loses leading or trailing spaces.
+
+**Batch 2 - Studio (dashboards, Datasets, queries, templates, widgets), 2026-11-04.** The 15 files under
+`modules/admin/studio/` leave the allow-list (103 to 88).
+- Rows: the dashboard id, description and *As of*; the Dataset id, physical reference and the bind / materialize /
+  calculated / measure names and labels; the query name, description and each `$param` default; the template id
+  prefix; the new dashboard id and the widget id and description.
+- Pickers: the dashboard date-range preset, and one per exposed field in the dashboard filter bar. A re-pick of a value
+  whose filter is already on does nothing, as the old select did (the picker reports a re-pick; a first cut toggled the
+  filter off).
+- Kept boxed with `form-allow`: the date-range day, from and to (live date filters with a calendar panel and a max
+  day), the dashboard date-field typeahead, two **multiple** selects (exposed fields, the explore field list), the share
+  link (a read-only copy box), the SQL expression editors, and the Datasets columns table's *Role* select (a
+  table-cell select, which the rulebook keeps a dropdown).
+- **`[ngModel]` as a one-control bridge**: the date-range picker and the query `$param` rows bind a signal to the row
+  through `[ngModel]` / `(ngModelChange)` (standalone), as the filter bar already did. A reactive control would need a
+  second, synced copy of the signal. The rulebook now names this the one sanctioned use of `ngModel`.
+- Behaviour to know: the query parameter defaults, calculated and measure names, column label and format and the
+  dashboard *As of* now update per committed row, not per keystroke; Enter in a row no longer submits the query, the
+  materialize, apply-template, add-to-dashboard or widget-save forms (their buttons do). The filter bar picker is named
+  by the field alone (it was "Filter by <field>").

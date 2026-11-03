@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { runSql } from 'app/inspecto/data-table/sql/sql-run';
 import { checkCalculatedExpr, checkCalculatedName } from './calculated-column-guard';
 import { CalculatedColumn } from './dataset-types';
@@ -26,28 +27,21 @@ interface TestOutcome {
 @Component({
     selector: 'app-dataset-calculated',
     standalone: true,
-    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex flex-col gap-3">
             @for (c of rows(); track $index; let i = $index) {
                 <div class="grid grid-cols-[1fr_2fr_auto_auto] items-end gap-2">
+                    <inspecto-pen-field
+                        label="Name"
+                        [ariaLabel]="'Calculated column name ' + (i + 1)"
+                        [ngModel]="c.name"
+                        (ngModelChange)="patch(i, { name: $event })"
+                        [error]="nameError(c.name) ?? ''"
+                    ></inspecto-pen-field>
                     <div>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Name</mat-label>
-                            <input
-                                matInput
-                                [ngModel]="c.name"
-                                (ngModelChange)="patch(i, { name: $event })"
-                                [attr.aria-label]="'Calculated column name ' + (i + 1)"
-                            />
-                        </mat-form-field>
-                        @if (nameError(c.name); as err) {
-                            <div class="mt-1 text-xs text-red-600 dark:text-red-400">{{ err }}</div>
-                        }
-                    </div>
-                    <div>
-                        <mat-form-field subscriptSizing="dynamic">
+                        <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a SQL expression editor -->
                             <mat-label>Expression</mat-label>
                             <input
                                 matInput

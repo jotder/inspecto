@@ -57,6 +57,14 @@ describe('DashboardFilterBarComponent', () => {
         expect(spy).toHaveBeenCalledWith({ field: 'tariff', value: 'standard' });
     });
 
+    it('re-picking a value whose filter is already on does not toggle it off (the picker reports a re-pick)', () => {
+        const fixture = create();
+        const spy = vi.fn();
+        fixture.componentInstance.drillToggle.subscribe(spy);
+        fixture.componentInstance.onPick('tariff', 'premium'); // tariff = premium is already a chip
+        expect(spy).not.toHaveBeenCalled();
+    });
+
     it('renders nothing when no fields are exposed', () => {
         const fixture = create([]);
         expect(fixture.nativeElement.textContent.trim()).toBe('');

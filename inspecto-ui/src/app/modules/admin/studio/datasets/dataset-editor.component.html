@@ -66,16 +66,13 @@
     }
 
     <form [formGroup]="form" class="bg-card mt-6 grid grid-cols-1 gap-4 rounded-2xl p-5 shadow sm:grid-cols-3">
-        <mat-form-field subscriptSizing="dynamic">
-            <mat-label>Dataset id</mat-label>
-            <input matInput formControlName="name" placeholder="e.g. cdr_view" />
-            @if (form.controls.name.hasError('pattern')) {
-                <mat-error>Letters, digits, dot, dash, underscore; start alphanumeric.</mat-error>
-            }
-            @if (form.controls.name.hasError('duplicate')) {
-                <mat-error>A dataset with this id already exists.</mat-error>
-            }
-        </mat-form-field>
+        <inspecto-pen-field
+            label="Dataset id"
+            [required]="true"
+            placeholder="e.g. cdr_view"
+            formControlName="name"
+            [error]="idError()"
+        ></inspecto-pen-field>
 
         <inspecto-option-picker label="Kind" [options]="kinds" formControlName="kind" />
 
@@ -89,10 +86,12 @@
         />
 
         @if (!isVirtual()) {
-            <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">
-                <mat-label>Physical reference</mat-label>
-                <input matInput formControlName="physicalRef" placeholder="catalog table / parquet path / cache id" />
-            </mat-form-field>
+            <inspecto-pen-field
+                class="sm:col-span-3"
+                label="Physical reference"
+                placeholder="catalog table / parquet path / cache id"
+                formControlName="physicalRef"
+            ></inspecto-pen-field>
         }
     </form>
 

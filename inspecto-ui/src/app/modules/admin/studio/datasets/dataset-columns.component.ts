@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { DatasetColumn, DatasetRole } from './dataset-types';
 
 const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
@@ -15,7 +15,7 @@ const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
 @Component({
     selector: 'app-dataset-columns',
     standalone: true,
-    imports: [FormsModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+    imports: [FormsModule, MatFormFieldModule, MatSelectModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @if (rows().length === 0) {
@@ -39,8 +39,8 @@ const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
                                 <span class="bg-card rounded px-2 py-0.5 font-mono text-xs">{{ col.type }}</span>
                             </td>
                             <td class="py-1 pr-3">
-                                <mat-form-field subscriptSizing="dynamic" class="w-32">
-                                    <mat-select
+                                <mat-form-field subscriptSizing="dynamic" class="w-32"><!-- form-allow: a table-cell select (one dialog per cell is worse, angular-ui skill) -->
+                                    <!-- form-allow: a table-cell select --><mat-select
                                         [ngModel]="col.role"
                                         (ngModelChange)="patch(col.name, { role: $event })"
                                         [aria-label]="'Role for ' + col.name"
@@ -52,26 +52,22 @@ const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
                                 </mat-form-field>
                             </td>
                             <td class="py-1 pr-3">
-                                <mat-form-field subscriptSizing="dynamic" class="w-40">
-                                    <input
-                                        matInput
-                                        [ngModel]="col.label ?? ''"
-                                        (ngModelChange)="patch(col.name, { label: $event })"
-                                        [attr.aria-label]="'Label for ' + col.name"
-                                        [placeholder]="col.name"
-                                    />
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    class="w-40"
+                                    [ariaLabel]="'Label for ' + col.name"
+                                    [placeholder]="col.name"
+                                    [ngModel]="col.label ?? ''"
+                                    (ngModelChange)="patch(col.name, { label: $event })"
+                                ></inspecto-pen-field>
                             </td>
                             <td class="py-1">
-                                <mat-form-field subscriptSizing="dynamic" class="w-28">
-                                    <input
-                                        matInput
-                                        [ngModel]="col.format ?? ''"
-                                        (ngModelChange)="patch(col.name, { format: $event })"
-                                        [attr.aria-label]="'Format for ' + col.name"
-                                        placeholder="—"
-                                    />
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    class="w-28"
+                                    [ariaLabel]="'Format for ' + col.name"
+                                    placeholder="—"
+                                    [ngModel]="col.format ?? ''"
+                                    (ngModelChange)="patch(col.name, { format: $event })"
+                                ></inspecto-pen-field>
                             </td>
                         </tr>
                     }

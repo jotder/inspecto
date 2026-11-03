@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
@@ -34,32 +33,22 @@ export interface WidgetSaveResult {
 @Component({
     selector: 'app-widget-save-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Save widget</h2>
         <mat-dialog-content>
             <form [formGroup]="form" (ngSubmit)="save()" class="flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Widget id</mat-label>
-                    <input
-                        matInput
-                        formControlName="name"
-                        [readonly]="data.lockId"
-                        placeholder="e.g. duration_by_tariff"
-                        cdkFocusInitial
-                    />
-                    @if (form.controls.name.hasError('pattern')) {
-                        <mat-error>Letters, digits, dot, dash, underscore; start alphanumeric.</mat-error>
-                    }
-                    @if (form.controls.name.hasError('duplicate')) {
-                        <mat-error>A widget with this id already exists.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Description</mat-label>
-                    <input matInput formControlName="description" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Widget id"
+                    [required]="true"
+                    [readOnly]="data.lockId"
+                    placeholder="e.g. duration_by_tariff"
+                    formControlName="name"
+                    [error]="nameError()"
+                ></inspecto-pen-field>
+                <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -88,6 +77,15 @@ export class WidgetSaveDialog {
         ],
         description: [this.data.description ?? ''],
     });
+
+    /** The id row's error line: shown once the row was left or Save was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash, underscore; start alphanumeric.';
+        if (c.hasError('duplicate')) return 'A widget with this id already exists.';
+        return '';
+    }
 
     save(): void {
         const ctrl = this.form.controls.name;

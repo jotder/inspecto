@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDatepickerInputEvent, MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { DateTime } from 'luxon';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import {
     DATE_RANGE_PRESETS,
     DateRangePreset,
@@ -25,21 +26,25 @@ import {
 @Component({
     selector: 'app-dashboard-date-range',
     standalone: true,
-    imports: [MatButtonModule, MatDatepickerModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule],
+    imports: [
+        FormsModule,
+        InspectoOptionPickerComponent,
+        MatButtonModule,
+        MatDatepickerModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex flex-wrap items-center gap-2" role="group" [attr.aria-label]="label()">
-            <mat-form-field subscriptSizing="dynamic" class="w-44">
-                <mat-label>{{ label() }}</mat-label>
-                <mat-select [value]="picked()" (selectionChange)="onPick($event.value)">
-                    <mat-option value="">All dates</mat-option>
-                    @for (p of presets; track p.id) {
-                        <mat-option [value]="p.id">{{ p.label }}</mat-option>
-                    }
-                    <mat-option value="day">Single day</mat-option>
-                    <mat-option value="custom">Custom</mat-option>
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker
+                class="w-56"
+                [label]="label()"
+                [options]="rangeOptions"
+                [ngModel]="picked()"
+                (ngModelChange)="onPick($event ?? '')"
+            />
             @if (picked() === 'day') {
                 <button
                     mat-icon-button
@@ -50,7 +55,7 @@ import {
                 >
                     <mat-icon svgIcon="heroicons_outline:chevron-left" />
                 </button>
-                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                <mat-form-field subscriptSizing="dynamic" class="w-40"><!-- form-allow: a live date filter with a calendar panel; its max day (the anchor) has no pen-field equivalent -->
                     <mat-label>Day</mat-label>
                     <input
                         matInput
@@ -74,7 +79,7 @@ import {
                 </button>
             }
             @if (picked() === 'custom') {
-                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                <mat-form-field subscriptSizing="dynamic" class="w-40"><!-- form-allow: a live date filter with a calendar panel -->
                     <mat-label>From</mat-label>
                     <input
                         matInput
@@ -85,7 +90,7 @@ import {
                     <mat-datepicker-toggle matIconSuffix [for]="fromPicker" />
                     <mat-datepicker #fromPicker />
                 </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                <mat-form-field subscriptSizing="dynamic" class="w-40"><!-- form-allow: a live date filter with a calendar panel -->
                     <mat-label>To</mat-label>
                     <input
                         matInput
@@ -114,7 +119,12 @@ export class DashboardDateRangeComponent {
     readonly label = input('Date range');
     readonly selectionChange = output<DateRangeSelection | null>();
 
-    readonly presets = DATE_RANGE_PRESETS;
+    readonly rangeOptions: PickerOption[] = [
+        { value: '', label: 'All dates' },
+        ...DATE_RANGE_PRESETS.map((p) => ({ value: p.id, label: p.label })),
+        { value: 'day', label: 'Single day' },
+        { value: 'custom', label: 'Custom' },
+    ];
 
     /** The select's value — follows the selection, but can sit on *Custom* while its days are incomplete. */
     readonly picked = linkedSignal<string>(() => {

@@ -2,13 +2,12 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { Dashboard } from '../dashboards/dashboard-types';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface AddToDashboardData {
     widgetId: string;
@@ -37,11 +36,10 @@ const NEW_DASHBOARD = '__new__';
     standalone: true,
     imports: [
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -55,16 +53,13 @@ const NEW_DASHBOARD = '__new__';
                     formControlName="target"
                 />
                 @if (form.controls.target.value === NEW) {
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>New dashboard id</mat-label>
-                        <input matInput formControlName="name" placeholder="e.g. fraud_overview" />
-                        @if (form.controls.name.hasError('pattern')) {
-                            <mat-error>Letters, digits, dot, dash, underscore; start alphanumeric.</mat-error>
-                        }
-                        @if (form.controls.name.hasError('duplicate')) {
-                            <mat-error>A dashboard with this id already exists.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="New dashboard id"
+                        [required]="true"
+                        placeholder="e.g. fraud_overview"
+                        formControlName="name"
+                        [error]="nameError()"
+                    ></inspecto-pen-field>
                 }
             </form>
         </mat-dialog-content>
@@ -99,6 +94,15 @@ export class AddToDashboardDialog {
             ],
         ],
     });
+
+    /** The new id row's error line: shown once the row was left or Add was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash, underscore; start alphanumeric.';
+        if (c.hasError('duplicate')) return 'A dashboard with this id already exists.';
+        return '';
+    }
 
     add(): void {
         const target = this.form.controls.target.value;

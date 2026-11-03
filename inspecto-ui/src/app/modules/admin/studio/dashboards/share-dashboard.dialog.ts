@@ -50,7 +50,7 @@ export interface ShareDashboardData {
                 <div class="text-secondary text-sm">
                     Anyone with this link can view <strong>{{ data.id }}</strong> read-only until it expires.
                 </div>
-                <mat-form-field subscriptSizing="dynamic">
+                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a read-only copy box for a generated link (selects all on focus), not a value to edit -->
                     <mat-label>Share link</mat-label>
                     <input matInput readonly [value]="shareUrl()" (focus)="selectAll($event)" />
                     <button

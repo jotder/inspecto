@@ -32,18 +32,14 @@
     @if (editing()) {
         <form [formGroup]="form" (ngSubmit)="save()" class="bg-card mt-6 flex flex-col gap-4 rounded-2xl p-5 shadow">
             <div class="flex flex-col gap-4 md:flex-row">
-                <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input
-                        matInput
-                        formControlName="name"
-                        autocomplete="off"
-                        placeholder="e.g. recent_high_risk_cdrs"
-                    />
-                    @if (errorFor('name'); as err) {
-                        <mat-error>{{ err }}</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="flex-auto"
+                    label="Name"
+                    [required]="true"
+                    placeholder="e.g. recent_high_risk_cdrs"
+                    formControlName="name"
+                    [error]="errorFor('name') ?? ''"
+                ></inspecto-pen-field>
                 <inspecto-option-picker
                     class="flex-auto"
                     label="Source dataset"
@@ -52,10 +48,11 @@
                 />
             </div>
 
-            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                <mat-label>Description (optional)</mat-label>
-                <input matInput formControlName="description" autocomplete="off" />
-            </mat-form-field>
+            <inspecto-pen-field
+                class="flex-auto"
+                label="Description (optional)"
+                formControlName="description"
+            ></inspecto-pen-field>
 
             <mat-button-toggle-group formControlName="type" aria-label="Query type">
                 <mat-button-toggle value="sql">SQL</mat-button-toggle>
@@ -89,15 +86,13 @@
                                 >
                             }
                             @for (name of userParamNames(); track name) {
-                                <mat-form-field subscriptSizing="dynamic" class="w-48">
-                                    <mat-label>${{ name }} default</mat-label>
-                                    <input
-                                        matInput
-                                        [value]="paramDefaults()[name] ?? ''"
-                                        (input)="setParamDefault(name, $any($event.target).value)"
-                                        autocomplete="off"
-                                    />
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    class="w-56"
+                                    [label]="'$' + name + ' default'"
+                                    [ngModel]="paramDefaults()[name] ?? ''"
+                                    (ngModelChange)="setParamDefault(name, $event)"
+                                    [ngModelOptions]="{ standalone: true }"
+                                ></inspecto-pen-field>
                             }
                         </div>
                     </div>

@@ -8,16 +8,14 @@
     >
         <ng-container actions>
             <form [formGroup]="form" class="flex items-center gap-2">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Dashboard id</mat-label>
-                    <input matInput formControlName="name" placeholder="e.g. cdr_overview" />
-                    @if (form.controls.name.hasError('pattern')) {
-                        <mat-error>Letters, digits, dot, dash, underscore; start alphanumeric.</mat-error>
-                    }
-                    @if (form.controls.name.hasError('duplicate')) {
-                        <mat-error>A dashboard with this id already exists.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="w-64"
+                    label="Dashboard id"
+                    [required]="true"
+                    placeholder="e.g. cdr_overview"
+                    formControlName="name"
+                    [error]="idError()"
+                ></inspecto-pen-field>
                 <inspecto-transfer-menu
                     [items]="transferItems"
                     [allowedKinds]="['dashboard']"
@@ -78,27 +76,25 @@
 
         <!-- UIE-5: the viewer header — what the page answers, the day its figures are as of, and the STAGED flag. -->
         <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-            <mat-form-field subscriptSizing="dynamic" class="min-w-64 flex-auto">
-                <mat-label>Description</mat-label>
-                <input
-                    matInput
-                    [formControl]="form.controls.description"
-                    placeholder="The question this dashboard answers"
-                />
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic" class="w-48">
-                <mat-label>As of</mat-label>
-                <input matInput type="date" [formControl]="form.controls.asOf" />
-                @if (form.controls.asOf.hasError('pattern')) {
-                    <mat-error>A date, YYYY-MM-DD.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                class="min-w-64 flex-auto"
+                label="Description"
+                placeholder="The question this dashboard answers"
+                [formControl]="form.controls.description"
+            ></inspecto-pen-field>
+            <inspecto-pen-field
+                class="w-56"
+                label="As of"
+                type="date"
+                [formControl]="form.controls.asOf"
+                [error]="asOfError()"
+            ></inspecto-pen-field>
             <mat-checkbox [formControl]="form.controls.illustrative">Illustrative data</mat-checkbox>
         </div>
 
         <!-- UIE-5 (d): the viewer's date range — which column it filters, and the range a viewer starts from. -->
         <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-            <mat-form-field subscriptSizing="dynamic" class="w-56">
+            <mat-form-field subscriptSizing="dynamic" class="w-56"><!-- form-allow: a typeahead with an autocomplete panel over the date columns -->
                 <mat-label>Date field</mat-label>
                 <input
                     matInput
@@ -163,9 +159,9 @@
             </div>
             <div>
                 <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Quick filters</div>
-                <mat-form-field subscriptSizing="dynamic" class="w-64">
+                <mat-form-field subscriptSizing="dynamic" class="w-64"><!-- form-allow: a multiple choice, not one value -->
                     <mat-label>Exposed fields</mat-label>
-                    <mat-select
+                    <!-- form-allow: a multiple choice, not one value --><mat-select
                         multiple
                         [ngModel]="exposedFields()"
                         (ngModelChange)="exposedFields.set($event)"

@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { runSql } from 'app/inspecto/data-table/sql/sql-run';
 import { NamedMeasure } from './dataset-types';
 
@@ -15,31 +16,25 @@ import { NamedMeasure } from './dataset-types';
 @Component({
     selector: 'app-dataset-measures',
     standalone: true,
-    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule],
+    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex flex-col gap-3">
             @for (m of rows(); track m.id; let i = $index) {
                 <div class="grid grid-cols-[1fr_1fr_1.5fr_auto_auto] items-end gap-2">
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Id</mat-label>
-                        <input
-                            matInput
-                            [ngModel]="m.id"
-                            (ngModelChange)="patch(i, { id: $event })"
-                            [attr.aria-label]="'Measure id ' + (i + 1)"
-                        />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Label</mat-label>
-                        <input
-                            matInput
-                            [ngModel]="m.label"
-                            (ngModelChange)="patch(i, { label: $event })"
-                            [attr.aria-label]="'Measure label ' + (i + 1)"
-                        />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
+                    <inspecto-pen-field
+                        label="Id"
+                        [ariaLabel]="'Measure id ' + (i + 1)"
+                        [ngModel]="m.id"
+                        (ngModelChange)="patch(i, { id: $event })"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Label"
+                        [ariaLabel]="'Measure label ' + (i + 1)"
+                        [ngModel]="m.label"
+                        (ngModelChange)="patch(i, { label: $event })"
+                    ></inspecto-pen-field>
+                    <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a SQL expression editor -->
                         <mat-label>Expression</mat-label>
                         <input
                             matInput

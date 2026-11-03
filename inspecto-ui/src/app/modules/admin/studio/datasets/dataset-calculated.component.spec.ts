@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError } from 'app/inspecto/testing/pen-field';
 import { CalculatedColumn } from './dataset-types';
 import { DatasetCalculatedComponent } from './dataset-calculated.component';
 
@@ -74,6 +75,12 @@ describe('DatasetCalculatedComponent', () => {
         const fixture = create([{ name: 'bad-name', expr: 'amt' }]);
         const c = fixture.componentInstance;
         expect(c.nameError(c.rows()[0].name)).toMatch(/letters, digits, underscore/i);
+    });
+
+    it('renders an invalid name as the Name row error line', () => {
+        const fixture = create([{ name: 'bad-name', expr: 'amt' }]);
+        const row = penByLabel(fixture.nativeElement, 'Name')!;
+        expect(penError(row)).toMatch(/letters, digits, underscore/i);
     });
 
     it('renders the inline error text in the DOM for a disallowed expression', () => {

@@ -69,6 +69,7 @@ import { KpiRange } from 'app/inspecto/api/kpis.service';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import {
     InspectoOptionPickerComponent,
     PickerOption,
@@ -115,6 +116,7 @@ function splitStores(v: string | undefined): string[] | undefined {
         MatInputModule,
         MatSelectModule,
         MatTooltipModule,
+        PenFieldComponent,
         RouterLink,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
@@ -588,6 +590,20 @@ export class DashboardEditorComponent implements OnInit {
             link.download = `${name}-tile-${i + 1}.png`;
             link.click();
         });
+    }
+
+    /** The Dashboard id row's error line: shown once the row was left or Save was pressed. */
+    idError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash, underscore; start alphanumeric.';
+        if (c.hasError('duplicate')) return 'A dashboard with this id already exists.';
+        return '';
+    }
+
+    asOfError(): string {
+        const c = this.form.controls.asOf;
+        return c.touched && c.hasError('pattern') ? 'A date, YYYY-MM-DD.' : '';
     }
 
     save(): void {

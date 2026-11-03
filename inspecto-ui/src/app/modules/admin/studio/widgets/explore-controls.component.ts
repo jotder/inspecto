@@ -52,9 +52,9 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
             @for (control of plugin().controls; track control.channel) {
                 <div class="flex items-end gap-2">
                     @if (control.multiple) {
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-form-field class="flex-1" subscriptSizing="dynamic"><!-- form-allow: a multiple choice, not one value -->
                             <mat-label>{{ control.label }}</mat-label>
-                            <mat-select
+                            <!-- form-allow: a multiple choice, not one value --><mat-select
                                 multiple
                                 [ngModel]="selectedFieldsByChannel()[control.channel] ?? noFields"
                                 (ngModelChange)="onFields(control, $event)"

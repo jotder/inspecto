@@ -4,9 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { concatMap, map, of, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
@@ -43,6 +41,7 @@ import { MaterializeDatasetDialog } from './materialize-dataset.dialog';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
 
@@ -59,11 +58,10 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
         ChipComponent,
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         RouterLink,
         InspectoAlertComponent,
@@ -433,6 +431,15 @@ export class DatasetEditorComponent implements OnInit {
                     },
                 });
             });
+    }
+
+    /** The Dataset id row's error line: shown once the row was left or Save was pressed. */
+    idError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash, underscore; start alphanumeric.';
+        if (c.hasError('duplicate')) return 'A dataset with this id already exists.';
+        return '';
     }
 
     save(): void {

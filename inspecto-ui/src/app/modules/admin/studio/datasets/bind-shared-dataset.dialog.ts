@@ -2,13 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ExchangeGrant, ExchangeService } from 'app/inspecto/api';
 import { uniqueNameValidator } from 'app/inspecto/investigation';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface BindSharedDatasetData {
     /** The active space id — grants where it is the consumer are the bindable ones. */
@@ -37,11 +36,10 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
     standalone: true,
     imports: [
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -68,17 +66,13 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
                             <p class="text-warn m-0 text-xs" role="alert">Choose a shared dataset.</p>
                         }
                     </div>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Local dataset name</mat-label>
-                        <input matInput formControlName="name" placeholder="e.g. analytics-hub_fx_rates_daily" />
-                        @if (form.controls.name.hasError('required')) {
-                            <mat-error>A name is required.</mat-error>
-                        } @else if (form.controls.name.hasError('pattern')) {
-                            <mat-error>Letters, digits, “.”, “-”, “_” only; must start alphanumeric.</mat-error>
-                        } @else if (form.controls.name.hasError('duplicate')) {
-                            <mat-error>A dataset with this name already exists.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Local dataset name"
+                        [required]="true"
+                        placeholder="e.g. analytics-hub_fx_rates_daily"
+                        formControlName="name"
+                        [error]="nameError()"
+                    ></inspecto-pen-field>
                 </form>
             }
         </mat-dialog-content>
@@ -138,6 +132,16 @@ export class BindSharedDatasetDialog {
             },
             error: () => this.grants.set([]),
         });
+    }
+
+    /** The name row's error line: shown once the row was left or Bind was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A name is required.';
+        if (c.hasError('pattern')) return 'Letters, digits, “.”, “-”, “_” only; must start alphanumeric.';
+        if (c.hasError('duplicate')) return 'A dataset with this name already exists.';
+        return '';
     }
 
     submit(): void {

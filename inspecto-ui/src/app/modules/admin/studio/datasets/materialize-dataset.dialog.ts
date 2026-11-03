@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation';
@@ -30,7 +29,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
  */
 @Component({
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Materialize dataset</h2>
@@ -40,17 +39,14 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
                 own, so charts read the summary instead of re-reading the detail.
             </div>
             <form [formGroup]="form" class="flex flex-col gap-2" (ngSubmit)="submit()">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Target dataset id</mat-label>
-                    <input matInput formControlName="target" cdkFocusInitial placeholder="e.g. orders_by_region" />
-                    @if (form.controls.target.hasError('required')) {
-                        <mat-error>A target is required.</mat-error>
-                    } @else if (form.controls.target.hasError('pattern')) {
-                        <mat-error>Letters, digits, “.”, “-”, “_” only; must start alphanumeric.</mat-error>
-                    } @else if (form.controls.target.hasError('sameAsSource')) {
-                        <mat-error>The target must differ from the source dataset.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Target dataset id"
+                    [required]="true"
+                    placeholder="e.g. orders_by_region"
+                    formControlName="target"
+                    [error]="targetError()"
+                ></inspecto-pen-field>
                 @if (form.controls.target.hasError('duplicate')) {
                     <p class="text-secondary text-xs" role="status">
                         “{{ form.controls.target.value }}” already exists — its snapshot will be replaced.
@@ -88,6 +84,16 @@ export class MaterializeDatasetDialog {
         // Advisory only — see the class doc. `uniqueNameValidator` sets `duplicate`, which this dialog
         // renders as a hint and does NOT treat as invalid.
         this.form.controls.target.addValidators(uniqueNameValidator(() => this.data.existingNames));
+    }
+
+    /** The target row's error line: shown once the row was left or Materialize was pressed. */
+    targetError(): string {
+        const c = this.form.controls.target;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A target is required.';
+        if (c.hasError('pattern')) return 'Letters, digits, “.”, “-”, “_” only; must start alphanumeric.';
+        if (c.hasError('sameAsSource')) return 'The target must differ from the source dataset.';
+        return '';
     }
 
     /** Valid enough to submit: `duplicate` is deliberately not disqualifying. */

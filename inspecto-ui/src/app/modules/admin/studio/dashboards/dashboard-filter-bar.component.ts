@@ -1,9 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
+import { InspectoOptionPickerComponent, PickerOption, pickerOptions } from 'app/inspecto/components/option-picker.component';
 import { Condition, ConditionGroup } from 'app/inspecto/query';
 import { DrillEvent } from '../widgets/widget-host.component';
 
@@ -17,25 +16,20 @@ import { DrillEvent } from '../widgets/widget-host.component';
 @Component({
     selector: 'app-dashboard-filter-bar',
     standalone: true,
-    imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatSelectModule],
+    imports: [FormsModule, InspectoOptionPickerComponent, MatButtonModule, MatIconModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @if (fields().length) {
             <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Dashboard quick filters">
                 @for (field of fields(); track field) {
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
-                        <mat-label>{{ field }}</mat-label>
-                        <mat-select
-                            [ngModel]="null"
-                            (ngModelChange)="onPick(field, $event)"
-                            [ngModelOptions]="{ standalone: true }"
-                            [attr.aria-label]="'Filter by ' + field"
-                        >
-                            @for (v of valuesFor(field); track v) {
-                                <mat-option [value]="v">{{ v }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
+                    <inspecto-option-picker
+                        class="w-56"
+                        [label]="field"
+                        [options]="optionsFor(field)"
+                        [ngModel]="null"
+                        (ngModelChange)="onPick(field, $event)"
+                        [ngModelOptions]="{ standalone: true }"
+                    />
                 }
                 @for (c of activeConditions(); track c.field + '=' + c.value) {
                     <button
@@ -74,11 +68,19 @@ export class DashboardFilterBarComponent {
         );
     });
 
-    valuesFor(field: string): string[] {
-        return this.values()[field] ?? [];
+    /** The picker's choices per exposed field, memoised per `values` (not a fresh array per change detection). */
+    private readonly optionsByField = computed<Record<string, PickerOption[]>>(() =>
+        Object.fromEntries(Object.entries(this.values()).map(([f, vs]) => [f, pickerOptions(vs)])),
+    );
+    private readonly noOptions: PickerOption[] = [];
+    optionsFor(field: string): PickerOption[] {
+        return this.optionsByField()[field] ?? this.noOptions;
     }
 
     onPick(field: string, value: string | null): void {
-        if (value != null && value !== '') this.drillToggle.emit({ field, value });
+        if (value == null || value === '') return;
+        // The picker reports a re-pick of the value it shows; adding a filter that is already on must not toggle it off.
+        if (this.activeConditions().some((c) => c.field === field && c.value === value)) return;
+        this.drillToggle.emit({ field, value });
     }
 }

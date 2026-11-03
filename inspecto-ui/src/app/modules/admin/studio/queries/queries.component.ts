@@ -1,12 +1,10 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
@@ -42,6 +40,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import './query.kind'; // ensure the query kind is registered
 
 /** The default (empty) structured model — a fresh Query Core builder state. */
@@ -104,12 +103,12 @@ function tokenName(raw: string): string {
         InspectoPageHeaderComponent,
         ChipComponent,
         AiExplainComponent,
+        FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
+        PenFieldComponent,
         MatProgressSpinnerModule,
         MatTooltipModule,
         InspectoAlertComponent,

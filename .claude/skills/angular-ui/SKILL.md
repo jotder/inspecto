@@ -496,6 +496,9 @@ src/app/
   put `cdkFocusInitial` on the `<inspecto-pen-field>` host (the focus trap moves it to the row's value; CDK logs a
   harmless dev-mode warning that the host itself is not focusable).
   ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
+  A row bound to a SIGNAL (one control, no form around it) may bridge with `[ngModel]` / `(ngModelChange)` and
+  `[ngModelOptions]="{ standalone: true }"` when it sits inside a form - the one sanctioned use of `ngModel` (UI-FORM-ROWS-1 P3; the dashboard
+  filter bar, the date-range preset, the query `$param` rows). A form of several values stays reactive.
   **`help`** (2026-11-03, `UI-FORM-ROWS-1`) is the one tiny line under the row, as `option-picker`'s `help`: give it
   only to a field whose name does not explain itself; an error replaces it.
   **One row geometry (UI-FORM-ROWS-1 P0, operator 2026-11-03):** `pen-field` and `option-picker` both lay out on

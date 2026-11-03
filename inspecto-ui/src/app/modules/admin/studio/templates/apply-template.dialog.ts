@@ -2,12 +2,11 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { BiTemplate } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface ApplyTemplateData {
     template: BiTemplate;
@@ -31,11 +30,10 @@ export interface ApplyTemplateResult {
     standalone: true,
     imports: [
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -53,13 +51,16 @@ export interface ApplyTemplateResult {
                         <p class="text-warn m-0 text-xs" role="alert">Choose a dataset to bind the template to.</p>
                     }
                 </div>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Id prefix (optional)</mat-label>
-                    <input matInput formControlName="prefix" placeholder="e.g. q3" />
-                    @if (form.controls.prefix.hasError('pattern')) {
-                        <mat-error>Letters, digits, dash, underscore only.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Id prefix (optional)"
+                    placeholder="e.g. q3"
+                    formControlName="prefix"
+                    [error]="
+                        form.controls.prefix.touched && form.controls.prefix.hasError('pattern')
+                            ? 'Letters, digits, dash, underscore only.'
+                            : ''
+                    "
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
