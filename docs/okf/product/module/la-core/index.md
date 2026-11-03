@@ -38,6 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-BASIC-DISCOVER-1` | P3 | feature | Discover a Dataset in Basic: entities per Entity Type, busiest entities, link kinds, period, amount totals (LA-BASIC-DISCOVERY-1 P0 + P1,… | — |
 | `LA-ENTITY-SUMMARY-1` | P3 | feature | an entity summary in Basic (first / last seen, top counterparts by links and amount, link kinds, activity) - the full profile pages stay… | — |
 | `LA-QUERY-BUILDER-1` | P3 | feature | a no-code query builder over a Dataset's roles with *Draw these* and *Save as preset* (LA-BASIC-DISCOVERY-1 P4). | — |
+| `LA-PIPELINE-MAPPINGS-1` | P3 | feature | saved Mappings of Datasets that Pipelines keep up to date, not only of Add data Datasets (filed 2026-11-03). | operator |
 | `LA-ARRIVAL-LEDGER-1` | P2 | feature | an arrival ledger per Dataset and a three-clock *Data status* (received · covers through · graph indexed through), in every edition (LA-D… | — |
 | `LA-ARRIVAL-MODES-1` | P3 | feature | incremental semantics for import Datasets: *Replace the period it covers*, duplicate-upload refusal (sha256) and a stated schema-drift po… | — |
 | `LA-ARRIVAL-FEEDS-1` | P3 | feature | files from a foreign process, made visible (LA-DATA-ARRIVAL-1 P3, decision D-1). | — |
