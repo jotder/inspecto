@@ -81,6 +81,31 @@ foreign process** (a folder or SFTP the Space watches or is told to check).
 
 P1 is the one to build first: it makes every later phase visible, and it is useful on Basic today.
 
+## 5a. P0 findings (2026-11-03, `ControlApiOnboardFilesTest`)
+
+- **V1 confirmed:** a file a foreign process writes into `<dataRoot>/inbox/<id>` is taken by *Run now* (20 rows
+  added, inbox emptied) - pinned by `aFileDroppedInTheInboxIsTakenByRunNowAndEachArrivalIsItsOwnParquetFile`. So D-1's
+  *Import waiting files* is UI only: list the inbox, call Run now.
+- **V2 confirmed (the defect):** the same file appended twice doubles the rows (130 → 160). `LA-ARRIVAL-MODES-1`.
+- **V3:** each arrival lands as **its own Parquet file** named after its source (`foreign_drop_out.parquet`,
+  `add_<stamp>_transfers_out.parquet`); nothing compacts them. Good for tracing, bad for reads in the long run
+  (`LA-DATASET-COMPACT-1`).
+- **V4** (index cost per append on Basic) needs Link Analysis on the classpath; measure in `la/inspecto-geo-link`
+  with the ledger work.
+
+**Ledger design, revised (smaller than §4 assumed).** The engine already writes a per-file audit row for every
+arrival, uploads and drops alike (`ConsignmentAuditWriter` `_status_` ledger, `StatusStore.files(cfg)`):
+`start_time, end_time, filename, status, parsed_rows, error_rows, output_paths, output_sizes_bytes, consignment_id,
+origin, logical_name`. So the arrival list is a **read** over that ledger, not a new writer:
+
+- **covered period** = Parquet column statistics (min / max of the Dataset's *When* column) of the row's
+  `output_paths` - read from file metadata, nothing stored; an output a later *Replace everything* set aside reads as
+  "replaced by <file>".
+- **what the ledger lacks** - mode (replace / append), sha256 of the source, who sent it (upload or drop), and the
+  import-time index outcome - goes into one small sidecar per Dataset, keyed by `consignment_id`, written by
+  `OnboardImport` (an upload); a drop simply has no sidecar row (sender = *a system*).
+- `GET /datasets/{id}/arrivals` joins the two; `lastImport` stays as it is (the Home card) until the UI reads the list.
+
 ## 6. Decisions (operator 2026-11-03: the recommended options, accepted)
 
 - **D-1 Basic and foreign drops: manual.** Basic shows the Dataset's inbox path and *N files waiting · Import waiting

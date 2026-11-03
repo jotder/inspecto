@@ -469,6 +469,35 @@ class ControlApiOnboardFilesTest {
         }
     }
 
+    /**
+     * LA-ARRIVAL-LEDGER-1 (V1, V3): a file a foreign process puts in the import inbox is taken by Run now (no upload),
+     * and every arrival lands as its own Parquet file named after its source - the arrival ledger relies on both.
+     */
+    @Test
+    void aFileDroppedInTheInboxIsTakenByRunNowAndEachArrivalIsItsOwnParquetFile(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("drop");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            Path inbox = Path.of("database", "inbox", id);
+            Files.writeString(inbox.resolve("foreign_drop.csv"), transfers(20));
+            JsonNode now = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(20, now.get("rowsIn").asLong(), now.toString());
+            assertEquals(120, now.get("rowsAfter").asLong(), now.toString());
+            assertEquals("[]", listing(inbox), "the dropped file was taken");
+            String files = listing(Path.of("database", id, "database"));
+            assertTrue(files.contains("foreign_drop_out.parquet"), files);
+            assertTrue(files.contains("_transfers_out.parquet"), files);
+        }
+    }
+
+    private static String listing(Path dir) throws Exception {
+        if (!Files.exists(dir)) return "(none)";
+        try (var s = Files.walk(dir)) {
+            return s.filter(Files::isRegularFile).map(p -> dir.relativize(p).toString()).sorted().toList().toString();
+        }
+    }
+
     /** LA-ONBOARD-RESIDUALS-1 (7): the registry entry keeps the last import's replace-or-append and row counts. */
     private static void assertLastImport(ComponentStore registry, String id, boolean replaced, long before, long after, String file) {
         Map<?, ?> last = (Map<?, ?>) registry.get("dataset", id).orElseThrow().content().get("lastImport");
