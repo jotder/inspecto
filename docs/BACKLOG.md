@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **76<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 62<!--count:backlog-p3--> × P3** —
+> **78<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 64<!--count:backlog-p3--> × P3** —
+> ⬆ **76 → 78 (P3 62 → 64) on 2026-11-03**: filed P3 feature `LA-INDEX-PAIRS-LOOPS-1` (plan `la-index-pairs-loops-plan.md`, decisions Q-1…Q-5 accepted by the operator) and P3 defect `LA-PRESET-ROLES-1` (a preset's From/To guessed from the wrong two classified columns on IMS CDRs) [items: module.la-core · kind: feature].
 > ⬇ **77 → 76 (P3 63 → 62) on 2026-11-03**: closed P3 feature `LA-PRESET-QUERIES-1` (LA-BASIC-DISCOVERY-1 P0 + P3) [items: module.la-core · kind: feature] — `GET /inv/presets?dataset=` lists the Industry pack's preset queries whose roles the Dataset maps (from its `defaultLinkMapping`, else its classified columns, a `*_kind` column, its event date and the pack's `measure_hints`), and `POST /inv/presets/{id}/run` answers a masked, capped (500 rows and the entity fence), audited table (`LINK_PRESET_RUN`): Reached by many, Reaching many, Top counterparts of one entity, Biggest senders by amount, and per pack Money in, then out again within hours (mobile money, the `timeToCashOut` Value Measure) and Linked through one shared item (telecom). The panel sits under Basic's Start box with *Draw these*. Two departures from the plan, assistant-decided under delegation: presets are code keyed by pack id (not `industry-pack.toon` entries), and the aggregate shape is rendered in la-api (not `MeasureCompiler`, which la-api may not depend on). As built in `superpower/la-basic-discovery-plan.md` §7; `ControlApiPresetQueriesTest`.
 > ⬆ **73 → 77 (P3 59 → 63) on 2026-11-03**: filed `LA-BASIC-DISCOVER-1`, `LA-ENTITY-SUMMARY-1`, `LA-PRESET-QUERIES-1` and `LA-QUERY-BUILDER-1` from the new plan `LA-BASIC-DISCOVERY-1` (decisions Q-1…Q-5 accepted by the operator, presets first) [items: module.la-core · kind: feature].
 > ⬆ **69 → 73 (P2 13 → 14, P3 56 → 59) on 2026-11-03**: filed `LA-ARRIVAL-LEDGER-1` (P2), `LA-ARRIVAL-MODES-1`, `LA-ARRIVAL-FEEDS-1` and `LA-DATASET-COMPACT-1` (P3) from the new plan `LA-DATA-ARRIVAL-1` (operator accepted decisions D-1…D-5 2026-11-03) [items: module.la-core · kind: feature].
@@ -420,10 +421,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 64<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 62<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 76<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 64<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 78<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -704,6 +705,8 @@ provenance in [`archived-documents/plans-archive/link-analysis-backlog-plan.md`]
 What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 
+- **P3** · `LA-INDEX-PAIRS-LOOPS-1` — **Two-way pairs and Short loops written by the link index build, so they answer in a second on large Datasets (filed 2026-11-03).** On IMS (39.4 M links) both time out or run out of memory today, even over the index; a FULL build gains a `derived` phase writing `pairs_back` (2.79 M rows, ~16 s) and `loops` (entities with at most `index.loops_max_degree` counterparts, 525 k rows at 50, ~16 s); the two presets read them; a timed-out preset answers in a sentence. Decisions Q-1…Q-5 accepted 2026-11-03. → [`superpower/la-index-pairs-loops-plan.md`](superpower/la-index-pairs-loops-plan.md) [items: module.la-core · kind: feature]
+- **P3** · `LA-PRESET-ROLES-1` — **preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03).** IMS `ims_cdr_dataset` resolves From = `served_msisdn`, To = `served_imsi` (one subscriber's number and SIM), not caller and callee; prefer the link index's or a Mapping's columns, or the pack's role hints, before the first-two rule. → [`superpower/la-index-pairs-loops-plan.md`](superpower/la-index-pairs-loops-plan.md) §7 [items: module.la-core · kind: defect · hold: demand]
 - **P3** · `LA-BASIC-DISCOVER-1` — **Discover a Dataset in Basic: entities per Entity Type, busiest entities, link kinds, period, amount totals (LA-BASIC-DISCOVERY-1 P0 + P1, filed 2026-11-03).** `GET /inv/datasets/{id}/discover` from `EntityProfiles` blocks over the Dataset's mapping, masked, cached per last arrival; the Data page's *Discover* tab and the Start box's *About this Dataset*. → [`superpower/la-basic-discovery-plan.md`](superpower/la-basic-discovery-plan.md) [items: module.la-core · kind: feature]
 - **P3** · `LA-ENTITY-SUMMARY-1` — **an entity summary in Basic (first / last seen, top counterparts by links and amount, link kinds, activity) - the full profile pages stay Standard (D-LAE4) (LA-BASIC-DISCOVERY-1 P2).** `GET /inv/entities/{type}/{key}/summary`, *Summary* in the node dialog. → [`superpower/la-basic-discovery-plan.md`](superpower/la-basic-discovery-plan.md) [items: module.la-core · kind: feature]
 - **P3** · `LA-QUERY-BUILDER-1` — **a no-code query builder over a Dataset's roles with *Draw these* and *Save as preset* (LA-BASIC-DISCOVERY-1 P4).** → [`superpower/la-basic-discovery-plan.md`](superpower/la-basic-discovery-plan.md) [items: module.la-core · kind: feature]
