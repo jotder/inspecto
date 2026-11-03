@@ -77,6 +77,58 @@ final class DatasetEntryRules {
                     + "', which is not one of the Dataset's columns");
     }
 
+    static final String ORIGIN_MAPPING = "mapping";
+    static final String BASED_ON = "basedOn";
+
+    /**
+     * LA-DATA-PAGE-1 (plan §8): a <b>Mapping</b> is a Dataset entry ({@code origin: mapping}) that reads ANOTHER import
+     * Dataset's stored data its own way - its own Entity Types, link mapping and event date. Its {@code basedOn} must name
+     * an Add data Dataset of this Space (not itself), and its {@code physicalRef} must be exactly that base's: a Mapping
+     * never points at data of its own choosing. Run on every Dataset write with the Space's registry.
+     *
+     * @throws IllegalArgumentException naming the broken rule
+     */
+    static void validateMapping(java.nio.file.Path writeRoot, String id, Map<String, Object> content) {
+        Object basedOn = content.get(BASED_ON);
+        boolean mapping = ORIGIN_MAPPING.equals(String.valueOf(content.get("origin")));
+        if (!mapping) {
+            if (basedOn != null) throw new IllegalArgumentException(BASED_ON + " is only for a Mapping (origin: mapping)");
+            return;
+        }
+        if (!(basedOn instanceof String base) || base.isBlank())
+            throw new IllegalArgumentException("a Mapping names the Dataset it reads: " + BASED_ON + " is required");
+        if (base.equals(id)) throw new IllegalArgumentException("a Mapping cannot be based on itself");
+        if (writeRoot == null) throw new IllegalArgumentException("a Mapping needs this Space's registry to check '" + base + "'");
+        Map<String, Object> baseEntry = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry")).get("dataset", base)
+                .map(com.gamma.pipeline.ComponentRegistry.Component::content)
+                .orElseThrow(() -> new IllegalArgumentException(BASED_ON + " names no Dataset '" + base + "'"));
+        if (!"import".equals(String.valueOf(baseEntry.get("origin"))))
+            throw new IllegalArgumentException("a Mapping reads an Add data Dataset; '" + base + "' is not one");
+        if (!String.valueOf(baseEntry.get("physicalRef")).equals(String.valueOf(content.get("physicalRef"))))
+            throw new IllegalArgumentException("a Mapping reads exactly the data of '" + base + "': physicalRef must be '"
+                    + baseEntry.get("physicalRef") + "'");
+        // nothing that would read other data, or compute columns the base does not have
+        for (String k : List.of("sql", "view", "sourceName", "calculated"))
+            if (content.get(k) != null) throw new IllegalArgumentException("a Mapping reads its base's data as stored: '" + k + "' is not allowed");
+        Set<String> mine = columnNames(content), theirs = columnNames(baseEntry);
+        if (mine != null && theirs != null)
+            for (String c : mine)
+                if (!theirs.contains(c))
+                    throw new IllegalArgumentException("a Mapping names only columns of '" + base + "'; '" + c + "' is not one");
+    }
+
+    /** The Mappings of this Space based on {@code base}, by id (sorted); empty when there are none. */
+    static List<String> mappingsOf(java.nio.file.Path writeRoot, String base) {
+        List<String> out = new java.util.ArrayList<>();
+        if (writeRoot == null || base == null) return out;
+        com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
+        for (com.gamma.pipeline.ComponentRegistry.Component c : store.list("dataset"))
+            if (ORIGIN_MAPPING.equals(String.valueOf(c.content().get("origin"))) && base.equals(c.content().get(BASED_ON)))
+                out.add(c.name());
+        java.util.Collections.sort(out);
+        return out;
+    }
+
     /** The entry's column names, lower-cased; {@code null} when it lists none. */
     private static Set<String> columnNames(Map<String, Object> content) {
         if (!(content.get("columns") instanceof List<?> cols) || cols.isEmpty()) return null;

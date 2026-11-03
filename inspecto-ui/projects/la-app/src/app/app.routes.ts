@@ -37,6 +37,8 @@ export const laAppRoutes: Route[] = [
             { path: '', pathMatch: 'full', component: LandingComponent },
             // Add data (OB-14), the first-run page's "Use my own data": the one Add data screen both apps use (LA-ONBOARD-1 phase 4).
             { path: 'add-data', loadComponent: () => import('./add-data.page').then((m) => m.AddDataPageComponent) },
+            // LA-DATA-PAGE-1: the Datasets, their Entities and their Mappings.
+            { path: 'data', loadComponent: () => import('./data.page').then((m) => m.DataPageComponent) },
             // The library's lazy boundaries, exactly as the gamma host loads them.
             {
                 path: 'link-analysis',

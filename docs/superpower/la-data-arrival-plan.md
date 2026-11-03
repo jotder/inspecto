@@ -146,3 +146,53 @@ origin, logical_name`. So the arrival list is a **read** over that ledger, not a
 - Uploading the same file twice is refused with the first import's date; a re-sent folder file follows its policy.
 - A file covering 1-7 Oct sent again with corrections replaces exactly those days (Replace the period).
 - Specs for each route (real-HTTP tests), UI specs, and one live drive on Basic and Preview.
+
+## 8. P5 — the Data page: Datasets, Entities and named Mappings (operator 2026-11-03)
+
+**Operator ask:** "not only Entities - the Mapping is saved and registered as a Dataset; the user manages and saves the
+Dataset, its Entities and Mappings, handy." **Operator choices (2026-11-03):** a *named mapping saved as its own
+Dataset* over the same data, and a new **Data** page in Inspecto LA (`LA-DATA-PAGE-1`).
+
+**BUILT 2026-11-03 (P5a + P5b):** `DatasetEntryRules.validateMapping` (on every Dataset write: `basedOn` names an Add
+data Dataset, `physicalRef` is exactly the base's, `basedOn` only on a Mapping), the base-view check in
+`ComponentRoutes.writeComponent` (404 like reading the base), the delete guard (409 naming the Mappings), *Add a file* /
+*Run now* on a Mapping refused naming the base; the Inspecto LA **Data** page (`/data`, `data.page.ts` + pure
+`data-page.ts`) with the Dataset card, Entities (the existing `PUT /datasets/{id}/columns/{c}`) and Mappings (create /
+edit / delete through the component routes). Tests: `ControlApiOnboardFilesTest#aMappingReadsItsBasesDataItsOwnWay…`,
+`data-page.spec.ts`, `data.page.spec.ts`. User guide §3.4. **Left:** M3 - a Mapping has no link index of its own (a
+*Build index* gesture or Standard's Jobs); P5c the live check on Basic.
+
+**Review 2026-11-03, fixed:** a hidden base and a missing base both answer 404, checked before the shape rules (no
+existence oracle); a Mapping may carry no `sql` / `view` / `sourceName` / `calculated` and only columns of its base;
+Run now on a Mapping is refused like Add a file. **Recorded, not changed (assistant-decided under delegation):** (a) a
+plain Dataset entry may already point its `physicalRef` at any store - that predates Mappings and is the component
+routes' existing rule, not widened here; (b) a new Mapping is visible to the Space unless shared, like any Dataset the
+component routes create - its author must see the base; (c) Mappings are not re-checked when their base is edited
+(a base `physicalRef` change leaves them stale until their next save; deleting the base is refused while they exist).
+
+**Model.**
+- An **import Dataset** (Add data) owns the files, the Pipeline and the arrivals; it keeps its own default mapping.
+- A **Mapping** is a Dataset entry over the SAME stored data with its own reading of it: `physicalRef` = the import's,
+  `basedOn: <import id>`, `origin: mapping`, its own `columns[].entityType` / classification, `primaryEntityType`,
+  `defaultLinkMapping {from, to, kind?, time?, amount?, details?}` and `eventDate`. One file read as *calls* and as
+  *SMS*, or *sender → receiver* and *device → number*, without copying data. It appears everywhere a Dataset does
+  (Start box, Open, Explore, widgets) because it IS one.
+- The server already validates the mapping against the entry's columns (`DatasetEntryRules`); a Mapping is saved
+  through the Dataset entry route. New: `basedOn` is checked (must name an import Dataset the author may view; its
+  `physicalRef` must equal the base's) and a Mapping takes no files (*Add a file* / *Run now* answer 409: "add files to
+  <base>").
+
+**The Data page** (`/data`, left navigation between Link Analysis and Entity Lists):
+- every Dataset as a card: name, kind, *Data status* line, *Arrivals* (import Datasets), *Add a file* / *Run now*;
+- **Entities**: each column's Entity Type (or *a detail*), editable (the existing `PUT /datasets/{id}/columns/{c}`);
+- **Mappings**: the import's own mapping and every Mapping based on it; *New mapping* and *Edit* open the Add data
+  step-3 editor ("What does each column hold?" + "Each row is a link") over the base's columns, with a name;
+  *Delete* removes the Mapping entry only (never the data).
+
+**Decisions (assistant-decided under delegation, to review):** (M1) a Mapping is a plain Dataset entry, no new store;
+(M2) deleting an import Dataset that Mappings are based on is refused (409, naming them) until they are deleted - no
+dangling entries; (M3) a Mapping gets no link index of its own at save (exploration reads the Dataset; Standard's Jobs
+or a later *Build index* add it); (M4) names follow the Dataset id rule and must not clash with an existing Dataset.
+
+**Phases.** P5a backend (`basedOn` rules, files refused on a Mapping, delete refused while Mappings exist, tests);
+P5b the Data page (list + Entities + Mappings, the step-3 editor reused, specs + a11y); P5c live check on Basic.

@@ -554,6 +554,80 @@ class ControlApiOnboardFilesTest {
         }
     }
 
+    /**
+     * LA-DATA-PAGE-1 (plan §8): a Mapping is a Dataset entry over an Add data Dataset's own data, with its own link mapping.
+     * Its base must be an import Dataset of this Space and its physicalRef exactly the base's; it takes no files; the base
+     * cannot be deleted while a Mapping reads it.
+     */
+    @Test
+    void aMappingReadsItsBasesDataItsOwnWayTakesNoFilesAndHoldsItsBase(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("base");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(40), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            String cols = "\"columns\":[{\"name\":\"from_account\",\"type\":\"string\"},{\"name\":\"to_account\",\"type\":\"string\"},"
+                    + "{\"name\":\"channel\",\"type\":\"string\"},{\"name\":\"booked_at\",\"type\":\"timestamp\"}]";
+            String mapping = "{\"id\":\"by_channel\",\"origin\":\"mapping\",\"basedOn\":\"" + id + "\",\"physicalRef\":\"" + id
+                    + "/database\"," + cols + ",\"defaultLinkMapping\":{\"from\":\"from_account\",\"to\":\"channel\",\"time\":\"booked_at\"},"
+                    + "\"eventDate\":\"booked_at\"}";
+            HttpResponse<String> made = json(c, "POST", "/components/dataset", mapping, null);
+            assertTrue(made.statusCode() == 200 || made.statusCode() == 201, made.body());
+
+            // its base must be ITS data: another physicalRef, no basedOn, itself, or a Dataset no import made are refused
+            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m2\"")
+                    .replace(id + "/database", "elsewhere/database"), null).statusCode());
+            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m3\"")
+                    .replace("\"basedOn\":\"" + id + "\",", ""), null).statusCode());
+            new ComponentStore(root.resolve("registry")).write("dataset", "piped", Map.of("physicalRef", id + "/database"));
+            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m4\"")
+                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"piped\""), null).statusCode());
+            assertEquals(422, json(c, "POST", "/components/dataset", "{\"id\":\"m5\",\"physicalRef\":\"x\",\"basedOn\":\"" + id + "\"}",
+                    null).statusCode(), "basedOn is only for a Mapping");
+
+            // nothing that reads other data or columns the base does not have; an unknown base answers like a hidden one
+            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m6\"")
+                    .replace("\"eventDate\"", "\"sql\":\"SELECT 1\",\"eventDate\""), null).statusCode());
+            assertEquals(422, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m7\"")
+                    .replace("{\"name\":\"booked_at\"", "{\"name\":\"secret_col\",\"type\":\"string\"},{\"name\":\"booked_at\""), null).statusCode(),
+                    "a column the base does not have");
+            assertEquals(404, json(c, "POST", "/components/dataset", mapping.replace("\"by_channel\"", "\"m8\"")
+                    .replace("\"basedOn\":\"" + id + "\"", "\"basedOn\":\"nope\""), null).statusCode());
+
+            // a Mapping takes no files, nor Run now: they go to its base
+            HttpResponse<String> files = send(c, "POST", "/datasets/by_channel/files?name=more.csv", transfers(5).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(409, files.statusCode(), files.body());
+            assertTrue(files.body().contains("add files to '" + id + "'"), files.body());
+            HttpResponse<String> run = json(c, "POST", "/datasets/by_channel/run", null, null);
+            assertEquals(409, run.statusCode(), run.body());
+            assertTrue(run.body().contains("add files to '" + id + "'"), run.body());
+
+            // the base is held while the Mapping reads it; deleting the Mapping releases it
+            HttpResponse<String> held = json(c, "DELETE", "/components/dataset/" + id, null, null);
+            assertEquals(409, held.statusCode(), held.body());
+            assertTrue(held.body().contains("by_channel"), held.body());
+            data(json(c, "DELETE", "/components/dataset/by_channel", null, null), 200);
+            data(json(c, "DELETE", "/components/dataset/piped", null, null), 200);
+            data(json(c, "DELETE", "/components/dataset/" + id, null, null), 200);
+        }
+    }
+
+    /** LA-DATA-PAGE-1: a Mapping of a base its author cannot see is 404 - exactly as a Mapping of a base that does not exist. */
+    @Test
+    void aMappingOfAHiddenBaseAnswersAsIfTheBaseWereAbsent(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "private_base", Map.of("physicalRef", "private_base/database",
+                    "origin", "import", "importPipeline", "private_base", "owner", "uploader-1", "shares", List.of()));
+            String body = "{\"id\":\"%s\",\"origin\":\"mapping\",\"basedOn\":\"%s\",\"physicalRef\":\"private_base/database\","
+                    + "\"defaultLinkMapping\":{\"from\":\"a\",\"to\":\"b\"}}";
+            HttpResponse<String> hidden = json(c, "POST", "/components/dataset", body.formatted("peek", "private_base"), AUTHOR);
+            HttpResponse<String> absent = json(c, "POST", "/components/dataset", body.formatted("peek2", "no_such_base"), AUTHOR);
+            assertEquals(404, hidden.statusCode(), hidden.body());
+            assertEquals(404, absent.statusCode(), absent.body());
+            assertFalse(new ComponentStore(root.resolve("registry")).get("dataset", "peek").isPresent(), "nothing was written");
+        }
+    }
+
     private static String listing(Path dir) throws Exception {
         if (!Files.exists(dir)) return "(none)";
         try (var s = Files.walk(dir)) {

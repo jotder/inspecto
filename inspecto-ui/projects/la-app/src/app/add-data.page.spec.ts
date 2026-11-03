@@ -70,7 +70,11 @@ function create(selfImport = true) {
 }
 
 describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
-    afterEach(() => http?.verify());
+    afterEach(() => {
+        // LA-ARRIVAL-LEDGER-1: each Dataset card reads its arrivals; these tests do not look at them
+        http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        http?.verify();
+    });
 
     it('titles the screen "Onboard a file", hosts Add data and lists the Datasets imported here (no violations)', async () => {
         const { el } = create();

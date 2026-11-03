@@ -198,6 +198,23 @@ shows and sets this.
 
 These changes need the right to edit Datasets when you sign in; without it they are greyed out with the reason.
 
+### 3.4 The Data page: Datasets, Entities and Mappings
+
+**Data** (left navigation) lists every Dataset you added with *Add data*. For each one:
+
+- its card: the **Data status** line (when data last arrived, the period it covers, whether the graph has it), the
+  **Arrivals** (every file it took, uploaded or put in its inbox by another system), *Add a file* and *Run now*;
+- **Entities**: what each column holds, one Entity Type or *Nothing: a detail* per column - changed here, saved at once;
+- **Mappings**: how its rows are read as links. The Dataset has its own; **New mapping** saves another, under its own
+  name: *From* and *To* (and what each holds), and optionally *Kind of link*, *When* and *Amount*. A Mapping is a Dataset
+  of its own over the same data - it appears in the Start box and everywhere a Dataset does, without copying anything.
+  One file of transfers can be read as *account → account* and as *account → channel*. *Edit* changes a Mapping, *Delete*
+  removes only the Mapping (never the data), *Explore* opens it in Link Analysis.
+
+Files always go to the Dataset you added, never to a Mapping (*Add a file* on a Mapping is refused and names the
+Dataset). A Dataset that Mappings read cannot be deleted until they are. Datasets kept up to date by Pipelines are listed
+by name at the end of the page.
+
 ---
 
 ## 4. The screen

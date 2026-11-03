@@ -475,6 +475,13 @@ final class ComponentRoutes implements RouteModule {
                     + String.join(", ", consumers) + " — revoke the grant(s) first");
         requireNoStrandedObjects(api, type, current.content(), null);
         if ("runbook".equals(type)) requireNoLinkingAlertRules(store, id);
+        // LA-DATA-PAGE-1 (M2): an Add data Dataset that Mappings read is not deleted out from under them.
+        if ("dataset".equals(type)) {
+            List<String> mappings = DatasetEntryRules.mappingsOf(api.writeRoot(), id);
+            if (!mappings.isEmpty())
+                throw new ApiException(409, ErrorCodes.CONFLICT, "dataset '" + id + "' is read by Mapping(s): "
+                        + String.join(", ", mappings) + " - delete them first");
+        }
         // LA-ONBOARD-ORPHAN-PIPELINE-1: an Add data Dataset takes its import Pipeline with it.
         OnboardImport.Retirement retirement = "dataset".equals(type) ? OnboardImport.claimRetirement(api, id, current.content()) : null;
         boolean removed;
@@ -751,6 +758,14 @@ final class ComponentRoutes implements RouteModule {
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {
+            // LA-DATA-PAGE-1: a Mapping reads its base's data, so its author must be able to see that base (else the
+            // Mapping would read a Dataset shared away from them). Checked BEFORE the shape rules, and a missing base
+            // answers the same 404 as a hidden one, so the answer never tells which Datasets exist.
+            if ("dataset".equals(type) && content.get(DatasetEntryRules.BASED_ON) instanceof String base && !base.isBlank()) {
+                Map<String, Object> baseEntry = store.get("dataset", base).map(ComponentRegistry.Component::content).orElse(null);
+                if (baseEntry == null || !ComponentAccess.canView(ex, baseEntry))
+                    throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + base + "'");
+            }
             validateKind(api, type, id, content);
             // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: this door writes decision-rule too — the same invoke-api gate
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
@@ -814,6 +829,7 @@ final class ComponentRoutes implements RouteModule {
     static void validateKind(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
                              String type, String id, Map<String, Object> content) {
         validateKind(type, id, content);
+        if ("dataset".equals(type)) DatasetEntryRules.validateMapping(writeRoot, id, content);   // LA-DATA-PAGE-1
         // An optional module's own kinds and reserved store names (the risk-score kind and its risk_scores_ outputs):
         // absent module = the kind stays opaque config and nothing is reserved.
         for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class)) {

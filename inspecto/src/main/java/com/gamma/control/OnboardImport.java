@@ -910,6 +910,9 @@ final class OnboardImport {
         boolean ours = "import".equals(String.valueOf(content.get("origin"))) && id.equals(content.get("importPipeline"))
                 && service.pathFor(id).map(p -> p.toAbsolutePath().normalize().equals(expected)).orElse(false)
                 && service.configFor(id).isPresent();
+        if (!ours && DatasetEntryRules.ORIGIN_MAPPING.equals(String.valueOf(content.get("origin"))))   // LA-DATA-PAGE-1
+            throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is a Mapping of '" + content.get(DatasetEntryRules.BASED_ON)
+                    + "': it reads that Dataset's data, so add files to '" + content.get(DatasetEntryRules.BASED_ON) + "'");
         if (!ours)
             throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is kept up to date by a Pipeline, not by Add data; add files to that Pipeline's Collector");
         return content;

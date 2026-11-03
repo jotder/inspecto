@@ -7,6 +7,12 @@ export const LA_APP_NAV = [
         blurb: 'Investigate how entities link, one expand step at a time.',
     },
     {
+        path: 'data',
+        label: 'Data',
+        icon: 'heroicons_outline:circle-stack',
+        blurb: 'Your Datasets: add files, see what arrived, and choose how each is read as a graph.',
+    },
+    {
         path: 'geo-map',
         /** The `/bootstrap` feature that must be true for the area to be offered: the Geo map is Standard and up (D-LAE5). */
         feature: 'geoMap',
