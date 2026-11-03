@@ -349,6 +349,8 @@
     "/inv/investigations/{investigationId}/members",
     "/inv/investigations/{investigationId}/members/revoke",
     "/inv/value-measures",
+    "/inv/presets",
+    "/inv/presets/{presetId}/run",
     "/inv/pattern/branching",
     "/inv/pattern/temporal",
     "/expectations/{expectationId}/baseline/accept",

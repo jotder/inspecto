@@ -287,6 +287,7 @@ import {
     SAVED_VIEW_NOT_EVIDENCE,
 } from './link-analysis.service';
 import { FoundAction, LinkAnalysisDiscoverComponent } from './link-analysis-discover.component';
+import { LinkAnalysisPresetsComponent, PresetDraw } from './link-analysis-presets.component';
 import { AddToListData, AddToListResult, LinkAnalysisAddToListDialog } from './link-analysis-add-to-list.dialog';
 import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
 import { LinkAnalysisTimelinePlaybackComponent } from './link-analysis-timeline-playback.component';
@@ -498,6 +499,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         InvestigationSettingsSections,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
+        LinkAnalysisPresetsComponent,
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
         LinkAnalysisSettingsComponent,
@@ -5721,6 +5723,11 @@ Its prior copies stay in its version history.`,
         const ds = this.discoverDataset();
         if (!ds) return;
         await this.startFrom({ kind: 'found', datasetId: ds.id, values: a.row.values, what: a.what });
+    }
+
+    /** *Draw these* (LA-PRESET-QUERIES-1): the Start box's path over a preset question's answer. */
+    async drawPreset(d: PresetDraw): Promise<void> {
+        await this.startFrom({ kind: 'found', datasetId: d.datasetId, values: d.values, what: d.what });
     }
 
     /** *Add to a list* (UC-10): the dialog picks or creates the list and writes; an exclusion list becomes the case's. */

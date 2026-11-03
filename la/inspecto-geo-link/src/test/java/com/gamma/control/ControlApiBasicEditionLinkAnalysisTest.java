@@ -52,6 +52,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
             new String[]{"POST", "/inv/projection"},                         // InvRoutes: what a Link Analysis dashboard widget reads (D-LAE2: stays open)
             new String[]{"POST", "/inv/projection/neighbors/preview"},       // InvRoutes: the explorer's Grow preview (LA-GROW-EXCLUDE-1 GE-10)
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
+            new String[]{"GET", "/inv/presets"},                              // PresetRoutes
             new String[]{"GET", "/inv/entity-identities"},                    // EntityIdentityRoutes
             new String[]{"GET", "/inv/entity-types"},                         // EntityProfileRoutes
             new String[]{"POST", "/inv/entities/msisdn/resolve"},             // EntityProfileRoutes: "Open in Link Analysis" (D-LAE4: stays open)

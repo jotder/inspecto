@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.linkAnalysis`](../../../../../product-map/addon/linkAnalysis.toon).
 
-111 row(s).
+113 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -67,6 +67,7 @@ tags: [feature-db, addon]
 | "GET /inv/investigations/([^/]+)/references" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/investigations/([^/]+)/references"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/investigations/([^/]+)/working-set" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/investigations/([^/]+)/working-set"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/pending" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/pending"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /inv/presets" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/presets"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/schema/relationships" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/schema/relationships"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/snapshots" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/snapshots"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/uploads" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/uploads"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
@@ -116,6 +117,7 @@ tags: [feature-db, addon]
 | "POST /inv/investigations/([^/]+)/undo" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/investigations/([^/]+)/undo"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/pattern/branching" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/pattern/branching"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/pattern/temporal" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/pattern/temporal"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /inv/presets/([^/]+)/run" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/presets/([^/]+)/run"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/projection" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/projection/multi" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection/multi"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/projection/neighbors" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/projection/neighbors"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

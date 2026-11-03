@@ -3,6 +3,7 @@ com.gamma.la.api.InvRoutes
 com.gamma.la.api.CaseHistoryRoutes
 com.gamma.la.api.PatternRoutes
 com.gamma.la.api.ValueMeasureRoutes
+com.gamma.la.api.PresetRoutes
 com.gamma.la.api.InvestigationRoutes
 com.gamma.la.api.DossierRoutes
 com.gamma.la.api.DossierBundleRoutes

@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-98 route(s) registered; 98 in the OpenAPI contract, 0 not.
+100 route(s) registered; 100 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -96,6 +96,8 @@ tags: [api, routes, generated]
 | POST | `/inv/pattern/branching` | POST /inv/pattern/branching (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java` |
 | POST | `/inv/pattern/temporal` | POST /inv/pattern/temporal (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PatternRoutes.java` |
 | GET | `/inv/pending` | GET /inv/pending — the four-eyes approver inbox | inv | `canApproveLinkExpansions` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
+| GET | `/inv/presets` | List the preset queries a Dataset can answer | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PresetRoutes.java` |
+| POST | `/inv/presets/{presetId}/run` | Run one preset query over a Dataset | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PresetRoutes.java` |
 | POST | `/inv/projection` | POST /inv/projection (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/projection/multi` | POST /inv/projection/multi (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/projection/neighbors` | POST /inv/projection/neighbors (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |

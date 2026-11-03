@@ -577,6 +577,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/entities/([^/]+)/suggest", "read-shaped", "lists the values of an Entity Type that start a graph, by a prefix sent in the body (the Start box's type-ahead); reads the caller's viewable Datasets, persists nothing"),
             new Exemption("POST", "/inv/deep-links/resolve", "read-shaped", "validates an Open in Inspecto LA link's entity, window and Investigation (LA-EDITIONS-1 section 4); reads no Dataset, persists nothing; an Investigation the caller cannot read is 404, and reveal:true demands canRevealLinkEntities in the handler"),
             new Exemption("POST", "/inv/traversal/recursive-paths", "read-shaped", "walks paths over a Dataset (LA-11); persists nothing"),
+            new Exemption("POST", "/inv/presets/([^/]+)/run", "read-shaped", "runs one preset query over a Dataset (LA-PRESET-QUERIES-1); persists nothing"),
             new Exemption("POST", "/inv/pattern/branching", "read-shaped", "matches a branching motif over a Dataset (LA-14b); persists nothing"),
             new Exemption("POST", "/inv/pattern/temporal", "read-shaped", "burst / periodicity over a Dataset's link event times; persists nothing"),
             new Exemption("POST", "/inv/investigations/([^/]+)/replay", "read-shaped", "re-evaluates a sealed Investigation log (LA-10); persists nothing"),

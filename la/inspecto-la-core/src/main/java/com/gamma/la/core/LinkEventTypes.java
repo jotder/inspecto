@@ -35,6 +35,10 @@ public final class LinkEventTypes {
      *  {@code entities} (how many breach its thresholds) and {@code truncated} carry what the analyst was told. */
     public static final String LINK_VALUE_MEASURED = "LINK_VALUE_MEASURED";
 
+    /** A preset query was run over a Dataset ({@code POST /inv/presets/{id}/run}, LA-PRESET-QUERIES-1). {@code preset},
+     *  {@code rows} and {@code truncated} carry what the analyst was told. */
+    public static final String LINK_PRESET_RUN = "LINK_PRESET_RUN";
+
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */

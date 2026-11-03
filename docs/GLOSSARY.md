@@ -940,6 +940,8 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Purpose** *(Link Analysis)* — The **stated reason or legal basis** an analyst gives when starting an **Investigation**: a required field, sealed into the Investigation header and shown in the **Dossier**, recorded but never enforced. ⛔ Distinct from an **Entity List**'s *purpose* (`allow` · `block` · `watch` · `exclusion`), which is a behavioural role of the list, not a justification; say "Investigation purpose" or "list purpose" when both could be read.
 
+**Preset query** *(Link Analysis; `GET /inv/presets`, `POST /inv/presets/{id}/run`; added 2026-11-03, `LA-PRESET-QUERIES-1`)* — A question an industry already asks of its relationship data (*Reached by many*, *Top counterparts of one entity*, *Money in, then out again within hours*), run over one **Dataset** with a few parameters and answered as a table that *Draw these* turns into a graph. Declarative, never free SQL: it reads the Dataset's mapped roles (From, To, Kind of link, When, Amount), and one whose roles the Dataset does not map is not offered. The set follows the Space's **Industry pack**. Type vs Instance: the preset is the Type; one run with its parameters is the Instance. ⛔ Not a saved **View** (it stores nothing) and not a **Value Measure** (one preset may run a Value Measure with preset thresholds).
+
 **Diagnosis** — An AI-assisted root-cause analysis of a failing Run or Collector that produces an **Incident** with
 a suggested fix.
 

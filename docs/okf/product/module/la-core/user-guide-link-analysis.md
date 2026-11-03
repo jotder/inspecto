@@ -303,6 +303,25 @@ lists any value not in the Dataset. A list or a paste draws at most 25 values in
 
 **Start from** is a choice that opens as a popup, like the Entity Type. The box always draws; it records nothing.
 
+**Preset queries** (Basic, under the Start box) ask a Dataset the questions your industry already asks, without
+writing a query. Pick the **Dataset** and a **Question**, set its few values (each has a default), and choose **Ask**:
+
+| Question | Answers | Offered when the Dataset maps |
+|---|---|---|
+| Reached by many | the entities that most distinct others link to, at least *N* | From, To |
+| Reaching many | the entities that link to the most distinct others, at least *N* | From, To |
+| Top counterparts of one entity | who one entity links to most: links, and the total amount when there is one | From, To |
+| Biggest senders by amount | the entities that send the most in total | From, To, Amount |
+| Money in, then out again within hours *(mobile money)* | entities whose money leaves again soon after it arrives: median hours, links out, received | From, To, Kind of link, When, Amount |
+| Linked through one shared item *(telecom)* | entities linked to many others by a kind of link that means sharing one item (the pack's shared device) | From, To, Kind of link |
+
+From and To come from the Dataset's link (Add data and Mappings state it), else its first two columns that hold an
+Entity Type; Kind of link is a column named `kind` or `…_kind`; When is its event date; Amount is a number column
+the Space's industry calls an amount. A question the Dataset cannot answer is not listed: name the columns on the Data
+page ([§3.4](#34-the-data-page-datasets-entities-and-mappings)). The answer is a table (at most 500 rows; masked ids show
+as aliases, exactly as on the graph). **Draw these** starts a graph from the listed entities, the top 25 first, the way
+a paste does. Every question asked is recorded.
+
 **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page, open a short
 *Investigate {number}* form in the Investigation tab that asks only for the purpose.
 

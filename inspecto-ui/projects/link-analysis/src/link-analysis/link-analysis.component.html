@@ -1527,6 +1527,13 @@
                                 (listsWanted)="refreshEntityLists()"
                                 (openAddData)="openAddData()"
                             ></inspecto-link-analysis-start-box>
+                            <!-- LA-PRESET-QUERIES-1: the questions the Space's pack asks of a Dataset; Draw these starts from the answer -->
+                            <inspecto-link-analysis-presets
+                                class="block w-full max-w-3xl p-4"
+                                [datasets]="startCatalogue().datasets"
+                                [initialDataset]="startDataset()"
+                                (draw)="drawPreset($event)"
+                            ></inspecto-link-analysis-presets>
                         }
                     </div>
                 }

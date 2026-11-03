@@ -1254,6 +1254,90 @@
         "x-optional-module" : true
       }
     },
+    "/inv/presets" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "List the preset queries a Dataset can answer",
+        "operationId" : "getInvPresets",
+        "description" : "LA-PRESET-QUERIES-1. The presets the Space's Industry pack (domain_profile) offers - the neutral set when none - whose roles the Dataset maps. {dataset, pack, roles {from, to, kind, time, amount} (a column name or null), presets [{id, label, description, kind (aggregate|measure), needs [role], params [{name, label, type (entity|number|kinds|window), default}]}]}. Roles come from the Dataset's defaultLinkMapping, else its first two columns classified as an Entity Type; kind, time and amount are found by name, type and the pack's measure_hints. A preset whose roles are not all mapped is not listed.",
+        "parameters" : [ {
+          "name" : "dataset",
+          "in" : "query",
+          "required" : true,
+          "description" : "The Dataset id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The offered presets and the Dataset roles."
+          },
+          "404" : {
+            "description" : "No such Dataset, or one the caller cannot view."
+          },
+          "422" : {
+            "description" : "No 'dataset', or a Dataset that cannot be read."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/presets/{presetId}/run" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Run one preset query over a Dataset",
+        "operationId" : "postInvPresetRun",
+        "description" : "LA-PRESET-QUERIES-1. Body {dataset, params {name: value}}. Declarative, never free SQL: an aggregate preset groups the links by one end over the mapped roles (quoted columns, bound values); a measure preset runs a Value Measure (quick_cash_out = timeToCashOut). Answer {preset, dataset, columns [{id, label, entity}], rows, count, truncated, masking}. Entity columns are exploration aliases when the Space masks; an entity parameter may be such an alias. At most 500 rows (the top parameter, and the Space's entity fence), under the Space's statement timeout. Read-shaped: persists nothing. Audited as LINK_PRESET_RUN.",
+        "parameters" : [ {
+          "name" : "presetId",
+          "in" : "path",
+          "required" : true,
+          "description" : "The preset id, from GET /inv/presets.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "dataset" ],
+                "properties" : {
+                  "dataset" : {
+                    "type" : "string"
+                  },
+                  "params" : {
+                    "type" : "object",
+                    "additionalProperties" : true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The result table."
+          },
+          "404" : {
+            "description" : "No such Dataset (or not viewable), or no such preset in this Space's pack."
+          },
+          "422" : {
+            "description" : "No body or dataset, a role the Dataset does not map, an unknown or bad parameter, or an alias this server never minted."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/value-measures" : {
       "get" : {
         "tags" : [ "inv" ],

@@ -1493,6 +1493,58 @@ export interface ValueMeasureResult {
     fences?: { maxEntities: number; timeoutSeconds: number; maxWindowDays: number };
 }
 
+/** LA-PRESET-QUERIES-1: the roles a preset reads from a Dataset - a column name, or null when the Dataset maps none. */
+export interface PresetRoles {
+    from: string | null;
+    to: string | null;
+    kind: string | null;
+    time: string | null;
+    amount: string | null;
+}
+
+export interface PresetParam {
+    name: string;
+    label: string;
+    /** `entity` (an id or an alias), `number`, `kinds` (a comma list) or `window` (e.g. `30d`, `24h`). */
+    type: 'entity' | 'number' | 'kinds' | 'window';
+    default: string;
+}
+
+export interface PresetQuery {
+    id: string;
+    label: string;
+    description: string;
+    kind: 'aggregate' | 'measure';
+    needs: (keyof PresetRoles)[];
+    params: PresetParam[];
+}
+
+/** `GET /inv/presets?dataset=`: the Space's pack presets this Dataset can answer, and its roles. */
+export interface PresetList {
+    dataset: string;
+    pack: string | null;
+    roles: PresetRoles;
+    presets: PresetQuery[];
+}
+
+export interface PresetColumn {
+    id: string;
+    label: string;
+    /** The column holds entity ids (aliases when the Space masks) - what *Draw these* starts from. */
+    entity: boolean;
+}
+
+/** `POST /inv/presets/{id}/run`: the result table. */
+export interface PresetRunResult {
+    preset: PresetQuery;
+    dataset: string;
+    columns: PresetColumn[];
+    rows: Record<string, unknown>[];
+    count: number;
+    truncated: boolean;
+    masking?: { mode: string; masked: boolean; basis?: string };
+}
+
 /** `POST …/alert-rules` for a value Measure: fires when ≥ 1 entity breaches (comparator/threshold are the server's). */
 export interface ValueMeasureAlertRuleRequest {
     name: string;
@@ -2203,6 +2255,16 @@ export class InvService {
     /** LA-18: one value Measure over a whole Dataset. Read-only; 503 no write root · 422 · 404 unknown Dataset. */
     valueMeasures(q: ValueMeasureQuery): Observable<ValueMeasureResult> {
         return this.http.get<ValueMeasureResult>(apiUrl('/inv/value-measures'), { params: toParams({ ...q }) });
+    }
+
+    /** LA-PRESET-QUERIES-1: the preset queries a Dataset can answer. 404 unknown Dataset · 422 unreadable. */
+    presets(dataset: string): Observable<PresetList> {
+        return this.http.get<PresetList>(apiUrl('/inv/presets'), { params: toParams({ dataset }) });
+    }
+
+    /** LA-PRESET-QUERIES-1: run one preset. Read-only; 404 unknown Dataset or preset · 422 unmapped role or bad parameter. */
+    runPreset(id: string, dataset: string, params: Record<string, string>): Observable<PresetRunResult> {
+        return this.http.post<PresetRunResult>(apiUrl(`/inv/presets/${encodeURIComponent(id)}/run`), { dataset, params });
     }
 
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──

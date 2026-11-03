@@ -1,6 +1,6 @@
 # LA-BASIC-DISCOVERY-1 — discovery, an entity summary and preset queries in Basic
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6; presets first).** Operator ask: "entity profiling and some kind of
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6; presets first). P0 + P3 BUILT 2026-11-03 (§7); P1, P2, P4 open.** Operator ask: "entity profiling and some kind of
 > discovery in Basic also; the user should be able to query the entity relationship data; some preset queries would be
 > nice." Product hub `docs/okf/product/module/la-core/`. Related: `la-data-arrival-plan.md` (the Data page, Mappings),
 > `docs/EDITIONS.md` (D-LAE4: the Entity profile **pages** are Standard and up). Board rows: `LA-BASIC-DISCOVER-1`,
@@ -90,3 +90,43 @@ key; tests per route (real HTTP, masking, limits) and UI specs.
 - **Q-4** Order: **P3 presets first** (the most visible value), then P1, P2, P4. Alternative: P1 first (cheapest).
 - **Q-5** A preset needs its roles mapped: a Dataset that lacks a role (e.g. no device column) does not list that
   preset rather than showing it greyed - the Mapping page is where a role is added.
+
+## 7. As built: P0 + P3 (2026-11-03)
+
+**P0 findings.** V1: `/bi/query` is not the presets' path - la-api may not depend on the engine (LA separation D-1), so
+`MeasureCompiler` is out of reach; presets render one fixed shape in la-api instead (below), which also gives them a real
+HAVING. V2: `ValueMeasures.evaluate` runs over any Dataset's roles and covers *cash-in then cash-out* (`timeToCashOut`);
+its window is capped by the Space (31 days by default), so that preset defaults to `last: 30d`. V3 (pattern packs in the
+browser) and V4 (cost on a 10^7-row Dataset) belong to P1 and stay open; the presets' first run on IMS is the V4 sample.
+
+**§6a decisions taken under delegation (assistant, 2026-11-03).**
+- Presets are **code keyed by Industry pack id** (`PresetQueries.forPack`: `mobile-money`, `telecom`, else a neutral
+  set), not `preset_queries[]` in `industry-pack.toon`: a preset's compile rule is code either way, and a file format
+  with one reader is speculative. Move them to the pack when Space-level presets (P4) need them as data.
+- The **aggregate shape** (group by From or To; distinct counterparts, links, total amount; optional one-entity and
+  kinds filters; a minimum on the first measure; ordered by it) is rendered in `PresetQueries.aggregateSql` with quoted
+  columns and bound values - Q-2's "declarative, never free SQL" holds; the engine compiler does not.
+- Roles: `defaultLinkMapping` {from, to, kind, time} when stated, else the first two columns classified as an Entity
+  Type; Kind = `kind` / `*_kind`; When = `eventDate`, else the first date column; Amount = the first number column a
+  pack `measure_hints` word names (never From or To). Read against the relation's REAL columns.
+- The first set: *Reached by many* (fan-in), *Reaching many* (fan-out), *Top counterparts of one entity*, *Biggest
+  senders by amount*, *Money in, then out again within hours* (mobile money), *Linked through one shared item* (telecom). Labels are neutral (AC-09, the vocabulary guard); the pack words stay in the ids. The
+  plan's *SIMs seen in many handsets* is *Reaching many* over a SIM-to-handset Dataset; no separate preset.
+- The panel sits under **Basic's Start box** only; Standard starts in the Investigation tab and gets presets with P4.
+
+**Seams.** `la/inspecto-la-api`: `PresetQueries` (catalogue, roles, SQL), `PresetRoutes` (featureIds geoLink; gate
+order 503 → 422 body → 404 Dataset via `InvRoutes.relationFor` → 404 preset → 422 role / parameter / unknown alias;
+`ExplorationMasking` out on entity columns and `in` on the `entity` parameter; rows `min(top ≤ 500, fences.maxEntities)`;
+statement timeout from the fences; audit `LINK_PRESET_RUN`). The POST is a read-shaped exemption (CapabilityManifest,
+the contract test), rate-classed EXPENSIVE; the GET (a zero-row column probe) EXEMPT. Both are in the la-api
+`module.toon` route list. UI: `link-analysis-presets.component.ts` + `presets.ts`; *Draw these* is the Start box's
+`found` start (25 values per start).
+
+**Gotcha.** DuckDB refuses the zone id `Z`: pass `ZoneId.of("UTC")`, never `ZoneOffset.UTC` (the first test run failed on it).
+
+A `kinds` filter on a Dataset that maps no kind of link is refused 422 (the panel does not show that field there), never
+silently dropped; the Value Measure preset is cut to the same 500 rows as the aggregates.
+
+**Tests.** `ControlApiPresetQueriesTest` (list per pack and per mapped roles, masking scan of every body - the Value
+Measure preset included, alias in, the cap and `truncated`, the `LINK_PRESET_RUN` audit, gate order), `PresetRoutesContractTest`, the Basic and module-gate
+route lists, `link-analysis-presets.component.spec.ts`.

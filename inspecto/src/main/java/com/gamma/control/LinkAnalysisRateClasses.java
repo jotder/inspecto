@@ -32,6 +32,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/pattern/temporal"},
             {"POST", "/inv/pattern/branching"},
             {"POST", "/inv/schema/overlap-profile"},
+            {"POST", "/inv/presets/([^/]+)/run"},    // LA-PRESET-QUERIES-1: groups a whole Dataset by one end
             {"POST", "/inv/graph/runs"},
             {"POST", "/inv/index/builds"},
             {"POST", "/inv/uploads/([^/]+)"},   // LA-ANALYST-UPLOAD-1: buffers up to upload.max_bytes and writes disk
@@ -63,6 +64,7 @@ final class LinkAnalysisRateClasses {
     static final String[][] EXEMPT = {
             {"GET", "/inv/schema/relationships"},
             {"GET", "/inv/value-measures"},
+            {"GET", "/inv/presets"},                       // LA-PRESET-QUERIES-1: a zero-row probe of one Dataset's columns
             {"POST", "/inv/snapshots"},
             {"GET", "/inv/uploads"},                       // LA-I2-GAPS-RESIDUALS-1: the upload-enabled Collectors, from config
             {"DELETE", "/inv/uploads/([^/]+)/([^/]+)"},    // LA-I2-GAPS-RESIDUALS-1: removes one pending file and its record
