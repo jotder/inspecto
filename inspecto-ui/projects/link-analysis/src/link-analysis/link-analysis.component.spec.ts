@@ -9,7 +9,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
@@ -5005,6 +5005,34 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const picker = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="start-dataset"]');
         expect(picker?.textContent).toContain('Transfers');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('?dataset= naming a Dataset added since the list was read (the page is kept alive) reads the list again and preselects it', async () => {
+        const { fixture } = create({ features: BASIC, datasets: [DS], queryParams: { dataset: 'transfers' } });
+        const list = vi
+            .spyOn(TestBed.inject(DatasetsService), 'list')
+            .mockReturnValueOnce(of([DS]) as never)
+            .mockReturnValue(of([DS, TRANSFERS]) as never);
+        const info = vi.spyOn(TestBed.inject(ToastrService), 'info');
+        await settle(fixture);
+        expect(list).toHaveBeenCalledTimes(2);
+        expect(fixture.componentInstance.startDataset()).toBe('transfers');
+        expect(info).not.toHaveBeenCalledWith('That Dataset is not in this Space.', 'Not found');
+    });
+
+    it('coming back to the kept-alive page re-reads the Datasets, so one added meanwhile is offered', async () => {
+        const { fixture } = create({ features: BASIC, datasets: [DS] });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        const list = vi.spyOn(TestBed.inject(DatasetsService), 'list').mockReturnValue(of([DS, TRANSFERS]) as never);
+        const router = TestBed.inject(Router);
+        const here = router.url.split('?')[0];
+        (router.events as unknown as Subject<unknown>).next(new NavigationEnd(1, '/add-data', '/add-data'));
+        expect(list).not.toHaveBeenCalled(); // leaving reads nothing
+        (router.events as unknown as Subject<unknown>).next(new NavigationEnd(2, here, here));
+        await settle(fixture);
+        expect(list).toHaveBeenCalled();
+        expect(c.datasets().map((d) => d.id)).toContain('transfers');
     });
 
     it('LA-UNSAVED-INVESTIGATION-1: one entity starts unsaved over its binding; Degrees 2 walks one more degree, recorded', async () => {

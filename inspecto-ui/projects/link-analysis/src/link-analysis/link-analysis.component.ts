@@ -38,10 +38,10 @@ import { MatDividerModule } from '@angular/material/divider';
 import { FormMenuDirective } from './form-menu.directive';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router, UrlTree } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, UrlTree } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
-import { distinctUntilChanged, map } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map } from 'rxjs/operators';
 import {
     ComponentsService,
     ExchangeService,
@@ -1882,17 +1882,40 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.pushWaiters.splice(0).forEach((w) => w());
     }
 
-    ngOnInit(): void {
-        // Each list degrades independently — a failing lookup must not blank the pane.
+    /** (Re)read the Space's Datasets; a failure keeps the list it had. */
+    private loadDatasets(): Promise<LaDataset[]> {
         this.datasetsLoaded = new Promise((resolve) =>
             this.datasetsService.list().subscribe({
                 next: (d) => {
                     this.datasets.set(d);
                     resolve(d);
                 },
-                error: () => resolve([]),
+                error: () => resolve(this.datasets()),
             }),
         );
+        return this.datasetsLoaded;
+    }
+
+    ngOnInit(): void {
+        // Each list degrades independently — a failing lookup must not blank the pane.
+        void this.loadDatasets();
+        // The page is kept alive between routes (KeepAliveRouteReuseStrategy), so ngOnInit does not run again: coming
+        // back to it re-reads the Datasets, so one added meanwhile (Add data) is offered without a reload.
+        const here = this.router.url.split('?')[0];
+        let away = false;
+        this.router.events
+            .pipe(
+                filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe((e) => {
+                const path = e.urlAfterRedirects.split('?')[0];
+                if (path !== here) away = true;
+                else if (away) {
+                    away = false;
+                    void this.loadDatasets();
+                }
+            });
         this.pipelinesService.list().subscribe({ next: (p) => this.pipelines.set(p), error: () => undefined });
         // A start (`?seed=`, below) waits for the views too: a Dataset's start mapping may come from a saved view.
         this.viewsLoaded = new Promise((resolve) =>
@@ -2021,7 +2044,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                     queryParamsHandling: 'merge',
                     replaceUrl: true,
                 });
-                const [datasets] = await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+                let [datasets] = await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
+                // a Dataset added since the list was read (the page is kept alive): read it once more before giving up
+                if (!datasets.some((d) => d.id === datasetId)) datasets = await this.loadDatasets();
                 if (this.startCatalogue().datasets.some((d) => d.id === datasetId)) this.startDataset.set(datasetId);
                 else if (datasets.some((d) => d.id === datasetId)) this.exploreDataset(datasetId);
                 else this.toastr.info('That Dataset is not in this Space.', 'Not found');
