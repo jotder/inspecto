@@ -47,9 +47,12 @@
                                 (input)="onCombinedSearch($event)"
                             />
                         </div>
-                        <mat-form-field subscriptSizing="dynamic" class="w-72">
+                        <!-- form-allow: a multiple select over the combined view's Pipelines --><mat-form-field
+                            subscriptSizing="dynamic"
+                            class="w-72"
+                        >
                             <mat-label>Pipelines</mat-label>
-                            <mat-select
+                            <!-- form-allow: a multiple select over the combined view's Pipelines --><mat-select
                                 multiple
                                 [value]="combinedSelected()"
                                 (selectionChange)="setCombinedSelected($event.value)"

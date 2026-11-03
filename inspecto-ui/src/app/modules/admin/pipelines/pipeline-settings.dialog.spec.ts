@@ -1,4 +1,3 @@
-import { ChangeDetectorRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -6,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PipelineSettingsDialog, PipelineSettingsData } from './pipeline-settings.dialog';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 
 function make(data: Partial<PipelineSettingsData> = {}) {
     const ref = { close: vi.fn(), disableClose: false };
@@ -116,10 +116,10 @@ describe('PipelineSettingsDialog', () => {
         expect(c.form.controls.orderBy.value).toBe('seq');
         expect(c.form.controls.deleteColumn.value).toBe('deleted');
         expect(c.form.controls.deleteValues.value).toBe('true, Y');
-        const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label')).map((l) =>
-            (l as HTMLElement).textContent?.trim(),
-        );
-        expect(labels).toEqual(expect.arrayContaining(['Order by column', 'Delete marker column', 'Delete values']));
+        const root = fixture.nativeElement as HTMLElement;
+        for (const label of ['Order by column', 'Delete marker column', 'Delete values']) {
+            expect(penByLabel(root, label), label).not.toBeNull();
+        }
     });
 
     it('writes edited order by and delete fields, splitting the values on commas', () => {
@@ -182,15 +182,16 @@ describe('PipelineSettingsDialog', () => {
         });
         c.form.controls.deleteColumn.setValue('op');
         fixture.detectChanges();
-        expect(fixture.nativeElement.querySelector('mat-error')).toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-pen-field p[role="alert"]')).toBeNull();
         c.save();
-        fixture.debugElement.injector.get(ChangeDetectorRef).markForCheck();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(ref.close).not.toHaveBeenCalled();
         expect(c.form.controls.deleteValues.hasError('required')).toBe(true);
-        const err = fixture.nativeElement.querySelector('mat-error') as HTMLElement;
+        const err = fixture.nativeElement.querySelector('inspecto-pen-field p[role="alert"]') as HTMLElement;
         expect(err?.textContent).toContain('Give at least one marker value');
-        expect(err.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        expect(penError(penByLabel(fixture.nativeElement, 'Delete values')!)).toContain(
+            'Give at least one marker value',
+        );
     });
 
     it('refuses delete values with no column', () => {

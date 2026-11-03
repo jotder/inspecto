@@ -2,9 +2,8 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -40,14 +39,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
 @Component({
     selector: 'app-pipeline-duplicate-dialog',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
-        InspectoAlertComponent,
-    ],
+    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, PenFieldComponent, InspectoAlertComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Duplicate pipeline</h2>
@@ -57,16 +49,13 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 copy lands as an inactive draft with its own directories — activate it when you are ready.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>New pipeline name</mat-label>
-                    <input matInput formControlName="name" cdkFocusInitial />
-                    @if (form.controls.name.hasError('required')) {
-                        <mat-error>A name is required.</mat-error>
-                    }
-                    @if (form.controls.name.hasError('duplicate')) {
-                        <mat-error>A pipeline with this name already exists.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="New pipeline name"
+                    [required]="true"
+                    formControlName="name"
+                    [error]="nameError()"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -86,6 +75,16 @@ export class PipelineDuplicateDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    /** The name row's error lines: shown once the row was left or Duplicate was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        const lines: string[] = [];
+        if (c.hasError('required')) lines.push('A name is required.');
+        if (c.hasError('duplicate')) lines.push('A pipeline with this name already exists.');
+        return lines.join(' ');
+    }
 
     save(): void {
         const name = String(this.form.controls.name.value ?? '').trim();

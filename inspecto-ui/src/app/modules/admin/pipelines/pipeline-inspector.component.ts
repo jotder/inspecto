@@ -1,24 +1,22 @@
 import {
     ChangeDetectionStrategy,
     Component,
-    ElementRef,
     EventEmitter,
     Input,
     OnChanges,
     Output,
     SimpleChanges,
-    ViewChild,
     inject,
     signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthoredNode } from 'app/inspecto/api';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import {
     categoryColor,
     categoryLabel,
@@ -44,13 +42,12 @@ import {
     standalone: true,
     imports: [
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         FormsModule,
         MatSlideToggleModule,
         ReactiveFormsModule,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -83,57 +80,17 @@ import {
             @if (compact) {
                 @if (!readOnly) {
                     <!-- Identity ON the config page (operator ask 2026-08-22, restyled 2026-09-04): Name is a
-                         PROPERTY ROW above every definition pane — the same .sf-row anatomy as a schema-form
-                         flat row (label · value · pencil → dense inline input; Enter/blur commit, Escape
-                         cancels). Description is no longer authored here (operator ask 2026-09-04); the model
-                         field is carried through the rename event unchanged. -->
-                    <form
-                        [formGroup]="renameForm"
-                        class="sf-row mb-2 flex min-h-8 min-w-0 items-center gap-2"
-                        data-key="name"
-                        (ngSubmit)="commitIdentity()"
-                        (keydown.escape)="cancelNameEdit()"
-                    >
-                        <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
-                            <span class="truncate" id="pipeline-inspector-name-label" title="Name">Name</span>
-                        </span>
-                        <div class="flex min-w-0 flex-1 items-center">
-                            @if (editingName()) {
-                                <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
-                                    <input
-                                        matInput
-                                        #nameInput
-                                        formControlName="name"
-                                        [placeholder]="node.id"
-                                        aria-labelledby="pipeline-inspector-name-label"
-                                        (blur)="commitIdentity()"
-                                    />
-                                </mat-form-field>
-                            } @else {
-                                <button
-                                    type="button"
-                                    class="sf-value hover:bg-hover min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                                    [class.text-secondary]="!node.name"
-                                    [attr.aria-label]="'Name: ' + (node.name || node.id)"
-                                    [title]="node.name || node.id"
-                                    (click)="startNameEdit()"
-                                >
-                                    {{ node.name || node.id }}
-                                </button>
-                            }
-                        </div>
-                        <button
-                            type="button"
-                            class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                            [attr.aria-label]="editingName() ? 'Done editing Name' : 'Edit Name'"
-                            (mousedown)="$event.preventDefault()"
-                            (click)="editingName() ? commitIdentity() : startNameEdit()"
-                        >
-                            <mat-icon
-                                class="icon-size-4"
-                                [svgIcon]="editingName() ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
-                            ></mat-icon>
-                        </button>
+                         PROPERTY ROW above every definition pane (label · value · pencil; Enter/blur commit,
+                         Escape cancels). Description is no longer authored here (operator ask 2026-09-04); the
+                         model field is carried through the rename event unchanged. A committed row emits the
+                         rename (renameForm's valueChanges → commitIdentity). -->
+                    <form [formGroup]="renameForm" class="mb-2 block">
+                        <inspecto-pen-field
+                            label="Name"
+                            [mono]="true"
+                            [placeholder]="node.id"
+                            formControlName="name"
+                        ></inspecto-pen-field>
                     </form>
                 } @else {
                     <div class="sf-row mb-2 flex min-h-8 min-w-0 items-center gap-2" data-key="name">
@@ -177,10 +134,11 @@ import {
                 }
             } @else if (renaming()) {
                 <form [formGroup]="renameForm" (ngSubmit)="commitRename()" class="mb-2 space-y-1">
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" [placeholder]="node.id" />
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Name"
+                        [placeholder]="node.id"
+                        formControlName="name"
+                    ></inspecto-pen-field>
                     <div class="flex gap-2">
                         <button mat-flat-button color="primary" type="submit">Save</button>
                         <button mat-stroked-button type="button" (click)="renaming.set(false)">Cancel</button>
@@ -319,8 +277,6 @@ export class PipelineInspectorComponent implements OnChanges {
 
     /** Whether the (non-compact) inline Name editor is open. Reset whenever the selection changes. */
     readonly renaming = signal(false);
-    /** Compact mode: whether the Name property row shows its inline input instead of the value text. */
-    readonly editingName = signal(false);
     /**
      * Name only — Description left every properties panel (operator ask 2026-09-04). The rename event
      * still carries the node's stored description UNCHANGED so the host contract stays as it was.
@@ -329,46 +285,33 @@ export class PipelineInspectorComponent implements OnChanges {
         name: this.fb.control(''),
     });
 
-    @ViewChild('nameInput') private nameInput?: ElementRef<HTMLInputElement>;
+    constructor() {
+        // Compact mode: the Name row's committed value (Enter / blur; Escape drops the draft and commits
+        // nothing) is the rename. Seeds below write with emitEvent:false, so only a person's edit reaches here.
+        this.renameForm.controls.name.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+            if (this.compact) this.commitIdentity();
+        });
+    }
 
     ngOnChanges(changes: SimpleChanges): void {
         // A different selection makes any in-progress rename stale — never carry one node's draft
         // onto another node. In compact mode reseed the row from the new node instead.
         if (changes['node']) {
             this.renaming.set(false);
-            this.editingName.set(false);
             if (this.compact && this.node) {
-                this.renameForm.setValue({ name: this.node.name ?? '' });
+                this.renameForm.setValue({ name: this.node.name ?? '' }, { emitEvent: false });
             }
         }
     }
 
-    /** Compact mode: open the Name row's inline input, seeded from the node, and focus it. */
-    startNameEdit(): void {
-        if (this.readOnly) return;
-        const n = this.node;
-        if (!n) return;
-        this.renameForm.setValue({ name: n.name ?? '' });
-        this.editingName.set(true);
-        // The input renders on the next change detection; focus it once it exists.
-        setTimeout(() => this.nameInput?.nativeElement.focus());
-    }
-
-    /** Compact mode: Escape — discard the draft and show the stored name again. */
-    cancelNameEdit(): void {
-        this.renameForm.setValue({ name: this.node?.name ?? '' });
-        this.editingName.set(false);
-    }
-
     /**
-     * Compact-mode commit (Enter / blur / the check button): close the row and emit only when the
-     * trimmed name actually differs from the node's, so tabbing through never patches the model or
-     * dirties the pipeline. Description travels through unchanged.
+     * Compact-mode commit (the Name row committed): emit only when the trimmed name actually differs
+     * from the node's, so tabbing through never patches the model or dirties the pipeline. Description
+     * travels through unchanged.
      */
     commitIdentity(): void {
         const n = this.node;
         if (!n) return;
-        this.editingName.set(false);
         const name = (this.renameForm.getRawValue().name ?? '').trim();
         if (name === (n.name ?? '')) return;
         this.rename.emit({ name, description: n.description ?? '' });

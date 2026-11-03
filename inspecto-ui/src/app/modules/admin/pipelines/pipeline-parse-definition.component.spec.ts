@@ -13,6 +13,7 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { GrammarEditorComponent, grammarToCsv, parsingAttributesFor } from 'app/inspecto/grammar';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, penText } from 'app/inspecto/testing/pen-field';
 import {
     PipelineParseDefinitionComponent,
     decodeProfileOverrides,
@@ -1686,60 +1687,51 @@ describe('PipelineParseDefinitionComponent', () => {
      * derives or guesses one itself (P2 stays pure).
      */
     describe('filenameColumnTarget (Files & metadata tab)', () => {
+        /** The Column name row, once its [ngModel] bridge has written the host's value (NgModel writes async). */
+        async function filenameRow(fixture: ComponentFixture<unknown>): Promise<HTMLElement> {
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            return penByLabel(fixture.nativeElement, 'Column name')!;
+        }
+
         it('renders nothing when the host has no target (ambiguous/no sink)', async () => {
             const fixture = await create();
             expect(fixture.nativeElement.textContent).not.toContain('Source filename column');
+            expect(penByLabel(fixture.nativeElement, 'Column name')).toBeNull();
         });
 
         it('renders the field seeded from the host target, on the Files & metadata tab', async () => {
             const fixture = await create();
             fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
-            fixture.detectChanges();
-            const input = fixture.nativeElement.querySelector(
-                'input[aria-label="Source filename column"]',
-            ) as HTMLInputElement;
-            expect(input.value).toBe('src_file');
+            const row = await filenameRow(fixture);
+            expect(penText(row)).toBe('src_file');
+            expect(row.querySelector('button')?.getAttribute('aria-label')).toContain('Source filename column');
             expect(fixture.nativeElement.textContent).toContain('Warehouse');
         });
 
         it('emits null on a blank commit (clears the column)', async () => {
             const fixture = await create();
             fixture.componentInstance.filenameColumnTarget.set({ value: 'src_file', target: 'Warehouse' });
-            fixture.detectChanges();
-            const input = fixture.nativeElement.querySelector(
-                'input[aria-label="Source filename column"]',
-            ) as HTMLInputElement;
-            input.value = '';
-            input.dispatchEvent(new Event('change'));
-            fixture.detectChanges();
+            penEdit(fixture, await filenameRow(fixture), '');
             expect(fixture.componentInstance.filenameColumnChange).toBeNull();
         });
 
         it('refuses an invalid identifier with an inline alert, and emits nothing for it', async () => {
             const fixture = await create();
             fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
-            fixture.detectChanges();
-            const input = fixture.nativeElement.querySelector(
-                'input[aria-label="Source filename column"]',
-            ) as HTMLInputElement;
-            input.value = '0_bad_start';
-            input.dispatchEvent(new Event('change'));
-            fixture.detectChanges();
+            const row = await filenameRow(fixture);
+            penEdit(fixture, row, '0_bad_start');
             expect(fixture.componentInstance.filenameColumnChange).toBeUndefined();
-            const alert = fixture.nativeElement.querySelector('[role="alert"]');
+            const alert = fixture.nativeElement.querySelector('inspecto-pen-field p[role="alert"]');
             expect(alert?.textContent).toContain('Must start with a letter');
+            expect(penError(row)).toContain('Must start with a letter');
         });
 
         it('emits the trimmed valid identifier and clears any prior error', async () => {
             const fixture = await create();
             fixture.componentInstance.filenameColumnTarget.set({ value: '', target: 'Warehouse' });
-            fixture.detectChanges();
-            const input = fixture.nativeElement.querySelector(
-                'input[aria-label="Source filename column"]',
-            ) as HTMLInputElement;
-            input.value = ' src_file ';
-            input.dispatchEvent(new Event('change'));
-            fixture.detectChanges();
+            penEdit(fixture, await filenameRow(fixture), ' src_file ');
             expect(fixture.componentInstance.filenameColumnChange).toBe('src_file');
             expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
         });

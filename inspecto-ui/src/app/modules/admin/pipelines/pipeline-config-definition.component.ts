@@ -11,11 +11,10 @@ import {
     signal,
     viewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { map } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
@@ -33,6 +32,7 @@ import {
 import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
@@ -111,12 +111,11 @@ function mergeFormValues(
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
+        PenFieldComponent,
         EnrichmentEditorComponent,
         InspectoSchemaPartitionsEditorComponent,
         PipelineExtraConfigComponent,
@@ -142,10 +141,13 @@ function mergeFormValues(
                     overwrite the file reference with inline SQL.
                 </inspecto-alert>
             } @else {
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Enrichment name</mat-label>
-                    <input matInput [formControl]="enrichName" [placeholder]="node().id" [readonly]="readOnly()" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Enrichment name"
+                    [mono]="true"
+                    [placeholder]="node().id"
+                    [readOnly]="readOnly()"
+                    [formControl]="enrichName"
+                ></inspecto-pen-field>
                 <inspecto-schema-form
                     #wiring
                     [specs]="wiringSpecs"
@@ -505,6 +507,9 @@ export class PipelineConfigDefinitionComponent {
     private enrichInitFor: string | null = null;
 
     constructor() {
+        // The Enrichment name row commits on Enter / blur, so no `input` event follows the change (a Tab out
+        // or an Enter is not a click either): re-derive dirtiness when the committed value lands.
+        this.enrichName.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.emitDirty());
         // Seed from the node input. The host recreates this component per node (and on Discard), so
         // this runs once per instance — but an input swap without recreation re-seeds correctly too.
         effect(() => {

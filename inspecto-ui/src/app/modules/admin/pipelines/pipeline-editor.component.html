@@ -9,18 +9,16 @@
         <h1 class="mr-2 shrink-0 text-lg font-semibold leading-7 tracking-tight">Pipelines</h1>
 
         @if (creating() && canAuthor()) {
-            <mat-form-field subscriptSizing="dynamic" class="w-56">
-                <mat-label>New pipeline name</mat-label>
-                <input matInput [formControl]="newName" placeholder="orders_rollup" (keyup.enter)="createPipeline()" />
-                <!-- Two ways to be invalid, and they must not share a message: a 409 from the write route
-                     sets `duplicate` (createPipeline), and printing "a name is required" over a field that
-                     visibly HOLDS a name is a dead end — the builder cannot tell what to change. -->
-                @if (newName.touched && newName.hasError('duplicate')) {
-                    <mat-error>A pipeline called that already exists — pick another name</mat-error>
-                } @else if (newName.touched && newName.invalid) {
-                    <mat-error>A name is required</mat-error>
-                }
-            </mat-form-field>
+            <!-- (entered): Enter in the OPEN row commits the name, then creates; the Enter that opens the row does not. -->
+            <inspecto-pen-field
+                class="w-56"
+                label="New pipeline name"
+                [required]="true"
+                placeholder="orders_rollup"
+                [formControl]="newName"
+                [error]="newNameError()"
+                (entered)="createPipeline()"
+            ></inspecto-pen-field>
             <!-- D3: ONE question at create time types the Parse Step immediately. Without it the lift
                  produces the generic parser node, which the author then converts through a custody
                  dialog — the detour this removes. Deliberately not defaulted: guessing a format would

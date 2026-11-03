@@ -2,10 +2,9 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSampleValueDirective } from 'app/inspecto/components/sample-value.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -36,8 +35,7 @@ export interface PipelineRenameResultData {
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
         InspectoSampleValueDirective,
@@ -51,13 +49,14 @@ export interface PipelineRenameResultData {
                 so nothing is re-processed and no history is lost.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Display name</mat-label>
-                    <input matInput formControlName="name" placeholder="e.g. Retail Orders (EU)" cdkFocusInitial />
-                    @if (form.controls.name.hasError('required')) {
-                        <mat-error>A display name is required.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Display name"
+                    [required]="true"
+                    placeholder="e.g. Retail Orders (EU)"
+                    formControlName="name"
+                    [error]="nameError()"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -77,6 +76,12 @@ export class PipelineRenameDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    /** The name row's error line: shown once the row was left or Rename was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        return c.touched && c.hasError('required') ? 'A display name is required.' : '';
+    }
 
     save(): void {
         const name = String(this.form.controls.name.value ?? '').trim();

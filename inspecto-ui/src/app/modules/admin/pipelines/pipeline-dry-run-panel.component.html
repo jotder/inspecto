@@ -3,7 +3,10 @@
         <h3 class="text-sm font-semibold">Dry-run</h3>
         <span class="text-xs opacity-70">a bounded sample through the transform→sink subgraph (no write)</span>
     </div>
-    <mat-form-field class="w-full" subscriptSizing="dynamic">
+    <!-- form-allow: a JSON sample-rows box for the dry-run, not one value of a record --><mat-form-field
+        class="w-full"
+        subscriptSizing="dynamic"
+    >
         <mat-label>Sample rows (JSON array)</mat-label>
         <textarea matInput rows="3" [formControl]="sampleText"></textarea>
     </mat-form-field>

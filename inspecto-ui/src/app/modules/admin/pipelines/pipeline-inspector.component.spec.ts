@@ -3,6 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthoredNode } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penOpen, penText } from 'app/inspecto/testing/pen-field';
 import { PipelineInspectorComponent } from './pipeline-inspector.component';
 
 function create(inputs: Partial<PipelineInspectorComponent> = {}) {
@@ -199,9 +200,8 @@ describe('PipelineInspectorComponent', () => {
 
         /**
          * 2026-08-22 (operator ask): identity lives ON the config page. 2026-09-04 (operator ask):
-         * Name renders as a PROPERTY ROW — the schema-form flat row's anatomy (`.sf-row`: label ·
-         * value text · pencil → dense `.sf-dense` inline input) — and Description is gone from every
-         * properties panel.
+         * Name renders as a PROPERTY ROW — `<inspecto-pen-field>` (label · value text · pencil → inline
+         * input, UI-FORM-ROWS-1) — and Description is gone from every properties panel.
          */
         it('renders Name as a property row (value text + pencil) and no Description field', () => {
             // ⚠ setInput, not the Object.assign helper — the seed runs in ngOnChanges, which only
@@ -211,18 +211,18 @@ describe('PipelineInspectorComponent', () => {
             fixture.componentRef.setInput('node', NODE);
             fixture.detectChanges();
             const el = fixture.nativeElement as HTMLElement;
-            const row = el.querySelector('.sf-row[data-key="name"]') as HTMLElement;
+            const row = penByLabel(el, 'Name')!;
             expect(row).not.toBeNull();
-            expect(row.classList.contains('min-h-8')).toBe(true); // 32px, like a schema-form flat row
-            expect(row.querySelector('.sf-value')?.textContent?.trim()).toBe('Parse CSV');
-            expect(row.querySelector('.sf-pencil')?.getAttribute('aria-label')).toBe('Edit Name');
+            expect(row.querySelector('.prop-row')).not.toBeNull(); // the shared property-row geometry
+            expect(penText(row)).toBe('Parse CSV');
+            expect(row.querySelector('button.pen-pencil')).not.toBeNull();
             expect(row.querySelector('input')).toBeNull(); // no input until the pencil
             expect(el.querySelector('[formcontrolname="description"]')).toBeNull();
             expect(el.textContent).not.toContain('Description');
             expect(el.querySelector('[aria-label="Rename Step"]')).toBeNull(); // the summary's pencil is not this one
         });
 
-        it('pencil opens the dense inline input; Enter emits the new name with the description unchanged', () => {
+        it('pencil opens the inline input; Enter emits the new name with the description unchanged', () => {
             const { fixture, c } = create({ status: 'configured', category: 'PARSE' });
             fixture.componentRef.setInput('compact', true);
             fixture.componentRef.setInput('node', NODE);
@@ -231,21 +231,15 @@ describe('PipelineInspectorComponent', () => {
             const rename = vi.fn();
             c.rename.subscribe(rename);
 
-            (el.querySelector('.sf-pencil') as HTMLButtonElement).click();
-            fixture.detectChanges();
-            const input = el.querySelector('.sf-row[data-key="name"] input') as HTMLInputElement;
+            const row = penByLabel(el, 'Name')!;
+            const input = penOpen(fixture, row) as HTMLInputElement;
             expect(input).not.toBeNull();
-            expect(input.closest('mat-form-field')?.classList.contains('sf-dense')).toBe(true);
-            expect(input.closest('mat-form-field')?.querySelector('mat-label')).toBeNull(); // no floating label
+            expect(input.value).toBe('Parse CSV'); // seeded from the node
             expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV' });
 
-            input.value = '  CDR parse ';
-            input.dispatchEvent(new Event('input'));
-            (el.querySelector('.sf-row[data-key="name"]') as HTMLFormElement).dispatchEvent(new Event('submit'));
-            fixture.detectChanges();
+            penEdit(fixture, row, '  CDR parse ');
             expect(rename).toHaveBeenCalledWith({ name: 'CDR parse', description: 'the daily feed' });
-            expect(c.editingName()).toBe(false);
-            expect(el.querySelector('.sf-row[data-key="name"] input')).toBeNull();
+            expect(row.querySelector('input')).toBeNull();
 
             // a commit with nothing further changed emits no second rename (no phantom dirty)
             fixture.componentRef.setInput('node', { ...NODE, name: 'CDR parse' });
@@ -263,17 +257,16 @@ describe('PipelineInspectorComponent', () => {
             const rename = vi.fn();
             c.rename.subscribe(rename);
 
-            c.startNameEdit();
-            fixture.detectChanges();
-            const input = el.querySelector('.sf-row[data-key="name"] input') as HTMLInputElement;
+            const row = penByLabel(el, 'Name')!;
+            const input = penOpen(fixture, row) as HTMLInputElement;
             input.value = 'abandoned';
             input.dispatchEvent(new Event('input'));
             input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             fixture.detectChanges();
             expect(rename).not.toHaveBeenCalled();
-            expect(c.editingName()).toBe(false);
+            expect(row.querySelector('input')).toBeNull();
             expect(c.renameForm.getRawValue()).toEqual({ name: 'Parse CSV' });
-            expect(el.querySelector('.sf-value')?.textContent?.trim()).toBe('Parse CSV');
+            expect(penText(row)).toBe('Parse CSV');
             // a blur firing AFTER the cancel (browsers differ on removal) must not emit either
             c.commitIdentity();
             expect(rename).not.toHaveBeenCalled();

@@ -19,6 +19,7 @@ import type { AttributeSpec } from 'app/inspecto/component-model';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penText } from 'app/inspecto/testing/pen-field';
 import { EnrichmentHostPipeline, PipelineConfigDefinitionComponent } from './pipeline-config-definition.component';
 import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 
@@ -434,6 +435,21 @@ describe('PipelineConfigDefinitionComponent', () => {
         // the editor is the primary surface, not the key/value grid (no extras ⇒ no Additional config)
         expect(c.allowAddExtra()).toBe(false);
         expect(fixture.nativeElement.querySelector('app-pipeline-extra-config')).toBeNull();
+    });
+
+    /**
+     * UI-FORM-ROWS-1: the Enrichment name is a property row that commits on Enter / blur, so no `input` or
+     * `click` follows the change — the committed value itself must re-derive the pane's dirty flag.
+     */
+    it('a committed Enrichment name dirties the pane', async () => {
+        const fixture = await create({ node: { id: 'enrich1', type: 'enrichment' } });
+        const seen: boolean[] = [];
+        fixture.componentInstance.dirtyChange.subscribe((d) => seen.push(d));
+        const row = penByLabel(fixture.nativeElement as HTMLElement, 'Enrichment name')!;
+        expect(penText(row)).toBe('enrich1');
+        penEdit(fixture, row, 'orders_enrich');
+        expect(fixture.componentInstance.enrichName.value).toBe('orders_enrich');
+        expect(seen.at(-1)).toBe(true);
     });
 
     it('seeds a FRESH companion from the host pipeline instead of asking (P6-c)', async () => {

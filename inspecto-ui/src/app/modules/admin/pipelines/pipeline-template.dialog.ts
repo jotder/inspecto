@@ -2,10 +2,9 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSampleValueDirective } from 'app/inspecto/components/sample-value.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -38,8 +37,7 @@ export interface PipelineTemplateResultData {
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
         InspectoSampleValueDirective,
@@ -54,27 +52,22 @@ export interface PipelineTemplateResultData {
                 unrunnable until you clear the template flag.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Template id</mat-label>
-                    <input matInput formControlName="id" placeholder="e.g. orders_eu" cdkFocusInitial />
-                    <mat-hint>Lowercase letters, digits and underscores. This is the permanent identity.</mat-hint>
-                    @if (form.controls.id.hasError('required')) {
-                        <mat-error>An id is required.</mat-error>
-                    }
-                    @if (form.controls.id.hasError('pattern')) {
-                        <mat-error
-                            >Lowercase letters, digits and underscores only; start with a letter or digit.</mat-error
-                        >
-                    }
-                    @if (form.controls.id.hasError('duplicate')) {
-                        <mat-error>A pipeline with this id already exists.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Display name (optional)</mat-label>
-                    <input matInput formControlName="displayName" placeholder="e.g. Orders (EU)" />
-                    <mat-hint>Shown in lists. Defaults to the id.</mat-hint>
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Template id"
+                    [required]="true"
+                    [mono]="true"
+                    placeholder="e.g. orders_eu"
+                    help="Lowercase letters, digits and underscores. This is the permanent identity."
+                    formControlName="id"
+                    [error]="idError()"
+                ></inspecto-pen-field>
+                <inspecto-pen-field
+                    label="Display name (optional)"
+                    placeholder="e.g. Orders (EU)"
+                    help="Shown in lists. Defaults to the id."
+                    formControlName="displayName"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -102,6 +95,18 @@ export class PipelineTemplateDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    /** The id row's error lines: shown once the row was left or Create template was pressed. */
+    idError(): string {
+        const c = this.form.controls.id;
+        if (!c.touched) return '';
+        const lines: string[] = [];
+        if (c.hasError('required')) lines.push('An id is required.');
+        if (c.hasError('pattern'))
+            lines.push('Lowercase letters, digits and underscores only; start with a letter or digit.');
+        if (c.hasError('duplicate')) lines.push('A pipeline with this id already exists.');
+        return lines.join(' ');
+    }
 
     save(): void {
         // Normalise BEFORE validating, so the pattern judges the value we actually send. Otherwise a

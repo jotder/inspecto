@@ -14,9 +14,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** What an extra entry's stored value IS — decides the control drawn and the validation applied. */
 export type ExtraValueKind = 'text' | 'number' | 'boolean' | 'json';
@@ -65,9 +66,10 @@ interface ExtraEntry {
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatSlideToggleModule,
         MatTooltipModule,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     template: `
         <!-- Property rows, the SAME idiom as the schema-form's flat mode (label · value · pencil): the
@@ -102,7 +104,7 @@ interface ExtraEntry {
                             }
                             @default {
                                 @if (isEditing(e)) {
-                                    <mat-form-field
+                                    <!-- form-allow: the in-row editor of an .sf-row, the same dense field as schema-form's flat rows (kept boxed with them, UI-FORM-ROWS-1 P1); a json entry is a JSON editor --><mat-form-field
                                         class="sf-dense w-full"
                                         appearance="outline"
                                         subscriptSizing="dynamic"
@@ -180,20 +182,22 @@ interface ExtraEntry {
                 <!-- Adding is offered ONLY where this editor is the node's primary surface (no schema
                      at all) — a schema-backed type's vocabulary is the schema. -->
                 <div class="mt-1 flex items-start gap-1">
-                    <mat-form-field class="sf-dense flex-1" appearance="outline" subscriptSizing="dynamic">
-                        <input matInput placeholder="New key" aria-label="New key" [formControl]="draftKey" />
-                        @if (draftKey.hasError('duplicate')) {
-                            <mat-error>That key already exists above</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field class="sf-dense w-28 shrink-0" appearance="outline" subscriptSizing="dynamic">
-                        <mat-select aria-label="Type of the new key" [formControl]="draftKind">
-                            <mat-option value="text">Text</mat-option>
-                            <mat-option value="number">Number</mat-option>
-                            <mat-option value="boolean">True/false</mat-option>
-                            <mat-option value="json">JSON</mat-option>
-                        </mat-select>
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        class="flex-1"
+                        label="New key"
+                        [mono]="true"
+                        [formControl]="draftKey"
+                        [error]="
+                            draftKey.touched && draftKey.hasError('duplicate') ? 'That key already exists above' : ''
+                        "
+                    ></inspecto-pen-field>
+                    <inspecto-option-picker
+                        class="w-32 shrink-0"
+                        label="Type of the new key"
+                        [hideLabel]="true"
+                        [options]="kindOptions"
+                        [formControl]="draftKind"
+                    />
                     <button
                         mat-icon-button
                         type="button"
@@ -227,6 +231,13 @@ export class PipelineExtraConfigComponent {
     readonly rows = signal<ExtraEntry[]>([]);
     readonly draftKey = this.fb.nonNullable.control('');
     readonly draftKind = this.fb.nonNullable.control<ExtraValueKind>('text');
+    /** The new key's type choices (a picker's values are strings: the ExtraValueKind names themselves). */
+    readonly kindOptions: PickerOption[] = [
+        { value: 'text', label: 'Text' },
+        { value: 'number', label: 'Number' },
+        { value: 'boolean', label: 'True/false' },
+        { value: 'json', label: 'JSON' },
+    ];
 
     constructor() {
         // Seed from the input. The host recreates this component per node (and on Discard), and an

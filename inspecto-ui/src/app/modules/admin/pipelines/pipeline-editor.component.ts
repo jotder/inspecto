@@ -19,9 +19,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
@@ -60,6 +58,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { companionSchemaName, schemaNameFromPath, segmentPathsOf } from 'app/inspecto/segments';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
@@ -197,13 +196,12 @@ const UNDO_CAP = 50;
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatMenuModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         DefinitionDrawerComponent,
         PipelineCollectionDefinitionComponent,
         PipelineParseDefinitionComponent,
@@ -1318,6 +1316,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.creating.set(true);
         this.newName.reset('');
         this.newFrontend.reset('');
+    }
+
+    /**
+     * The create row's error line. Two ways to be invalid, and they must not share a message: a 409 from the write
+     * route sets `duplicate` (createPipeline), and printing "a name is required" over a field that visibly HOLDS a
+     * name is a dead end — the builder cannot tell what to change.
+     */
+    newNameError(): string {
+        const c = this.newName;
+        if (!c.touched) return '';
+        if (c.hasError('duplicate')) return 'A pipeline called that already exists — pick another name';
+        return c.invalid ? 'A name is required' : '';
     }
 
     createPipeline(): void {

@@ -16,8 +16,6 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable, forkJoin, of, throwError } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
@@ -37,6 +35,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { downloadCsv } from 'app/inspecto/data-table/core/csv';
@@ -294,14 +293,13 @@ export function withDecodeProfile(
         FormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTooltipModule,
         GrammarEditorComponent,
         InspectoAlertComponent,
         ChipComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
         InspectoSchemaFieldsEditorComponent,
@@ -730,19 +728,19 @@ export function withDecodeProfile(
                             >
                                 Add a column with the source file name
                             </mat-checkbox>
-                            <mat-form-field class="mt-1 w-full" subscriptSizing="dynamic">
-                                <input
-                                    matInput
-                                    [value]="t.value"
-                                    placeholder="file_name"
-                                    aria-label="Source filename column"
-                                    [readonly]="readOnly()"
-                                    (change)="onFilenameColumnBlur($any($event.target).value)"
-                                />
-                            </mat-form-field>
-                            @if (filenameColumnError(); as err) {
-                                <p class="text-warn m-0 mt-1 text-xs" role="alert">{{ err }}</p>
-                            }
+                            <!-- One value bound to the host's target, no form: the [ngModel] bridge. A committed
+                                 change (Enter / blur) is the old input's change event. -->
+                            <inspecto-pen-field
+                                class="mt-1"
+                                label="Column name"
+                                ariaLabel="Source filename column"
+                                placeholder="file_name"
+                                [mono]="true"
+                                [readOnly]="readOnly()"
+                                [error]="filenameColumnError() ?? ''"
+                                [ngModel]="t.value"
+                                (ngModelChange)="onFilenameColumnBlur($event ?? '')"
+                            ></inspecto-pen-field>
                             <!-- ONE short lineage hint (R11): the column is real in the WRITTEN rows but is
                                  not a parsed column — stamped at write by the sink, never saved into
                                  raw.fields[]. -->
@@ -857,9 +855,8 @@ export class PipelineParseDefinitionComponent {
     /** Set only while the last edit failed the identifier pattern — cleared on a valid or blank commit. */
     readonly filenameColumnError = signal<string | null>(null);
 
-    /** Commit (on blur): blank clears the column, an invalid identifier is refused with an inline error
-     *  (never `<mat-error>` — this input carries no `NgControl`, so a mat-form-field never enters an
-     *  error state for it; the schema-form `list`-type fix set the precedent). */
+    /** Commit (Enter / blur): blank clears the column, an invalid identifier is refused with the row's
+     *  error line. */
     onFilenameColumnBlur(raw: string): void {
         if (this.readOnly()) return;
         const value = raw.trim();

@@ -3,11 +3,10 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSampleValueDirective } from 'app/inspecto/components/sample-value.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -31,8 +30,7 @@ export interface PipelineSettingsData {
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
         InspectoOptionPickerComponent,
@@ -47,11 +45,12 @@ export interface PipelineSettingsData {
                 to by name — pick a load mode to make one.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Description</mat-label>
-                    <textarea matInput rows="2" formControlName="description"></textarea>
-                    <mat-hint>Optional — leaving it blank clears the stored description.</mat-hint>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Description"
+                    [multiline]="true"
+                    help="Optional — leaving it blank clears the stored description."
+                    formControlName="description"
+                ></inspecto-pen-field>
                 <inspecto-option-picker
                     class="block w-full"
                     label="Produces"
@@ -66,50 +65,38 @@ export interface PipelineSettingsData {
                         formControlName="load"
                         [options]="LOAD_MODES"
                     />
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Key columns</mat-label>
-                        <input matInput formControlName="key" placeholder="e.g. msisdn, event_date" />
-                        @if (form.controls.load.value !== 'replace') {
-                            <mat-hint
-                                >Comma-separated. Required for upsert/scd2 — this is the identity the dataset dedupes
-                                on.</mat-hint
-                            >
-                        }
-                        @if (form.controls.key.hasError('required')) {
-                            <mat-error>upsert/scd2 requires at least one key column.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Key columns"
+                        placeholder="e.g. msisdn, event_date"
+                        [help]="
+                            form.controls.load.value !== 'replace'
+                                ? 'Comma-separated. Required for upsert/scd2 — this is the identity the dataset dedupes on.'
+                                : ''
+                        "
+                        formControlName="key"
+                        [error]="keyError()"
+                    ></inspecto-pen-field>
                     @if (form.controls.load.value !== 'replace') {
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <mat-label>Order by column</mat-label>
-                            <input matInput formControlName="orderBy" placeholder="e.g. updated_at" />
-                            <mat-hint
-                                >Optional. Within one batch, the row with the greatest value wins for each
-                                key.</mat-hint
-                            >
-                        </mat-form-field>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <mat-label>Delete marker column</mat-label>
-                            <input matInput formControlName="deleteColumn" placeholder="e.g. op" />
-                            <mat-hint
-                                >Optional. A row whose marker matches a delete value removes its key. The marker is not
-                                stored.</mat-hint
-                            >
-                            @if (form.controls.deleteColumn.hasError('required')) {
-                                <mat-error>Name the column that carries the delete marker.</mat-error>
-                            }
-                            @if (form.controls.deleteColumn.hasError('isKey')) {
-                                <mat-error>The delete marker column cannot be a key column.</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <mat-label>Delete values</mat-label>
-                            <input matInput formControlName="deleteValues" placeholder="e.g. D, DELETE" />
-                            <mat-hint>Comma-separated marker values that mean delete.</mat-hint>
-                            @if (form.controls.deleteValues.hasError('required')) {
-                                <mat-error>Give at least one marker value that means delete.</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Order by column"
+                            placeholder="e.g. updated_at"
+                            help="Optional. Within one batch, the row with the greatest value wins for each key."
+                            formControlName="orderBy"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Delete marker column"
+                            placeholder="e.g. op"
+                            help="Optional. A row whose marker matches a delete value removes its key. The marker is not stored."
+                            formControlName="deleteColumn"
+                            [error]="deleteColumnError()"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Delete values"
+                            placeholder="e.g. D, DELETE"
+                            help="Comma-separated marker values that mean delete."
+                            formControlName="deleteValues"
+                            [error]="deleteValuesError()"
+                        ></inspecto-pen-field>
                         @if (deleteWithoutOrderBy()) {
                             <inspecto-alert variant="warning">
                                 Without an order by column, an upsert and a delete for the same key in one batch resolve
@@ -117,11 +104,13 @@ export interface PipelineSettingsData {
                             </inspecto-alert>
                         }
                     }
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Refresh seconds</mat-label>
-                        <input matInput type="number" min="0" formControlName="refreshSeconds" />
-                        <mat-hint>0 = every run.</mat-hint>
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Refresh seconds"
+                        type="number"
+                        [min]="0"
+                        help="0 = every run."
+                        formControlName="refreshSeconds"
+                    ></inspecto-pen-field>
                 }
                 @if (error()) {
                     <inspecto-alert variant="error" [title]="error()!" />
@@ -174,6 +163,26 @@ export class PipelineSettingsDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    /** The error lines save() raises, shown on their rows once the row was left or Save was pressed. */
+    keyError(): string {
+        const c = this.form.controls.key;
+        return c.touched && c.hasError('required') ? 'upsert/scd2 requires at least one key column.' : '';
+    }
+
+    deleteColumnError(): string {
+        const c = this.form.controls.deleteColumn;
+        if (!c.touched) return '';
+        const lines: string[] = [];
+        if (c.hasError('required')) lines.push('Name the column that carries the delete marker.');
+        if (c.hasError('isKey')) lines.push('The delete marker column cannot be a key column.');
+        return lines.join(' ');
+    }
+
+    deleteValuesError(): string {
+        const c = this.form.controls.deleteValues;
+        return c.touched && c.hasError('required') ? 'Give at least one marker value that means delete.' : '';
+    }
 
     save(): void {
         this.error.set(null);

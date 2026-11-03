@@ -219,3 +219,17 @@ allow-list (114 to 103).
   dashboard *As of* now update per committed row, not per keystroke; Enter in a row no longer submits the query, the
   materialize, apply-template, add-to-dashboard or widget-save forms (their buttons do). The filter bar picker is named
   by the field alone (it was "Filter by <field>").
+
+**Batch 3 - Pipelines, 2026-11-04.** The 12 files under `modules/admin/pipelines/` leave the allow-list (88 to 76).
+- Rows: the change-id, duplicate, rename and template dialogs, the six Pipeline settings, the new Pipeline name (it
+  still creates on Enter, through `(entered)`), the inspector's node name (compact mode emits the rename when the row
+  commits), the Enrichment name, the parse step's filename column (an `[ngModel]` bridge: it is bound to the host's
+  target, not a form) and the extra config's new key; the new key's type is a picker.
+- Kept boxed with `form-allow`: the dry-run's JSON sample rows, the combined view's **multiple** Pipeline choice, and
+  the extra config's in-row editor. That editor is the same dense field as `schema-form`'s rows, which P1 kept on
+  purpose; converting it alone would put two row layouts in one list. It moves when `schema-form`'s editor does.
+- Behaviour to know: Enter no longer submits the change-id, duplicate, rename, template, settings or inspector rename
+  forms (their buttons do). Per commit, not per keystroke: the change-id confirm (its button enables when the row
+  commits), the settings warning about a missing order-by column, the extra config's Add and duplicate check, and the
+  Enrichment name's dirtiness (a `valueChanges` subscription re-derives it; without it Apply stayed grey after a Tab).
+  An unnamed compact node shows its id as a grey placeholder. The confirm field lost `autocomplete="off"`.
