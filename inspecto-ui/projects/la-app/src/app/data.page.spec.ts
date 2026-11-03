@@ -41,6 +41,34 @@ const DATASETS = [
         },
     },
     { type: 'dataset', name: 'mm_links', ref: 'dataset/mm_links', content: { physicalRef: 'mm/database' } },
+    // LA-PIPELINE-MAPPINGS-1: a Pipeline-fed Dataset that lists its columns may be a Mapping's base
+    {
+        type: 'dataset',
+        name: 'wallet_txn',
+        ref: 'dataset/wallet_txn',
+        content: {
+            physicalRef: 'wallet_txn/database',
+            columns: [
+                { name: 'src_id', type: 'string', classification: 'ACCOUNT_ID' },
+                { name: 'dst_id', type: 'string', classification: 'ACCOUNT_ID' },
+                { name: 'txn_date', type: 'date' },
+            ],
+        },
+    },
+    // ... and one computed when read may not
+    { type: 'dataset', name: 'computed_ds', ref: 'dataset/computed_ds', content: { sql: 'SELECT 1', columns: [] } },
+    {
+        type: 'dataset',
+        name: 'by_agent',
+        ref: 'dataset/by_agent',
+        content: {
+            origin: 'mapping',
+            basedOn: 'wallet_txn',
+            physicalRef: 'wallet_txn/database',
+            columns: [],
+            defaultLinkMapping: { from: 'src_id', to: 'agent_id', time: 'txn_date' },
+        },
+    },
 ];
 
 function create() {
@@ -74,8 +102,10 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         const maps = q(el, 'mappings')!.textContent ?? '';
         expect(maps).toContain('from_account → to_account');
         expect(q(el, 'mapping-by_channel')!.textContent).toContain('from_account → channel');
-        expect(el.textContent).toContain('Kept up to date by Pipelines');
-        expect(el.textContent).toContain('mm_links');
+        const others = el.querySelector('[aria-labelledby="data-others"]')!.textContent ?? '';
+        expect(others).toContain('mm_links');
+        expect(others).toContain('computed_ds');
+        expect(others).not.toContain('wallet_txn');
         await expectNoA11yViolations(el);
     });
 
@@ -126,6 +156,37 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         });
         req.flush({ name: 'by_channel' });
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('a Pipeline-fed Dataset gets its own Entities and Mappings, and a Mapping of it saves with it as the base', () => {
+        const { fixture, el, c } = create();
+        const pipe = q(el, 'data-wallet_txn')!;
+        expect(pipe.querySelector('[data-testid="pipeline-card"]')!.textContent).toContain('Kept up to date by a Pipeline or a Job');
+        expect(pipe.querySelector('inspecto-import-dataset-card')).toBeNull(); // no Add a file, Run now or arrivals
+        expect(pipe.querySelector('[data-testid="entities"]')!.textContent).toContain('src_id');
+        expect(pipe.querySelector('[data-testid="mapping-by_agent"]')).not.toBeNull();
+        expect(c.bases().map((d) => d.id)).toEqual(['transfers', 'wallet_txn']);
+
+        (pipe.querySelector('[data-testid="mapping-new"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        c.form.patchValue({ name: 'wallet_to_wallet', from: 'src_id', to: 'dst_id' });
+        c.form.controls.name.updateValueAndValidity();
+        c.saveMapping();
+        const req = http.expectOne((r) => r.method === 'POST' && r.url === apiUrl('/components/dataset'));
+        const body = req.request.body as Record<string, unknown>;
+        expect(body['basedOn']).toBe('wallet_txn');
+        expect(body['physicalRef']).toBe('wallet_txn/database');
+        req.flush({ name: 'wallet_to_wallet' });
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('a Mapping that reads a column its base no longer lists is marked, naming the column', async () => {
+        const { el } = create();
+        const drift = q(el, 'data-wallet_txn')!.querySelector('[data-testid="mapping-drift"]');
+        expect(drift?.textContent).toContain('agent_id');
+        expect(drift?.textContent).not.toContain('src_id');
+        expect(q(el, 'data-transfers')!.querySelector('[data-testid="mapping-drift"]')).toBeNull();
+        await expectNoA11yViolations(el);
     });
 
     it('a name a Dataset already has is refused', () => {

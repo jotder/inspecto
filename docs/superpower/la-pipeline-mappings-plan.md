@@ -1,6 +1,6 @@
 # Mappings of Pipeline Datasets (`LA-PIPELINE-MAPPINGS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 BUILT 2026-11-03 (§8).** Operator ask, after a walkthrough of the
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 and P1 BUILT 2026-11-03 (§8, §9).** Operator ask, after a walkthrough of the
 > Entities and Data pages in Basic: a saved **Mapping** (a Dataset of its own that reads another Dataset's rows its own
 > way) should work for Datasets that **Pipelines** keep up to date, not only for Datasets added with *Add data*.
 > Board row `LA-PIPELINE-MAPPINGS-1`.
@@ -128,3 +128,37 @@ filter rows (a Mapping reads every row of its base); building link indexes for M
   unrestricted Mapping of a base shared away is 404 by id and absent from the list, visible once the base is shared,
   absent again when the base is gone, and still deletable; `ComponentAccessAsOwnerTest.aMappingIsJudgedOnItsBaseToo`;
   `PostgresPublishJobTest.aMappingIsPublishedOnlyByAnAuthorWhoMayReadItsBase`.
+
+## 9. As built: P1 (2026-11-03)
+
+- **The Data page** (`inspecto-ui/projects/la-app/src/app/data.page.ts`) renders every Dataset that may be a base,
+  imports first, then those Pipelines keep up to date. Each gets the same **Entities** and **Mappings** cards. Only the
+  top card differs: an import keeps its Dataset card (Add a file, Run now, arrivals), and a Pipeline Dataset gets a short
+  *Kept up to date by a Pipeline* card.
+- **Which Datasets** (`data-page.ts` `DataEntry.mappable`): the server's base rule (a `physicalRef`, not computed when
+  read, not a Mapping), plus two things the UI needs. The Dataset must not be an Entity List's store (`entity_list_`,
+  `EntityListSidecar.PREFIX`), and it must list at least two columns, which the Mapping form offers as From and To. The
+  rest stay a line of names under **Other Datasets**, with the reason.
+- **Deviation from §3.4:** the Pipeline card has no Data status line. `GET /datasets/{id}/arrivals` serves only Add data
+  Datasets (`DatasetArrivals`: a Pipeline Dataset's arrivals are its Pipeline's runs), and the entry does not name its
+  Pipeline. Showing either would need server work this phase did not take on.
+- **The card says "a Pipeline or a Job"**: a stored Dataset outside Add data is written by a Pipeline or by a Job
+  (`MaterializeTask` writes a `physicalRef` and columns), and the entry does not say which.
+- **§3.4 against §7, settled:** the Entities card on a Pipeline Dataset sets what its columns hold - the column
+  classifications the Entities page's Columns tab already set for every Dataset (`OnboardImport`'s column route). §7's
+  "editing a Pipeline Dataset's own entry" means its source definition (`physicalRef`, `sql`, its Pipeline), which
+  stays out of reach here.
+- **A known gap, recorded for P2's guide:** the server accepts a base the page does not offer (one with fewer than two
+  columns, or an Entity List's store). A Mapping of such a base, made through the API, has no section on this page; it
+  is still listed, explored and deleted from the Start box and the components API.
+- **Drifted columns** (`driftedColumns`): a Mapping whose From, To, kind, when or amount column its base no longer lists
+  is marked under it ("Reads a column wallet_txn no longer has: agent_id. Edit the Mapping, or it cannot be read."). The
+  comparison is case-insensitive, like the server's column check. A base that lists no columns is not compared.
+- **The read of a drifted Mapping** (moved from P0) is not tested here. A Mapping cannot be *saved* with a column its
+  base lacks (`validateMapping`), so drift only appears when the base changes afterwards. LA reads turn DuckDB's binder
+  error into a 422 that keeps the column name (`DatasetReadFault.scrub` strips only paths and the statement echo). P2's
+  live check confirms it on a real drifted Mapping.
+- Tests: `data.page.spec.ts` covers a Pipeline Dataset with its own cards and no import card, a Mapping saved with it as
+  the base, the drift mark naming only the missing column, computed and column-less Datasets left under Other
+  Datasets, and axe. `data-page.spec.ts` covers `mappable` for each case and `driftedColumns`. Ran the la-app specs
+  (21 files, 130 tests), eslint and `lint:tokens`, all clean.

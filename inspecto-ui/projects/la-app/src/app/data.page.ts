@@ -23,6 +23,7 @@ import {
     MappingForm,
     TypeChoice,
     dataEntry,
+    driftedColumns,
     formOf,
     mappingEntry,
     mappingLine,
@@ -30,10 +31,11 @@ import {
 } from './data-page';
 
 /**
- * The **Data** page (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): every Add data Dataset with its
- * card (Data status, Arrivals, Add a file, Run now), its **Entities** (what each column holds, editable) and its
- * **Mappings** - each a Dataset of its own that reads the same data its own way (From, To, Kind of link, When, Amount),
- * created, edited and deleted here. Datasets a Pipeline keeps up to date are listed by name only.
+ * The **Data** page (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): every Dataset that may be a
+ * Mapping's base (LA-PIPELINE-MAPPINGS-1: Add data ones, then stored ones kept up to date elsewhere) with its card (an
+ * import's Data status, Arrivals, Add a file, Run now; a short one otherwise), its **Entities** (what each column holds,
+ * editable) and its **Mappings** - each a Dataset of its own that reads the same data its own way (From, To, Kind of
+ * link, When, Amount), created, edited and deleted here. Every other Dataset is listed by name, with why.
  */
 @Component({
     selector: 'la-app-data-page',
@@ -62,15 +64,15 @@ import {
                 </a>
             </div>
             <p class="text-secondary m-0 text-sm">
-                Each Dataset you added, what arrived in it, what its columns hold, and its Mappings: the ways its rows
-                are read as links. A Mapping is a Dataset of its own over the same data.
+                Each Dataset you added or a Pipeline keeps up to date, what its columns hold, and its Mappings: the ways
+                its rows are read as links. A Mapping is a Dataset of its own over the same data.
             </p>
             @if (error()) {
                 <inspecto-alert variant="error">{{ error() }}</inspecto-alert>
             }
             @if (entries() === null) {
                 <inspecto-skeleton [lines]="4"></inspecto-skeleton>
-            } @else if (!imports().length) {
+            } @else if (!bases().length) {
                 <inspecto-empty-state
                     icon="heroicons_outline:circle-stack"
                     title="No Dataset added yet"
@@ -79,21 +81,34 @@ import {
                     (action)="goAddData()"
                 ></inspecto-empty-state>
             } @else {
-                @for (d of imports(); track d.id) {
+                @for (d of bases(); track d.id) {
                     <section
                         class="flex flex-col gap-3"
                         [attr.aria-labelledby]="'data-' + d.id"
                         [attr.data-testid]="'data-' + d.id"
                     >
                         <h2 class="m-0 text-lg font-semibold" [id]="'data-' + d.id">{{ d.id }}</h2>
-                        <inspecto-import-dataset-card
-                            [dataset]="{
-                                id: d.id,
-                                kind: d.kind,
-                                description: d.description,
-                                importPipeline: d.importPipeline ?? d.id,
-                            }"
-                        ></inspecto-import-dataset-card>
+                        @if (d.origin === 'import') {
+                            <inspecto-import-dataset-card
+                                [dataset]="{
+                                    id: d.id,
+                                    kind: d.kind,
+                                    description: d.description,
+                                    importPipeline: d.importPipeline ?? d.id,
+                                }"
+                            ></inspecto-import-dataset-card>
+                        } @else {
+                            <div class="bg-card flex flex-col gap-1 rounded-2xl border p-4" data-testid="pipeline-card">
+                                <p class="m-0 text-sm font-semibold">Kept up to date by a Pipeline or a Job</p>
+                                @if (d.description) {
+                                    <p class="text-secondary m-0 text-sm">{{ d.description }}</p>
+                                }
+                                <p class="text-secondary m-0 text-sm">
+                                    Its data is written there, not added here. What its columns hold and its Mappings
+                                    are set here.
+                                </p>
+                            </div>
+                        }
 
                         <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="entities">
                             <h3 class="m-0 text-base font-semibold">Entities</h3>
@@ -145,6 +160,15 @@ import {
                                     >
                                         <span class="font-medium">{{ m.id }}</span>
                                         <span class="text-secondary">· {{ line(m.mapping) }}</span>
+                                        @if (drifted(m, d); as gone) {
+                                            @if (gone.length) {
+                                                <span class="text-warn w-full text-sm" data-testid="mapping-drift">
+                                                    Reads {{ gone.length === 1 ? 'a column' : 'columns' }}
+                                                    {{ d.id }} no longer has: {{ gone.join(', ') }}. Edit the
+                                                    Mapping, or it cannot be read.
+                                                </span>
+                                            }
+                                        }
                                         <span class="ml-auto flex gap-1">
                                             <a
                                                 mat-button
@@ -276,8 +300,12 @@ import {
             }
             @if (others().length) {
                 <section class="flex flex-col gap-1" aria-labelledby="data-others">
-                    <h2 class="m-0 text-base font-semibold" id="data-others">Kept up to date by Pipelines</h2>
-                    <p class="text-secondary m-0 text-sm">{{ others().join(', ') }}</p>
+                    <h2 class="m-0 text-base font-semibold" id="data-others">Other Datasets</h2>
+                    <p class="text-secondary m-0 text-sm">
+                        No Mapping is offered for these: each is computed when read, has no stored data, is an Entity
+                        List's store, or lists fewer than two columns to read as From and To.
+                        {{ others().join(', ') }}
+                    </p>
                 </section>
             }
         </div>
@@ -304,7 +332,15 @@ export class DataPageComponent implements OnInit {
     readonly types = signal<TypeChoice[]>([]);
     readonly error = signal('');
     readonly imports = computed(() => (this.entries() ?? []).filter((e) => e.origin === 'import'));
-    readonly others = computed(() => (this.entries() ?? []).filter((e) => e.origin === 'other').map((e) => e.id));
+    /** Every Dataset a Mapping may be based on: the imports first, then those Pipelines keep up to date. */
+    readonly bases = computed(() => [
+        ...this.imports(),
+        ...(this.entries() ?? []).filter((e) => e.origin === 'other' && e.mappable),
+    ]);
+    readonly others = computed(() =>
+        (this.entries() ?? []).filter((e) => e.origin === 'other' && !e.mappable).map((e) => e.id),
+    );
+    protected readonly drifted = driftedColumns;
     /** The open Mapping editor: its base, and the Mapping's id when editing one (null = a new one). */
     readonly editing = signal<{ base: DataEntry; id: string | null } | null>(null);
     readonly saving = signal(false);

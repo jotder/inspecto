@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ComponentDef } from '@inspecto/core/api';
-import { dataEntry, formOf, mappingEntry, mappingLine, typeOf } from './data-page';
+import { dataEntry, driftedColumns, formOf, mappingEntry, mappingLine, typeOf } from './data-page';
 
 const TYPES = [
     { id: 'account', label: 'Account', classifications: ['ACCOUNT_ID'] },
@@ -33,6 +33,24 @@ describe('the Data page model (LA-DATA-PAGE-1)', () => {
         expect(dataEntry(def('x', { origin: 'mapping', basedOn: 'transfers' })).basedOn).toBe('transfers');
         expect(dataEntry(def('y', {})).origin).toBe('other');
         expect(mappingLine(null)).toBe('No link mapping yet');
+    });
+
+    it('LA-PIPELINE-MAPPINGS-1: which Datasets may be a base, and the columns a Mapping reads that its base dropped', () => {
+        const cols = [
+            { name: 'a', type: 'string' },
+            { name: 'b', type: 'string' },
+        ];
+        expect(BASE.mappable).toBe(true);
+        expect(dataEntry(def('piped', { physicalRef: 'p/database', columns: cols })).mappable).toBe(true);
+        expect(dataEntry(def('few', { physicalRef: 'p/database', columns: cols.slice(0, 1) })).mappable).toBe(false);
+        expect(dataEntry(def('calc', { physicalRef: 'p/database', sql: 'SELECT 1', columns: cols })).mappable).toBe(false);
+        expect(dataEntry(def('nowhere', { columns: cols })).mappable).toBe(false);
+        expect(dataEntry(def('entity_list_watch', { physicalRef: 'entity_list_watch', columns: cols })).mappable).toBe(false);
+        expect(dataEntry(def('m', { origin: 'mapping', physicalRef: 'p/database', columns: cols })).mappable).toBe(false);
+
+        const m = dataEntry(def('m', { origin: 'mapping', defaultLinkMapping: { from: 'from_account', to: 'gone', kind: 'Channel' } }));
+        expect(driftedColumns(m, BASE)).toEqual(['gone']); // case-insensitive, as the server's column check
+        expect(driftedColumns(m, dataEntry(def('bare', { physicalRef: 'x' })))).toEqual([]); // nothing to compare with
     });
 
     it('a column means the Entity Type that claims its classification; none is a detail', () => {

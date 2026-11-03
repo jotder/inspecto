@@ -22,8 +22,13 @@ export interface LinkMapping {
 export interface DataEntry {
     id: string;
     description: string;
-    /** `import` (Add data), `mapping` (a Mapping of an import), or `other` (kept up to date by a Pipeline). */
+    /** `import` (Add data), `mapping` (a Mapping of another Dataset), or `other` (kept up to date by a Pipeline). */
     origin: 'import' | 'mapping' | 'other';
+    /**
+     * May be a Mapping's base here (LA-PIPELINE-MAPPINGS-1): an import, or a stored, plain Dataset - a `physicalRef`, not
+     * computed when read, not an Entity List's store - that lists the columns the Mapping form offers.
+     */
+    mappable: boolean;
     kind: 'stream' | 'reference';
     basedOn: string | null;
     physicalRef: string;
@@ -42,6 +47,20 @@ export interface TypeChoice {
 }
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/** The id prefix of an Entity List's Parquet store (`EntityListSidecar.PREFIX`): a store, not data to read as links. */
+const ENTITY_LIST_STORE = 'entity_list_';
+
+/**
+ * The columns a Mapping reads that its base no longer lists (a Pipeline's schema changed under it), in mapping order;
+ * empty when nothing drifted or the base lists no columns to compare with.
+ */
+export function driftedColumns(m: DataEntry, base: DataEntry): string[] {
+    if (!m.mapping || !base.columns.length) return [];
+    const has = new Set(base.columns.map((c) => c.name.toLowerCase()));
+    const read = [m.mapping.from, m.mapping.to, m.mapping.kind, m.mapping.time, m.mapping.amount];
+    return read.filter((c): c is string => !!c && !has.has(c.toLowerCase()));
+}
 
 export function dataEntry(def: ComponentDef): DataEntry {
     const c = (def.content ?? {}) as Record<string, unknown>;
@@ -66,10 +85,20 @@ export function dataEntry(def: ComponentDef): DataEntry {
                   classification: str(x['classification']),
               }))
         : [];
+    // the server's base rule (DatasetEntryRules.validateMapping), plus what the form needs: two columns to pick from
+    const computedWhenRead = ['sql', 'view', 'sourceName', 'calculated'].some((k) => c[k] != null);
+    const mappable =
+        origin === 'import' ||
+        (origin === 'other' &&
+            !!str(c['physicalRef']) &&
+            !computedWhenRead &&
+            !def.name.startsWith(ENTITY_LIST_STORE) &&
+            columns.length >= 2);
     return {
         id: def.name,
         description: str(c['description']) ?? '',
         origin,
+        mappable,
         kind: c['kind'] === 'reference' ? 'reference' : 'stream',
         basedOn: str(c['basedOn']),
         physicalRef: str(c['physicalRef']) ?? '',
