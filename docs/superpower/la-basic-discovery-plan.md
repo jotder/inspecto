@@ -130,3 +130,18 @@ silently dropped; the Value Measure preset is cut to the same 500 rows as the ag
 **Tests.** `ControlApiPresetQueriesTest` (list per pack and per mapped roles, masking scan of every body - the Value
 Measure preset included, alias in, the cap and `truncated`, the `LINK_PRESET_RUN` audit, gate order), `PresetRoutesContractTest`, the Basic and module-gate
 route lists, `link-analysis-presets.component.spec.ts`.
+
+### 7.1 Graph-shaped presets and panel fixes (2026-11-03, operator: "help the user choose which entities to investigate")
+
+The core set (every Space; a pack puts its own first) gained four **graph** presets, each a fixed statement over the
+links joined to themselves (`PresetQueries.graphSql`, no graph store): **Two-way pairs** (A to B and B to A, at least
+*n* each way), **Short loops** (A to B to C to A, each loop once with its smallest id first; entities with more than
+`maxLinks` (200) distinct counterparts are left out before the joins, the statement timeout bounds the rest),
+**Newcomers** (first seen within the last *N* days of the DATA - its newest link, not the calendar - with at least *n*
+links; needs When) and **Two steps from one entity** (undirected: step 1 with its links, step 2 with the number of
+step-1 entities leading to it; an alias is accepted). Their entity columns are masked like the others. Core order: Reached
+by many, Reaching many, Two-way pairs, Short loops, Newcomers, Biggest senders, Top counterparts, Two steps.
+
+Panel fixes from the live drive: the Dataset is preselected by the Start box's rule (the page's, else a valid pick, else
+the first), and a measure shows at most two decimals (`presetNumber`). Not done: Bridges, Shared counterparts and
+Bursts (listed in the conversation's proposal) - left for P4 or a later row if asked.

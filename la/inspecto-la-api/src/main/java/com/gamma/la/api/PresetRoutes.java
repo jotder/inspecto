@@ -140,6 +140,20 @@ public final class PresetRoutes implements RouteModule {
                 int cap = Math.min(PresetQueries.MAX_ROWS, fences.maxEntities());
                 rows = r.entities().size() > cap ? r.entities().subList(0, cap) : r.entities();
                 truncated = r.truncated() || r.entities().size() > cap;
+            } else if (p.graph() != null) {
+                String entity = p.param("entity") == null ? null : PresetQueries.value(p, given, "entity");
+                if (p.param("entity") != null && entity == null) throw new IllegalArgumentException("'entity' is required");
+                if (entity != null) entity = mask.in(entity);
+                columns = PresetQueries.graphColumns(p.graph());
+                List<String> binds = new ArrayList<>();
+                String sql = PresetQueries.graphSql(datasetId, p.graph(), t.roles(), name -> PresetQueries.number(p, given, name),
+                        entity, binds);
+                int limit = Math.min(PresetQueries.top(p, given), fences.maxEntities());
+                DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(datasetId,
+                        t.relationSql(), sql, limit, 0, List.of(), List.of(), binds),
+                        SqlSandboxPolicy.withCaps(null, 0, fences.timeoutSeconds()), UTC);
+                rows = r.rows();
+                truncated = r.truncated();
             } else {
                 PresetQueries.Aggregate a = p.aggregate();
                 String entity = a.entityParam() == null ? null : PresetQueries.value(p, given, a.entityParam());

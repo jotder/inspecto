@@ -304,13 +304,18 @@ lists any value not in the Dataset. A list or a paste draws at most 25 values in
 **Start from** is a choice that opens as a popup, like the Entity Type. The box always draws; it records nothing.
 
 **Preset queries** (Basic, under the Start box) ask a Dataset the questions your industry already asks, without
-writing a query. Pick the **Dataset** and a **Question**, set its few values (each has a default), and choose **Ask**:
+writing a query: most of them point at *who to look at first*. The same core set is offered in every Space; an
+industry pack adds its own questions ahead of it. Pick the **Dataset** (the Start box's, at first) and a **Question**, set its few values (each has a default), and choose **Ask**:
 
 | Question | Answers | Offered when the Dataset maps |
 |---|---|---|
 | Reached by many | the entities that most distinct others link to, at least *N* | From, To |
 | Reaching many | the entities that link to the most distinct others, at least *N* | From, To |
+| Two-way pairs | pairs that link to each other in both directions, with the links each way | From, To |
+| Short loops | three entities linked in a circle (A to B to C and back to A); very busy entities are left out | From, To |
+| Newcomers | entities first seen in the last days of the data that already have many links | From, To, When |
 | Top counterparts of one entity | who one entity links to most: links, and the total amount when there is one | From, To |
+| Two steps from one entity | its direct counterparts, then theirs, and through how many of them | From, To |
 | Biggest senders by amount | the entities that send the most in total | From, To, Amount |
 | Money in, then out again within hours *(mobile money)* | entities whose money leaves again soon after it arrives: median hours, links out, received | From, To, Kind of link, When, Amount |
 | Linked through one shared item *(telecom)* | entities linked to many others by a kind of link that means sharing one item (the pack's shared device) | From, To, Kind of link |

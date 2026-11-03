@@ -163,9 +163,13 @@ export class LinkAnalysisPresetsComponent {
     private loading?: Subscription;
 
     constructor() {
+        // The Start box's rule: the page's Dataset when it can start a graph, else keep a valid pick, else the first.
         effect(() => {
-            const id = this.initialDataset();
-            if (id && !this.dataset.value) this.dataset.setValue(id);
+            const ids = this.datasets().map((d) => d.id);
+            const wanted = this.initialDataset();
+            const current = this.dataset.value;
+            const next = wanted && ids.includes(wanted) ? wanted : current && ids.includes(current) ? current : (ids[0] ?? null);
+            if (next !== current) this.dataset.setValue(next);
         });
         this.dataset.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((id) => this.load(id));
         this.preset.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.buildParams());

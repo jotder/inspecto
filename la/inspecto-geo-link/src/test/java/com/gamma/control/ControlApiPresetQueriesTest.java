@@ -61,6 +61,11 @@ class ControlApiPresetQueriesTest {
         return "('" + from + "','" + to + "','" + kind + "'," + amount + ",TIMESTAMP '" + at.toString().replace('T', ' ') + ":00')";
     }
 
+    private static String link(String from, String to, int daysAgo) {
+        LocalDateTime at = LocalDateTime.now(ZoneOffset.UTC).minusDays(daysAgo).withHour(9).withMinute(0).withSecond(0).withNano(0);
+        return "('" + from + "','" + to + "',TIMESTAMP '" + at.toString().replace('T', ' ') + ":00')";
+    }
+
     private static Map<String, Object> entry(String view) {
         return Map.of("view", view, "columns", List.of(Map.of("name", "caller", "classification", "MSISDN"),
                 Map.of("name", "callee", "classification", "MSISDN")));
@@ -83,7 +88,14 @@ class ControlApiPresetQueriesTest {
                             + ") AS t(caller,callee,link_kind,amount,ts)", "2026-11-03T00:00:00Z"));
             views.write(new ViewDefinition("pairs_view", "flow-x", List.of(),
                     "SELECT caller, callee FROM (VALUES ('" + A + "','" + B + "')) AS t(caller,callee)", "2026-11-03T00:00:00Z"));
+            // the graph shapes: A <-> B two-way, B -> C -> D -> B a loop, E new (all its links on the last day of the data)
+            String links = String.join(",",
+                    link(A, B, 20), link(B, A, 20), link(B, C, 19), link(C, D, 18), link(D, B, 17),
+                    link(E, A, 1), link(E, B, 1), link(E, C, 0));
+            views.write(new ViewDefinition("graph_view", "flow-x", List.of(),
+                    "SELECT caller, callee, ts FROM (VALUES " + links + ") AS t(caller,callee,ts)", "2026-11-03T00:00:00Z"));
             ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
+            registry.write("dataset", "graph_ds", entry("graph_view"));
             registry.write("dataset", "pays_ds", entry("pays_view"));
             registry.write("dataset", "pairs_ds", entry("pairs_view"));
             Files.writeString(writeRoot.resolve("link-analysis.toon"), "domain_profile: mobile-money\n" + settings);
@@ -130,12 +142,14 @@ class ControlApiPresetQueriesTest {
             assertEquals("link_kind", full.at("/roles/kind").asText());
             assertEquals("ts", full.at("/roles/time").asText());
             assertEquals("amount", full.at("/roles/amount").asText());
-            assertEquals(List.of("quick_cash_out", "fan_in", "counterparts", "top_senders", "fan_out"), ids(full.get("presets")));
+            assertEquals(List.of("quick_cash_out", "fan_in", "fan_out", "two_way", "short_loops", "newcomers", "top_senders",
+                    "counterparts", "two_steps"), ids(full.get("presets")));
 
             // no Kind, When or Amount: the presets that need them are not offered (Q-5)
             JsonNode pairs = ok(c, "GET", "/inv/presets?dataset=pairs_ds", null, true);
             assertTrue(pairs.at("/roles/amount").isNull(), pairs.toString());
-            assertEquals(List.of("fan_in", "counterparts", "fan_out"), ids(pairs.get("presets")));
+            // no When either: Newcomers is not offered
+            assertEquals(List.of("fan_in", "fan_out", "two_way", "short_loops", "counterparts", "two_steps"), ids(pairs.get("presets")));
         }
     }
 
@@ -202,6 +216,35 @@ class ControlApiPresetQueriesTest {
     }
 
     @Test
+    void theGraphShapesFindPairsLoopsNewcomersAndANeighbourhoodAsAliases(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "masking_mode: all\n")) {
+            JsonNode twoWay = run(c, "two_way", "graph_ds", "{}", false);
+            assertEquals(1, twoWay.get("count").asInt(), twoWay.toString());              // A <-> B only
+            assertEquals(1, twoWay.get("rows").get(0).get("links_back").asInt());
+            assertTrue(twoWay.get("rows").get(0).get("counterpart").asText().startsWith("masked:"));
+
+            JsonNode loops = run(c, "short_loops", "graph_ds", "{}", false);
+            assertEquals(1, loops.get("count").asInt(), loops.toString());                // B -> C -> D -> B, once
+            JsonNode loop = loops.get("rows").get(0);
+            assertEquals(3, java.util.stream.Stream.of("entity", "second", "third").map(k -> loop.get(k).asText()).distinct().count());
+            // a cap below every entity's counterparts leaves nothing to join
+            assertEquals(0, run(c, "short_loops", "graph_ds", "{\"maxLinks\":1}", false).get("count").asInt());
+
+            JsonNode newcomers = run(c, "newcomers", "graph_ds", "{\"days\":7,\"min\":3}", false);
+            assertEquals(1, newcomers.get("count").asInt(), newcomers.toString());        // E: three links, all in the last days
+            assertEquals(3, newcomers.get("rows").get(0).get("links").asInt());
+
+            // two steps from A (by its alias): B and E directly, then C (through B and E) and D (through B)
+            String aliasOfA = twoWay.get("rows").get(0).get("entity").asText();
+            JsonNode around = run(c, "two_steps", "graph_ds", "{\"entity\":\"" + aliasOfA + "\"}", false);
+            assertEquals(4, around.get("count").asInt(), around.toString());
+            List<String> steps = new ArrayList<>();
+            for (JsonNode r : around.get("rows")) steps.add(r.get("steps").asInt() + ":" + r.get("via").asInt());
+            assertEquals(List.of("1:2", "1:1", "2:2", "2:1"), steps);
+        }
+    }
+
+    @Test
     void refusesInGateOrder(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
             assertEquals(422, send(c, "GET", "/inv/presets", null).statusCode());
@@ -222,6 +265,13 @@ class ControlApiPresetQueriesTest {
             HttpResponse<String> noKind = send(c, "POST", "/inv/presets/fan_in/run",
                     "{\"dataset\":\"pairs_ds\",\"params\":{\"kinds\":\"p2p\"}}");
             assertEquals(422, noKind.statusCode(), noKind.body());
+            assertEquals(422, send(c, "POST", "/inv/presets/two_steps/run", "{\"dataset\":\"graph_ds\"}").statusCode());
+            // pairs_ds maps no When: Newcomers is refused, not run over nothing
+            assertEquals(422, send(c, "POST", "/inv/presets/newcomers/run", "{\"dataset\":\"pairs_ds\"}").statusCode());
+            HttpResponse<String> manyDays = send(c, "POST", "/inv/presets/newcomers/run",
+                    "{\"dataset\":\"graph_ds\",\"params\":{\"days\":\"99999999999\"}}");
+            assertEquals(422, manyDays.statusCode(), manyDays.body());
+            assertTrue(manyDays.body().contains("whole number of days"), manyDays.body());
             assertEquals(422, send(c, "POST", "/inv/presets/counterparts/run",
                     "{\"dataset\":\"pays_ds\",\"params\":{\"entity\":\"masked:unknown\"}}").statusCode());
         }

@@ -6,9 +6,22 @@ import type { PresetParam, PresetRunResult } from '@inspecto/link-analysis/api/i
  * one rule a parameter's value must meet before it is sent. No Angular, no HTTP.
  */
 
-/** The result table's columns, in the server's order and words. */
+/** The result table's columns, in the server's order and words; a number reads at most two decimals. */
 export function presetColumns(r: PresetRunResult | null): ColDef[] {
-    return (r?.columns ?? []).map((c) => ({ field: c.id, headerName: c.label }));
+    return (r?.columns ?? []).map((c) =>
+        c.entity
+            ? { field: c.id, headerName: c.label }
+            : { field: c.id, headerName: c.label, valueFormatter: (p: { value: unknown }) => presetNumber(p.value) },
+    );
+}
+
+/** A measure as read: `119292.33999999998` → `119,292.34`; anything not a number unchanged. */
+export function presetNumber(v: unknown): string {
+    return typeof v === 'number' && Number.isFinite(v)
+        ? v.toLocaleString('en', { maximumFractionDigits: 2 })
+        : v === null || v === undefined
+          ? ''
+          : String(v);
 }
 
 /** What *Draw these* starts from: every entity column's values (aliases when the Space masks), once each. */

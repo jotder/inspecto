@@ -85,9 +85,17 @@ final class PresetQueries {
      */
     record Aggregate(String by, List<String> measures, String entityParam, String kindsParam, String minParam) {}
 
-    /** One preset: an {@code aggregate} or a Value Measure ({@code measure}); exactly one is set. */
+    /**
+     * One preset: an {@code aggregate}, a Value Measure ({@code measure}) or a {@code graph} shape (a fixed statement over
+     * the links joined to themselves - {@link #graphSql}); exactly one is set.
+     */
     record Preset(String id, String label, String description, List<String> needs, List<Param> params,
-                  Aggregate aggregate, String measure) {
+                  Aggregate aggregate, String measure, String graph) {
+        Preset(String id, String label, String description, List<String> needs, List<Param> params,
+               Aggregate aggregate, String measure) {
+            this(id, label, description, needs, params, aggregate, measure, null);
+        }
+
         boolean offeredFor(Roles r) {
             for (String n : needs) if (r.get(n) == null) return false;
             return true;
@@ -103,7 +111,7 @@ final class PresetQueries {
             m.put("id", id);
             m.put("label", label);
             m.put("description", description);
-            m.put("kind", measure == null ? "aggregate" : "measure");
+            m.put("kind", graph != null ? "graph" : measure != null ? "measure" : "aggregate");
             m.put("needs", needs);
             m.put("params", params.stream().map(Param::toMap).toList());
             return m;
@@ -157,11 +165,46 @@ final class PresetQueries {
                     new Param("kinds", "The kind of link that means sharing one item", "kinds", "shared_device"), TOP),
             new Aggregate("from", List.of("counterparts"), null, "kinds", "min"), null);
 
-    /** The presets a Space with Industry pack {@code packId} offers (null = none stated: the neutral set). */
+    /** Pairs that link both ways: A to B and B to A. */
+    private static final Preset TWO_WAY = new Preset("two_way", "Two-way pairs",
+            "Pairs of entities that link to each other in both directions - something going back and forth between them.",
+            List.of("from", "to"),
+            List.of(new Param("min", "At least this many links each way", "number", "1"), TOP),
+            null, null, "two_way");
+
+    /** Loops of three: A to B, B to C, C back to A. */
+    private static final Preset SHORT_LOOPS = new Preset("short_loops", "Short loops",
+            "Three entities linked in a circle (A to B to C and back to A) - round-tripping, layering. Very busy entities are left out so it stays quick.",
+            List.of("from", "to"),
+            List.of(new Param("maxLinks", "Leave out entities with more than this many counterparts", "number", "200"), TOP),
+            null, null, "short_loops");
+
+    /** Entities first seen lately that already have many links. */
+    private static final Preset NEWCOMERS = new Preset("newcomers", "Newcomers",
+            "Entities first seen in the last days of the data that already link to many others - fresh accounts ramping up.",
+            List.of("from", "to", "time"),
+            List.of(new Param("days", "First seen in the last this many days of the data", "number", "7"),
+                    new Param("min", "At least this many links", "number", "5"), TOP),
+            null, null, "newcomers");
+
+    /** Everyone within two steps of one entity, either direction. */
+    private static final Preset TWO_STEPS = new Preset("two_steps", "Two steps from one entity",
+            "Who is around one entity: its direct counterparts, then theirs - and through how many of them.",
+            List.of("from", "to"),
+            List.of(new Param("entity", "The entity", "entity", ""), TOP),
+            null, null, "two_steps");
+
+    /** Who to look at first: every Space offers these; a pack puts its own questions ahead of them. */
+    private static final List<Preset> CORE = List.of(FAN_IN, FAN_OUT, TWO_WAY, SHORT_LOOPS, NEWCOMERS, TOP_SENDERS, COUNTERPARTS,
+            TWO_STEPS);
+
+    /** The presets a Space with Industry pack {@code packId} offers (null = none stated: the core set alone). */
     static List<Preset> forPack(String packId) {
-        if ("mobile-money".equals(packId)) return List.of(QUICK_CASH_OUT, FAN_IN, COUNTERPARTS, TOP_SENDERS, FAN_OUT);
-        if ("telecom".equals(packId)) return List.of(SHARED_DEVICE, COUNTERPARTS, FAN_IN, FAN_OUT);
-        return List.of(FAN_IN, FAN_OUT, COUNTERPARTS, TOP_SENDERS);
+        List<Preset> out = new ArrayList<>();
+        if ("mobile-money".equals(packId)) out.add(QUICK_CASH_OUT);
+        if ("telecom".equals(packId)) out.add(SHARED_DEVICE);
+        out.addAll(CORE);
+        return out;
     }
 
     static Preset find(String packId, String id) {
@@ -200,6 +243,84 @@ final class PresetQueries {
     static int top(Preset p, Map<String, String> given) {
         if (p.param("top") == null) return MAX_ROWS;
         return (int) Math.max(1, Math.min(MAX_ROWS, number(p, given, "top")));
+    }
+
+    // ── the graph shapes ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    /** The result columns of a graph shape, in order; entity columns are masked like exploration. */
+    static List<Column> graphColumns(String shape) {
+        return switch (shape) {
+            case "two_way" -> List.of(new Column("entity", "Entity", true), new Column("counterpart", "Counterpart", true),
+                    new Column("links_out", "Links out", false), new Column("links_back", "Links back", false));
+            case "short_loops" -> List.of(new Column("entity", "Entity", true), new Column("second", "Then", true),
+                    new Column("third", "Then, back to the first", true));
+            case "newcomers" -> List.of(new Column("entity", "Entity", true), new Column("first_seen", "First seen", false),
+                    new Column("links", "Links", false), new Column("counterparts", "Distinct counterparts", false));
+            case "two_steps" -> List.of(new Column("entity", "Entity", true), new Column("steps", "Steps away", false),
+                    new Column("via", "Links (1 step) or ways in (2 steps)", false));
+            default -> throw new IllegalStateException(shape);
+        };
+    }
+
+    /**
+     * The statement for a graph shape over the links {@code __l(s, t[, ts])} - the From and To ends as text, self-links and
+     * empty ends left out. {@code n(name)} reads a number parameter; {@code entity} is the (unmasked) entity or null.
+     * Every value is a bound parameter, every identifier a quoted, real column.
+     */
+    static String graphSql(String datasetId, String shape, Roles r, java.util.function.ToDoubleFunction<String> n, String entity,
+                           List<String> binds) {
+        String s = q(r.from()), t = q(r.to());
+        String ts = "newcomers".equals(shape) ? ", TRY_CAST(" + q(r.time()) + " AS TIMESTAMP) AS ts" : "";
+        String links = "WITH __l AS (SELECT CAST(" + s + " AS VARCHAR) AS s, CAST(" + t + " AS VARCHAR) AS t" + ts + " FROM "
+                + q(datasetId) + " WHERE " + s + " IS NOT NULL AND " + t + " IS NOT NULL AND CAST(" + s + " AS VARCHAR) <> CAST("
+                + t + " AS VARCHAR))";
+        return switch (shape) {
+            case "two_way" -> {
+                binds.add(String.valueOf(n.applyAsDouble("min")));
+                yield links + ", __e AS (SELECT s, t, count(*) AS n FROM __l GROUP BY s, t)"
+                        + " SELECT a.s AS entity, a.t AS counterpart, a.n AS links_out, b.n AS links_back"
+                        + " FROM __e a JOIN __e b ON a.s = b.t AND a.t = b.s"
+                        + " WHERE a.s < a.t AND least(a.n, b.n) >= CAST(? AS DOUBLE)"
+                        + " ORDER BY a.n + b.n DESC, entity, counterpart";
+            }
+            case "short_loops" -> {
+                binds.add(String.valueOf(n.applyAsDouble("maxLinks")));
+                // each loop once: its smallest id first; busy entities (many counterparts) left out before the joins
+                yield links + ", __e AS (SELECT DISTINCT s, t FROM __l),"
+                        + " __d AS (SELECT v FROM (SELECT s AS v, t AS o FROM __e UNION SELECT t, s FROM __e) GROUP BY v"
+                        + " HAVING count(DISTINCT o) > CAST(? AS DOUBLE)),"
+                        + " __k AS (SELECT * FROM __e WHERE s NOT IN (SELECT v FROM __d) AND t NOT IN (SELECT v FROM __d))"
+                        + " SELECT a.s AS entity, a.t AS second, b.t AS third FROM __k a JOIN __k b ON b.s = a.t"
+                        + " JOIN __k c ON c.s = b.t AND c.t = a.s"
+                        + " WHERE b.t <> a.s AND a.s < a.t AND a.s < b.t ORDER BY entity, second, third";
+            }
+            case "newcomers" -> {
+                double days = n.applyAsDouble("days");
+                if (days < 1 || days > 3660 || days != Math.floor(days))
+                    throw new IllegalArgumentException("'days' must be a whole number of days, 1 to 3660");
+                binds.add(String.valueOf((long) days));
+                binds.add(String.valueOf(n.applyAsDouble("min")));
+                // "lately" is the last days of the DATA (its newest link), not of the calendar: an old extract still answers
+                yield links + ", __b AS (SELECT s AS e, t AS o, ts FROM __l UNION ALL SELECT t, s, ts FROM __l)"
+                        + " SELECT e AS entity, min(ts) AS first_seen, count(*) AS links, count(DISTINCT o) AS counterparts"
+                        + " FROM __b GROUP BY e"
+                        + " HAVING min(ts) > (SELECT max(ts) FROM __l) - to_days(CAST(? AS INTEGER))"
+                        + " AND count(*) >= CAST(? AS DOUBLE) ORDER BY links DESC, entity";
+            }
+            case "two_steps" -> {
+                if (entity == null) throw new IllegalArgumentException("'entity' is required");
+                binds.add(entity);
+                binds.add(entity);
+                // self-links are already out of __l, so the entity never appears at step 1; the second bind keeps it out of step 2
+                yield links + ", __u AS (SELECT s AS a, t AS b FROM __l UNION ALL SELECT t, s FROM __l),"
+                        + " __1 AS (SELECT b AS v, count(*) AS n FROM __u WHERE a = ? GROUP BY b)"
+                        + " SELECT v AS entity, 1 AS steps, n AS via FROM __1"
+                        + " UNION ALL SELECT u.b, 2, count(DISTINCT u.a) FROM __u u JOIN __1 ON u.a = __1.v"
+                        + " WHERE u.b <> ? AND u.b NOT IN (SELECT v FROM __1) GROUP BY u.b"
+                        + " ORDER BY steps, via DESC, entity";
+            }
+            default -> throw new IllegalStateException(shape);
+        };
     }
 
     // ── the aggregate render ─────────────────────────────────────────────────────────────────────────────────────────

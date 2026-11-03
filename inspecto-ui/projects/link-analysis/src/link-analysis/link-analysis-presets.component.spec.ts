@@ -9,7 +9,7 @@ import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/gri
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvService, PresetList, PresetRunResult } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisPresetsComponent, PresetDraw } from './link-analysis-presets.component';
-import { presetEntityValues, presetParamValues } from './presets';
+import { presetColumns, presetEntityValues, presetNumber, presetParamValues } from './presets';
 
 const LIST: PresetList = {
     dataset: 'pays',
@@ -72,7 +72,7 @@ class HostComponent {
     readonly drawn: PresetDraw[] = [];
 }
 
-function setup(opts: { list?: () => unknown; run?: () => unknown } = {}) {
+function setup(opts: { list?: () => unknown; run?: () => unknown; initial?: string | null } = {}) {
     const inv = {
         presets: vi.fn((_d: string) => (opts.list ? opts.list() : of(LIST))),
         runPreset: vi.fn((_id: string, _d: string, _p: Record<string, string>) => (opts.run ? opts.run() : of(ANSWER))),
@@ -86,6 +86,7 @@ function setup(opts: { list?: () => unknown; run?: () => unknown } = {}) {
         ],
     });
     const fixture = TestBed.createComponent(HostComponent);
+    if (opts.initial !== undefined) fixture.componentInstance.initial.set(opts.initial);
     fixture.detectChanges();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -101,6 +102,15 @@ describe('preset helpers', () => {
         ]);
         expect(presetEntityValues(null)).toEqual([]);
         expect(presetParamValues({ min: ' 3 ', top: '', entity: null })).toEqual({ min: '3' });
+    });
+
+    it('reads a measure with at most two decimals and leaves entity columns as they are', () => {
+        expect(presetNumber(119292.33999999998)).toBe('119,292.34');
+        expect(presetNumber(25)).toBe('25');
+        expect(presetNumber(null)).toBe('');
+        const cols = presetColumns(ANSWER);
+        expect(cols[0].valueFormatter).toBeUndefined();
+        expect(typeof cols[1].valueFormatter).toBe('function');
     });
 });
 
@@ -123,6 +133,12 @@ describe('LinkAnalysisPresetsComponent', () => {
             { datasetId: 'pays', values: ['masked:aaaa', 'masked:bbbb'], what: 'the answer to "Reached by many"' },
         ]);
         await expectNoA11yViolations(el);
+    });
+
+    it("asks of the first Dataset when the page names none, as the Start box does", () => {
+        const { inv, c } = setup({ initial: null });
+        expect(inv.presets).toHaveBeenCalledWith('pays');
+        expect(c.dataset.value).toBe('pays');
     });
 
     it('refuses a bad number and a missing entity inline, without asking the server', () => {

@@ -173,6 +173,14 @@ function create(
                               masking: signal(null),
                               reads: new ConditionalReadCache(() => ''),
                               listEntityLists: () => of({ lists: [], headSeq: 0, headHash: null }),
+                              // the Preset queries panel under the Start box reads its Dataset's presets at once
+                              presets: (dataset: string) =>
+                                  of({
+                                      dataset,
+                                      pack: null,
+                                      roles: { from: null, to: null, kind: null, time: null, amount: null },
+                                      presets: [],
+                                  }),
                               ...opts.inv,
                           },
                       },

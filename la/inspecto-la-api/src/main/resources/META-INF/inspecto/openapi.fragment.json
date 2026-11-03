@@ -1259,7 +1259,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the preset queries a Dataset can answer",
         "operationId" : "getInvPresets",
-        "description" : "LA-PRESET-QUERIES-1. The presets the Space's Industry pack (domain_profile) offers - the neutral set when none - whose roles the Dataset maps. {dataset, pack, roles {from, to, kind, time, amount} (a column name or null), presets [{id, label, description, kind (aggregate|measure), needs [role], params [{name, label, type (entity|number|kinds|window), default}]}]}. Roles come from the Dataset's defaultLinkMapping, else its first two columns classified as an Entity Type; kind, time and amount are found by name, type and the pack's measure_hints. A preset whose roles are not all mapped is not listed.",
+        "description" : "LA-PRESET-QUERIES-1. The presets the Space's Industry pack (domain_profile) offers - always the core set, the pack's own first - whose roles the Dataset maps. {dataset, pack, roles {from, to, kind, time, amount} (a column name or null), presets [{id, label, description, kind (aggregate|measure|graph), needs [role], params [{name, label, type (entity|number|kinds|window), default}]}]}. Roles come from the Dataset's defaultLinkMapping, else its first two columns classified as an Entity Type; kind, time and amount are found by name, type and the pack's measure_hints. A preset whose roles are not all mapped is not listed.",
         "parameters" : [ {
           "name" : "dataset",
           "in" : "query",
@@ -1291,7 +1291,7 @@
         "tags" : [ "inv" ],
         "summary" : "Run one preset query over a Dataset",
         "operationId" : "postInvPresetRun",
-        "description" : "LA-PRESET-QUERIES-1. Body {dataset, params {name: value}}. Declarative, never free SQL: an aggregate preset groups the links by one end over the mapped roles (quoted columns, bound values); a measure preset runs a Value Measure (quick_cash_out = timeToCashOut). Answer {preset, dataset, columns [{id, label, entity}], rows, count, truncated, masking}. Entity columns are exploration aliases when the Space masks; an entity parameter may be such an alias. At most 500 rows (the top parameter, and the Space's entity fence), under the Space's statement timeout. Read-shaped: persists nothing. Audited as LINK_PRESET_RUN.",
+        "description" : "LA-PRESET-QUERIES-1. Body {dataset, params {name: value}}. Declarative, never free SQL: an aggregate preset groups the links by one end over the mapped roles (quoted columns, bound values); a graph preset joins the links to themselves (two_way, short_loops, newcomers, two_steps); a measure preset runs a Value Measure (quick_cash_out = timeToCashOut). Answer {preset, dataset, columns [{id, label, entity}], rows, count, truncated, masking}. Entity columns are exploration aliases when the Space masks; an entity parameter may be such an alias. At most 500 rows (the top parameter, and the Space's entity fence), under the Space's statement timeout. Read-shaped: persists nothing. Audited as LINK_PRESET_RUN.",
         "parameters" : [ {
           "name" : "presetId",
           "in" : "path",
