@@ -1,6 +1,6 @@
 # One form idiom: property rows (`UI-FORM-ROWS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 BUILT 2026-11-03 (§7).** Operator ask: *"we need uniform look and feel
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8).** Operator ask: *"we need uniform look and feel
 > for the form items"* - single-line field / value rows with a pencil to edit (as elsewhere), a short description in
 > tiny type under a field whose name does not explain itself, the whole form at one glance without scrolling (fold
 > groups or a wizard for long ones), and every dropdown a popup dialog that can carry hints, search, groups and nested
@@ -105,3 +105,47 @@ boxes; colours and typography beyond the row (the design tokens stay as they are
   eslint, `lint:tokens` and `lint:forms` are clean, and both apps build. Seen on Basic: the Data page Mapping form's
   value and choice rows now line up. A long one-word label now breaks inside its 45% (`overflow-wrap`) instead of
   running under the value (seen in `explore-controls`, which also overlapped before).
+
+## 8. As built: P1 (2026-11-03)
+
+- **`schema-form` draws only property rows.** The tiered (default) mode now renders through the same row template the
+  `[flat]` mode used since 2026-09-04, so its 34 hosts get rows without a change of their own. The old boxed template
+  (256 lines) is gone.
+  - Required rows are shown. *Optional settings (n)* and *Advanced settings (n)* are named folds; the advanced gear
+    is gone. A fold says how many of its shown fields need fixing (touched and invalid), and `validate()` still opens
+    a fold that holds an error.
+  - Rows go two per line once the host is at least 560 px wide, in both modes (the `ResizeObserver` was flat-only).
+  - Focus lands on the first row's control (`cdkFocusInitial`).
+- **Features the boxed template had, moved into the row** so no host loses one: suggestions on a list's draft (an
+  `optionLoader`), the *Explicitly none* switch for an optional empty list, and a text input plus the token picker for
+  a number the host offers tokens for.
+- **Help is the tiny line under a row** in both modes, replacing the info-icon tooltip. An error line replaces it.
+- **A required choice row shows its error after `validate()`.** The picker's own required line appears only once its
+  dialog was opened, so the row draws it and the picker no longer gets `[required]`.
+- **Spec support**: `inspecto/testing/schema-form.ts` (`sfOpen`, `sfRow`, `sfHelp`). Five host specs now open a row
+  before reading its control and read errors from the row's alert line: schema-form, alert-rule-form, job-form,
+  pipeline-collection-definition and risk-score-form. Three new schema-form tests cover the folds, the fold's "to
+  fix" count and the choice-row error.
+- **Not converted**: the inline editor that opens in a row is still a dense outlined Material field (`.sf-dense`), so
+  `schema-form.component.ts` stays on the `lint:forms` allow-list (124). Moving that editor onto pen-field needs
+  suggestions and a suffix slot on pen-field; it is left for when a screen needs it.
+- Checks (before the verification fixes): full UI suite 7159 passed; the 5 failures are the known, older `add-data.page.spec.ts` ones. Typecheck,
+  eslint, `lint:tokens` and `lint:forms` are clean, and both apps build. **Not seen on screen**: the Basic install
+  reaches no schema-form screen (Value Measures, templates and index builds are Standard), and the console app was not
+  served from this lane.
+- **Verification round 1 found five regressions; four are fixed:**
+  1. A token picked from the picker's menu never landed: the menu took focus, the row closed itself 200 ms later
+     and took the menu with it. Focus inside a CDK overlay pane that does not hold the form (the token menu, an
+     autocomplete panel) now counts as still in the row. A dialog is an overlay pane too, so it is excluded by that
+     rule: in a dialog, focus leaving the row still closes it (round 2 caught the first cut keeping every dialog row open).
+  2. In two columns, help and error lines were their own grid cells and scrambled the layout. A row and its lines now
+     share one cell (`data-cell-for`), and the lines are indented under the value only in one column.
+  3. A host-disabled field (an immutable id on edit) looked editable. Its row now has no pencil and a disabled value.
+  4. Help and error lines were not tied to the control. The value button, the inputs, the list draft and the toggle
+     now carry `aria-describedby` pointing to the line shown. `aria-invalid` stays with MatInput, whose own binding wins;
+     the choice picker exposes no describedby input, so a choice row is described only by its error once it shows one.
+  5. Partly fixed: Enter, Escape or a picked suggestion closes the row and hands focus back to the row's value, not
+     the page. The refocus is deferred, because the browser's Enter-to-submit needs the input still in the form, and it
+     is skipped when another row was opened meanwhile.
+     Still open and lower: a closed list row shows "—" for both "unset" and "explicitly none"; a placeholder shows
+     only in an open row; a multiline or list editor is narrow in two columns.

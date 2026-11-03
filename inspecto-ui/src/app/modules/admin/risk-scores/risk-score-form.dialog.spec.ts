@@ -112,7 +112,7 @@ describe('RiskScoreFormDialog', () => {
         cmp.save();
         fixture.detectChanges();
         expect(create).not.toHaveBeenCalled();
-        expect(fixture.nativeElement.querySelector('mat-error')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('mat-error, [role="alert"]')).not.toBeNull(); // a row alert line since UI-FORM-ROWS-1
     });
 
     it('lands a 422 on the factor row it names, message verbatim', async () => {

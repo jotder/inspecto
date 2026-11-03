@@ -131,7 +131,10 @@ describe('PipelineCollectionDefinitionComponent', () => {
         const row = (fixture.nativeElement as HTMLElement).querySelector('.sf-row[data-key="duplicate_check"]')!;
         expect(row).not.toBeNull();
         expect(row.textContent).toContain('Marker dedup (file)');
-        const help = row.querySelector('mat-icon[aria-label]')!.getAttribute('aria-label')!;
+        // UI-FORM-ROWS-1: the help is the tiny line under the row, no longer an info-icon tooltip
+        const help = (fixture.nativeElement as HTMLElement).querySelector(
+            '[data-help-for="duplicate_check"]',
+        )!.textContent!;
         expect(help).toContain('File-grain');
         expect(help).toContain('Duplicate records still pass');
         expect(help).toContain('Dedup (record) Step (transform.dedup)');

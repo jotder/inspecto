@@ -1,4 +1,5 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
+import { sfOpen } from 'app/inspecto/testing/schema-form';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -552,6 +553,7 @@ describe('JobFormDialog', () => {
             );
             await Promise.resolve();
             fixture.detectChanges();
+            sfOpen(fixture, 'day'); // UI-FORM-ROWS-1: the picker sits on the row's control, shown while it is open
 
             const picker = (fixture.nativeElement as HTMLElement).querySelector(
                 'button[aria-label="Insert a runtime token into Day"]',
@@ -773,10 +775,9 @@ describe('JobFormDialog — risk.score', () => {
         return { ...r, list };
     };
     /** The param form's `Model` field — `[formControlName]` is a binding there, so there is no attribute to select. */
+    /** The parameter form's `model` property row (UI-FORM-ROWS-1), or undefined. */
     const modelField = (el: HTMLElement): HTMLElement | undefined =>
-        Array.from(el.querySelectorAll<HTMLElement>('inspecto-schema-form mat-form-field')).find(
-            (f) => f.querySelector('mat-label')?.textContent?.trim() === 'Model',
-        );
+        el.querySelector<HTMLElement>('inspecto-schema-form .sf-row[data-key="model"]') ?? undefined;
 
     it('is in the declared type palette, so it is pickable when the catalog is unavailable', () => {
         const { c } = create({});
@@ -788,6 +789,7 @@ describe('JobFormDialog — risk.score', () => {
         const { c, fixture, list } = await setup();
         const model = c.paramSpecs().find((s) => s.key === 'model');
         expect(model).toMatchObject({ type: 'autocomplete', required: true, tier: 'required' });
+        sfOpen(fixture, 'model');
         expect(modelField(fixture.nativeElement)?.querySelector('input[aria-autocomplete]')).toBeTruthy();
 
         const options = await c.paramOptionLoaders()['model']({});
@@ -800,10 +802,10 @@ describe('JobFormDialog — risk.score', () => {
         c.save();
         fixture.detectChanges();
         expect(save).not.toHaveBeenCalled();
-        expect(
-            modelField(fixture.nativeElement)?.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')
-                ?.textContent,
-        ).toContain('is required');
+        // the row's own alert line, under it
+        const alert = modelField(fixture.nativeElement)?.nextElementSibling;
+        expect(alert?.getAttribute('role')).toBe('alert');
+        expect(alert?.textContent).toContain('is required');
 
         c.paramForm!.form.patchValue({ model: 'subs' });
         c.save(); // → save step

@@ -1,5 +1,5 @@
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
@@ -58,13 +58,19 @@ function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
     return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
 }
 
-/** The schema-form `<mat-form-field>` labelled `label` (its controls bind `formControlName` as a property, so no attribute). */
+/** The schema-form property row labelled `label` (UI-FORM-ROWS-1: every field is a row), or null. */
 function fieldByLabel(el: HTMLElement, label: string): HTMLElement | null {
     return (
-        (Array.from(el.querySelectorAll('inspecto-schema-form mat-form-field')).find(
-            (f) => f.querySelector('mat-label')?.textContent?.trim() === label,
+        (Array.from(el.querySelectorAll('inspecto-schema-form .sf-row')).find(
+            (r) => (r.querySelector('[id]')?.textContent ?? '').replace('*', '').trim() === label,
         ) as HTMLElement | undefined) ?? null
     );
+}
+
+/** The error line under the row labelled `label` (the row's own role="alert" line), or ''. */
+function rowAlert(el: HTMLElement, label: string): string {
+    const next = fieldByLabel(el, label)?.nextElementSibling;
+    return next?.getAttribute('role') === 'alert' ? (next.textContent ?? '').trim() : '';
 }
 
 describe('AlertRuleFormDialog', () => {
@@ -338,9 +344,7 @@ describe('AlertRuleFormDialog', () => {
         fixture.detectChanges();
         expect(c.step()).toBe('config');
         expect(save).not.toHaveBeenCalled();
-        const err = fieldByLabel(fixture.nativeElement, 'Measure')!.querySelector('mat-error');
-        expect(err?.textContent).toContain('"mode" is not an aggregate');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        expect(rowAlert(fixture.nativeElement, 'Measure')).toContain('"mode" is not an aggregate');
     });
 
     it('an invalid by column blocks save and shows its error line (a list error is never a mat-error)', () => {
@@ -412,8 +416,11 @@ describe('AlertRuleFormDialog', () => {
         expect(err?.textContent).toContain('A rule id is required.');
         expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
-    /** The "Incident per" draft input (the schema-form list field labelled so). */
-    function byInput(el: HTMLElement): HTMLInputElement {
+    /** The "Incident per" draft input (the schema-form list row labelled so), opened the way a person does. */
+    function byInput(fixture: ComponentFixture<unknown>): HTMLInputElement {
+        const el = fixture.nativeElement as HTMLElement;
+        fieldByLabel(el, 'Incident per')!.querySelector<HTMLButtonElement>('button.sf-value')!.click();
+        fixture.detectChanges();
         return fieldByLabel(el, 'Incident per')!.querySelector('input') as HTMLInputElement;
     }
 
@@ -425,7 +432,7 @@ describe('AlertRuleFormDialog', () => {
         };
         c.schemaForm.showOptional.set(true);
         fixture.detectChanges();
-        const input = byInput(fixture.nativeElement);
+        const input = byInput(fixture);
         input.focus(); // loads the suggestions
         await fixture.whenStable();
         fixture.detectChanges();
@@ -464,7 +471,7 @@ describe('AlertRuleFormDialog', () => {
         const { c, save, fixture } = create({ rule: { ...MEASURE_RULE, by: ['region'], stormCap: 50 } as AlertRule });
         c.schemaForm.showOptional.set(true);
         fixture.detectChanges();
-        const input = byInput(fixture.nativeElement);
+        const input = byInput(fixture);
         input.focus();
         await fixture.whenStable();
         fixture.detectChanges();
@@ -497,7 +504,7 @@ describe('AlertRuleFormDialog', () => {
         const { c, save, fixture } = create({ rule: MEASURE_RULE });
         c.schemaForm.showOptional.set(true);
         fixture.detectChanges();
-        const input = byInput(fixture.nativeElement);
+        const input = byInput(fixture);
         const spec = c.attributes.find((s) => s.key === 'by')!;
         c.schemaForm.setListDraft('by', 'ms');
         c.schemaForm.addListOption(spec, 'msisdn', input);
@@ -515,9 +522,7 @@ describe('AlertRuleFormDialog', () => {
         fixture.detectChanges();
         expect(c.step()).toBe('config');
         expect(save).not.toHaveBeenCalled();
-        expect(fieldByLabel(fixture.nativeElement, 'Threshold')!.querySelector('mat-error')?.textContent).toContain(
-            'Threshold must be greater than 0',
-        );
+        expect(rowAlert(fixture.nativeElement, 'Threshold')).toContain('Threshold must be greater than 0');
     });
 
     it('offers only the comparators the engine accepts (no eq)', () => {

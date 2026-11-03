@@ -21,7 +21,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import {
     AttributeOption,
     AttributeSpec,
@@ -69,7 +68,6 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
         MatIconModule,
         MatInputModule,
         MatSlideToggleModule,
-        MatTooltipModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -105,567 +103,383 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                     }
                 </div>
             } @else {
-                @if (tiers().advanced.length) {
-                    <div class="flex justify-end">
-                        <button
-                            mat-icon-button
-                            type="button"
-                            matTooltip="Advanced settings"
-                            [attr.aria-label]="showAdvanced() ? 'Hide advanced settings' : 'Show advanced settings'"
-                            [attr.aria-expanded]="showAdvanced()"
-                            (click)="showAdvanced.set(!showAdvanced())"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
-                        </button>
-                    </div>
-                }
-
-                @for (g of groupsOf(tiers().required); track g.name; let gi = $index) {
-                    @if (g.name) {
-                        <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
-                            {{ g.name }}
-                        </div>
+                <!-- UI-FORM-ROWS-1 P1 (operator 2026-11-03): the three tiers as PROPERTY ROWS too - required
+                     always shown, optional and advanced as named folds that say how many fields they hold and
+                     how many need fixing. validate() opens a fold that holds an error. -->
+                <div [class]="gridClass()">
+                    @for (g of groupsOf(tiers().required); track g.name; let gi = $index) {
+                        <ng-container *ngTemplateOutlet="heading; context: { name: g.name, level: 3 }"></ng-container>
+                        @for (spec of g.specs; track spec.key; let i = $index) {
+                            <ng-container
+                                *ngTemplateOutlet="row; context: { spec, first: gi === 0 && i === 0 }"
+                            ></ng-container>
+                        }
                     }
-                    @for (spec of g.specs; track spec.key; let i = $index) {
-                        <ng-container
-                            *ngTemplateOutlet="field; context: { spec, first: gi === 0 && i === 0 }"
-                        ></ng-container>
-                    }
-                }
-
-                @if (tiers().optional.length) {
+                </div>
+                @for (fold of folds(); track fold.tier) {
                     <button
                         type="button"
                         class="text-secondary flex items-center gap-1 self-start py-1 text-sm font-medium"
-                        [attr.aria-expanded]="showOptional()"
-                        (click)="showOptional.set(!showOptional())"
+                        [attr.aria-expanded]="fold.open"
+                        [attr.data-fold]="fold.tier"
+                        (click)="toggleFold(fold.tier)"
                     >
                         <mat-icon
                             class="icon-size-4"
-                            [svgIcon]="
-                                showOptional() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
-                            "
+                            [svgIcon]="fold.open ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
                         ></mat-icon>
-                        Optional settings ({{ tiers().optional.length }})
+                        {{ fold.title }} ({{ fold.count }})
+                        @if (fold.problems) {
+                            <span class="text-warn">· {{ fold.problems }} to fix</span>
+                        }
                     </button>
-                    @if (showOptional()) {
-                        @for (g of groupsOf(tiers().optional); track g.name) {
-                            @if (g.name) {
-                                <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
-                                    {{ g.name }}
-                                </div>
+                    @if (fold.open) {
+                        <div [class]="gridClass()">
+                            @for (g of groupsOf(tiers()[fold.tier]); track g.name) {
+                                <ng-container
+                                    *ngTemplateOutlet="heading; context: { name: g.name, level: 4 }"
+                                ></ng-container>
+                                @for (spec of g.specs; track spec.key) {
+                                    <ng-container *ngTemplateOutlet="row; context: { spec }"></ng-container>
+                                }
                             }
-                            @for (spec of g.specs; track spec.key) {
-                                <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
-                            }
-                        }
-                    }
-                }
-
-                @if (showAdvanced()) {
-                    <div class="text-secondary py-1 text-sm font-medium" role="heading" aria-level="3">Advanced</div>
-                    @for (g of groupsOf(tiers().advanced); track g.name) {
-                        @if (g.name) {
-                            <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="4">
-                                {{ g.name }}
-                            </div>
-                        }
-                        @for (spec of g.specs; track spec.key) {
-                            <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
-                        }
+                        </div>
                     }
                 }
             }
 
-            <ng-template #field let-spec="spec" let-first="first">
-                @if (isVisible(spec)) {
-                    @switch (spec.type) {
-                        @case ('boolean') {
-                            <mat-slide-toggle
-                                class="py-2"
-                                [formControlName]="spec.key"
-                                [attr.cdkFocusInitial]="first ? '' : null"
-                                >{{ spec.label }}</mat-slide-toggle
-                            >
-                        }
-                        <!--
-                            A single choice is asked in a POPUP, not a dropdown (operator ask
-                            2026-08-22): the shared picker gives every option a full-length label and
-                            a filter box once the list is long, which a dropdown overlay cannot. It is
-                            a ControlValueAccessor, so formControlName binds exactly as mat-select
-                            did — and it renders its own label and error, which is why there is no
-                            mat-form-field around it (see the component's own note).
-                            (no backticks in this comment: it lives inside a template literal)
-                        -->
-                        @case ('select') {
-                            <inspecto-option-picker
-                                class="block w-full py-1"
-                                [formControlName]="spec.key"
-                                [label]="spec.label"
-                                [options]="spec.options ?? []"
-                                [help]="spec.help ?? ''"
-                                [required]="!!spec.required"
-                                [attr.cdkFocusInitial]="first ? '' : null"
-                            />
-                        }
-                        @case ('autocomplete') {
-                            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                <mat-label>{{ spec.label }}</mat-label>
-                                <input
-                                    matInput
-                                    [formControlName]="spec.key"
-                                    [placeholder]="spec.placeholder ?? ''"
-                                    [matAutocomplete]="ac"
-                                    [attr.cdkFocusInitial]="first ? '' : null"
-                                    (focus)="loadOptionsFor(spec)"
-                                />
-                                <mat-autocomplete #ac="matAutocomplete">
-                                    @for (opt of filteredOptions(spec); track opt.value) {
-                                        <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
-                                    }
-                                </mat-autocomplete>
-                                <inspecto-token-picker
-                                    matSuffix
-                                    [fieldLabel]="spec.label"
-                                    [tokens]="tokensFor(spec)"
-                                    (picked)="applyToken(spec, $event)"
-                                />
-                                @if (spec.help) {
-                                    <mat-hint>{{ spec.help }}</mat-hint>
-                                }
-                                <mat-error>{{ errorFor(spec) }}</mat-error>
-                            </mat-form-field>
-                        }
-                        @case ('multiline') {
-                            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                <mat-label>{{ spec.label }}</mat-label>
-                                <textarea
-                                    matInput
-                                    rows="4"
-                                    [formControlName]="spec.key"
-                                    [placeholder]="spec.placeholder ?? ''"
-                                    [attr.cdkFocusInitial]="first ? '' : null"
-                                ></textarea>
-                                <inspecto-token-picker
-                                    matSuffix
-                                    [fieldLabel]="spec.label"
-                                    [tokens]="tokensFor(spec)"
-                                    (picked)="applyToken(spec, $event)"
-                                />
-                                @if (spec.help) {
-                                    <mat-hint>{{ spec.help }}</mat-hint>
-                                }
-                                <mat-error>{{ errorFor(spec) }}</mat-error>
-                            </mat-form-field>
-                        }
-                        @case ('list') {
-                            <!-- string[] as removable chips. The text box is a DRAFT, not the control:
-                                 the control's value is the array, committed on Enter / + / blur. -->
-                            <div class="flex flex-col gap-1">
-                                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                    <mat-label>{{ spec.label }}</mat-label>
-                                    <!-- Suggestions only when the host passes an optionLoader for this key
-                                         (e.g. columnOptionLoader). An open panel defers the blur-commit to
-                                         (closed): clicking an option blurs the draft first, and committing
-                                         there would add the half-typed text beside the picked option. -->
-                                    <input
-                                        #listInput
-                                        matInput
-                                        type="text"
-                                        [value]="listDraft(spec.key)"
-                                        [placeholder]="spec.placeholder ?? ''"
-                                        [attr.cdkFocusInitial]="first ? '' : null"
-                                        [matAutocomplete]="listAc"
-                                        [matAutocompleteDisabled]="!optionLoaders?.[spec.key]"
-                                        #listTrigger="matAutocompleteTrigger"
-                                        (focus)="loadOptionsFor(spec)"
-                                        (input)="setListDraft(spec.key, $any($event.target).value)"
-                                        (keydown.enter)="
-                                            listTrigger.activeOption
-                                                ? $event.preventDefault()
-                                                : addListItem(spec, $event)
-                                        "
-                                        (blur)="listTrigger.panelOpen || addListItem(spec)"
-                                    />
-                                    <mat-autocomplete
-                                        #listAc="matAutocomplete"
-                                        (optionSelected)="addListOption(spec, $event.option.value, listInput)"
-                                        (closed)="commitListDraftIfLeft(spec, listInput)"
-                                    >
-                                        @for (opt of listOptions(spec); track opt.value) {
-                                            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
-                                        }
-                                    </mat-autocomplete>
-                                    <button
-                                        mat-icon-button
-                                        matSuffix
-                                        type="button"
-                                        [attr.aria-label]="'Add entry to ' + spec.label"
-                                        [disabled]="!listDraft(spec.key).trim()"
-                                        (click)="addListItem(spec)"
-                                    >
-                                        <mat-icon svgIcon="heroicons_outline:plus" />
-                                    </button>
-                                    <inspecto-token-picker
-                                        matSuffix
-                                        [fieldLabel]="spec.label"
-                                        [tokens]="tokensFor(spec)"
-                                        (picked)="applyToken(spec, $event)"
-                                    />
-                                    @if (spec.help) {
-                                        <mat-hint>{{ spec.help }}</mat-hint>
-                                    }
-                                    <!-- No <mat-error> here: this field's <input> is a DRAFT, never bound
-                                         to the control, so the form-field has no NgControl and could
-                                         never enter an error state. See listError(). -->
-                                </mat-form-field>
-                                @if (listError(spec)) {
-                                    <p class="text-warn text-xs" role="alert">{{ listError(spec) }}</p>
-                                }
-                                @if (listValue(spec.key).length) {
-                                    <div class="flex flex-wrap gap-1 pb-1">
-                                        @for (item of listValue(spec.key); track $index) {
-                                            <inspecto-chip
-                                                variant="soft"
-                                                [removable]="true"
-                                                [removeLabel]="'Remove ' + item + ' from ' + spec.label"
-                                                (removed)="removeListItem(spec, $index)"
-                                            >
-                                                <span class="font-mono">{{ item }}</span>
-                                            </inspecto-chip>
-                                        }
-                                    </div>
-                                } @else if (!spec.required) {
-                                    <!-- SCHEMA-FORM-EMPTY-LIST-1: an empty list has TWO meanings and the control
-                                         must keep them apart. Cleared (null) = "unset, the default applies";
-                                         explicitly none ([]) = "deliberately no entries" — the key[0]:
-                                         opt-out a hand-authored TOON can already express. -->
-                                    <mat-slide-toggle
-                                        class="pb-1 text-xs"
-                                        [checked]="isExplicitlyNone(spec.key)"
-                                        [attr.aria-label]="'Explicitly none for ' + spec.label"
-                                        (change)="setExplicitlyNone(spec, $event.checked)"
-                                    >
-                                        Explicitly none (the default does not apply)
-                                    </mat-slide-toggle>
-                                }
-                            </div>
-                        }
-                        @case ('number') {
-                            @if (tokensFor(spec).length > 0) {
-                                <!-- A numeric field the host offers tokens for (a job's INTEGER/DECIMAL
-                                     parameter and the epoch-seconds token): a TEXT input, because a native
-                                     type="number" cannot display a dollar-token at all — it reads back blank.
-                                     The numeric contract moves into a validator that exempts a whole-value
-                                     token (see tokenSyntax); value() turns a numeric literal back into a
-                                     number so hosts see the same shape the type="number" widget emits.
-                                     Deliberately no spinner: the affordance a token-capable field trades
-                                     away is stepping, which never made sense for an epoch anyway.
-                                     ⛔ Not folded into the branch below — its static type="number" is
-                                     load-bearing for NumberValueAccessor. -->
-                                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                    <mat-label>{{ spec.label }}</mat-label>
-                                    <input
-                                        matInput
-                                        type="text"
-                                        inputmode="decimal"
-                                        [formControlName]="spec.key"
-                                        [placeholder]="spec.placeholder ?? ''"
-                                        [attr.cdkFocusInitial]="first ? '' : null"
-                                    />
-                                    <inspecto-token-picker
-                                        matSuffix
-                                        [fieldLabel]="spec.label"
-                                        [tokens]="tokensFor(spec)"
-                                        (picked)="applyToken(spec, $event)"
-                                    />
-                                    @if (spec.help) {
-                                        <mat-hint>{{ spec.help }}</mat-hint>
-                                    }
-                                    <mat-error>{{ errorFor(spec) }}</mat-error>
-                                </mat-form-field>
-                            } @else {
-                                <!-- Static type="number" so Angular's NumberValueAccessor attaches (a [type]
-                                     binding would leave the default accessor → string values). -->
-                                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                    <mat-label>{{ spec.label }}</mat-label>
-                                    <input
-                                        matInput
-                                        type="number"
-                                        [formControlName]="spec.key"
-                                        [placeholder]="spec.placeholder ?? ''"
-                                        [attr.cdkFocusInitial]="first ? '' : null"
-                                    />
-                                    @if (spec.help) {
-                                        <mat-hint>{{ spec.help }}</mat-hint>
-                                    }
-                                    <mat-error>{{ errorFor(spec) }}</mat-error>
-                                </mat-form-field>
-                            }
-                        }
-                        @default {
-                            <!-- string / identifier. A secret spec masks the input; unlike the number
-                                 case above, a bound [type] is safe here because text and password
-                                 share Angular's DefaultValueAccessor, so no accessor is lost. -->
-                            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                <mat-label>{{ spec.label }}</mat-label>
-                                <input
-                                    matInput
-                                    [type]="spec.secret ? 'password' : 'text'"
-                                    [attr.autocomplete]="spec.secret ? 'new-password' : null"
-                                    [formControlName]="spec.key"
-                                    [placeholder]="spec.placeholder ?? ''"
-                                    [attr.cdkFocusInitial]="first ? '' : null"
-                                />
-                                <inspecto-token-picker
-                                    matSuffix
-                                    [fieldLabel]="spec.label"
-                                    [tokens]="tokensFor(spec)"
-                                    (picked)="applyToken(spec, $event)"
-                                />
-                                @if (spec.help) {
-                                    <mat-hint>{{ spec.help }}</mat-hint>
-                                }
-                                <mat-error>{{ errorFor(spec) }}</mat-error>
-                            </mat-form-field>
-                        }
-                    }
+            <ng-template #heading let-name="name" let-level="level">
+                @if (name) {
+                    <div
+                        class="text-secondary pb-1 pt-2 text-sm font-medium"
+                        [class.col-span-2]="columns() === 2"
+                        role="heading"
+                        [attr.aria-level]="level"
+                    >
+                        {{ name }}
+                    </div>
                 }
             </ng-template>
 
-            <!-- flat mode's property row. Its controls carry NO mat-label (the row label is the label,
-                 wired through aria-labelledby) and NO mat-error/mat-hint (help is the info tooltip;
-                 the error is the explicit role="alert" line below, like a list field's). -->
-            <ng-template #row let-spec="spec">
+            <!-- The property row (every mode since UI-FORM-ROWS-1 P1). Its controls carry NO mat-label (the
+                 row label is the label, wired through aria-labelledby) and NO mat-error/mat-hint: the help is the
+                 tiny line under the row and the error the explicit role="alert" line that replaces it. -->
+            <ng-template #row let-spec="spec" let-first="first">
                 @if (isVisible(spec)) {
-                    <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- focusin/focusout/escape delegate from the row's own controls; the row itself is not focusable by design -->
-                    <div
-                        class="sf-row flex min-h-8 min-w-0 items-center gap-2"
-                        [attr.data-key]="spec.key"
-                        (focusin)="onRowFocusIn(spec)"
-                        (focusout)="onRowFocusOut(spec, $event)"
-                        (keydown.escape)="stopEditing()"
-                    >
-                        <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
-                            <span class="truncate" [id]="labelId(spec)" [title]="spec.label"
-                                >{{ spec.label }}
-                                @if (isRequiredSpec(spec)) {
-                                    <span class="text-warn" aria-hidden="true">*</span>
-                                }
+                    <!-- one grid cell holds the row AND its lines, so two columns never split them -->
+                    <div class="min-w-0" [attr.data-cell-for]="spec.key">
+                        <!-- eslint-disable-next-line @angular-eslint/template/interactive-supports-focus -- focusin/focusout/escape delegate from the row's own controls; the row itself is not focusable by design -->
+                        <div
+                            class="sf-row flex min-h-8 min-w-0 items-center gap-2"
+                            [attr.data-key]="spec.key"
+                            [attr.data-first]="first ? '' : null"
+                            (focusin)="onRowFocusIn(spec)"
+                            (focusout)="onRowFocusOut(spec, $event)"
+                            (keydown.escape)="stopEditing(true)"
+                        >
+                            <span class="text-secondary flex w-40 shrink-0 items-center gap-1 text-sm">
+                                <span class="truncate" [id]="labelId(spec)" [title]="spec.label"
+                                    >{{ spec.label }}
+                                    @if (isRequiredSpec(spec)) {
+                                        <span class="text-warn" aria-hidden="true">*</span>
+                                    }
+                                </span>
                             </span>
-                            @if (spec.help) {
-                                <mat-icon
-                                    class="icon-size-4 shrink-0"
-                                    svgIcon="heroicons_outline:information-circle"
-                                    role="img"
-                                    tabindex="0"
-                                    [matTooltip]="spec.help"
-                                    [attr.aria-label]="spec.help"
-                                ></mat-icon>
-                            }
-                        </span>
-                        <div class="flex min-w-0 flex-1 items-center">
-                            @switch (spec.type) {
-                                @case ('boolean') {
-                                    <!-- A toggle IS its own editor: no display/edit split, no pencil. -->
-                                    <mat-slide-toggle
-                                        class="sf-toggle"
-                                        [formControlName]="spec.key"
-                                        [disabled]="readOnly"
-                                        [aria-labelledby]="labelId(spec)"
-                                    ></mat-slide-toggle>
-                                }
-                                @case ('select') {
-                                    <!-- The shared picker is already a click-to-pick property row (label ·
+                            <div class="flex min-w-0 flex-1 items-center">
+                                @switch (spec.type) {
+                                    @case ('boolean') {
+                                        <!-- A toggle IS its own editor: no display/edit split, no pencil. -->
+                                        <mat-slide-toggle
+                                            class="sf-toggle"
+                                            [formControlName]="spec.key"
+                                            [disabled]="readOnly"
+                                            [aria-labelledby]="labelId(spec)"
+                                            [aria-describedby]="describedBy(spec) ?? ''"
+                                            [attr.cdkFocusInitial]="first ? '' : null"
+                                        ></mat-slide-toggle>
+                                    }
+                                    @case ('select') {
+                                        <!-- The shared picker is already a click-to-pick property row (label ·
                                          value ▾), so it renders inline as the value control with its own
-                                         label visually hidden (still the trigger's accessible name) and
-                                         its help suppressed — the info icon covers it. It keeps its own
-                                         error line, so the row renders none. -->
-                                    <inspecto-option-picker
-                                        class="block w-full"
-                                        [formControlName]="spec.key"
-                                        [label]="spec.label"
-                                        [hideLabel]="true"
-                                        [options]="spec.options ?? []"
-                                        [required]="!!spec.required"
-                                        [readOnly]="readOnly"
-                                    />
-                                }
-                                @case ('list') {
-                                    @if (isEditing(spec)) {
-                                        <div class="flex min-w-0 flex-1 flex-col gap-1">
+                                         label visually hidden (still the trigger's accessible name) and its
+                                         help suppressed - the row draws the help line. No [required]: the
+                                         picker's own required line shows only once its dialog was opened, so
+                                         the row draws the error after validate(), as for every other type. -->
+                                        <inspecto-option-picker
+                                            class="block w-full"
+                                            [formControlName]="spec.key"
+                                            [label]="spec.label"
+                                            [hideLabel]="true"
+                                            [options]="spec.options ?? []"
+                                            [readOnly]="readOnly"
+                                            [attr.cdkFocusInitial]="first ? '' : null"
+                                        />
+                                    }
+                                    @case ('list') {
+                                        @if (isEditing(spec)) {
+                                            <div class="flex min-w-0 flex-1 flex-col gap-1">
+                                                <mat-form-field
+                                                    class="sf-dense w-full"
+                                                    appearance="outline"
+                                                    subscriptSizing="dynamic"
+                                                >
+                                                    <!-- Suggestions only when the host passes an optionLoader for this
+                                                     key (e.g. columnOptionLoader). An open panel defers the
+                                                     blur-commit to (closed): clicking an option blurs the draft
+                                                     first, and committing there would add the half-typed text. -->
+                                                    <input
+                                                        #listInput
+                                                        matInput
+                                                        type="text"
+                                                        [value]="listDraft(spec.key)"
+                                                        [placeholder]="spec.placeholder ?? ''"
+                                                        [attr.aria-labelledby]="labelId(spec)"
+                                                        [attr.aria-describedby]="describedBy(spec)"
+                                                        [matAutocomplete]="listAc"
+                                                        [matAutocompleteDisabled]="!optionLoaders?.[spec.key]"
+                                                        #listTrigger="matAutocompleteTrigger"
+                                                        (focus)="loadOptionsFor(spec)"
+                                                        (input)="setListDraft(spec.key, $any($event.target).value)"
+                                                        (keydown.enter)="
+                                                            listTrigger.activeOption
+                                                                ? $event.preventDefault()
+                                                                : addListItem(spec, $event)
+                                                        "
+                                                        (blur)="listTrigger.panelOpen || addListItem(spec)"
+                                                    />
+                                                    <mat-autocomplete
+                                                        #listAc="matAutocomplete"
+                                                        (optionSelected)="
+                                                            addListOption(spec, $event.option.value, listInput)
+                                                        "
+                                                        (closed)="commitListDraftIfLeft(spec, listInput)"
+                                                    >
+                                                        @for (opt of listOptions(spec); track opt.value) {
+                                                            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+                                                        }
+                                                    </mat-autocomplete>
+                                                    <button
+                                                        mat-icon-button
+                                                        matSuffix
+                                                        type="button"
+                                                        [attr.aria-label]="'Add entry to ' + spec.label"
+                                                        [disabled]="!listDraft(spec.key).trim()"
+                                                        (click)="addListItem(spec)"
+                                                    >
+                                                        <mat-icon svgIcon="heroicons_outline:plus" />
+                                                    </button>
+                                                    <inspecto-token-picker
+                                                        matSuffix
+                                                        [fieldLabel]="spec.label"
+                                                        [tokens]="tokensFor(spec)"
+                                                        (picked)="applyToken(spec, $event)"
+                                                    />
+                                                </mat-form-field>
+                                                @if (listValue(spec.key).length) {
+                                                    <div class="flex flex-wrap gap-1">
+                                                        @for (item of listValue(spec.key); track $index) {
+                                                            <inspecto-chip
+                                                                variant="soft"
+                                                                [removable]="true"
+                                                                [removeLabel]="'Remove ' + item + ' from ' + spec.label"
+                                                                (removed)="removeListItem(spec, $index)"
+                                                            >
+                                                                <span class="font-mono">{{ item }}</span>
+                                                            </inspecto-chip>
+                                                        }
+                                                    </div>
+                                                } @else if (!spec.required) {
+                                                    <!-- SCHEMA-FORM-EMPTY-LIST-1: an empty list has TWO meanings and the
+                                                     control keeps them apart. Cleared (null) = "unset, the default
+                                                     applies"; explicitly none ([]) = "deliberately no entries". -->
+                                                    <mat-slide-toggle
+                                                        class="pb-1 text-xs"
+                                                        [checked]="isExplicitlyNone(spec.key)"
+                                                        [attr.aria-label]="'Explicitly none for ' + spec.label"
+                                                        (change)="setExplicitlyNone(spec, $event.checked)"
+                                                    >
+                                                        Explicitly none (the default does not apply)
+                                                    </mat-slide-toggle>
+                                                }
+                                            </div>
+                                        } @else {
+                                            <button
+                                                type="button"
+                                                class="sf-value flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded px-1 py-0.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                                [class.hover:bg-hover]="!readOnly"
+                                                [class.cursor-default]="readOnly"
+                                                [attr.aria-label]="'Edit ' + spec.label"
+                                                [attr.aria-describedby]="describedBy(spec)"
+                                                [disabled]="isDisabled(spec)"
+                                                [attr.cdkFocusInitial]="first ? '' : null"
+                                                (click)="!readOnly && startEditing(spec)"
+                                            >
+                                                @for (item of listValue(spec.key); track $index) {
+                                                    <inspecto-chip variant="soft"
+                                                        ><span class="font-mono">{{ item }}</span></inspecto-chip
+                                                    >
+                                                } @empty {
+                                                    <span class="text-secondary font-mono text-sm">—</span>
+                                                }
+                                            </button>
+                                        }
+                                    }
+                                    @default {
+                                        @if (isEditing(spec)) {
                                             <mat-form-field
                                                 class="sf-dense w-full"
                                                 appearance="outline"
                                                 subscriptSizing="dynamic"
                                             >
-                                                <input
-                                                    matInput
-                                                    type="text"
-                                                    [value]="listDraft(spec.key)"
-                                                    [placeholder]="spec.placeholder ?? ''"
-                                                    [attr.aria-labelledby]="labelId(spec)"
-                                                    (input)="setListDraft(spec.key, $any($event.target).value)"
-                                                    (keydown.enter)="addListItem(spec, $event)"
-                                                    (blur)="addListItem(spec)"
-                                                />
-                                                <button
-                                                    mat-icon-button
-                                                    matSuffix
-                                                    type="button"
-                                                    [attr.aria-label]="'Add entry to ' + spec.label"
-                                                    [disabled]="!listDraft(spec.key).trim()"
-                                                    (click)="addListItem(spec)"
-                                                >
-                                                    <mat-icon svgIcon="heroicons_outline:plus" />
-                                                </button>
-                                                <inspecto-token-picker
-                                                    matSuffix
-                                                    [fieldLabel]="spec.label"
-                                                    [tokens]="tokensFor(spec)"
-                                                    (picked)="applyToken(spec, $event)"
-                                                />
-                                            </mat-form-field>
-                                            @if (listValue(spec.key).length) {
-                                                <div class="flex flex-wrap gap-1">
-                                                    @for (item of listValue(spec.key); track $index) {
-                                                        <inspecto-chip
-                                                            variant="soft"
-                                                            [removable]="true"
-                                                            [removeLabel]="'Remove ' + item + ' from ' + spec.label"
-                                                            (removed)="removeListItem(spec, $index)"
+                                                @switch (spec.type) {
+                                                    @case ('autocomplete') {
+                                                        <input
+                                                            matInput
+                                                            [formControlName]="spec.key"
+                                                            [placeholder]="spec.placeholder ?? ''"
+                                                            [matAutocomplete]="ac"
+                                                            [attr.aria-labelledby]="labelId(spec)"
+                                                            [attr.aria-describedby]="describedBy(spec)"
+                                                            (focus)="loadOptionsFor(spec)"
+                                                            (keydown.enter)="stopEditing(true)"
+                                                        />
+                                                        <mat-autocomplete
+                                                            #ac="matAutocomplete"
+                                                            (optionSelected)="stopEditing(true)"
                                                         >
-                                                            <span class="font-mono">{{ item }}</span>
-                                                        </inspecto-chip>
+                                                            @for (opt of filteredOptions(spec); track opt.value) {
+                                                                <mat-option [value]="opt.value">{{
+                                                                    opt.label
+                                                                }}</mat-option>
+                                                            }
+                                                        </mat-autocomplete>
                                                     }
-                                                </div>
-                                            }
-                                        </div>
-                                    } @else {
-                                        <button
-                                            type="button"
-                                            class="sf-value flex min-w-0 flex-1 flex-wrap items-center gap-1 rounded px-1 py-0.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                                            [class.hover:bg-hover]="!readOnly"
-                                            [class.cursor-default]="readOnly"
-                                            [attr.aria-label]="'Edit ' + spec.label"
-                                            (click)="!readOnly && startEditing(spec)"
-                                        >
-                                            @for (item of listValue(spec.key); track $index) {
-                                                <inspecto-chip variant="soft"
-                                                    ><span class="font-mono">{{ item }}</span></inspecto-chip
-                                                >
-                                            } @empty {
-                                                <span class="text-secondary font-mono text-sm">—</span>
-                                            }
-                                        </button>
-                                    }
-                                }
-                                @default {
-                                    @if (isEditing(spec)) {
-                                        <mat-form-field
-                                            class="sf-dense w-full"
-                                            appearance="outline"
-                                            subscriptSizing="dynamic"
-                                        >
-                                            @switch (spec.type) {
-                                                @case ('autocomplete') {
-                                                    <input
-                                                        matInput
-                                                        [formControlName]="spec.key"
-                                                        [placeholder]="spec.placeholder ?? ''"
-                                                        [matAutocomplete]="ac"
-                                                        [attr.aria-labelledby]="labelId(spec)"
-                                                        (focus)="loadOptionsFor(spec)"
-                                                        (keydown.enter)="stopEditing()"
-                                                    />
-                                                    <mat-autocomplete
-                                                        #ac="matAutocomplete"
-                                                        (optionSelected)="stopEditing()"
-                                                    >
-                                                        @for (opt of filteredOptions(spec); track opt.value) {
-                                                            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+                                                    @case ('multiline') {
+                                                        <textarea
+                                                            matInput
+                                                            rows="3"
+                                                            [formControlName]="spec.key"
+                                                            [placeholder]="spec.placeholder ?? ''"
+                                                            [attr.aria-labelledby]="labelId(spec)"
+                                                            [attr.aria-describedby]="describedBy(spec)"
+                                                        ></textarea>
+                                                    }
+                                                    @case ('number') {
+                                                        @if (tokensFor(spec).length > 0) {
+                                                            <!-- A numeric field the host offers tokens for: a TEXT input,
+                                                             because type="number" reads a dollar-token back blank; the
+                                                             numeric contract is a validator that exempts a token, and
+                                                             value() turns a numeric literal back into a number. -->
+                                                            <input
+                                                                matInput
+                                                                type="text"
+                                                                inputmode="decimal"
+                                                                [formControlName]="spec.key"
+                                                                [placeholder]="spec.placeholder ?? ''"
+                                                                [attr.aria-labelledby]="labelId(spec)"
+                                                                [attr.aria-describedby]="describedBy(spec)"
+                                                                (keydown.enter)="stopEditing(true)"
+                                                            />
+                                                        } @else {
+                                                            <!-- Static type="number" so NumberValueAccessor attaches. -->
+                                                            <input
+                                                                matInput
+                                                                type="number"
+                                                                [formControlName]="spec.key"
+                                                                [placeholder]="spec.placeholder ?? ''"
+                                                                [attr.aria-labelledby]="labelId(spec)"
+                                                                [attr.aria-describedby]="describedBy(spec)"
+                                                                (keydown.enter)="stopEditing(true)"
+                                                            />
                                                         }
-                                                    </mat-autocomplete>
+                                                    }
+                                                    @default {
+                                                        <input
+                                                            matInput
+                                                            [type]="spec.secret ? 'password' : 'text'"
+                                                            [attr.autocomplete]="spec.secret ? 'new-password' : null"
+                                                            [formControlName]="spec.key"
+                                                            [placeholder]="spec.placeholder ?? ''"
+                                                            [attr.aria-labelledby]="labelId(spec)"
+                                                            [attr.aria-describedby]="describedBy(spec)"
+                                                            (keydown.enter)="stopEditing(true)"
+                                                        />
+                                                    }
                                                 }
-                                                @case ('multiline') {
-                                                    <textarea
-                                                        matInput
-                                                        rows="3"
-                                                        [formControlName]="spec.key"
-                                                        [placeholder]="spec.placeholder ?? ''"
-                                                        [attr.aria-labelledby]="labelId(spec)"
-                                                    ></textarea>
-                                                }
-                                                @case ('number') {
-                                                    <input
-                                                        matInput
-                                                        type="number"
-                                                        [formControlName]="spec.key"
-                                                        [placeholder]="spec.placeholder ?? ''"
-                                                        [attr.aria-labelledby]="labelId(spec)"
-                                                        (keydown.enter)="stopEditing()"
+                                                @if (spec.type !== 'number' || tokensFor(spec).length > 0) {
+                                                    <inspecto-token-picker
+                                                        matSuffix
+                                                        [fieldLabel]="spec.label"
+                                                        [tokens]="tokensFor(spec)"
+                                                        (picked)="applyToken(spec, $event)"
                                                     />
                                                 }
-                                                @default {
-                                                    <input
-                                                        matInput
-                                                        [type]="spec.secret ? 'password' : 'text'"
-                                                        [attr.autocomplete]="spec.secret ? 'new-password' : null"
-                                                        [formControlName]="spec.key"
-                                                        [placeholder]="spec.placeholder ?? ''"
-                                                        [attr.aria-labelledby]="labelId(spec)"
-                                                        (keydown.enter)="stopEditing()"
-                                                    />
-                                                }
-                                            }
-                                            @if (spec.type !== 'number') {
-                                                <inspecto-token-picker
-                                                    matSuffix
-                                                    [fieldLabel]="spec.label"
-                                                    [tokens]="tokensFor(spec)"
-                                                    (picked)="applyToken(spec, $event)"
-                                                />
-                                            }
-                                        </mat-form-field>
-                                    } @else {
-                                        <button
-                                            type="button"
-                                            class="sf-value min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                                            [class.hover:bg-hover]="!readOnly"
-                                            [class.cursor-default]="readOnly"
-                                            [class.text-secondary]="displayValue(spec) === '—'"
-                                            [attr.aria-label]="spec.label + ': ' + displayValue(spec)"
-                                            [title]="displayValue(spec)"
-                                            (click)="!readOnly && startEditing(spec)"
-                                        >
-                                            {{ displayValue(spec) }}
-                                        </button>
+                                            </mat-form-field>
+                                        } @else {
+                                            <button
+                                                type="button"
+                                                class="sf-value min-w-0 flex-1 truncate rounded px-1 py-0.5 text-left font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                                [class.hover:bg-hover]="!readOnly"
+                                                [class.cursor-default]="readOnly"
+                                                [class.text-secondary]="displayValue(spec) === '—'"
+                                                [attr.aria-label]="spec.label + ': ' + displayValue(spec)"
+                                                [title]="displayValue(spec)"
+                                                [attr.aria-describedby]="describedBy(spec)"
+                                                [disabled]="isDisabled(spec)"
+                                                [attr.cdkFocusInitial]="first ? '' : null"
+                                                (click)="!readOnly && startEditing(spec)"
+                                            >
+                                                {{ displayValue(spec) }}
+                                            </button>
+                                        }
                                     }
                                 }
+                            </div>
+                            @if (hasPencil(spec)) {
+                                <button
+                                    type="button"
+                                    class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                    [attr.aria-label]="(isEditing(spec) ? 'Done editing ' : 'Edit ') + spec.label"
+                                    (click)="isEditing(spec) ? stopEditing() : startEditing(spec)"
+                                >
+                                    <mat-icon
+                                        class="icon-size-4"
+                                        [svgIcon]="
+                                            isEditing(spec) ? 'heroicons_outline:check' : 'heroicons_outline:pencil'
+                                        "
+                                    ></mat-icon>
+                                </button>
                             }
                         </div>
-                        @if (hasPencil(spec)) {
-                            <button
-                                type="button"
-                                class="sf-pencil text-secondary hover:bg-hover flex h-7 w-7 shrink-0 items-center justify-center rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                                [attr.aria-label]="(isEditing(spec) ? 'Done editing ' : 'Edit ') + spec.label"
-                                (click)="isEditing(spec) ? stopEditing() : startEditing(spec)"
+                        @if (rowError(spec)) {
+                            <p
+                                class="text-warn m-0 text-xs"
+                                [class.pl-40]="columns() === 1"
+                                role="alert"
+                                [id]="lineId(spec)"
                             >
-                                <mat-icon
-                                    class="icon-size-4"
-                                    [svgIcon]="isEditing(spec) ? 'heroicons_outline:check' : 'heroicons_outline:pencil'"
-                                ></mat-icon>
-                            </button>
+                                {{ rowError(spec) }}
+                            </p>
+                        } @else if (spec.help) {
+                            <p
+                                class="text-secondary m-0 text-xs"
+                                [class.pl-40]="columns() === 1"
+                                [id]="lineId(spec)"
+                                [attr.data-help-for]="spec.key"
+                            >
+                                {{ spec.help }}
+                            </p>
+                        }
+                        @if (sampleValues?.[spec.key]; as sample) {
+                            <p
+                                class="text-secondary m-0 text-xs"
+                                [class.pl-40]="columns() === 1"
+                                [attr.data-sample-for]="spec.key"
+                            >
+                                Sample resolves to <span class="font-mono">{{ sample }}</span>
+                            </p>
                         }
                     </div>
-                    @if (spec.type !== 'select' && rowError(spec)) {
-                        <p class="text-warn m-0 pl-40 text-xs" role="alert">{{ rowError(spec) }}</p>
-                    }
-                    @if (sampleValues?.[spec.key]; as sample) {
-                        <p class="text-secondary m-0 pl-40 text-xs" [attr.data-sample-for]="spec.key">
-                            Sample resolves to <span class="font-mono">{{ sample }}</span>
-                        </p>
-                    }
                 }
             </ng-template>
         </form>
@@ -697,7 +511,7 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
     private resizeObserver?: ResizeObserver;
 
     ngAfterViewInit(): void {
-        if (!this.flat || typeof ResizeObserver === 'undefined' || !this.formEl) return;
+        if (typeof ResizeObserver === 'undefined' || !this.formEl) return;
         this.resizeObserver = new ResizeObserver((entries) => {
             const width = entries[0]?.contentRect.width ?? 0;
             const next = width >= InspectoSchemaFormComponent.TWO_COLUMN_MIN_WIDTH ? 2 : 1;
@@ -739,7 +553,7 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
 
     /** Booleans and selects are their own editors (toggle / click-to-pick), so no pencil. In read-only mode, pencil is hidden. */
     hasPencil(spec: AttributeSpec): boolean {
-        return !this.readOnly && spec.type !== 'boolean' && spec.type !== 'select';
+        return !this.readOnly && !this.isDisabled(spec) && spec.type !== 'boolean' && spec.type !== 'select';
     }
 
     /** Switch a flat row to edit mode and focus its control. */
@@ -754,11 +568,42 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
     }
 
     /** Return the editing row (if any) to display mode. The control's value is already committed. */
-    stopEditing(): void {
+    stopEditing(refocus = false): void {
         clearTimeout(this.exitTimer);
-        if (this.editingKey() === null) return;
+        const key = this.editingKey();
+        if (key === null) return;
         this.editingKey.set(null);
         this.cdr.markForCheck();
+        if (refocus) {
+            // Give focus to the row's value, not the page, once the input is gone. Deferred: on Enter the browser's
+            // implicit form submission is the keydown's DEFAULT action, which needs the input still in the form.
+            setTimeout(() => {
+                if (this.editingKey() !== null) return; // another row was opened meanwhile: leave its focus alone
+                this.cdr.detectChanges();
+                this.rowElement(key)?.querySelector<HTMLElement>('button.sf-value')?.focus();
+            });
+        }
+    }
+
+    /** A host-disabled control (an immutable id on edit): its row reads as locked - no pencil, no editor. */
+    isDisabled(spec: AttributeSpec): boolean {
+        return !!this.form.get(spec.key)?.disabled;
+    }
+
+    /** The id of the row's help / error line (only one shows at a time). */
+    lineId(spec: AttributeSpec): string {
+        return this.labelId(spec) + '-line';
+    }
+
+    /** What a row's control is described by: its error line, else its help line, else nothing. */
+    describedBy(spec: AttributeSpec): string | null {
+        return this.rowError(spec) || spec.help ? this.lineId(spec) : null;
+    }
+
+    /** Focus inside a CDK overlay (the token menu, an autocomplete panel) still belongs to the open row. */
+    private inOverlay(node: Node | null): boolean {
+        const pane = node instanceof Element ? node.closest('.cdk-overlay-pane') : null;
+        return !!pane && !pane.contains(this.host.nativeElement);
     }
 
     onRowFocusIn(spec: AttributeSpec): void {
@@ -774,10 +619,11 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         if (!this.isEditing(spec)) return;
         const row = event.currentTarget as HTMLElement | null;
         const next = event.relatedTarget as Node | null;
-        if (next && row?.contains(next)) return;
+        if (next && (row?.contains(next) || this.inOverlay(next))) return;
         clearTimeout(this.exitTimer);
         this.exitTimer = setTimeout(() => {
-            if (this.isEditing(spec) && !this.rowElement(spec.key)?.contains(document.activeElement)) {
+            const active = document.activeElement;
+            if (this.isEditing(spec) && !this.rowElement(spec.key)?.contains(active) && !this.inOverlay(active)) {
                 this.stopEditing();
             }
         }, 200);
@@ -831,6 +677,41 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
     readonly showOptional = signal(false);
     readonly showAdvanced = signal(false);
     readonly tiers = signal<ReturnType<typeof byTier>>({ required: [], optional: [], advanced: [] });
+
+    /** The row grid: two columns once the host is wide enough (see {@link columns}), else one. */
+    gridClass(): string {
+        return this.columns() === 2 ? 'grid grid-cols-2 gap-x-6 gap-y-0.5' : 'flex flex-col gap-0.5';
+    }
+
+    /**
+     * The optional and advanced tiers as named folds (UI-FORM-ROWS-1 P1): each says how many fields it holds and how
+     * many of its shown fields need fixing (touched and invalid), so a closed fold never hides an error silently.
+     */
+    folds(): { tier: 'optional' | 'advanced'; title: string; count: number; problems: number; open: boolean }[] {
+        const out = [];
+        for (const tier of ['optional', 'advanced'] as const) {
+            const specs = this.tiers()[tier];
+            if (!specs.length) continue;
+            const problems = specs.filter((s) => {
+                const c = this.form.get(s.key);
+                return this.isVisible(s) && !!c?.invalid && c.touched;
+            }).length;
+            const open = tier === 'optional' ? this.showOptional() : this.showAdvanced();
+            out.push({
+                tier,
+                title: tier === 'optional' ? 'Optional settings' : 'Advanced settings',
+                count: specs.length,
+                problems,
+                open,
+            });
+        }
+        return out;
+    }
+
+    toggleFold(tier: 'optional' | 'advanced'): void {
+        const s = tier === 'optional' ? this.showOptional : this.showAdvanced;
+        s.set(!s());
+    }
 
     private allSpecs: AttributeSpec[] = [];
     private formValue = signal<Record<string, unknown>>({});

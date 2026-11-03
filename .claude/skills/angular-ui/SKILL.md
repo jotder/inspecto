@@ -328,9 +328,13 @@ src/app/
   generic Key/Value grid, and adding keys only where the node type has no schema at all. **Since
   2026-09-05 it renders PROPERTY ROWS** — label · value · pencil, the schema-form's flat idiom over the
   shared `.sf-*` geometry; a boolean is a toggle with no pencil — and every definition-pane schema-form,
-  the Collector's three included, is `[flat]="true"`: no Advanced gear, no chevron disclosure. A new
+  the Collector's three included, is `[flat]="true"`: no Optional / Advanced folds. A new
   pane section that shows stored values follows the same idiom; do not reintroduce a stack of outlined
-  Material fields beside property rows.
+  Material fields beside property rows. **Since UI-FORM-ROWS-1 P1 (2026-11-03) the tiered (non-flat) form is
+  rows too**: required rows shown, *Optional settings (n)* and *Advanced settings (n)* as folds that count the
+  fields needing a fix (no gear), the help as the tiny line under a row (no info-icon tooltip), two columns on a
+  wide host. A row's control exists only while the row is open: a spec opens it with `sfOpen(fixture, key)`
+  (`inspecto/testing/schema-form.ts`) and reads errors from the row's `role="alert"` line, never `mat-error`.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
   component deliberately does not have. ⚠ **A host must never read a shared component through

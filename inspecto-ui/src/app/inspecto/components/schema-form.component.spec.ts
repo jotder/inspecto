@@ -1,9 +1,10 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AbstractControl, ValidatorFn } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { AttributeSpec, AttributeToken } from 'app/inspecto/component-model';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { sfHelp, sfOpen, sfRow } from 'app/inspecto/testing/schema-form';
 import { InspectoSchemaFormComponent } from './schema-form.component';
 
 const SPECS: AttributeSpec[] = [
@@ -184,6 +185,7 @@ describe('InspectoSchemaFormComponent', () => {
         const fixture = create();
         fixture.componentInstance.showAdvanced.set(true);
         fixture.detectChanges();
+        sfOpen(fixture, 'threads'); // UI-FORM-ROWS-1: a row's input exists while the row is open
 
         const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[type="number"]')!;
         expect(input).toBeTruthy();
@@ -266,6 +268,7 @@ describe('InspectoSchemaFormComponent', () => {
 
     it('a list field without an optionLoader has no suggestion combobox', () => {
         const fixture = create(LIST_SPECS);
+        sfOpen(fixture, 'patterns');
         const input = fixture.nativeElement.querySelector('input[placeholder="^CALL"]') as HTMLInputElement;
         expect(input.getAttribute('role')).toBeNull();
     });
@@ -285,6 +288,7 @@ describe('InspectoSchemaFormComponent', () => {
         };
         c.specs = LIST_SPECS;
         fixture.detectChanges();
+        sfOpen(fixture, 'patterns');
         const spec = LIST_SPECS[0];
         const input = fixture.nativeElement.querySelector('input[placeholder="^CALL"]') as HTMLInputElement;
         expect(input.getAttribute('role')).toBe('combobox');
@@ -341,6 +345,7 @@ describe('InspectoSchemaFormComponent', () => {
     it('renders committed list entries as removable chips and loads initial arrays', async () => {
         const fixture = create(LIST_SPECS, { patterns: ['^CALL', '^SMS'] });
         fixture.detectChanges();
+        sfOpen(fixture, 'patterns'); // the removable chips are the open row's; closed, it shows them read-only
         const el = fixture.nativeElement as HTMLElement;
 
         expect(el.textContent).toContain('^CALL');
@@ -487,8 +492,10 @@ describe('InspectoSchemaFormComponent', () => {
         // NB: `formControlName` is a property binding here, so it never reflects to a DOM attribute —
         // an `input[formcontrolname=…]` selector silently matches nothing. Each fixture below declares a
         // single spec, so the sole rendered <input> is unambiguous.
-        const soleInput = (fixture: { nativeElement: HTMLElement }) =>
-            fixture.nativeElement.querySelector('input') as HTMLInputElement;
+        const soleInput = (fixture: ComponentFixture<InspectoSchemaFormComponent>) => {
+            sfOpen(fixture, Object.keys(fixture.componentInstance.form.controls)[0]); // open the sole row
+            return fixture.nativeElement.querySelector('input') as HTMLInputElement;
+        };
 
         it('masks the input and keeps the value readable to the host', () => {
             const fixture = create([{ key: 'token', label: 'Token', type: 'string', tier: 'required', secret: true }]);
@@ -574,6 +581,7 @@ describe('InspectoSchemaFormComponent', () => {
 
         it('renders a picker only where the host offered tokens', () => {
             const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            sfOpen(fixture, 'day');
             const labels = pickers(fixture).map((b) => b.getAttribute('aria-label'));
             expect(labels).toEqual(['Insert a runtime token into Day']);
         });
@@ -584,6 +592,7 @@ describe('InspectoSchemaFormComponent', () => {
             // declaration site — and the button rendered in `…-infix`, next to the text. Asserting the
             // button merely EXISTS passes in both worlds, which is how the first cut looked green.
             const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            sfOpen(fixture, 'day');
             const [picker] = pickers(fixture);
             expect(picker.closest('.mat-mdc-form-field-icon-suffix')).not.toBeNull();
             expect(picker.closest('.mat-mdc-form-field-infix')).toBeNull();
@@ -620,10 +629,11 @@ describe('InspectoSchemaFormComponent', () => {
                 { key: 'threads', label: 'Threads', type: 'number', tier: 'required', required: false },
             ];
             const fixture = create(NUMS, undefined, undefined, { tokens: { since: [EPOCH] }, tokenSyntax: SYNTAX });
-            // specs render in declaration order; formControlName is a property binding, not an attribute
-            const [since, threads] = Array.from(fixture.nativeElement.querySelectorAll('input')) as HTMLInputElement[];
-            expect(since.type).toBe('text');
+            // one row is open at a time (UI-FORM-ROWS-1): read each row's input while it is the open one
+            const threads = sfOpen(fixture, 'threads')!.querySelector('input') as HTMLInputElement;
             expect(threads.type).toBe('number');
+            const since = sfOpen(fixture, 'since')!.querySelector('input') as HTMLInputElement;
+            expect(since.type).toBe('text');
             expect(pickers(fixture).map((b) => b.getAttribute('aria-label'))).toEqual([
                 'Insert a runtime token into Since',
             ]);
@@ -706,6 +716,7 @@ describe('InspectoSchemaFormComponent', () => {
                 },
             ];
             const fixture = create(specs);
+            sfOpen(fixture, 'channel');
             const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
             expect(input).toBeTruthy();
             expect(input.value).toBe('');
@@ -725,6 +736,7 @@ describe('InspectoSchemaFormComponent', () => {
 
         it('fills the sample value in a list draft field when pressing ArrowRight', () => {
             const fixture = create(LIST_SPECS);
+            sfOpen(fixture, 'patterns');
             const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
             expect(input).toBeTruthy();
             expect(input.value).toBe('');
@@ -843,22 +855,19 @@ describe('InspectoSchemaFormComponent', () => {
             expect(row(fixture, 'skip').querySelector('.sf-value')?.textContent?.trim()).toBe('0');
         });
 
-        it('renders help as an info tooltip trigger, not as text under the field', () => {
+        it('renders help as the tiny line under the row (UI-FORM-ROWS-1), not as a tooltip', () => {
             const fixture = createFlat();
             const r = row(fixture, 'encoding');
-            const info = r.querySelector('mat-icon[aria-label="Byte encoding of the file"]');
-            expect(info).toBeTruthy();
-            expect(r.querySelector('mat-hint')).toBeNull();
-            // The help text appears ONLY as the icon's accessible name — never as visible prose.
-            const prose = Array.from(fixture.nativeElement.querySelectorAll('p, mat-hint')).map(
-                (e: Element) => e.textContent,
-            );
-            expect(prose.join(' ')).not.toContain('Byte encoding');
+            expect(r.querySelector('mat-icon[aria-label="Byte encoding of the file"]')).toBeNull();
+            expect(sfHelp(fixture.nativeElement, 'encoding')).toBe('Byte encoding of the file');
+            const help = fixture.nativeElement.querySelector('[data-help-for="encoding"]') as HTMLElement;
+            expect(help.classList.contains('text-xs')).toBe(true);
         });
 
         it('lays rows out in a two-column grid when columns() is 2, with group headings spanning both', () => {
             const fixture = createFlat();
-            const container = () => row(fixture, 'quote').parentElement as HTMLElement;
+            // a row and its lines share one cell (UI-FORM-ROWS-1): the grid is the cell's parent
+            const container = () => row(fixture, 'quote').parentElement!.parentElement as HTMLElement;
             expect(container().classList.contains('grid')).toBe(false);
 
             fixture.componentInstance.columns.set(2);
@@ -878,10 +887,132 @@ describe('InspectoSchemaFormComponent', () => {
             expect(r.textContent).toContain('Enrich');
         });
 
-        it('leaves the NON-flat path untouched: Optional settings (N) still renders', () => {
+        it('the tiered (non-flat) form is property rows too, with its tiers as named folds (UI-FORM-ROWS-1)', () => {
             const fixture = create();
-            expect(fixture.nativeElement.textContent).toContain('Optional settings (2)');
-            expect(fixture.nativeElement.querySelector('.sf-row')).toBeNull();
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.textContent).toContain('Optional settings (2)');
+            expect(el.textContent).toContain('Advanced settings (1)');
+            expect(sfRow(el, 'name')).not.toBeNull();
+            expect(el.querySelector('mat-form-field')).toBeNull(); // nothing boxed until a row is opened
+        });
+
+        it('a closed fold says how many of its fields need fixing, and validate() opens it', () => {
+            const specs: AttributeSpec[] = [
+                { key: 'name', label: 'Name', type: 'string', tier: 'required', required: false },
+                { key: 'owner', label: 'Owner', type: 'string', tier: 'optional', required: true },
+            ];
+            const fixture = create(specs);
+            const c = fixture.componentInstance;
+            c.form.get('owner')!.markAsTouched();
+            fixture.detectChanges();
+            const fold = fixture.nativeElement.querySelector('[data-fold="optional"]') as HTMLElement;
+            expect(fold.textContent).toContain('1 to fix');
+            expect(c.validate()).toBe(false);
+            fixture.detectChanges();
+            expect(c.showOptional()).toBe(true);
+            expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Owner is required');
+        });
+
+        it("in two columns a help line stays in its row's cell, and a control is described by it", () => {
+            const specs: AttributeSpec[] = [
+                { key: 'a', label: 'A', type: 'string', tier: 'required', required: false, help: 'About A' },
+                { key: 'b', label: 'B', type: 'string', tier: 'required', required: false },
+                { key: 'c', label: 'C', type: 'string', tier: 'required', required: false, help: 'About C' },
+            ];
+            const fixture = create(specs);
+            fixture.componentInstance.columns.set(2);
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            const grid = sfRow(el, 'a')!.parentElement!.parentElement!;
+            expect(grid.classList.contains('grid-cols-2')).toBe(true);
+            expect(Array.from(grid.children).map((c) => c.getAttribute('data-cell-for'))).toEqual(['a', 'b', 'c']);
+            const value = sfRow(el, 'a')!.querySelector('button.sf-value')!;
+            const line = value.getAttribute('aria-describedby')!;
+            expect(el.querySelector(`[id="${line}"]`)?.textContent?.trim()).toBe('About A');
+            const input = sfOpen(fixture, 'a')!.querySelector('input')!;
+            expect(input.getAttribute('aria-describedby')).toBe(line);
+        });
+
+        it('a host-disabled field reads as locked: no pencil, and its value does not open an editor', () => {
+            const specs: AttributeSpec[] = [{ key: 'id', label: 'Id', type: 'string', tier: 'required' }];
+            const fixture = create(specs, { id: 'kept' });
+            fixture.componentInstance.form.get('id')!.disable();
+            fixture.detectChanges();
+            const r = sfRow(fixture.nativeElement, 'id')!;
+            expect(r.querySelector('.sf-pencil')).toBeNull();
+            expect((r.querySelector('button.sf-value') as HTMLButtonElement).disabled).toBe(true);
+            expect(r.textContent).toContain('kept');
+        });
+
+        it('focus moving into an overlay (the token menu) keeps the row open; Escape closes it and refocuses its value', async () => {
+            const specs: AttributeSpec[] = [
+                { key: 'day', label: 'Day', type: 'string', tier: 'required', required: false },
+            ];
+            const fixture = create(specs);
+            const c = fixture.componentInstance;
+            const r = sfOpen(fixture, 'day')!;
+            // the token menu: its own pane in the overlay container
+            const overlay = document.createElement('div');
+            overlay.className = 'cdk-overlay-container';
+            const pane = document.createElement('div');
+            pane.className = 'cdk-overlay-pane';
+            const item = document.createElement('button');
+            pane.appendChild(item);
+            overlay.appendChild(pane);
+            document.body.appendChild(overlay);
+            try {
+                item.focus();
+                r.dispatchEvent(new FocusEvent('focusout', { relatedTarget: item, bubbles: true }));
+                await new Promise((done) => setTimeout(done, 250));
+                expect(c.editingKey()).toBe('day'); // still open: the token can land
+            } finally {
+                overlay.remove();
+            }
+            const input = sfRow(fixture.nativeElement, 'day')!.querySelector('input')!;
+            input.focus();
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            fixture.detectChanges();
+            expect(c.editingKey()).toBeNull();
+            await new Promise((done) => setTimeout(done)); // the refocus waits for the key's default action
+            expect(document.activeElement).toBe(sfRow(fixture.nativeElement, 'day')!.querySelector('button.sf-value'));
+        });
+
+        it('in a dialog (an overlay pane holding the form) focus leaving the row still closes it', async () => {
+            const specs: AttributeSpec[] = [
+                { key: 'day', label: 'Day', type: 'string', tier: 'required', required: false },
+            ];
+            const fixture = create(specs);
+            const c = fixture.componentInstance;
+            const overlay = document.createElement('div');
+            overlay.className = 'cdk-overlay-container';
+            const pane = document.createElement('div');
+            pane.className = 'cdk-overlay-pane';
+            const elsewhere = document.createElement('button'); // e.g. the dialog's own Cancel
+            pane.append(fixture.nativeElement, elsewhere);
+            overlay.appendChild(pane);
+            document.body.appendChild(overlay);
+            try {
+                const r = sfOpen(fixture, 'day')!;
+                elsewhere.focus();
+                r.dispatchEvent(new FocusEvent('focusout', { relatedTarget: elsewhere, bubbles: true }));
+                await new Promise((done) => setTimeout(done, 250));
+                expect(c.editingKey()).toBeNull();
+            } finally {
+                overlay.remove();
+            }
+        });
+
+        it('a required choice row shows its error after validate(), without its dialog having opened', () => {
+            const specs: AttributeSpec[] = [
+                { key: 'kind', label: 'Kind', type: 'select', tier: 'required', options: [{ value: 'a', label: 'A' }] },
+            ];
+            const fixture = create(specs);
+            expect(fixture.componentInstance.validate()).toBe(false);
+            fixture.detectChanges();
+            const alerts = Array.from(fixture.nativeElement.querySelectorAll('[role="alert"]')).map(
+                (a: Element) => a.textContent ?? '',
+            );
+            expect(alerts.some((t) => t.includes('Kind is required'))).toBe(true);
         });
 
         it('has no axe violations in flat mode, display and edit', async () => {
