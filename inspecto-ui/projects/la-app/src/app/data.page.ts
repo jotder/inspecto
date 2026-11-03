@@ -163,9 +163,9 @@ import {
                                         @if (drifted(m, d); as gone) {
                                             @if (gone.length) {
                                                 <span class="text-warn w-full text-sm" data-testid="mapping-drift">
-                                                    Reads {{ gone.length === 1 ? 'a column' : 'columns' }}
-                                                    {{ d.id }} no longer has: {{ gone.join(', ') }}. Edit the
-                                                    Mapping, or it cannot be read.
+                                                    Reads {{ gone.length === 1 ? 'a column' : 'columns' }} {{ d.id }} no
+                                                    longer has: {{ gone.join(', ') }}. Edit the Mapping, or it cannot be
+                                                    read.
                                                 </span>
                                             }
                                         }
@@ -374,9 +374,13 @@ export class DataPageComponent implements OnInit {
     });
 
     constructor() {
-        this.form.controls.from.valueChanges
+        this.form.controls.from.valueChanges.pipe(takeUntilDestroyed()).subscribe((from) => {
+            this.form.controls.to.updateValueAndValidity({ emitEvent: false });
+            this.holdsOf(from, this.form.controls.fromType);
+        });
+        this.form.controls.to.valueChanges
             .pipe(takeUntilDestroyed())
-            .subscribe(() => this.form.controls.to.updateValueAndValidity({ emitEvent: false }));
+            .subscribe((to) => this.holdsOf(to, this.form.controls.toType));
     }
 
     ngOnInit(): void {
@@ -417,6 +421,13 @@ export class DataPageComponent implements OnInit {
         return typeOf(classification, this.types());
     }
 
+    /** A column just picked as From or To starts out holding what the base says it holds; the user may change it. */
+    private holdsOf(column: string, holds: { setValue(v: string): void }): void {
+        const base = this.editing()?.base;
+        const col = base?.columns.find((c) => c.name === column);
+        if (col) holds.setValue(typeOf(col.classification, this.types())?.id ?? '');
+    }
+
     mappingsOf(base: string): DataEntry[] {
         return (this.entries() ?? []).filter((e) => e.origin === 'mapping' && e.basedOn === base);
     }
@@ -445,6 +456,7 @@ export class DataPageComponent implements OnInit {
     private open(base: DataEntry, id: string | null, f: MappingForm): void {
         this.saveError.set('');
         this.editing.set({ base, id });
+        // fromType / toType are reset after from / to (declaration order), so Edit keeps the Mapping's own "holds"
         this.form.reset(f);
         // an existing Mapping keeps its name (its id): not edited, so not re-judged by the naming rule
         if (id) this.form.controls.name.disable({ emitEvent: false });

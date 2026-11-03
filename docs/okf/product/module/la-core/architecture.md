@@ -1361,6 +1361,24 @@ limits and the commit's write order are in
   `DatasetEntryRules` (run by `ComponentRoutes.validateKind` on every Dataset write, so the generic component
   routes refuse the same) checks the shape: from and to required and different, every named column one of the
   entry's `columns[]` when it lists any, `primaryEntityType` a non-blank id.
+- **Mappings (LA-DATA-PAGE-1, widened by LA-PIPELINE-MAPPINGS-1 2026-11-03).** A Mapping is a Dataset entry
+  `{origin: mapping, basedOn, physicalRef}` that reads another Dataset's stored rows its own way.
+  - **Its base** (`DatasetEntryRules.validateMapping`) is any stored, plain Dataset: one with a `physicalRef`, not
+    itself a Mapping, and none of `sql`, `view`, `sourceName`, `calculated`. Add data and Pipeline- or Job-fed
+    Datasets both qualify. The Mapping's `physicalRef` must be exactly its base's, and it may name only the base's
+    columns.
+  - **It never widens who reads the base.** `ComponentAccess.canView` judges a Mapping on its base's envelope too,
+    resolved through `ComponentAccess.DatasetEntries` (installed by `ControlApi`, cached per request). So do the
+    caller-less `canViewAs(…, configRoot)` used by `ScheduledIndexBuild` and `StandingDetection`, and
+    `PostgresPublishJobType.canRead`. A hidden or missing base makes the Mapping read as absent. Delete judges only
+    the Mapping's own envelope, so an orphan stays removable.
+  - **Its columns can drift.** A base can lose a column after the Mapping is saved. Preset roles
+    (`PresetQueries.roles`) then refuse 422 with the column named, instead of falling back to the first two classified
+    columns, which used to answer a different graph silently. The Data page marks such a Mapping.
+  - **On the Data page** (la-app), every Dataset that may be a base, and lists at least two columns, gets the Entities
+    and Mappings cards. Picking From or To starts its "holds" at the base's classification. Pipeline-fed Datasets show
+    no arrivals: `GET /datasets/{id}/arrivals` serves Add data Datasets only.
+  - **A Mapping has its own link index.** It is built only when a `la.index.build` Job names the Mapping.
 - **Entity profiles read `defaultLinkMapping` (F-9).** `EntityTypeBindings.resolve` adds the Dataset's own default
   mapping after saved views and published index manifests (skipped when one of those already names the same two
   ends), so link roles and the `links` section are assessed with no saved view. Pinned by

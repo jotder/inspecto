@@ -393,8 +393,9 @@ final class PresetQueries {
      * (Add data and Mappings do); else From and To are its first two columns classified as an Entity Type and Kind a
      * column named {@code kind} or {@code *_kind}. When (if not mapped) is the {@code eventDate}, else the first date
      * or timestamp column; Amount is the first number column whose name the Industry pack hints ({@code measure_hints}).
-     * {@code columns} are the relation's REAL columns ({@link DatasetProvider.Column}, coarse types); a role naming a
-     * column the relation has not got is absent.
+     * {@code columns} are the relation's REAL columns ({@link DatasetProvider.Column}, coarse types). A link mapping that
+     * names a column the relation has not got is refused ({@link IllegalArgumentException}, LA-PIPELINE-MAPPINGS-1); a
+     * role found any other way is simply absent when its column is.
      */
     static Roles roles(Map<String, Object> dataset, List<DatasetProvider.Column> columns, List<EntityTypes.EntityType> types,
                        IndustryPack pack) {
@@ -407,6 +408,18 @@ final class PresetQueries {
             }
         String from = null, to = null, kind = null, time = null;
         if (dataset.get("defaultLinkMapping") instanceof Map<?, ?> m) {
+            // LA-PIPELINE-MAPPINGS-1 (§3.3): a link mapping that names a column the data no longer has is refused, never
+            // quietly replaced by the classified columns - that would answer a different graph under the Mapping's name
+            List<String> gone = new ArrayList<>(), unreadable = new ArrayList<>();
+            for (String k : List.of("from", "to", "kind", "time", "amount"))
+                if (m.get(k) instanceof String s && !s.isBlank() && col(real, s) == null)
+                    (SAFE_IDENT.matcher(s.trim()).matches() ? gone : unreadable).add(s.trim());
+            if (!unreadable.isEmpty())
+                throw new IllegalArgumentException("its link mapping reads " + String.join(", ", unreadable)
+                        + ": preset questions read only columns named with letters, digits and _");
+            if (!gone.isEmpty())
+                throw new IllegalArgumentException("its link mapping reads " + String.join(", ", gone)
+                        + ", which its data does not have (any more) - edit the Mapping or the Dataset's link mapping");
             from = col(real, m.get("from"));
             to = col(real, m.get("to"));
             kind = col(real, m.get("kind"));

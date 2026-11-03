@@ -161,7 +161,9 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
     it('a Pipeline-fed Dataset gets its own Entities and Mappings, and a Mapping of it saves with it as the base', () => {
         const { fixture, el, c } = create();
         const pipe = q(el, 'data-wallet_txn')!;
-        expect(pipe.querySelector('[data-testid="pipeline-card"]')!.textContent).toContain('Kept up to date by a Pipeline or a Job');
+        expect(pipe.querySelector('[data-testid="pipeline-card"]')!.textContent).toContain(
+            'Kept up to date by a Pipeline or a Job',
+        );
         expect(pipe.querySelector('inspecto-import-dataset-card')).toBeNull(); // no Add a file, Run now or arrivals
         expect(pipe.querySelector('[data-testid="entities"]')!.textContent).toContain('src_id');
         expect(pipe.querySelector('[data-testid="mapping-by_agent"]')).not.toBeNull();
@@ -178,6 +180,26 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(body['physicalRef']).toBe('wallet_txn/database');
         req.flush({ name: 'wallet_to_wallet' });
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('picking From or To starts its "holds" at what the base says; Edit keeps what the Mapping holds', () => {
+        const { c } = create();
+        c.newMapping(c.bases().find((d) => d.id === 'wallet_txn')!);
+        expect(c.form.getRawValue().fromType).toBe(''); // the base has no link mapping of its own yet
+        c.form.controls.from.setValue('src_id');
+        c.form.controls.to.setValue('txn_date');
+        expect(c.form.getRawValue().fromType).toBe('account'); // src_id holds ACCOUNT_ID in the base
+        expect(c.form.getRawValue().toType).toBe(''); // a detail
+        c.form.controls.toType.setValue('account'); // the user may still change it
+        expect(c.form.getRawValue().toType).toBe('account');
+
+        // an existing Mapping that reads to_account as nothing keeps that on Edit, though the base classifies it
+        c.editMapping(c.imports()[0], {
+            ...c.mappingsOf('transfers')[0],
+            columns: [],
+            mapping: { from: 'from_account', to: 'to_account' },
+        });
+        expect(c.form.getRawValue().toType).toBe('');
     });
 
     it('a Mapping that reads a column its base no longer lists is marked, naming the column', async () => {

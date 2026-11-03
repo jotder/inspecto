@@ -200,20 +200,33 @@ These changes need the right to edit Datasets when you sign in; without it they 
 
 ### 3.4 The Data page: Datasets, Entities and Mappings
 
-**Data** (left navigation) lists every Dataset you added with *Add data*. For each one:
+**Data** (left navigation) lists every Dataset you added with *Add data*, then every Dataset a Pipeline or a Job keeps
+up to date. For each one:
 
-- its card: the **Data status** line (when data last arrived, the period it covers, whether the graph has it), the
-  **Arrivals** (every file it took, uploaded or put in its inbox by another system), *Add a file* and *Run now*;
+- its card: for a Dataset you added, the **Data status** line (when data last arrived, the period it covers, whether the
+  graph has it), the **Arrivals** (every file it took, uploaded or put in its inbox by another system), *Add a file* and
+  *Run now*; for one a Pipeline or a Job keeps up to date, *Kept up to date by a Pipeline or a Job* - its data is
+  written there, so there is nothing to add here;
 - **Entities**: what each column holds, one Entity Type or *Nothing: a detail* per column - changed here, saved at once;
 - **Mappings**: how its rows are read as links. The Dataset has its own; **New mapping** saves another, under its own
-  name: *From* and *To* (and what each holds), and optionally *Kind of link*, *When* and *Amount*. A Mapping is a Dataset
+  name: *From* and *To* (what each holds starts at what the Dataset says that column holds), and optionally *Kind of
+  link*, *When* and *Amount*. A Mapping is a Dataset
   of its own over the same data - it appears in the Start box and everywhere a Dataset does, without copying anything.
   One file of transfers can be read as *account → account* and as *account → channel*. *Edit* changes a Mapping, *Delete*
   removes only the Mapping (never the data), *Explore* opens it in Link Analysis.
 
 Files always go to the Dataset you added, never to a Mapping (*Add a file* on a Mapping is refused and names the
-Dataset). A Dataset that Mappings read cannot be deleted until they are. Datasets kept up to date by Pipelines are listed
-by name at the end of the page.
+Dataset). A Dataset that Mappings read cannot be deleted until they are.
+
+- **Who sees a Mapping:** only someone who may read its Dataset. A Mapping never shows a Dataset's rows to someone the
+  Dataset is not shared with; for them it is simply not there.
+- **When a Dataset changes under a Mapping:** if a Pipeline drops a column a Mapping reads, the Mapping is marked
+  (*Reads a column … no longer has: …*), and a preset question over it is refused with the column named rather than
+  answered over other columns. Edit the Mapping.
+- **Other Datasets** at the end of the page are listed by name. They are computed when read, have no stored data, are
+  an Entity List's store, or list fewer than two columns, so no Mapping is offered for them.
+- A Mapping of a large Dataset has no link index of its own until an administrator adds an index build Job for it. Until
+  then, preset questions over it read the Dataset.
 
 ---
 

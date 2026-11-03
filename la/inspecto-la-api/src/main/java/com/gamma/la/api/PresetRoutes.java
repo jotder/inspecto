@@ -198,8 +198,13 @@ public final class PresetRoutes implements RouteModule {
         }
         LinkAnalysisSettings settings = LinkAnalysisSettings.forRoot(writeRoot);
         IndustryPack pack = settings.activePack();
-        return new Target(datasetId, relationSql,
-                PresetQueries.roles(dataset, columns, settings.effectiveEntityTypes(), pack), pack == null ? null : pack.id());
+        PresetQueries.Roles roles;
+        try {
+            roles = PresetQueries.roles(dataset, columns, settings.effectiveEntityTypes(), pack);
+        } catch (IllegalArgumentException drifted) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + datasetId + "': " + drifted.getMessage());
+        }
+        return new Target(datasetId, relationSql, roles, pack == null ? null : pack.id());
     }
 
     private static String datasetOf(Object raw) {

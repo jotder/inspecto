@@ -409,6 +409,17 @@ class ControlApiPresetQueriesTest {
             assertEquals(422, send(c, "POST", "/inv/presets/two_steps/run", "{\"dataset\":\"graph_ds\"}").statusCode());
             // pairs_ds maps no When: Newcomers is refused, not run over nothing
             assertEquals(422, send(c, "POST", "/inv/presets/newcomers/run", "{\"dataset\":\"pairs_ds\"}").statusCode());
+            // LA-PIPELINE-MAPPINGS-1 (§3.3): a link mapping naming a column the data lacks (a base that changed under a
+            // Mapping) is refused with the column named - never answered over the classified columns instead
+            new ComponentStore(root.resolve("registry")).write("dataset", "drifted_ds", Map.of("view", "pays_view",
+                    "columns", List.of(Map.of("name", "caller", "classification", "MSISDN"), Map.of("name", "callee",
+                            "classification", "MSISDN")), "defaultLinkMapping", Map.of("from", "caller", "to", "agent_id")));
+            HttpResponse<String> listed = send(c, "GET", "/inv/presets?dataset=drifted_ds", null);
+            assertEquals(422, listed.statusCode(), listed.body());
+            assertTrue(listed.body().contains("agent_id"), listed.body());
+            HttpResponse<String> ran = send(c, "POST", "/inv/presets/fan_out/run", "{\"dataset\":\"drifted_ds\"}");
+            assertEquals(422, ran.statusCode(), ran.body());
+            assertTrue(ran.body().contains("which its data does not have"), ran.body());
             HttpResponse<String> manyDays = send(c, "POST", "/inv/presets/newcomers/run",
                     "{\"dataset\":\"graph_ds\",\"params\":{\"days\":\"99999999999\"}}");
             assertEquals(422, manyDays.statusCode(), manyDays.body());

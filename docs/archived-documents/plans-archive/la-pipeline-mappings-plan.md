@@ -1,6 +1,6 @@
 # Mappings of Pipeline Datasets (`LA-PIPELINE-MAPPINGS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 and P1 BUILT 2026-11-03 (§8, §9).** Operator ask, after a walkthrough of the
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0, P1 and P2 BUILT 2026-11-03 (§8-§10). SHIPPED 2026-11-03, archived.** Operator ask, after a walkthrough of the
 > Entities and Data pages in Basic: a saved **Mapping** (a Dataset of its own that reads another Dataset's rows its own
 > way) should work for Datasets that **Pipelines** keep up to date, not only for Datasets added with *Add data*.
 > Board row `LA-PIPELINE-MAPPINGS-1`.
@@ -162,3 +162,25 @@ filter rows (a Mapping reads every row of its base); building link indexes for M
   the base, the drift mark naming only the missing column, computed and column-less Datasets left under Other
   Datasets, and axe. `data-page.spec.ts` covers `mappable` for each case and `driftedColumns`. Ran the la-app specs
   (21 files, 130 tests), eslint and `lint:tokens`, all clean.
+
+## 10. As built: P2 (2026-11-03) - shipped
+
+- **Live check, Basic on `la-mobile-money`** (synthetic):
+  - On the Data page, *New mapping* on `mm_links_dataset` (built by the `mm_links` Job, with no link mapping of its
+    own) saved **`mm_wallet_links`**: `src → dst`, both Wallet, kind `kind`, when `ts`, amount `amount`. The server
+    answered 200; under P0 this base was refused.
+  - The Mapping appears in the Start box with Wallet as its Entity Type and offers all nine presets, *Quick cash-out*
+    included (it needs amount and time, which the base alone did not map). *Reaching many* answered 50 rows from the
+    Dataset. `mm_wallet_links` is kept in the Space as a working example.
+- **Drift found a silent fallback - fixed.** The check used a hand-written Mapping reading `agent_id`, a column
+  `mm_links` lacks. It answered *Reaching many* with 50 rows: `PresetQueries.roles` dropped the missing column and
+  fell back to the first two classified columns (`src`, `dst`), a different graph under the Mapping's name. Now a link
+  mapping that names a column the data lacks is refused 422, naming the column, on both the list and the run
+  (`ControlApiPresetQueriesTest.refusesInGateOrder`, `drifted_ds`). The check file was then removed.
+- **Form fix found while saving:** picking From or To left its *holds* at *Nothing: a detail* even when the base
+  classifies that column. Picking a column now starts its *holds* at the base's classification. Edit keeps the
+  Mapping's own choice: the form resets the *holds* fields after From and To, in declaration order
+  (`data.page.spec.ts`). Columns whose names are not letters, digits and `_` are refused with that reason, not as
+  missing.
+- Docs: user guide §3.4 (Pipeline and Job Datasets, who sees a Mapping, drift, other Datasets, index), la-core
+  `architecture.md` (Mappings). The Mapping's own link index stays out of scope (Q-4), as the guide says.
