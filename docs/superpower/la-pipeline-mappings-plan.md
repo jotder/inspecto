@@ -1,6 +1,6 @@
 # Mappings of Pipeline Datasets (`LA-PIPELINE-MAPPINGS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 open (recommendations in §6).** Operator ask, after a walkthrough of the
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6).** Operator ask, after a walkthrough of the
 > Entities and Data pages in Basic: a saved **Mapping** (a Dataset of its own that reads another Dataset's rows its own
 > way) should work for Datasets that **Pipelines** keep up to date, not only for Datasets added with *Add data*.
 > Board row `LA-PIPELINE-MAPPINGS-1`.
@@ -75,7 +75,7 @@ and the presets and draws; a computed Dataset is refused with the reason; on a s
 access to the base can neither read nor create a Mapping of it (tests); a Mapping whose base dropped a column it reads
 is marked on the Data page.
 
-## 6. Decisions (recommendations; the operator decides)
+## 6. Decisions (operator 2026-11-03: accepted as recommended)
 
 - **Q-1 Which bases.** (a) any stored, plain Dataset of any origin except a Mapping ⟵ *recommended*; (b) Pipeline
   Datasets only by an allow-list in Settings; (c) also computed (`sql` / `view`) Datasets - a Mapping would then copy
