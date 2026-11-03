@@ -122,6 +122,34 @@ export interface ImportExpectation {
     message?: string | null;
 }
 
+/**
+ * One arrival of an import Dataset (`GET /datasets/{id}/arrivals`, LA-ARRIVAL-LEDGER-1): a file its Pipeline took. `sender`
+ * `system` = a file a foreign process put in the inbox; `kept` false = a later Replace everything set its rows aside.
+ */
+export interface Arrival {
+    file: string;
+    sender: 'upload' | 'system';
+    received: string | null;
+    status: string | null;
+    rowsRead: number | null;
+    rowsRejected: number | null;
+    mode: 'replace' | 'append' | null;
+    sha256: string | null;
+    index: string | null;
+    consignment: string;
+    kept: boolean;
+    coversFrom: string | null;
+    coversTo: string | null;
+}
+
+export interface Arrivals {
+    dataset: string;
+    eventDateColumn: string | null;
+    arrivals: Arrival[];
+    truncated: boolean;
+    reason: string | null;
+}
+
 /** The run summary the commit, Add a file and Run now answer (200), or a followed run's `summary`. */
 export interface ImportSummary {
     dataset: string;
@@ -577,4 +605,63 @@ export function editionLock(
     const flag = features[feature];
     const locked = flag === false || (flag === undefined && edition === 'basic');
     return locked ? (reasons[feature] ?? fallback) : null;
+}
+
+// ── LA-ARRIVAL-LEDGER-1: the arrivals of an import Dataset in words ──────────────────────────────────────────
+
+/** A ledger time (no zone) or an event value as shown: date and minutes, or the date alone. */
+function when(v: string | null, dateOnly = false): string {
+    if (!v) return '';
+    const t = v.replace('T', ' ');
+    return dateOnly ? t.slice(0, 10) : t.slice(0, 16);
+}
+
+/** The period an arrival (or the Dataset) covers, `2026-09-01 – 2026-09-28`; '' when its event dates are unknown. */
+export function coversText(from: string | null, to: string | null): string {
+    if (!from || !to) return '';
+    const a = when(from, true);
+    const b = when(to, true);
+    return a === b ? a : `${a} – ${b}`;
+}
+
+/**
+ * The Dataset's **Data status** in one line, from its newest arrival: when data last arrived, the period the data still kept
+ * covers, and whether the graph has it - said only when the import recorded it (a file from a system has no such record).
+ */
+export function dataStatusLine(list: readonly Arrival[]): string | null {
+    const newest = list[0];
+    if (!newest) return null;
+    const parts = [`Received ${when(newest.received)}`];
+    const kept = list.filter((a) => a.kept);
+    const froms = kept.map((a) => a.coversFrom).filter((v): v is string => !!v);
+    const tos = kept.map((a) => a.coversTo).filter((v): v is string => !!v);
+    const covers =
+        froms.length && tos.length
+            ? coversText(
+                  froms.reduce((x, y) => (y < x ? y : x)),
+                  tos.reduce((x, y) => (y > x ? y : x)),
+              )
+            : '';
+    if (covers) parts.push(`covers ${covers}`);
+    if (newest.index === 'BUILT' || newest.index === 'UP_TO_DATE') parts.push('graph up to date');
+    else if (newest.index === 'DEFERRED') parts.push("the graph is updated by the Space's Jobs");
+    else if (newest.index === 'FAILED' || newest.index === 'REFUSED') parts.push('the graph was not updated');
+    return parts.join(' · ');
+}
+
+/** One arrival in words: who sent it, what it did, its rows and period, and whether its rows are still kept. */
+export function arrivalLine(a: Arrival): string {
+    const parts = [a.sender === 'upload' ? 'uploaded' : 'from a system'];
+    if (a.mode === 'replace') parts.push('replaced the data');
+    else if (a.mode === 'append') parts.push('added its rows');
+    if (typeof a.rowsRead === 'number')
+        parts.push(
+            a.rowsRejected
+                ? `${plural(a.rowsRead, 'row', 'rows')} (${a.rowsRejected} rejected)`
+                : plural(a.rowsRead, 'row', 'rows'),
+        );
+    const covers = coversText(a.coversFrom, a.coversTo);
+    if (covers) parts.push(`covers ${covers}`);
+    if (!a.kept) parts.push('set aside by a later replace');
+    return parts.join(' · ');
 }

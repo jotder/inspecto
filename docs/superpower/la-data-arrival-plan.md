@@ -106,6 +106,30 @@ origin, logical_name`. So the arrival list is a **read** over that ledger, not a
   `OnboardImport` (an upload); a drop simply has no sidecar row (sender = *a system*).
 - `GET /datasets/{id}/arrivals` joins the two; `lastImport` stays as it is (the Home card) until the UI reads the list.
 
+## 5b. P1 as built (2026-11-03, assistant-decided under operator delegation "take decisions on my behalf")
+
+- `GET /datasets/{id}/arrivals` (`inspecto/.../control/DatasetArrivals.java`, registered in `DatasetRoutes`): a READ gate as
+  `/freshness` (503 no write root · 400 bad id · 404 unknown or shared away); a Dataset no import made answers 200 with no
+  arrivals and the reason. Newest first, at most 200 (`truncated`). Per arrival: `file, sender (upload | system),
+  received, status, rowsRead, rowsRejected, mode, sha256, index, consignment, kept, coversFrom, coversTo`. The import
+  fields of the entry are never trusted alone: only the Add data Pipeline written for THIS id is read (a forged
+  `importPipeline` answers no arrivals), as `OnboardImport.importDataset` does. Accepted for now (review 2026-11-03): the
+  whole per-file ledger is read per request before the newest 200 are cut; the sha256 is read in the request thread.
+- Sidecar `<dataRoot>/<id>/arrivals.jsonl`, one line per successful upload, written after the run (first commit and Add a
+  file), matched to the ledger row by the **landed file name** (unique per upload, `add_<stamp>_…`; one run may take an
+  upload and a waiting drop together, even in separate Consignments). Best effort: a failed write only makes that upload read as *from a system*.
+- Period: min / max of the Dataset's `eventDate` over the arrival's own Parquet outputs, read in a DuckDB sealed to
+  `<dataRoot>/<id>`; outputs outside it are never read. No `eventDate` → no period.
+- UI: the Add data **Dataset card** shows *Data status* (received · covers · graph, the graph part only when the upload
+  recorded an index outcome) and an **Arrivals** list (five, then *Show all*), re-read after every Add a file / Run now.
+- **Decisions taken (review on return):** (a) a *system* arrival says nothing about the graph rather than guess - Run
+  now's own index outcome is not recorded per file yet; (b) the *Data status* is on the Dataset card only for now - the
+  Start box and dock lines wait for a second request, so the Explorer screens stay as they are; (c) no capability on
+  the read (as `/freshness`): the list holds file names and counts, never row values; (d) the sidecar is not versioned
+  or signed - it is display data, the audit ledger stays the record.
+- Tests: `ControlApiOnboardFilesTest#theArrivalsOfAnImportDatasetAreListedNewestFirstWithTheirPeriod` (real HTTP),
+  `import-dataset-card.component.spec.ts` (rendering, five-then-all, a11y; the wording helpers).
+
 ## 6. Decisions (operator 2026-11-03: the recommended options, accepted)
 
 - **D-1 Basic and foreign drops: manual.** Basic shows the Dataset's inbox path and *N files waiting · Import waiting

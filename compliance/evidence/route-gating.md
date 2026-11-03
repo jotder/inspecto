@@ -171,7 +171,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/dashboards/([^/]+)/share` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:55` |
 | PUT | `/datasets/([^/]+)/columns/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |
 | POST | `/datasets/([^/]+)/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:76` |
-| POST | `/datasets/([^/]+)/materialize` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java:66` |
+| POST | `/datasets/([^/]+)/materialize` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java:67` |
 | POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:78` |
 | POST | `/db/query` | exempt | group-gated | `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java:62` |
 | POST | `/decision-rules` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:64` |

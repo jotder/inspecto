@@ -227,6 +227,17 @@ the Space setting `data.self_import` (on with no sign-in, off with sign-in until
 ⛔ never "upload wizard" or "import wizard"; ⛔ not the Investigation tab's analyst upload (`/inv/uploads`, which
 only drops a file in an existing Collector's inbox).
 
+**Arrival** — One file a Dataset's Pipeline took: an upload (*Add data*, *Add a file*) or a file a foreign process put
+in its inbox (*from a system*). Listed newest first by `GET /datasets/{id}/arrivals` with its rows, the period it covers
+and whether its rows are still kept (`LA-ARRIVAL-LEDGER-1`). One arrival is one file of a **Consignment**. ⛔ not
+"import" for a file a system sent; ⛔ not "batch".
+
+**Data status** — The one line that says, for a Dataset, when data last **arrived** (*Received*), the period its kept
+data **covers** (*Data as of* is the end of that period), and whether the **graph** includes it — said only when known.
+
+**Link index** — Link Analysis' prebuilt store of a Dataset's links, built from its files so a graph reads fast; built
+in the import run, or by the Space's `la.index.build` Job (Standard and above). Its state is *up to date* or *waiting*.
+
 **Consignment** — A set of one or more files ingested and processed together as one unit of work. ⛔ *Batch*
 in this entity sense (renamed 2026-08-03, §13 — ✅ **rolled out in the Java code 2026-08-31**: the types are
 `Consignment`, `ConsignmentEvent`/`ConsignmentEventBus`, `ConsignmentManifest`, `ConsignmentAuditWriter`/

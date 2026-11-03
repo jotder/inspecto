@@ -4,6 +4,7 @@ import { Observable, filter, switchMap, take, tap, throwError, timer } from 'rxj
 import { apiUrl, toParams } from '@inspecto/core/api';
 import { ShortReads } from '@inspecto/core/api/short-reads';
 import type {
+    Arrivals,
     CommitBody,
     DataSettings,
     FormatOverrides,
@@ -111,6 +112,11 @@ export class OnboardService {
                 r.state === 'succeeded' && r.summary ? [r.summary] : throwError(() => new ImportRunFailed(r)),
             ),
         );
+    }
+
+    /** Every file the import Dataset took, newest first, with the period each covers (a read: no capability). */
+    arrivals(datasetId: string): Observable<Arrivals> {
+        return this.http.get<Arrivals>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/arrivals`));
     }
 
     /** The Space's `data.self_import` (OB-7): whether people may Add data here. */

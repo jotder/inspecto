@@ -491,6 +491,69 @@ class ControlApiOnboardFilesTest {
         }
     }
 
+    /**
+     * LA-ARRIVAL-LEDGER-1: GET /datasets/{id}/arrivals lists every file the import took, newest first - uploads with their
+     * name, mode and sha256, a foreign drop as one from a system - with the period each covers; a Replace everything marks
+     * the older arrivals as no longer kept.
+     */
+    @Test
+    void theArrivalsOfAnImportDatasetAreListedNewestFirstWithTheirPeriod(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("arrivals");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            byte[] november = transfers(30).getBytes(StandardCharsets.UTF_8);
+            data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv&mode=append", november, null), 200);
+            Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(20));
+            data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+
+            JsonNode out = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200);
+            JsonNode list = out.get("arrivals");
+            assertEquals(3, list.size(), out.toString());
+            assertNotNull(out.get("eventDateColumn").textValue(), "Add data names the When column: " + out);
+
+            JsonNode drop = list.get(0), nov = list.get(1), first = list.get(2);
+            assertEquals("system", drop.get("sender").asText(), drop.toString());
+            assertTrue(drop.get("file").asText().contains("foreign_drop"), drop.toString());
+            assertEquals(20, drop.get("rowsRead").asLong());
+            assertTrue(drop.get("mode").isNull());
+
+            assertEquals("upload", nov.get("sender").asText(), nov.toString());
+            assertEquals("november.csv", nov.get("file").asText());
+            assertEquals("append", nov.get("mode").asText());
+            assertEquals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(november)),
+                    nov.get("sha256").asText(), "the upload's own bytes");
+            assertEquals("transfers.csv", first.get("file").asText());
+            for (JsonNode a : list) {
+                assertTrue(a.get("kept").asBoolean(), a.toString());
+                assertTrue(a.get("coversFrom").asText().startsWith("2026-09"), "the period read from its Parquet: " + a);
+                assertTrue(a.get("coversTo").asText().compareTo(a.get("coversFrom").asText()) >= 0, a.toString());
+            }
+
+            // Replace everything: the newest arrival is kept, every older one is set aside
+            data(send(c, "POST", "/datasets/" + id + "/files?name=december.csv", transfers(10).getBytes(StandardCharsets.UTF_8), null), 200);
+            JsonNode after = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals(4, after.size());
+            assertEquals("replace", after.get(0).get("mode").asText());
+            assertTrue(after.get(0).get("kept").asBoolean());
+            for (int i = 1; i < 4; i++) assertFalse(after.get(i).get("kept").asBoolean(), after.get(i).toString());
+
+            // gates: unknown 404; a Dataset no import made answers 200 with no arrivals and why
+            assertEquals(404, json(c, "GET", "/datasets/nope/arrivals", null, null).statusCode());
+            new ComponentStore(root.resolve("registry")).write("dataset", "piped", Map.of("physicalRef", "piped/database"));
+            JsonNode piped = data(json(c, "GET", "/datasets/piped/arrivals", null, null), 200);
+            assertEquals(0, piped.get("arrivals").size());
+            assertTrue(piped.get("reason").asText().contains("not made with Add data"), piped.toString());
+
+            // a forged entry naming ANOTHER Dataset's import Pipeline reads nothing of it (its import fields are editable)
+            new ComponentStore(root.resolve("registry")).write("dataset", "forged",
+                    Map.of("physicalRef", id + "/database", "origin", "import", "importPipeline", id, "eventDate", "booked_at"));
+            JsonNode forged = data(json(c, "GET", "/datasets/forged/arrivals", null, null), 200);
+            assertEquals(0, forged.get("arrivals").size(), forged.toString());
+            assertTrue(forged.get("eventDateColumn").isTextual());
+        }
+    }
+
     private static String listing(Path dir) throws Exception {
         if (!Files.exists(dir)) return "(none)";
         try (var s = Files.walk(dir)) {

@@ -14,6 +14,7 @@ import {
     viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription } from 'rxjs';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -24,7 +25,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { AddDataAccess } from './add-data-access';
-import { ImportDataset, ImportSummary, fileProblem } from './add-data.model';
+import { Arrival, ImportDataset, ImportSummary, arrivalLine, dataStatusLine, fileProblem } from './add-data.model';
 import { ImportSummaryComponent } from './import-summary.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
@@ -68,11 +69,46 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             @if (dataset().description) {
                 <p class="text-secondary m-0 text-sm">{{ dataset().description }}</p>
             }
+            @if (statusLine(); as line) {
+                <p class="m-0 text-sm" data-testid="data-status">
+                    <span class="font-semibold">Data status:</span> {{ line }}
+                </p>
+            }
             @if (last(); as s) {
                 <div class="flex flex-col gap-1">
                     <h4 class="m-0 text-sm font-semibold">Last import</h4>
                     <inspecto-import-summary [summary]="s"></inspecto-import-summary>
                 </div>
+            }
+            @if (arrivals().length) {
+                <section
+                    class="flex flex-col gap-1"
+                    [attr.aria-labelledby]="titleId + '-arrivals'"
+                    data-testid="arrivals"
+                >
+                    <h4 class="m-0 text-sm font-semibold" [id]="titleId + '-arrivals'">Arrivals</h4>
+                    <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+                        @for (a of shownArrivals(); track a.consignment + a.file) {
+                            <li [class.text-secondary]="!a.kept">
+                                <span class="font-medium">{{ a.file }}</span>
+                                <span class="text-secondary"> · {{ received(a) }}</span>
+                                <span class="block text-xs">{{ line(a) }}</span>
+                            </li>
+                        }
+                    </ul>
+                    @if (arrivals().length > arrivalsShown) {
+                        <button
+                            mat-button
+                            type="button"
+                            class="self-start"
+                            data-testid="arrivals-more"
+                            [attr.aria-expanded]="allArrivals()"
+                            (click)="allArrivals.set(!allArrivals())"
+                        >
+                            {{ allArrivals() ? 'Show fewer' : 'Show all ' + arrivals().length }}
+                        </button>
+                    }
+                </section>
             }
 
             @if (dataset().kind === 'stream') {
@@ -190,11 +226,40 @@ export class ImportDatasetCardComponent {
     protected readonly locked = computed(() => this.access.lockReason());
     private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
+    /** LA-ARRIVAL-LEDGER-1: every file the import took, newest first; [] while unread or when the read fails. */
+    protected readonly arrivals = signal<Arrival[]>([]);
+    protected readonly arrivalsShown = 5;
+    protected readonly allArrivals = signal(false);
+    protected readonly shownArrivals = computed(() =>
+        this.allArrivals() ? this.arrivals() : this.arrivals().slice(0, this.arrivalsShown),
+    );
+    protected readonly statusLine = computed(() => dataStatusLine(this.arrivals()));
+    protected readonly line = arrivalLine;
+    protected readonly received = (a: Arrival): string => (a.received ?? '').replace('T', ' ').slice(0, 16);
+
     constructor() {
         effect(() => {
             const s = this.summary();
             untracked(() => this.last.set(s));
         });
+        effect(() => {
+            const id = this.dataset().id;
+            untracked(() => this.loadArrivals(id));
+        });
+    }
+
+    private arrivalsRead?: Subscription;
+
+    /** Re-read the arrivals; a read still in flight is dropped, so an older answer never overwrites a newer one. */
+    private loadArrivals(id: string): void {
+        this.arrivalsRead?.unsubscribe();
+        this.arrivalsRead = this.onboard
+            .arrivals(id)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (r) => this.arrivals.set(r.arrivals ?? []),
+                error: () => this.arrivals.set([]), // the card stays usable; only the history is missing
+            });
     }
 
     protected onFile(event: Event): void {
@@ -224,6 +289,7 @@ export class ImportDatasetCardComponent {
                 this.busy.set(false);
                 this.last.set(s);
                 this.imported.emit(s);
+                this.loadArrivals(this.dataset().id);
             },
             error: (err: unknown) => {
                 this.busy.set(false);

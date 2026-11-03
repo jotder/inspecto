@@ -558,6 +558,8 @@ final class OnboardImport {
         Path aside;
         /** The ledger's {@code consignment_id} of the last batch {@link #runChecked} saw this run add; null if none. */
         String runBatch;
+        /** sha256 of the uploaded file (LA-ARRIVAL-LEDGER-1), read as it lands; null for Run now. */
+        String sha256;
 
         Job(Space space, String id, String kind, Path source, String fileName, Map<String, Object> dataset, boolean replace) {
             this.space = space;
@@ -585,6 +587,7 @@ final class OnboardImport {
             String stem = source.getFileName().toString().replaceFirst("\\.[^.]*$", "");
             Path dest = in.resolve("add_" + stamp() + "_" + stem + "." + extension(type));
             Path tmp = in.resolve(".landing-" + dest.getFileName());
+            sha256 = DatasetArrivals.sha256(source);
             Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
             Files.move(tmp, dest, StandardCopyOption.ATOMIC_MOVE);   // the poll never sees a half-written file
             landed = dest;
@@ -609,6 +612,7 @@ final class OnboardImport {
             registry.write("dataset", id, dataset);
             undo.push(() -> registry.delete("dataset", id));
             followOn(summary);
+            recordArrival(summary);
             OnboardRoutes.deleteTree(draftDir);
             undo.clear();
             com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_DATASET);   // OB-13
@@ -682,6 +686,11 @@ final class OnboardImport {
             if (runBatch != null) m.put("batch", runBatch);
             if (fileName != null) m.put("file", fileName);
             return m;
+        }
+
+        /** LA-ARRIVAL-LEDGER-1: what the run ledger cannot know about this upload, for {@code GET /datasets/{id}/arrivals}. */
+        void recordArrival(Map<String, Object> summary) {
+            DatasetArrivals.recordUpload(space.dataRoot(), id, runBatch, landed, fileName, replace, sha256, summary);
         }
 
         /**
@@ -952,6 +961,7 @@ final class OnboardImport {
                     j.recordLastImport(s);   // before the old rows are dropped: a failed write still restores them
                     j.dropAside();
                     j.followOn(s);
+                    j.recordArrival(s);
                     j.undo.clear();
                     return s;
                 } finally {

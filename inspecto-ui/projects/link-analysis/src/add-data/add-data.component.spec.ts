@@ -135,7 +135,11 @@ function commit(fixture: ComponentFixture<HostComponent>, el: HTMLElement): Test
 const bodyOf = (req: TestRequest) => req.request.body as CommitBody;
 
 describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1)', () => {
-    afterEach(() => http?.verify());
+    afterEach(() => {
+        // LA-ARRIVAL-LEDGER-1: the Dataset card reads its arrivals; a test that does not look at them answers none
+        http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        http?.verify();
+    });
 
     it('step 1: formats and this Space limits are shown BEFORE upload; a database is locked on Basic (no violations)', async () => {
         const { el } = create();

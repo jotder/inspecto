@@ -9,7 +9,15 @@ import { apiUrl, LensService } from '@inspecto/core/api';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { AddDataAccess } from './add-data-access';
-import { AUTOMATION_FALLBACK, ImportDataset, ImportSummary, SELF_IMPORT_OFF } from './add-data.model';
+import {
+    Arrival,
+    AUTOMATION_FALLBACK,
+    ImportDataset,
+    ImportSummary,
+    SELF_IMPORT_OFF,
+    arrivalLine,
+    dataStatusLine,
+} from './add-data.model';
 import { summary } from './add-data.testing';
 import { ImportDatasetCardComponent } from './import-dataset-card.component';
 
@@ -81,7 +89,11 @@ function create(o: Opts = {}) {
 const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
 describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-14, DT-14)', () => {
-    afterEach(() => http?.verify());
+    afterEach(() => {
+        // LA-ARRIVAL-LEDGER-1: the Dataset card reads its arrivals; a test that does not look at them answers none
+        http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        http?.verify();
+    });
 
     it('Basic: "one-time import", Add a file beside Run now, and Keep this up to date locked with its reason (no violations)', async () => {
         const { fixture, el } = create();
@@ -177,5 +189,81 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(q(el, 'card-locked')!.textContent).toContain(SELF_IMPORT_OFF);
         expect((q(el, 'run-now') as HTMLButtonElement).disabled).toBe(true);
         expect(TestBed.inject(AddDataAccess).lockReason()).toBe(SELF_IMPORT_OFF);
+    });
+
+    it('LA-ARRIVAL-LEDGER-1: shows the Data status and the newest arrivals, five at first, a set-aside one marked (no violations)', async () => {
+        const { fixture, el } = create();
+        const a = (i: number, over: Partial<Arrival> = {}): Arrival => ({
+            file: `f${i}.csv`,
+            sender: 'upload',
+            received: `2026-11-0${i} 09:1${i}:00`,
+            status: 'SUCCESS',
+            rowsRead: 10 * i,
+            rowsRejected: 0,
+            mode: 'append',
+            sha256: null,
+            index: null,
+            consignment: `b${i}`,
+            kept: true,
+            coversFrom: `2026-09-0${i} 00:00:00`,
+            coversTo: `2026-09-1${i} 00:00:00`,
+            ...over,
+        });
+        const list = [
+            a(7, { sender: 'system', mode: null, file: 'drop.csv' }),
+            a(6, { index: 'BUILT' }),
+            a(5),
+            a(4),
+            a(3),
+            a(2, { kept: false }),
+            a(1, { mode: 'replace', kept: false }),
+        ];
+        http.expectOne(apiUrl('/datasets/transfers/arrivals')).flush({
+            dataset: 'transfers',
+            eventDateColumn: 'booked_at',
+            arrivals: list,
+            truncated: false,
+            reason: null,
+        });
+        fixture.detectChanges();
+        const status = q(el, 'data-status')!.textContent ?? '';
+        expect(status).toContain('Received 2026-11-07 09:17');
+        expect(status).toContain('covers 2026-09-03 – 2026-09-17'); // the kept arrivals only
+        const items = () => Array.from(q(el, 'arrivals')!.querySelectorAll('li')).map((li) => li.textContent ?? '');
+        expect(items().length).toBe(5);
+        expect(items()[0]).toContain('drop.csv');
+        expect(items()[0]).toContain('from a system');
+        expect(items()[1]).toContain('uploaded · added its rows · 60 rows');
+        (q(el, 'arrivals-more') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(items().length).toBe(7);
+        expect(items()[6]).toContain('replaced the data');
+        expect(items()[6]).toContain('set aside by a later replace');
+        await expectNoA11yViolations(el);
+    });
+
+    it('LA-ARRIVAL-LEDGER-1: the graph part of the Data status is said only when the import recorded it', () => {
+        const base: Arrival = {
+            file: 'x.csv',
+            sender: 'upload',
+            received: '2026-11-02 08:00:00',
+            status: 'SUCCESS',
+            rowsRead: 1,
+            rowsRejected: 0,
+            mode: 'append',
+            sha256: null,
+            index: null,
+            consignment: 'b',
+            kept: true,
+            coversFrom: null,
+            coversTo: null,
+        };
+        expect(dataStatusLine([base])).toBe('Received 2026-11-02 08:00');
+        expect(dataStatusLine([{ ...base, index: 'BUILT' }])).toBe('Received 2026-11-02 08:00 · graph up to date');
+        expect(dataStatusLine([{ ...base, index: 'DEFERRED' }])).toContain("updated by the Space's Jobs");
+        expect(dataStatusLine([])).toBeNull();
+        expect(arrivalLine({ ...base, rowsRead: 5, rowsRejected: 2 })).toBe(
+            'uploaded · added its rows · 5 rows (2 rejected)',
+        );
     });
 });
