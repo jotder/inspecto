@@ -58,6 +58,13 @@ Dataset or Mapping says is the amount. A Mapping chosen for a different amount g
 - **One place for the meaning of a column.** The role belongs to the column (`columns[].role`, beside
   `classification`), not to each Mapping: today every Mapping would repeat "this is a date". A Mapping reads its base's
   roles and may override one (as it already overrides "holds").
+- **One vocabulary on the existing key (operator decision B, 2026-11-04).** `columns[].role` already existed, with
+  the Studio / materialization values `dimension | measure | temporal`, and `DatasetRelation.temporalColumn` (read by
+  Reconciliation's `ReconDay`) refused two `temporal` columns. The role set is therefore stored as
+  `entity | temporal | measure | dimension | detail`, shown as Entity · Time · Measure · Category · Detail (the
+  mapping is in `docs/GLOSSARY.md` *Column Role*); materialization seeds stay valid. `temporalColumn` keeps one
+  `temporal` column as before; with several it takes the one the link mapping's `time` names, and with none named
+  the refusal stands. Rejected: (A) a separate `linkRole` key — two keys for one meaning.
 - **Back-compatible read.** An entry without roles reads as today: `classification` set → Entity; the mapping's `time`
   → Time; `amount` → Measure; `kind` → Category; every other column → Detail. No migration is needed for the read; the
   Data page writes roles from then on. (Operator standing preference: breaking changes are free, but an absent field
@@ -94,6 +101,9 @@ Dataset or Mapping says is the amount. A Mapping chosen for a different amount g
   *recommended*; (b) carried only when a Mapping opts in.
 - **Q-6 Categories.** (a) a Category is low cardinality (Add data proposes it under a distinct-count bound, say 200);
   a wider text column stays a Detail ⟵ *recommended*; (b) any text column may be a Category.
+- **Q-7 The stored key (found building P0; operator 2026-11-04: B).** (A) a new `linkRole` key; (B) the existing
+  `columns[].role`, one vocabulary `entity | temporal | measure | dimension | detail` (UI Time = `temporal`, Category
+  = `dimension`), with `temporalColumn` resolving several Times by the link mapping's `time` ⟵ *chosen*. See §3.
 
 ## 6. Not in scope
 

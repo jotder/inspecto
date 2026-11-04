@@ -392,7 +392,8 @@ final class PresetQueries {
      * The Dataset's columns by role. From, To, Kind and When come from its {@code defaultLinkMapping} when it states one
      * (Add data and Mappings do); else From and To are its first two columns classified as an Entity Type and Kind a
      * column named {@code kind} or {@code *_kind}. When (if not mapped) is the {@code eventDate}, else the first date
-     * or timestamp column; Amount is the first number column whose name the Industry pack hints ({@code measure_hints}).
+     * or timestamp column; Amount is the mapping's {@code amount}, else the first number column whose name the Industry
+     * pack hints ({@code measure_hints}).
      * {@code columns} are the relation's REAL columns ({@link DatasetProvider.Column}, coarse types). A link mapping that
      * names a column the relation has not got is refused ({@link IllegalArgumentException}, LA-PIPELINE-MAPPINGS-1); a
      * role found any other way is simply absent when its column is.
@@ -406,7 +407,7 @@ final class PresetQueries {
                 real.put(c.name().toLowerCase(Locale.ROOT), c.name());
                 type.put(c.name(), c.type() == null ? "" : c.type().toLowerCase(Locale.ROOT));
             }
-        String from = null, to = null, kind = null, time = null;
+        String from = null, to = null, kind = null, time = null, amount = null;
         if (dataset.get("defaultLinkMapping") instanceof Map<?, ?> m) {
             // LA-PIPELINE-MAPPINGS-1 (§3.3): a link mapping that names a column the data no longer has is refused, never
             // quietly replaced by the classified columns - that would answer a different graph under the Mapping's name
@@ -424,6 +425,7 @@ final class PresetQueries {
             to = col(real, m.get("to"));
             kind = col(real, m.get("kind"));
             time = col(real, m.get("time"));
+            amount = col(real, m.get("amount"));   // LA-COLUMN-ROLES-1 P0: the mapping's amount, before any pack hint
         }
         if (from == null || to == null) {
             List<String> classified = new ArrayList<>();
@@ -445,8 +447,7 @@ final class PresetQueries {
                 if (e.getValue().equals("date")) { time = e.getKey(); break; }
         List<String> hints = pack == null || pack.profile() == null || pack.profile().measureHints().isEmpty()
                 ? List.of("amount", "value") : pack.profile().measureHints();
-        String amount = null;
-        for (String h : hints) {
+        for (String h : amount == null ? hints : List.<String>of()) {
             for (Map.Entry<String, String> e : type.entrySet())
                 if (e.getValue().equals("number") && e.getKey().toLowerCase(Locale.ROOT).contains(h.toLowerCase(Locale.ROOT))
                         && !e.getKey().equals(from) && !e.getKey().equals(to)) { amount = e.getKey(); break; }

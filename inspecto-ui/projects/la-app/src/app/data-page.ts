@@ -5,10 +5,30 @@ import type { ComponentDef } from '@inspecto/core/api';
  * entry read for the page, a column's Entity Type from its classification, and the entry a saved Mapping becomes.
  */
 
+/**
+ * A column's role as stored (`columns[].role`, LA-COLUMN-ROLES-1; one vocabulary with the Studio Dataset editor's
+ * dimension / measure / temporal). The words the UI shows are {@link ROLE_LABELS}.
+ */
+export type ColumnRole = 'entity' | 'temporal' | 'measure' | 'dimension' | 'detail';
+
+export const ROLE_LABELS: Record<ColumnRole, string> = {
+    entity: 'Entity',
+    temporal: 'Time',
+    measure: 'Measure',
+    dimension: 'Category',
+    detail: 'Detail',
+};
+
+const ROLES = Object.keys(ROLE_LABELS) as ColumnRole[];
+
 export interface DataColumn {
     name: string;
     type: string;
     classification: string | null;
+    /** The stored role; null when the entry says none (then {@link roleOf} reads it from the rest of the entry). */
+    role: ColumnRole | null;
+    /** What a Measure counts in (USD, s, bytes); null when not said. */
+    unit: string | null;
 }
 
 export interface LinkMapping {
@@ -83,6 +103,8 @@ export function dataEntry(def: ComponentDef): DataEntry {
                   name: str(x['name'])!,
                   type: str(x['type']) ?? 'string',
                   classification: str(x['classification']),
+                  role: ROLES.find((r) => r === str(x['role'])?.toLowerCase()) ?? null,
+                  unit: str(x['unit']),
               }))
         : [];
     // the server's base rule (DatasetEntryRules.validateMapping), plus what the form needs: two columns to pick from
@@ -115,6 +137,21 @@ export function typeOf(classification: string | null, types: readonly TypeChoice
     if (!classification) return null;
     const k = classification.toUpperCase();
     return types.find((t) => t.classifications.some((x) => x.toUpperCase() === k)) ?? null;
+}
+
+/**
+ * A column's role: the stored one, else (an entry written before roles) read from the rest of the entry - holds an
+ * Entity Type → Entity; the link mapping's time or the event date → Time; its amount → Measure; its kind → Category;
+ * anything else → Detail.
+ */
+export function roleOf(col: DataColumn, entry: DataEntry, types: readonly TypeChoice[]): ColumnRole {
+    if (col.role) return col.role;
+    const is = (n: string | null | undefined) => !!n && n.toLowerCase() === col.name.toLowerCase();
+    if (typeOf(col.classification, types)) return 'entity';
+    if (is(entry.mapping?.time) || is(entry.eventDate)) return 'temporal';
+    if (is(entry.mapping?.amount)) return 'measure';
+    if (is(entry.mapping?.kind)) return 'dimension';
+    return 'detail';
 }
 
 /** A link mapping in words: `from_account → to_account · kind channel · when booked_at`. */
@@ -153,7 +190,15 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
     const columns = base.columns.map((c) => {
         const chosen = c.name === f.from ? f.fromType : c.name === f.to ? f.toType : undefined;
         const classification = chosen === undefined ? c.classification : chosen ? classify(chosen) : null;
-        return { name: c.name, type: c.type, ...(classification ? { classification } : {}) };
+        // a From / To re-classified here is an Entity column, or no longer one; every other column keeps its role
+        const role = chosen === undefined ? c.role : classification ? 'entity' : c.role === 'entity' ? null : c.role;
+        return {
+            name: c.name,
+            type: c.type,
+            ...(classification ? { classification } : {}),
+            ...(role ? { role } : {}),
+            ...(role === 'measure' && c.unit ? { unit: c.unit } : {}),
+        };
     });
     const mapping: Record<string, string> = { from: f.from, to: f.to };
     if (f.kind) mapping['kind'] = f.kind;

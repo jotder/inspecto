@@ -98,7 +98,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
     it('lists each Add data Dataset with its Entities and Mappings, and the Pipeline-fed ones by name (no violations)', async () => {
         const { el } = create();
         expect(q(el, 'data-transfers')).not.toBeNull();
-        expect(q(el, 'entities')!.textContent).toContain('from_account');
+        expect(q(el, 'columns')!.textContent).toContain('from_account');
         const maps = q(el, 'mappings')!.textContent ?? '';
         expect(maps).toContain('from_account → to_account');
         expect(q(el, 'mapping-by_channel')!.textContent).toContain('from_account → channel');
@@ -186,7 +186,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             'Kept up to date by a Pipeline or a Job',
         );
         expect(pipe.querySelector('inspecto-import-dataset-card')).toBeNull(); // no Add a file, Run now or arrivals
-        expect(pipe.querySelector('[data-testid="entities"]')!.textContent).toContain('src_id');
+        expect(pipe.querySelector('[data-testid="columns"]')!.textContent).toContain('src_id');
         expect(pipe.querySelector('[data-testid="mapping-by_agent"]')).not.toBeNull();
         expect(c.bases().map((d) => d.id)).toEqual(['transfers', 'wallet_txn']);
 
@@ -232,19 +232,85 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         await expectNoA11yViolations(el);
     });
 
-    it('the Entities card is one picker row per column, and a pick saves at once', () => {
-        const { el, c } = create();
-        const card = q(el, 'data-transfers')!.querySelector('[data-testid="entities"]')!;
-        expect(card.querySelectorAll('inspecto-option-picker').length).toBe(3);
+    const put = (column: string) =>
+        http.expectOne((r) => r.method === 'PUT' && r.url === apiUrl(`/datasets/transfers/columns/${column}`));
+
+    it('LA-COLUMN-ROLES-1: the Columns card is a role row per column, with Holds under an Entity, read for old entries', () => {
+        const { el } = create();
+        const card = q(el, 'data-transfers')!.querySelector('[data-testid="columns"]')!;
+        expect(card.querySelector('h3')!.textContent).toBe('Columns');
         expect(card.querySelector('mat-form-field, mat-select')).toBeNull();
+        // an entry without roles: a column holding an Entity Type is an Entity, any other a Detail
+        expect(card.querySelector('[data-testid="role-from_account"]')!.textContent).toContain('Entity');
         expect(card.querySelector('[data-testid="entity-from_account"]')!.textContent).toContain('Account');
-        c.holds().get('transfers')!.get('channel')!.setValue('account');
-        const req = http.expectOne(
-            (r) => r.method === 'PUT' && r.url === apiUrl('/datasets/transfers/columns/channel'),
-        );
-        expect(req.request.body).toEqual({ entityType: 'account' });
+        expect(card.querySelector('[data-testid="role-channel"]')!.textContent).toContain('Detail');
+        expect(card.querySelector('[data-testid="entity-channel"]')).toBeNull();
+        // three role rows, and a Holds row for each of the two Entity columns
+        expect(card.querySelectorAll('inspecto-option-picker').length).toBe(5);
+    });
+
+    it('a role other than Entity saves at once, and an Entity column that becomes one stops holding its type', () => {
+        const { c } = create();
+        c.roles().get('transfers')!.get('channel')!.setValue('dimension');
+        let req = put('channel');
+        expect(req.request.body).toEqual({ role: 'dimension' });
         req.flush({});
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+
+        c.roles().get('transfers')!.get('to_account')!.setValue('temporal');
+        req = put('to_account');
+        expect(req.request.body).toEqual({ role: 'temporal', entityType: null });
+        req.flush({});
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('Entity waits for what the column holds, saying so, then saves both in one write', () => {
+        const { fixture, el, c } = create();
+        c.roles().get('transfers')!.get('channel')!.setValue('entity');
+        fixture.detectChanges();
+        http.expectNone((r) => r.method === 'PUT');
+        const row = el.querySelector('[data-testid="column-channel"]')!;
+        expect(row.querySelector('[data-testid="entity-channel"]')).not.toBeNull();
+        expect(row.querySelector('[role="alert"]')!.textContent).toContain('Pick the Entity Type it holds');
+        c.holds().get('transfers')!.get('channel')!.setValue('account');
+        const req = put('channel');
+        expect(req.request.body).toEqual({ entityType: 'account', role: 'entity' });
+        req.flush({});
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('a Measure has a Unit row, and a unit saves with the role', () => {
+        const { fixture, el, c } = create();
+        c.roles().get('transfers')!.get('channel')!.setValue('measure');
+        put('channel').flush({});
+        const measured = structuredClone(DATASETS);
+        (measured[0].content.columns as Record<string, unknown>[])[2] = {
+            name: 'channel',
+            type: 'string',
+            role: 'measure',
+        };
+        http.expectOne(apiUrl('/components/dataset')).flush(measured);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="unit-channel"]')).not.toBeNull();
+        c.units().get('transfers')!.get('channel')!.setValue(' USD ');
+        const req = put('channel');
+        expect(req.request.body).toEqual({ role: 'measure', unit: 'USD' });
+        req.flush({});
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('a refused change says why and reads the stored value back', () => {
+        const { fixture, el, c } = create();
+        c.roles().get('transfers')!.get('channel')!.setValue('measure');
+        put('channel').flush(
+            { error: { message: 'column channel has role x' } },
+            { status: 422, statusText: 'Unprocessable Entity' },
+        );
+        // nothing was written, so the read back may come from the short-read cache rather than a new request
+        http.match(apiUrl('/components/dataset')).forEach((r) => r.flush(DATASETS));
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-alert')).not.toBeNull();
+        expect(c.roles().get('transfers')!.get('channel')!.value).toBe('detail');
     });
 
     it('a name a Dataset already has is refused', () => {

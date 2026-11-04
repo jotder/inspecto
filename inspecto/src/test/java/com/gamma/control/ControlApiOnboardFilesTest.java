@@ -904,6 +904,23 @@ class ControlApiOnboardFilesTest {
             assertEquals(422, json(c, "PUT", "/datasets/calls/columns/a_party", "{\"entityType\":\"spaceship\"}", null).statusCode());
             assertEquals(404, json(c, "PUT", "/datasets/none/columns/a_party", "{\"entityType\":\"msisdn\"}", null).statusCode());
 
+            // LA-COLUMN-ROLES-1: the same route sets a column's role and a measure's unit, judged by the Dataset rules
+            data(json(c, "PUT", "/datasets/calls/columns/a_party", "{\"entityType\":\"msisdn\",\"role\":\"entity\"}", null), 200);
+            data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"measure\",\"unit\":\"USD\"}", null), 200);
+            String cols = data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString();
+            assertTrue(cols.contains("\"role\":\"entity\"") && cols.contains("\"unit\":\"USD\""), cols);
+            HttpResponse<String> badRole = json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"amount\"}", null);
+            assertEquals(422, badRole.statusCode(), badRole.body());
+            assertEquals(422, json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"entity\"}", null).statusCode(),
+                    "an Entity column holds an Entity Type");
+            assertEquals(422, json(c, "PUT", "/datasets/calls/columns/b_party", "{}", null).statusCode());
+            // a column that stops being a measure drops its unit; clearing what an Entity column holds makes it a detail
+            data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"Temporal\"}", null), 200); // stored lower-case
+            data(json(c, "PUT", "/datasets/calls/columns/a_party", "{\"entityType\":null}", null), 200);
+            cols = data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString();
+            assertFalse(cols.contains("unit") || cols.contains("\"role\":\"entity\""), cols);
+            assertTrue(cols.contains("\"role\":\"temporal\""), cols);
+
             // the Dataset rules hold on every write: a link mapping naming a column the entry does not list is refused
             HttpResponse<String> bad = json(c, "PUT", "/components/dataset/calls", "{\"physicalRef\":\"calls/database\",\"columns\":"
                     + "[{\"name\":\"a_party\"}],\"defaultLinkMapping\":{\"from\":\"a_party\",\"to\":\"c_party\"}}", null);

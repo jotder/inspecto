@@ -1092,7 +1092,9 @@ final class OnboardImport {
     // ── PUT /datasets/{id}/columns/{column} ─────────────────────────────────────────────────────────────────
 
     /**
-     * Change one column's Entity Type: body {@code {entityType: "<id>" | null}} or {@code {classification: "<X>" | null}}.
+     * Change one column's Entity Type: body {@code {entityType: "<id>" | null}} or {@code {classification: "<X>" | null}};
+     * and/or its role (LA-COLUMN-ROLES-1: {@code role: entity|temporal|measure|dimension|detail | null}) and a measure's
+     * {@code unit} ({@code null} clears either; the Dataset rules judge the result).
      * The Dataset is re-assessed on the next profile read (its binding signature changes). Gates: capability → write root
      * 503 → unknown or unseen Dataset 404 → view-only 403 → approval policy over Datasets 409 → unknown column or Entity
      * Type 422 → the entry still passes the Dataset rules (a column in the link mapping keeps working) → write.
@@ -1104,13 +1106,22 @@ final class OnboardImport {
         Map<String, Object> current = store.get("dataset", id).map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset component '" + id + "'"));
         OnboardRoutes.requireEdit(ex, id, current);
-        PendingChanges.holdRefusing(api, List.of("dataset"), "a column's Entity Type is a Dataset change");
+        PendingChanges.holdRefusing(api, List.of("dataset"), "a column's role or Entity Type is a Dataset change");
         boolean byType = body.containsKey("entityType"), byClass = body.containsKey("classification");
-        if (byType == byClass)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "state exactly one of entityType or classification (null clears it)");
-        String classification;
+        boolean byRole = body.containsKey("role"), byUnit = body.containsKey("unit");
+        if (byType && byClass)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "state one of entityType or classification, not both");
+        if (!byType && !byClass && !byRole && !byUnit)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "state entityType or classification, role or unit (null clears it)");
+        // stored lower-case: Studio and Explore compare the role as written
+        String role = byRole && body.get("role") != null ? String.valueOf(body.get("role")).trim().toLowerCase(Locale.ROOT) : null;
+        String unit = byUnit && body.get("unit") != null ? String.valueOf(body.get("unit")).trim() : null;
+        String classification = null;
         String typeId = null;
-        if (byType) {
+        if (!byType && !byClass) {
+            // the column keeps what it holds
+        } else if (byType) {
             Object v = body.get("entityType");
             if (v == null) classification = null;
             else {
@@ -1134,8 +1145,23 @@ final class OnboardImport {
         for (Object o : cols) {
             if (o instanceof Map<?, ?> c && column.equalsIgnoreCase(String.valueOf(c.get("name")))) {
                 Map<String, Object> m = new LinkedHashMap<>((Map<String, Object>) c);
-                if (classification == null) m.remove("classification");
-                else m.put("classification", classification);
+                if (byType || byClass) {
+                    if (classification == null) m.remove("classification");
+                    else m.put("classification", classification);
+                    // LA-COLUMN-ROLES-1: clearing what an Entity column holds, without a new role, makes it a detail again
+                    if (classification == null && !byRole && "entity".equalsIgnoreCase(String.valueOf(m.get("role"))))
+                        m.remove("role");
+                }
+                if (byRole) {
+                    if (role == null || role.isEmpty()) m.remove("role");
+                    else m.put("role", role);
+                    // a unit is a measure's: a column that stops being one drops it unless the body states one
+                    if (!byUnit && !"measure".equalsIgnoreCase(role)) m.remove("unit");
+                }
+                if (byUnit) {
+                    if (unit == null || unit.isEmpty()) m.remove("unit");
+                    else m.put("unit", unit);
+                }
                 next.add(m);
                 found = true;
             } else next.add(o);
@@ -1153,7 +1179,7 @@ final class OnboardImport {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dataset", id);
         out.put("column", column);
-        out.put("classification", classification);
+        if (byType || byClass) out.put("classification", classification);
         if (typeId != null) out.put("entityType", typeId);
         out.put("columns", written.content().get("columns"));
         return out;

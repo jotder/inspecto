@@ -361,6 +361,24 @@ class DatasetRelationTest {
                         col("event_time", "temporal"), col("ingested_at", "temporal"))));
         assertTrue(e.getMessage().contains("event_time") && e.getMessage().contains("ingested_at"),
                 "names both offenders: " + e.getMessage());
+        // LA-COLUMN-ROLES-1: a link mapping whose time names neither still leaves no honest pick
+        Map<String, Object> elsewhere = new java.util.HashMap<>(columns(
+                col("event_time", "temporal"), col("ingested_at", "temporal")));
+        elsewhere.put("defaultLinkMapping", Map.of("from", "a", "to", "b", "time", "booked_at"));
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.temporalColumn(elsewhere));
+    }
+
+    @Test
+    void severalTemporalColumnsResolveToTheOneTheLinkMappingDatesWith() {
+        // LA-COLUMN-ROLES-1 (operator 2026-11-04): a Dataset has several Time columns; the mapping's time is the one
+        Map<String, Object> ds = new java.util.HashMap<>(columns(
+                col("event_time", "temporal"), col("ingested_at", "temporal"), col("id", "dimension")));
+        ds.put("defaultLinkMapping", Map.of("from", "a", "to", "b", "time", "INGESTED_AT"));
+        assertEquals(Optional.of("ingested_at"), DatasetRelation.temporalColumn(ds));
+        // one temporal column wins as before, whatever the mapping says
+        Map<String, Object> one = new java.util.HashMap<>(columns(col("event_time", "temporal")));
+        one.put("defaultLinkMapping", Map.of("from", "a", "to", "b", "time", "booked_at"));
+        assertEquals(Optional.of("event_time"), DatasetRelation.temporalColumn(one));
     }
 
     @Test

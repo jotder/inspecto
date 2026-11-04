@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-363 test class(es): 134 unit, 229 real-HTTP control-plane, 0 IT.
+364 test class(es): 135 unit, 229 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -250,6 +250,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiViewsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiViewsTest.java` | The {@code sink.view} consumer (T32 Phase C follow-up) over real HTTP: discover view definitions |
 | `CursorTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CursorTest.java` | {@link Cursor} — the opaque keyset pagination token: round-trips the key parts, is URL-safe, and |
 | `DashboardDateRangeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DashboardDateRangeTest.java` | UIE-5 (d): the server's copy of the SPA's date-range maths ({@code dashboard-date-range.spec.ts} pins the same cases). |
+| `DatasetEntryRulesRolesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetEntryRulesRolesTest.java` | {@code columns[].role} on a Dataset entry (LA-COLUMN-ROLES-1 P0, operator decision B 2026-11-04): one vocabulary, |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |
 | `ExchangeAttributeScopeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ExchangeAttributeScopeTest.java` | SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): nothing stamped on the exchange by one request may be readable |

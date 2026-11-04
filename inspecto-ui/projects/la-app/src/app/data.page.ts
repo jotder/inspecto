@@ -12,28 +12,41 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { DatasetColumnsService } from '@inspecto/link-analysis/api/dataset-columns.service';
+import { ColumnChange, DatasetColumnsService } from '@inspecto/link-analysis/api/dataset-columns.service';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
 import { ADD_DATA_ROUTE } from './first-run';
 import {
+    ColumnRole,
+    DataColumn,
     DataEntry,
     MAPPING_NAME,
     MappingForm,
+    ROLE_LABELS,
     TypeChoice,
     dataEntry,
     driftedColumns,
     formOf,
     mappingEntry,
     mappingLine,
+    roleOf,
     typeOf,
 } from './data-page';
+
+/** What each role means, under its name in the role picker. */
+const ROLE_HINTS: Record<ColumnRole, string> = {
+    entity: 'Holds an Entity Type: links join on it',
+    temporal: 'A date or time: to play and filter by',
+    measure: 'A number to sum and filter by (an amount, a volume)',
+    dimension: 'A few named values: to filter by (a type, a channel)',
+    detail: 'Carried along, not filtered on',
+};
 
 /**
  * The **Data** page (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): every Dataset that may be a
  * Mapping's base (LA-PIPELINE-MAPPINGS-1: Add data ones, then stored ones kept up to date elsewhere) with its card (an
- * import's Data status, Arrivals, Add a file, Run now; a short one otherwise), its **Entities** (what each column holds,
- * editable) and its **Mappings** - each a Dataset of its own that reads the same data its own way (From, To, Kind of
+ * import's Data status, Arrivals, Add a file, Run now; a short one otherwise), its **Columns** (each column's role - Entity,
+ * Time, Measure, Category, Detail - with what an Entity column holds and a Measure's unit, editable; LA-COLUMN-ROLES-1) and its **Mappings** - each a Dataset of its own that reads the same data its own way (From, To, Kind of
  * link, When, Amount), created, edited and deleted here. Every other Dataset is listed by name, with why.
  */
 @Component({
@@ -108,19 +121,46 @@ import {
                             </div>
                         }
 
-                        <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="entities">
-                            <h3 class="m-0 text-base font-semibold">Entities</h3>
+                        <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="columns">
+                            <h3 class="m-0 text-base font-semibold">Columns</h3>
                             <p class="text-secondary m-0 text-sm">
-                                What each column holds. A column with no Entity Type is a detail.
+                                What each column is: an Entity it holds, a Time, a Measure, a Category or a Detail. A
+                                Dataset may have several of each.
                             </p>
                             <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                                 @for (col of d.columns; track col.name) {
-                                    <inspecto-option-picker
-                                        [label]="col.name"
-                                        [options]="typeOptions()"
-                                        [formControl]="holds().get(d.id)!.get(col.name)!"
-                                        [attr.data-testid]="'entity-' + col.name"
-                                    ></inspecto-option-picker>
+                                    @let r = roleShown(d, col);
+                                    <div class="flex flex-col" [attr.data-testid]="'column-' + col.name">
+                                        <inspecto-option-picker
+                                            [label]="col.name"
+                                            [options]="roleOptions"
+                                            [formControl]="roles().get(d.id)!.get(col.name)!"
+                                            [attr.data-testid]="'role-' + col.name"
+                                        ></inspecto-option-picker>
+                                        @if (r === 'entity') {
+                                            <inspecto-option-picker
+                                                [label]="col.name + ' holds'"
+                                                [options]="typeOptions()"
+                                                [formControl]="holds().get(d.id)!.get(col.name)!"
+                                                [attr.data-testid]="'entity-' + col.name"
+                                            ></inspecto-option-picker>
+                                            @if (!holds().get(d.id)!.get(col.name)!.value) {
+                                                <p class="text-warn m-0 text-xs" role="alert">
+                                                    Pick the Entity Type it holds to save it as an Entity.
+                                                </p>
+                                            }
+                                        } @else if (r === 'measure') {
+                                            <inspecto-pen-field
+                                                label="Unit"
+                                                [ariaLabel]="col.name + ' unit'"
+                                                placeholder="USD, s, bytes"
+                                                [maxlength]="32"
+                                                help="What it counts in"
+                                                [formControl]="units().get(d.id)!.get(col.name)!"
+                                                [attr.data-testid]="'unit-' + col.name"
+                                            ></inspecto-pen-field>
+                                        }
+                                    </div>
                                 }
                             </div>
                         </div>
@@ -339,23 +379,56 @@ export class DataPageComponent implements OnInit {
         return [{ value: '', label: 'None' }, ...this.columnOptions(d)];
     }
 
+    /** A column's role, in the words the page shows (LA-COLUMN-ROLES-1). */
+    protected readonly roleOptions: PickerOption[] = (Object.keys(ROLE_LABELS) as ColumnRole[]).map((r) => ({
+        value: r,
+        label: ROLE_LABELS[r],
+        hint: ROLE_HINTS[r],
+    }));
+
     /**
-     * One control per column of every base (what it holds); a change saves at once, as the Entities page does.
-     * Rebuilt whenever the Datasets or the Entity Types are read again, so a control always shows the stored value.
+     * One control per column of every base and per question (its role, what it holds, a measure's unit); a change saves
+     * at once, as the Entities page does. Rebuilt whenever the Datasets or the Entity Types are read again, so a control
+     * always shows the stored value.
      */
-    readonly holds = computed(() => {
-        const out = new Map<string, Map<string, FormControl<string>>>();
+    private controls<T>(seed: (d: DataEntry, c: DataColumn) => T, save: (d: DataEntry, c: DataColumn, v: T) => void) {
+        const out = new Map<string, Map<string, FormControl<T>>>();
         for (const d of this.bases()) {
-            const controls = new Map<string, FormControl<string>>();
+            const controls = new Map<string, FormControl<T>>();
             for (const c of d.columns) {
-                const ctrl = new FormControl(this.typeOf(c.classification)?.id ?? '', { nonNullable: true });
-                ctrl.valueChanges.subscribe((v) => this.setEntityType(d, c.name, v));
+                const ctrl = new FormControl(seed(d, c), { nonNullable: true });
+                ctrl.valueChanges.subscribe((v) => save(d, c, v));
                 controls.set(c.name, ctrl);
             }
             out.set(d.id, controls);
         }
         return out;
-    });
+    }
+
+    readonly holds = computed(() =>
+        this.controls<string>(
+            (_, c) => this.typeOf(c.classification)?.id ?? '',
+            (d, c, v) => this.setHolds(d, c, v),
+        ),
+    );
+    readonly roles = computed(() =>
+        this.controls<ColumnRole>(
+            (d, c) => roleOf(c, d, this.types()),
+            (d, c, v) => this.setRole(d, c, v),
+        ),
+    );
+    readonly units = computed(() =>
+        this.controls<string>(
+            (_, c) => c.unit ?? '',
+            (d, c, v) => this.save(d, c, { role: 'measure', unit: (v ?? '').trim() || null }),
+        ),
+    );
+    /** A role picked but not saved yet: Entity, until what it holds is picked. Cleared on every read. */
+    private readonly picked = signal<ReadonlyMap<string, ColumnRole>>(new Map());
+
+    protected roleShown(d: DataEntry, c: DataColumn): ColumnRole {
+        return this.picked().get(`${d.id}/${c.name}`) ?? roleOf(c, d, this.types());
+    }
 
     /** The name's error line, shown once the field was left or a save was tried. */
     protected nameError(): string {
@@ -452,6 +525,7 @@ export class DataPageComponent implements OnInit {
                 }),
             )
             .subscribe((list) => {
+                this.picked.set(new Map());
                 this.entries.set(list);
                 this.form.controls.name.updateValueAndValidity({ emitEvent: false }); // "taken" reads this list
             });
@@ -477,11 +551,30 @@ export class DataPageComponent implements OnInit {
         return !!name && !e?.id && (this.entries() ?? []).some((x) => x.id === name);
     }
 
-    protected setEntityType(d: DataEntry, column: string, typeId: string): void {
+    /** What an Entity column holds: a type makes it an Entity column; none makes it a detail (the server drops the role). */
+    private setHolds(d: DataEntry, c: DataColumn, typeId: string): void {
+        this.save(d, c, typeId ? { entityType: typeId, role: 'entity' } : { entityType: null });
+    }
+
+    /** An Entity role waits for what it holds; any other role saves at once, and stops the column holding a type. */
+    private setRole(d: DataEntry, c: DataColumn, role: ColumnRole): void {
+        const held = this.holds().get(d.id)?.get(c.name)?.value ?? '';
+        this.picked.update((m) => new Map(m).set(`${d.id}/${c.name}`, role));
+        if (role === 'entity') {
+            if (held) this.save(d, c, { role, entityType: held });
+            return;
+        }
+        this.save(d, c, this.typeOf(c.classification) ? { role, entityType: null } : { role });
+    }
+
+    private save(d: DataEntry, c: DataColumn, change: ColumnChange): void {
         this.error.set('');
-        this.columns.setEntityType(d.id, column, typeId || null).subscribe({
+        this.columns.setColumn(d.id, c.name, change).subscribe({
             next: () => this.load(),
-            error: (e) => this.error.set(apiErrorMessage(e, `What ${column} holds could not be changed.`)),
+            error: (e) => {
+                this.error.set(apiErrorMessage(e, `Column ${c.name} could not be changed.`));
+                this.load(); // back to what is stored
+            },
         });
     }
 

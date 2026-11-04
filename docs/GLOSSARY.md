@@ -723,6 +723,24 @@ max).
 **Measure** — A BI aggregation (SUM, AVG, COUNT, …) over a Dataset. *(This is the BI sense of "metric"; ⛔ do not
 call it a "Metric" — that word is reserved for observability.)*
 
+**Column Role** *(added 2026-11-04, `LA-COLUMN-ROLES-1`; operator decision B)* — What one Dataset column is, stored
+as `columns[].role` on the Dataset registry entry: ONE vocabulary for the key that the Studio Dataset editor and
+materialization seeds already write (`dimension | measure | temporal`) and Link Analysis widens. ⚠ The Studio editor
+does not offer `entity` / `detail` yet (it keeps them on save). Stored value ↔ the word the UI shows:
+
+| Stored `role` | UI label | Meaning |
+|---|---|---|
+| `entity` | **Entity** | holds an **Entity Type** (`classification` says which); links join on it |
+| `temporal` | **Time** | a date / time; a Dataset may have several (the link mapping's `time` is the one that dates links) |
+| `measure` | **Measure** | a number to aggregate and filter by; may carry a `unit` (`USD`, `s`, `bytes`) |
+| `dimension` | **Category** | a few named values to filter by (a type, a channel) |
+| `detail` | **Detail** | carried along, not filtered on |
+
+An entry without a role reads one from the rest of the entry (holds an Entity Type → Entity; the mapping's time or
+`eventDate` → Time; its amount → Measure; its kind → Category; else Detail). ⛔ "Time" and "Category" are UI words
+only — never store `time` / `category`. ⛔ A **Measure** column is a column; a **Measure** (above) is the aggregation
+over it. ⛔ Not a Result Set column's analytic role (§7 *Result Set*), which is derived per query, never stored.
+
 **Report** — A **scheduled delivery of rendered output**: a Dashboard (or other rendering) exported on a
 **Trigger** to a channel / recipient list in a chosen format (CSV / PDF / PNG), authored on the *KPI &
 Reports* page and executed as a **Job**. The Dashboard is the *thing delivered*; the Report is the *delivery*.

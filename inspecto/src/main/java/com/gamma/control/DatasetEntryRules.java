@@ -31,6 +31,7 @@ final class DatasetEntryRules {
     static void validate(Map<String, Object> content) {
         // DATASET-CALC-NAME-COLLISION-1: a calculated column may not reuse a declared column's name, nor repeat another's
         com.gamma.query.DatasetRelation.requireFreeCalculatedNames(content);
+        columnRoles(content);
         Object primary = content.get(PRIMARY_ENTITY_TYPE);
         if (primary != null && (!(primary instanceof String s) || s.isBlank()))
             throw new IllegalArgumentException(PRIMARY_ENTITY_TYPE + " must be an Entity Type id (a non-blank string)");
@@ -56,6 +57,34 @@ final class DatasetEntryRules {
                     throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + ".details must be a list of column names");
                 requireColumn(s, "details", columns);
             }
+        }
+    }
+
+    /** A column's role (LA-COLUMN-ROLES-1); the UI says Entity · Time · Measure · Category · Detail. */
+    static final List<String> ROLES = List.of("entity", "temporal", "measure", "dimension", "detail");
+    private static final int UNIT_MAX = 32;
+
+    /**
+     * {@code columns[].role} is one of {@link #ROLES} or absent (an absent role reads from the rest of the entry, so an
+     * entry written before roles still loads); an {@code entity} column names what it holds ({@code classification});
+     * {@code unit} is a short text on a {@code measure} column only.
+     */
+    private static void columnRoles(Map<String, Object> content) {
+        if (!(content.get("columns") instanceof List<?> cols)) return;
+        for (Object o : cols) {
+            if (!(o instanceof Map<?, ?> c)) continue;
+            Object name = c.get("name"), unit = c.get("unit");
+            // matched without case, as DatasetRelation.temporalColumn reads it: the block is hand-editable TOON too
+            Object role = c.get("role") instanceof String r ? r.trim().toLowerCase(Locale.ROOT) : c.get("role");
+            if (role != null && !(role instanceof String r && ROLES.contains(r)))
+                throw new IllegalArgumentException("column '" + name + "' has role '" + role + "' (allowed: " + ROLES + ")");
+            if ("entity".equals(role) && !(c.get("classification") instanceof String k && !k.isBlank()))
+                throw new IllegalArgumentException("column '" + name + "' is an Entity column but holds no Entity Type (classification)");
+            if (unit == null) continue;
+            if (!"measure".equals(role))
+                throw new IllegalArgumentException("column '" + name + "' has a unit, which only a measure column has");
+            if (!(unit instanceof String u) || u.isBlank() || u.length() > UNIT_MAX)
+                throw new IllegalArgumentException("column '" + name + "' has a unit that is not a short text (1-" + UNIT_MAX + " characters)");
         }
     }
 

@@ -274,32 +274,42 @@ public final class DatasetRelation {
      *
      * <p><b>Absent degrades, ambiguous rejects.</b> No {@code columns} block, or none carrying the role,
      * returns empty — a dataset without a temporal column must still be readable (decision D3: addressing
-     * degrades, it does not break). Two columns claiming the role throw: there is no honest way to pick one,
+     * degrades, it does not break). Several columns may claim the role (LA-COLUMN-ROLES-1: a Dataset has several
+     * Time columns); then the one its link mapping dates links with ({@code defaultLinkMapping.time}) is the
+     * temporal column. Several and no mapping naming one of them throw: there is no honest way to pick one,
      * and silently taking the first would bind the catalog's bounds to declaration order.
      *
      * <p>The name is identifier-checked here because the caller's next move is to embed it in
      * {@code min()/max()} SQL — the same fail-closed rule the calculated columns follow.
      *
-     * @throws IllegalArgumentException if two columns declare {@code role: temporal}, or the one that does
-     *                                  has no plain-identifier name
+     * @throws IllegalArgumentException if several columns declare {@code role: temporal} and the link mapping's
+     *                                  {@code time} names none of them, or the chosen one has no plain-identifier name
      */
     public static Optional<String> temporalColumn(Map<String, Object> datasetConfig) {
         Object cols = datasetConfig == null ? null : datasetConfig.get("columns");
         if (!(cols instanceof java.util.List<?> list)) return Optional.empty();
-        String found = null;
+        java.util.List<String> found = new java.util.ArrayList<>();
         for (Object o : list) {
             // an entry that is not an object declares no role at all — it cannot be the temporal one
             if (!(o instanceof Map<?, ?> c) || !"temporal".equalsIgnoreCase(Values.trimToNull(cast(c).get("role")))) continue;
-            String name = Values.trimToNull(cast(c).get("name"));
-            if (name == null || !SAFE_IDENT.matcher(name).matches())
-                throw new IllegalArgumentException(
-                        "temporal column needs a plain-identifier 'name', got '" + name + "'");
-            if (found != null)
-                throw new IllegalArgumentException("dataset declares two temporal columns ('" + found
-                        + "' and '" + name + "'); exactly one column may carry role: temporal");
-            found = name;
+            found.add(Values.trimToNull(cast(c).get("name")));
         }
-        return Optional.ofNullable(found);
+        String name;
+        if (found.isEmpty()) return Optional.empty();
+        else if (found.size() == 1) name = found.get(0);
+        else {
+            String primary = datasetConfig.get("defaultLinkMapping") instanceof Map<?, ?> m
+                    ? Values.trimToNull(cast(m).get("time")) : null;
+            name = primary == null ? null
+                    : found.stream().filter(n -> n != null && n.equalsIgnoreCase(primary)).findFirst().orElse(null);
+            if (name == null)
+                throw new IllegalArgumentException("dataset declares several temporal columns (" + found
+                        + ") and its link mapping's time names none of them; name the one that dates its rows");
+        }
+        if (name == null || !SAFE_IDENT.matcher(name).matches())
+            throw new IllegalArgumentException(
+                    "temporal column needs a plain-identifier 'name', got '" + name + "'");
+        return Optional.of(name);
     }
 
     /**

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-45 test class(es): 45 unit, 0 real-HTTP control-plane, 0 IT.
+46 test class(es): 46 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -61,6 +61,7 @@ mvn -o test -pl la/inspecto-la-api -Dtest=CaseHistoryRoutesContractTest,ColumnPr
 | `LaApiRoutesManifestParityTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/LaApiRoutesManifestParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule}s |
 | `LaLimitCatalogueParityTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/LaLimitCatalogueParityTest.java` | {@code LA-CONFIG-LIMITS-1}: an item whose code site still holds a constant has its catalogue default pinned to that |
 | `PatternRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/PatternRoutesContractTest.java` | {@link PatternRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |
+| `PresetRolesTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/PresetRolesTest.java` | {@link PresetQueries#roles}: the Amount a preset sums is the column the Dataset's (or Mapping's) link mapping names, |
 | `PresetRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/PresetRoutesContractTest.java` | {@link PresetRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |
 | `ReferenceRowsKeyPredicateTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ReferenceRowsKeyPredicateTest.java` | {@link ReferenceRows#keyPredicate}: the prunable forms and the CAST fallback. |
 | `ScheduledIndexBuildTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ScheduledIndexBuildTest.java` | The pure authority re-decision of the scheduled index build principal (D-ING2, the standing-detection model). |
