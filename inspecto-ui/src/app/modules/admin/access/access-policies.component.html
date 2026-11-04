@@ -151,18 +151,23 @@
         </div>
 
         <form [formGroup]="form" (ngSubmit)="explain()" class="flex flex-wrap items-start gap-3">
-            <mat-form-field subscriptSizing="dynamic" class="min-w-72 flex-1">
-                <mat-label>Route</mat-label>
-                <input matInput formControlName="route" placeholder="/access/roles" />
-                @if (form.controls.route.touched && form.controls.route.invalid) {
-                    <mat-error>A route is required</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                class="min-w-72 flex-1"
+                label="Route"
+                [required]="true"
+                [mono]="true"
+                placeholder="/access/roles"
+                formControlName="route"
+                [error]="routeError()"
+            ></inspecto-pen-field>
             <inspecto-option-picker class="w-32" label="Method" [options]="methods" formControlName="method" />
-            <mat-form-field subscriptSizing="dynamic" class="w-48">
-                <mat-label>Resource kind (optional)</mat-label>
-                <input matInput formControlName="resourceKind" placeholder="incident" />
-            </mat-form-field>
+            <inspecto-pen-field
+                class="w-48"
+                label="Resource kind (optional)"
+                [mono]="true"
+                placeholder="incident"
+                formControlName="resourceKind"
+            ></inspecto-pen-field>
             <button mat-flat-button color="primary" type="submit" class="mt-1" [disabled]="explaining()">
                 {{ explaining() ? 'Evaluating…' : 'Explain' }}
             </button>

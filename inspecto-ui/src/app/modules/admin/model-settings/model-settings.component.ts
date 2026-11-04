@@ -1,12 +1,11 @@
 import { UpperCasePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
@@ -16,7 +15,9 @@ import {
     AssistSettingsUpdate,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** Display names for the provider dropdown. */
 const PROVIDER_LABELS: Record<string, string> = {
@@ -48,9 +49,10 @@ const TIERS = ['small', 'medium', 'large'] as const;
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
-        MatSelectModule,
         UpperCasePipe,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     templateUrl: './model-settings.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -101,6 +103,17 @@ export class ModelSettingsComponent implements OnInit {
         return (this.settings()?.availableProviders ?? []).includes(p);
     }
 
+    /**
+     * The provider choices, grouped Hosted / Local. A hosted provider this server cannot run is left out (the picker
+     * has no disabled choice), unless it is the stored one, which stays named.
+     */
+    readonly providerOptions = computed<PickerOption[]>(() => [
+        ...this.hostedProviders
+            .filter((p) => this.isSelectable(p) || p === this.provider())
+            .map((p) => ({ value: p, label: this.label(p), group: 'Hosted' })),
+        ...this.localProviders.map((p) => ({ value: p, label: this.label(p), group: 'Local' })),
+    ]);
+
     get hostedJarMissing(): boolean {
         return !!this.settings() && this.hostedProviders.some((p) => !this.isSelectable(p));
     }
@@ -109,8 +122,9 @@ export class ModelSettingsComponent implements OnInit {
         return this.isLocal(this.provider());
     }
 
-    /** Seed the form from a provider's defaults (called on dropdown change). */
+    /** Seed the form from a provider's defaults (called on a provider pick; a re-pick of the current one keeps the form). */
     onProviderChange(p: string): void {
+        if (p === this.provider()) return;
         const d = this.settings()?.defaults?.[p];
         this.provider.set(p);
         this.baseUrl = d?.baseUrl ?? '';

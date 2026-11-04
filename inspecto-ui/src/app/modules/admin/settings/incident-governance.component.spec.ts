@@ -349,17 +349,21 @@ describe('IncidentGovernanceComponent', () => {
             button('Save Escalation Rule')!.click();
             fixture.detectChanges();
             expect(button('Add Escalation Rule')).toBeTruthy();
-            expect(el.querySelector('mat-error')).toBeNull();
+            expect(el.querySelector('inspecto-pen-field p[role="alert"]')).toBeNull();
         });
 
         it('a created rule clears the add form without flagging the blank id', () => {
             const { c, fixture, el, button, components } = setup();
+            button('Add Escalation Rule')!.click();
+            fixture.detectChanges();
+            expect(components.create).not.toHaveBeenCalled();
+            expect(el.querySelector('inspecto-pen-field p[role="alert"]')?.textContent).toContain('An id is required.');
             c.rule.patchValue({ id: 'second' });
             button('Add Escalation Rule')!.click();
             fixture.detectChanges();
             expect(components.create).toHaveBeenCalled();
             expect(c.rule.getRawValue().id).toBe('');
-            expect(el.querySelector('mat-error')).toBeNull();
+            expect(el.querySelector('inspecto-pen-field p[role="alert"]')).toBeNull();
         });
 
         it('cancel returns the form to adding a new rule', () => {

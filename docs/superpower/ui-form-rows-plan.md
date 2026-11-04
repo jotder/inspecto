@@ -65,7 +65,7 @@ card was followed by a reload served from the read cache, so the row could snap 
 | **P1** | `schema-form` draws only rows (its 9 boxed fields), its tiers as `form-section` folds - 34 screens at once | M |
 | **P2** | the Link Analysis panes (la-app, link-analysis library) still using boxed fields | M |
 | **P3** | the admin panes, in batches by use, each batch its own commit; the allow-list shrinks with each | L |
-| **P4** | nested options and per-picker layout in `option-picker`, built when the first screen needs them | S |
+| **P4** | nested options and per-picker layout in `option-picker`, built when the first screen needs them; a disabled option with its reason (the model provider list, P3 batch 4) | S |
 
 ## 5. Decisions (operator 2026-11-03: accepted as recommended)
 
@@ -233,3 +233,21 @@ allow-list (114 to 103).
   commits), the settings warning about a missing order-by column, the extra config's Add and duplicate check, and the
   Enrichment name's dirtiness (a `valueChanges` subscription re-derives it; without it Apply stayed grey after a Tab).
   An unnamed compact node shows its id as a grey placeholder. The confirm field lost `autocomplete="off"`.
+
+**Batch 4 - Access, Model Settings, Settings, 2026-11-04.** The 11 files under `modules/admin/access/`,
+`model-settings/` and `settings/` leave the allow-list (76 to 65).
+- Rows: the access policy route and resource kind, the policy and role names, the role's data scopes, the Model
+  Settings URLs, API-key variable name, tier models and timeout (two per line), the approver roster and egress entries
+  (both still add on Enter, through `(entered)`), the new exclusion category list, every Incident governance field
+  (labels shortened, the parenthetical moved to `help`), the operational database URL and user, and the scheduler's
+  limits (two per line; the in-force cap stays a placeholder, never a `default`, so a blank row never writes the
+  inherited value into `scheduler.toon`). Pickers: the model provider (grouped Hosted / Local) and the exclusion
+  category's Entity Type.
+- **Secrets stay boxed**: the Model Settings API key (masked) and the operational database's password reference. A row
+  would show its value as plain text when closed.
+- Also kept boxed: the access lens search box and the policy condition (an expression editor).
+- Behaviour to know: Enter no longer submits the explain, policy, role, exclusion, governance, test-connection or
+  scheduler forms. The governance state diagram follows each committed state. The model provider picker lists only the
+  providers this server can run, and the alert says the others are left out (`mat-select` greyed them; the picker has
+  no disabled option - a P4 candidate). A re-pick of the current provider is ignored, so it never resets the edited
+  form. Model Settings keeps its existing `[(ngModel)]` bindings (it has no form; moved, not added).

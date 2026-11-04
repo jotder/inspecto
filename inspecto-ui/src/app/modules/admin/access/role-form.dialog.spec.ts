@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { RoleFormData, RoleFormDialog } from './role-form.dialog';
 
 const VOCAB = ['canAuthorWorkbench', 'canOperateRuns', 'canConfigureAccess'];
@@ -44,13 +45,19 @@ describe('RoleFormDialog', () => {
     });
 
     it('rejects a duplicate or malformed name inline and does not close', () => {
-        const { c, ref } = create();
+        const { fixture, c, ref } = create();
+        const name = () => penByLabel(fixture.nativeElement, 'Role name')!;
+        expect(penError(name())).toBe(''); // nothing red on a fresh form
         c.form.controls.name.setValue('operations'); // already exists
         c.save();
         expect(c.form.controls.name.hasError('duplicate')).toBe(true);
+        refresh(fixture);
+        expect(penError(name())).toBe('A role with this name already exists.');
         c.form.controls.name.setValue('bad name!');
         c.save();
         expect(c.form.controls.name.hasError('pattern')).toBe(true);
+        refresh(fixture);
+        expect(penError(name())).toBe("Letters, digits, '.', '_' and '-' only.");
         expect(ref.close).not.toHaveBeenCalled();
     });
 
@@ -58,7 +65,7 @@ describe('RoleFormDialog', () => {
         const { fixture, c, ref } = create({
             role: { name: 'operations', capabilities: ['canOperateRuns'], dataScopes: ['billing'] },
         });
-        expect((fixture.nativeElement as HTMLElement).querySelector('input[formcontrolname="name"]')).toBeNull();
+        expect(penByLabel(fixture.nativeElement, 'Role name')).toBeNull();
         expect(c.selected.has('canOperateRuns')).toBe(true);
         c.save();
         expect(ref.close).toHaveBeenCalledWith({

@@ -9,6 +9,7 @@ import { ToastrService } from 'ngx-toastr';
 
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import {
     apiErrorMessage,
@@ -43,6 +44,7 @@ import {
         MatProgressSpinnerModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     template: `
@@ -126,18 +128,18 @@ import {
                         Opens the connection for real and runs <code>SELECT 1</code>. Nothing is saved.
                     </p>
                     <form [formGroup]="form" (ngSubmit)="test()" class="flex flex-col gap-2">
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>JDBC URL</mat-label>
-                            <input matInput formControlName="url" placeholder="jdbc:postgresql://host:5432/inspecto" />
-                            @if (form.controls.url.hasError('required')) {
-                                <mat-error>A JDBC URL is required.</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>User</mat-label>
-                            <input matInput formControlName="user" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
+                        <inspecto-pen-field
+                            label="JDBC URL"
+                            [required]="true"
+                            [mono]="true"
+                            placeholder="jdbc:postgresql://host:5432/inspecto"
+                            formControlName="url"
+                            [error]="urlError()"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field label="User" [mono]="true" formControlName="user"></inspecto-pen-field>
+                        <!-- form-allow: a secret field (a password reference; a mistyped literal must never show in a closed row) --><mat-form-field
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>Password reference</mat-label>
                             <input matInput formControlName="password" [placeholder]="refExample" />
                             <mat-hint>{{ refHint }}</mat-hint>
@@ -210,6 +212,12 @@ export class OperationalDbComponent {
     /** The badge value — text, never colour alone, and it says WHY a family is off. */
     stateOf(f: OperationalDbFamily): string {
         return f.enabled ? 'active' : 'disabled';
+    }
+
+    /** The JDBC URL row's error line: shown once the row was left or Test connection was pressed. */
+    urlError(): string {
+        const c = this.form.controls.url;
+        return c.touched && c.hasError('required') ? 'A JDBC URL is required.' : '';
     }
 
     test(): void {

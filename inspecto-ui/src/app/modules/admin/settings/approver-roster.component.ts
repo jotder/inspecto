@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 
@@ -11,6 +9,7 @@ import { ApproverRosterService, LensService, apiErrorMessage } from 'app/inspect
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 type ListKey = 'users' | 'groups';
 
@@ -27,13 +26,12 @@ type ListKey = 'users' | 'groups';
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
     ],
     template: `
         <div class="flex flex-col gap-6 p-6">
@@ -98,15 +96,14 @@ type ListKey = 'users' | 'groups';
                                 class="flex flex-wrap items-start gap-3"
                                 (ngSubmit)="add(key)"
                             >
-                                <mat-form-field class="w-80" subscriptSizing="dynamic">
-                                    <mat-label>{{ labels[key].field }}</mat-label>
-                                    <input matInput formControlName="entry" autocomplete="off" />
-                                    @if (forms[key].controls.entry.hasError('required')) {
-                                        <mat-error>Enter a value.</mat-error>
-                                    } @else if (forms[key].controls.entry.hasError('duplicate')) {
-                                        <mat-error>That entry is already in the list.</mat-error>
-                                    }
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    class="w-80"
+                                    [label]="labels[key].field"
+                                    [mono]="true"
+                                    formControlName="entry"
+                                    [error]="entryError(key)"
+                                    (entered)="add(key)"
+                                ></inspecto-pen-field>
                                 <button mat-stroked-button type="submit" class="mt-1">
                                     {{ labels[key].add }}
                                 </button>
@@ -197,6 +194,15 @@ export class ApproverRosterSettingsComponent implements OnInit {
     @HostListener('window:beforeunload', ['$event'])
     onBeforeUnload(event: BeforeUnloadEvent): void {
         if (this.dirty()) event.preventDefault();
+    }
+
+    /** The add row's error line: shown once the row was left or an add was tried. */
+    entryError(key: ListKey): string {
+        const c = this.forms[key].controls.entry;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Enter a value.';
+        if (c.hasError('duplicate')) return 'That entry is already in the list.';
+        return '';
     }
 
     add(key: ListKey): void {

@@ -2,9 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, Observable, of, tap } from 'rxjs';
@@ -27,6 +25,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { PolicyFormData, PolicyFormDialog } from './policy-form.dialog';
 
@@ -56,10 +55,9 @@ import { PolicyFormData, PolicyFormDialog } from './policy-form.dialog';
         InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTooltipModule,
+        PenFieldComponent,
         ChipComponent,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
@@ -214,6 +212,12 @@ export class AccessPoliciesComponent {
 
     private saveError(err: unknown): string {
         return isStaleVersionError(err) ? STALE_WRITE_MESSAGE : apiErrorMessage(err, 'Could not save the policies');
+    }
+
+    /** The Route row's error line: shown once the row was left or Explain was pressed. */
+    routeError(): string {
+        const c = this.form.controls.route;
+        return c.touched && c.invalid ? 'A route is required' : '';
     }
 
     /** Run the dry-run for the caller's own session against the form's route/method/resourceKind. */

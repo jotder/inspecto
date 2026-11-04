@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { LensService } from 'app/inspecto/api';
 import { ExclusionCategoriesService, ExclusionListChip } from 'app/inspecto/api/exclusion-categories.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError } from 'app/inspecto/testing/pen-field';
 import { ExclusionCategoriesComponent } from './exclusion-categories.component';
 
 const LISTS: ExclusionListChip[] = [
@@ -99,9 +100,7 @@ describe('ExclusionCategoriesComponent', () => {
         el.querySelector<HTMLButtonElement>('form button[type="submit"]')!.click();
         fixture.detectChanges();
         expect(api.create).not.toHaveBeenCalled();
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain(
-            'Enter a name',
-        );
+        expect(penError(penByLabel(el, 'New category list')!)).toContain('Enter a name');
 
         c.form.setValue({ title: ' Defence ', entityType: 'msisdn', autoApply: true, restricted: true });
         el.querySelector<HTMLButtonElement>('form button[type="submit"]')!.click();

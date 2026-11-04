@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { EgressSettingsService, LensService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, penOpen } from 'app/inspecto/testing/pen-field';
 import { EgressSettingsComponent } from './egress.component';
 
 /** The 422 `PUT /settings/egress` answers for a range overlapping a never-liftable one (EgressPolicy.Allowlist.of). */
@@ -32,16 +33,19 @@ function setup(opts: { canAdminister?: boolean; save?: EgressSettingsService['sa
     const fixture = TestBed.createComponent(EgressSettingsComponent);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const input = () => el.querySelector<HTMLInputElement>('input[formControlName="entry"]')!;
+    const row = () => penByLabel(el, 'Host name or CIDR')!;
     const button = (label: string) =>
         Array.from(el.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.trim() === label);
+    /** Type into the row and press Add with the mouse: the click's mousedown blurs the row, which commits it. */
     const type = (value: string) => {
-        input().value = value;
-        input().dispatchEvent(new Event('input'));
+        const box = penOpen(fixture, row());
+        box.value = value;
+        box.dispatchEvent(new Event('input'));
+        box.dispatchEvent(new Event('blur'));
         button('Add')!.click();
         fixture.detectChanges();
     };
-    return { fixture, c: fixture.componentInstance, el, api, toastr, input, button, type };
+    return { fixture, c: fixture.componentInstance, el, api, toastr, row, button, type };
 }
 
 describe('EgressSettingsComponent', () => {
@@ -72,14 +76,20 @@ describe('EgressSettingsComponent', () => {
         expect(c.hasUnsavedChanges()).toBe(false);
     });
 
+    it('adds the entry when Enter commits the row', () => {
+        const { c, fixture, row } = setup();
+        penEdit(fixture, row(), 'Billing.Internal');
+        expect(c.entries()).toEqual(['tickets.internal', '10.20.0.0/16', 'billing.internal']);
+        expect(penError(row())).toBe('');
+    });
+
     it('refuses a duplicate or a spaced entry inline, without adding it', () => {
-        const { c, el, type } = setup();
+        const { c, row, type } = setup();
+        expect(penError(row())).toBe(''); // nothing red on a fresh form
         type('TICKETS.internal');
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain(
-            'already in the list',
-        );
+        expect(penError(row())).toContain('already in the list');
         type('a b');
-        expect(el.querySelector('mat-error')?.textContent).toContain('cannot contain spaces');
+        expect(penError(row())).toContain('cannot contain spaces');
         expect(c.entries()).toHaveLength(2);
     });
 
@@ -110,7 +120,7 @@ describe('EgressSettingsComponent', () => {
     it('hides every editing control without canAdminister, keeping the list readable', async () => {
         const { el, button } = setup({ canAdminister: false });
         expect(el.querySelectorAll('li')).toHaveLength(2);
-        expect(el.querySelector('input[formControlName="entry"]')).toBeNull();
+        expect(penByLabel(el, 'Host name or CIDR')).toBeNull();
         expect(el.querySelector('button[aria-label^="Remove"]')).toBeNull();
         expect(button('Save allowlist')).toBeUndefined();
         expect(el.textContent).toContain('Administer capability required');

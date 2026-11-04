@@ -21,10 +21,6 @@ src/app/inspecto/spaces/space-form.dialog.ts
 src/app/inspecto/tags/tag-assignment.dialog.ts
 src/app/inspecto/transfer/import-bundle.dialog.html
 src/app/layout/common/search/search.component.html
-src/app/modules/admin/access/access-policies.component.html
-src/app/modules/admin/access/access.component.html
-src/app/modules/admin/access/policy-form.dialog.ts
-src/app/modules/admin/access/role-form.dialog.ts
 src/app/modules/admin/action-requests/action-requests.component.html
 src/app/modules/admin/agent-chat/agent-chat.component.html
 src/app/modules/admin/alerts/alert-rule-form.dialog.ts
@@ -52,7 +48,6 @@ src/app/modules/admin/jobs/jobs.component.html
 src/app/modules/admin/map-settings/map-settings.component.ts
 src/app/modules/admin/menu/menu-node.dialog.ts
 src/app/modules/admin/menu/menu-route.dialog.ts
-src/app/modules/admin/model-settings/model-settings.component.html
 src/app/modules/admin/pending-changes/pending-changes.component.html
 src/app/modules/admin/reconciliation/recon-assign.dialog.ts
 src/app/modules/admin/reconciliation/reconciliation-form.dialog.ts
@@ -67,12 +62,6 @@ src/app/modules/admin/runbooks/runbooks.component.ts
 src/app/modules/admin/runs/reprocess.dialog.ts
 src/app/modules/admin/screening/check-name.dialog.html
 src/app/modules/admin/screening/screening.component.html
-src/app/modules/admin/settings/approver-roster.component.ts
-src/app/modules/admin/settings/egress.component.ts
-src/app/modules/admin/settings/exclusion-categories.component.ts
-src/app/modules/admin/settings/incident-governance.component.ts
-src/app/modules/admin/settings/operational-db.component.ts
-src/app/modules/admin/settings/scheduler.component.ts
 src/app/modules/admin/spaces/import-bundle.dialog.ts
 src/app/modules/admin/spaces/space-template-gallery.dialog.ts
 src/app/modules/admin/tags/tags.component.html

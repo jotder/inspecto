@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 
@@ -11,6 +9,7 @@ import { EgressSettingsService, LensService, apiErrorMessage } from 'app/inspect
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** `EgressRoutes.MAX_ENTRIES` — the PUT refuses a longer list. */
 const MAX_ENTRIES = 200;
@@ -33,13 +32,12 @@ const MAX_ENTRIES = 200;
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
     ],
     template: `
         <div class="flex flex-col gap-6 p-6">
@@ -98,24 +96,15 @@ const MAX_ENTRIES = 200;
 
                     @if (canEdit()) {
                         <form [formGroup]="addForm" class="flex flex-wrap items-start gap-3" (ngSubmit)="add()">
-                            <mat-form-field class="w-80" subscriptSizing="dynamic">
-                                <mat-label>Host name or CIDR</mat-label>
-                                <input
-                                    matInput
-                                    formControlName="entry"
-                                    placeholder="tickets.internal or 10.20.0.0/16"
-                                    autocomplete="off"
-                                />
-                                @if (addForm.controls.entry.hasError('required')) {
-                                    <mat-error>Enter a host name or a CIDR range.</mat-error>
-                                } @else if (addForm.controls.entry.hasError('whitespace')) {
-                                    <mat-error>An entry cannot contain spaces.</mat-error>
-                                } @else if (addForm.controls.entry.hasError('duplicate')) {
-                                    <mat-error>That entry is already in the list.</mat-error>
-                                } @else if (addForm.controls.entry.hasError('full')) {
-                                    <mat-error>The list holds at most {{ maxEntries }} entries.</mat-error>
-                                }
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="w-80"
+                                label="Host name or CIDR"
+                                [mono]="true"
+                                placeholder="tickets.internal or 10.20.0.0/16"
+                                formControlName="entry"
+                                [error]="entryError()"
+                                (entered)="add()"
+                            ></inspecto-pen-field>
                             <button mat-stroked-button type="submit" class="mt-1">Add</button>
                         </form>
                     }
@@ -205,6 +194,17 @@ export class EgressSettingsComponent implements OnInit {
     @HostListener('window:beforeunload', ['$event'])
     onBeforeUnload(event: BeforeUnloadEvent): void {
         if (this.dirty()) event.preventDefault();
+    }
+
+    /** The add row's error line: shown once the row was left or an add was tried. */
+    entryError(): string {
+        const c = this.addForm.controls.entry;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Enter a host name or a CIDR range.';
+        if (c.hasError('whitespace')) return 'An entry cannot contain spaces.';
+        if (c.hasError('duplicate')) return 'That entry is already in the list.';
+        if (c.hasError('full')) return `The list holds at most ${this.maxEntries} entries.`;
+        return '';
     }
 
     add(): void {

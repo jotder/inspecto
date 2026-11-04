@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AccessService, PolicyDef, PolicyPreview } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { PolicyFormData, PolicyFormDialog } from './policy-form.dialog';
 
 const OTHER: PolicyDef = { name: 'b', effect: 'allow' };
@@ -62,11 +63,15 @@ describe('PolicyFormDialog', () => {
     });
 
     it('rejects a duplicate name inline and does not save', () => {
-        const { c, save } = create();
+        const { fixture, c, save } = create();
         c.form.controls.name.setValue('B');
         c.save();
         expect(c.form.controls.name.hasError('duplicate')).toBe(true);
         expect(save).not.toHaveBeenCalled();
+        refresh(fixture);
+        expect(penError(penByLabel(fixture.nativeElement, 'Policy name')!)).toBe(
+            'A policy with this name already exists.',
+        );
     });
 
     it("edit keeps the name immutable and the stored target, and shows the server's warnings", async () => {
@@ -74,7 +79,7 @@ describe('PolicyFormDialog', () => {
             policy: { name: 'p', effect: 'deny', target: { actions: ['write'] }, when: "'x' in subject.roles" },
             warnings: [{ policy: 'p', code: 'unknown-role', message: "'x' is not a role in this Space" }],
         });
-        expect(fixture.nativeElement.querySelector('input[formcontrolname="name"]')).toBeNull();
+        expect(penByLabel(fixture.nativeElement, 'Policy name')).toBeNull();
         expect(fixture.nativeElement.textContent).toContain("'x' is not a role in this Space");
         c.save();
         expect((save.mock.calls[0] as unknown as [PolicyDef[]])[0][1]).toEqual({

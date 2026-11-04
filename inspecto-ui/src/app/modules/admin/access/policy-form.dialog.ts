@@ -19,6 +19,7 @@ import {
     STALE_WRITE_MESSAGE,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -70,6 +71,7 @@ interface MatrixColumn {
         MatInputModule,
         MatRadioModule,
         InspectoAlertComponent,
+        PenFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>{{ title }}</h2>
@@ -83,17 +85,14 @@ interface MatrixColumn {
                     </inspecto-alert>
                 }
                 @if (!data.policy) {
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Policy name</mat-label>
-                        <input matInput formControlName="name" placeholder="e.g. contractor-write-freeze" />
-                        @if (form.controls.name.hasError('required')) {
-                            <mat-error>A policy name is required.</mat-error>
-                        } @else if (form.controls.name.hasError('pattern')) {
-                            <mat-error>Letters, digits, '.', '_' and '-' only.</mat-error>
-                        } @else if (form.controls.name.hasError('duplicate')) {
-                            <mat-error>A policy with this name already exists.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Policy name"
+                        [required]="true"
+                        [mono]="true"
+                        placeholder="e.g. contractor-write-freeze"
+                        formControlName="name"
+                        [error]="nameError()"
+                    ></inspecto-pen-field>
                 }
 
                 <div class="flex flex-col gap-1">
@@ -124,7 +123,7 @@ interface MatrixColumn {
                     }
                 </fieldset>
 
-                <mat-form-field subscriptSizing="dynamic">
+                <!-- form-allow: a condition expression editor (code) --><mat-form-field subscriptSizing="dynamic">
                     <mat-label>Condition (when)</mat-label>
                     <textarea
                         matInput
@@ -274,6 +273,16 @@ export class PolicyFormDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty || this.targetDirty, this.confirm);
+
+    /** The Policy name row's error line: shown once the row was left or Save / Preview impact was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A policy name is required.';
+        if (c.hasError('pattern')) return "Letters, digits, '.', '_' and '-' only.";
+        if (c.hasError('duplicate')) return 'A policy with this name already exists.';
+        return '';
+    }
 
     toggleAction(a: string, checked: boolean): void {
         if (checked) this.selectedActions.add(a);

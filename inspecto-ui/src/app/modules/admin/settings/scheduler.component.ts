@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 
@@ -12,6 +10,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { LensService, SchedulerSettingsService, SchedulerView, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /**
  * Settings ▸ **Scheduler** — the hot-tunable Consignment concurrency caps (scheduler-system-config
@@ -35,14 +34,13 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
         ChipComponent,
         InspectoEmptyStateComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     template: `
         <div class="flex flex-col gap-6">
@@ -87,46 +85,61 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             }
                             .
                         </p>
-                        <div class="flex flex-wrap items-start gap-3">
-                            <mat-form-field class="w-60" subscriptSizing="dynamic">
-                                <mat-label>Max concurrent Consignments</mat-label>
-                                <input
-                                    matInput
-                                    type="number"
-                                    formControlName="system"
-                                    min="0"
-                                    max="100000"
-                                    [placeholder]="'' + view()!.system.maxConcurrentConsignments"
-                                />
-                                @if (form.controls.system.invalid) {
-                                    <mat-error>0 (unbounded) to 100000; blank = inherit the launch default.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-52" subscriptSizing="dynamic">
-                                <mat-label>Intake cap (files/cycle)</mat-label>
-                                <input matInput type="number" formControlName="intakeMax" min="0" max="10000000" />
-                                @if (form.controls.intakeMax.invalid) {
-                                    <mat-error>0 (off) or more; blank = inherit the launch default.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-52" subscriptSizing="dynamic">
-                                <mat-label>Intake cap floor</mat-label>
-                                <input matInput type="number" formControlName="intakeMin" min="1" max="10000000" />
-                                @if (form.controls.intakeMin.invalid) {
-                                    <mat-error>At least 1; blank = inherit the launch default.</mat-error>
-                                }
-                            </mat-form-field>
+                        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                            <!-- The in-force value is a PLACEHOLDER, never a pen-field default: a blank row commits its
+                                 default, which would write the inherited value into scheduler.toon. -->
+                            <inspecto-pen-field
+                                label="Max concurrent Consignments"
+                                type="number"
+                                [min]="0"
+                                [max]="100000"
+                                [placeholder]="'' + view()!.system.maxConcurrentConsignments"
+                                formControlName="system"
+                                [error]="
+                                    invalidLine(
+                                        form.controls.system,
+                                        '0 (unbounded) to 100000; blank = inherit the launch default.'
+                                    )
+                                "
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Intake cap (files/cycle)"
+                                type="number"
+                                [min]="0"
+                                [max]="10000000"
+                                formControlName="intakeMax"
+                                [error]="
+                                    invalidLine(
+                                        form.controls.intakeMax,
+                                        '0 (off) or more; blank = inherit the launch default.'
+                                    )
+                                "
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Intake cap floor"
+                                type="number"
+                                [min]="1"
+                                [max]="10000000"
+                                formControlName="intakeMin"
+                                [error]="
+                                    invalidLine(
+                                        form.controls.intakeMin,
+                                        'At least 1; blank = inherit the launch default.'
+                                    )
+                                "
+                            ></inspecto-pen-field>
                             <inspecto-option-picker
-                                class="block w-52 py-1"
+                                class="block"
                                 formControlName="intakeAdaptive"
                                 label="Adaptive intake control"
                                 [options]="ADAPTIVE_OPTIONS"
                             />
+                        </div>
+                        <div>
                             <button
                                 mat-flat-button
                                 color="primary"
                                 type="submit"
-                                class="mt-1"
                                 [disabled]="!canOperate() || saving()"
                             >
                                 Save server settings
@@ -161,24 +174,32 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             These two work as a pair: total memory at risk is the per-instance limit times the number of
                             Runs allowed at once. Capping one without the other leaves the product unbounded.
                         </p>
-                        <div class="flex flex-wrap items-start gap-3">
-                            <mat-form-field class="w-60" subscriptSizing="dynamic">
-                                <mat-label>Memory limit per Run</mat-label>
-                                <input matInput formControlName="memoryLimit" placeholder="2GB or 80%" />
-                                @if (form.controls.memoryLimit.invalid) {
-                                    <mat-error
-                                        >A size like 2GB or 512MB, or 1–100% of host RAM like 80%; blank = inherit the
-                                        launch default.</mat-error
-                                    >
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-60" subscriptSizing="dynamic">
-                                <mat-label>Max concurrent Runs</mat-label>
-                                <input matInput type="number" formControlName="jobRuns" min="0" max="100000" />
-                                @if (form.controls.jobRuns.invalid) {
-                                    <mat-error>0 (unbounded) to 100000; blank = inherit the launch default.</mat-error>
-                                }
-                            </mat-form-field>
+                        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                            <inspecto-pen-field
+                                label="Memory limit per Run"
+                                [mono]="true"
+                                placeholder="2GB or 80%"
+                                formControlName="memoryLimit"
+                                [error]="
+                                    invalidLine(
+                                        form.controls.memoryLimit,
+                                        'A size like 2GB or 512MB, or 1–100% of host RAM like 80%; blank = inherit the launch default.'
+                                    )
+                                "
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Max concurrent Runs"
+                                type="number"
+                                [min]="0"
+                                [max]="100000"
+                                formControlName="jobRuns"
+                                [error]="
+                                    invalidLine(
+                                        form.controls.jobRuns,
+                                        '0 (unbounded) to 100000; blank = inherit the launch default.'
+                                    )
+                                "
+                            ></inspecto-pen-field>
                         </div>
                         <p class="text-secondary text-xs">
                             In force now:
@@ -213,40 +234,47 @@ import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/compon
                             default (currently {{ view()!.space.effectivePollSeconds ?? 60 }}s poll /
                             {{ view()!.space.effectiveAcquirePollSeconds ?? 60 }}s acquire).
                         </p>
-                        <div class="flex flex-wrap items-start gap-3">
-                            <mat-form-field class="w-60" subscriptSizing="dynamic">
-                                <mat-label>Max concurrent Consignments</mat-label>
-                                <input
-                                    matInput
-                                    type="number"
-                                    formControlName="space"
-                                    min="0"
-                                    max="100000"
-                                    [placeholder]="'' + view()!.space.maxConcurrentConsignments"
-                                />
-                                @if (spaceForm.controls.space.invalid) {
-                                    <mat-error>0 (unbounded) to 100000; blank = no space-tier cap.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-52" subscriptSizing="dynamic">
-                                <mat-label>Poll interval (seconds)</mat-label>
-                                <input matInput type="number" formControlName="poll" min="1" max="86400" />
-                                @if (spaceForm.controls.poll.invalid) {
-                                    <mat-error>1 to 86400 seconds, or blank to inherit.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-52" subscriptSizing="dynamic">
-                                <mat-label>Acquire interval (seconds)</mat-label>
-                                <input matInput type="number" formControlName="acquire" min="1" max="86400" />
-                                @if (spaceForm.controls.acquire.invalid) {
-                                    <mat-error>1 to 86400 seconds, or blank to inherit.</mat-error>
-                                }
-                            </mat-form-field>
+                        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                            <inspecto-pen-field
+                                label="Max concurrent Consignments"
+                                type="number"
+                                [min]="0"
+                                [max]="100000"
+                                [placeholder]="'' + view()!.space.maxConcurrentConsignments"
+                                formControlName="space"
+                                [error]="
+                                    invalidLine(
+                                        spaceForm.controls.space,
+                                        '0 (unbounded) to 100000; blank = no space-tier cap.'
+                                    )
+                                "
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Poll interval (seconds)"
+                                type="number"
+                                [min]="1"
+                                [max]="86400"
+                                formControlName="poll"
+                                [error]="
+                                    invalidLine(spaceForm.controls.poll, '1 to 86400 seconds, or blank to inherit.')
+                                "
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Acquire interval (seconds)"
+                                type="number"
+                                [min]="1"
+                                [max]="86400"
+                                formControlName="acquire"
+                                [error]="
+                                    invalidLine(spaceForm.controls.acquire, '1 to 86400 seconds, or blank to inherit.')
+                                "
+                            ></inspecto-pen-field>
+                        </div>
+                        <div>
                             <button
                                 mat-flat-button
                                 color="primary"
                                 type="submit"
-                                class="mt-1"
                                 [disabled]="!canOperate() || saving()"
                             >
                                 Save space settings
@@ -379,6 +407,11 @@ export class SchedulerSettingsComponent implements OnInit {
 
     ngOnInit(): void {
         this.refresh();
+    }
+
+    /** A row's error line: `message` once the row was left or its Save was pressed and the value is out of bounds. */
+    invalidLine(control: AbstractControl, message: string): string {
+        return control.touched && control.invalid ? message : '';
     }
 
     saveSystem(): void {

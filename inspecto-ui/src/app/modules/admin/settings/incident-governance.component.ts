@@ -3,9 +3,7 @@ import { ChangeDetectionStrategy, Component, OnInit, ViewChild, computed, inject
 import { FormArray, FormBuilder, FormGroup, FormGroupDirective, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { Observable, catchError, of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 
@@ -20,6 +18,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { validateGroup } from 'app/inspecto/query/condition-rules';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { emptyGroup } from 'app/inspecto/query/query-types';
@@ -55,12 +54,11 @@ import {
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
         QueryConditionGroupComponent,
         WorkflowStateEditorComponent,
     ],
@@ -93,21 +91,22 @@ import {
                         through RESOLVED (where the Disposition and postmortem are required) or by archiving.
                     </p>
                     <form [formGroup]="workflow" class="flex flex-col gap-3" (ngSubmit)="saveWorkflow()">
-                        <div class="flex flex-wrap gap-3">
-                            <mat-form-field class="w-56">
-                                <mat-label>Initial state</mat-label>
-                                <input matInput formControlName="initial" />
-                                @if (workflow.controls.initial.hasError('required')) {
-                                    <mat-error>An initial state is required.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-96">
-                                <mat-label>Terminal states (comma-separated)</mat-label>
-                                <input matInput formControlName="terminal" />
-                                @if (workflow.controls.terminal.hasError('required')) {
-                                    <mat-error>Declare at least one terminal state.</mat-error>
-                                }
-                            </mat-form-field>
+                        <div class="grid max-w-200 grid-cols-1 gap-x-8 sm:grid-cols-2">
+                            <inspecto-pen-field
+                                label="Initial state"
+                                [required]="true"
+                                [mono]="true"
+                                formControlName="initial"
+                                [error]="workflowError('initial')"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Terminal states"
+                                [required]="true"
+                                [mono]="true"
+                                help="Comma-separated."
+                                formControlName="terminal"
+                                [error]="workflowError('terminal')"
+                            ></inspecto-pen-field>
                         </div>
                         <div class="flex flex-wrap items-start gap-6">
                             <table class="w-full max-w-200 text-sm">
@@ -187,26 +186,33 @@ import {
                         priority.
                     </p>
                     <form [formGroup]="sla" class="flex flex-col gap-3" (ngSubmit)="saveSla()">
-                        <div class="flex flex-wrap gap-3">
-                            <mat-form-field class="w-64">
-                                <mat-label>Time zone (IANA, e.g. Europe/London)</mat-label>
-                                <input matInput formControlName="zone" />
-                                @if (sla.controls.zone.hasError('required')) {
-                                    <mat-error>An explicit time zone is required.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-32">
-                                <mat-label>Day starts</mat-label>
-                                <input matInput formControlName="start" placeholder="09:00" />
-                            </mat-form-field>
-                            <mat-form-field class="w-32">
-                                <mat-label>Day ends</mat-label>
-                                <input matInput formControlName="end" placeholder="17:00" />
-                            </mat-form-field>
-                            <mat-form-field class="w-96">
-                                <mat-label>Holidays (yyyy-mm-dd, comma-separated)</mat-label>
-                                <input matInput formControlName="holidays" />
-                            </mat-form-field>
+                        <div class="grid max-w-200 grid-cols-1 gap-x-8 sm:grid-cols-2">
+                            <inspecto-pen-field
+                                label="Time zone"
+                                [required]="true"
+                                [mono]="true"
+                                help="IANA, e.g. Europe/London."
+                                formControlName="zone"
+                                [error]="zoneError()"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Day starts"
+                                [mono]="true"
+                                placeholder="09:00"
+                                formControlName="start"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Day ends"
+                                [mono]="true"
+                                placeholder="17:00"
+                                formControlName="end"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                label="Holidays"
+                                [mono]="true"
+                                help="yyyy-mm-dd, comma-separated."
+                                formControlName="holidays"
+                            ></inspecto-pen-field>
                         </div>
                         <fieldset class="flex flex-wrap gap-3">
                             <legend class="text-secondary mb-1 text-sm">Working days</legend>
@@ -334,21 +340,25 @@ import {
                             class="flex flex-wrap items-start gap-3"
                             (ngSubmit)="addRule()"
                         >
-                            <mat-form-field class="w-48">
-                                <mat-label>Rule id</mat-label>
-                                <input matInput formControlName="id" />
-                                @if (rule.controls.id.hasError('required')) {
-                                    <mat-error>An id is required.</mat-error>
-                                }
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="w-48"
+                                label="Rule id"
+                                [required]="true"
+                                [mono]="true"
+                                formControlName="id"
+                                [error]="ruleIdError()"
+                            ></inspecto-pen-field>
                             <div class="w-48">
                                 <inspecto-option-picker label="Fires" formControlName="on" [options]="onOptions" />
                             </div>
                             @if (rule.controls.on.value === 'age') {
-                                <mat-form-field class="w-40">
-                                    <mat-label>After minutes</mat-label>
-                                    <input matInput type="number" min="1" formControlName="afterMinutes" />
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    class="w-40"
+                                    label="After minutes"
+                                    type="number"
+                                    [min]="1"
+                                    formControlName="afterMinutes"
+                                ></inspecto-pen-field>
                             } @else {
                                 <div class="w-48">
                                     <inspecto-option-picker
@@ -358,14 +368,16 @@ import {
                                     />
                                 </div>
                             }
-                            <mat-form-field class="w-40">
-                                <mat-label>Only priority</mat-label>
-                                <input matInput formControlName="priority" />
-                            </mat-form-field>
-                            <mat-form-field class="w-48">
-                                <mat-label>Reassign to</mat-label>
-                                <input matInput formControlName="reassign" />
-                            </mat-form-field>
+                            <inspecto-pen-field
+                                class="w-40"
+                                label="Only priority"
+                                formControlName="priority"
+                            ></inspecto-pen-field>
+                            <inspecto-pen-field
+                                class="w-48"
+                                label="Reassign to"
+                                formControlName="reassign"
+                            ></inspecto-pen-field>
                             <mat-checkbox formControlName="notify">Notify</mat-checkbox>
                             <mat-checkbox formControlName="raisePriority">Raise priority</mat-checkbox>
                             <div class="w-full">
@@ -629,6 +641,25 @@ export class IncidentGovernanceComponent implements OnInit {
             }),
             'SLA policy',
         );
+    }
+
+    /** The Initial / Terminal state rows' error lines: shown once the row was left or Save workflow was pressed. */
+    workflowError(name: 'initial' | 'terminal'): string {
+        const c = this.workflow.controls[name];
+        if (!c.touched || !c.hasError('required')) return '';
+        return name === 'initial' ? 'An initial state is required.' : 'Declare at least one terminal state.';
+    }
+
+    /** The Time zone row's error line: shown once the row was left or Save SLA policy was pressed. */
+    zoneError(): string {
+        const c = this.sla.controls.zone;
+        return c.touched && c.hasError('required') ? 'An explicit time zone is required.' : '';
+    }
+
+    /** The Rule id row's error line: shown once the row was left or the rule was submitted. */
+    ruleIdError(): string {
+        const c = this.rule.controls.id;
+        return c.touched && c.hasError('required') ? 'An id is required.' : '';
     }
 
     whenShowsErrors(): boolean {

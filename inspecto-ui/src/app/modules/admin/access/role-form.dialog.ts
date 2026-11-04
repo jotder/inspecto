@@ -3,10 +3,9 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 
 import { RoleDef } from 'app/inspecto/api';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -29,38 +28,21 @@ export interface RoleFormData {
     selector: 'app-role-form-dialog',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatCheckboxModule,
-        MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
-    ],
+    imports: [ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatDialogModule, PenFieldComponent],
     template: `
         <h2 mat-dialog-title>{{ data.role ? 'Edit role "' + data.role.name + '"' : 'New role' }}</h2>
         <form (ngSubmit)="save()" [formGroup]="form">
             <mat-dialog-content class="flex w-100 max-w-full flex-col gap-4">
                 @if (!data.role) {
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Role name</mat-label>
-                        <input
-                            matInput
-                            formControlName="name"
-                            placeholder="e.g. fraud-analyst"
-                            aria-label="Role name"
-                        />
-                        <mat-hint
-                            >The IdP role claim value — lowercase; assignment stays in your identity provider.</mat-hint
-                        >
-                        @if (form.controls.name.hasError('required')) {
-                            <mat-error>A role name is required.</mat-error>
-                        } @else if (form.controls.name.hasError('pattern')) {
-                            <mat-error>Letters, digits, '.', '_' and '-' only.</mat-error>
-                        } @else if (form.controls.name.hasError('duplicate')) {
-                            <mat-error>A role with this name already exists.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Role name"
+                        [required]="true"
+                        [mono]="true"
+                        placeholder="e.g. fraud-analyst"
+                        help="The IdP role claim value — lowercase; assignment stays in your identity provider."
+                        formControlName="name"
+                        [error]="nameError()"
+                    ></inspecto-pen-field>
                 }
 
                 <fieldset class="flex flex-col gap-1">
@@ -72,16 +54,13 @@ export interface RoleFormData {
                     }
                 </fieldset>
 
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Data scopes</mat-label>
-                    <input
-                        matInput
-                        formControlName="dataScopes"
-                        placeholder="e.g. fraud, billing"
-                        aria-label="Data scopes, comma-separated"
-                    />
-                    <mat-hint>Comma-separated case types this role may see (SEC-7d); empty = unscoped.</mat-hint>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Data scopes"
+                    ariaLabel="Data scopes, comma-separated"
+                    placeholder="e.g. fraud, billing"
+                    help="Comma-separated case types this role may see (SEC-7d); empty = unscoped."
+                    formControlName="dataScopes"
+                ></inspecto-pen-field>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
@@ -118,6 +97,16 @@ export class RoleFormDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty || this.capsDirty, this.confirm);
+
+    /** The Role name row's error line: shown once the row was left or Save was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A role name is required.';
+        if (c.hasError('pattern')) return "Letters, digits, '.', '_' and '-' only.";
+        if (c.hasError('duplicate')) return 'A role with this name already exists.';
+        return '';
+    }
 
     toggle(cap: string, checked: boolean): void {
         if (checked) this.selected.add(cap);

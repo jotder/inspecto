@@ -17,6 +17,7 @@ import {
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { AccessPoliciesComponent } from './access-policies.component';
 import { PolicyFormData } from './policy-form.dialog';
 
@@ -99,10 +100,14 @@ describe('AccessPoliciesComponent', () => {
     });
 
     it('requires a route before explaining', () => {
-        const { c, explain } = create();
+        const { fixture, c, explain } = create();
+        const route = penByLabel(fixture.nativeElement, 'Route')!;
+        expect(penError(route)).toBe(''); // nothing red on a fresh form
         c.explain();
         expect(explain).not.toHaveBeenCalled();
         expect(c.form.controls.route.touched).toBe(true);
+        refresh(fixture);
+        expect(penError(route)).toBe('A route is required');
     });
 
     it('reports a disabled engine without a trace', async () => {

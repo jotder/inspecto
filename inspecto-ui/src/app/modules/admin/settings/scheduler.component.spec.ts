@@ -100,7 +100,7 @@ describe('SchedulerSettingsComponent', () => {
         expect(el.textContent).toContain('Throttled by intake control');
         expect(el.textContent).toContain('noisy_feed');
         expect(el.textContent).toContain('admitting 250 of 1000 files/cycle');
-        const inputs = Array.from(el.querySelectorAll('input[type="number"]'));
+        const inputs = Array.from(el.querySelectorAll('inspecto-pen-field[type="number"]'));
         // system cap · intake max · intake floor · max concurrent Runs · space cap · poll cadence ·
         // acquire cadence. (The memory limit is a text input — a size string, not a number.)
         expect(inputs).toHaveLength(7);

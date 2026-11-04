@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { AssistService, AssistSettings } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { pickerSet } from 'app/inspecto/testing/pen-field';
 import { ModelSettingsComponent } from './model-settings.component';
 
 const SETTINGS: AssistSettings = {
@@ -49,6 +50,21 @@ describe('ModelSettingsComponent', () => {
         expect(c.timeoutSeconds).toBe(45);
         expect(c.currentIsLocal).toBe(true);
         expect(c.hostedJarMissing).toBe(true); // anthropic known but not available
+    });
+
+    it('offers only the providers this server can run, grouped Hosted / Local', () => {
+        const { fixture } = create();
+        expect(fixture.componentInstance.providerOptions()).toEqual([
+            { value: 'ollama', label: 'Ollama (local)', group: 'Local' },
+        ]);
+    });
+
+    it('a re-pick of the current provider keeps the edited form (only a new provider seeds its defaults)', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        c.baseUrl = 'http://gpu-box:11434';
+        pickerSet(fixture, 'inspecto-option-picker', 'ollama');
+        expect(c.baseUrl).toBe('http://gpu-box:11434');
     });
 
     it('has no a11y violations', async () => {

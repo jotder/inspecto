@@ -2,9 +2,6 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, si
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 
 import { LensService, apiErrorMessage } from 'app/inspecto/api';
@@ -14,6 +11,8 @@ import {
     ExclusionVisibility,
 } from 'app/inspecto/api/exclusion-categories.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** What every change made here records as its reason in the list's fact log. */
 const REASON = 'changed in Settings > Link Analysis';
@@ -33,10 +32,9 @@ const REASON = 'changed in Settings > Link Analysis';
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
-        MatInputModule,
-        MatSelectModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     template: `
         <section class="flex max-w-4xl flex-col gap-3" aria-labelledby="exclusion-categories-heading">
@@ -90,24 +88,25 @@ const REASON = 'changed in Settings > Link Analysis';
                 }
                 @if (canEdit()) {
                     <form [formGroup]="form" class="flex flex-wrap items-start gap-3" (ngSubmit)="create()">
-                        <mat-form-field class="w-72" subscriptSizing="dynamic">
-                            <mat-label>New category list</mat-label>
-                            <input matInput formControlName="title" autocomplete="off" maxlength="200" />
-                            @if (form.controls.title.hasError('required')) {
-                                <mat-error>Enter a name, for example Politicians.</mat-error>
+                        <inspecto-pen-field
+                            class="w-72"
+                            label="New category list"
+                            [required]="true"
+                            [maxlength]="200"
+                            formControlName="title"
+                            [error]="titleError()"
+                        ></inspecto-pen-field>
+                        <div class="flex w-48 flex-col">
+                            <inspecto-option-picker
+                                class="block w-full"
+                                label="Entity Type"
+                                [options]="entityTypeOptions()"
+                                formControlName="entityType"
+                            />
+                            @if (form.controls.entityType.touched && form.controls.entityType.hasError('required')) {
+                                <p class="text-warn m-0 text-xs" role="alert">Choose an Entity Type.</p>
                             }
-                        </mat-form-field>
-                        <mat-form-field class="w-48" subscriptSizing="dynamic">
-                            <mat-label>Entity Type</mat-label>
-                            <mat-select formControlName="entityType">
-                                @for (t of entityTypes(); track t.id) {
-                                    <mat-option [value]="t.id">{{ t.label }}</mat-option>
-                                }
-                            </mat-select>
-                            @if (form.controls.entityType.hasError('required')) {
-                                <mat-error>Choose an Entity Type.</mat-error>
-                            }
-                        </mat-form-field>
+                        </div>
                         <mat-checkbox formControlName="autoApply" class="mt-3"
                             >Apply to every new Investigation</mat-checkbox
                         >
@@ -151,8 +150,18 @@ export class ExclusionCategoriesComponent implements OnInit {
         restricted: new FormControl(false, { nonNullable: true }),
     });
 
+    readonly entityTypeOptions = computed<PickerOption[]>(() =>
+        this.entityTypes().map((t) => ({ value: t.id, label: t.label })),
+    );
+
     ngOnInit(): void {
         this.reload();
+    }
+
+    /** The name row's error line: shown once the row was left or Create was pressed. */
+    titleError(): string {
+        const c = this.form.controls.title;
+        return c.touched && c.hasError('required') ? 'Enter a name, for example Politicians.' : '';
     }
 
     create(): void {

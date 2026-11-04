@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ApproverRosterService, LensService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, penOpen } from 'app/inspecto/testing/pen-field';
 import { ApproverRosterSettingsComponent } from './approver-roster.component';
 
 function setup(opts: { canAdminister?: boolean; applies?: boolean; save?: ApproverRosterService['save'] } = {}) {
@@ -29,14 +30,17 @@ function setup(opts: { canAdminister?: boolean; applies?: boolean; save?: Approv
     const el = fixture.nativeElement as HTMLElement;
     const button = (label: string) =>
         Array.from(el.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent?.trim() === label);
+    const rows = () => [penByLabel(el, 'User id')!, penByLabel(el, 'Group name')!];
+    /** Type into a row and press its Add button: the click's mousedown blurs the row, which commits it. */
     const type = (index: number, value: string, add: string) => {
-        const input = el.querySelectorAll<HTMLInputElement>('input[formControlName="entry"]')[index];
-        input.value = value;
-        input.dispatchEvent(new Event('input'));
+        const box = penOpen(fixture, rows()[index]);
+        box.value = value;
+        box.dispatchEvent(new Event('input'));
+        box.dispatchEvent(new Event('blur'));
         button(add)!.click();
         fixture.detectChanges();
     };
-    return { fixture, c: fixture.componentInstance, el, api, toastr, button, type };
+    return { fixture, c: fixture.componentInstance, el, api, toastr, button, type, rows };
 }
 
 describe('ApproverRosterSettingsComponent', () => {
@@ -63,11 +67,19 @@ describe('ApproverRosterSettingsComponent', () => {
         expect(c.hasUnsavedChanges()).toBe(false);
     });
 
+    it('adds a group when Enter commits its row', () => {
+        const { c, fixture, rows } = setup();
+        penEdit(fixture, rows()[1], 'cab');
+        expect(c.draft().groups).toEqual(['ra-approvers', 'cab']);
+        expect(c.hasUnsavedChanges()).toBe(true);
+    });
+
     it('refuses a duplicate inline and shows a 422 verbatim', () => {
         const err = new HttpErrorResponse({ status: 422, error: { error: { message: "'users': an entry is blank" } } });
-        const { el, fixture, button, type } = setup({ save: () => throwError(() => err) });
+        const { el, fixture, button, type, rows } = setup({ save: () => throwError(() => err) });
+        expect(penError(rows()[0])).toBe(''); // nothing red on a fresh form
         type(0, 'ana', 'Add user');
-        expect(el.querySelector('mat-error')?.textContent).toContain('already in the list');
+        expect(penError(rows()[0])).toContain('already in the list');
         type(1, 'cab', 'Add group');
         button('Save roster')!.click();
         fixture.detectChanges();
@@ -78,6 +90,7 @@ describe('ApproverRosterSettingsComponent', () => {
         const { el, button } = setup({ canAdminister: false, applies: false });
         expect(button('Save roster')).toBeUndefined();
         expect(el.querySelector('input')).toBeNull();
+        expect(el.querySelector('inspecto-pen-field')).toBeNull();
         expect(el.textContent).toContain('approvals follow roles alone');
     });
 });
