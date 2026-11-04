@@ -63,8 +63,12 @@ public final class EntityTypes {
             new Family("place", "Place", "Where something happened: a site, a branch, an area."),
             new Family("document", "Document", "A paper or record that identifies a party or evidences a deal: an ID document, a contract."));
 
-    /** The most characters a stated definition, and a stated example, may hold. */
-    static final int MAX_DEFINITION = 300, MAX_EXAMPLE = 64;
+    /**
+     * The most characters a stated definition, and a stated example, may hold. ⚠ The definition bound IS the Industry pack's
+     * term bound: an overlay lends a type its {@code entity_type.*} term's definition and the pack's load validates the
+     * overlay, so a tighter bound here would refuse a pack that loads today.
+     */
+    static final int MAX_DEFINITION = IndustryPack.MAX_DEFINITION, MAX_EXAMPLE = 64;
 
     /** The family ids of {@link #FAMILIES}, in order. */
     public static List<String> familyIds() {

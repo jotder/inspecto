@@ -89,7 +89,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
     private static final Pattern TOOL = Pattern.compile("^[a-z][a-z0-9-]{0,31}$");
     private static final int MAX_LABEL = 60;
     private static final int MAX_ABBREVIATION = 16;
-    private static final int MAX_DEFINITION = 400;
+    static final int MAX_DEFINITION = 400;
     private static final int MAX_TERMS = 200;
     private static final Set<String> INVESTIGATE_STRINGS = Set.of("entity_type", "dataset", "source_col", "target_col",
             "link_kind_col", "time_col", "events_col");

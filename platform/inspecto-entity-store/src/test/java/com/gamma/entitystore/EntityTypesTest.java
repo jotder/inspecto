@@ -134,7 +134,9 @@ class EntityTypesTest {
         t.put("family", 7);
         assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("family must be a string"));
         t.put("family", "party");
-        t.put("definition", "x".repeat(301));
+        t.put("definition", "x".repeat(400));
+        assertEquals(400, EntityTypes.parse(List.of(t)).get(0).definition().length(), "the pack's term bound, not a tighter one");
+        t.put("definition", "x".repeat(401));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("definition is longer"));
         t.put("definition", "ok");
         t.put("example", "x".repeat(65));
