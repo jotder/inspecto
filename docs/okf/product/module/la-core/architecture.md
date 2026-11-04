@@ -1361,7 +1361,8 @@ limits and the commit's write order are in
   amount / details, the primary Entity Type, and for a Reference the identifying column. Every proposal is
   `{value, evidence, confidence}` (OF-2); a column whose values fit no Entity Type stays a detail and says why.
 - **The registry entry carries the link (OB-8).** A committed Dataset has `columns[].classification`,
-  `primaryEntityType` and `defaultLinkMapping {from, to, kind?, time?, amount?, details?[]}`.
+  `primaryEntityType` and `defaultLinkMapping {from, to, kind?, primaryTime?, primaryMeasure?, details?[]}` (`time` /
+  `amount` are the primaries' old names, still read; §6.15).
   `DatasetEntryRules` (run by `ComponentRoutes.validateKind` on every Dataset write, so the generic component
   routes refuse the same) checks the shape: from and to required and different, every named column one of the
   entry's `columns[]` when it lists any, `primaryEntityType` a non-blank id.
@@ -1641,6 +1642,60 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - The reactor ran 56 of 56 modules: 11,280 tests, 0 failures, verdict guard PASS. The UI suite passed 6,779 tests.
   - Six stale tests that peer commits left on master were fixed first, none in the Link Analysis UI: two Job tests outran by the new retry, a new scoring route, a DELETE-only Investigation path, and two sign-in specs.
 - **Deliberately not built:** Export in the embed viewer (it needs a grant flag first).
+
+### 6.15 Column roles (LA-COLUMN-ROLES-1, as built 2026-11-04/05)
+
+A Dataset column has a **role**, stored once on the registry entry as `columns[].role`, one vocabulary with Studio:
+`entity | temporal | measure | dimension | detail`, shown as **Entity · Time · Measure · Category · Detail**
+(`docs/GLOSSARY.md` *Column Role*; operator decision B). A Measure may carry a `unit`; a Time, Measure or Category
+column may say `carried: false`. A Mapping copies its base's columns with their roles and marks.
+
+- **The rules** (`DatasetEntryRules`, run on every Dataset write): a role is one of the five or absent; an Entity column
+  holds an Entity Type (`classification`); a `unit` is a Measure's only; a Measure, and the primary Measure, is a
+  number column (`number`, BIGINT, DOUBLE, DECIMAL(p,s)...; a column without a type is not checked); `carried` is a
+  boolean. An entry without roles still loads and reads back-compatibly: holds an Entity Type → Entity; the mapping's
+  primary Time or `eventDate` → Time; its primary Measure → Measure; its kind → Category; on the Data page a
+  date/timestamp column → Time; anything else → Detail.
+- **Primaries.** `defaultLinkMapping` names `primaryTime` (dates each link: the window, newcomers, playback's first
+  choice, Reconciliation's `DatasetRelation.temporalColumn` when several Times exist) and `primaryMeasure` (presets'
+  sums). `time` / `amount` are their old names, read for stored entries and in an Add data commit body; two different
+  columns under both names are refused. A primary's column, when it states a role, has the matching role. Readers:
+  `DatasetRelation.temporalColumn`, `PresetQueries.roles`, `EntityTypeBindings`, `OnboardImport`'s index build, the LA
+  start path (`readLinkMapping`), Studio.
+- **Add data** proposes a role per column (`entityTypes.columns[].role`, with evidence; `distinct` for a text column):
+  Entity when it holds an Entity Type; the link's kind / time / measure take Category / Time / Measure; else a DATE or
+  TIMESTAMP is a Time, a DOUBLE (or a BIGINT named as an amount) a Measure, a text column whose sampled values repeat
+  under 200 distinct a Category (sure under 20), anything else a Detail (always sure). The commit writes the roles; a
+  stated role that contradicts the Entity Type, the link's primaries or a Measure on text is 422. The Roles step shows a
+  role row per column and offers each primary only among columns of its role; a Measure whose type is changed to text
+  becomes a Detail.
+- **Carriage (operator decision A, 2026-11-04).** The **link index** carries every Time, Measure and Category column
+  (`DatasetEntryRules.carriedColumns`, column order, never a link end, at most 50 = the index build's own bound): Add
+  data's first build passes them, and the Edge index tool's first-build form is prefilled with them. A **link read
+  carries none by default**: a read's `attrCols` are grouping keys (server `edgeSql`, the UI fold key), so carrying a
+  timestamp or an amount would unfold the links. Play's Time picker (the timeline menu and a picker on the playback
+  strip) lists the dated link columns and the Dataset's Time columns, the primary first; picking one the links do not
+  carry re-reads them carrying that one column, and only while the canvas is still the plain query's result
+  (`plainGraph`: a seeded start, an Investigation, an expand, a Grow or a push is never replaced by the whole Dataset).
+- **Filter by role** (`role-filters.ts`, `link-analysis-role-filter.component.ts`): a range per Measure, a value list per
+  Category (its distinct values read with one SQL per column, at most 200, as toggle chips with a find box past 12; read
+  once per Dataset, a late answer for a Dataset no longer drawn is dropped), a window on any Time column. Applying writes
+  the conditions into the one predicate tree - taking out only the conditions the panel wrote last time (JSON-equal), so
+  the analyst's own and a loaded saved view's conditions stay even on a role column; an OR or negated root becomes one
+  group ANDed with them - and pushes it as the read's `filter`, which the server renders over the Dataset in SQL or,
+  when the read is served from the link index, over its attribute columns (`IndexedRead.renderFilter`) - so no column
+  needs carrying for it. A Category value holding a comma cannot travel in an `in` list and is left out.
+- **Entity profile measures** (`EntityProfiles.measures`): for each binding of the Entity Type, each Measure of that
+  Dataset over the rows naming the Entity in that column - rows holding a number, sum, lowest, highest, the unit - inside
+  the profile's window on the binding's time column; a value that is no number is not counted (`TRY_CAST`; sums rounded
+  to 6 places through BigDecimal, a non-finite one is null). Inside a window a binding with no time column adds none.
+  The bound column and any column holding an Entity Type are never a measure here - and `DatasetEntryRules` refuses a
+  Measure that holds an Entity Type ("an identifier, not a measure"), because its sums would surface raw ids the
+  profile masks; the Data page drops an unclaimed Entity Type when a column becomes a Measure. The Entity page shows
+  them as **Measures** (absent when there are none).
+- **Deliberately not built** (board row `LA-COLUMN-ROLES-2`): the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the
+  primary Measure (the canvas still weighs links by their count); a Mapping-level override of `carried` (a Mapping keeps
+  its base's mark); Category values for a multi-Dataset read (the panel offers a single read's Dataset only).
 
 ## 7. Host registration, Jobs and live detection
 

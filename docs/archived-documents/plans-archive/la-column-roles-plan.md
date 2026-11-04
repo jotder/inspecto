@@ -1,5 +1,7 @@
 # Column roles: several times, measures and categories per Dataset (`LA-COLUMN-ROLES-1`)
 
+> **SHIPPED 2026-11-05 (P0-P3; archived).** As-built truth: [la-core architecture](../../okf/product/module/la-core/architecture.md) §6.15 "Column roles"; open remainder: BACKLOG `LA-COLUMN-ROLES-2`.
+
 > **PLAN 2026-11-04 — decisions Q-1…Q-6 accepted by the operator 2026-11-04 (the recommended options, §5).** Operator ask, on the Data page's
 > Entities card: *"some of the important fields missing like date (would be more than one), amount, volume, type
 > (would be multiple) which would be used for play / filter"*. Board row `LA-COLUMN-ROLES-1`.
