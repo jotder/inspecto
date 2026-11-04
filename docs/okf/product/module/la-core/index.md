@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-COLUMN-ROLES-1` | P2 | feature | a column has a role: Entity, Time, Measure, Category or Detail, several of each, so play and filter can use every date, measure and categ… | operator |
+| `LA-COLUMN-ROLES-1` | P2 | feature | a column has a role: Entity, Time, Measure, Category or Detail, several of each, so play and filter can use every date, measure and categ… | — |
 | `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
 | `LA-BASIC-DISCOVER-1` | P3 | feature | Discover a Dataset in Basic: entities per Entity Type, busiest entities, link kinds, period, amount totals (LA-BASIC-DISCOVERY-1 P0 + P1,… | — |
 | `LA-ENTITY-SUMMARY-1` | P3 | feature | an entity summary in Basic (first / last seen, top counterparts by links and amount, link kinds, activity) - the full profile pages stay… | — |

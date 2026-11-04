@@ -1,6 +1,6 @@
 # Column roles: several times, measures and categories per Dataset (`LA-COLUMN-ROLES-1`)
 
-> **PLAN 2026-11-04 — decisions Q-1…Q-6 OPEN (recommendations marked, §5).** Operator ask, on the Data page's
+> **PLAN 2026-11-04 — decisions Q-1…Q-6 accepted by the operator 2026-11-04 (the recommended options, §5).** Operator ask, on the Data page's
 > Entities card: *"some of the important fields missing like date (would be more than one), amount, volume, type
 > (would be multiple) which would be used for play / filter"*. Board row `LA-COLUMN-ROLES-1`.
 
@@ -80,7 +80,7 @@ Dataset or Mapping says is the amount. A Mapping chosen for a different amount g
 | **P2** | Carry: every role column rides on links (`attrCols`) and in the link index (`attributeColumns`; one rebuild per index); Play picks its Time column | M |
 | **P3** | Filter: a range per Measure, a value list per Category, a window on any Time column — server side for index reads, SQL for Dataset reads; Entity profiles sum and range every Measure | M |
 
-## 5. Decisions (open)
+## 5. Decisions (operator 2026-11-04: accepted as recommended)
 
 - **Q-1 Where a role lives.** (a) on the column of the Dataset, a Mapping inherits and may override ⟵ *recommended*
   (one place for meaning; matches "holds"); (b) on each Mapping only.
