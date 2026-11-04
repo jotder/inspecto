@@ -70,9 +70,9 @@ class ControlApiEntityTypeDeleteTest {
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {
             JsonNode out = data(delete(c, "/inv/entity-types/handset", AUTHOR));
             assertEquals("handset", out.get("deleted").asText());
-            assertEquals(8, out.get("entityTypesInForce").size());
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size() - 1, out.get("entityTypesInForce").size());
             List<String> ids = typesInForce(c);
-            assertEquals(8, ids.size(), ids.toString());
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size() - 1, ids.size(), ids.toString());
             assertFalse(ids.contains("handset"));
             String toon = Files.readString(root.resolve("link-analysis.toon"));
             assertTrue(toon.contains("entity_types"), "deleting an inherited default states the rest: " + toon);

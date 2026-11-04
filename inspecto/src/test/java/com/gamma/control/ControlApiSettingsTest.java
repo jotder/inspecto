@@ -671,7 +671,7 @@ class ControlApiSettingsTest {
             String path = "/spaces/acme/settings/link-analysis";
             JsonNode def = json(send(c.port, "GET", path, null));
             assertTrue(def.get("entityTypes").isNull(), "absent ⇒ inherit: " + def);
-            assertEquals(9, def.get("entityTypesInForce").size());
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size(), def.get("entityTypesInForce").size(), "the neutral starter catalogue");
             JsonNode agent = def.get("entityTypesInForce").get(6);
             assertEquals("agent", agent.get("id").asText());
             assertEquals("Intermediary / till", agent.get("label").asText());
@@ -731,7 +731,7 @@ class ControlApiSettingsTest {
             assertEquals(200, reset.statusCode(), reset.body());
             JsonNode got = json(send(c.port, "GET", path, null));
             assertTrue(got.get("entityTypes").isNull(), "a PUT without entityTypes resets to inherit: " + got);
-            assertEquals(9, got.get("entityTypesInForce").size());
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size(), got.get("entityTypesInForce").size());
         }
     }
 

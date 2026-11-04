@@ -363,9 +363,9 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /**
-     * The Entity Types in force: the stated list, else {@link EntityTypes#DEFAULTS} as the Space's packs read them
-     * ({@link #activePacks}, merged by id by {@link IndustryPack#overlay(List, List)}: relabelled, plus each type a pack adds
-     * under its family). Packs that do not read together (installed packs are checked at load, so only in theory) give the
+     * The Entity Types in force: the stated list; else, with packs in force ({@link #activePacks}), the types those packs
+     * list, merged by id over the starter definitions ({@link IndustryPack#overlay(List, List)}); else the neutral starter
+     * catalogue {@link EntityTypes#DEFAULTS} (ENTITY-TYPE-CATALOG-1 Q-6). Packs that do not read together (installed packs are checked at load, so only in theory) give the
      * neutral defaults: a merge that cannot be trusted is never partly applied.
      */
     public List<EntityTypes.EntityType> effectiveEntityTypes() {

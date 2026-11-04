@@ -1,4 +1,4 @@
-terms[22]{key,label,abbreviation,definition}:
+terms[33]{key,label,abbreviation,definition}:
   concept.node,Subscribers,"","The lines and identities on the canvas."
   concept.link,Calls,"","Calls, messages and other contacts between two lines, folded into one link per pair and kind."
   concept.row,Call detail records,CDR / XDR,"The usage records behind the links: a CDR for voice and SMS, an XDR for data and signalling events."
@@ -21,3 +21,14 @@ terms[22]{key,label,abbreviation,definition}:
   term.wangiri,Wangiri,"","One-ring fraud: a short missed call from a premium-rate number that tempts the victim to call back."
   record_type.voice_call,Voice call record,"","One call between two lines: who called whom, from which card and handset, and which cell served it."
   record_type.sms,Text message record,"","One text message between two lines, with the cell that served the sender."
+  entity_type.account,Billing account,"","The account a line's bills and top-ups are charged to."
+  entity_type.iccid,ICCID,"","Integrated Circuit Card Identifier: the serial number printed on a SIM card, 19 or 20 digits with a check digit."
+  entity_type.apn,APN,"","Access Point Name: the gateway a line's data session goes out through."
+  entity_type.roaming_partner,Roaming partner,"","A network abroad that a line roamed on, named by its network code (MCC and MNC)."
+  entity_type.retailer,SIM retailer,"","The shop or dealer that sold or registered a SIM card."
+  record_type.data_session,Data session,"","One period of mobile data use: the line, card and handset, the access point and the address it was given."
+  record_type.sim_registration,SIM registration,"","A SIM card registered to a person: the line, the card, the identity document shown and the shop that took it."
+  record_type.top_up,Airtime top-up,"","Credit added to a prepaid line, at a shop or from an account."
+  record_type.roaming,Roaming record,"","A line's activity on a network abroad."
+  record_type.device_change,Handset change,"","A line seen in a different handset than before."
+  record_type.invoice,Billing statement,"","A bill for an account: the account, its holder and its lines."

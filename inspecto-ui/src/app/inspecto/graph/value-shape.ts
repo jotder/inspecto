@@ -36,8 +36,9 @@ export function isFreeShape(shape: string | null | undefined): boolean {
  */
 export function shapeSpecificity(shape: string | null | undefined): number {
     if (isFreeShape(shape)) return 0;
-    if (shape!.startsWith('luhn(')) return 7;
-    return ({ iban: 6, email: 5, uuid: 4, e164: 2 } as Record<string, number>)[shape!] ?? 3;
+    const range = shape!.includes('-'); // digits(a-b), luhn(a-b): a set length is narrower than a range
+    if (shape!.startsWith('luhn(')) return range ? 7 : 8;
+    return ({ iban: 6, email: 5, uuid: 4, e164: 1 } as Record<string, number>)[shape!] ?? (range ? 2 : 3);
 }
 
 /** How `value` fits `shape`; an absent, free or unknown shape fits nothing (it checks nothing). */

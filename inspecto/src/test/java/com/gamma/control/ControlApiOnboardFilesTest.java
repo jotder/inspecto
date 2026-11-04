@@ -911,17 +911,17 @@ class ControlApiOnboardFilesTest {
             data(json(c, "PUT", "/datasets/calls/record-type", "{\"recordType\":null}", null), 200);
             assertFalse(data(json(c, "GET", "/components/dataset/calls", null, null), 200).get("content").has("recordType"));
 
-            // the draft proposes the record type whose likely types the columns hold: phone numbers and handsets -> a call
-            StringBuilder sb = new StringBuilder("caller,callee,device_serial,duration\n");
+            // the draft proposes the record type whose likely types the columns hold: numbers, handsets and the serving cell -> a call
+            StringBuilder sb = new StringBuilder("caller,callee,device_serial,cell_id,duration\n");
             for (int i = 0; i < 60; i++) {
                 String body = String.format("35%012d", 200000 + i);
                 sb.append("+3361234").append(String.format("%04d", i)).append(",+3361299").append(String.format("%04d", i)).append(',')
-                        .append(body).append(luhnDigit(body)).append(',').append(i).append('\n');
+                        .append(body).append(luhnDigit(body)).append(",SITE-").append(i % 7).append(',').append(i).append('\n');
             }
             JsonNode d = draft(c, "calls.csv", "stream", sb.toString(), null);
             JsonNode rt = d.get("entityTypes").get("recordType");
             assertEquals("voice_call", rt.get("value").asText(), rt.toString());
-            assertEquals("high", rt.get("confidence").asText(), "two of its likely types are held and nothing ties");
+            assertEquals("high", rt.get("confidence").asText(), "three of its four likely types are held; a data session covers fewer of its six");
             assertTrue(rt.get("evidence").asText().contains("voice call record"), rt.toString());
             String draftId = d.get("draftId").asText();
             assertEquals(422, json(c, "POST", "/onboard/files/" + draftId + "/commit", "{\"name\":\"rt_bad\",\"recordType\":\"nope\"}", null)

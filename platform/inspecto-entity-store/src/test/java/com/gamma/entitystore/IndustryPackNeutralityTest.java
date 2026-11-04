@@ -97,7 +97,7 @@ class IndustryPackNeutralityTest {
         assertEquals("MSISDN", label(telecom.overlay(EntityTypes.DEFAULTS), "msisdn"));
         assertEquals("Phone number", label(money.overlay(EntityTypes.DEFAULTS), "msisdn"), "mobile money does not relabel the phone number");
         assertEquals("Wallet", label(money.overlay(EntityTypes.DEFAULTS), "wallet"));
-        assertFalse(label(telecom.overlay(EntityTypes.DEFAULTS), "wallet").equals("Wallet"));
+        assertTrue(telecom.overlay(EntityTypes.DEFAULTS).stream().noneMatch(t -> t.id().equals("wallet")), "telecom does not list wallets");
     }
 
     private static String label(List<EntityTypes.EntityType> types, String id) {

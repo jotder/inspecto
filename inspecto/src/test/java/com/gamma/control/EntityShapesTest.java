@@ -84,13 +84,42 @@ class EntityShapesTest {
         assertEquals("high", call.get("confidence"), call.toString());
         assertTrue(String.valueOf(call.get("evidence")).contains("msisdn, imei"), call.toString());
 
-        Map<String, Object> tie = EntityShapes.recordType(held("msisdn", "cell"), RECORDS);
-        assertEquals("call", tie.get("value"), "a tie goes to the first in force");
+        // the same two held types: an SMS record's two likely types are all covered, a call's three are not
+        Map<String, Object> sms = EntityShapes.recordType(held("msisdn", "cell"), RECORDS);
+        assertEquals("sms", sms.get("value"), sms.toString());
+        assertEquals("high", sms.get("confidence"));
+        List<IndustryPack.RecordType> twins = List.of(new IndustryPack.RecordType("a", "A", "", List.of("msisdn", "cell")),
+                new IndustryPack.RecordType("b", "B", "", List.of("cell", "msisdn")));
+        Map<String, Object> tie = EntityShapes.recordType(held("msisdn", "cell"), twins);
+        assertEquals("a", tie.get("value"), "a full tie goes to the first in force");
         assertEquals("low", tie.get("confidence"));
         assertEquals("low", EntityShapes.recordType(held("bank"), RECORDS).get("confidence"), "one held type is a guess");
 
         Map<String, Object> nothing = EntityShapes.recordType(held("note"), RECORDS);
         assertNull(nothing.get("value"), nothing.toString());
+    }
+
+    /** P3 content: a plain call file (two numbers and a handset serial) against the shipped telecom record types. */
+    @Test
+    void aPlainCallFileIsACallRecordAtLowConfidenceAndALowGuessIsNoEvidence() {
+        List<IndustryPack.RecordType> telecom = com.gamma.entitystore.IndustryPacks.bundled().find("telecom").recordTypes();
+        Map<String, Object> call = EntityShapes.recordType(held("msisdn", "imei"), telecom);
+        assertEquals("voice_call", call.get("value"), "a handset change covers the same share, so the first in force: " + call);
+        assertEquals("low", call.get("confidence"));
+
+        // a number column that merely fits a digits shape (a low guess) does not steer the record type
+        List<Map<String, Object>> cols = new ArrayList<>(List.of(
+                Map.of("column", "caller", "entityType", OnboardDraft.choice("msisdn", "", true)),
+                Map.of("column", "duration_ms", "entityType", OnboardDraft.choice("bank", "", false))));
+        Map<String, Object> p = EntityShapes.recordType(Map.of("columns", cols), RECORDS);
+        assertEquals("sms", p.get("value"), "counted, the low 'bank' guess would make it a payment (1 of 1): " + p);
+    }
+
+    @Test
+    void aNameThatIsATypesIdWinsOverItsLastToken() {
+        assertEquals("IP_ADDRESS", EntityShapes.nameHint("ip_address", EntityTypes.DEFAULTS));
+        assertEquals("IP_ADDRESS", EntityShapes.nameHint("IpAddress", EntityTypes.DEFAULTS));
+        assertEquals("ADDRESS", EntityShapes.nameHint("home_address", EntityTypes.DEFAULTS));
     }
 
     @Test

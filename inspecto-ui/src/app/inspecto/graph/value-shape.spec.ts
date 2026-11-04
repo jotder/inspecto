@@ -32,6 +32,9 @@ describe('shapeFit (browser half of the shared value-shape fixture)', () => {
 describe('shapeSpecificity', () => {
     it('ranks a narrower shape higher, as the Java side', () => {
         expect(shapeSpecificity('luhn(15)')).toBeGreaterThan(shapeSpecificity('digits(15)'));
+        expect(shapeSpecificity('luhn(15)')).toBeGreaterThan(shapeSpecificity('luhn(13-19)'));
+        expect(shapeSpecificity('digits(15)')).toBeGreaterThan(shapeSpecificity('digits(14-15)'));
+        expect(shapeSpecificity('digits(14-15)')).toBeGreaterThan(shapeSpecificity('e164'));
         expect(shapeSpecificity('digits(15)')).toBeGreaterThan(shapeSpecificity('e164'));
         expect(shapeSpecificity('e164')).toBeGreaterThan(shapeSpecificity('free'));
         expect(shapeSpecificity(null)).toBe(0);

@@ -65,13 +65,14 @@ public final class ValueShapes {
      */
     public static int specificity(String shape) {
         if (isFree(shape)) return 0;
-        if (shape.startsWith("luhn(")) return 7;
+        boolean range = shape.contains("-");   // digits(a-b), luhn(a-b): a set length is narrower than a range
+        if (shape.startsWith("luhn(")) return range ? 7 : 8;
         return switch (shape) {
             case "iban" -> 6;
             case "email" -> 5;
             case "uuid" -> 4;
-            case "e164" -> 2;
-            default -> 3; // digits(...)
+            case "e164" -> 1;
+            default -> range ? 2 : 3; // digits(...)
         };
     }
 

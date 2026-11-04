@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,15 +39,51 @@ class IndustryPacksTest {
         assertNull(c.find("generic"), "generic is the neutral vocabulary, never a pack");
     }
 
+    /** ENTITY-TYPE-CATALOG-1 Q-6: a Space with a pack reads the types the pack LISTS, starter ids keeping their contracts. */
     @Test
-    void aPackRelabelsTheCoreEntityTypesAndNeverAddsOne() {
+    void aPackReadsExactlyTheTypesItListsRelabellingStarterIdsAndAddingItsOwn() {
         IndustryPack telecom = IndustryPacks.bundled().find("telecom");
         List<EntityTypes.EntityType> types = telecom.overlay(EntityTypes.DEFAULTS);
-        assertEquals(EntityTypes.DEFAULTS.stream().map(EntityTypes.EntityType::id).toList(),
-                types.stream().map(EntityTypes.EntityType::id).toList());
-        assertEquals("MSISDN", types.stream().filter(t -> t.id().equals("msisdn")).findFirst().orElseThrow().label());
-        assertEquals("Account", types.stream().filter(t -> t.id().equals("account")).findFirst().orElseThrow().label(),
-                "a type the pack has no term for keeps its neutral label");
+        assertEquals(telecom.entityTypes().stream().map(EntityTypes.EntityType::id).toList(),
+                types.stream().map(EntityTypes.EntityType::id).toList(), "membership and order are the pack's");
+        assertFalse(types.stream().anyMatch(t -> t.id().equals("wallet")), "a starter type the pack does not list is not read");
+        assertEquals("MSISDN", label(types, "msisdn"));
+        assertEquals("Email address", label(types, "email"), "a listed type the pack has no term for keeps its neutral label");
+        EntityTypes.EntityType msisdn = types.stream().filter(t -> t.id().equals("msisdn")).findFirst().orElseThrow();
+        assertEquals(EntityTypes.coreDefault("msisdn").classifications(), msisdn.classifications(), "ids and classifications are contracts");
+        assertEquals("identifier", msisdn.family());
+        EntityTypes.EntityType iccid = types.stream().filter(t -> t.id().equals("iccid")).findFirst().orElseThrow();
+        assertEquals("ICCID", iccid.label());
+        assertEquals("luhn(19-20)", iccid.shape());
+        assertTrue(ValueShapes.fits(iccid.shape(), iccid.example()), "a pack's example fits its own shape");
+    }
+
+    /**
+     * The Space Templates that select a pack bind columns to these classifications (la-showcase: ACCOUNT, IMSI, MSISDN;
+     * la-mobile-money: AGENT, MSISDN, WALLET; telco-fraud: MSISDN): the pack must still claim them, or a column loses its type.
+     */
+    @Test
+    void eachPackClaimsTheClassificationsItsTemplatesBind() {
+        Map<String, List<String>> bound = Map.of("telecom", List.of("ACCOUNT", "IMSI", "MSISDN"),
+                "mobile-money", List.of("AGENT", "MSISDN", "WALLET"));
+        for (var e : bound.entrySet()) {
+            List<String> claimed = IndustryPacks.bundled().find(e.getKey()).overlay(EntityTypes.DEFAULTS).stream()
+                    .flatMap(t -> t.classifications().stream()).toList();
+            assertTrue(claimed.containsAll(e.getValue()), e.getKey() + " claims " + claimed);
+        }
+    }
+
+    @Test
+    void everyExampleFitsItsShapeInTheStarterAndInEveryPack() {
+        List<EntityTypes.EntityType> all = new java.util.ArrayList<>(EntityTypes.DEFAULTS);
+        for (IndustryPack p : IndustryPacks.bundled().installed()) all.addAll(p.overlay(EntityTypes.DEFAULTS));
+        for (EntityTypes.EntityType t : all)
+            if (!ValueShapes.isFree(t.shape()))
+                assertTrue(ValueShapes.fits(t.shape(), t.example()), t.id() + ": example '" + t.example() + "' does not fit " + t.shape());
+    }
+
+    private static String label(List<EntityTypes.EntityType> types, String id) {
+        return types.stream().filter(t -> t.id().equals(id)).findFirst().orElseThrow().label();
     }
 
     @Test
@@ -178,8 +215,8 @@ class IndustryPacksTest {
         }));
         assertEquals(List.of(), c.refused());
         List<EntityTypes.EntityType> types = c.find("toy").overlay(EntityTypes.DEFAULTS);
-        assertEquals(EntityTypes.DEFAULTS.size() + 1, types.size(), "the core types, then the added one");
-        EntityTypes.EntityType ss = types.get(types.size() - 1);
+        assertEquals(1, types.size(), "the pack lists one type, its own");
+        EntityTypes.EntityType ss = types.get(0);
         assertEquals(new EntityTypes.EntityType("starship", "Starship", "upper-trim", false, List.of("STARSHIP"), "device",
                 "A vessel that travels between stars.", "104233", "digits(6)"), ss);
         assertEquals("starship", c.find("toy").profile().suggestedLists().get(0).entityType(), "a suggestion may name the pack's own type");

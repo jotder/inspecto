@@ -301,10 +301,12 @@ public record IndustryPack(String id, String name, String description, List<Stri
     }
 
     /**
-     * {@code base} as {@code packs} read it, the first pack winning (ENTITY-TYPE-CATALOG-1 Q-5: several packs in one Space
-     * merge by id). A type of {@code base} takes the normaliser, masking, classifications, shape and example of the first pack
-     * that restates it, and the label and definition of the first pack with an {@code entity_type.*} term for it; its family
-     * stays {@code base}'s. Each type a pack adds follows, in pack order. The same id in two packs must agree on family,
+     * The Entity Types {@code packs} LIST, read over {@code base}, the first pack winning (ENTITY-TYPE-CATALOG-1 Q-5: several
+     * packs in one Space merge by id; Q-6: with a pack in force a Space reads its packs' types, not the whole starter
+     * catalogue). In pack order, each id once: an id {@code base} has keeps {@code base}'s family and takes the normaliser,
+     * masking and classifications of the first pack that lists it, its example and shape unless that pack states none; an id
+     * {@code base} lacks is a pack's own type. Either takes the label and definition of the first pack with an
+     * {@code entity_type.*} term for it. The same id in two packs must agree on family,
      * normaliser, masking and classifications, else {@link IllegalArgumentException} (installed packs are checked at load, {@link IndustryPacks}).
      */
     public static List<EntityTypes.EntityType> overlay(List<IndustryPack> packs, List<EntityTypes.EntityType> base) {
@@ -314,21 +316,15 @@ public record IndustryPack(String id, String name, String description, List<Stri
                 EntityTypes.EntityType prev = stated.putIfAbsent(t.id(), t);
                 if (prev != null) agree(prev, t, p.id);
             }
+        Map<String, EntityTypes.EntityType> byId = new LinkedHashMap<>();
+        for (EntityTypes.EntityType b : base) byId.put(b.id(), b);
         List<EntityTypes.EntityType> out = new ArrayList<>();
-        Set<String> ids = new HashSet<>();
-        for (EntityTypes.EntityType b : base) {
-            EntityTypes.EntityType t = stated.getOrDefault(b.id(), b);
-            Term term = firstTerm(packs, "entity_type." + b.id());
-            out.add(new EntityTypes.EntityType(b.id(), term != null ? term.label() : b.label(), t.normaliser(), t.masked(),
+        for (EntityTypes.EntityType t : stated.values()) {
+            EntityTypes.EntityType b = byId.getOrDefault(t.id(), t);
+            Term term = firstTerm(packs, "entity_type." + t.id());
+            out.add(new EntityTypes.EntityType(t.id(), term != null ? term.label() : b.label(), t.normaliser(), t.masked(),
                     t.classifications(), b.family(), term != null ? term.definition() : b.definition(),
                     t.example() != null ? t.example() : b.example(), t.shape() != null ? t.shape() : b.shape()));
-            ids.add(b.id());
-        }
-        for (EntityTypes.EntityType t : stated.values()) {
-            if (!ids.add(t.id())) continue;
-            Term term = firstTerm(packs, "entity_type." + t.id());
-            out.add(new EntityTypes.EntityType(t.id(), term != null ? term.label() : t.label(), t.normaliser(), t.masked(),
-                    t.classifications(), t.family(), term != null ? term.definition() : t.definition(), t.example(), t.shape()));
         }
         return List.copyOf(out);
     }

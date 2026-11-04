@@ -148,6 +148,10 @@ final class EntityShapes {
     /** A classification named by the column's name tokens: a hint word, or a type's id or classification. */
     static String nameHint(String column, List<EntityTypes.EntityType> types) {
         List<String> tokens = tokens(column);
+        // the whole name first: ip_address is the network-address type, not the postal one its last token names
+        String whole = String.join("_", tokens);
+        for (EntityTypes.EntityType t : types)
+            if (t.id().equals(whole) && !t.classifications().isEmpty()) return t.classifications().get(0).toUpperCase(Locale.ROOT);
         for (String tok : tokens) {
             for (EntityTypes.EntityType t : types) {
                 if (t.id().equalsIgnoreCase(tok)) return t.classifications().isEmpty() ? null : t.classifications().get(0).toUpperCase(Locale.ROOT);
@@ -211,26 +215,34 @@ final class EntityShapes {
     }
 
     /**
-     * The record type of a draft (ENTITY-TYPE-CATALOG-1 P2): the one whose likely Entity Types the most proposed columns hold
-     * (distinct types; ties go to the first in force). {@code high} when at least two of its likely types are held and no other
-     * record type ties. {@code entityTypes} is the block {@link #propose} answered.
+     * The record type of a draft (ENTITY-TYPE-CATALOG-1 P2): the one whose likely Entity Types the most columns surely hold
+     * (proposals of high confidence only)
+     * (distinct types), then the one whose likely types those cover the larger share of (a call record's four over a data
+     * session's six); a remaining tie goes to the first in force. {@code high} when at least two of its likely types are held
+     * and no other record type ties. {@code entityTypes} is the block {@link #propose} answered.
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> recordType(Map<String, Object> entityTypes, List<IndustryPack.RecordType> recordTypes) {
         Set<String> held = new LinkedHashSet<>();
         for (Object o : (List<Object>) entityTypes.getOrDefault("columns", List.of()))
-            if (o instanceof Map<?, ?> row && row.get("entityType") instanceof Map<?, ?> ch && ch.get("value") != null)
+            // only a sure proposal is evidence: a low guess (a number column that merely fits a digits shape) would steer it
+            if (o instanceof Map<?, ?> row && row.get("entityType") instanceof Map<?, ?> ch && ch.get("value") != null
+                    && "high".equals(ch.get("confidence")))
                 held.add(String.valueOf(ch.get("value")));
         IndustryPack.RecordType best = null;
         List<String> bestHeld = List.of();
         boolean tie = false;
         for (IndustryPack.RecordType r : recordTypes) {
             List<String> hits = r.likelyTypes().stream().filter(held::contains).toList();
-            if (hits.size() > bestHeld.size()) {
+            if (hits.isEmpty()) continue;
+            // compare hits, then coverage hits/size without division: a/b vs c/d as a*d vs c*b
+            int cmp = best == null ? 1 : hits.size() != bestHeld.size() ? Integer.compare(hits.size(), bestHeld.size())
+                    : Integer.compare(hits.size() * best.likelyTypes().size(), bestHeld.size() * r.likelyTypes().size());
+            if (cmp > 0) {
                 best = r;
                 bestHeld = hits;
                 tie = false;
-            } else if (!hits.isEmpty() && hits.size() == bestHeld.size()) tie = true;
+            } else if (cmp == 0) tie = true;
         }
         if (best == null)
             return OnboardDraft.choice(null, "no column holds an Entity Type a record type of this Space usually holds", false);

@@ -47,8 +47,10 @@ class EntityTypesTest {
     }
 
     @Test
-    void theDefaultsAreTheSeededNineAndValidate() {
-        assertEquals(List.of("subscriber", "imsi", "imei", "msisdn", "wallet", "account", "agent", "handset", "cell"),
+    void theDefaultsAreTheSeededNineThenTheNeutralStarterTypesAndValidate() {
+        // ENTITY-TYPE-CATALOG-1 P3: the nine original ids first (data contracts), then the neutral types every domain shares
+        assertEquals(List.of("subscriber", "imsi", "imei", "msisdn", "wallet", "account", "agent", "handset", "cell",
+                        "email", "id_document", "organisation", "bank_account", "card", "ip_address", "address"),
                 EntityTypes.DEFAULTS.stream().map(EntityType::id).toList());
         assertDoesNotThrow(() -> EntityTypes.validate(EntityTypes.DEFAULTS));
         assertEquals(EntityTypes.DEFAULTS, EntityTypes.parse(EntityTypes.shape(EntityTypes.DEFAULTS)));
@@ -86,12 +88,12 @@ class EntityTypesTest {
         want.put("handset", List.of("HANDSET"));
         want.put("cell", List.of("CELL", "CELL_ID"));
         Map<String, List<String>> got = new LinkedHashMap<>();
-        for (EntityType t : EntityTypes.DEFAULTS) got.put(t.id(), t.classifications());
+        for (EntityType t : EntityTypes.DEFAULTS.subList(0, 9)) got.put(t.id(), t.classifications());
         assertEquals(want, got);
 
         Map<String, String> families = new LinkedHashMap<>();
         for (EntityType t : EntityTypes.DEFAULTS) {
-            families.put(t.id(), t.family());
+            if (want.containsKey(t.id())) families.put(t.id(), t.family());
             assertFalse(t.definition() == null || t.definition().isBlank(), t.id() + " has a definition");
             assertFalse(t.example() == null || t.example().isBlank(), t.id() + " has an example");
         }

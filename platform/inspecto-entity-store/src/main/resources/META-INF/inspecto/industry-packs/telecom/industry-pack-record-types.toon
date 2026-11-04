@@ -1,5 +1,17 @@
-record_types[2]:
+record_types[8]:
   - id: voice_call
     likely_types[4]: msisdn,imsi,imei,cell
   - id: sms
     likely_types[3]: msisdn,imsi,cell
+  - id: data_session
+    likely_types[6]: msisdn,imsi,imei,apn,ip_address,cell
+  - id: sim_registration
+    likely_types[6]: msisdn,iccid,imsi,subscriber,id_document,retailer
+  - id: top_up
+    likely_types[3]: msisdn,retailer,account
+  - id: roaming
+    likely_types[3]: msisdn,imsi,roaming_partner
+  - id: device_change
+    likely_types[4]: msisdn,imsi,imei,handset
+  - id: invoice
+    likely_types[4]: account,subscriber,msisdn,email

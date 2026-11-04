@@ -74,8 +74,9 @@ final class DomainProfileRoutes implements RouteModule {
                 : LinkAnalysisSettings.forRoot(root).extraPacks();
         for (String x : extraInForce) if (packs.find(x) != null && !chosen.contains(packs.find(x))) chosen.add(packs.find(x));
         try {
-            com.gamma.entitystore.EntityTypes.validate(IndustryPack.overlay(chosen, com.gamma.entitystore.EntityTypes.DEFAULTS),
-                    Integer.MAX_VALUE);
+            if (!chosen.isEmpty())   // none chosen = the neutral starter catalogue
+                com.gamma.entitystore.EntityTypes.validate(IndustryPack.overlay(chosen, com.gamma.entitystore.EntityTypes.DEFAULTS),
+                        Integer.MAX_VALUE);
         } catch (IllegalArgumentException clash) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "these packs do not read together: " + clash.getMessage());
         }

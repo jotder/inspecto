@@ -1,13 +1,57 @@
-entity_types[3]:
+entity_types[13]:
+  - id: subscriber
+    normaliser: default
+    masked: true
+    classifications[1]: SUBSCRIBER
   - id: wallet
     normaliser: upper-trim
     masked: true
     classifications[1]: WALLET
-  - id: agent
-    normaliser: upper-trim
-    masked: false
-    classifications[2]: AGENT,TILL
   - id: msisdn
     normaliser: e164
     masked: true
     classifications[1]: MSISDN
+  - id: agent
+    normaliser: upper-trim
+    masked: false
+    classifications[2]: AGENT,TILL
+  - id: account
+    normaliser: upper-trim
+    masked: true
+    classifications[1]: ACCOUNT
+  - id: merchant
+    family: organisation
+    normaliser: upper-trim
+    masked: false
+    classifications[2]: MERCHANT,SHORTCODE
+    example: MER-55021
+  - id: biller
+    family: organisation
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BILLER
+    example: BIL-0007
+  - id: bank_account
+    normaliser: upper-trim
+    masked: true
+    classifications[2]: IBAN,BANK_ACCOUNT
+  - id: card
+    normaliser: digits
+    masked: true
+    classifications[2]: CARD,PAN
+  - id: id_document
+    normaliser: upper-trim
+    masked: true
+    classifications[3]: ID_DOCUMENT,NATIONAL_ID,PASSPORT
+  - id: imei
+    normaliser: digits
+    masked: true
+    classifications[1]: IMEI
+  - id: email
+    normaliser: default
+    masked: true
+    classifications[1]: EMAIL
+  - id: ip_address
+    normaliser: default
+    masked: false
+    classifications[1]: IP_ADDRESS

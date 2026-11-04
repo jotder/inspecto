@@ -56,7 +56,7 @@ public final class EntityTypes {
     /** The closed family set, in the order a picker shows them. ⛔ Neutral words only ({@code IndustryPackNeutralityTest}). */
     public static final List<Family> FAMILIES = List.of(
             new Family("party", "Party", "A person or customer the records are about."),
-            new Family("organisation", "Organisation", "A business or body that serves customers: a shop, a merchant, a branch."),
+            new Family("organisation", "Organisation", "A business or body that serves customers: a shop, a branch, a supplier."),
             new Family("account", "Account", "Something that holds a balance or a service for a party."),
             new Family("identifier", "Identifier",
                     "A number or code that names a party or an account: a phone number, a card number, an email address."),
@@ -93,9 +93,11 @@ public final class EntityTypes {
     public static final List<String> NORMALISERS = List.of("default", "digits", "e164", "upper-trim");
 
     /**
-     * The seeded types a space inherits until it states its own (design §2.6). ⛔ The labels are NEUTRAL (AC-09): an
-     * industry word ("MSISDN", "Wallet") is the Space's {@link IndustryPack} relabelling the type, never the core's.
-     * The ids and classifications are data contracts and stay as they are; each type sits under one {@link #FAMILIES} family.
+     * The <b>neutral starter catalogue</b> (ENTITY-TYPE-CATALOG-1 Q-6): what a Space with no Industry pack and no stated
+     * list reads, and the core definitions a pack restating one of these ids starts from. With a pack in force a Space reads
+     * the types its packs LIST instead ({@link IndustryPack#overlay(List, List)}). ⛔ The labels are NEUTRAL (AC-09): an
+     * industry word ("MSISDN", "Wallet") is a pack relabelling the type, never the core's. The first nine ids and their
+     * classifications are data contracts and stay as they are; each type sits under one {@link #FAMILIES} family.
      */
     public static final List<EntityType> DEFAULTS = List.of(
             new EntityType("subscriber", "Subscriber", "default", true, List.of("SUBSCRIBER"),
@@ -115,7 +117,22 @@ public final class EntityTypes {
             new EntityType("handset", "Device", "default", false, List.of("HANDSET"),
                     "device", "A phone or terminal, by its make and model.", "Model X-200", "free"),
             new EntityType("cell", "Location", "upper-trim", false, List.of("CELL", "CELL_ID"),
-                    "place", "The network site or area that served an event.", "SITE-0451-B", "free"));
+                    "place", "The network site or area that served an event.", "SITE-0451-B", "free"),
+            // the neutral types every domain shares (ENTITY-TYPE-CATALOG-1 P3)
+            new EntityType("email", "Email address", "default", true, List.of("EMAIL"),
+                    "identifier", "An address mail is sent to.", "name@example.org", "email"),
+            new EntityType("id_document", "Identity document", "upper-trim", true, List.of("ID_DOCUMENT", "NATIONAL_ID", "PASSPORT"),
+                    "document", "The number of a paper that identifies a person: an identity card, a passport.", "X1234567", "free"),
+            new EntityType("organisation", "Organisation", "default", false, List.of("ORGANISATION", "COMPANY"),
+                    "organisation", "A business or body, by its name or registration number.", "Example Trading Ltd", "free"),
+            new EntityType("bank_account", "Bank account", "upper-trim", true, List.of("IBAN", "BANK_ACCOUNT"),
+                    "account", "An account held at a bank, best written as an IBAN.", "GB82WEST12345698765432", "iban"),
+            new EntityType("card", "Payment card", "digits", true, List.of("CARD", "PAN"),
+                    "identifier", "The long number on a payment card: 13 to 19 digits with a check digit.", "4000000000000002", "luhn(13-19)"),
+            new EntityType("ip_address", "Network address", "default", false, List.of("IP_ADDRESS"),
+                    "identifier", "The address a device used on a network.", "192.0.2.10", "free"),
+            new EntityType("address", "Postal address", "default", false, List.of("ADDRESS"),
+                    "place", "Where a party lives or a business trades.", "1 Example Street", "free"));
 
     /** The core default of {@code id}, else {@code null} (a Space's own type). */
     public static EntityType coreDefault(String id) {

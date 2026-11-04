@@ -64,7 +64,7 @@ class ControlApiEntityTypeProfileTest {
         subjects();
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {
             JsonNode items = data(get(c, "/inv/entity-types", OWNER)).get("items");
-            assertEquals(9, items.size(), "the seeded types are in force");
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size(), items.size(), "the neutral starter catalogue is in force");
             JsonNode msisdn = null, imei = null, wallet = null;
             for (JsonNode t : items) {
                 if ("msisdn".equals(t.get("id").asText())) msisdn = t;

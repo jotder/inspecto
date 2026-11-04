@@ -65,6 +65,9 @@ class ValueShapesTest {
         assertTrue(ValueShapes.specificity("luhn(15)") > ValueShapes.specificity("digits(15)"));
         assertTrue(ValueShapes.specificity("digits(15)") > ValueShapes.specificity("e164"));
         assertTrue(ValueShapes.specificity("e164") > ValueShapes.specificity("free"));
+        assertTrue(ValueShapes.specificity("luhn(15)") > ValueShapes.specificity("luhn(13-19)"), "a set length over a range");
+        assertTrue(ValueShapes.specificity("digits(15)") > ValueShapes.specificity("digits(14-15)"));
+        assertTrue(ValueShapes.specificity("digits(14-15)") > ValueShapes.specificity("e164"));
         assertEquals(0, ValueShapes.specificity(null));
     }
 
