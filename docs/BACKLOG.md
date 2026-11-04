@@ -25,7 +25,9 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **78<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 63<!--count:backlog-p3--> × P3** —
+> **79<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 65<!--count:backlog-p3--> × P3** —
+> ⬆ **77 → 79 (P3 63 → 65) on 2026-11-04**: filed P3 features `UI-PICKER-OPTIONS-1` and `UI-SCHEMA-FORM-EDITOR-1`, the open remainder of `UI-FORM-ROWS-1` [items: layer.product · kind: feature].
+> ⬇ **78 → 77 (P2 15 → 14) on 2026-11-04**: closed P2 feature `UI-FORM-ROWS-1` [items: layer.product · kind: feature] — every value of a record is a property row and every single choice a picker dialog, app-wide; the `lint:forms` allow-list fell from 127 files to one (`schema-form`), and every remaining box is a marked `form-allow` exception. As built: `okf/product/layer/product/spec-forms-state.md`; plan archived.
 > ⬆ **77 → 78 (P2 14 → 15) on 2026-11-03**: filed P2 feature `UI-FORM-ROWS-1` (plan `ui-form-rows-plan.md`, decisions Q-1…Q-5 accepted by the operator) [items: layer.product · kind: feature].
 > ⬇ **78 → 77 (P3 64 → 63) on 2026-11-03**: closed P3 feature `LA-PIPELINE-MAPPINGS-1` [items: module.la-core · kind: feature] — a Mapping may be based on any stored, plain Dataset (Pipeline- or Job-fed too) and never widens who reads its base (canView, sweeps, publish); the Data page gives those Datasets Entities and Mappings and marks drifted Mappings; a link mapping naming a missing column is refused, not answered over other columns. Plan archived; facts in `okf/product/module/la-core/architecture.md` (Mappings).
 > ⬆ **77 → 78 (P3 63 → 64) on 2026-11-03**: filed P3 feature `LA-PIPELINE-MAPPINGS-1` (plan `la-pipeline-mappings-plan.md`, decisions Q-1…Q-5 accepted by the operator) [items: module.la-core · kind: feature].
@@ -424,11 +426,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 63<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 78<!--count:backlog-rows--> as pending work overstates it.
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 65<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 65<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 79<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -594,7 +596,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Onboarding & bundles
 
-- **P2** · `UI-FORM-ROWS-1` — **one form idiom app-wide: property rows (label · value · ✎ / ▾), a tiny help line under unusual fields, the whole form at one glance with fold groups or a wizard, every choice a dialog (filed 2026-11-03).** `pen-field` and `option-picker` already exist but do not match each other, `schema-form` still draws 9 boxed fields, and 127 files hold a `mat-form-field` (32 a `mat-select`); the la-app Data page is converted. P0 (row geometry, `lint:forms` guard) and P1 (schema-form all rows, tiers as folds) built 2026-11-03; P2 (the Link Analysis panes, allow-list 114) built 2026-11-04; P3 admin panes built 2026-11-04 in seven batches (the allow-list holds only schema-form), P4 nested options. → [`superpower/ui-form-rows-plan.md`](superpower/ui-form-rows-plan.md) [items: layer.product · kind: feature]
 - **P2** · `ONBOARDING-FIRST-RUN-1` — **console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion `LA-ONBOARD-1` OB-1 expects.** Operator 2026-10-22: file first is the primary path (guided editor = expert path), detected settings are pre-applied with evidence and low confidence flagged, missing capabilities are shown locked with a reason, all nine console first-time use cases are must-have; the Inspecto LA answers A-1…A-16 apply where they touch the console. Builds on `LA-ONBOARD-1`'s shared pieces (the `/onboard/files` route, sample loading, the locked-with-reason component, counters, the walkthrough fixes) and adds: console entry points and Add data on the shared screen, the console Space guide, format evidence in the import draft (delimiter, dates, nested JSON record path, file-name dates), a fix catalogue behind "problems in plain words" (used by both UIs), the console Dataset page (manual-run gesture, *Keep this up to date* on Standard, feed offers), lookups, remote systems (Standard). OF-1…OF-3 answered 2026-10-25 (OF-2: 200 values, still to build). **Slice C3 partly built 2026-11-01:** the console `/add-data` page hosts the shared Add data screen (`whatColumnsHold=optional`, Explore → Studio Link Analysis, *Open in editor* → guided editor on Standard+) and Home's first-run panel leads with *Add data* (*Onboard a Stream* stays the advanced start, OF-3); left in C3: drop zones on Home / Catalog / empty Datasets pane, *Open in editor* on the review screen. → `superpower/first-run-onboarding-plan.md` · `okf/product/module/etl/spec-first-time-user-use-cases.md` [items: layer.product, module.etl, module.processor, edition.basic · kind: feature]
 
 #### Datasets & lineage
@@ -699,7 +700,9 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.11 Web UI — SPA-wide hygiene
 
-- No open rows. (`API-DEAD-METHODS-1` shipped 2026-10-04: the Configuration pane's **Preview** tab now calls `previewParsing` / `previewSchema` / `previewEnrichment` — `okf/product/module/config/user-guide-config.md`.)
+- **P3** · `UI-PICKER-OPTIONS-1` — **`<inspecto-option-picker>` gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker layout (two columns, a description panel).** Built when the first screen needs one. Known first customer: Model Settings, whose provider list now hides the providers the server cannot run because the picker has no disabled option (it was greyed in the old `mat-select`). From `UI-FORM-ROWS-1` P4. [items: layer.product · kind: feature · hold: demand]
+- **P3** · `UI-SCHEMA-FORM-EDITOR-1` — **`<inspecto-schema-form>`'s in-row editor is still a dense boxed Material field, the last file on the `lint:forms` allow-list.** Moving it onto `pen-field` needs suggestions (an autocomplete panel) and a suffix slot (the token picker) on `pen-field`; the Pipeline extra-config editor is its twin and moves with it. Also left from the rollout: a closed list row shows "—" for both unset and explicitly none, and a multiline or list editor is narrow in two columns. As built: `okf/product/layer/product/spec-forms-state.md`. [items: layer.product · kind: feature]
+- Shipped, not open: (`API-DEAD-METHODS-1` shipped 2026-10-04: the Configuration pane's **Preview** tab now calls `previewParsing` / `previewSchema` / `previewEnrichment` — `okf/product/module/config/user-guide-config.md`.)
 
 ### 3.12 Link Analysis & Geo
 

@@ -1,6 +1,6 @@
 # One form idiom: property rows (`UI-FORM-ROWS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9); P3 BUILT 2026-11-04 in seven batches (§10) - the allow-list holds only `schema-form`; P4 open.** Operator ask: *"we need uniform look and feel
+> **SHIPPED 2026-11-04 - archived; as built: `docs/okf/product/layer/product/spec-forms-state.md` ("Property rows"); open remainder: BACKLOG `UI-PICKER-OPTIONS-1` (P4) and `UI-SCHEMA-FORM-EDITOR-1`.** **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9); P3 BUILT 2026-11-04 in seven batches (§10) - the allow-list holds only `schema-form`; P4 open.** Operator ask: *"we need uniform look and feel
 > for the form items"* - single-line field / value rows with a pencil to edit (as elsewhere), a short description in
 > tiny type under a field whose name does not explain itself, the whole form at one glance without scrolling (fold
 > groups or a wizard for long ones), and every dropdown a popup dialog that can carry hints, search, groups and nested

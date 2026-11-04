@@ -510,7 +510,7 @@ src/app/
   ⛔ **`lint:forms`** (`inspecto-ui/tools/check-form-idiom.mjs`, a CI guard and the pre-commit hook) refuses a new
   `<mat-form-field>` / `<mat-select>` outside `tools/form-idiom-allowlist.txt`, and a listed file that no longer holds
   one: convert a screen, delete its line. A deliberate exception (code / SQL / JSON editor, grid filter, search box)
-  carries `form-allow` and the reason on the tag's line; so does a message composer or a many-line paste box (P2). Plan and rollout: `docs/superpower/ui-form-rows-plan.md`.
+  carries `form-allow` and the reason on the tag's line; so does a message composer or a many-line paste box (P2). As built: `docs/okf/product/layer/product/spec-forms-state.md` ("Property rows"); rollout history: `docs/archived-documents/plans-archive/ui-form-rows-plan.md`.
   ⚠ **`[error]` is a plain input, not control state**: the host computes it (`ctl.touched && ctl.hasError(...)`), and
   an `OnPush` host re-renders it only after a template event, so a spec that patches the form from code must
   `markForCheck()` first (`refresh(fixture)` in `inspecto/testing/pen-field.ts`, beside `penEdit`/`penText`/

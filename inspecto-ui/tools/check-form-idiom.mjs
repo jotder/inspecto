@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Form-idiom guard (UI-FORM-ROWS-1, docs/superpower/ui-form-rows-plan.md P0).
+// Form-idiom guard (UI-FORM-ROWS-1; as built: docs/okf/product/layer/product/spec-forms-state.md "Property rows").
 //
 // One form idiom app-wide: a typed value is an `<inspecto-pen-field>` row, a choice an `<inspecto-option-picker>` row
 // (label · value · ✎ / ▾). The older boxed Material field (`<mat-form-field>`) and dropdown (`<mat-select>`) may stay
