@@ -157,6 +157,21 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(c.editing()).toBeNull();
     });
 
+    it('LA-COLUMN-ROLES-1 P1: a Mapping picks its primary Time among the Time columns, and saves it as primaryTime', () => {
+        const { fixture, el, c } = create();
+        const base = (c as unknown as { bases: () => { id: string }[] }).bases().find((b) => b.id === 'wallet_txn')!;
+        const noneOr = (role: string | null) =>
+            (c as unknown as { noneOr: (d: unknown, r: string | null) => { value: string }[] })
+                .noneOr(base, role)
+                .map((o) => o.value);
+        expect(noneOr('temporal')).toEqual(['', 'txn_date']); // a date column reads as a Time (no role stored)
+        expect(noneOr('measure')).toEqual(['']);
+        expect(noneOr(null)).toEqual(['', 'src_id', 'dst_id', 'txn_date']);
+        (q(el, 'mapping-new') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(q(el, 'mapping-primaryTime')).not.toBeNull();
+    });
+
     it('Edit keeps the Mapping name and saves by replacing the entry', () => {
         const { fixture, el, c } = create();
         expect(q(el, 'mapping-form')).toBeNull(); // nothing open, so no error shows before a submit

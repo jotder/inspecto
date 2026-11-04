@@ -58,11 +58,17 @@ import {
     formatSize,
     initialColumns,
     initialRoles,
+    LINK_PRIMARIES,
+    MEASURE_TYPES,
+    LinkPrimary,
+    PRIMARY_ROLE,
+    columnRole,
     limitsLine,
     lowChoices,
     quoteLabel,
     suggestDatasetName,
 } from './add-data.model';
+import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '../api/column-roles';
 import { ImportDatasetCardComponent } from './import-dataset-card.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
@@ -72,6 +78,7 @@ type ColumnGroup = FormGroup<{
     type: FormControl<string>;
     drop: FormControl<boolean>;
     entityType: FormControl<string>;
+    role: FormControl<ColumnRole>;
 }>;
 
 const NONE = '';
@@ -171,8 +178,8 @@ export class AddDataComponent implements OnInit {
         from: [NONE],
         to: [NONE],
         kind: [NONE],
-        time: [NONE],
-        amount: [NONE],
+        primaryTime: [NONE],
+        primaryMeasure: [NONE],
         identifying: [NONE],
     });
 
@@ -256,6 +263,29 @@ export class AddDataComponent implements OnInit {
         { value: NONE, label: 'None' },
         ...this.columnOptions(),
     ]);
+    /**
+     * The columns a link choice may name (LA-COLUMN-ROLES-1 P1): any for the kind; the Time columns for its time, the
+     * Measure columns for its measure.
+     */
+    protected readonly linkColumnOptions = computed<Record<LinkPrimary, PickerOption[]>>(() => {
+        const of = (role: ColumnRole | null) => [
+            { value: NONE, label: 'None' },
+            ...this.keptColumns()
+                .filter((c) => !role || columnRole(c) === role)
+                .map((c) => ({ value: c.name, label: c.rename.trim() || c.name })),
+        ];
+        return {
+            kind: of(null),
+            primaryTime: of(PRIMARY_ROLE.primaryTime),
+            primaryMeasure: of(PRIMARY_ROLE.primaryMeasure),
+        };
+    });
+    /** A column's role when it holds no Entity Type: Time, Measure (a number column only), Category or Detail. */
+    protected roleOptions(type: string): PickerOption[] {
+        return (['temporal', 'measure', 'dimension', 'detail'] as const)
+            .filter((r) => r !== 'measure' || MEASURE_TYPES.has(type))
+            .map((r) => ({ value: r, label: ROLE_LABELS[r], hint: ROLE_HINTS[r] }));
+    }
     protected readonly primaryOptions = computed<PickerOption[]>(() => {
         const held = [
             ...new Set(
@@ -456,6 +486,7 @@ export class AddDataComponent implements OnInit {
             type: [c.type],
             drop: [c.drop],
             entityType: [c.entityType],
+            role: [c.role],
         });
     }
 
@@ -502,6 +533,10 @@ export class AddDataComponent implements OnInit {
         return this.draft()?.entityTypes.columns.find((c) => c.column === column)?.entityType;
     }
 
+    protected roleChoice(column: string): Choice<ColumnRole> | undefined {
+        return this.draft()?.entityTypes.columns.find((c) => c.column === column)?.role;
+    }
+
     protected typeChoice(column: string): Choice<string> | undefined {
         return this.draft()?.columns.find((c) => c.name === column)?.type;
     }
@@ -516,8 +551,8 @@ export class AddDataComponent implements OnInit {
     /** The optional link roles, in screen order. */
     protected readonly linkRoles = [
         { id: 'kind', label: 'Kind of link' },
-        { id: 'time', label: 'When' },
-        { id: 'amount', label: 'Amount' },
+        { id: 'primaryTime', label: 'When (a Time column)' },
+        { id: 'primaryMeasure', label: 'Weighed by (a Measure column)' },
     ] as const;
     protected readonly formatSize = formatSize;
     protected readonly count = count;
@@ -535,8 +570,8 @@ export class AddDataComponent implements OnInit {
             from: v.from,
             to: v.to,
             kind: v.kind,
-            time: v.time,
-            amount: v.amount,
+            primaryTime: v.primaryTime,
+            primaryMeasure: v.primaryMeasure,
             identifying: v.identifying,
         };
         const body = buildCommit(d, v.name, v.description, v.columns, roles, {
@@ -611,10 +646,13 @@ export class AddDataComponent implements OnInit {
             const n = key.slice(7);
             return (col(n)?.entityType || null) !== (this.entityChoice(n)?.value ?? null);
         }
+        if (key.startsWith('role.')) {
+            const n = key.slice(5);
+            return col(n)?.role !== this.roleChoice(n)?.value;
+        }
         const l = d.entityTypes.link;
         if (key === choiceKey.link('from')) return v.from !== (l?.from.value ?? '') || v.to !== (l?.to.value ?? '');
-        for (const role of ['kind', 'time', 'amount'] as const)
-            if (key === choiceKey.link(role)) return v[role] !== (l?.[role].value ?? '');
+        for (const role of LINK_PRIMARIES) if (key === choiceKey.link(role)) return v[role] !== (l?.[role].value ?? '');
         if (key === choiceKey.primary) return v.primary !== (d.entityTypes.primary.value ?? '');
         if (key === choiceKey.identifying) return v.identifying !== (d.entityTypes.identifying?.value ?? '');
         return false;

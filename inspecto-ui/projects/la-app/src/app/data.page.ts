@@ -23,6 +23,7 @@ import {
     DataEntry,
     MAPPING_NAME,
     MappingForm,
+    ROLE_HINTS,
     ROLE_LABELS,
     TypeChoice,
     dataEntry,
@@ -33,15 +34,6 @@ import {
     roleOf,
     typeOf,
 } from './data-page';
-
-/** What each role means, under its name in the role picker. */
-const ROLE_HINTS: Record<ColumnRole, string> = {
-    entity: 'Holds an Entity Type: links join on it',
-    temporal: 'A date or time: to play and filter by',
-    measure: 'A number to sum and filter by (an amount, a volume)',
-    dimension: 'A few named values: to filter by (a type, a channel)',
-    detail: 'Carried along, not filtered on',
-};
 
 /**
  * The **Data** page (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): every Dataset that may be a
@@ -304,7 +296,8 @@ const ROLE_HINTS: Record<ColumnRole, string> = {
                                             <inspecto-option-picker
                                                 [label]="opt.label"
                                                 [formControlName]="opt.key"
-                                                [options]="noneOr(d)"
+                                                [attr.data-testid]="'mapping-' + opt.key"
+                                                [options]="noneOr(d, opt.role)"
                                                 [help]="opt.help"
                                                 placeholder="None"
                                             ></inspecto-option-picker>
@@ -355,9 +348,9 @@ export class DataPageComponent implements OnInit {
     protected readonly addData = ADD_DATA_ROUTE;
     protected readonly line = mappingLine;
     protected readonly optional = [
-        { key: 'kind', label: 'Kind of link', help: 'A column naming the kind of each link' },
-        { key: 'time', label: 'When', help: 'The column that dates each link' },
-        { key: 'amount', label: 'Amount', help: 'A number column carried on each link' },
+        { key: 'kind', label: 'Kind of link', help: 'A column naming the kind of each link', role: null },
+        { key: 'primaryTime', label: 'When', help: 'The Time column that dates each link', role: 'temporal' },
+        { key: 'primaryMeasure', label: 'Measure', help: 'The Measure column that weighs each link', role: 'measure' },
     ] as const;
 
     /** What a column may hold: an Entity Type (grouped by family, with its definition and an example), or nothing (a detail). */
@@ -375,9 +368,13 @@ export class DataPageComponent implements OnInit {
         }));
     }
 
-    /** An optional column: none, or one of the base's. */
-    protected noneOr(d: DataEntry): PickerOption[] {
-        return [{ value: '', label: 'None' }, ...this.columnOptions(d)];
+    /** An optional column: none, or one of the base's (only its Time or Measure columns for a primary, LA-COLUMN-ROLES-1 P1). */
+    protected noneOr(d: DataEntry, role: ColumnRole | null = null): PickerOption[] {
+        const fits = (name: string) => {
+            const c = d.columns.find((x) => x.name === name);
+            return !role || (!!c && roleOf(c, d, this.types()) === role);
+        };
+        return [{ value: '', label: 'None' }, ...this.columnOptions(d).filter((o) => fits(o.value))];
     }
 
     /** A column's role, in the words the page shows (LA-COLUMN-ROLES-1). */
@@ -485,8 +482,8 @@ export class DataPageComponent implements OnInit {
         ],
         toType: [''],
         kind: [''],
-        time: [''],
-        amount: [''],
+        primaryTime: [''],
+        primaryMeasure: [''],
     });
 
     constructor() {

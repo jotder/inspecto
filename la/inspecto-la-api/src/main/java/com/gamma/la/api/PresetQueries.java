@@ -412,7 +412,7 @@ final class PresetQueries {
             // LA-PIPELINE-MAPPINGS-1 (§3.3): a link mapping that names a column the data no longer has is refused, never
             // quietly replaced by the classified columns - that would answer a different graph under the Mapping's name
             List<String> gone = new ArrayList<>(), unreadable = new ArrayList<>();
-            for (String k : List.of("from", "to", "kind", "time", "amount"))
+            for (String k : List.of("from", "to", "kind", "time", "amount", "primaryTime", "primaryMeasure"))
                 if (m.get(k) instanceof String s && !s.isBlank() && col(real, s) == null)
                     (SAFE_IDENT.matcher(s.trim()).matches() ? gone : unreadable).add(s.trim());
             if (!unreadable.isEmpty())
@@ -424,8 +424,9 @@ final class PresetQueries {
             from = col(real, m.get("from"));
             to = col(real, m.get("to"));
             kind = col(real, m.get("kind"));
-            time = col(real, m.get("time"));
-            amount = col(real, m.get("amount"));   // LA-COLUMN-ROLES-1 P0: the mapping's amount, before any pack hint
+            // LA-COLUMN-ROLES-1 P1: primaryTime / primaryMeasure, or their old names time / amount
+            time = col(real, m.get("primaryTime") != null ? m.get("primaryTime") : m.get("time"));
+            amount = col(real, m.get("primaryMeasure") != null ? m.get("primaryMeasure") : m.get("amount"));   // P0: before any pack hint
         }
         if (from == null || to == null) {
             List<String> classified = new ArrayList<>();

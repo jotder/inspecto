@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ColumnMeta } from 'app/inspecto/query';
-import { buildDataset, inferRoles } from './dataset-types';
+import { buildDataset, fieldRole, inferRoles } from './dataset-types';
 
 const COLS: ColumnMeta[] = [
     { name: 'id', type: 'number' },
@@ -22,6 +22,16 @@ describe('inferRoles', () => {
         const roles = Object.fromEntries(inferRoles(COLS).map((c) => [c.name, c.role]));
         expect(roles['id']).toBe('dimension');
         expect(roles['cell_id']).toBe('dimension');
+    });
+});
+
+describe('fieldRole (LA-COLUMN-ROLES-1)', () => {
+    it('a widget binds an Entity or a Detail column as a dimension, the others as themselves', () => {
+        expect(fieldRole('entity')).toBe('dimension');
+        expect(fieldRole('detail')).toBe('dimension');
+        expect(fieldRole('dimension')).toBe('dimension');
+        expect(fieldRole('measure')).toBe('measure');
+        expect(fieldRole('temporal')).toBe('temporal');
     });
 });
 

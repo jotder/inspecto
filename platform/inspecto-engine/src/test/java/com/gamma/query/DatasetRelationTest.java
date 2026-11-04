@@ -379,6 +379,9 @@ class DatasetRelationTest {
         Map<String, Object> one = new java.util.HashMap<>(columns(col("event_time", "temporal")));
         one.put("defaultLinkMapping", Map.of("from", "a", "to", "b", "time", "booked_at"));
         assertEquals(Optional.of("event_time"), DatasetRelation.temporalColumn(one));
+        // LA-COLUMN-ROLES-1 P1: primaryTime is the name now; time the old one, read when primaryTime is absent
+        ds.put("defaultLinkMapping", Map.of("from", "a", "to", "b", "primaryTime", "event_time"));
+        assertEquals(Optional.of("event_time"), DatasetRelation.temporalColumn(ds));
     }
 
     @Test

@@ -275,7 +275,8 @@ public final class DatasetRelation {
      * <p><b>Absent degrades, ambiguous rejects.</b> No {@code columns} block, or none carrying the role,
      * returns empty — a dataset without a temporal column must still be readable (decision D3: addressing
      * degrades, it does not break). Several columns may claim the role (LA-COLUMN-ROLES-1: a Dataset has several
-     * Time columns); then the one its link mapping dates links with ({@code defaultLinkMapping.time}) is the
+     * Time columns); then the one its link mapping dates links with ({@code defaultLinkMapping.primaryTime}, or its old
+     * name {@code time}) is the
      * temporal column. Several and no mapping naming one of them throw: there is no honest way to pick one,
      * and silently taking the first would bind the catalog's bounds to declaration order.
      *
@@ -299,7 +300,7 @@ public final class DatasetRelation {
         else if (found.size() == 1) name = found.get(0);
         else {
             String primary = datasetConfig.get("defaultLinkMapping") instanceof Map<?, ?> m
-                    ? Values.trimToNull(cast(m).get("time")) : null;
+                    ? Values.trimToNull(cast(m).getOrDefault("primaryTime", cast(m).get("time"))) : null;
             name = primary == null ? null
                     : found.stream().filter(n -> n != null && n.equalsIgnoreCase(primary)).findFirst().orElse(null);
             if (name == null)

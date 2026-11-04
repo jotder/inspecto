@@ -30,7 +30,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
-import { Dataset } from '../datasets/dataset-types';
+import { Dataset, fieldRole } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { Query, QueryType, buildQuery } from './query-types';
@@ -373,7 +373,7 @@ export class QueriesComponent implements OnInit {
 
     async run(): Promise<void> {
         const ds = this.selectedDataset();
-        const hints = (ds?.columns ?? []).map((c) => ({ name: c.name, type: c.type, role: c.role }));
+        const hints = (ds?.columns ?? []).map((c) => ({ name: c.name, type: c.type, role: fieldRole(c.role) }));
         this.running.set(true);
 
         if (this.form.controls.type.value === 'structured') {

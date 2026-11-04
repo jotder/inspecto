@@ -73,7 +73,7 @@ describe('the Data page model (LA-DATA-PAGE-1)', () => {
             name: 'by_channel',
             to: 'channel',
             toType: 'channel',
-            time: 'booked_at',
+            primaryTime: 'booked_at',
             kind: '',
         };
         expect(formOf(BASE, TYPES).fromType).toBe('account');
@@ -81,12 +81,15 @@ describe('the Data page model (LA-DATA-PAGE-1)', () => {
         expect(e['origin']).toBe('mapping');
         expect(e['basedOn']).toBe('transfers');
         expect(e['physicalRef']).toBe('transfers/database');
-        expect(e['defaultLinkMapping']).toEqual({ from: 'from_account', to: 'channel', time: 'booked_at' });
+        expect(formOf(BASE, TYPES).primaryTime).toBe('booked_at'); // the old name `time`, read
+        expect(e['defaultLinkMapping']).toEqual({ from: 'from_account', to: 'channel', primaryTime: 'booked_at' });
         expect(e['eventDate']).toBe('booked_at');
         expect(e['primaryEntityType']).toBe('account');
         const cols = e['columns'] as { name: string; classification?: string }[];
         expect(cols.find((c) => c.name === 'channel')?.classification).toBe('CHANNEL');
         expect(cols.find((c) => c.name === 'to_account')?.classification).toBe('ACCOUNT_ID'); // untouched
+        // LA-COLUMN-ROLES-1 P1: the primary Time takes its role when the base states none
+        expect(cols.find((c) => c.name === 'booked_at')).toMatchObject({ role: 'temporal' });
         expect(String(e['description'])).toContain('A Mapping of transfers');
     });
 

@@ -3,6 +3,7 @@ import {
     AUTOMATION_FALLBACK,
     buildCommit,
     choiceKey,
+    columnRole,
     editionLock,
     excelLine,
     fileProblem,
@@ -45,14 +46,18 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
                 name: 'from_account',
                 entityType: 'account',
             });
-            expect(body.columns.find((c) => c.name === 'ts')).toEqual({ name: 'ts', entityType: null });
+            expect(body.columns.find((c) => c.name === 'ts')).toEqual({
+                name: 'ts',
+                entityType: null,
+                role: 'temporal',
+            });
             expect(body.primaryEntityType).toBe('account');
             expect(body.link).toEqual({
                 from: 'from_account',
                 to: 'to_account',
                 kind: 'channel',
-                time: 'ts',
-                amount: 'amount',
+                primaryTime: 'ts',
+                primaryMeasure: 'amount',
             });
             expect(body.identifyingColumn).toBeUndefined();
         });
@@ -73,7 +78,41 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
             expect(body.columns.find((c) => c.name === 'txn_id')!.rename).toBe('transfer_id');
             expect(body.columns.find((c) => c.name === 'amount')!.type).toBe('VARCHAR');
             expect(body.columns.find((c) => c.name === 'channel')).toEqual({ name: 'channel', drop: true });
-            expect(body.link).toEqual({ from: 'from_account', to: 'to_account', time: 'ts', amount: 'amount' });
+            // a Measure made text is no Measure any more (the server refuses one), so it is no primary either
+            expect(body.columns.find((c) => c.name === 'amount')!.role).toBe('detail');
+            expect(body.link).toEqual({ from: 'from_account', to: 'to_account', primaryTime: 'ts' });
+        });
+
+        it('LA-COLUMN-ROLES-1 P1: a role per column; a primary names a column of its role, else it is not sent', () => {
+            const d = transfersDraft();
+            const cols = initialColumns(d).map((c) =>
+                c.name === 'ts'
+                    ? { ...c, role: 'dimension' as const }
+                    : c.name === 'txn_id'
+                      ? { ...c, role: 'entity' as const }
+                      : c,
+            );
+            const body = buildCommit(d, 'x', '', cols, initialRoles(d), { withEntityTypes: true });
+            expect(body.columns.find((c) => c.name === 'ts')!.role).toBe('dimension');
+            expect(body.columns.find((c) => c.name === 'txn_id')!.role).toBe('detail'); // no Entity without an Entity Type
+            expect(body.columns.find((c) => c.name === 'from_account')!.role).toBeUndefined(); // the server's: entity
+            expect(body.link).toEqual({
+                from: 'from_account',
+                to: 'to_account',
+                kind: 'channel',
+                primaryMeasure: 'amount',
+            });
+            expect(columnRole({ ...cols[0], entityType: 'account' })).toBe('entity');
+        });
+
+        it('the closed optional step: a guessed role is not applied, the column stays a Detail', () => {
+            const d = transfersDraft();
+            d.entityTypes.columns[4].role = { value: 'dimension', evidence: 'x', confidence: 'low' };
+            const body = buildCommit(d, 'x', '', initialColumns(d), initialRoles(d), { withEntityTypes: false });
+            expect(body.columns.find((c) => c.name === 'channel')!.role).toBe('detail');
+            expect(body.columns.find((c) => c.name === 'ts')!.role).toBeUndefined(); // a sure one: the server applies it
+            expect(lowChoices(d, true).map((p) => p.key)).toContain(choiceKey.role('channel'));
+            expect(lowChoices(d, false).map((p) => p.key)).not.toContain(choiceKey.role('channel'));
         });
 
         it('no link without two different ends; a primary nobody holds is not sent', () => {

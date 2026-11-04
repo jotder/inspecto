@@ -66,4 +66,55 @@ class DatasetEntryRulesRolesTest {
         assertTrue(refusal(entry(col("name", "amount", "role", "measure", "unit", " "))).contains("short text"));
         assertTrue(refusal(entry(col("name", "amount", "role", "measure", "unit", "x".repeat(33)))).contains("short text"));
     }
+
+    // ── P1: the primaries and the numeric check ─────────────────────────────────────────────────────────────────────
+
+    private static Map<String, Object> linked(Map<String, Object> mapping, Map<String, Object>... cols) {
+        Map<String, Object> e = new LinkedHashMap<>(entry(cols));
+        e.put("defaultLinkMapping", mapping);
+        return e;
+    }
+
+    private static final Map<String, Object> A = col("name", "a", "role", "entity", "classification", "ACCOUNT");
+    private static final Map<String, Object> B = col("name", "b", "role", "entity", "classification", "ACCOUNT");
+
+    @Test
+    void thePrimariesNameATimeAndAMeasure() {
+        assertDoesNotThrow(() -> DatasetEntryRules.validate(linked(
+                Map.of("from", "a", "to", "b", "primaryTime", "booked_at", "primaryMeasure", "amount"),
+                A, B, col("name", "booked_at", "role", "temporal"), col("name", "settled_at", "role", "temporal"),
+                col("name", "amount", "type", "number", "role", "measure"), col("name", "fee", "type", "DECIMAL(18,2)", "role", "measure"))));
+        assertTrue(refusal(linked(Map.of("from", "a", "to", "b", "primaryTime", "amount"),
+                A, B, col("name", "amount", "type", "number", "role", "measure")))
+                .contains("primaryTime names 'amount', which is not a Time column (its role is measure)"));
+        assertTrue(refusal(linked(Map.of("from", "a", "to", "b", "primaryMeasure", "booked_at"),
+                A, B, col("name", "booked_at", "role", "temporal")))
+                .contains("primaryMeasure names 'booked_at', which is not a Measure column"));
+    }
+
+    @Test
+    void theOldNamesAreReadAndMayNotDisagree() {
+        // an entry written before P1 (time / amount, no roles) still loads
+        assertDoesNotThrow(() -> DatasetEntryRules.validate(linked(Map.of("from", "a", "to", "b", "time", "ts", "amount", "amt"),
+                col("name", "a"), col("name", "b"), col("name", "ts"), col("name", "amt", "type", "number"))));
+        // the old name is checked like the new one
+        assertTrue(refusal(linked(Map.of("from", "a", "to", "b", "time", "amt"),
+                A, B, col("name", "amt", "type", "number", "role", "measure"))).contains("not a Time column"));
+        assertTrue(refusal(linked(Map.of("from", "a", "to", "b", "primaryTime", "ts", "time", "ts2"),
+                A, B, col("name", "ts"), col("name", "ts2"))).contains("state primaryTime only"));
+        assertDoesNotThrow(() -> DatasetEntryRules.validate(linked(Map.of("from", "a", "to", "b", "primaryTime", "ts", "time", "TS"),
+                A, B, col("name", "ts"))));
+    }
+
+    @Test
+    void aMeasureHoldsNumbers() {
+        assertTrue(refusal(entry(col("name", "currency", "type", "string", "role", "measure")))
+                .contains("is a measure but holds string values, not numbers"));
+        assertTrue(refusal(linked(Map.of("from", "a", "to", "b", "amount", "currency"), A, B, col("name", "currency", "type", "VARCHAR")))
+                .contains("holds VARCHAR values, not numbers"));
+        // a column without a type is a Dataset read at query time: not checked
+        assertDoesNotThrow(() -> DatasetEntryRules.validate(entry(col("name", "amount", "role", "measure"))));
+        for (String t : List.of("number", "BIGINT", "double", "DECIMAL(10,2)", "integer"))
+            assertDoesNotThrow(() -> DatasetEntryRules.validate(entry(col("name", "amount", "type", t, "role", "measure"))), t);
+    }
 }

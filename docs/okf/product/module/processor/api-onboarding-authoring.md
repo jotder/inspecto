@@ -351,8 +351,9 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
  format:{type, delimiter?, header?, quote?},                    // delimiter/header/quote for CSV / TSV only
  columns:[{name, header, type:{value, format, evidence, confidence}, sample:[up to 3]}],
  rows:[up to 20 preview rows],
- entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence}}],
-              primary, link:{from, to, kind, time, amount, details} (stream) | identifying (reference)},
+ entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence},
+                        role:{value, evidence, confidence}, distinct? (text columns)}],
+              primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)},
  limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}}
 ```
 
@@ -378,8 +379,13 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   imsi, wallet, agent/till, cell). Only VARCHAR and BIGINT columns can hold identifiers. **From/to:** two columns
   of one Entity Type whose names say direction (from/to, payer/payee, sender/receiver, caller/called, debit/credit,
   src/dst) is `high`; the same type without direction words, or two different types, is `low`. Kind: a text column
-  named type/kind/channel/… with at most 50 distinct sampled values. Time: the TIMESTAMP (else DATE) column.
-  Amount: a numeric column named amount/value/sum/…. Details: the rest. Primary: the Entity Type most columns
+  named type/kind/channel/… with at most 50 distinct sampled values. Primary Time (`primaryTime`): the TIMESTAMP
+  (else DATE) column. Primary Measure (`primaryMeasure`): a numeric column named amount/value/sum/…. Details: the rest.
+  **Roles (LA-COLUMN-ROLES-1 P1):** every `entityTypes.columns[]` row also carries `role` (a choice:
+  `entity | temporal | measure | dimension | detail`) and, for a text column, `distinct` (its distinct sampled
+  values). Entity when it holds an Entity Type; the link's kind / time / measure take Category / Time / Measure;
+  else a DATE or TIMESTAMP is a Time, a DOUBLE (or a BIGINT named as an amount) a Measure, a text column whose values
+  repeat under 200 distinct a Category (`high` under 20), anything else a Detail (always `high`). Primary: the Entity Type most columns
   hold (a tie is `low`). Reference: the identifying column is the Entity Type column whose sampled values are all
   distinct (an `id` or `key` name wins).
 * Limits come from the configurable-limits catalogue (`LaLimit`, Space layer, `PUT /settings/link-analysis/limits`):
@@ -393,8 +399,13 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
 ### The commit
 
 Body (every key optional; absent = the draft's proposal): `{name, description, columns:[{name, type?, format?,
-entityType? (id|null), rename?, drop?}], primaryEntityType?, link?: {from, to, kind?, time?, amount?, details?} |
-null, identifyingColumn?}`. Columns are named by their **draft** name. `format.*` cannot change at commit (422:
+entityType? (id|null), role?, rename?, drop?}], primaryEntityType?, link?: {from, to, kind?, primaryTime?,
+primaryMeasure?, details?} | null, identifyingColumn?}`. Columns are named by their **draft** name. A column's role
+is the stated `role`, else Entity when it holds an Entity Type, else the draft's proposal while it fits the column's
+type (else Detail); the link's kind / primaryTime / primaryMeasure columns take Category / Time / Measure unless a
+role is stated. A stated role that contradicts the Entity Type, the link's primaries, or a Measure on a non-number
+column is 422. The Dataset is written with `columns[].role` and `defaultLinkMapping.primaryTime / primaryMeasure`
+(`time` / `amount` are their old names, still read for entries written before). `format.*` cannot change at commit (422:
 re-draft with `?delimiter=…`), because the columns were read with it. Order:
 
 1. Decide everything first: 422 for a choice naming nothing real; 409 for a taken name (Dataset, Pipeline, config

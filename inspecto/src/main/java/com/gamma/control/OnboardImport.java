@@ -250,7 +250,7 @@ final class OnboardImport {
      * and is left out of the mapping, so it never reaches the Dataset.
      */
     record PlanCol(String source, String name, String selector, String type, String format, String classification, String entityType,
-                   boolean keep) {}
+                   boolean keep, String role) {}
 
     record Plan(List<PlanCol> cols, Map<String, Object> format, String primaryEntityType, Map<String, Object> link,
                 String identifying, String description, String frontendType) {
@@ -267,13 +267,18 @@ final class OnboardImport {
                 }
             // proposals per draft column
             Map<String, Map<String, Object>> entityByColumn = new LinkedHashMap<>();
+            Map<String, String> roleByColumn = new LinkedHashMap<>();   // LA-COLUMN-ROLES-1 P1: the proposed role
             Map<String, Object> et = (Map<String, Object>) draft.getOrDefault("entityTypes", Map.of());
             for (Object o : (List<Object>) et.getOrDefault("columns", List.of()))
-                if (o instanceof Map<?, ?> m) entityByColumn.put(String.valueOf(m.get("column")), (Map<String, Object>) m.get("entityType"));
+                if (o instanceof Map<?, ?> m) {
+                    entityByColumn.put(String.valueOf(m.get("column")), (Map<String, Object>) m.get("entityType"));
+                    String r = proposed(m.get("role"));
+                    if (r != null) roleByColumn.put(String.valueOf(m.get("column")), r);
+                }
             Map<String, Map<String, Object>> overrides = new LinkedHashMap<>();
             if (body.get("columns") != null) {
                 if (!(body.get("columns") instanceof List<?> l))
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "columns must be a list of {name, type?, format?, entityType?, rename?, drop?}");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "columns must be a list of {name, type?, format?, entityType?, role?, rename?, drop?}");
                 for (Object o : l) {
                     if (!(o instanceof Map<?, ?> m) || !(m.get("name") instanceof String n))
                         throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every columns[] entry needs the draft column's name");
@@ -293,7 +298,7 @@ final class OnboardImport {
                 String n = String.valueOf(p.get("name"));
                 Map<String, Object> o = overrides.getOrDefault(n, Map.of());
                 if (Boolean.TRUE.equals(o.get("drop"))) {
-                    cols.add(new PlanCol(n, n, String.valueOf(p.get("selector")), "VARCHAR", null, null, null, false));
+                    cols.add(new PlanCol(n, n, String.valueOf(p.get("selector")), "VARCHAR", null, null, null, false, null));
                     continue;
                 }
                 String out = o.get("rename") instanceof String r && !r.isBlank() ? r.trim() : n;
@@ -325,8 +330,9 @@ final class OnboardImport {
                     classification = proposed != null && typeId.equals(prop.get("value")) ? String.valueOf(proposed)
                             : t.classifications().isEmpty() ? null : t.classifications().get(0);
                 }
+                boolean holds = typeId != null && !typeId.isEmpty();
                 cols.add(new PlanCol(n, out, String.valueOf(p.get("selector")), type, fmt == null || fmt.isBlank() ? null : fmt,
-                        classification, typeId == null || typeId.isEmpty() ? null : typeId, true));
+                        classification, holds ? typeId : null, true, role(n, o, roleByColumn.get(n), holds, type)));
                 renamed.put(n, out);
             }
             if (renamed.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every column was dropped");
@@ -349,11 +355,13 @@ final class OnboardImport {
                 Map<String, Object> l = new LinkedHashMap<>();
                 boolean stated = body.containsKey("link");
                 if (stated && body.get("link") != null && !(body.get("link") instanceof Map))
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "link must be {from, to, kind?, time?, amount?, details?} or null");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                            "link must be {from, to, kind?, primaryTime?, primaryMeasure?, details?} or null");
                 Map<String, Object> given = stated ? (Map<String, Object>) body.get("link") : null;
                 if (!stated || given != null) {
-                    for (String k : List.of("from", "to", "kind", "time", "amount")) {
-                        String v = given != null ? (given.get(k) == null ? null : String.valueOf(given.get(k))) : proposed(proposedLink.get(k));
+                    for (String k : List.of("from", "to", "kind", DatasetEntryRules.PRIMARY_TIME, DatasetEntryRules.PRIMARY_MEASURE)) {
+                        // a body may still say time / amount, the primaries' old names (one or the other, as stored entries)
+                        String v = given != null ? givenLink(given, k) : proposed(proposedLink.get(k));
                         if (v == null) continue;
                         String out = renamed.get(v);
                         if (out == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "link." + k + " '" + v + "' is not a kept column");
@@ -369,8 +377,64 @@ final class OnboardImport {
                     else if (given != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "link needs a from and a to column");
                 }
             }
+            if (link != null) cols = linkRoles(cols, overrides, link);
             String description = body.get("description") instanceof String s && !s.isBlank() ? s.trim() : null;
             return new Plan(cols, draftFormat, primary, link, identifying, description, String.valueOf(draft.get("type")));
+        }
+
+        /**
+         * LA-COLUMN-ROLES-1 P1: a kept column's role. A stated {@code role} is taken as given (the Dataset rules check it);
+         * a column that holds an Entity Type is an Entity; else the draft's proposal while it still fits the column's
+         * (possibly changed) type, else a Detail.
+         */
+        private static String role(String column, Map<String, Object> o, String proposed, boolean holds, String type) {
+            if (o.containsKey("role") && o.get("role") != null) {
+                String r = String.valueOf(o.get("role")).trim().toLowerCase(Locale.ROOT);
+                if (!DatasetEntryRules.ROLES.contains(r))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role of '" + column + "' must be one of " + DatasetEntryRules.ROLES);
+                if ("entity".equals(r) != holds)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, holds
+                            ? "'" + column + "' holds an Entity Type, so its role is entity"
+                            : "'" + column + "' is an Entity column only when it holds an Entity Type (entityType)");
+                return r;
+            }
+            if (holds) return "entity";
+            if (proposed == null || "entity".equals(proposed)) return "detail";
+            boolean fits = switch (proposed) {
+                case "temporal" -> type.equals("DATE") || type.equals("TIMESTAMP");
+                case "measure" -> type.equals("DOUBLE") || type.equals("BIGINT");
+                default -> true;
+            };
+            return fits ? proposed : "detail";
+        }
+
+        /**
+         * The link's kind is a Category, its primary Time a Time and its primary Measure a Measure, unless the body stated
+         * the column's role itself (then the Dataset rules refuse a contradiction) or the column holds an Entity Type.
+         */
+        private static List<PlanCol> linkRoles(List<PlanCol> cols, Map<String, Map<String, Object>> overrides, Map<String, Object> link) {
+            Map<String, String> want = new LinkedHashMap<>();
+            for (var e : Map.of("kind", "dimension", DatasetEntryRules.PRIMARY_TIME, "temporal", DatasetEntryRules.PRIMARY_MEASURE, "measure")
+                    .entrySet())
+                if (link.get(e.getKey()) instanceof String c) want.put(c, e.getValue());
+            List<PlanCol> out = new ArrayList<>();
+            for (PlanCol c : cols) {
+                String r = want.get(c.name());
+                Object stated = overrides.getOrDefault(c.source(), Map.of()).get("role");
+                out.add(c.keep() && r != null && stated == null && c.entityType() == null
+                        ? new PlanCol(c.source(), c.name(), c.selector(), c.type(), c.format(), c.classification(), c.entityType(), true, r)
+                        : c);
+            }
+            return out;
+        }
+
+        private static String givenLink(Map<String, Object> given, String key) {
+            String old = DatasetEntryRules.PRIMARY_TIME.equals(key) ? "time" : DatasetEntryRules.PRIMARY_MEASURE.equals(key) ? "amount" : null;
+            try {
+                return old == null ? (given.get(key) == null ? null : String.valueOf(given.get(key))) : DatasetEntryRules.primary(given, key, old);
+            } catch (IllegalArgumentException twoNames) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "link: " + twoNames.getMessage());
+            }
         }
 
         /** A body string, or null; anything else is 422 (never a ClassCastException 500). */
@@ -495,7 +559,7 @@ final class OnboardImport {
             d.put("kind", kind);
             d.put("importPipeline", id);
             d.put("importFormat", type);
-            String time = link == null ? null : (String) link.get("time");
+            String time = link == null ? null : (String) link.get(DatasetEntryRules.PRIMARY_TIME);
             if (time != null) d.put("eventDate", time);
             List<Map<String, Object>> columns = new ArrayList<>();
             for (PlanCol c : cols) {
@@ -504,6 +568,7 @@ final class OnboardImport {
                 m.put("name", c.name());
                 m.put("type", datasetType(c.type()));
                 if (c.classification() != null) m.put("classification", c.classification());
+                if (c.role() != null) m.put("role", c.role());
                 columns.add(m);
             }
             d.put("columns", columns);
@@ -724,8 +789,9 @@ final class OnboardImport {
             if (builder == null) return outcome("NOT_AVAILABLE", "Link Analysis is not installed, so there is no index to build");
             try {
                 LinkIndexAccess.Outcome o = builder.build(space.writeRoot(), space.dataRoot(), new LinkIndexAccess.Request(
-                        "onboard:" + id, id, (String) m.get("from"), (String) m.get("to"), (String) m.get("kind"), (String) m.get("time"),
-                        null, (String) m.get("amount"), List.of(), space.actor(), true, 300_000L, 0L));
+                        "onboard:" + id, id, (String) m.get("from"), (String) m.get("to"), (String) m.get("kind"),
+                        DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_TIME, "time"), null,
+                        DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount"), List.of(), space.actor(), true, 300_000L, 0L));
                 Map<String, Object> r = outcome(o.result(), o.message());
                 r.put("code", o.code());
                 r.put("edges", o.edges());

@@ -153,7 +153,7 @@ final class EntityTypeBindings {
     }
 
     /**
-     * LA-ONBOARD-1 OB-8 (F-9): the Dataset's own {@code defaultLinkMapping {from, to, kind?, time?}}, so its links are
+     * LA-ONBOARD-1 OB-8 (F-9): the Dataset's own {@code defaultLinkMapping {from, to, kind?, primaryTime?}}, so its links are
      * assessed before anyone saves a view or builds an index. Skipped when a view or index already names the same two ends.
      */
     static void defaultMapping(String dataset, Map<String, Object> content, List<LinkMapping> out) {
@@ -162,7 +162,13 @@ final class EntityTypeBindings {
         for (LinkMapping x : out)
             if (x.dataset().equals(dataset) && x.source().equalsIgnoreCase(from.trim()) && x.target().equalsIgnoreCase(to.trim())) return;
         out.add(new LinkMapping(dataset, from.trim(), to.trim(), m.get("kind") instanceof String k && !k.isBlank() ? k.trim() : null,
-                m.get("time") instanceof String t && !t.isBlank() ? t.trim() : null));
+                linkTime(m)));
+    }
+
+    /** LA-COLUMN-ROLES-1 P1: the Time that dates the links, {@code primaryTime}, or its old name {@code time}. */
+    static String linkTime(Map<?, ?> m) {
+        Object t = m.get("primaryTime") instanceof String s && !s.isBlank() ? s : m.get("time");
+        return t instanceof String s && !s.isBlank() ? s.trim() : null;
     }
 
     /** The mapping of every published index over {@code dataset} (an unreadable manifest is no mapping). */

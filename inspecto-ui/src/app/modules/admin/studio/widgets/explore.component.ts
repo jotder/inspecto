@@ -35,7 +35,7 @@ import {
     draftPlacement,
     draftSaveWarning,
 } from 'app/inspecto/transfer';
-import { Dataset, DatasetColumn, inferRoles } from '../datasets/dataset-types';
+import { Dataset, DatasetColumn, fieldRole, inferRoles } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Query } from '../queries/query-types';
 import { QueriesService } from '../queries/queries.service';
@@ -141,9 +141,10 @@ export class ExploreComponent implements OnInit {
         const columns: VizField[] = this.columns().map((c) => ({
             name: c.name,
             type: c.type,
-            role: c.role,
+            role: fieldRole(c.role),
             label: c.label,
-            cardinality: c.role === 'dimension' ? (served.get(c.name) ?? distinctCount(rows, c.name)) : undefined,
+            cardinality:
+                fieldRole(c.role) === 'dimension' ? (served.get(c.name) ?? distinctCount(rows, c.name)) : undefined,
         }));
         // Named measures join the field list as ready-made aggregates (expression carried verbatim).
         const measures: VizField[] = (ds?.measures ?? []).map((m) => ({

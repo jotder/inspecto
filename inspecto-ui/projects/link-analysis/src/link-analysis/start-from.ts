@@ -165,7 +165,7 @@ export function startMapping(
                 targetCol: m.to,
                 ...(m.kind ? { linkKindCol: m.kind } : {}),
             },
-            ...(m.time ? { timeCol: m.time } : {}),
+            ...(m.primaryTime ? { timeCol: m.primaryTime } : {}),
             from: 'default link',
         };
     const profile = domainProfiles().find((p) => p.investigate?.mapping.dataset === ds.id)?.investigate?.mapping;

@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting, TestRequest } from '@a
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -187,6 +188,24 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         expect(q(el, 'remote-hand-off')).not.toBeNull();
     });
 
+    it('LA-COLUMN-ROLES-1 P1: a role row per column that holds no Entity Type; the primaries offer only their role', async () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        expect(q(el, 'role-from_account')).toBeNull(); // an Entity: its Holds row says so
+        expect(q(el, 'role-ts')!.textContent).toContain('Time');
+        expect(q(el, 'role-amount')!.textContent).toContain('Measure');
+        expect(q(el, 'role-channel')!.textContent).toContain('Category');
+        const cmp = fixture.debugElement.query(By.directive(AddDataComponent)).componentInstance as unknown as {
+            linkColumnOptions: () => Record<string, { value: string }[]>;
+            roleOptions: (t: string) => { value: string }[];
+        };
+        expect(cmp.linkColumnOptions()['primaryTime'].map((o) => o.value)).toEqual(['', 'ts']);
+        expect(cmp.linkColumnOptions()['primaryMeasure'].map((o) => o.value)).toEqual(['', 'amount']);
+        expect(cmp.roleOptions('VARCHAR').map((o) => o.value)).not.toContain('measure');
+        expect(cmp.roleOptions('DOUBLE').map((o) => o.value)).toContain('measure');
+        await expectNoA11yViolations(el);
+    });
+
     it('a sure draft: every choice pre-applied with its evidence, nothing to confirm, one click commits it (no violations)', async () => {
         const { fixture, el } = create();
         upload(fixture, el, transfersDraft());
@@ -207,8 +226,8 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
             from: 'from_account',
             to: 'to_account',
             kind: 'channel',
-            time: 'ts',
-            amount: 'amount',
+            primaryTime: 'ts',
+            primaryMeasure: 'amount',
         });
         expect(body.primaryEntityType).toBe('account');
         req.flush(summary());
