@@ -83,7 +83,7 @@ Dataset or Mapping says is the amount. A Mapping chosen for a different amount g
 | Phase | What | Size |
 |---|---|---|
 | **P0** | Fix the `amount` defect in `PresetQueries.roles()` (the mapping's amount, then the pack hint), with a test that fails today. Registry: `columns[].role` (+ measure `unit`) validated in `DatasetEntryRules`; the back-compatible read. Data page: the Entities card becomes **Columns** — role + holds (+ unit) per column | M |
-| **P1** | Mappings: `primaryTime` / `primaryMeasure` picked among the role columns; Add data proposes roles per column (several times / measures / categories, distinct counts for categories) and the Roles step shows them | M |
+| **P1** | Mappings: `primaryTime` / `primaryMeasure` picked among the role columns; Add data proposes roles per column (several times / measures / categories, distinct counts for categories) and the Roles step shows them. Left from P0 (2026-11-04): the Studio Dataset editor offers the `entity` and `detail` roles too, and `DatasetEntryRules` refuses a mapping `amount` (or a `measure` role) on a non-numeric column | M |
 | **P2** | Carry: every role column rides on links (`attrCols`) and in the link index (`attributeColumns`; one rebuild per index); Play picks its Time column | M |
 | **P3** | Filter: a range per Measure, a value list per Category, a window on any Time column — server side for index reads, SQL for Dataset reads; Entity profiles sum and range every Measure | M |
 
