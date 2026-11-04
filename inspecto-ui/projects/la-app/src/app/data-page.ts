@@ -1,4 +1,5 @@
 import type { ComponentDef } from '@inspecto/core/api';
+import type { EntityTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
 /**
  * The **Data** page's pure half (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): a Dataset registry
@@ -39,8 +40,11 @@ export interface DataEntry {
     primaryEntityType: string | null;
 }
 
-/** The Entity Types a column may hold: the id, its words, and the classifications that mean it. */
-export interface TypeChoice {
+/**
+ * The Entity Types a column may hold: the id, its words, the classifications that mean it, and the reader guidance
+ * (family, definition, example) the picker groups and explains them by.
+ */
+export interface TypeChoice extends EntityTypeGuide {
     id: string;
     label: string;
     classifications: string[];

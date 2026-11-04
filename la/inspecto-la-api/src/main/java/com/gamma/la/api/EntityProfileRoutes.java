@@ -125,7 +125,8 @@ public final class EntityProfileRoutes implements RouteModule {
         audit(ex, LinkEventTypes.LINK_ENTITY_TYPES_LISTED, "link.entity_types.listed",
                 "link.entity_types.listed - " + items.size() + " types, " + n + " bindings",
                 b -> b.attr("types", items.size()).attr("bindings", n));
-        return Map.of("items", items);
+        // The closed family set (ENTITY-TYPE-CATALOG-1): the order and words the "what does this column hold" picker groups by.
+        return Map.of("items", items, "families", EntityTypes.familiesShape());
     }
 
     /**

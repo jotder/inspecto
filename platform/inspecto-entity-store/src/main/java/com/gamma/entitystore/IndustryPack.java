@@ -199,7 +199,8 @@ public record IndustryPack(String id, String name, String description, List<Stri
 
     /**
      * {@code base} as this pack reads it: each type the pack restates takes its normaliser, masking and classifications,
-     * and each type with an {@code entity_type.*} term takes that label. Order and membership are {@code base}'s.
+     * and each type with an {@code entity_type.*} term takes that label and its definition. Order, membership, family and
+     * example are {@code base}'s (a pack relabels; the family stays the neutral word every reader shares).
      */
     public List<EntityTypes.EntityType> overlay(List<EntityTypes.EntityType> base) {
         List<EntityTypes.EntityType> out = new ArrayList<>();
@@ -207,7 +208,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
             EntityTypes.EntityType t = entityTypes.stream().filter(p -> p.id().equals(b.id())).findFirst().orElse(b);
             Term term = term("entity_type." + b.id());
             out.add(new EntityTypes.EntityType(b.id(), term != null ? term.label() : b.label(), t.normaliser(), t.masked(),
-                    t.classifications()));
+                    t.classifications(), b.family(), term != null ? term.definition() : b.definition(), b.example()));
         }
         return List.copyOf(out);
     }

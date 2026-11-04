@@ -61,7 +61,7 @@ nothing beyond a label.
 
 | Phase | What | Size |
 |---|---|---|
-| **P0** | Families in the core; each of the nine types gets one (contract unchanged); the picker groups by family and shows family + example + definition. No rule change yet | S |
+| **P0** ✅ 2026-11-04 | Families in the core; each of the nine types gets one (contract unchanged); the picker groups by family and shows family + example + definition. No rule change yet. **As built:** `EntityTypes.FAMILIES` + `family`/`definition`/`example` on `EntityType` (optional on the wire and in TOON; a stated type without them takes the core default's of the same id, a new id has none → *Other*); a pack overlay keeps family/example and lends its term's definition; `GET /inv/entity-types` also answers `families`; the shared builder `link-analysis/api/entity-type-options.ts` feeds the Data page and Add data; the option picker's filter also matches hint and group | S |
 | **P1** | Packs may add types under a family; value shape + example in the pack's TOON from the closed shape vocabulary; `EntityShapes` reads them; neutrality test rule; several packs per Space merge by id | M |
 | **P2** | Record types: defined by the pack (likely types, and likely roles with `LA-COLUMN-ROLES-1`); a Dataset's `recordType`; Add data proposes it; the picker's *Likely in a …* group with "shape matches" from the column's sample | M |
 | **P3** | Content: the telecom and mobile-money packs made comprehensive (types + record types + examples), and a neutral starter catalogue for a Space with no pack | M |

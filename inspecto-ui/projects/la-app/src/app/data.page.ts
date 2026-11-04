@@ -14,6 +14,7 @@ import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.co
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { DatasetColumnsService } from '@inspecto/link-analysis/api/dataset-columns.service';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
+import { EntityFamily, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
 import { ADD_DATA_ROUTE } from './first-run';
 import {
@@ -319,10 +320,10 @@ export class DataPageComponent implements OnInit {
         { key: 'amount', label: 'Amount', help: 'A number column carried on each link' },
     ] as const;
 
-    /** What a column may hold: an Entity Type, or nothing (a detail). */
+    /** What a column may hold: an Entity Type (grouped by family, with its definition and an example), or nothing (a detail). */
     protected readonly typeOptions = computed<PickerOption[]>(() => [
         { value: '', label: 'Nothing: a detail' },
-        ...this.types().map((t) => ({ value: t.id, label: t.label })),
+        ...entityTypeOptions(this.types(), this.families()),
     ]);
 
     /** A base's columns to pick From / To from, each with what the base says it holds. */
@@ -370,6 +371,8 @@ export class DataPageComponent implements OnInit {
     /** Every Dataset entry; null while they load. */
     readonly entries = signal<DataEntry[] | null>(null);
     readonly types = signal<TypeChoice[]>([]);
+    /** The families the type choices group by, in the server's order. */
+    readonly families = signal<EntityFamily[]>([]);
     readonly error = signal('');
     readonly imports = computed(() => (this.entries() ?? []).filter((e) => e.origin === 'import'));
     /** Every Dataset a Mapping may be based on: the imports first, then those Pipelines keep up to date. */
@@ -427,16 +430,20 @@ export class DataPageComponent implements OnInit {
         this.load();
         this.profiles
             .entityTypes()
-            .pipe(catchError(() => of({ items: [] })))
-            .subscribe((l) =>
+            .pipe(catchError(() => of({ items: [], families: [] })))
+            .subscribe((l) => {
+                this.families.set(l.families ?? []);
                 this.types.set(
                     (l.items ?? []).map((t) => ({
                         id: t.id,
                         label: t.label,
                         classifications: t.classifications ?? [],
+                        family: t.family,
+                        definition: t.definition,
+                        example: t.example,
                     })),
-                ),
-            );
+                );
+            });
     }
 
     load(): void {

@@ -132,7 +132,10 @@ export class OptionPickerDialog {
     readonly shown = computed(() => {
         const q = this.filter().trim().toLowerCase();
         if (!q) return this.data.options;
-        return this.data.options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+        // the hint and the group match too, so a reader can find a choice by what it is, not only by its name
+        return this.data.options.filter((o) =>
+            [o.label, o.value, o.hint, o.group].some((s) => !!s && s.toLowerCase().includes(q)),
+        );
     });
 
     /** The shown options as runs: consecutive options that share a `group` form one run; ungrouped ones a run without one. */

@@ -85,8 +85,17 @@ function create(o: Opts = {}) {
                     entityTypes: () =>
                         of({
                             items: [
-                                { id: 'account', label: 'Account' },
-                                { id: 'msisdn', label: 'Phone number' },
+                                { id: 'account', label: 'Account', family: 'account' },
+                                {
+                                    id: 'msisdn',
+                                    label: 'Phone number',
+                                    family: 'identifier',
+                                    example: '+44 7700 900123',
+                                },
+                            ],
+                            families: [
+                                { id: 'identifier', label: 'Identifier', definition: 'A number that names something.' },
+                                { id: 'account', label: 'Account', definition: 'Holds a balance.' },
                             ],
                         }),
                 },
@@ -139,6 +148,23 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         // LA-ARRIVAL-LEDGER-1: the Dataset card reads its arrivals; a test that does not look at them answers none
         http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
         http?.verify();
+    });
+
+    it('what a column holds: grouped by family, a proposal the Space does not know under Other (ENTITY-TYPE-CATALOG-1)', () => {
+        const { fixture } = create();
+        const add = fixture.debugElement.children[0].componentInstance as unknown as {
+            entityOptions: () => unknown[];
+            draft: { set(d: unknown): void };
+        };
+        add.draft.set({
+            entityTypes: { columns: [{ entityType: { value: 'iban' } }, { entityType: { value: 'msisdn' } }] },
+        });
+        expect(add.entityOptions()).toEqual([
+            { value: '', label: 'Nothing: a detail', hint: 'Shown on links or entities, not drawn as a node' },
+            { value: 'msisdn', label: 'Phone number', group: 'Identifier', hint: 'e.g. +44 7700 900123' },
+            { value: 'account', label: 'Account', group: 'Account' },
+            { value: 'iban', label: 'iban', group: 'Other' },
+        ]);
     });
 
     it('step 1: formats and this Space limits are shown BEFORE upload; a database is locked on Basic (no violations)', async () => {

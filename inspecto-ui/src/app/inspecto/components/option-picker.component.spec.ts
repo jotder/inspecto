@@ -231,6 +231,26 @@ describe('OptionPickerDialog', () => {
         expect((shown[0] as HTMLElement).textContent).toContain('Option 7');
     });
 
+    it('filters on the hint and the group too, keeping the group heading over what it found', () => {
+        const many: PickerOption[] = Array.from({ length: 9 }, (_, i) => ({ value: `v${i}`, label: `Option ${i}` }));
+        many[2] = { value: 'v2', label: 'Phone number', hint: 'A telephone number', group: 'Identifier' };
+        many[5] = { value: 'v5', label: 'Device', hint: 'A phone or terminal', group: 'Device' };
+        const { fixture } = createDialog(many);
+        const labels = (): string[] =>
+            Array.from(fixture.nativeElement.querySelectorAll('button[role="option"]')).map((o) =>
+                (o as HTMLElement).querySelector('.block')!.textContent!.trim(),
+            );
+
+        fixture.componentInstance.filter.set('terminal'); // only in a hint
+        fixture.detectChanges();
+        expect(labels()).toEqual(['Device']);
+
+        fixture.componentInstance.filter.set('identifier'); // only in a group
+        fixture.detectChanges();
+        expect(labels()).toEqual(['Phone number']);
+        expect(fixture.nativeElement.querySelector('[role="group"]')?.getAttribute('aria-label')).toBe('Identifier');
+    });
+
     it('marks the current choice as selected and closes with the picked value', () => {
         const { fixture, close } = createDialog(OPTIONS, 'json');
         const options = Array.from(
