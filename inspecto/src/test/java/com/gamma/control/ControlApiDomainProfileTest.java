@@ -181,7 +181,28 @@ class ControlApiDomainProfileTest {
             assertTrue(r.body().contains("telecom"), "the refusal names the installed packs: " + r.body());
             assertEquals(422, send(c, "PUT", ROUTE, "{\"domainProfile\":7}", AUTHOR).statusCode());
             assertEquals(422, send(c, "PUT", ROUTE, "{}", AUTHOR).statusCode());
+            assertEquals(422, send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\",\"extraPacks\":[\"atlantis\"]}", AUTHOR).statusCode());
+            assertEquals(422, send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\",\"extraPacks\":\"mobile-money\"}", AUTHOR).statusCode());
             assertFalse(Files.exists(c.root().resolve(LinkAnalysisSettings.FILE)));
+        }
+    }
+
+    /** ENTITY-TYPE-CATALOG-1 P1: further packs join the Domain Profile's Entity Types; left out of a PUT they are kept. */
+    @Test
+    void extraPacksRoundTripAndJoinTheEntityTypes(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, Files.createDirectories(tmp.resolve("config")))) {
+            JsonNode put = data(send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\",\"extraPacks\":[\"mobile-money\",\"telecom\"]}", AUTHOR), 200);
+            assertEquals("telecom", put.get("active").asText());
+            assertEquals("[\"mobile-money\"]", put.get("extraPacks").toString(), "the Domain Profile is not repeated as an extra");
+            LinkAnalysisSettings s = LinkAnalysisSettings.read(c.root().resolve(LinkAnalysisSettings.FILE));
+            assertEquals("Wallet", s.effectiveEntityTypes().stream().filter(t -> t.id().equals("wallet")).findFirst().orElseThrow().label());
+
+            JsonNode kept = data(send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\"}", AUTHOR), 200);
+            assertEquals("[\"mobile-money\"]", kept.get("extraPacks").toString(), "left out of the PUT, the stored extras stay");
+            JsonNode nul = data(send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\",\"extraPacks\":null}", AUTHOR), 200);
+            assertEquals("[\"mobile-money\"]", nul.get("extraPacks").toString(), "null reads as left out");
+            JsonNode cleared = data(send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\",\"extraPacks\":[]}", AUTHOR), 200);
+            assertEquals("[]", cleared.get("extraPacks").toString());
         }
     }
 

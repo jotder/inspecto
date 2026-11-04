@@ -20,11 +20,14 @@ import java.util.Map;
  * <pre>
  *   industry-pack.toon               manifest: id, name, description, space_templates, pattern_packs, profile
  *   industry-pack-terms.toon         terms[n]{key,label,abbreviation,definition} - the relabels
- *   industry-pack-entity-types.toon  entity_types[n] - core Entity Types restated (normaliser, masked, classifications)
+ *   industry-pack-entity-types.toon  entity_types[n] - core Entity Types restated, or added under a family
+ *                                    (normaliser, masked, classifications, family, shape, example)
  *   industry-pack-link-kinds.toon    link_kinds[n] - the link kinds the pack's terms may name
+ *   industry-pack-record-types.toon  OPTIONAL record_types[n]{id, likely_types[]} - what a row of a Dataset can be
  * </pre>
  * ⛔ <b>Fail closed.</b> A pack whose files are missing, do not parse or break any {@link IndustryPack#parse} rule, or
- * whose id two jars both declare, is <b>refused whole</b> and reported in {@link Catalogue#refused()} — never partly
+ * whose id two jars both declare, or that does not read together with the packs installed before it (the same Entity Type
+ * id on a different family, normaliser or masking, or a classification two packs' types both claim), is <b>refused whole</b> and reported in {@link Catalogue#refused()} — never partly
  * installed. A Space naming a refused or absent pack reads the neutral vocabulary, and the settings route refuses to
  * select it (422).
  */
@@ -103,13 +106,28 @@ public final class IndustryPacks {
                 continue;
             }
             try {
-                installed.add(IndustryPack.parse(id, read(loader, id, "industry-pack.toon"), read(loader, id, "industry-pack-terms.toon"),
-                        read(loader, id, "industry-pack-entity-types.toon"), read(loader, id, "industry-pack-link-kinds.toon")));
+                IndustryPack p = IndustryPack.parse(id, read(loader, id, "industry-pack.toon"), read(loader, id, "industry-pack-terms.toon"),
+                        read(loader, id, "industry-pack-entity-types.toon"), read(loader, id, "industry-pack-link-kinds.toon"),
+                        readOptional(loader, id, "industry-pack-record-types.toon"));
+                // Several packs may be in force in one Space: every installed pack must read together with the ones before it.
+                List<IndustryPack> together = new ArrayList<>(installed);
+                together.add(p);
+                try {
+                    EntityTypes.validate(IndustryPack.overlay(together, EntityTypes.DEFAULTS), Integer.MAX_VALUE);
+                } catch (IllegalArgumentException clash) {
+                    throw new IllegalArgumentException("does not read together with the packs installed before it: " + clash.getMessage(), clash);
+                }
+                installed.add(p);
             } catch (IOException | RuntimeException e) {
                 refused.add(new Refused(id, e.getMessage()));
             }
         }
         return new Catalogue(installed, refused);
+    }
+
+    /** {@link #read}, or {@code null} when the pack has no such file. */
+    private static Map<String, Object> readOptional(ClassLoader loader, String id, String file) throws IOException {
+        return loader.getResource(DIR + id + "/" + file) == null ? null : read(loader, id, file);
     }
 
     private static Map<String, Object> read(ClassLoader loader, String id, String file) throws IOException {

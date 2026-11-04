@@ -1,6 +1,8 @@
 package com.gamma.control;
 
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.IndustryPack;
+import com.gamma.entitystore.ValueShapes;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -17,11 +19,12 @@ import java.util.regex.Pattern;
  * the Dataset's primary Entity Type, and for a Reference the column that identifies the entity. Pure: the caller
  * hands it the sampled values; nothing here reads a file.
  *
- * <p><b>Every proposal is a guess with its evidence</b> (plan §7): value shapes (an IMEI's Luhn check digit, an IBAN's
- * mod-97 check, an e-mail, a phone number written {@code +} and 8 to 15 digits) and column names (a token naming an
- * Entity Type's id or one of its classifications: {@code from_account} holds accounts). A shape maps to an Entity Type
- * only when the Space has a type claiming that classification (an IBAN to the type claiming {@code IBAN}, else
- * {@code ACCOUNT}); otherwise the column stays a detail and the evidence says why.
+ * <p><b>Every proposal is a guess with its evidence</b> (plan §7): value shapes and column names (a token naming an
+ * Entity Type's id or one of its classifications: {@code from_account} holds accounts). ⚠ The shapes are the Space's own
+ * Entity Types' {@code shape}s (ENTITY-TYPE-CATALOG-1, the closed {@link ValueShapes} vocabulary: a Luhn-checked serial,
+ * an IBAN's mod-97 check, an e-mail, a phone number written {@code +} and 8 to 15 digits, …), never a list of its own: a
+ * column whose every sampled value fits a type's shape is proposed as that type (the most values, then the narrowest
+ * shape); a type of shape {@code free} is proposed only by name.
  *
  * <p><b>Confidence (OF-2):</b> {@code high} when every sampled value agrees with the proposal and the sample has at
  * least {@link OnboardDraft#MIN_SAMPLE} non-blank values; {@code low} otherwise.
@@ -33,17 +36,12 @@ final class EntityShapes {
     /** One sampled column: its name, its proposed type and its non-blank sampled values. */
     record Column(String name, String type, List<String> values) {}
 
-    private static final Pattern IMEI = Pattern.compile("\\d{15}");
-    private static final Pattern PHONE_PLUS = Pattern.compile("\\+\\d{8,15}");
-    private static final Pattern DIGITS_8_15 = Pattern.compile("\\d{8,15}");
-    private static final Pattern IBAN = Pattern.compile("[A-Z]{2}\\d{2}[A-Z0-9]{11,30}");
-    private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
     private static final Pattern ID_LIKE = Pattern.compile("\\S{1,128}");
     private static final Pattern TOKEN_SPLIT = Pattern.compile("[^a-z0-9]+");
 
     /** Name tokens that say "this is a classification", beyond a type's own id and classifications. */
     private static final Map<String, String> NAME_HINTS = Map.ofEntries(
-            Map.entry("account", "ACCOUNT"), Map.entry("acct", "ACCOUNT"), Map.entry("acc", "ACCOUNT"), Map.entry("iban", "IBAN"),
+            Map.entry("account", "ACCOUNT"), Map.entry("acct", "ACCOUNT"), Map.entry("acc", "ACCOUNT"), Map.entry("iban", "ACCOUNT"),
             Map.entry("msisdn", "MSISDN"), Map.entry("phone", "MSISDN"), Map.entry("mobile", "MSISDN"),
             Map.entry("caller", "MSISDN"), Map.entry("callee", "MSISDN"), Map.entry("called", "MSISDN"), Map.entry("calling", "MSISDN"),
             Map.entry("anumber", "MSISDN"), Map.entry("bnumber", "MSISDN"),
@@ -144,39 +142,37 @@ final class EntityShapes {
         if (n == 0) return OnboardDraft.choice(null, "no value in the sample", false);
 
         String hint = nameHint(c.name(), types);
-        Shape shape = shapeOf(c.values());
-        String cls = null;
+        Shape shape = shapeOf(c.values(), types);
+        EntityTypes.EntityType type;
         String why;
         boolean agree;
         if (hint != null) {
-            cls = hint;
-            Shape expected = shapeFor(hint);
-            if (expected != null && shape.cls != null && !shape.cls.equals(expected.cls) && !(hint.equals("ACCOUNT") && "IBAN".equals(shape.cls))) {
+            type = typeClaiming(hint, types);
+            if (type == null)
+                return OnboardDraft.choice(null, "the name '" + c.name() + "' says " + hint.toLowerCase(Locale.ROOT)
+                        + ", but no Entity Type in this Space holds " + hint.toLowerCase(Locale.ROOT) + " - it stays a detail", false);
+            int fit = fitting(type, c.values());
+            if (fit == 0 && shape.type != null && shape.type != type && shape.count == n) {
                 why = "the name says " + hint + " but " + shape.describe(n);
                 agree = false;
             } else {
-                int fit = fitting(hint, shape, c.values(), types);
                 agree = fit == n;
                 why = "the name '" + c.name() + "' says " + hint.toLowerCase(Locale.ROOT)
                         + (agree ? "; all " + n + " sampled values look like identifiers of it"
                                 : "; " + (n - fit) + " of " + n + " sampled values do not look like one");
             }
-        } else if (shape.cls != null && shape.count == n) {
-            cls = shape.cls;
-            agree = shape.strong;
-            why = shape.describe(n) + (shape.strong ? "" : " (digits alone could also be account numbers)");
-        } else if (shape.cls != null) {
-            return OnboardDraft.choice(null, shape.describe(n) + ", so it is left as a detail", false);
-        } else {
-            return OnboardDraft.choice(null, "neither the name nor the values point to an Entity Type", n >= OnboardDraft.MIN_SAMPLE);
+            Map<String, Object> ch = OnboardDraft.choice(type.id(), why, agree && n >= OnboardDraft.MIN_SAMPLE);
+            ch.put("classification", firstClassification(type, hint));
+            return ch;
         }
-        EntityTypes.EntityType type = typeClaiming(cls, types);
-        if (type == null && "IBAN".equals(cls)) type = typeClaiming("ACCOUNT", types);
-        if (type == null)
-            return OnboardDraft.choice(null, why + ", but no Entity Type in this Space holds " + cls.toLowerCase(Locale.ROOT)
-                    + " - it stays a detail", false);
-        Map<String, Object> ch = OnboardDraft.choice(type.id(), why, agree && n >= OnboardDraft.MIN_SAMPLE);
-        ch.put("classification", firstClassification(type, cls));
+        if (shape.type == null)
+            return OnboardDraft.choice(null, "neither the name nor the values point to an Entity Type", n >= OnboardDraft.MIN_SAMPLE);
+        if (shape.count < n)
+            return OnboardDraft.choice(null, shape.describe(n) + ", so it is left as a detail", false);
+        type = shape.type;
+        why = shape.describe(n) + (shape.strong ? "" : " (digits alone could also be account numbers)");
+        Map<String, Object> ch = OnboardDraft.choice(type.id(), why, shape.strong && n >= OnboardDraft.MIN_SAMPLE);
+        ch.put("classification", type.classifications().isEmpty() ? type.id().toUpperCase(Locale.ROOT) : type.classifications().get(0));
         return ch;
     }
 
@@ -196,6 +192,10 @@ final class EntityShapes {
     /** A classification named by the column's name tokens: a hint word, or a type's id or classification. */
     static String nameHint(String column, List<EntityTypes.EntityType> types) {
         List<String> tokens = tokens(column);
+        // the whole name first: ip_address is the network-address type, not the postal one its last token names
+        String whole = String.join("_", tokens);
+        for (EntityTypes.EntityType t : types)
+            if (t.id().equals(whole) && !t.classifications().isEmpty()) return t.classifications().get(0).toUpperCase(Locale.ROOT);
         for (String tok : tokens) {
             for (EntityTypes.EntityType t : types) {
                 if (t.id().equalsIgnoreCase(tok)) return t.classifications().isEmpty() ? null : t.classifications().get(0).toUpperCase(Locale.ROOT);
@@ -218,83 +218,81 @@ final class EntityShapes {
         return out;
     }
 
-    /** The values' common shape. */
-    record Shape(String cls, int count, boolean strong, String label) {
+    /**
+     * The Space type whose shape the most sampled values fit ({@code type} null when none fits one): the most values, then
+     * the narrowest shape ({@link ValueShapes#specificity}), then the type's order. {@code strong} when every fitting value
+     * fits strongly (a phone number written with its {@code +}, not bare digits).
+     */
+    record Shape(EntityTypes.EntityType type, int count, boolean strong, String label) {
         String describe(int n) {
             return count == n ? "all " + n + " sampled values are " + label : count + " of " + n + " sampled values are " + label;
         }
     }
 
-    static Shape shapeOf(List<String> values) {
-        int imei = 0, phone = 0, digits = 0, iban = 0, email = 0;
-        for (String v : values) {
-            String s = v.trim();
-            if (IMEI.matcher(s).matches() && luhn(s)) imei++;
-            if (PHONE_PLUS.matcher(s).matches()) phone++;
-            if (DIGITS_8_15.matcher(s).matches()) digits++;
-            String compact = s.replace(" ", "").toUpperCase(Locale.ROOT);
-            if (IBAN.matcher(compact).matches() && ibanValid(compact)) iban++;
-            if (EMAIL.matcher(s).matches()) email++;
+    static Shape shapeOf(List<String> values, List<EntityTypes.EntityType> types) {
+        Shape best = new Shape(null, 0, false, "");
+        int bestRank = -1;
+        for (EntityTypes.EntityType t : types) {
+            if (ValueShapes.isFree(t.shape())) continue;
+            int count = 0, strong = 0;
+            for (String v : values) {
+                ValueShapes.Fit f = ValueShapes.fit(t.shape(), v);
+                if (f != ValueShapes.Fit.NONE) count++;
+                if (f == ValueShapes.Fit.STRONG) strong++;
+            }
+            int rank = ValueShapes.specificity(t.shape());
+            if (count == 0 || count < best.count || (count == best.count && rank <= bestRank)) continue;
+            best = new Shape(t, count, strong == count, ValueShapes.describe(t.shape(), strong == count));
+            bestRank = rank;
         }
-        int best = Math.max(Math.max(imei, phone), Math.max(Math.max(iban, email), digits));
-        if (best == 0) return new Shape(null, 0, false, "");
-        if (imei == best) return new Shape("IMEI", imei, true, "15-digit numbers with a valid IMEI check digit");
-        if (iban == best) return new Shape("IBAN", iban, true, "IBANs with a valid check");
-        if (email == best) return new Shape("EMAIL", email, true, "e-mail addresses");
-        if (phone == best) return new Shape("MSISDN", phone, true, "phone numbers written + and 8 to 15 digits");
-        return new Shape("MSISDN", digits, false, "8 to 15 digits long, like phone numbers");
+        return best;
     }
 
-    private static Shape shapeFor(String cls) {
-        return switch (cls) {
-            case "IMEI" -> new Shape("IMEI", 0, true, "");
-            case "IBAN" -> new Shape("IBAN", 0, true, "");
-            case "EMAIL" -> new Shape("EMAIL", 0, true, "");
-            default -> null;
-        };
-    }
-
-    /** How many values fit the classification named by the column name. */
-    private static int fitting(String cls, Shape shape, List<String> values, List<EntityTypes.EntityType> types) {
-        if (shape.cls != null && shape.cls.equals(cls)) return shape.count;
-        EntityTypes.EntityType t = typeClaiming(cls, types);
-        String normaliser = t == null ? "default" : t.normaliser();
+    /** How many values fit {@code type}: its shape when it states one, else anything identifier-like. */
+    private static int fitting(EntityTypes.EntityType type, List<String> values) {
         int fit = 0;
         for (String v : values) {
-            String s = v.trim();
-            boolean ok = switch (normaliser) {
-                case "digits" -> s.chars().allMatch(Character::isDigit) && !s.isEmpty();
-                case "e164" -> s.matches("\\+?\\d{6,15}");
-                default -> ID_LIKE.matcher(s).matches();
-            };
+            boolean ok = ValueShapes.isFree(type.shape()) ? ID_LIKE.matcher(v.trim()).matches() : ValueShapes.fits(type.shape(), v);
             if (ok) fit++;
         }
         return fit;
     }
 
-    static boolean luhn(String digits) {
-        int sum = 0;
-        boolean dbl = false;
-        for (int i = digits.length() - 1; i >= 0; i--) {
-            int d = digits.charAt(i) - '0';
-            if (dbl) {
-                d *= 2;
-                if (d > 9) d -= 9;
-            }
-            sum += d;
-            dbl = !dbl;
+    /**
+     * The record type of a draft (ENTITY-TYPE-CATALOG-1 P2): the one whose likely Entity Types the most columns surely hold
+     * (proposals of high confidence only)
+     * (distinct types), then the one whose likely types those cover the larger share of (a call record's four over a data
+     * session's six); a remaining tie goes to the first in force. {@code high} when at least two of its likely types are held
+     * and no other record type ties. {@code entityTypes} is the block {@link #propose} answered.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> recordType(Map<String, Object> entityTypes, List<IndustryPack.RecordType> recordTypes) {
+        Set<String> held = new LinkedHashSet<>();
+        for (Object o : (List<Object>) entityTypes.getOrDefault("columns", List.of()))
+            // only a sure proposal is evidence: a low guess (a number column that merely fits a digits shape) would steer it
+            if (o instanceof Map<?, ?> row && row.get("entityType") instanceof Map<?, ?> ch && ch.get("value") != null
+                    && "high".equals(ch.get("confidence")))
+                held.add(String.valueOf(ch.get("value")));
+        IndustryPack.RecordType best = null;
+        List<String> bestHeld = List.of();
+        boolean tie = false;
+        for (IndustryPack.RecordType r : recordTypes) {
+            List<String> hits = r.likelyTypes().stream().filter(held::contains).toList();
+            if (hits.isEmpty()) continue;
+            // compare hits, then coverage hits/size without division: a/b vs c/d as a*d vs c*b
+            int cmp = best == null ? 1 : hits.size() != bestHeld.size() ? Integer.compare(hits.size(), bestHeld.size())
+                    : Integer.compare(hits.size() * best.likelyTypes().size(), bestHeld.size() * r.likelyTypes().size());
+            if (cmp > 0) {
+                best = r;
+                bestHeld = hits;
+                tie = false;
+            } else if (cmp == 0) tie = true;
         }
-        return sum % 10 == 0;
-    }
-
-    static boolean ibanValid(String iban) {
-        String r = iban.substring(4) + iban.substring(0, 4);
-        int mod = 0;
-        for (char ch : r.toCharArray()) {
-            int v = Character.isDigit(ch) ? ch - '0' : ch - 'A' + 10;
-            mod = v > 9 ? (mod * 100 + v) % 97 : (mod * 10 + v) % 97;
-        }
-        return mod == 1;
+        if (best == null)
+            return OnboardDraft.choice(null, "no column holds an Entity Type a record type of this Space usually holds", false);
+        String why = (bestHeld.size() == 1 ? "a column holds " : "the columns hold ") + String.join(", ", bestHeld)
+                + ", which a " + best.label().toLowerCase(Locale.ROOT) + " usually holds" + (tie ? " - a tie, the first is proposed" : "");
+        return OnboardDraft.choice(best.id(), why, bestHeld.size() >= 2 && !tie);
     }
 
     // ── the Dataset level ────────────────────────────────────────────────────────────────────────────────────

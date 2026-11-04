@@ -124,7 +124,7 @@ final class PresetQueries {
     private static final Param KINDS = new Param("kinds", "Only these kinds of link (comma list, empty = all)", "kinds", "");
 
     private static final Preset FAN_IN = new Preset("fan_in", "Reached by many",
-            "Entities that many different others link to - a collector, a mule, a popular merchant.",
+            "Entities that many different others link to - a collector, a mule, a popular shop.",
             List.of("from", "to"),
             List.of(new Param("min", "At least this many distinct senders", "number", "5"), KINDS, TOP),
             new Aggregate("to", List.of("counterparts", "links"), null, "kinds", "min"), null);

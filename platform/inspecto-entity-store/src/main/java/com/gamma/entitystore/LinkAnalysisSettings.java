@@ -51,7 +51,23 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                                    List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
                                    Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
                                    Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold, Embed embed,
-                                   String domainProfile) {
+                                   String domainProfile, List<String> extraPacks) {
+
+    public LinkAnalysisSettings {
+        extraPacks = extraPacks == null ? List.of() : List.copyOf(extraPacks);
+    }
+
+    /** The form without {@code extraPacks}: the Domain Profile's pack alone is in force. */
+    public LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNodeCap, Integer suspicionNodeCap,
+                                String maskingMode, Integer fourEyesBudgetAbove, Integer fourEyesFanOutAbove,
+                                List<EntityTypes.EntityType> entityTypes, Integer mergedDistinctCap,
+                                Integer seedByDistinctCap, GraphRun graphRun, Index index, Drafts drafts,
+                                Integer maxSetBytes, Long maxInvestigationBytes, Integer hubThreshold, Embed embed,
+                                String domainProfile) {
+        this(projectionNodeCap, analysisNodeCap, suspicionNodeCap, maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove,
+                entityTypes, mergedDistinctCap, seedByDistinctCap, graphRun, index, drafts, maxSetBytes,
+                maxInvestigationBytes, hubThreshold, embed, domainProfile, List.of());
+    }
 
     /**
      * The sixteen-knob form that predates {@code domainProfile}: no Domain Profile is stated (the neutral vocabulary).
@@ -347,13 +363,46 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /**
-     * The Entity Types in force: the stated list, else {@link EntityTypes#DEFAULTS} as the Space's Domain Profile reads
-     * them ({@link IndustryPack#overlay} - relabelled, never more types).
+     * The Entity Types in force: the stated list; else, with packs in force ({@link #activePacks}), the types those packs
+     * list, merged by id over the starter definitions ({@link IndustryPack#overlay(List, List)}); else the neutral starter
+     * catalogue {@link EntityTypes#DEFAULTS} (ENTITY-TYPE-CATALOG-1 Q-6). Packs that do not read together (installed packs are checked at load, so only in theory) give the
+     * neutral defaults: a merge that cannot be trusted is never partly applied.
      */
     public List<EntityTypes.EntityType> effectiveEntityTypes() {
         if (entityTypes != null) return entityTypes;
-        IndustryPack pack = activePack();
-        return pack != null ? pack.overlay(EntityTypes.DEFAULTS) : EntityTypes.DEFAULTS;
+        List<IndustryPack> packs = activePacks();
+        if (packs.isEmpty()) return EntityTypes.DEFAULTS;
+        try {
+            List<EntityTypes.EntityType> merged = IndustryPack.overlay(packs, EntityTypes.DEFAULTS);
+            EntityTypes.validate(merged, Integer.MAX_VALUE);
+            return merged;
+        } catch (IllegalArgumentException clash) {
+            return EntityTypes.DEFAULTS;
+        }
+    }
+
+    /**
+     * The record types in force (ENTITY-TYPE-CATALOG-1 Q-3): those of {@link #activePacks}, merged by id, the Domain Profile's
+     * first. Empty when no pack is in force.
+     */
+    public List<IndustryPack.RecordType> effectiveRecordTypes() {
+        return IndustryPack.recordTypes(activePacks());
+    }
+
+    /**
+     * Every installed pack in force for this Space, the Domain Profile's first (it wins a label two packs both give), then
+     * each of {@code extra_packs} (ENTITY-TYPE-CATALOG-1 Q-5: a telecom operator that runs mobile money). Ids that are not
+     * installed are skipped; a repeated id counts once.
+     */
+    public List<IndustryPack> activePacks() {
+        List<IndustryPack> out = new java.util.ArrayList<>();
+        IndustryPack primary = activePack();
+        if (primary != null) out.add(primary);
+        for (String id : extraPacks) {
+            IndustryPack p = IndustryPacks.bundled().find(id);
+            if (p != null && !out.contains(p)) out.add(p);
+        }
+        return List.copyOf(out);
     }
 
     /**
@@ -371,10 +420,22 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
      * packs. A document that does not parse is refused, never replaced.
      */
     public static void writeDomainProfile(Path path, String id) throws IOException {
+        writeDomainProfile(path, id, null);
+    }
+
+    /**
+     * {@link #writeDomainProfile(Path, String)}, and when {@code extraPacks} is not {@code null} also set ({@code []} clears) the
+     * {@code extra_packs} the caller has validated against the installed packs.
+     */
+    public static void writeDomainProfile(Path path, String id, List<String> extraPacks) throws IOException {
         synchronized (LaLimits.WRITE_LOCK) {
             Map<String, Object> m = LaLimits.loadRaw(path);   // absent = empty; unparseable = IOException (refused)
             if (id == null) m.remove("domain_profile");
             else m.put("domain_profile", id);
+            if (extraPacks != null) {
+                if (extraPacks.isEmpty()) m.remove("extra_packs");
+                else m.put("extra_packs", List.copyOf(extraPacks));
+            }
             AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".link-analysis-");
         }
     }
@@ -506,7 +567,7 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
                     optInt(m, "merged_distinct_cap"),
                     optInt(m, "seed_by_distinct_cap"), graphRun(m.get("graph_run")), index(m.get("index")), drafts(m.get("drafts")),
                     optInt(m, "max_set_bytes"), optLong(m, "max_investigation_bytes"), optInt(m, "hub_threshold"), embed(m.get("embed")),
-                    domainProfile(m.get("domain_profile")));
+                    domainProfile(m.get("domain_profile")), extraPacks(m.get("extra_packs")));
         } catch (Exception e) {
             return EMPTY;
         }
@@ -599,6 +660,15 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
         }
         Index r = new Index(enabled, maxDisk, optInt(g, "keep_versions"), optInt(g, "max_age_hours"));
         return r.isNone() ? null : r;
+    }
+
+    /** The stored {@code extra_packs}: each pack id of the right shape, once; anything else is dropped. */
+    private static List<String> extraPacks(Object raw) {
+        if (!(raw instanceof List<?> l)) return List.of();
+        List<String> out = new java.util.ArrayList<>();
+        for (Object o : l)
+            if (o instanceof String s && IndustryPack.ID.matcher(s.trim()).matches() && !out.contains(s.trim())) out.add(s.trim());
+        return out;
     }
 
     /** A stored pack id of the right shape, else {@code null} (no Domain Profile stated). */

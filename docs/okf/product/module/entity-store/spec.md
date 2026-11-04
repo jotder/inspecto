@@ -58,7 +58,46 @@ Writes are read-modify-write over the raw TOON map under one lock, so unknown ke
 
 Index `META-INF/inspecto/industry-packs.toon`; each pack is `META-INF/inspecto/industry-packs/<id>/` with
 `industry-pack.toon`, `industry-pack-terms.toon`, `industry-pack-entity-types.toon`,
-`industry-pack-link-kinds.toon`. Bundled: `telecom`, `mobile-money`. Term keys are `concept.`, `entity_type.`,
-`link_kind.`, `measure.`, `pattern.` or `term.`; a pack never adds a concept.
+`industry-pack-link-kinds.toon` and, optionally, `industry-pack-record-types.toon`. Bundled: `telecom`, `mobile-money`.
+Term keys are `concept.`, `entity_type.`, `record_type.`, `link_kind.`, `measure.`, `pattern.` or `term.`.
+
+### The Entity Type catalogue (`ENTITY-TYPE-CATALOG-1`, built 2026-11-04)
+
+- **Families.** Every Entity Type sits under one family of the closed, neutral core set `EntityTypes.FAMILIES`
+  (Party · Organisation · Account · Identifier · Device · Place · Document). Families, definitions and examples are
+  reader guidance only, never identity.
+- **The neutral starter catalogue** is `EntityTypes.DEFAULTS`: the nine original ids (`subscriber`, `imsi`, `imei`,
+  `msisdn`, `wallet`, `account`, `agent`, `handset`, `cell` — ids and classifications are data contracts, unchanged)
+  plus neutral types every domain shares (`email`, `id_document`, `organisation`, `bank_account`, `card`,
+  `ip_address`, `address`). A Space with no pack reads it.
+- **Membership.** A Space with packs reads only the types its packs list, in pack order, each restated core id keeping
+  its starter family, definition and example unless the pack states its own example or shape; a stated
+  `entity_types` list still wins over everything.
+- **A pack adds types** only under a core family; an added type's label and definition are the pack's own
+  `entity_type.<id>` term (so `IndustryPackNeutralityTest`'s derived word list covers it). The neutrality rule is
+  "every pack type sits under a core family; no pack word in the core".
+- **Value shapes** (`ValueShapes`, `inspecto/graph/value-shape.ts`, one parity fixture
+  `entity-shape-parity.fixture.json`): `free · e164 · digits(n|a-b) · luhn(n|a-b) · iban · email · uuid`, never a
+  free regex. `e164` fits strongly with `+`, weakly as bare digits; `digits` always weakly; the narrower shape wins a
+  tie, a set length above a range. Add data (`EntityShapes`) proposes the type whose shape the most sampled values fit; a
+  `free` type only by name, a column's whole name matching a type id before its tokens (`ip_address`).
+- **Several packs per Space:** `extra_packs` beside `domain_profile` (the Domain Profile alone gives the vocabulary);
+  merged by id, first pack wins a label. One id must agree on family, normaliser, masking and classifications in every
+  pack — `IndustryPacks.load` refuses a pack that does not read together with those installed before it, and
+  `PUT /settings/link-analysis/domain-profile` refuses a chosen set that does not (422).
+- **Record types:** a pack's `record_types[n]{id, likely_types[]}`, label from `record_type.<id>`; a Dataset's
+  `recordType` (`PUT /datasets/{id}/record-type`, or the Add data commit); `GET /inv/entity-types` answers
+  `recordTypes`. The "what does this column hold" picker puts the record type's likely types first (*Likely in a …*)
+  and marks a type whose shape the column's sample fits (*Shape matches*) — in Add data only, because the Data page's
+  row sample is masked for masked types. Add data proposes the record type from its sure (high-confidence) column
+  proposals: the most likely types held, then the larger share of the record type's list; a remaining tie is low.
+
+⚠ Gotchas: a pack restating a starter id must repeat its classifications exactly (the agreement rule); a new type
+needs both its `entity_type.<id>` term and a family or the whole pack is refused; adding a starter type changes what a
+no-pack Space reads (tests pin the starter size); a shape is evidence, so a pack must not give a broad shape (`digits(5-6)`) to a type
+whose values look like any small number — leave it `free` and let the name propose it.
+
+Deliberate deferrals: likely column ROLES per record type (with `LA-COLUMN-ROLES-1`) — not carried; the Studio
+Entity Types settings page shows the new fields read-only at most.
 
 Tests: [tests-inventory](tests-inventory.md).

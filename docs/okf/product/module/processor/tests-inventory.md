@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-364 test class(es): 135 unit, 229 real-HTTP control-plane, 0 IT.
+365 test class(es): 136 unit, 229 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -253,6 +253,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `DatasetEntryRulesRolesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetEntryRulesRolesTest.java` | {@code columns[].role} on a Dataset entry (LA-COLUMN-ROLES-1 P0, operator decision B 2026-11-04): one vocabulary, |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |
+| `EntityShapesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntityShapesTest.java` | ENTITY-TYPE-CATALOG-1 P1: Add data proposes a column's Entity Type from the SPACE's types' value shapes, not from a list |
 | `ExchangeAttributeScopeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ExchangeAttributeScopeTest.java` | SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): nothing stamped on the exchange by one request may be readable |
 | `FindingJsonShapeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/FindingJsonShapeTest.java` | The {@link Finding} diagnostic contract (authoring-residuals R1) through the REAL serializer the |
 | `ImportCapabilityGuardTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportCapabilityGuardTest.java` | {@link ImportCapabilityGuard} is COMPLETE against {@link CapabilityManifest}: for every writable kind, every declared |

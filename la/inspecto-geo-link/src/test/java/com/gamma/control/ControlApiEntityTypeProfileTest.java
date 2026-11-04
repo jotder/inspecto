@@ -64,7 +64,7 @@ class ControlApiEntityTypeProfileTest {
         subjects();
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {
             JsonNode items = data(get(c, "/inv/entity-types", OWNER)).get("items");
-            assertEquals(9, items.size(), "the seeded types are in force");
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size(), items.size(), "the neutral starter catalogue is in force");
             JsonNode msisdn = null, imei = null, wallet = null;
             for (JsonNode t : items) {
                 if ("msisdn".equals(t.get("id").asText())) msisdn = t;
@@ -96,6 +96,16 @@ class ControlApiEntityTypeProfileTest {
             for (JsonNode t : stranger)
                 if ("msisdn".equals(t.get("id").asText()))
                     assertFalse(t.at("/headline/assessed").asBoolean(), "another caller's view of the bindings has no headline of its own yet");
+
+            // ENTITY-TYPE-CATALOG-1 P2: the record types of the Space's packs ride along - none without a pack
+            assertEquals(0, data(get(c, "/inv/entity-types", OWNER)).get("recordTypes").size());
+            Files.writeString(c.root().resolve(com.gamma.entitystore.LinkAnalysisSettings.FILE), "domain_profile: telecom\n");
+            JsonNode records = data(get(c, "/inv/entity-types", OWNER)).get("recordTypes");
+            JsonNode call = null;
+            for (JsonNode r : records) if ("voice_call".equals(r.get("id").asText())) call = r;
+            assertNotNull(call, records.toString());
+            assertTrue(call.get("likelyTypes").toString().contains("msisdn"), call.toString());
+            assertFalse(call.get("label").asText().isBlank());
         }
     }
 

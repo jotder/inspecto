@@ -6712,7 +6712,7 @@
         "tags" : [ "settings" ],
         "summary" : "The Space's Domain Profile: the active Industry pack's terminology and the installed packs",
         "operationId" : "getSettingsLinkAnalysisDomainProfile",
-        "description" : "Answers {active, stated, profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. A pack that failed validation at load is listed under refused, never installed.",
+        "description" : "Answers {active, stated, extraPacks[], profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. extraPacks are the further installed packs whose Entity Types join the Domain Profile's, merged by id (ENTITY-TYPE-CATALOG-1). A pack that failed validation at load, or does not read together with the packs installed before it, is listed under refused, never installed.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
@@ -6723,7 +6723,7 @@
         "tags" : [ "settings" ],
         "summary" : "Select the Space's Domain Profile (canAuthorWorkbench)",
         "operationId" : "putSettingsLinkAnalysisDomainProfile",
-        "description" : "Body {domainProfile: pack id | generic | null}. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack; 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and answers the GET shape.",
+        "description" : "Body {domainProfile: pack id | generic | null, extraPacks?: [pack id]}. extraPacks left out keeps the stored ones, [] clears them. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack, or when extraPacks is not a list of installed pack ids, or the chosen packs do not read together (one Entity Type id stated differently); 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and extra_packs and answers the GET shape.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
@@ -8451,7 +8451,7 @@
         ],
         "summary" : "Add data: one confirm - write the import Pipeline, run it once, register the Dataset",
         "operationId" : "postOnboardFilesByFileIdCommit",
-        "description" : "LA-ONBOARD-1 OB-2/OB-3/OB-4/OB-8. {fileId} is the draftId. Body (every key optional; absent = the draft's proposal): {name (Dataset and Pipeline id, lower-case), description, columns:[{name (the draft column), type?, format?, entityType? (id or null), role? (entity|temporal|measure|dimension|detail), rename?, drop?}], primaryEntityType?, link?:{from, to, kind?, primaryTime?, primaryMeasure?, details?[]} | null (stream), identifyingColumn? (reference), format? (must equal the draft's: re-draft to change it)}. Writes imports/<id>_schema.toon (index selectors for delimited files) and imports/<id>_pipeline.toon (an ordinary Pipeline, origin: import, trigger {type: manual}, local inbox, accepts_upload, PARQUET), both through the save gate; registers it, lands the file, runs it once, registers the Dataset {physicalRef <id>/database, origin import, kind, columns[].classification, primaryEntityType, defaultLinkMapping, eventDate, identifyingColumn}, then - inside the same run (DT-16) unless pipeline.automation is present - builds the link index and evaluates the Expectations targeting the Pipeline. Answers the run summary {dataset, pipeline, kind, file, rowsIn, rowsRejected, rejectedDetail?, quarantined:[{file, reason}], rowsBefore, rowsAfter, rowsChanged, replaced, followOnInRun, index:{result, message, code?, edges?, nodes?}, expectations:[{name, status, violations}]}; above import.inline_max_bytes 202 {runId, dataset, action, state, startedAt, poll}. A failed commit leaves nothing behind (config files, registration, data and inbox directories, Dataset entry); the draft keeps its file. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown/expired draft (or another person's); 409 the name is taken (Dataset, Pipeline, config files or data directory), an approval policy holds Datasets, the same import is in flight, or import.max_datasets is reached; 422 a choice naming nothing real, a save-gate refusal, or a run that imported nothing.",
+        "description" : "LA-ONBOARD-1 OB-2/OB-3/OB-4/OB-8. {fileId} is the draftId. Body (every key optional; absent = the draft's proposal): {name (Dataset and Pipeline id, lower-case), description, columns:[{name (the draft column), type?, format?, entityType? (id or null), role? (entity|temporal|measure|dimension|detail), rename?, drop?}], primaryEntityType?, recordType? (a record type of the Space's packs, or null), link?:{from, to, kind?, primaryTime?, primaryMeasure?, details?[]} | null (stream), identifyingColumn? (reference), format? (must equal the draft's: re-draft to change it)}. Writes imports/<id>_schema.toon (index selectors for delimited files) and imports/<id>_pipeline.toon (an ordinary Pipeline, origin: import, trigger {type: manual}, local inbox, accepts_upload, PARQUET), both through the save gate; registers it, lands the file, runs it once, registers the Dataset {physicalRef <id>/database, origin import, kind, columns[].classification, primaryEntityType, defaultLinkMapping, eventDate, identifyingColumn}, then - inside the same run (DT-16) unless pipeline.automation is present - builds the link index and evaluates the Expectations targeting the Pipeline. Answers the run summary {dataset, pipeline, kind, file, rowsIn, rowsRejected, rejectedDetail?, quarantined:[{file, reason}], rowsBefore, rowsAfter, rowsChanged, replaced, followOnInRun, index:{result, message, code?, edges?, nodes?}, expectations:[{name, status, violations}]}; above import.inline_max_bytes 202 {runId, dataset, action, state, startedAt, poll}. A failed commit leaves nothing behind (config files, registration, data and inbox directories, Dataset entry); the draft keeps its file. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown/expired draft (or another person's); 409 the name is taken (Dataset, Pipeline, config files or data directory), an approval policy holds Datasets, the same import is in flight, or import.max_datasets is reached; 422 a choice naming nothing real, a save-gate refusal, or a run that imported nothing.",
         "parameters" : [
           {
             "name" : "fileId",
@@ -8645,6 +8645,41 @@
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped {dataset, column, classification, entityType?, columns}."
+          }
+        }
+      }
+    },
+    "/datasets/{datasetId}/record-type" : {
+      "put" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Say what one row of a Dataset is (its record type)",
+        "operationId" : "putDatasetsByDatasetIdRecordType",
+        "description" : "ENTITY-TYPE-CATALOG-1 P2. canAuthorWorkbench. Body {recordType: '<id>' | null}: a record type of the Space's Industry packs (GET /inv/entity-types answers recordTypes), or null to clear it. It only orders the 'what does this column hold' choices: the record type's likely Entity Types first. Gates: 401/403; 503 no write root; 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 an approval policy holds Datasets; 422 recordType missing, not a string or null, or not a record type of this Space. Answers {dataset, recordType}.",
+        "parameters" : [
+          {
+            "name" : "datasetId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {dataset, recordType}."
           }
         }
       }

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,15 +39,51 @@ class IndustryPacksTest {
         assertNull(c.find("generic"), "generic is the neutral vocabulary, never a pack");
     }
 
+    /** ENTITY-TYPE-CATALOG-1 Q-6: a Space with a pack reads the types the pack LISTS, starter ids keeping their contracts. */
     @Test
-    void aPackRelabelsTheCoreEntityTypesAndNeverAddsOne() {
+    void aPackReadsExactlyTheTypesItListsRelabellingStarterIdsAndAddingItsOwn() {
         IndustryPack telecom = IndustryPacks.bundled().find("telecom");
         List<EntityTypes.EntityType> types = telecom.overlay(EntityTypes.DEFAULTS);
-        assertEquals(EntityTypes.DEFAULTS.stream().map(EntityTypes.EntityType::id).toList(),
-                types.stream().map(EntityTypes.EntityType::id).toList());
-        assertEquals("MSISDN", types.stream().filter(t -> t.id().equals("msisdn")).findFirst().orElseThrow().label());
-        assertEquals("Account", types.stream().filter(t -> t.id().equals("account")).findFirst().orElseThrow().label(),
-                "a type the pack has no term for keeps its neutral label");
+        assertEquals(telecom.entityTypes().stream().map(EntityTypes.EntityType::id).toList(),
+                types.stream().map(EntityTypes.EntityType::id).toList(), "membership and order are the pack's");
+        assertFalse(types.stream().anyMatch(t -> t.id().equals("wallet")), "a starter type the pack does not list is not read");
+        assertEquals("MSISDN", label(types, "msisdn"));
+        assertEquals("Email address", label(types, "email"), "a listed type the pack has no term for keeps its neutral label");
+        EntityTypes.EntityType msisdn = types.stream().filter(t -> t.id().equals("msisdn")).findFirst().orElseThrow();
+        assertEquals(EntityTypes.coreDefault("msisdn").classifications(), msisdn.classifications(), "ids and classifications are contracts");
+        assertEquals("identifier", msisdn.family());
+        EntityTypes.EntityType iccid = types.stream().filter(t -> t.id().equals("iccid")).findFirst().orElseThrow();
+        assertEquals("ICCID", iccid.label());
+        assertEquals("luhn(19-20)", iccid.shape());
+        assertTrue(ValueShapes.fits(iccid.shape(), iccid.example()), "a pack's example fits its own shape");
+    }
+
+    /**
+     * The Space Templates that select a pack bind columns to these classifications (la-showcase: ACCOUNT, IMSI, MSISDN;
+     * la-mobile-money: AGENT, MSISDN, WALLET; telco-fraud: MSISDN): the pack must still claim them, or a column loses its type.
+     */
+    @Test
+    void eachPackClaimsTheClassificationsItsTemplatesBind() {
+        Map<String, List<String>> bound = Map.of("telecom", List.of("ACCOUNT", "IMSI", "MSISDN"),
+                "mobile-money", List.of("AGENT", "MSISDN", "WALLET"));
+        for (var e : bound.entrySet()) {
+            List<String> claimed = IndustryPacks.bundled().find(e.getKey()).overlay(EntityTypes.DEFAULTS).stream()
+                    .flatMap(t -> t.classifications().stream()).toList();
+            assertTrue(claimed.containsAll(e.getValue()), e.getKey() + " claims " + claimed);
+        }
+    }
+
+    @Test
+    void everyExampleFitsItsShapeInTheStarterAndInEveryPack() {
+        List<EntityTypes.EntityType> all = new java.util.ArrayList<>(EntityTypes.DEFAULTS);
+        for (IndustryPack p : IndustryPacks.bundled().installed()) all.addAll(p.overlay(EntityTypes.DEFAULTS));
+        for (EntityTypes.EntityType t : all)
+            if (!ValueShapes.isFree(t.shape()))
+                assertTrue(ValueShapes.fits(t.shape(), t.example()), t.id() + ": example '" + t.example() + "' does not fit " + t.shape());
+    }
+
+    private static String label(List<EntityTypes.EntityType> types, String id) {
+        return types.stream().filter(t -> t.id().equals(id)).findFirst().orElseThrow().label();
     }
 
     @Test
@@ -134,7 +171,7 @@ class IndustryPacksTest {
                 "toy", "purpose must be one of");
         assertRefused(load(write(tmp.resolve("jar2"), "toy", f -> f.equals("manifest")
                 ? manifest("toy") + "  suggested_lists[1]{title,purpose,entity_type,why}:\n    Busy ones,exclusion,starship,\"Too busy.\"\n" : null)),
-                "toy", "is not a core Entity Type");
+                "toy", "neither a core Entity Type nor one the pack lists");
     }
 
     /**
@@ -159,11 +196,95 @@ class IndustryPacksTest {
         assertRefused(c, "toy", "names no core concept");
     }
 
+    // ── ENTITY-TYPE-CATALOG-1 P1: a pack adds types under a family ─────────────────────────────────────────────
+
+    private static final String STARSHIP_TERMS = "terms[2]{key,label,abbreviation,definition}:\n  concept.node,Things,\"\",\"What is drawn.\"\n"
+            + "  entity_type.starship,Starship,SS,\"A vessel that travels between stars.\"\n";
+
+    private static String starship(String extra) {
+        return "entity_types[1]:\n  - id: starship\n    normaliser: upper-trim\n    masked: false\n    classifications[1]: STARSHIP\n" + extra;
+    }
+
     @Test
-    void anEntityTypeTheCoreDoesNotHaveIsRefused() throws IOException {
-        IndustryPacks.Catalogue c = load(write(tmp.resolve("jar1"), "toy", f -> f.equals("types")
-                ? "entity_types[1]:\n  - id: starship\n    normaliser: default\n    masked: false\n    classifications[1]: STARSHIP\n" : null));
-        assertRefused(c, "toy", "is not a core Entity Type");
+    void aPackAddsATypeUnderAFamilyWithItsTermShapeAndExample() throws IOException {
+        IndustryPacks.Catalogue c = load(write(tmp.resolve("jar1"), "toy", f -> switch (f) {
+            case "terms" -> STARSHIP_TERMS;
+            case "types" -> starship("    family: device\n    shape: digits(6)\n    example: \"104233\"\n");
+            case "manifest" -> manifest("toy") + "  suggested_lists[1]{title,purpose,entity_type,why}:\n    Fleet,watch,starship,\"Ours.\"\n";
+            default -> null;
+        }));
+        assertEquals(List.of(), c.refused());
+        List<EntityTypes.EntityType> types = c.find("toy").overlay(EntityTypes.DEFAULTS);
+        assertEquals(1, types.size(), "the pack lists one type, its own");
+        EntityTypes.EntityType ss = types.get(0);
+        assertEquals(new EntityTypes.EntityType("starship", "Starship", "upper-trim", false, List.of("STARSHIP"), "device",
+                "A vessel that travels between stars.", "104233", "digits(6)"), ss);
+        assertEquals("starship", c.find("toy").profile().suggestedLists().get(0).entityType(), "a suggestion may name the pack's own type");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> wire = (List<Map<String, Object>>) c.find("toy").toMap().get("entityTypes");
+        assertEquals("digits(6)", wire.get(wire.size() - 1).get("shape"));
+    }
+
+    @Test
+    void anAddedTypeWithoutAFamilyOrATermIsRefused() throws IOException {
+        assertRefused(load(write(tmp.resolve("jar1"), "toy", f -> f.equals("types") ? starship("")
+                : f.equals("terms") ? STARSHIP_TERMS : null)), "toy", "must name its family");
+        assertRefused(load(write(tmp.resolve("jar2"), "toy", f -> f.equals("types") ? starship("    family: device\n") : null)),
+                "toy", "needs a term 'entity_type.starship'");
+        assertRefused(load(write(tmp.resolve("jar3"), "toy", f -> f.equals("types") ? starship("    family: vehicle\n")
+                : f.equals("terms") ? STARSHIP_TERMS : null)), "toy", "family must be one of");
+    }
+
+    @Test
+    void aShapeOutsideTheClosedVocabularyIsRefused() throws IOException {
+        assertRefused(load(write(tmp.resolve("jar1"), "toy", f -> f.equals("types") ? starship("    family: device\n    shape: \"[A-Z]+\"\n")
+                : f.equals("terms") ? STARSHIP_TERMS : null)), "toy", "value shape must be one of");
+    }
+
+    @Test
+    void aRestatedCoreTypeKeepsItsFamilyAndMayStateItsShape() throws IOException {
+        assertRefused(load(write(tmp.resolve("jar1"), "toy", f -> f.equals("types")
+                ? "entity_types[1]:\n  - id: account\n    family: party\n    normaliser: upper-trim\n    masked: true\n    classifications[1]: ACCOUNT\n"
+                : null)), "toy", "a pack keeps it there");
+        IndustryPacks.Catalogue c = load(write(tmp.resolve("jar2"), "toy", f -> f.equals("types")
+                ? "entity_types[1]:\n  - id: account\n    normaliser: upper-trim\n    masked: true\n    classifications[1]: ACCOUNT\n"
+                + "    shape: iban\n    example: GB82WEST12345698765432\n" : null));
+        EntityTypes.EntityType account = c.find("toy").overlay(EntityTypes.DEFAULTS).stream()
+                .filter(t -> t.id().equals("account")).findFirst().orElseThrow();
+        assertEquals("iban", account.shape());
+        assertEquals("GB82WEST12345698765432", account.example());
+        assertEquals("account", account.family());
+    }
+
+    @Test
+    void twoPacksThatDisagreeOnASharedTypeOrClaimOneClassificationDoNotBothInstall() throws IOException {
+        Path a = write(tmp.resolve("jarA"), "alpha", f -> f.equals("types") ? starship("    family: device\n")
+                : f.equals("terms") ? STARSHIP_TERMS : null);
+        Path b = write(tmp.resolve("jarB"), "beta", f -> f.equals("types") ? starship("    family: place\n")
+                : f.equals("terms") ? STARSHIP_TERMS : null);
+        IndustryPacks.Catalogue c = load(a, b);
+        assertNotNull(c.find("alpha"));
+        assertRefused(c, "beta", "does not read together");
+
+        Path d = write(tmp.resolve("jarD"), "delta", f -> f.equals("types")
+                ? "entity_types[1]:\n  - id: dock\n    family: place\n    normaliser: default\n    masked: false\n    classifications[1]: STARSHIP\n"
+                : f.equals("terms") ? "terms[1]{key,label,abbreviation,definition}:\n  entity_type.dock,Dock,\"\",\"Where ships wait.\"\n" : null);
+        assertRefused(load(a, d), "delta", "is claimed by both");
+
+        Path g = write(tmp.resolve("jarG"), "gamma", f -> f.equals("types") ? starship("    family: device\n    shape: digits(4)\n")
+                : f.equals("terms") ? "terms[1]{key,label,abbreviation,definition}:\n  entity_type.starship,Spaceship,\"\",\"A ship.\"\n" : null);
+        IndustryPacks.Catalogue both = load(a, g);
+        assertEquals(List.of(), both.refused(), "the same family, normaliser and masking read together");
+        List<EntityTypes.EntityType> merged = IndustryPack.overlay(List.of(both.find("gamma"), both.find("alpha")), EntityTypes.DEFAULTS);
+        EntityTypes.EntityType ss = merged.stream().filter(t -> t.id().equals("starship")).findFirst().orElseThrow();
+        assertEquals("Spaceship", ss.label(), "the first pack wins the label");
+        assertEquals("digits(4)", ss.shape());
+        assertEquals(1, merged.stream().filter(t -> t.id().equals("starship")).count(), "one id, one type");
+        // the same id with other classifications: refused too, so any subset and order of installed packs reads together
+        Path h = write(tmp.resolve("jarH"), "eta", f -> f.equals("types")
+                ? "entity_types[1]:\n  - id: starship\n    family: device\n    normaliser: upper-trim\n    masked: false\n    classifications[1]: SHIP\n"
+                : f.equals("terms") ? STARSHIP_TERMS : null);
+        assertRefused(load(a, h), "eta", "classifications");
     }
 
     @Test
@@ -204,6 +325,59 @@ class IndustryPacksTest {
         assertRefused(c, "toy", "relabels to its neutral label");
     }
 
+    // ── ENTITY-TYPE-CATALOG-1 P2: record types ─────────────────────────────────────────────────────────────────
+
+    private static final String SHIP_LOG_TERMS = "terms[2]{key,label,abbreviation,definition}:\n  entity_type.starship,Starship,\"\",\"A vessel.\"\n"
+            + "  record_type.ship_log,Ship log,\"\",\"One line of a vessel's log.\"\n";
+
+    /** A pack {@code id} with a record-type file {@code recordTypes} beside the four files. */
+    private static Path withRecordTypes(Path root, String id, String types, String terms, String recordTypes) throws IOException {
+        write(root, id, f -> f.equals("types") ? types : f.equals("terms") ? terms : null);
+        Files.writeString(root.resolve(IndustryPacks.DIR + id + "/industry-pack-record-types.toon"), recordTypes, StandardCharsets.UTF_8);
+        return root;
+    }
+
+    @Test
+    void aPackDefinesRecordTypesLabelledByTheirTermsNamingItsOwnTypes() throws IOException {
+        IndustryPacks.Catalogue c = load(withRecordTypes(tmp.resolve("jar1"), "toy", starship("    family: device\n"), SHIP_LOG_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[2]: starship,account\n"));
+        assertEquals(List.of(), c.refused());
+        assertEquals(List.of(new IndustryPack.RecordType("ship_log", "Ship log", "One line of a vessel's log.", List.of("starship", "account"))),
+                c.find("toy").recordTypes());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> wire = (List<Map<String, Object>>) c.find("toy").toMap().get("recordTypes");
+        assertEquals(List.of("starship", "account"), wire.get(0).get("likelyTypes"));
+        assertEquals(List.of(), load(write(tmp.resolve("jar0"), "bare", f -> null)).find("bare").recordTypes(), "the file is optional");
+    }
+
+    @Test
+    void aRecordTypeNamingNoTypeOrWithoutItsTermOrTwiceRefusesThePack() throws IOException {
+        String types = starship("    family: device\n");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar1"), "toy", types, SHIP_LOG_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: comet\n")), "toy", "likely type 'comet'");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar2"), "toy", types, STARSHIP_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n")), "toy", "needs a term 'record_type.ship_log'");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar3"), "toy", types, SHIP_LOG_TERMS,
+                "record_types[2]:\n  - id: ship_log\n    likely_types[1]: starship\n  - id: ship_log\n    likely_types[1]: account\n")),
+                "toy", "listed twice");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar4"), "toy", types,
+                SHIP_LOG_TERMS.replace("terms[2]", "terms[3]") + "  record_type.dock,Dock,\"\",\"x\"\n",
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n")), "toy", "names no core concept");
+    }
+
+    @Test
+    void theShippedPacksDefineRecordTypesAndASpaceReadsThoseOfEveryPackInForce() throws IOException {
+        IndustryPack telecom = IndustryPacks.bundled().find("telecom");
+        assertTrue(telecom.recordTypes().stream().anyMatch(r -> r.id().equals("voice_call") && r.likelyTypes().contains("msisdn")));
+        Path file = tmp.resolve(LinkAnalysisSettings.FILE);
+        Files.writeString(file, "domain_profile: telecom\nextra_packs[1]: mobile-money\n");
+        List<String> ids = LinkAnalysisSettings.read(file).effectiveRecordTypes().stream().map(IndustryPack.RecordType::id).toList();
+        assertTrue(ids.contains("voice_call") && ids.contains("transfer"), ids.toString());
+        assertTrue(ids.indexOf("voice_call") < ids.indexOf("transfer"), "the Domain Profile's first");
+        Files.writeString(file, "masking_mode: typed\n");
+        assertEquals(List.of(), LinkAnalysisSettings.read(file).effectiveRecordTypes(), "no pack, no record type");
+    }
+
     // ── the Space side ──────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -219,6 +393,26 @@ class IndustryPacksTest {
         LinkAnalysisSettings unknown = LinkAnalysisSettings.read(file);
         assertNull(unknown.activePack(), "a pack this build does not ship is never applied");
         assertEquals("Phone number", label(unknown, "msisdn"));
+    }
+
+    @Test
+    void extraPacksJoinTheDomainProfilesTypesAndTheProfileWinsALabel() throws IOException {
+        Path file = tmp.resolve(LinkAnalysisSettings.FILE);
+        Files.writeString(file, "domain_profile: telecom\nextra_packs[2]: mobile-money,atlantis\n");
+        LinkAnalysisSettings s = LinkAnalysisSettings.read(file);
+        assertEquals(List.of("mobile-money", "atlantis"), s.extraPacks());
+        assertEquals(List.of("telecom", "mobile-money"), s.activePacks().stream().map(IndustryPack::id).toList(),
+                "an extra pack this build does not ship is skipped");
+        assertEquals("telecom", s.activePack().id(), "the Domain Profile alone gives the vocabulary");
+        assertEquals("MSISDN", label(s, "msisdn"));
+        assertEquals("Wallet", label(s, "wallet"), "the extra pack relabels its own types");
+
+        LinkAnalysisSettings.writeDomainProfile(file, "telecom", List.of());
+        assertEquals(List.of(), LinkAnalysisSettings.read(file).extraPacks(), "[] clears them");
+        LinkAnalysisSettings.writeDomainProfile(file, "telecom", List.of("mobile-money"));
+        LinkAnalysisSettings.writeDomainProfile(file, null);
+        assertEquals(List.of("mobile-money"), LinkAnalysisSettings.read(file).extraPacks(), "a profile-only write keeps them");
+        assertEquals("Wallet", label(LinkAnalysisSettings.read(file), "wallet"), "an extra pack applies without a Domain Profile");
     }
 
     @Test

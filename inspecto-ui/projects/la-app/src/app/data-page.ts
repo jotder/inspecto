@@ -51,6 +51,8 @@ export interface DataEntry {
     mapping: LinkMapping | null;
     eventDate: string | null;
     primaryEntityType: string | null;
+    /** What one row is: a record type id of the Space's packs (ENTITY-TYPE-CATALOG-1 P2); null when not said. */
+    recordType: string | null;
 }
 
 /**
@@ -128,6 +130,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
         mapping,
         eventDate: str(c['eventDate']),
         primaryEntityType: str(c['primaryEntityType']),
+        recordType: str(c['recordType']),
     };
 }
 

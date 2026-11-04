@@ -1,0 +1,17 @@
+record_types[8]:
+  - id: transfer
+    likely_types[2]: wallet,msisdn
+  - id: cash_out
+    likely_types[3]: agent,wallet,msisdn
+  - id: cash_in
+    likely_types[3]: agent,wallet,msisdn
+  - id: merchant_payment
+    likely_types[3]: wallet,merchant,msisdn
+  - id: bill_payment
+    likely_types[3]: wallet,biller,account
+  - id: bank_transfer
+    likely_types[3]: wallet,bank_account,card
+  - id: kyc_registration
+    likely_types[4]: subscriber,id_document,msisdn,wallet
+  - id: login_event
+    likely_types[4]: wallet,msisdn,imei,ip_address

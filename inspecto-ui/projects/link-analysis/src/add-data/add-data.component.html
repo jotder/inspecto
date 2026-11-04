@@ -300,7 +300,9 @@
                                             formControlName="entityType"
                                             [attr.data-testid]="'entity-' + g.controls.name.value"
                                             [label]="g.controls.rename.value || g.controls.name.value"
-                                            [options]="entityOptions()"
+                                            [options]="
+                                                entityOptionsByColumn().get(g.controls.name.value) ?? entityOptions()
+                                            "
                                         ></inspecto-option-picker>
                                         <ng-container
                                             *ngTemplateOutlet="
@@ -429,6 +431,21 @@
                                 *ngTemplateOutlet="evidence; context: { c: d.entityTypes.primary, k: key.primary }"
                             ></ng-container>
                         </div>
+                        @if (recordTypes().length) {
+                            <div class="flex flex-col gap-1 rounded-lg p-2" data-testid="record-type">
+                                <inspecto-option-picker
+                                    label="Each row is"
+                                    formControlName="recordType"
+                                    [options]="recordTypeOptions()"
+                                    help="Puts the Entity Types such a record usually holds first"
+                                ></inspecto-option-picker>
+                                @if (d.entityTypes.recordType) {
+                                    <ng-container
+                                        *ngTemplateOutlet="evidence; context: { c: d.entityTypes.recordType, k: '' }"
+                                    ></ng-container>
+                                }
+                            </div>
+                        }
                     }
                 </section>
 

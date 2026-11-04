@@ -29,7 +29,13 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import { statusEdgeClasses, statusRowClasses } from '@inspecto/core/components/status-badge.component';
 import { DataTableComponent } from '@inspecto/core/data-table/data-table.component';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
-import { OTHER_FAMILY, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
+import {
+    EntityFamily,
+    EntityTypeGuide,
+    OTHER_FAMILY,
+    RecordTypeGuide,
+    entityTypeOptions,
+} from '@inspecto/link-analysis/api/entity-type-options';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { AddDataAccess } from './add-data-access';
@@ -181,6 +187,7 @@ export class AddDataComponent implements OnInit {
         primaryTime: [NONE],
         primaryMeasure: [NONE],
         identifying: [NONE],
+        recordType: [NONE],
     });
 
     // ── words and options ────────────────────────────────────────────────────────────────────────────────────────────
@@ -204,7 +211,23 @@ export class AddDataComponent implements OnInit {
         { value: '', label: quoteLabel('') },
     ];
     /** The Entity Types of this Space (`/inv/entity-types`); empty when not readable, then the draft's proposals stand in. */
-    private readonly entityTypes = signal<PickerOption[]>([]);
+    private readonly typeList = signal<{ types: EntityTypeGuide[]; families: EntityFamily[] }>({
+        types: [],
+        families: [],
+    });
+    private readonly entityTypes = computed<PickerOption[]>(() =>
+        entityTypeOptions(this.typeList().types, this.typeList().families),
+    );
+    /** What a row of a Dataset can be, from the Space's packs (ENTITY-TYPE-CATALOG-1 P2); empty = not asked. */
+    protected readonly recordTypes = signal<RecordTypeGuide[]>([]);
+    protected readonly recordTypeOptions = computed<PickerOption[]>(() => [
+        { value: NONE, label: 'Not said' },
+        ...this.recordTypes().map((r) => ({
+            value: r.id,
+            label: r.label,
+            ...(r.definition ? { hint: r.definition } : {}),
+        })),
+    ]);
     protected readonly excelText = computed(() => excelLine(this.excel()));
     /** This Space's limits before any upload (`import.*` in the Link Analysis limits), else null. */
     protected readonly limitsText = computed(() => {
@@ -255,6 +278,28 @@ export class AddDataComponent implements OnInit {
                 ...(known.some((o) => o.group) ? { group: OTHER_FAMILY } : {}),
             })),
         ];
+    });
+    /**
+     * Each column's choices (ENTITY-TYPE-CATALOG-1 P2): {@link entityOptions}, with the chosen record type's likely types first
+     * and a type whose value shape every sampled value of the column fits marked "Shape matches". The sample is the
+     * draft column's own sampled values: the person's file, before anything is masked.
+     */
+    protected readonly entityOptionsByColumn = computed<ReadonlyMap<string, PickerOption[]>>(() => {
+        const d = this.draft();
+        const base = this.entityOptions();
+        const { types, families } = this.typeList();
+        if (!d || !types.length) return new Map();
+        this.formTick();
+        const rt = this.recordTypes().find((r) => r.id === this.form.controls.recordType.value) ?? null;
+        const known = new Set(types.map((t) => t.id));
+        return new Map(
+            d.columns.map((c) => {
+                const sample = (c.sample ?? []).map((v) => (v == null ? null : String(v)));
+                const narrowed = entityTypeOptions(types, families, { recordType: rt, sample });
+                // the "nothing" choice first and a proposal the Space does not know last, as entityOptions has them
+                return [c.name, [base[0], ...narrowed, ...base.filter((o) => o.value !== NONE && !known.has(o.value))]];
+            }),
+        );
     });
     protected readonly columnOptions = computed<PickerOption[]>(() =>
         this.keptColumns().map((c) => ({ value: c.name, label: c.rename.trim() || c.name })),
@@ -392,8 +437,14 @@ export class AddDataComponent implements OnInit {
             .entityTypes()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: (l) => this.entityTypes.set(entityTypeOptions(l.items ?? [], l.families ?? [])),
-                error: () => this.entityTypes.set([]),
+                next: (l) => {
+                    this.typeList.set({ types: l.items ?? [], families: l.families ?? [] });
+                    this.recordTypes.set(l.recordTypes ?? []);
+                },
+                error: () => {
+                    this.typeList.set({ types: [], families: [] });
+                    this.recordTypes.set([]);
+                },
             });
         this.formSub = this.form.valueChanges.subscribe(() => this.formTick.update((n) => n + 1));
         // A different separator, header line or quote re-reads the file (the draft's columns were read with the old one).
@@ -573,6 +624,7 @@ export class AddDataComponent implements OnInit {
             primaryTime: v.primaryTime,
             primaryMeasure: v.primaryMeasure,
             identifying: v.identifying,
+            ...(this.recordTypes().length ? { recordType: v.recordType } : {}),
         };
         const body = buildCommit(d, v.name, v.description, v.columns, roles, {
             withEntityTypes: this.withEntityTypes(),

@@ -671,7 +671,7 @@ class ControlApiSettingsTest {
             String path = "/spaces/acme/settings/link-analysis";
             JsonNode def = json(send(c.port, "GET", path, null));
             assertTrue(def.get("entityTypes").isNull(), "absent ⇒ inherit: " + def);
-            assertEquals(9, def.get("entityTypesInForce").size());
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size(), def.get("entityTypesInForce").size(), "the neutral starter catalogue");
             JsonNode agent = def.get("entityTypesInForce").get(6);
             assertEquals("agent", agent.get("id").asText());
             assertEquals("Intermediary / till", agent.get("label").asText());
@@ -686,7 +686,7 @@ class ControlApiSettingsTest {
             // a stated core id without guidance takes the core default's; a new id (till) has none
             String stored = "[{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":true,"
                     + "\"classifications\":[\"MSISDN\"],\"family\":\"identifier\",\"definition\":\"A telephone number, best in "
-                    + "international form.\",\"example\":\"+44 7700 900123\"},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
+                    + "international form.\",\"example\":\"+44 7700 900123\",\"shape\":\"e164\"},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
                     + "\"upper-trim\",\"masked\":false,\"classifications\":[\"TILL\",\"AGENT\"]}]";
             HttpResponse<String> put = send(c.port, "PUT", path, "{\"maskingMode\":\"all\",\"entityTypes\":" + list + "}");
             assertEquals(200, put.statusCode(), put.body());
@@ -731,7 +731,7 @@ class ControlApiSettingsTest {
             assertEquals(200, reset.statusCode(), reset.body());
             JsonNode got = json(send(c.port, "GET", path, null));
             assertTrue(got.get("entityTypes").isNull(), "a PUT without entityTypes resets to inherit: " + got);
-            assertEquals(9, got.get("entityTypesInForce").size());
+            assertEquals(com.gamma.entitystore.EntityTypes.DEFAULTS.size(), got.get("entityTypesInForce").size());
         }
     }
 

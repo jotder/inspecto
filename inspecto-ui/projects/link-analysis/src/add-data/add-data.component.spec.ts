@@ -43,6 +43,7 @@ interface Opts {
     selfImport?: boolean | 'unknown';
     mode?: 'ask' | 'optional';
     limits?: { key: string; inForce: number }[];
+    recordTypes?: { id: string; label: string; likelyTypes: string[] }[];
 }
 
 const LIMITS = [
@@ -92,12 +93,14 @@ function create(o: Opts = {}) {
                                     label: 'Phone number',
                                     family: 'identifier',
                                     example: '+44 7700 900123',
+                                    shape: 'e164',
                                 },
                             ],
                             families: [
                                 { id: 'identifier', label: 'Identifier', definition: 'A number that names something.' },
                                 { id: 'account', label: 'Account', definition: 'Holds a balance.' },
                             ],
+                            ...(o.recordTypes ? { recordTypes: o.recordTypes } : {}),
                         }),
                 },
             },
@@ -166,6 +169,92 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
             { value: 'account', label: 'Account', group: 'Account' },
             { value: 'iban', label: 'iban', group: 'Other' },
         ]);
+    });
+
+    const RECORDS = [{ id: 'transfer', label: 'Transfer', likelyTypes: ['account'] }];
+    const proposedTransfer = (): OnboardDraft => {
+        const d = transfersDraft();
+        return {
+            ...d,
+            entityTypes: { ...d.entityTypes, recordType: { value: 'transfer', evidence: 'x', confidence: 'high' } },
+        };
+    };
+
+    it('the commit sends the proposed record type (ENTITY-TYPE-CATALOG-1 P2)', () => {
+        const { fixture, el } = create({ recordTypes: RECORDS });
+        upload(fixture, el, proposedTransfer());
+        const req = commit(fixture, el);
+        expect(bodyOf(req).recordType).toBe('transfer');
+        req.flush(summary());
+    });
+
+    it('the commit sends no record type once the person clears it, not the proposal (ENTITY-TYPE-CATALOG-1 P2)', () => {
+        const { fixture, el } = create({ recordTypes: RECORDS });
+        upload(fixture, el, proposedTransfer());
+        const add = fixture.debugElement.children[0].componentInstance as unknown as {
+            form: { controls: { recordType: { setValue(v: string): void } } };
+        };
+        add.form.controls.recordType.setValue(''); // "Not said"
+        fixture.detectChanges();
+        const req = commit(fixture, el);
+        expect(bodyOf(req).recordType).toBeNull();
+        req.flush(summary());
+    });
+
+    it('a Space without record types sends none and is not asked (ENTITY-TYPE-CATALOG-1 P2)', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        expect(q(el, 'record-type')).toBeNull();
+        const req = commit(fixture, el);
+        expect('recordType' in bodyOf(req)).toBe(false);
+        req.flush(summary());
+    });
+
+    it('each column: the record type likely types first, and a type the column sample fits marked (ENTITY-TYPE-CATALOG-1 P2)', async () => {
+        const { fixture, el } = create({
+            recordTypes: [{ id: 'transfer', label: 'Transfer', likelyTypes: ['account'] }],
+        });
+        const add = fixture.debugElement.children[0].componentInstance as unknown as {
+            entityOptionsByColumn: () => ReadonlyMap<string, { value: string; group?: string; hint?: string }[]>;
+            form: { controls: { recordType: { setValue(v: string): void } } };
+        };
+        const base = transfersDraft();
+        const d = transfersDraft({
+            columns: [
+                ...base.columns,
+                {
+                    name: 'payer_phone',
+                    header: 'payer_phone',
+                    type: { ...base.columns[0].type },
+                    sample: ['+447700900123', ''],
+                },
+            ],
+            entityTypes: {
+                ...base.entityTypes,
+                recordType: {
+                    value: 'transfer',
+                    evidence: '2 columns hold types a transfer usually holds',
+                    confidence: 'high',
+                },
+            },
+        });
+        upload(fixture, el, d);
+        expect(q(el, 'record-type')).not.toBeNull();
+        const from = add.entityOptionsByColumn().get('from_account')!;
+        expect(from.map((o) => [o.group, o.value])).toEqual([
+            [undefined, ''],
+            ['Likely in a transfer', 'account'],
+            ['Identifier', 'msisdn'],
+        ]);
+        const phone = add.entityOptionsByColumn().get('payer_phone')!;
+        expect(phone.find((o) => o.value === 'msisdn')!.hint).toBe('Shape matches. e.g. +44 7700 900123');
+        // ACC-… values fit no phone number
+        expect(from.find((o) => o.value === 'msisdn')!.hint).toBe('e.g. +44 7700 900123');
+
+        add.form.controls.recordType.setValue('');
+        fixture.detectChanges();
+        expect(add.entityOptionsByColumn().get('from_account')![1].group).toBe('Identifier');
+        await expectNoA11yViolations(el);
     });
 
     it('step 1: formats and this Space limits are shown BEFORE upload; a database is locked on Basic (no violations)', async () => {

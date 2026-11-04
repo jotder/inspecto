@@ -14,7 +14,7 @@ import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.co
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { ColumnChange, DatasetColumnsService } from '@inspecto/link-analysis/api/dataset-columns.service';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
-import { EntityFamily, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
+import { EntityFamily, RecordTypeGuide, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
 import { ADD_DATA_ROUTE } from './first-run';
 import {
@@ -120,6 +120,15 @@ import {
                                 What each column is: an Entity it holds, a Time, a Measure, a Category or a Detail. A
                                 Dataset may have several of each.
                             </p>
+                            @if (recordTypes().length && recordTypeControls().get(d.id); as rt) {
+                                <inspecto-option-picker
+                                    label="Each row is"
+                                    [options]="recordTypeOptions()"
+                                    [formControl]="rt"
+                                    help="Puts the Entity Types such a record usually holds first"
+                                    data-testid="record-type"
+                                ></inspecto-option-picker>
+                            }
                             <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                                 @for (col of d.columns; track col.name) {
                                     @let r = roleShown(d, col);
@@ -133,7 +142,7 @@ import {
                                         @if (r === 'entity') {
                                             <inspecto-option-picker
                                                 [label]="col.name + ' holds'"
-                                                [options]="typeOptions()"
+                                                [options]="holdsOptions().get(d.id) ?? typeOptions()"
                                                 [formControl]="holds().get(d.id)!.get(col.name)!"
                                                 [attr.data-testid]="'entity-' + col.name"
                                             ></inspecto-option-picker>
@@ -368,6 +377,32 @@ export class DataPageComponent implements OnInit {
         ...entityTypeOptions(this.types(), this.families()),
     ]);
 
+    /** What one row of a Dataset can be (ENTITY-TYPE-CATALOG-1 P2): the Space's record types, or not said. */
+    protected readonly recordTypeOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'Not said' },
+        ...this.recordTypes().map((r) => ({
+            value: r.id,
+            label: r.label,
+            ...(r.definition ? { hint: r.definition } : {}),
+        })),
+    ]);
+
+    /** What an Entity column of each base may hold: as {@link typeOptions}, the base's record type's likely types first. */
+    protected readonly holdsOptions = computed(
+        () =>
+            new Map(
+                this.bases().map((d) => [
+                    d.id,
+                    [
+                        { value: '', label: 'Nothing: a detail' },
+                        ...entityTypeOptions(this.types(), this.families(), {
+                            recordType: this.recordTypes().find((r) => r.id === d.recordType) ?? null,
+                        }),
+                    ],
+                ]),
+            ),
+    );
+
     /** A base's columns to pick From / To from, each with what the base says it holds. */
     protected columnOptions(d: DataEntry): PickerOption[] {
         return d.columns.map((c) => ({
@@ -445,6 +480,16 @@ export class DataPageComponent implements OnInit {
             (d, c, v) => this.save(d, c, { carried: v === 'no' ? false : null }),
         ),
     );
+    /** What one row of each base is; a change saves at once. Rebuilt on every read, so it shows the stored value. */
+    readonly recordTypeControls = computed(() => {
+        const out = new Map<string, FormControl<string>>();
+        for (const d of this.bases()) {
+            const ctrl = new FormControl(d.recordType ?? '', { nonNullable: true });
+            ctrl.valueChanges.subscribe((v) => this.setRecordType(d, v));
+            out.set(d.id, ctrl);
+        }
+        return out;
+    });
     /** A role picked but not saved yet: Entity, until what it holds is picked. Cleared on every read. */
     private readonly picked = signal<ReadonlyMap<string, ColumnRole>>(new Map());
 
@@ -467,6 +512,8 @@ export class DataPageComponent implements OnInit {
     readonly types = signal<TypeChoice[]>([]);
     /** The families the type choices group by, in the server's order. */
     readonly families = signal<EntityFamily[]>([]);
+    /** What a row can be, from the Space's packs; empty when none is in force (then the question is not asked). */
+    readonly recordTypes = signal<RecordTypeGuide[]>([]);
     readonly error = signal('');
     readonly imports = computed(() => (this.entries() ?? []).filter((e) => e.origin === 'import'));
     /** Every Dataset a Mapping may be based on: the imports first, then those Pipelines keep up to date. */
@@ -524,9 +571,10 @@ export class DataPageComponent implements OnInit {
         this.load();
         this.profiles
             .entityTypes()
-            .pipe(catchError(() => of({ items: [], families: [] })))
+            .pipe(catchError(() => of({ items: [], families: [], recordTypes: [] })))
             .subscribe((l) => {
                 this.families.set(l.families ?? []);
+                this.recordTypes.set(l.recordTypes ?? []);
                 this.types.set(
                     (l.items ?? []).map((t) => ({
                         id: t.id,
@@ -593,6 +641,17 @@ export class DataPageComponent implements OnInit {
             return;
         }
         this.save(d, c, this.typeOf(c.classification) ? { role, entityType: null } : { role });
+    }
+
+    private setRecordType(d: DataEntry, recordType: string): void {
+        this.error.set('');
+        this.columns.setRecordType(d.id, recordType || null).subscribe({
+            next: () => this.load(),
+            error: (e) => {
+                this.error.set(apiErrorMessage(e, `What a row of ${d.id} is could not be changed.`));
+                this.load();
+            },
+        });
     }
 
     private save(d: DataEntry, c: DataColumn, change: ColumnChange): void {

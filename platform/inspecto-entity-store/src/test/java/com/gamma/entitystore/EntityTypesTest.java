@@ -47,8 +47,10 @@ class EntityTypesTest {
     }
 
     @Test
-    void theDefaultsAreTheSeededNineAndValidate() {
-        assertEquals(List.of("subscriber", "imsi", "imei", "msisdn", "wallet", "account", "agent", "handset", "cell"),
+    void theDefaultsAreTheSeededNineThenTheNeutralStarterTypesAndValidate() {
+        // ENTITY-TYPE-CATALOG-1 P3: the nine original ids first (data contracts), then the neutral types every domain shares
+        assertEquals(List.of("subscriber", "imsi", "imei", "msisdn", "wallet", "account", "agent", "handset", "cell",
+                        "email", "id_document", "organisation", "bank_account", "card", "ip_address", "address"),
                 EntityTypes.DEFAULTS.stream().map(EntityType::id).toList());
         assertDoesNotThrow(() -> EntityTypes.validate(EntityTypes.DEFAULTS));
         assertEquals(EntityTypes.DEFAULTS, EntityTypes.parse(EntityTypes.shape(EntityTypes.DEFAULTS)));
@@ -86,12 +88,12 @@ class EntityTypesTest {
         want.put("handset", List.of("HANDSET"));
         want.put("cell", List.of("CELL", "CELL_ID"));
         Map<String, List<String>> got = new LinkedHashMap<>();
-        for (EntityType t : EntityTypes.DEFAULTS) got.put(t.id(), t.classifications());
+        for (EntityType t : EntityTypes.DEFAULTS.subList(0, 9)) got.put(t.id(), t.classifications());
         assertEquals(want, got);
 
         Map<String, String> families = new LinkedHashMap<>();
         for (EntityType t : EntityTypes.DEFAULTS) {
-            families.put(t.id(), t.family());
+            if (want.containsKey(t.id())) families.put(t.id(), t.family());
             assertFalse(t.definition() == null || t.definition().isBlank(), t.id() + " has a definition");
             assertFalse(t.example() == null || t.example().isBlank(), t.id() + " has an example");
         }
@@ -114,7 +116,7 @@ class EntityTypesTest {
                 Map.of("id", "msisdn", "label", "Line", "normaliser", "e164", "masked", true, "classifications", List.of("MSISDN")),
                 Map.of("id", "note", "label", "Free text", "normaliser", "default", "masked", false, "classifications", List.of())));
         EntityType core = EntityTypes.coreDefault("msisdn");
-        assertEquals(new EntityType("msisdn", "Line", "e164", true, List.of("MSISDN"), "identifier", core.definition(), core.example()),
+        assertEquals(new EntityType("msisdn", "Line", "e164", true, List.of("MSISDN"), "identifier", core.definition(), core.example(), "e164"),
                 parsed.get(0));
         assertEquals(new EntityType("note", "Free text", "default", false, List.of()), parsed.get(1));
         assertFalse(EntityTypes.shape(List.of(parsed.get(1))).get(0).containsKey("family"), "unstated guidance is not written");
@@ -141,6 +143,13 @@ class EntityTypesTest {
         t.put("definition", "ok");
         t.put("example", "x".repeat(65));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("example is longer"));
+        t.put("example", "+1");
+
+        // ENTITY-TYPE-CATALOG-1 P1: a stated shape is one of the closed vocabulary, and the wire carries it
+        t.put("shape", "digits(12)");
+        assertEquals("digits(12)", EntityTypes.shape(EntityTypes.parse(List.of(t))).get(0).get("shape"));
+        t.put("shape", "\\d+");
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("value shape must be one of"));
     }
 
     /** A pack relabels a type and lends it its term's definition; the family and example stay the core's. */
@@ -171,9 +180,9 @@ class EntityTypesTest {
     void entityTypesRoundTripThroughLinkAnalysisToon(@TempDir Path dir) throws Exception {
         List<EntityType> types = List.of(
                 new EntityType("agent", "Agent / till", "upper-trim", false, List.of("AGENT", "TILL"),
-                        "organisation", "A shop that serves customers.", "TILL-1"),
+                        "organisation", "A shop that serves customers.", "TILL-1", "free"),
                 new EntityType("msisdn", "MSISDN", "e164", true, List.of("MSISDN"),
-                        "identifier", "A telephone number.", "+44 7700 900001"),
+                        "identifier", "A telephone number.", "+44 7700 900001", "e164"),
                 new EntityType("note", "Free text", "default", false, List.of()));
         Path f = dir.resolve(LinkAnalysisSettings.FILE);
         new LinkAnalysisSettings(1200, null, null, "all", null, null, types, null, null, null, null, null, null, null, null).write(f);

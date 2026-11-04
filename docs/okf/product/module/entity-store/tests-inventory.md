@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.entity-store`](../../../../../product-map/module/entity-store.toon).
 
-15 test class(es): 15 unit, 0 real-HTTP control-plane, 0 IT.
+16 test class(es): 16 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -40,3 +40,4 @@ mvn -o test -pl platform/inspecto-entity-store -Dtest=EntityFactLogDataRootTest,
 | `LinkAnalysisEmbedSettingsTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/LinkAnalysisEmbedSettingsTest.java` | LA-EMBED-VIEW-1 (operator 2026-10-12 D4): the {@code embed} block of {@code link-analysis.toon} and its shipped defaults. |
 | `ListPruningSp4Test` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/ListPruningSp4Test.java` | SP4 correctness (fast): a list member never counts toward degree or budget, whichever SQL form carries the list, over the |
 | `NodeDictionaryTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/NodeDictionaryTest.java` | SP5 correctness (fast, small): the DuckDB E.164 macro agrees with the sealed Java {@code e164} normaliser, the |
+| `ValueShapesTest` | `com.gamma.entitystore` | unit | `platform/inspecto-entity-store/src/test/java/com/gamma/entitystore/ValueShapesTest.java` | ENTITY-TYPE-CATALOG-1 value shapes, the Java half of {@code entity-shape-parity.fixture.json} — the SAME file |

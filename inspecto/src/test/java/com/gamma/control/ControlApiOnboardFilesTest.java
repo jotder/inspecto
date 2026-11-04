@@ -234,7 +234,7 @@ class ControlApiOnboardFilesTest {
             JsonNode s = draft(c, "shapes.csv", "stream", sb.toString(), null);
             JsonNode imei = entityOf(s, "a");
             assertEquals("imei", imei.get("value").asText(), imei.toString());
-            assertTrue(imei.get("evidence").asText().contains("valid IMEI check digit"), imei.toString());
+            assertTrue(imei.get("evidence").asText().contains("15-digit numbers with a valid check digit"), imei.toString());
             assertEquals("high", imei.get("confidence").asText());
             JsonNode phone = entityOf(s, "b");
             assertEquals("msisdn", phone.get("value").asText(), phone.toString());
@@ -249,7 +249,7 @@ class ControlApiOnboardFilesTest {
     }
 
     private static char luhnDigit(String body) {
-        for (char d = '0'; d <= '9'; d++) if (EntityShapes.luhn(body + d)) return d;
+        for (char d = '0'; d <= '9'; d++) if (com.gamma.entitystore.ValueShapes.fits("luhn(15)", body + d)) return d;
         throw new AssertionError();
     }
 
@@ -983,6 +983,50 @@ class ControlApiOnboardFilesTest {
         }
     }
 
+    /** ENTITY-TYPE-CATALOG-1 P2: a Dataset says what one row is (a record type of the Space's packs); Add data proposes it. */
+    @Test
+    void aDatasetSaysWhatARowIsAndAddDataProposesIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            registry.write("dataset", "calls", Map.of("physicalRef", "calls/database", "columns", List.of(Map.of("name", "a_party"))));
+            // no pack in force: no record type to say
+            HttpResponse<String> none = json(c, "PUT", "/datasets/calls/record-type", "{\"recordType\":\"voice_call\"}", null);
+            assertEquals(422, none.statusCode(), none.body());
+
+            Files.writeString(root.resolve(com.gamma.entitystore.LinkAnalysisSettings.FILE), "domain_profile: telecom\n");
+            JsonNode r = data(json(c, "PUT", "/datasets/calls/record-type", "{\"recordType\":\"voice_call\"}", null), 200);
+            assertEquals("voice_call", r.get("recordType").asText());
+            assertEquals("voice_call", data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/recordType").asText());
+            assertEquals(422, json(c, "PUT", "/datasets/calls/record-type", "{\"recordType\":\"transfer\"}", null).statusCode(),
+                    "a record type of a pack the Space does not read");
+            assertEquals(422, json(c, "PUT", "/datasets/calls/record-type", "{}", null).statusCode());
+            assertEquals(422, json(c, "PUT", "/datasets/calls/record-type", "{\"recordType\":7}", null).statusCode());
+            assertEquals(404, json(c, "PUT", "/datasets/none/record-type", "{\"recordType\":null}", null).statusCode());
+            data(json(c, "PUT", "/datasets/calls/record-type", "{\"recordType\":null}", null), 200);
+            assertFalse(data(json(c, "GET", "/components/dataset/calls", null, null), 200).get("content").has("recordType"));
+
+            // the draft proposes the record type whose likely types the columns hold: numbers, handsets and the serving cell -> a call
+            StringBuilder sb = new StringBuilder("caller,callee,device_serial,cell_id,duration\n");
+            for (int i = 0; i < 60; i++) {
+                String body = String.format("35%012d", 200000 + i);
+                sb.append("+3361234").append(String.format("%04d", i)).append(",+3361299").append(String.format("%04d", i)).append(',')
+                        .append(body).append(luhnDigit(body)).append(",SITE-").append(i % 7).append(',').append(i).append('\n');
+            }
+            JsonNode d = draft(c, "calls.csv", "stream", sb.toString(), null);
+            JsonNode rt = d.get("entityTypes").get("recordType");
+            assertEquals("voice_call", rt.get("value").asText(), rt.toString());
+            assertEquals("high", rt.get("confidence").asText(), "three of its four likely types are held; a data session covers fewer of its six");
+            assertTrue(rt.get("evidence").asText().contains("voice call record"), rt.toString());
+            String draftId = d.get("draftId").asText();
+            assertEquals(422, json(c, "POST", "/onboard/files/" + draftId + "/commit", "{\"name\":\"rt_bad\",\"recordType\":\"nope\"}", null)
+                    .statusCode());
+            String id = uniqueId("rt_calls");
+            data(json(c, "POST", "/onboard/files/" + draftId + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            assertEquals("voice_call", data(json(c, "GET", "/components/dataset/" + id, null, null), 200).at("/content/recordType").asText(),
+                    "left out of the commit, the proposal is written");
+        }
+    }
+
     @Test
     void aColumnsEntityTypeCanBeChangedOnAnExistingDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
@@ -1149,7 +1193,7 @@ class ControlApiOnboardFilesTest {
             // 401 without a credential, on every route of the family
             for (String[] r : new String[][] {{"POST", "/onboard/files"}, {"POST", "/onboard/files/x/commit"},
                     {"GET", "/onboard/runs/x"}, {"POST", "/datasets/x/files"}, {"POST", "/datasets/x/run"},
-                    {"PUT", "/datasets/x/columns/y"}, {"PUT", "/settings/data"}})
+                    {"PUT", "/datasets/x/columns/y"}, {"PUT", "/datasets/x/record-type"}, {"PUT", "/settings/data"}})
                 assertEquals(401, send(c, r[0], r[1].endsWith("/files") ? r[1] + "?name=t.csv" : r[1], "{}".getBytes(StandardCharsets.UTF_8), null).statusCode(), r[1]);
             // 403: a Subject without canUploadData / canAuthorWorkbench / canAdminister
             assertEquals(403, send(c, "POST", "/onboard/files?name=t.csv", csv, ANALYST).statusCode());
@@ -1158,6 +1202,7 @@ class ControlApiOnboardFilesTest {
             assertEquals(403, send(c, "POST", "/datasets/x/files?name=t.csv", csv, ANALYST).statusCode());
             assertEquals(403, json(c, "POST", "/datasets/x/run", null, ANALYST).statusCode());
             assertEquals(403, json(c, "PUT", "/datasets/x/columns/y", "{\"entityType\":null}", UPLOADER).statusCode());
+            assertEquals(403, json(c, "PUT", "/datasets/x/record-type", "{\"recordType\":null}", UPLOADER).statusCode());
             assertEquals(403, json(c, "PUT", "/settings/data", "{\"selfImport\":true}", UPLOADER).statusCode());
 
             // the capability alone is not enough: with sign-in the Space's switch is off until an administrator turns it on
@@ -1189,6 +1234,7 @@ class ControlApiOnboardFilesTest {
             new ComponentStore(root.resolve("registry")).write("dataset", "open_ds", Map.of("physicalRef", "open_ds/database",
                     "columns", List.of(Map.of("name", "a"))));
             data(json(c, "PUT", "/datasets/open_ds/columns/a", "{\"entityType\":\"account\"}", AUTHOR), 200);
+            data(json(c, "PUT", "/datasets/open_ds/record-type", "{\"recordType\":null}", AUTHOR), 200);
             // a Dataset made private through the component routes stays private to its owner
             ComponentStore registry = new ComponentStore(root.resolve("registry"));
             Map<String, Object> privateDs = new java.util.LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());

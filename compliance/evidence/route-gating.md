@@ -169,10 +169,11 @@ system: the evidence cannot say something the code does not.
 | POST | `/connections/([^/]+)/test` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:50` |
 | POST | `/connections/test` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:63` |
 | POST | `/dashboards/([^/]+)/share` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:55` |
-| PUT | `/datasets/([^/]+)/columns/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |
-| POST | `/datasets/([^/]+)/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:76` |
+| PUT | `/datasets/([^/]+)/columns/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:82` |
+| POST | `/datasets/([^/]+)/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:78` |
 | POST | `/datasets/([^/]+)/materialize` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java:67` |
-| POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:78` |
+| PUT | `/datasets/([^/]+)/record-type` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:84` |
+| POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |
 | POST | `/db/query` | exempt | group-gated | `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java:62` |
 | POST | `/decision-rules` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:64` |
 | DELETE | `/decision-rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:68` |
@@ -312,8 +313,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/objects/([^/]+)/resolve` | gated | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:84` |
 | POST | `/objects/([^/]+)/split` | gated | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java:51` |
 | POST | `/objects/([^/]+)/transition` | gated | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:85` |
-| POST | `/onboard/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:71` |
-| POST | `/onboard/files/([^/]+)/commit` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:72` |
+| POST | `/onboard/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:73` |
+| POST | `/onboard/files/([^/]+)/commit` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:74` |
 | POST | `/onboarding/events` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java:40` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:43` |
 | POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:74` |
@@ -373,7 +374,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:54` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:86` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:89` |
-| PUT | `/settings/link-analysis/domain-profile` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DomainProfileRoutes.java:37` |
+| PUT | `/settings/link-analysis/domain-profile` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DomainProfileRoutes.java:41` |
 | PUT | `/settings/link-analysis/limits` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java:47` |
 | PUT | `/settings/list-limit` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:95` |
 | PUT | `/settings/mail-attachments` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java:39` |

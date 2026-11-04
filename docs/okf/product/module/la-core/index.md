@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `ENTITY-TYPE-CATALOG-1` | P2 | feature | a comprehensive Entity Type catalogue per domain: neutral families in the core (Party, Organisation, Account, Identifier, Device, Place,… | — |
 | `LA-COLUMN-ROLES-1` | P2 | feature | a column has a role: Entity, Time, Measure, Category or Detail, several of each, so play and filter can use every date, measure and categ… | — |
 | `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
 | `LA-BASIC-DISCOVER-1` | P3 | feature | Discover a Dataset in Basic: entities per Entity Type, busiest entities, link kinds, period, amount totals (LA-BASIC-DISCOVERY-1 P0 + P1,… | — |
@@ -53,3 +52,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
+| `ENTITY-TYPE-RECORD-ROLES-1` | P3 | feature | a record type also says which columns are usually its times, measures and categories, so Add data and the Data page propose column roles… | — |

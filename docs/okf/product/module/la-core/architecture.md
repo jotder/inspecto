@@ -585,17 +585,21 @@ optional pack field; no route was added.
 
 * **What it is.** A Space's **Domain Profile** names the installed **Industry pack** whose vocabulary Link Analysis
   uses: `domain_profile: <pack id>` in `link-analysis.toon`; absent, `generic` or a pack this build does not ship =
-  the neutral vocabulary. ⛔ A pack **relabels; it never adds a concept**: every term is keyed by a canonical concept
-  key (`concept.node|link|row|link_from|link_to`, `entity_type.<core type>`, `link_kind.<kind the pack lists>`,
+  the neutral vocabulary. ⛔ A pack relabels the core's concepts and, since `ENTITY-TYPE-CATALOG-1` (2026-11-04), may add
+  Entity Types — each under a core family — and record types; further packs join through `extra_packs` (one id is one
+  Entity Type in every pack; as built: [entity-store spec](../entity-store/spec.md) "Industry packs"). Every term is
+  keyed by a canonical concept key (`concept.node|link|row|link_from|link_to`, `entity_type.<core or pack type>`,
+  `record_type.<record type the pack lists>`, `link_kind.<kind the pack lists>`,
   `measure.<Value Measure>`, `pattern.<pattern pack the pack lists>`, or `term.<id>` for a glossary-only entry such as
   a fraud typology), and a key that names nothing in the core refuses the whole pack.
 * **Format** (`IndustryPack`, `IndustryPacks`, in `inspecto-entity-store`, a base module, so every edition ships the
   packs, Basic included, ED-5). Each jar may carry an index `META-INF/inspecto/industry-packs.toon`
-  (`packs[n]: a,b`); each pack is four files under `META-INF/inspecto/industry-packs/<id>/`: `industry-pack.toon`
+  (`packs[n]: a,b`); each pack is four files (plus an optional `industry-pack-record-types.toon`) under `META-INF/inspecto/industry-packs/<id>/`: `industry-pack.toon`
   (id, name, description, `space_templates`, `pattern_packs`, `profile` = measure / time column hints, suggested tool
   groups, the optional "Investigate a number" binding and the optional `suggested_lists`, LA-ONBOARD-1 phase 7), `industry-pack-terms.toon`
-  (`terms[n]{key,label,abbreviation,definition}`), `industry-pack-entity-types.toon` (core Entity Types restated:
-  normaliser from the closed set, masked, classifications; an id the core lacks is refused) and
+  (`terms[n]{key,label,abbreviation,definition}`), `industry-pack-entity-types.toon` (the Entity Types the pack's Spaces
+  read: starter ids restated, or the pack's own under a `family`, each with normaliser, masked, classifications and an
+  optional value `shape` and `example`; see the entity-store spec) and
   `industry-pack-link-kinds.toon`. Normalisers stay the closed set: a pack picks one per type, it never ships code.
 * **Shipped packs.** `telecom` (lead Space Template `telco-fraud`, also `la-showcase`; pattern packs
   `forwarding-relay` + the three `telecom-*` in `la-showcase`) and `mobile-money` (`la-mobile-money`, also

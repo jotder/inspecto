@@ -1,4 +1,4 @@
-entity_types[6]:
+entity_types[14]:
   - id: subscriber
     normaliser: default
     masked: true
@@ -11,6 +11,13 @@ entity_types[6]:
     normaliser: digits
     masked: true
     classifications[1]: IMSI
+  - id: iccid
+    family: identifier
+    normaliser: digits
+    masked: true
+    classifications[1]: ICCID
+    shape: luhn(19-20)
+    example: "8999900000000000014"
   - id: imei
     normaliser: digits
     masked: true
@@ -23,3 +30,38 @@ entity_types[6]:
     normaliser: upper-trim
     masked: false
     classifications[2]: CELL,CELL_ID
+  - id: account
+    normaliser: upper-trim
+    masked: true
+    classifications[1]: ACCOUNT
+    example: BA-0042-7781
+  - id: apn
+    family: place
+    normaliser: default
+    masked: false
+    classifications[1]: APN
+    example: internet.example
+  - id: roaming_partner
+    family: organisation
+    normaliser: digits
+    masked: false
+    classifications[2]: MCCMNC,PLMN
+    example: "00101"
+  - id: retailer
+    family: organisation
+    normaliser: upper-trim
+    masked: false
+    classifications[2]: RETAILER,DEALER
+    example: RTL-0042
+  - id: email
+    normaliser: default
+    masked: true
+    classifications[1]: EMAIL
+  - id: id_document
+    normaliser: upper-trim
+    masked: true
+    classifications[3]: ID_DOCUMENT,NATIONAL_ID,PASSPORT
+  - id: ip_address
+    normaliser: default
+    masked: false
+    classifications[1]: IP_ADDRESS

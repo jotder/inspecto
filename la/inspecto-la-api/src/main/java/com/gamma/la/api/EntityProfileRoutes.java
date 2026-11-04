@@ -125,8 +125,11 @@ public final class EntityProfileRoutes implements RouteModule {
         audit(ex, LinkEventTypes.LINK_ENTITY_TYPES_LISTED, "link.entity_types.listed",
                 "link.entity_types.listed - " + items.size() + " types, " + n + " bindings",
                 b -> b.attr("types", items.size()).attr("bindings", n));
-        // The closed family set (ENTITY-TYPE-CATALOG-1): the order and words the "what does this column hold" picker groups by.
-        return Map.of("items", items, "families", EntityTypes.familiesShape());
+        // The closed family set (ENTITY-TYPE-CATALOG-1): the order and words the "what does this column hold" picker groups by;
+        // the record types of the Space's packs (P2): what a row can be, and the types it usually holds.
+        List<Map<String, Object>> recordTypes = LinkAnalysisSettings.forRoot(writeRoot).effectiveRecordTypes().stream()
+                .map(com.gamma.entitystore.IndustryPack.RecordType::toMap).toList();
+        return Map.of("items", items, "families", EntityTypes.familiesShape(), "recordTypes", recordTypes);
     }
 
     /**

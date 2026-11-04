@@ -49,6 +49,8 @@ import java.util.stream.Stream;
  *       {@code POST /datasets/{id}/run} - <b>Run now</b>.</li>
  *   <li>{@code PUT /datasets/{id}/columns/{column}} - change one column's Entity Type (classification); the Dataset is
  *       re-assessed on the next read.</li>
+ *   <li>{@code PUT /datasets/{id}/record-type} - say what one row of the Dataset is (ENTITY-TYPE-CATALOG-1 P2): a record type
+ *       of the Space's packs, or {@code null}.</li>
  * </ul>
  *
  * <p><b>Gates, in order.</b> Capability 401/403 ({@code canUploadData}; {@code canAuthorWorkbench} for the column
@@ -79,6 +81,8 @@ final class OnboardRoutes implements RouteModule {
                 (e, m) -> OnboardImport.runNow(api, e, ApiContext.name(m))));
         api.put("/datasets/([^/]+)/columns/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> OnboardImport.setColumn(api, e, ApiContext.name(m), ApiContext.param(m, 2), api.body(e))));
+        api.put("/datasets/([^/]+)/record-type", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> OnboardImport.setRecordType(api, e, ApiContext.name(m), api.body(e))));
     }
 
     /** The standard rate-limit bucket covers these (each reads, or runs, a whole file). */
@@ -198,7 +202,11 @@ final class OnboardRoutes implements RouteModule {
             if (a.rows() > maxRows)
                 throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "'" + name + "' holds " + a.rows()
                         + " rows; this Space's import.max_rows is " + maxRows);
-            Map<String, Object> entity = OnboardDraft.entityTypes(a, LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes(), kind);
+            LinkAnalysisSettings laSettings = LinkAnalysisSettings.forRoot(writeRoot);
+            Map<String, Object> entity = OnboardDraft.entityTypes(a, laSettings.effectiveEntityTypes(), kind);
+            // ENTITY-TYPE-CATALOG-1 P2: what a row is, when the Space's packs define record types
+            if (!laSettings.effectiveRecordTypes().isEmpty())
+                entity.put("recordType", EntityShapes.recordType(entity, laSettings.effectiveRecordTypes()));
 
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("draftId", draftId);

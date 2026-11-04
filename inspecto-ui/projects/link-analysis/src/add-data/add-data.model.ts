@@ -84,6 +84,8 @@ export interface OnboardDraft {
         primary: Choice<string | null>;
         link?: DraftLink;
         identifying?: Choice<string | null> & { entityType?: string | null };
+        /** What one row is, a record type of the Space's packs (ENTITY-TYPE-CATALOG-1 P2); absent when the Space has none. */
+        recordType?: Choice<string | null>;
     };
     limits: DraftLimits;
 }
@@ -121,6 +123,7 @@ export interface CommitBody {
     primaryEntityType?: string | null;
     link?: CommitLink | null;
     identifyingColumn?: string | null;
+    recordType?: string | null;
 }
 
 /** `index` of a run summary: the link index built inside the user's run (DT-16). */
@@ -409,6 +412,8 @@ export interface RolesState {
     primaryTime: string;
     primaryMeasure: string;
     identifying: string;
+    /** What one row is (ENTITY-TYPE-CATALOG-1 P2); '' = not said, absent = not asked. */
+    recordType?: string;
 }
 
 /**
@@ -453,6 +458,7 @@ export function buildCommit(
         // The step was not opened: high proposals stand (the server applies them), low ones are not applied.
         const p = d.entityTypes.primary;
         out.primaryEntityType = p.value && p.confidence === 'high' ? p.value : null;
+        if (d.entityTypes.recordType) out.recordType = high(d.entityTypes.recordType) || null;
         if (d.kind === 'stream') {
             const l = d.entityTypes.link;
             const sure = l && l.from.value && l.to.value && l.from.confidence === 'high' && l.to.confidence === 'high';
@@ -480,6 +486,7 @@ export function buildCommit(
     };
     const heldTypes = new Set(columns.filter((c) => !c.drop && c.entityType).map((c) => c.entityType));
     out.primaryEntityType = roles.primary && heldTypes.has(roles.primary) ? roles.primary : null;
+    if (roles.recordType !== undefined) out.recordType = roles.recordType || null;
     if (d.kind === 'stream') {
         const from = keep(roles.from);
         const to = keep(roles.to);
@@ -546,6 +553,7 @@ export function initialRoles(d: OnboardDraft): RolesState {
         primaryTime: l?.primaryTime.value ?? '',
         primaryMeasure: l?.primaryMeasure.value ?? '',
         identifying: d.entityTypes.identifying?.value ?? '',
+        recordType: d.entityTypes.recordType?.value ?? '',
     };
 }
 
