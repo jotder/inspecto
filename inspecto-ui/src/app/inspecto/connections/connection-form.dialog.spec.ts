@@ -6,6 +6,7 @@ import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionProfile, ConnectionsService, ConnectionTestResult } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ConnectionFormDialog } from './connection-form.dialog';
 
 const TEST_OK: ConnectionTestResult = {
@@ -37,11 +38,6 @@ function create(profile?: ConnectionProfile, existingIds?: string[]) {
     const fixture = TestBed.createComponent(ConnectionFormDialog);
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, close, api };
-}
-
-/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
-function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
-    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
 }
 
 describe('ConnectionFormDialog', () => {
@@ -215,22 +211,62 @@ describe('ConnectionFormDialog', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('shows "Name is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+    it('shows "Name is required." only after save — never when the save step first renders', () => {
         const { fixture, c } = create();
         c.attrsForm().patchValue({ host: 'h', username: 'u' });
         c.submit();
         expect(c.step()).toBe('save');
         c.saveForm.controls.name.setValue('');
-        fixture.detectChanges();
-        const field = fieldOf(fixture.nativeElement, 'section[aria-label="Name this connection"]', 'name');
-        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
-        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
-        expect(field.querySelector('mat-error')).toBeNull();
+        refresh(fixture);
+        const section = fixture.nativeElement.querySelector(
+            'section[aria-label="Name this connection"]',
+        ) as HTMLElement;
+        const field = penByLabel(section, 'Name')!;
+        // Untouched: no error line under the row.
+        expect(penError(field)).toBe('');
         expect(field.textContent).not.toContain('Name is required.');
         c.submit();
-        fixture.detectChanges();
-        const err = field.querySelector('mat-error');
-        expect(err?.textContent).toContain('Name is required.');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(field)).toBe('Name is required.');
+    });
+
+    it('names a bad pattern and a duplicate under the Name row, word for word', () => {
+        const { fixture, c } = create(undefined, ['sftp_box']);
+        c.attrsForm().patchValue({ host: 'h', username: 'u' });
+        c.submit();
+        refresh(fixture);
+        const field = penByLabel(fixture.nativeElement, 'Name')!;
+        penEdit(fixture, field, '-bad');
+        expect(penError(field)).toBe('Start with a letter or digit; then letters, digits, . _ - only.');
+        penEdit(fixture, field, 'sftp_box');
+        expect(penError(field)).toBe('A connection with this name already exists.');
+    });
+
+    it('marks a missing required attribute under its row only once the form was submitted', () => {
+        const { fixture, c } = create();
+        c.onTypeChange('database');
+        refresh(fixture);
+        const host = penByLabel(fixture.nativeElement, 'Host')!;
+        expect(penError(host)).toBe('');
+        c.submit();
+        refresh(fixture);
+        expect(penError(host)).toBe('Host is required.');
+    });
+
+    it('ignores a re-pick of the current connection type, keeping the attributes already entered', () => {
+        const { c } = create();
+        c.attrsForm().patchValue({ host: 'sftp.example.com' });
+        c.onTypeChange('sftp');
+        expect(c.attrsForm().get('host')!.value).toBe('sftp.example.com');
+    });
+
+    it('keeps the secret fields boxed — a password reference never shows in a closed row', () => {
+        const { fixture } = create();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(penByLabel(el, 'Password')).toBeNull();
+        const boxed = Array.from(el.querySelectorAll('mat-form-field')).map((f) =>
+            f.querySelector('mat-label')?.textContent?.trim(),
+        );
+        expect(boxed).toContain('Password / passphrase');
     });
 });

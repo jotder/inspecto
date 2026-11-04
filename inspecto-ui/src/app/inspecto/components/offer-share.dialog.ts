@@ -2,9 +2,8 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ExchangeKind } from 'app/inspecto/api';
+import { PenFieldComponent } from './pen-field.component';
 
 export interface OfferShareData {
     kind: ExchangeKind;
@@ -27,7 +26,7 @@ export interface OfferShareResult {
  */
 @Component({
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Offer for sharing</h2>
@@ -48,16 +47,13 @@ export interface OfferShareResult {
                 }
             </div>
             <form [formGroup]="form">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Description (optional)</mat-label>
-                    <textarea
-                        matInput
-                        formControlName="description"
-                        rows="3"
-                        placeholder="What this {{ label }} contains — shown to spaces browsing the catalog"
-                        cdkFocusInitial
-                    ></textarea>
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Description (optional)"
+                    [multiline]="true"
+                    formControlName="description"
+                    placeholder="What this {{ label }} contains — shown to spaces browsing the catalog"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">

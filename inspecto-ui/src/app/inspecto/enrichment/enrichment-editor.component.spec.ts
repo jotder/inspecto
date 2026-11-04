@@ -3,6 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError } from 'app/inspecto/testing/pen-field';
 import { EnrichmentEditorComponent } from './enrichment-editor.component';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -96,6 +97,21 @@ describe('EnrichmentEditorComponent', () => {
         c.addReference();
         c.referenceRows.at(0).get('name')?.setValue('region_dim');
         expect(c.availableViews()).toEqual(['input', 'region_dim']);
+    });
+
+    it('draws a reference as rows: the alias error under its row, the bound Reference by its label', async () => {
+        const fixture = await create();
+        const c = fixture.componentInstance;
+        c.hydrate({ references: { region_dim: { ref: 'region_dim' } }, transform: 'SELECT 1 FROM input' });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('inspecto-option-picker')?.textContent).toContain('By name');
+        expect(el.textContent).toContain('REGION_DIM');
+        const alias = penByLabel(el, 'Alias in SQL')!;
+        expect(penError(alias)).toBe('');
+        penEdit(fixture, alias, '1bad');
+        expect(penError(alias)).toBe('Letters, digits, _ — start with a letter or _.');
+        expect(c.isDirty()).toBe(true);
     });
 
     it('has no a11y violations with rows in both bind modes', async () => {

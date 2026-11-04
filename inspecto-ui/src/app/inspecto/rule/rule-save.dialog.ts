@@ -4,11 +4,10 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 // Direct file imports (NOT the `app/inspecto/query` barrel) — see the note in `rule-types.ts`.
@@ -38,8 +37,7 @@ export interface RuleSaveData {
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         MatProgressSpinnerModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,30 +49,25 @@ export interface RuleSaveData {
                 >.
             </p>
             <form [formGroup]="form" (ngSubmit)="save()">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Rule id</mat-label>
-                    <input matInput formControlName="name" placeholder="e.g. high_error_rate" cdkFocusInitial />
-                    @if (form.controls.name.hasError('pattern')) {
-                        <mat-error>Letters, digits, dot, dash, underscore; start alphanumeric.</mat-error>
-                    } @else if (form.controls.name.hasError('duplicate')) {
-                        <mat-error>A rule with this id already exists.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Rule id"
+                    [required]="true"
+                    [mono]="true"
+                    placeholder="e.g. high_error_rate"
+                    formControlName="name"
+                    [error]="nameError()"
+                ></inspecto-pen-field>
 
                 @if (data.params.length) {
                     <div class="mt-3">
                         <div class="mb-1 text-xs font-semibold uppercase tracking-wider opacity-60">Parameters</div>
                         <div formGroupName="params" class="space-y-1">
                             @for (p of data.params; track p.name) {
-                                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                                    <mat-label>
-                                        <span class="font-mono">:{{ p.name }}</span>
-                                        <span class="text-secondary ml-1 text-xs"
-                                            >— {{ p.field }} {{ p.operator }}</span
-                                        >
-                                    </mat-label>
-                                    <input matInput [formControlName]="p.name" />
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    label=":{{ p.name }} — {{ p.field }} {{ p.operator }}"
+                                    [formControlName]="p.name"
+                                ></inspecto-pen-field>
                             }
                         </div>
                     </div>
@@ -129,6 +122,17 @@ export class RuleSaveDialog {
                 this.form.controls.name.addValidators(uniqueNameValidator(() => taken));
                 this.form.controls.name.updateValueAndValidity({ emitEvent: false });
             });
+    }
+
+    /** The Rule id row's error line: shown once the row was left or Save rule was pressed. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        // The boxed field went red on an empty id; a row has no outline, so it says so.
+        if (c.hasError('required')) return 'A rule id is required.';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash, underscore; start alphanumeric.';
+        if (c.hasError('duplicate')) return 'A rule with this id already exists.';
+        return '';
     }
 
     private get paramsGroup(): FormGroup {

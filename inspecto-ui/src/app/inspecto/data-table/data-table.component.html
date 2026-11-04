@@ -12,7 +12,7 @@
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
             </button>
             @if (searchOpen()) {
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
+                <!-- form-allow: a live search box over the grid's rows --><mat-form-field subscriptSizing="dynamic" class="w-56">
                     <input
                         matInput
                         [value]="search()"

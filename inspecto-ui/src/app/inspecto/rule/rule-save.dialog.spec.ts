@@ -6,6 +6,7 @@ import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { emptyGroup } from 'app/inspecto/query';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { RuleSaveDialog } from './rule-save.dialog';
 import { RulesService } from './rules.service';
 
@@ -63,6 +64,31 @@ describe('RuleSaveDialog', () => {
             }),
         );
         expect(close).toHaveBeenCalled();
+    });
+
+    it('the Rule id row shows its error line only after Save rule, then names what is wrong', () => {
+        const { f, c } = create();
+        const el = f.nativeElement as HTMLElement;
+        const row = penByLabel(el, 'Rule id')!;
+        expect(penError(row)).toBe(''); // nothing red on a fresh form
+        c.save();
+        refresh(f);
+        expect(penError(row)).toBe('A rule id is required.');
+        penEdit(f, row, 'bad id');
+        expect(penError(row)).toBe('Letters, digits, dot, dash, underscore; start alphanumeric.');
+        penEdit(f, row, 'existing_rule');
+        expect(penError(row)).toBe('A rule with this id already exists.');
+    });
+
+    it('a parameter row edits its default', () => {
+        const { f, c, save } = create();
+        const el = f.nativeElement as HTMLElement;
+        penEdit(f, penByLabel(el, 'Rule id')!, 'high_error');
+        penEdit(f, penByLabel(el, ':levelValue — level =')!, 'WARN');
+        c.save();
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({ params: [expect.objectContaining({ name: 'levelValue', value: 'WARN' })] }),
+        );
     });
 
     it('has no a11y violations', async () => {

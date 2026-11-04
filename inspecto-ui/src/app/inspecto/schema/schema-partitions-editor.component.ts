@@ -78,8 +78,12 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                                 />
                             </td>
                             <td class="py-0 pr-2">
-                                <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
-                                    <mat-select
+                                <!-- form-allow: a table-cell select of a repeating row (one partition segment) --><mat-form-field
+                                    class="sf-dense w-full"
+                                    appearance="outline"
+                                    subscriptSizing="dynamic"
+                                >
+                                    <!-- form-allow: a table-cell select of a repeating row (one partition segment) --><mat-select
                                         formControlName="source"
                                         aria-label="Partition source field"
                                         placeholder="pick a field…"
@@ -92,8 +96,12 @@ const DATE_TYPES = new Set(['DATE_YEAR', 'DATE_MONTH', 'DATE_DAY']);
                                 </mat-form-field>
                             </td>
                             <td class="py-0 pr-2">
-                                <mat-form-field class="sf-dense w-full" appearance="outline" subscriptSizing="dynamic">
-                                    <mat-select
+                                <!-- form-allow: a table-cell select of a repeating row (one partition segment) --><mat-form-field
+                                    class="sf-dense w-full"
+                                    appearance="outline"
+                                    subscriptSizing="dynamic"
+                                >
+                                    <!-- form-allow: a table-cell select of a repeating row (one partition segment) --><mat-select
                                         formControlName="type"
                                         aria-label="Partition derivation type"
                                         (selectionChange)="emitChanged()"

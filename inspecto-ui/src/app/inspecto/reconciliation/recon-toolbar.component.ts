@@ -1,11 +1,19 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+    AbstractControl,
+    FormControl,
+    FormGroup,
+    FormsModule,
+    ReactiveFormsModule,
+    ValidatorFn,
+    Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { statusEdgeClasses, statusIconClasses, statusRowClasses } from 'app/inspecto/components/status-badge.component';
 import { BAND_ICON, bandLegend, bandStatusTone, RECON_FILTER_LABELS, RECON_FILTERS, ReconFilter } from './recon-board';
 import { DEFAULT_BANDS, ReconBands } from './reconciliation-types';
@@ -28,52 +36,43 @@ const bandsOrdered: ValidatorFn = (g) => {
     selector: 'inspecto-recon-toolbar',
     standalone: true,
     imports: [
+        FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatSelectModule,
         MatTooltipModule,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex flex-wrap items-end gap-x-3 gap-y-1" role="group" aria-label="Reconciliation view">
-            <mat-form-field class="w-40" subscriptSizing="dynamic">
-                <mat-label>Day</mat-label>
-                <mat-select
-                    [value]="day()"
-                    (selectionChange)="dayChange.emit($event.value)"
-                    [disabled]="!availableDays().length"
-                >
-                    @for (d of availableDays(); track d) {
-                        <mat-option [value]="d">{{ d }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker
+                class="block w-48"
+                label="Day"
+                [options]="dayOptions()"
+                [ngModel]="day()"
+                (ngModelChange)="pickDay($event)"
+                [disabled]="!availableDays().length"
+            />
             @if (showFilter()) {
-                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                    <mat-label>Show</mat-label>
-                    <mat-select [value]="filter()" (selectionChange)="filterChange.emit($event.value)">
-                        @for (f of filters(); track f) {
-                            <mat-option [value]="f">{{ filterLabels[f] }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="block w-48"
+                    label="Show"
+                    [options]="filterOptions()"
+                    [ngModel]="filter()"
+                    (ngModelChange)="pickFilter($event)"
+                />
             }
             @if (showSample()) {
-                <mat-form-field class="w-36" subscriptSizing="dynamic">
-                    <mat-label>Sample keys</mat-label>
-                    <input
-                        matInput
-                        type="number"
-                        min="1"
-                        [formControl]="sampleControl"
-                        placeholder="All"
-                        (keydown.enter)="applySample()"
-                        (blur)="applySample()"
-                    />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="block w-44"
+                    label="Sample keys"
+                    type="number"
+                    [min]="1"
+                    placeholder="All"
+                    [formControl]="sampleControl"
+                ></inspecto-pen-field>
             }
 
             <ul class="ml-auto flex flex-wrap items-center gap-2 text-xs" aria-label="Band legend">
@@ -108,20 +107,26 @@ const bandsOrdered: ValidatorFn = (g) => {
                 (ngSubmit)="saveBands()"
                 aria-label="Tolerance bands"
             >
-                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                    <mat-label>OK below (%)</mat-label>
-                    <input matInput type="number" min="0" max="100" formControlName="okBelow" />
-                    @if (bandsForm.controls.okBelow.invalid) {
-                        <mat-error>A percentage from 0 to 100.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                    <mat-label>Breach above (%)</mat-label>
-                    <input matInput type="number" min="0" max="100" formControlName="warnAbove" />
-                    @if (bandsForm.controls.warnAbove.invalid) {
-                        <mat-error>A percentage from 0 to 100.</mat-error>
-                    }
-                </mat-form-field>
+                <div class="grid min-w-0 flex-1 grid-cols-1 gap-x-8 sm:grid-cols-2">
+                    <inspecto-pen-field
+                        label="OK below (%)"
+                        type="number"
+                        [min]="0"
+                        [max]="100"
+                        [required]="true"
+                        formControlName="okBelow"
+                        [error]="percentError(bandsForm.controls.okBelow)"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Breach above (%)"
+                        type="number"
+                        [min]="0"
+                        [max]="100"
+                        [required]="true"
+                        formControlName="warnAbove"
+                        [error]="percentError(bandsForm.controls.warnAbove)"
+                    ></inspecto-pen-field>
+                </div>
                 <button mat-flat-button color="primary" type="submit" [disabled]="saving()">Save bands</button>
                 @if (bandsForm.touched && bandsForm.hasError('order')) {
                     <p class="text-warn w-full text-xs" role="alert">"OK below" must not be above "Breach above".</p>
@@ -149,9 +154,12 @@ export class ReconToolbarComponent {
     readonly sampleChange = output<number | null>();
     readonly bandsSave = output<ReconBands>();
 
-    readonly filterLabels = RECON_FILTER_LABELS;
     readonly editing = signal(false);
     readonly filters = computed(() => RECON_FILTERS.filter((f) => f !== 'missing_c' || this.threeWay()));
+    readonly dayOptions = computed<PickerOption[]>(() => this.availableDays().map((d) => ({ value: d, label: d })));
+    readonly filterOptions = computed<PickerOption[]>(() =>
+        this.filters().map((f) => ({ value: f, label: RECON_FILTER_LABELS[f] })),
+    );
 
     readonly sampleControl = new FormControl<number | null>(null, [Validators.min(1)]);
     readonly bandsForm = new FormGroup(
@@ -189,6 +197,22 @@ export class ReconToolbarComponent {
             const b = this.bands() ?? DEFAULT_BANDS;
             this.bandsForm.setValue({ okBelow: b.warnPct, warnAbove: b.breachPct }, { emitEvent: false });
         });
+        // The row commits on Enter or when it is left - the moments the old box applied the sample on.
+        this.sampleControl.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.applySample());
+    }
+
+    /** The picker reports a re-pick of the shown day too; only a different day re-requests (as the select did). */
+    pickDay(d: string): void {
+        if (d !== this.day()) this.dayChange.emit(d);
+    }
+
+    pickFilter(f: string): void {
+        if (f !== this.filter()) this.filterChange.emit(f as ReconFilter);
+    }
+
+    /** A band row's error line, once the row was left or Save pressed. */
+    percentError(c: AbstractControl): string {
+        return c.touched && c.invalid ? 'A percentage from 0 to 100.' : '';
     }
 
     applySample(): void {

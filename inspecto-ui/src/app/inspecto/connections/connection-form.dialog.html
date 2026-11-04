@@ -5,15 +5,16 @@
     <mat-dialog-content class="space-y-3">
         @if (step() === 'config') {
         <!-- Connection type (the name is asked later, at save time) -->
-        <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Connection type</mat-label>
-                <mat-select [value]="connType()" (selectionChange)="onTypeChange($event.value)" cdkFocusInitial>
-                    @for (t of types; track t.type) {
-                    <mat-option [value]="t.type">{{ t.label }} — {{ t.description }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+            <inspecto-option-picker
+                class="block"
+                label="Connection type"
+                [options]="typeOptions"
+                [ngModel]="connType()"
+                (ngModelChange)="onTypeChange($event)"
+                [ngModelOptions]="{ standalone: true }"
+                cdkFocusInitial
+            />
         </div>
 
         <!-- Routing (SSH tunnel + proxy) — hidden behind a routing icon, popped open on click -->
@@ -44,27 +45,19 @@
                 SSH tunnel (bastion host)
             </mat-slide-toggle>
             @if (tunnelEnabled()) {
-            <div formGroupName="tunnel" class="mt-2 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Bastion host</mat-label>
-                    <input matInput formControlName="host" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Bastion port</mat-label>
-                    <input matInput type="number" formControlName="port" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Bastion username</mat-label>
-                    <input matInput formControlName="username" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Auth method</mat-label>
-                    <mat-select formControlName="auth">
-                        <mat-option value="password">password</mat-option>
-                        <mat-option value="key">key</mat-option>
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
+            <div formGroupName="tunnel" class="mt-2 grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                <inspecto-pen-field label="Bastion host" formControlName="host"></inspecto-pen-field>
+                <inspecto-pen-field label="Bastion port" type="number" formControlName="port"></inspecto-pen-field>
+                <inspecto-pen-field label="Bastion username" formControlName="username"></inspecto-pen-field>
+                <inspecto-option-picker
+                    class="block"
+                    label="Auth method"
+                    formControlName="auth"
+                    [options]="tunnelAuthOptions"
+                />
+                <!-- form-allow: a secret field (a secret reference; a mistyped literal must never show in a closed row) --><mat-form-field
+                    subscriptSizing="dynamic"
+                >
                     <mat-label>Bastion password / passphrase</mat-label>
                     <input matInput formControlName="password" />
                     <mat-hint>{{ secretHint }}</mat-hint>
@@ -95,27 +88,19 @@
                     Use proxy
                 </mat-slide-toggle>
                 @if (proxyEnabled()) {
-                <div formGroupName="proxy" class="mt-2 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Proxy type</mat-label>
-                        <mat-select formControlName="type">
-                            <mat-option value="HTTP">HTTP</mat-option>
-                            <mat-option value="SOCKS5">SOCKS5</mat-option>
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Proxy host</mat-label>
-                        <input matInput formControlName="host" />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Proxy port</mat-label>
-                        <input matInput type="number" formControlName="port" />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Proxy username</mat-label>
-                        <input matInput formControlName="username" />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
+                <div formGroupName="proxy" class="mt-2 grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                    <inspecto-option-picker
+                        class="block"
+                        label="Proxy type"
+                        formControlName="type"
+                        [options]="proxyTypeOptions"
+                    />
+                    <inspecto-pen-field label="Proxy host" formControlName="host"></inspecto-pen-field>
+                    <inspecto-pen-field label="Proxy port" type="number" formControlName="port"></inspecto-pen-field>
+                    <inspecto-pen-field label="Proxy username" formControlName="username"></inspecto-pen-field>
+                    <!-- form-allow: a secret field (a secret reference; a mistyped literal must never show in a closed row) --><mat-form-field
+                        subscriptSizing="dynamic"
+                    >
                         <mat-label>Proxy password</mat-label>
                         <input matInput formControlName="password" />
                         <mat-hint>{{ secretHint }}</mat-hint>
@@ -149,39 +134,45 @@
             <div class="mb-1 text-xs font-semibold uppercase tracking-wider opacity-60">
                 {{ connTypeLabel() }} settings
             </div>
-            <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                 @for (a of attrs(); track a.key) { @switch (a.control) { @case ('checkbox') {
                 <div class="flex items-center py-2">
                     <mat-checkbox [formControlName]="a.key">{{ a.label }}</mat-checkbox>
                 </div>
                 } @case ('select') {
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>{{ a.label }}</mat-label>
-                    <mat-select [formControlName]="a.key">
-                        @for (o of a.options ?? []; track o) {
-                        <mat-option [value]="o">{{ o }}</mat-option>
-                        }
-                    </mat-select>
-                    @if (a.hint) { <mat-hint>{{ a.hint }}</mat-hint> }
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="block"
+                    [label]="a.label"
+                    [formControlName]="a.key"
+                    [options]="attrOptions()[a.key]"
+                    [help]="a.hint ?? ''"
+                />
                 } @case ('number') {
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>{{ a.label }}</mat-label>
-                    <input matInput type="number" [formControlName]="a.key" />
-                    @if (a.hint) { <mat-hint>{{ a.hint }}</mat-hint> }
-                </mat-form-field>
-                } @default {
-                <mat-form-field subscriptSizing="dynamic">
+                <inspecto-pen-field
+                    [label]="a.label"
+                    type="number"
+                    [formControlName]="a.key"
+                    [help]="a.hint ?? ''"
+                ></inspecto-pen-field>
+                } @case ('password') {
+                <!-- form-allow: a secret field (a secret reference; a mistyped literal must never show in a closed row) --><mat-form-field
+                    subscriptSizing="dynamic"
+                >
                     <mat-label>{{ a.label }}</mat-label>
                     <input matInput [formControlName]="a.key" />
-                    @if (a.hint) {
-                    <mat-hint>{{ a.hint }}</mat-hint>
-                    } @else if (a.control === 'password') {
-                    <mat-hint>{{ secretHint }}</mat-hint>
-                    } @if (attrsForm().get(a.key)?.hasError('required')) {
+                    <mat-hint>{{ a.hint || secretHint }}</mat-hint>
+                    @if (attrsForm().get(a.key)?.hasError('required')) {
                     <mat-error>{{ a.label }} is required.</mat-error>
                     }
                 </mat-form-field>
+                } @default {
+                <inspecto-pen-field
+                    [label]="a.label"
+                    [formControlName]="a.key"
+                    [required]="!!a.required"
+                    [help]="a.hint ?? ''"
+                    [error]="requiredError(a)"
+                ></inspecto-pen-field>
                 } } }
             </div>
         </section>
@@ -211,23 +202,20 @@
             <div class="text-secondary text-sm">
                 {{ connTypeLabel() }} connection configured — give it a unique name to save it.
             </div>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Name</mat-label>
-                <input matInput formControlName="name" required cdkFocusInitial />
-                @if (saveForm.controls.name.hasError('required')) {
-                <mat-error>Name is required.</mat-error>
-                } @else if (saveForm.controls.name.hasError('pattern')) {
-                <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
-                } @else if (saveForm.controls.name.hasError('duplicate')) {
-                <mat-error>A connection with this name already exists.</mat-error>
-                }
-                <mat-hint>Unique — this is the profile id pipelines reference.</mat-hint>
-            </mat-form-field>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
-                <mat-label>Description</mat-label>
-                <textarea matInput formControlName="description" rows="2"></textarea>
-                <mat-hint>Optional — what this connection is for.</mat-hint>
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Name"
+                [required]="true"
+                formControlName="name"
+                help="Unique — this is the profile id pipelines reference."
+                [error]="nameError()"
+                cdkFocusInitial
+            ></inspecto-pen-field>
+            <inspecto-pen-field
+                label="Description"
+                [multiline]="true"
+                formControlName="description"
+                help="Optional — what this connection is for."
+            ></inspecto-pen-field>
         </section>
         }
     </mat-dialog-content>

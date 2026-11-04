@@ -7,6 +7,7 @@ import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { BrandingService, Space, SpacesService, TimezoneSettingsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { SpaceFormData, SpaceFormDialog } from './space-form.dialog';
 
 const toastr = { success: vi.fn(), warning: vi.fn(), error: vi.fn() };
@@ -46,9 +47,9 @@ function create(
     return { fixture, getFor, saveFor, spaceSave, tzSave, domainSave };
 }
 
-/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+/** The `<inspecto-pen-field>` row bound to `control` inside `scope`, so an error assertion is scoped to that one row. */
 function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
-    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+    return el.querySelector(`${scope} inspecto-pen-field[formControlName="${control}"]`) as HTMLElement;
 }
 
 describe('SpaceFormDialog', () => {
@@ -91,7 +92,7 @@ describe('SpaceFormDialog', () => {
             expect(c.form.get('timezone')!.hasError('timezone')).toBe(true);
         }
         c.submit();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(spaceSave).not.toHaveBeenCalled();
         expect(tzSave).not.toHaveBeenCalled();
         expect(fixture.nativeElement.textContent).toContain('Not an IANA timezone name');
@@ -189,22 +190,33 @@ describe('SpaceFormDialog', () => {
         });
     });
 
-    it('shows the id pattern error only after submit — never before (the error lands in the subscript)', () => {
+    it('shows the id pattern error only after submit — never before (the error lands in the row\'s alert line)', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.form.patchValue({ display_name: 'Anything' });
         c.editId.set(true);
         c.form.patchValue({ id: 'Bad Id' });
-        fixture.detectChanges();
+        refresh(fixture);
         const field = fieldOf(fixture.nativeElement, 'form', 'id');
         // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
         // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
-        expect(field.querySelector('mat-error')).toBeNull();
+        expect(penError(field)).toBe('');
         expect(field.textContent).not.toContain('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
         c.submit();
-        fixture.detectChanges();
-        const err = field.querySelector('mat-error');
-        expect(err?.textContent).toContain('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(field)).toBe('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
+    });
+
+    it('a committed id stops the name from re-deriving it; until then the name drives it', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        penEdit(fixture, penByLabel(el, 'Display name')!, 'First name');
+        expect(c.form.get('id')!.value).toBe('first-name');
+        c.editId.set(true);
+        refresh(fixture);
+        penEdit(fixture, fieldOf(el, 'form', 'id'), 'my-own-id');
+        penEdit(fixture, penByLabel(el, 'Display name')!, 'Second name');
+        expect(c.form.get('id')!.value).toBe('my-own-id');
     });
 });

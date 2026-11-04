@@ -58,9 +58,12 @@
                 </div>
             } @else {
                 <div class="flex flex-wrap items-center gap-2">
-                    <mat-form-field subscriptSizing="dynamic" class="w-44">
+                    <!-- form-allow: a table-cell select of a repeating row (one condition) --><mat-form-field
+                        subscriptSizing="dynamic"
+                        class="w-44"
+                    >
                         <mat-label>Field</mat-label>
-                        <mat-select
+                        <!-- form-allow: a table-cell select of a repeating row (one condition) --><mat-select
                             [value]="asCondition(it).field"
                             (selectionChange)="onFieldChange(asCondition(it), $event.value)"
                         >
@@ -69,9 +72,12 @@
                             }
                         </mat-select>
                     </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic" class="w-36">
+                    <!-- form-allow: a table-cell select of a repeating row (one condition) --><mat-form-field
+                        subscriptSizing="dynamic"
+                        class="w-36"
+                    >
                         <mat-label>Operator</mat-label>
-                        <mat-select
+                        <!-- form-allow: a table-cell select of a repeating row (one condition) --><mat-select
                             [value]="asCondition(it).operator"
                             (selectionChange)="onOperatorChange(asCondition(it), $event.value)"
                         >
@@ -88,9 +94,12 @@
                         >
                     }
                     @if (comparesField(asCondition(it))) {
-                        <mat-form-field subscriptSizing="dynamic" class="w-44">
+                        <!-- form-allow: a table-cell select of a repeating row (one condition) --><mat-form-field
+                            subscriptSizing="dynamic"
+                            class="w-44"
+                        >
                             <mat-label>Other field</mat-label>
-                            <mat-select
+                            <!-- form-allow: a table-cell select of a repeating row (one condition) --><mat-select
                                 [value]="asCondition(it).valueField"
                                 (selectionChange)="onValueField(asCondition(it), $event.value)"
                                 [attr.aria-describedby]="noteId(asCondition(it))"
@@ -103,7 +112,10 @@
                     } @else {
                         @switch (arity(asCondition(it))) {
                             @case (1) {
-                                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                                <!-- form-allow: a table-cell field of a repeating row (one condition) --><mat-form-field
+                                    subscriptSizing="dynamic"
+                                    class="w-40"
+                                >
                                     <mat-label>Value</mat-label>
                                     <input
                                         matInput
@@ -115,7 +127,10 @@
                                 </mat-form-field>
                             }
                             @case (2) {
-                                <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                <!-- form-allow: a table-cell field of a repeating row (one condition) --><mat-form-field
+                                    subscriptSizing="dynamic"
+                                    class="w-28"
+                                >
                                     <mat-label>From</mat-label>
                                     <input
                                         matInput
@@ -124,7 +139,10 @@
                                         (input)="onValue(asCondition(it), $any($event.target).value)"
                                     />
                                 </mat-form-field>
-                                <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                <!-- form-allow: a table-cell field of a repeating row (one condition) --><mat-form-field
+                                    subscriptSizing="dynamic"
+                                    class="w-28"
+                                >
                                     <mat-label>To</mat-label>
                                     <input
                                         matInput
@@ -135,7 +153,10 @@
                                 </mat-form-field>
                             }
                             @case ('list') {
-                                <mat-form-field subscriptSizing="dynamic" class="w-56">
+                                <!-- form-allow: a table-cell field of a repeating row (one condition) --><mat-form-field
+                                    subscriptSizing="dynamic"
+                                    class="w-56"
+                                >
                                     <mat-label>Values</mat-label>
                                     <input
                                         matInput

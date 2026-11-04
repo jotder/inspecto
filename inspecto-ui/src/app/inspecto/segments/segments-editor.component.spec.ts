@@ -3,6 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ParserTreeNode } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { InspectoSegmentsEditorComponent } from './segments-editor.component';
 
 const leaf = (label: string): ParserTreeNode => ({ label, value: 'v' });
@@ -26,6 +27,19 @@ describe('InspectoSegmentsEditorComponent', () => {
         component = fixture.componentInstance;
         fixture.componentRef.setInput('tree', TREE);
         fixture.detectChanges();
+    });
+
+    it('asks the segment key as a row and names a missing one only after validate', () => {
+        component.addSegment();
+        refresh(fixture);
+        const key = penByLabel(fixture.nativeElement, 'Segment key')!;
+        expect(penError(key)).toBe('');
+        expect(component.validate()).toBe(false);
+        refresh(fixture);
+        expect(penError(key)).toBe('A segment key is required.');
+        penEdit(fixture, key, 'moCallRecord');
+        expect(component.value()[0].key).toBe('moCallRecord');
+        expect(penError(key)).toBe('');
     });
 
     it('starts empty and refuses to validate with no segments', () => {

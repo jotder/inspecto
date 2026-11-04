@@ -1,7 +1,7 @@
 <div class="flex flex-col gap-3">
     @if (!hideInput) {
         <div>
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <!-- form-allow: an AI assistant prompt box (a message composer) --><mat-form-field class="w-full" subscriptSizing="dynamic">
                 <textarea matInput rows="3" [(ngModel)]="userText" [placeholder]="placeholder"></textarea>
             </mat-form-field>
             <div class="mt-2 flex items-center justify-end gap-4">

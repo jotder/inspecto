@@ -2,7 +2,7 @@
     <!-- AGT-6a A5.1, opt-in per pane: the sentence that becomes the tool's arguments. Enter submits, so
          the box behaves like every other single-field control in the app. -->
     @if (prompting()) {
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
+        <!-- form-allow: an AI prompt box (a message composer; Enter runs it) --><mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>{{ label() }}</mat-label>
             <input
                 matInput

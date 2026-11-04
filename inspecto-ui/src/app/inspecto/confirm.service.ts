@@ -3,9 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
+import { PenFieldComponent } from './components/pen-field.component';
 
 /**
  * One opt-in the confirm offers alongside the main action — e.g. "also delete the data".
@@ -45,7 +44,7 @@ interface ConfirmData {
 @Component({
     selector: 'inspecto-confirm-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatInputModule, FormsModule],
+    imports: [MatDialogModule, MatButtonModule, MatCheckboxModule, PenFieldComponent, FormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ data.title }}</h2>
@@ -64,10 +63,12 @@ interface ConfirmData {
                 </div>
             }
             @if (data.requireText) {
-                <mat-form-field class="mt-4 w-full" subscriptSizing="dynamic">
-                    <mat-label>Type “{{ data.requireText }}” to confirm</mat-label>
-                    <input matInput [(ngModel)]="typed" autocomplete="off" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="mt-4"
+                    label="Type “{{ data.requireText }}” to confirm"
+                    [mono]="true"
+                    [(ngModel)]="typed"
+                ></inspecto-pen-field>
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end" class="gap-2">

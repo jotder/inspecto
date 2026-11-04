@@ -35,15 +35,21 @@
                 [formGroupName]="si"
                 class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col gap-3"
             >
-                <div class="flex items-center gap-2">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Segment key</mat-label>
-                        <input matInput formControlName="key" [readonly]="!editable()" placeholder="moCallRecord" />
-                        <mat-hint>Must match the decoded record's own name.</mat-hint>
-                        @if (segment.get('key')?.hasError('required') && segment.get('key')?.touched) {
-                            <mat-error>A segment key is required.</mat-error>
-                        }
-                    </mat-form-field>
+                <div class="flex items-start gap-2">
+                    <inspecto-pen-field
+                        class="min-w-0 flex-1"
+                        label="Segment key"
+                        formControlName="key"
+                        [readOnly]="!editable()"
+                        [required]="true"
+                        placeholder="moCallRecord"
+                        help="Must match the decoded record's own name."
+                        [error]="
+                            segment.get('key')?.hasError('required') && segment.get('key')?.touched
+                                ? 'A segment key is required.'
+                                : ''
+                        "
+                    ></inspecto-pen-field>
                     @if (editable()) {
                         <button
                             mat-icon-button
@@ -59,7 +65,10 @@
                 <div formArrayName="columns" class="flex flex-col gap-2">
                     @for (column of columnsOf(segment).controls; track $index; let ci = $index) {
                         <div [formGroupName]="ci" class="flex items-start gap-2">
-                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                            <!-- form-allow: a table-cell field of a repeating row (one segment column) --><mat-form-field
+                                class="flex-1"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Selector</mat-label>
                                 <input
                                     matInput
@@ -72,7 +81,10 @@
                                     <mat-error>A selector is required.</mat-error>
                                 }
                             </mat-form-field>
-                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                            <!-- form-allow: a table-cell field of a repeating row (one segment column) --><mat-form-field
+                                class="flex-1"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Column</mat-label>
                                 <input
                                     matInput
@@ -89,9 +101,15 @@
                                     >
                                 }
                             </mat-form-field>
-                            <mat-form-field class="w-40" subscriptSizing="dynamic">
+                            <!-- form-allow: a table-cell select of a repeating row (one segment column) --><mat-form-field
+                                class="w-40"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Type</mat-label>
-                                <mat-select formControlName="type" [disabled]="!editable()">
+                                <!-- form-allow: a table-cell select of a repeating row (one segment column) --><mat-select
+                                    formControlName="type"
+                                    [disabled]="!editable()"
+                                >
                                     @for (t of types; track t) {
                                         <mat-option [value]="t">{{ t }}</mat-option>
                                     }

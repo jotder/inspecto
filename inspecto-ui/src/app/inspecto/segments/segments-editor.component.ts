@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, inject, input, signal } from '@angular/core';
+import { outputFromObservable } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,6 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { ParserTreeNode } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import {
     EVENT_TYPE_COLUMN,
     IDENTIFIER_RE,
@@ -48,6 +51,7 @@ import {
         MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        PenFieldComponent,
     ],
     templateUrl: './segments-editor.component.html',
 })
@@ -63,6 +67,11 @@ export class InspectoSegmentsEditorComponent {
     readonly eventTypeColumn = EVENT_TYPE_COLUMN;
 
     readonly form: FormGroup = this.fb.group({ segments: this.fb.array<FormGroup>([]) });
+    /**
+     * Fired on every change to the segments, so a host re-derives its dirty state: the key row commits on
+     * Enter / blur, which bubbles no `input` (and a Tab or Enter no `click`) for a host listener to catch.
+     */
+    readonly changed = outputFromObservable(this.form.valueChanges.pipe(map(() => undefined)));
     get segments(): FormArray<FormGroup> {
         return this.form.controls['segments'] as FormArray<FormGroup>;
     }

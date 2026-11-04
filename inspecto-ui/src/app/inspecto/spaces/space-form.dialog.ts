@@ -3,9 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
@@ -18,6 +16,7 @@ import {
     SpacesService,
     TimezoneSettingsService,
 } from 'app/inspecto/api';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -119,26 +118,27 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatRadioModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ editMode ? 'Edit space' : dataKind ? 'Create a Space' : 'New space' }}</h2>
         <form [formGroup]="form" (ngSubmit)="submit()">
             <mat-dialog-content class="space-y-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>{{ dataKind ? 'Name' : 'Display name' }}</mat-label>
-                    <input matInput formControlName="display_name" required autocomplete="off" cdkFocusInitial />
-                    @if (dataKind) {
-                        <mat-hint>Name it after the data, such as Mobile money or Call records: one Space per kind of data.</mat-hint>
-                    }
-                    @if (form.get('display_name')?.hasError('required')) {
-                        <mat-error>A name is required.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    [label]="dataKind ? 'Name' : 'Display name'"
+                    [required]="true"
+                    formControlName="display_name"
+                    [help]="
+                        dataKind
+                            ? 'Name it after the data, such as Mobile money or Call records: one Space per kind of data.'
+                            : ''
+                    "
+                    [error]="nameError()"
+                ></inspecto-pen-field>
 
                 @if (editMode) {
                     <div class="text-secondary text-xs">
@@ -152,18 +152,14 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                         <button type="button" mat-button (click)="editId.set(true)">Edit id</button>
                     </div>
                 } @else {
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Id</mat-label>
-                        <input matInput formControlName="id" autocomplete="off" (input)="idManual = true" />
-                        <mat-hint>lowercase letters, digits and hyphens — becomes the space folder</mat-hint>
-                        @if (form.get('id')?.hasError('required')) {
-                            <mat-error>Id is required.</mat-error>
-                        } @else if (form.get('id')?.hasError('pattern')) {
-                            <mat-error>Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.</mat-error>
-                        } @else if (form.get('id')?.hasError('duplicate')) {
-                            <mat-error>A space with this id already exists.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Id"
+                        [required]="true"
+                        [mono]="true"
+                        formControlName="id"
+                        help="lowercase letters, digits and hyphens — becomes the space folder"
+                        [error]="idError()"
+                    ></inspecto-pen-field>
                 }
 
                 @if (dataKind) {
@@ -188,10 +184,7 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                         <p class="text-secondary m-0 text-sm">It sets the words Link Analysis uses for your data.</p>
                     </div>
                 } @else {
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Description</mat-label>
-                    <input matInput formControlName="description" autocomplete="off" />
-                </mat-form-field>
+                <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
 
                 <!-- Branding -->
                 <div class="flex flex-col gap-2 border-t pt-3">
@@ -227,28 +220,21 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                     }
                 </div>
 
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Caption</mat-label>
-                    <input
-                        matInput
-                        formControlName="caption"
-                        autocomplete="off"
-                        placeholder="Unveil stories from your data"
-                    />
-                    <mat-hint>Shown beneath the logo in the sidebar.</mat-hint>
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Footer text</mat-label>
-                    <input matInput formControlName="footerText" autocomplete="off" />
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Default timezone</mat-label>
-                    <input matInput formControlName="timezone" autocomplete="off" placeholder="UTC" />
-                    <mat-error
-                        >Not an IANA timezone name — use one such as Asia/Kolkata, or leave empty for UTC.</mat-error
-                    >
-                    <mat-hint>An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it.</mat-hint>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Caption"
+                    formControlName="caption"
+                    placeholder="Unveil stories from your data"
+                    help="Shown beneath the logo in the sidebar."
+                ></inspecto-pen-field>
+                <inspecto-pen-field label="Footer text" formControlName="footerText"></inspecto-pen-field>
+                <inspecto-pen-field
+                    label="Default timezone"
+                    [mono]="true"
+                    formControlName="timezone"
+                    placeholder="UTC"
+                    help="An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it."
+                    [error]="timezoneError()"
+                ></inspecto-pen-field>
                 }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
@@ -335,7 +321,33 @@ export class SpaceFormDialog {
                         emitEvent: false,
                     });
             });
+            // An id the operator commits stops the name from re-deriving it (the sync above writes without an event).
+            this.form.controls['id'].valueChanges.pipe(takeUntilDestroyed()).subscribe(() => (this.idManual = true));
         }
+    }
+
+    /** The name row's error line: shown once the row was left or Create / Save was pressed. */
+    nameError(): string {
+        const c = this.form.controls['display_name'];
+        return c.touched && c.hasError('required') ? 'A name is required.' : '';
+    }
+
+    /** The id row's error line: shown once the row was left or Create was pressed. */
+    idError(): string {
+        const c = this.form.controls['id'];
+        if (!c?.touched) return '';
+        if (c.hasError('required')) return 'Id is required.';
+        if (c.hasError('pattern')) return 'Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.';
+        if (c.hasError('duplicate')) return 'A space with this id already exists.';
+        return '';
+    }
+
+    /** The timezone row's error line: shown once the row was left or Save was pressed. */
+    timezoneError(): string {
+        const c = this.form.controls['timezone'];
+        return c.touched && c.invalid
+            ? 'Not an IANA timezone name — use one such as Asia/Kolkata, or leave empty for UTC.'
+            : '';
     }
 
     onLogoSelected(input: HTMLInputElement): void {

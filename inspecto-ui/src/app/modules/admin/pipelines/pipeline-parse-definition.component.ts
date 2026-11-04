@@ -576,7 +576,11 @@ export function withDecodeProfile(
                                 <span class="text-secondary text-xs">Loading the saved segment columns…</span>
                             }
                         </div>
-                        <inspecto-segments-editor [tree]="previewTree()" [initial]="initialSegments()" />
+                        <inspecto-segments-editor
+                            [tree]="previewTree()"
+                            [initial]="initialSegments()"
+                            (changed)="emitDirty()"
+                        />
                     }
                 </div>
                 <!--
@@ -1708,7 +1712,7 @@ export class PipelineParseDefinitionComponent {
         this.emitDirty();
     }
 
-    private emitDirty(): void {
+    protected emitDirty(): void {
         if (this.decodeProfileFile() && this.editor) {
             const form = this.editor.grammar()['asn1'];
             this.asn1Edit.set({

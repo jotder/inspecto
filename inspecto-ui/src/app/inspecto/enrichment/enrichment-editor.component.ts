@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, Input, computed, inject, signal } from '@angular/core';
+import { outputFromObservable } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table';
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -54,11 +55,10 @@ export interface EnrichmentEditorValue {
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatSelectModule,
         MatTooltipModule,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
         SqlCodemirrorComponent,
     ],
     template: `
@@ -83,54 +83,51 @@ export interface EnrichmentEditorValue {
                 <form [formGroup]="referencesForm">
                     <div formArrayName="references" class="flex flex-col gap-2">
                         @for (g of referenceRows.controls; track $index; let i = $index) {
-                            <div [formGroupName]="i" class="flex flex-wrap items-center gap-2 rounded border p-2">
-                                <mat-form-field class="w-40" subscriptSizing="dynamic">
-                                    <mat-label>Alias in SQL</mat-label>
-                                    <input matInput formControlName="name" placeholder="region_dim" />
-                                    @if (g.get('name')?.hasError('pattern') && g.get('name')?.touched) {
-                                        <mat-error>Letters, digits, _ — start with a letter or _.</mat-error>
-                                    }
-                                </mat-form-field>
-                                <mat-form-field class="w-36" subscriptSizing="dynamic">
-                                    <mat-label>Bind</mat-label>
-                                    <mat-select formControlName="mode">
-                                        <mat-option value="ref">By name</mat-option>
-                                        <mat-option value="path">File path</mat-option>
-                                    </mat-select>
-                                </mat-form-field>
-                                @if (g.get('mode')?.value === 'ref') {
-                                    <mat-form-field class="min-w-52 flex-1" subscriptSizing="dynamic">
-                                        <mat-label>Published Reference</mat-label>
-                                        <mat-select formControlName="ref">
-                                            @for (o of referenceOptions; track o.id) {
-                                                <mat-option [value]="o.id">{{ o.label }}</mat-option>
-                                            }
-                                        </mat-select>
-                                        @if (referenceOptions.length === 0) {
-                                            <mat-hint>No live Reference Datasets published yet.</mat-hint>
-                                        }
-                                    </mat-form-field>
-                                    <mat-form-field class="w-36" subscriptSizing="dynamic">
-                                        <mat-label>As-of column</mat-label>
-                                        <input
-                                            matInput
-                                            formControlName="asOf"
-                                            matTooltip="SCD2 producers only — the event-time column to join as-of"
+                            <div [formGroupName]="i" class="flex items-start gap-2 rounded border p-2">
+                                <div class="grid min-w-0 flex-1 grid-cols-1 gap-x-8 sm:grid-cols-2">
+                                    <inspecto-pen-field
+                                        label="Alias in SQL"
+                                        placeholder="region_dim"
+                                        formControlName="name"
+                                        [error]="aliasError(g)"
+                                    ></inspecto-pen-field>
+                                    <inspecto-option-picker
+                                        class="block"
+                                        label="Bind"
+                                        formControlName="mode"
+                                        [options]="BIND_OPTIONS"
+                                    />
+                                    @if (g.get('mode')?.value === 'ref') {
+                                        <inspecto-option-picker
+                                            class="block"
+                                            label="Published Reference"
+                                            formControlName="ref"
+                                            [options]="referencePickerOptions"
+                                            [help]="
+                                                referenceOptions.length === 0
+                                                    ? 'No live Reference Datasets published yet.'
+                                                    : ''
+                                            "
                                         />
-                                    </mat-form-field>
-                                } @else {
-                                    <mat-form-field class="min-w-52 flex-1" subscriptSizing="dynamic">
-                                        <mat-label>File path</mat-label>
-                                        <input matInput formControlName="path" placeholder="data/ref/region_dim.csv" />
-                                    </mat-form-field>
-                                    <mat-form-field class="w-32" subscriptSizing="dynamic">
-                                        <mat-label>Format</mat-label>
-                                        <mat-select formControlName="format">
-                                            <mat-option value="CSV">CSV</mat-option>
-                                            <mat-option value="PARQUET">Parquet</mat-option>
-                                        </mat-select>
-                                    </mat-form-field>
-                                }
+                                        <inspecto-pen-field
+                                            label="As-of column"
+                                            formControlName="asOf"
+                                            help="SCD2 producers only — the event-time column to join as-of"
+                                        ></inspecto-pen-field>
+                                    } @else {
+                                        <inspecto-pen-field
+                                            label="File path"
+                                            placeholder="data/ref/region_dim.csv"
+                                            formControlName="path"
+                                        ></inspecto-pen-field>
+                                        <inspecto-option-picker
+                                            class="block"
+                                            label="Format"
+                                            formControlName="format"
+                                            [options]="FORMAT_OPTIONS"
+                                        />
+                                    }
+                                </div>
                                 <button
                                     mat-icon-button
                                     type="button"
@@ -171,9 +168,38 @@ export class EnrichmentEditorComponent {
     private toastr = inject(ToastrService);
 
     /** Produced Reference Datasets bindable by name (host-loaded; id = the producer's pipeline id). */
-    @Input() referenceOptions: { id: string; label: string }[] = [];
+    @Input() set referenceOptions(v: { id: string; label: string }[]) {
+        this.refs = v;
+        this.referencePickerOptions = v.map((o) => ({ value: o.id, label: o.label }));
+    }
+    get referenceOptions(): { id: string; label: string }[] {
+        return this.refs;
+    }
+    private refs: { id: string; label: string }[] = [];
+    /** The same Reference Datasets as the *Published Reference* picker's choices. */
+    referencePickerOptions: PickerOption[] = [];
+
+    readonly BIND_OPTIONS: PickerOption[] = [
+        { value: 'ref', label: 'By name' },
+        { value: 'path', label: 'File path' },
+    ];
+    readonly FORMAT_OPTIONS: PickerOption[] = [
+        { value: 'CSV', label: 'CSV' },
+        { value: 'PARQUET', label: 'Parquet' },
+    ];
+
+    /** The alias row's error line: a malformed alias, once the row was left or the build refused it. */
+    aliasError(g: FormGroup): string {
+        const c = g.get('name');
+        return c?.touched && c.hasError('pattern') ? 'Letters, digits, _ — start with a letter or _.' : '';
+    }
 
     readonly referencesForm: FormGroup = this.fb.group({ references: this.fb.array<FormGroup>([]) });
+    /**
+     * Fired on every change to a reference row, so a host re-derives its dirty state: a property row commits on
+     * Enter / blur, which bubbles no `input` (and a Tab or Enter no `click`) for a host listener to catch.
+     */
+    readonly changed = outputFromObservable(this.referencesForm.valueChanges.pipe(map(() => undefined)));
     get referenceRows(): FormArray<FormGroup> {
         return this.referencesForm.controls['references'] as FormArray<FormGroup>;
     }

@@ -157,7 +157,7 @@ function mergeFormValues(
                     [readOnly]="readOnly()"
                     (submitted)="submit()"
                 ></inspecto-schema-form>
-                <inspecto-enrichment-editor [referenceOptions]="refOptions()" />
+                <inspecto-enrichment-editor [referenceOptions]="refOptions()" (changed)="emitDirty()" />
             }
         } @else if (isSummarize()) {
             <!--
@@ -707,7 +707,7 @@ export class PipelineConfigDefinitionComponent {
         this.emitDirty();
     }
 
-    private emitDirty(): void {
+    protected emitDirty(): void {
         const dirty =
             (this.extraConfig?.isDirty() ?? false) ||
             (this.schemaForm?.isDirty() ?? false) ||

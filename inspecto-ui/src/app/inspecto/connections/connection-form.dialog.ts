@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -7,13 +7,18 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ConnectionProfile, ConnectionsService, ConnectionTestResult } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { CONNECTION_TYPES, attrsFor, connTypeDef, typeForConnector } from './connection-types';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
+import { CONNECTION_TYPES, ConnAttr, attrsFor, connTypeDef, typeForConnector } from './connection-types';
 
 /** Dialog data: `profile` set ⇒ edit mode (name/id locked); absent ⇒ create. */
 interface ConnectionFormData {
@@ -46,6 +51,7 @@ export interface ConnectionFormResult {
     selector: 'app-connection-form-dialog',
     standalone: true,
     imports: [
+        FormsModule,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
@@ -54,10 +60,11 @@ export interface ConnectionFormResult {
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
-        MatSelectModule,
         MatSlideToggleModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './connection-form.dialog.html',
@@ -69,13 +76,24 @@ export class ConnectionFormDialog {
     private ref = inject(MatDialogRef<ConnectionFormDialog, ConnectionFormResult>);
     readonly data = inject<ConnectionFormData>(MAT_DIALOG_DATA);
 
-    readonly types = CONNECTION_TYPES;
+    /** The connection type picker: the description is the option's hint (the dropdown printed "label — description"). */
+    readonly typeOptions: PickerOption[] = CONNECTION_TYPES.map((t) => ({
+        value: t.type,
+        label: t.label,
+        hint: t.description,
+    }));
+    readonly tunnelAuthOptions = pickerOptions(['password', 'key']);
+    readonly proxyTypeOptions = pickerOptions(['HTTP', 'SOCKS5']);
     readonly isEdit = !!this.data.profile;
     readonly secretHint = 'a ${ENV:VAR} reference, not a raw secret';
 
     /** Selected connection type → drives the per-type attribute sheet + the saved `connector`. */
     readonly connType = signal<string>(this.data.profile ? typeForConnector(this.data.profile.connector) : 'sftp');
     readonly attrs = computed(() => attrsFor(this.connType()));
+    /** Each select attribute's choices for its picker, by attribute key. */
+    readonly attrOptions = computed(() =>
+        Object.fromEntries(this.attrs().map((a) => [a.key, pickerOptions(a.options ?? [])] as const)),
+    );
     readonly connTypeLabel = computed(() => connTypeDef(this.connType()).label);
 
     /** The routing panel (SSH tunnel + proxy) is hidden behind a routing icon; this pops it open. */
@@ -158,8 +176,28 @@ export class ConnectionFormDialog {
         }
     }
 
-    /** Switch connection type → rebuild the attribute sheet to that type's defaults; clear the stale test. */
+    /** A required attribute's error line, once the field was left or the form submitted. */
+    requiredError(a: ConnAttr): string {
+        const c = this.attrsForm().get(a.key);
+        return c?.touched && c.hasError('required') ? `${a.label} is required.` : '';
+    }
+
+    /** The save step's Name error line, once the field was left or Create pressed. */
+    nameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Name is required.';
+        if (c.hasError('pattern')) return 'Start with a letter or digit; then letters, digits, . _ - only.';
+        if (c.hasError('duplicate')) return 'A connection with this name already exists.';
+        return '';
+    }
+
+    /**
+     * Switch connection type → rebuild the attribute sheet to that type's defaults; clear the stale test. A re-pick of
+     * the current type is ignored: the picker reports it, and a rebuild would wipe the attributes already entered.
+     */
     onTypeChange(type: string): void {
+        if (type === this.connType()) return;
         this.connType.set(type);
         this.rebuildAttrs(type);
         this.testResult.set(null);

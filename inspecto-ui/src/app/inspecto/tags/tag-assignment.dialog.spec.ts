@@ -6,6 +6,7 @@ import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { ObjectsService, Tag, TagsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit } from 'app/inspecto/testing/pen-field';
 import { TagAssignmentDialog } from './tag-assignment.dialog';
 
 const REGISTRY: Tag[] = [
@@ -91,6 +92,18 @@ describe('TagAssignmentDialog', () => {
         expect(c.isOn('urgent')).toBe(true);
         c.apply();
         expect(assign).toHaveBeenCalledWith('link-analysis-view', 'triage-view', 'urgent');
+    });
+
+    it('Enter in the open New tag row creates the tag; the Enter that opens the row does not', () => {
+        const { f, createTag } = create();
+        const row = penByLabel(f.nativeElement as HTMLElement, 'New tag')!;
+        const value = row.querySelector('button')!;
+        value.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        value.click(); // the browser's activation of the focused value button on that Enter
+        f.detectChanges();
+        expect(createTag).not.toHaveBeenCalled();
+        penEdit(f, row, 'urgent');
+        expect(createTag).toHaveBeenCalledWith('urgent');
     });
 
     it('does not create a blank tag', () => {

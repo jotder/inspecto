@@ -95,7 +95,10 @@
                              host projects its own buttons here; the editor has no write path of its own. -->
                         <ng-content select="[sampleCsvActions]"></ng-content>
                     </div>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <!-- form-allow: a sample-text box (many-line paste) --><mat-form-field
+                        class="w-full"
+                        subscriptSizing="dynamic"
+                    >
                         <textarea
                             matInput
                             rows="6"
@@ -212,7 +215,10 @@
         <div formArrayName="fields" class="flex flex-col gap-2">
             @for (g of fwFields.controls; track $index) {
                 <div [formGroupName]="$index" class="flex items-start gap-2">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                    <!-- form-allow: a table-cell field of a repeating row (one fixed-width slice) --><mat-form-field
+                        class="flex-1"
+                        subscriptSizing="dynamic"
+                    >
                         <mat-label>Name</mat-label>
                         <!-- Row-distinct accessible names: every row's visible label is the same word,
                              so without these a screen reader reads "Name / Start / Length" N times with
@@ -227,7 +233,10 @@
                             <mat-error>Required</mat-error>
                         }
                     </mat-form-field>
-                    <mat-form-field class="w-24" subscriptSizing="dynamic">
+                    <!-- form-allow: a table-cell field of a repeating row (one fixed-width slice) --><mat-form-field
+                        class="w-24"
+                        subscriptSizing="dynamic"
+                    >
                         <mat-label>Start</mat-label>
                         <input
                             matInput
@@ -237,7 +246,10 @@
                             [attr.aria-label]="'Field ' + ($index + 1) + ' start'"
                         />
                     </mat-form-field>
-                    <mat-form-field class="w-24" subscriptSizing="dynamic">
+                    <!-- form-allow: a table-cell field of a repeating row (one fixed-width slice) --><mat-form-field
+                        class="w-24"
+                        subscriptSizing="dynamic"
+                    >
                         <mat-label>Length</mat-label>
                         <input
                             matInput
@@ -324,9 +336,13 @@
                 @if (p.kind === 'table') {
                     <!-- S3: page size 10/25/50/100, default 10. A grid-toolbar page-size control stays a
                          plain mat-select per the angular-ui skill's own exception list. -->
-                    <mat-form-field subscriptSizing="dynamic" class="w-24" [class.ml-auto]="!sampleTree()">
+                    <!-- form-allow: a grid-toolbar select (page size) --><mat-form-field
+                        subscriptSizing="dynamic"
+                        class="w-24"
+                        [class.ml-auto]="!sampleTree()"
+                    >
                         <mat-label>Page size</mat-label>
-                        <mat-select
+                        <!-- form-allow: a grid-toolbar select (page size) --><mat-select
                             [value]="pageSize()"
                             (selectionChange)="pageSize.set($event.value)"
                             aria-label="Rows per page"

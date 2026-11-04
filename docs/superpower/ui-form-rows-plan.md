@@ -251,3 +251,29 @@ allow-list (114 to 103).
   providers this server can run, and the alert says the others are left out (`mat-select` greyed them; the picker has
   no disabled option - a P4 candidate). A re-pick of the current provider is ignored, so it never resets the edited
   form. Model Settings keeps its existing `[(ngModel)]` bindings (it has no form; moved, not added).
+
+**Batch 5 - the shared `inspecto/` library, 2026-11-04.** 18 files leave the allow-list (65 to 47); only
+`schema-form.component.ts` stays, for its in-row editor (P1).
+- Rows and pickers: the connection form (type, auth method, proxy type and every per-type attribute; the bastion and
+  proxy hosts, ports and users; the saved name and description), the enrichment editor's reference cards (alias, file
+  path, as-of column; bind, published Reference, format), the reconciliation toolbar (day and show pickers, sample
+  keys, the tolerance bands), the segment key, the offer-share description, the type-to-confirm box of
+  `confirmDestructive` (the exact text must still match before the button enables), the rule id and parameters, the
+  six Space form fields, and New tag in tag assignment (creates on Enter, through `(entered)`).
+- Kept boxed with `form-allow`: the cells of repeating-row editors (query condition rows, schema fields and
+  partitions, grammar slices, segment columns) and grid-toolbar selects, which the rulebook keeps as dropdowns; the AI
+  prompt boxes (message composers); the data-table and filter-bar search; the grammar sample text; the import bundle's
+  per-row action; and the connection form's secret references (`${ENV:...}` values, never shown in a closed row).
+- **Editors tell their host they changed.** The enrichment and segments editors gain a `changed` output
+  (`outputFromObservable` over their form's `valueChanges`). The Pipeline config and parse panes derived "dirty" from
+  `input` / `click` events, and a row committed by Tab or Enter fires neither, so Apply could stay grey; they now
+  bind `(changed)="emitDirty()"`. A test proves it (it fails without the binding).
+- Re-picks are ignored where the old select never reported one: the connection type (a rebuild would wipe the entered
+  attributes), the reconciliation day and filter.
+- Behaviour to know: Enter no longer submits the connection form's steps, the tolerance bands, the rule id or the Space
+  form. Per commit, not per keystroke: the type-to-confirm match, the Space form's Create button and its id-from-name
+  sync (a committed id stops the sync, through `valueChanges`), the enrichment editor's views and dirty state. The
+  connection type's description is now its option hint. The confirm box and Space form lost `autocomplete="off"`.
+- Known and lower: a reactive picker marks its form dirty when its current value is picked again (bind, format, auth
+  method); the picker reports every pick, which the dashboard filter bar relies on, so a host that must ignore a re-pick
+  guards it (connection type, reconciliation day and filter, model provider).

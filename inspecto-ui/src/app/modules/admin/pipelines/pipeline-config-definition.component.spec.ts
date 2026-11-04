@@ -452,6 +452,18 @@ describe('PipelineConfigDefinitionComponent', () => {
         expect(seen.at(-1)).toBe(true);
     });
 
+    it('a committed reference row in the enrichment editor dirties the pane (its changed output)', async () => {
+        const fixture = await create({ node: { id: 'enrich1', type: 'enrichment' } });
+        const seen: boolean[] = [];
+        fixture.componentInstance.dirtyChange.subscribe((d) => seen.push(d));
+        editor(fixture).addReference();
+        editor(fixture).markSaved(); // the new row is the baseline: only the committed edit below can dirty the pane
+        fixture.detectChanges();
+        const alias = penByLabel(fixture.nativeElement as HTMLElement, 'Alias in SQL')!;
+        penEdit(fixture, alias, 'tariffs'); // Enter commits: no input or click reaches the pane after the value lands
+        expect(seen.at(-1)).toBe(true);
+    });
+
     it('seeds a FRESH companion from the host pipeline instead of asking (P6-c)', async () => {
         const fixture = await create({
             node: { id: 'enrich1', type: 'enrichment' },

@@ -1,25 +1,7 @@
 # Files that may still hold a boxed <mat-form-field> / <mat-select> (UI-FORM-ROWS-1, tools/check-form-idiom.mjs).
 # This list only shrinks: convert a screen to pen-field / option-picker rows, then delete its line here.
 # Seeded 2026-11-03 with every file that held one (127).
-src/app/inspecto/ai-assist/ai-assist.component.html
-src/app/inspecto/components/assist-panel.component.html
-src/app/inspecto/components/filter-bar.component.ts
-src/app/inspecto/components/offer-share.dialog.ts
 src/app/inspecto/components/schema-form.component.ts
-src/app/inspecto/confirm.service.ts
-src/app/inspecto/connections/connection-form.dialog.html
-src/app/inspecto/data-table/data-table.component.html
-src/app/inspecto/enrichment/enrichment-editor.component.ts
-src/app/inspecto/grammar/grammar-editor.component.html
-src/app/inspecto/query/query-condition-group.component.html
-src/app/inspecto/reconciliation/recon-toolbar.component.ts
-src/app/inspecto/rule/rule-save.dialog.ts
-src/app/inspecto/schema/schema-fields-editor.component.html
-src/app/inspecto/schema/schema-partitions-editor.component.ts
-src/app/inspecto/segments/segments-editor.component.html
-src/app/inspecto/spaces/space-form.dialog.ts
-src/app/inspecto/tags/tag-assignment.dialog.ts
-src/app/inspecto/transfer/import-bundle.dialog.html
 src/app/layout/common/search/search.component.html
 src/app/modules/admin/action-requests/action-requests.component.html
 src/app/modules/admin/agent-chat/agent-chat.component.html
