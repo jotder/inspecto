@@ -306,10 +306,10 @@ public final class EntityProfileRoutes implements RouteModule {
     }
 
     /** A key resolved: the normalised typed key the profile reads by, and the key the caller is shown. */
-    private record Resolved(String key, String shown, boolean masked) {}
+    record Resolved(String key, String shown, boolean masked) {}
 
     /** Raw value or alias to the normalised key; 422 for an alias this server never minted or a key that folds to nothing. */
-    private static Resolved resolveKey(Path writeRoot, EntityTypes.EntityType t, String mode, String given) {
+    static Resolved resolveKey(Path writeRoot, EntityTypes.EntityType t, String mode, String given) {
         if (given == null || given.isBlank())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the Entity key is empty");
         boolean alias = given.startsWith(MaskTokens.TOKEN_PREFIX);
@@ -323,7 +323,7 @@ public final class EntityProfileRoutes implements RouteModule {
         return new Resolved(key, shown, masked);
     }
 
-    private static EntityTypes.EntityType type(Path writeRoot, String id) {
+    static EntityTypes.EntityType type(Path writeRoot, String id) {
         return LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes().stream().filter(t -> t.id().equals(id)).findFirst()
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no entity type '" + id + "'"));
     }

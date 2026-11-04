@@ -1600,8 +1600,43 @@ export interface DiscoverResult {
         from: DiscoverBusy[];
         to: DiscoverBusy[];
         source?: PresetRunResult['source'];
+        /** The Entity Type the From / To column holds (what a busiest row's summary asks for), or null. */
+        fromType?: string | null;
+        toType?: string | null;
     };
     measures: DiscoverSection & { items: DiscoverMeasure[] };
+    masking?: { mode: string; masked: boolean; basis?: string };
+}
+
+/** LA-ENTITY-SUMMARY-1: one counterpart of the summarised entity (an alias when the Space masks). */
+export interface EntitySummaryCounterpart {
+    entity: string;
+    links: number;
+    out: number;
+    in: number;
+    /** The primary Measure over their links, when the Dataset has one. */
+    amount?: number | null;
+}
+
+/** `GET /inv/entities/{type}/{key}/summary?dataset=`: one entity over one Dataset's links. A part whose role the Dataset does
+ *  not map is null; `assessed: false` (a read past the Space's limit) carries no counts at all. */
+export interface EntitySummaryResult {
+    entity: { type: string; key: string; masked: boolean };
+    dataset: string;
+    assessed: boolean;
+    reason: string | null;
+    links?: number;
+    linksOut?: number;
+    linksIn?: number;
+    counterparts?: number;
+    firstSeen?: string | null;
+    lastSeen?: string | null;
+    measure?: { column: string; unit: string | null; out: number | null; in: number | null } | null;
+    counterpartsByLinks?: EntitySummaryCounterpart[];
+    counterpartsByAmount?: EntitySummaryCounterpart[] | null;
+    kinds?: { kind: string; links: number; out: number; in: number }[] | null;
+    kindsTruncated?: boolean;
+    activity?: { day: string; links: number }[] | null;
     masking?: { mode: string; masked: boolean; basis?: string };
 }
 
@@ -2330,6 +2365,14 @@ export class InvService {
     /** LA-BASIC-DISCOVER-1: what is in one Dataset. Read-only; 404 unknown Dataset · 422 unreadable link mapping. */
     discover(dataset: string): Observable<DiscoverResult> {
         return this.http.get<DiscoverResult>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/discover`));
+    }
+
+    /** LA-ENTITY-SUMMARY-1: one entity over one Dataset. Read-only; 404 unknown type or Dataset · 422 raw key of a masked type. */
+    entitySummary(type: string, key: string, dataset: string): Observable<EntitySummaryResult> {
+        return this.http.get<EntitySummaryResult>(
+            apiUrl(`/inv/entities/${encodeURIComponent(type)}/${encodeURIComponent(key)}/summary`),
+            { params: toParams({ dataset }) },
+        );
     }
 
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──

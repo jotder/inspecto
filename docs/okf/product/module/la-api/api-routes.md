@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-101 route(s) registered; 101 in the OpenAPI contract, 0 not.
+102 route(s) registered; 102 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -22,6 +22,7 @@ tags: [api, routes, generated]
 | GET | `/inv/datasets/{datasetId}/files` | List the Files recorded towards a Dataset, with each File's index state | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DatasetFilesRoutes.java` |
 | POST | `/inv/deep-links/resolve` | Validate an Open in Inspecto LA link's parameters | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java` |
 | GET | `/inv/entities/{entityType}/{entityKey}/profile` | Read one Entity's profile by raw value or exploration alias | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityPageRoutes.java` |
+| GET | `/inv/entities/{entityType}/{entityKey}/summary` | One entity's summary over one Dataset's links | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntitySummaryRoutes.java` |
 | POST | `/inv/entities/{entityType}/resolve` | Resolve a raw value or an alias to the key an Entity profile URL takes | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
 | POST | `/inv/entities/{entityType}/suggest` | List the values of an Entity Type that start a graph (the Start box type-ahead) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityProfileRoutes.java` |
 | GET | `/inv/entity-identities` | GET /inv/entity-identities (generated skeleton) | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityIdentityRoutes.java` |

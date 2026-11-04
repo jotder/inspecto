@@ -186,6 +186,8 @@ function make(
             },
         ],
     });
+    // the Summary section's data table imports MatDialogModule, so a plain provider is shadowed (angular-ui trap c)
+    TestBed.overrideProvider(MatDialog, { useValue: dialog });
     TestBed.overrideComponent(NodeInsightComponent, { set: { changeDetection: ChangeDetectionStrategy.Eager } });
     const fixture = TestBed.createComponent(NodeInsightComponent);
     fixture.componentRef.setInput('ctx', { ...CTX, ...ctx });
@@ -556,5 +558,18 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await settle(fixture);
         expect(el.querySelector('[data-testid=risk-unmapped]')).not.toBeNull();
         expect(svc.lookup).not.toHaveBeenCalled();
+    });
+    it('offers no Summary when the host names no Dataset for it', () => {
+        const none = make();
+        expect(none.el.querySelector('[data-testid=ni-summary]')).toBeNull();
+    });
+
+    it('shows the Summary button for a node of a known type over a named Dataset', async () => {
+        const { el, c } = make({ summaryDataset: 'pays_ds' });
+        expect(el.querySelector('[data-testid=ni-summary-open]')?.textContent).toContain(
+            'Summarise its links in pays_ds',
+        );
+        expect(c.summaryOpen()).toBe(false);
+        await expectNoA11yViolations(el);
     });
 });

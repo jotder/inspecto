@@ -17,7 +17,8 @@ export function discoverCount(n: number | null | undefined, approximate = false)
 export function discoverPeriod(r: DiscoverResult | null): string {
     const p = r?.period;
     if (!p?.assessed || !p.from || !p.to) return '';
-    const days = p.days === null || p.days === undefined ? '' : `${p.days.toLocaleString('en')} day${p.days === 1 ? '' : 's'}, `;
+    const days =
+        p.days === null || p.days === undefined ? '' : `${p.days.toLocaleString('en')} day${p.days === 1 ? '' : 's'}, `;
     return `${p.from.slice(0, 10)} to ${p.to.slice(0, 10)} (${days}by ${p.column})`;
 }
 

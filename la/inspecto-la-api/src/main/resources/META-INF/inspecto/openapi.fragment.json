@@ -1781,6 +1781,46 @@
         "x-optional-module" : true
       }
     },
+    "/inv/entities/{entityType}/{entityKey}/summary" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "One entity's summary over one Dataset's links",
+        "operationId" : "getInvEntitySummary",
+        "description" : "LA-ENTITY-SUMMARY-1 (Basic and up; the full Entity profile pages stay Standard, D-LAE4). Query: dataset (required). {entity {type, key, masked}, dataset, assessed, reason, links, linksOut, linksIn, counterparts, firstSeen, lastSeen, measure {column, unit, out, in} | null, counterpartsByLinks [{entity, links, out, in, amount?}] (top 20), counterpartsByAmount (top 20 by the primary Measure) | null, kinds [{kind, links, out, in}] | null, kindsTruncated, activity [{day, links}] (the 90 days before its last seen) | null, masking}. A part whose role the Dataset does not map is null. Keys are compared normalised under the Entity Type's normaliser. For a type masked under the Space's mode the key must be the exploration alias (a raw value is refused 422, never read); counterparts leave as aliases when the Space masks. A read past the Space's statement timeout answers assessed:false with why. Audited as LINK_ENTITY_SUMMARIZED, never with the key.",
+        "parameters" : [ {
+          "name" : "entityType",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        }, {
+          "name" : "entityKey",
+          "in" : "path",
+          "required" : true,
+          "description" : "A raw value (unmasked types) or an exploration alias.",
+          "schema" : { "type" : "string" }
+        }, {
+          "name" : "dataset",
+          "in" : "query",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The summary."
+          },
+          "404" : {
+            "description" : "No such Entity Type; no such Dataset, or not viewable by the caller (the same answer)."
+          },
+          "422" : {
+            "description" : "No dataset; a raw key for a masked type; an alias this server never minted; a Dataset that maps no From and To."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/exclusion-lists" : {
       "get" : {
         "tags" : [ "inv" ],

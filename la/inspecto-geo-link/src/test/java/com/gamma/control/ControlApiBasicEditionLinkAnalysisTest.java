@@ -54,6 +54,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/presets"},                              // PresetRoutes
             new String[]{"GET", "/inv/datasets/x/discover"},                  // DiscoverRoutes (LA-BASIC-DISCOVER-1, Q-1: Basic and up)
+            new String[]{"GET", "/inv/entities/msisdn/447700900123/summary"},  // EntitySummaryRoutes (LA-ENTITY-SUMMARY-1, Q-1: Basic and up)
             new String[]{"GET", "/inv/entity-identities"},                    // EntityIdentityRoutes
             new String[]{"GET", "/inv/entity-types"},                         // EntityProfileRoutes
             new String[]{"POST", "/inv/entities/msisdn/resolve"},             // EntityProfileRoutes: "Open in Link Analysis" (D-LAE4: stays open)

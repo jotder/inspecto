@@ -43,6 +43,10 @@ public final class LinkEventTypes {
      *  totals and busiest entities. {@code dataset}, {@code cached} and {@code masked} carry the reach; no entity id is recorded. */
     public static final String LINK_DATASET_DISCOVERED = "LINK_DATASET_DISCOVERED";
 
+    /** One entity's summary was read over one Dataset ({@code GET /inv/entities/{type}/{key}/summary}, LA-ENTITY-SUMMARY-1).
+     *  {@code entityType}/{@code dataset}/{@code found}/{@code assessed} carry the reach; the key is never recorded. */
+    public static final String LINK_ENTITY_SUMMARIZED = "LINK_ENTITY_SUMMARIZED";
+
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-47 test class(es): 47 unit, 0 real-HTTP control-plane, 0 IT.
+48 test class(es): 48 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -42,6 +42,7 @@ mvn -o test -pl la/inspecto-la-api -Dtest=CaseHistoryRoutesContractTest,ColumnPr
 | `EntityKeySqlTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EntityKeySqlTest.java` | The Entity profile counts Entities by the SQL mirror of {@link EntityTypes#normalise} (D-EP5). It runs the shared |
 | `EntityPageRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EntityPageRoutesContractTest.java` | {@link EntityPageRoutes} against the platform test kit's RouteModule TCK: no host, no processor boot. |
 | `EntityProfileRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EntityProfileRoutesContractTest.java` | {@link EntityProfileRoutes} against the platform test kit's RouteModule TCK: no host, no processor boot. |
+| `EntitySummaryRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EntitySummaryRoutesContractTest.java` | {@link EntitySummaryRoutes} against the platform test kit's RouteModule TCK: no host, no processor boot. |
 | `GeoRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/GeoRoutesContractTest.java` | {@link GeoRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-1 P5a): no host, no processor boot. |
 | `GraphRunRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/GraphRunRoutesContractTest.java` | {@link GraphRunRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |
 | `IndexedExpandTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/IndexedExpandTest.java` | {@link IndexedExpand#notIndexable}: every rung the index must NOT answer, each against a simple twin (D-3 step 6). |

@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-105 row(s).
+106 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -28,6 +28,7 @@ tags: [feature-db, module]
 | "GET /inv/datasets/([^/]+)/discover" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/datasets/([^/]+)/discover"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/datasets/([^/]+)/files" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/datasets/([^/]+)/files"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/entities/([^/]+)/([^/]+)/profile" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entities/([^/]+)/([^/]+)/profile"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /inv/entities/([^/]+)/([^/]+)/summary" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entities/([^/]+)/([^/]+)/summary"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/entity-identities" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entity-identities"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/entity-identities/group" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entity-identities/group"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /inv/entity-types" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"GET /inv/entity-types"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

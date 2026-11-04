@@ -22,6 +22,7 @@ import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
 import { laLimit } from './la-limits';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { LinkAnalysisEntitySummaryComponent } from './link-analysis-entity-summary.component';
 
 /** What the node detail dialog's insight sections know about the clicked node and the graph around it. */
 export interface NodeInsightContext {
@@ -53,6 +54,8 @@ export interface NodeInsightContext {
     canHide: boolean;
     /** The Entity Profile page of this node's Entity, when the host mounts the Entities pages and the type is known. */
     entityPage?: UrlTree | null;
+    /** LA-ENTITY-SUMMARY-1: the Dataset whose links the Summary reads (the node's mapping's); absent = no Summary offered. */
+    summaryDataset?: string | null;
 }
 
 interface Membership {
@@ -73,12 +76,30 @@ interface Membership {
     selector: 'inspecto-la-node-insight',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, InspectoAlertComponent, ChipComponent, RouterLink, DatePipe],
+    imports: [MatButtonModule, InspectoAlertComponent, ChipComponent, RouterLink, DatePipe, LinkAnalysisEntitySummaryComponent],
     template: `
         @if (ctx().entityPage; as page) {
             <p class="mt-2 text-sm">
                 <a [routerLink]="page" data-testid="entity-page-link">Open the Entity page</a>
             </p>
+        }
+        @if (ctx().summaryDataset && ctx().entityType) {
+            <section class="mt-4" aria-labelledby="ni-summary" data-testid="ni-summary">
+                <h3 id="ni-summary" class="text-base font-semibold">Summary</h3>
+                @if (summaryOpen()) {
+                    <inspecto-link-analysis-entity-summary
+                        [type]="ctx().entityType!"
+                        [key]="ctx().listKey ?? ctx().key"
+                        [dataset]="ctx().summaryDataset!"
+                        [level]="4"
+                        drawWhyNot="It is on the graph already."
+                    ></inspecto-link-analysis-entity-summary>
+                } @else {
+                    <button mat-stroked-button type="button" data-testid="ni-summary-open" (click)="summaryOpen.set(true)">
+                        Summarise its links in {{ ctx().summaryDataset }}
+                    </button>
+                }
+            </section>
         }
         <section class="mt-4" aria-labelledby="ni-risk">
             <h3 id="ni-risk" class="text-base font-semibold">Risk</h3>
@@ -375,6 +396,8 @@ export class NodeInsightComponent implements OnInit {
     private readonly ref = inject(MatDialogRef, { optional: true });
 
     readonly ctx = input.required<NodeInsightContext>();
+    /** The Summary is read on demand: over a large Dataset it takes seconds. */
+    readonly summaryOpen = signal(false);
 
     readonly mapping = computed(() => riskMappingFor(this.ctx().profileId));
     readonly indicators = signal<ReferenceTable | null>(null);

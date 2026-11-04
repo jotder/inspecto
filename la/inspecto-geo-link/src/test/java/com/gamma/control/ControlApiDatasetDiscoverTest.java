@@ -168,6 +168,8 @@ class ControlApiDatasetDiscoverTest {
             assertEquals(3, busy.get("from").get(0).get("links").asInt());
             assertEquals(D, busy.get("to").get(0).get("entity").asText(), "D is reached by two others: " + busy);
             assertEquals("dataset", busy.at("/source/kind").asText());
+            assertEquals("msisdn", busy.get("fromType").asText(), "what a busiest row's summary asks for");
+            assertEquals("msisdn", busy.get("toType").asText());
         }
     }
 

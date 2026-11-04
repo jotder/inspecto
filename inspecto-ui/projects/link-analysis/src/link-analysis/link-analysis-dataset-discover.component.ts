@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -14,6 +15,7 @@ import {
     discoverPeriod,
     discoverSourceLine,
 } from './dataset-discover';
+import { EntitySummaryDialog, EntitySummaryDialogData } from './link-analysis-entity-summary.component';
 import type { PresetDraw } from './link-analysis-presets.component';
 
 /**
@@ -31,7 +33,9 @@ import type { PresetDraw } from './link-analysis-presets.component';
     template: `
         <section class="flex flex-col gap-2 text-sm" [attr.aria-labelledby]="titleId()" data-testid="la-discover">
             <div class="flex flex-wrap items-center gap-2">
-                <p role="heading" [attr.aria-level]="level()" [id]="titleId()" class="m-0 text-base font-semibold">{{ title() }}</p>
+                <p role="heading" [attr.aria-level]="level()" [id]="titleId()" class="m-0 text-base font-semibold">
+                    {{ title() }}
+                </p>
                 @if (!result() && !busy()) {
                     <button mat-stroked-button type="button" data-testid="la-discover-run" (click)="load()">
                         Show what is in it
@@ -63,7 +67,8 @@ import type { PresetDraw } from './link-analysis-presets.component';
                     <ul class="m-0 list-none p-0" data-testid="la-discover-types">
                         @for (t of r.entityTypes.items; track t.type) {
                             <li>
-                                <span class="font-medium">{{ t.label }}</span>:
+                                <span class="font-medium">{{ t.label }}</span
+                                >:
                                 {{ t.distinct === null ? 'not counted' : count(t.distinct, t.approximate) }}
                                 <span class="text-secondary text-xs">(in {{ t.columns.join(', ') }})</span>
                             </li>
@@ -94,7 +99,8 @@ import type { PresetDraw } from './link-analysis-presets.component';
                     <ul class="m-0 list-none p-0" data-testid="la-discover-measures">
                         @for (m of r.measures.items; track m.column) {
                             <li>
-                                <span class="font-medium">{{ m.column }}</span>: {{ measureLine(m) }}
+                                <span class="font-medium">{{ m.column }}</span
+                                >: {{ measureLine(m) }}
                             </li>
                         }
                     </ul>
@@ -113,7 +119,7 @@ import type { PresetDraw } from './link-analysis-presets.component';
                             [rows]="r.busiest.from"
                             [columns]="fromColumns"
                             noRowsTitle="No links"
-                            (rowClick)="pick($event)"
+                            (rowClick)="pick($event, 'from')"
                             data-testid="la-discover-busy-from"
                         ></inspecto-data-table>
                         <inspecto-data-table
@@ -121,7 +127,7 @@ import type { PresetDraw } from './link-analysis-presets.component';
                             [rows]="r.busiest.to"
                             [columns]="toColumns"
                             noRowsTitle="No links"
-                            (rowClick)="pick($event)"
+                            (rowClick)="pick($event, 'to')"
                             data-testid="la-discover-busy-to"
                         ></inspecto-data-table>
                     </div>
@@ -151,6 +157,7 @@ import type { PresetDraw } from './link-analysis-presets.component';
 })
 export class LinkAnalysisDatasetDiscoverComponent {
     private readonly inv = inject(InvService);
+    private readonly dialog = inject(MatDialog);
 
     /** The Dataset to discover. */
     readonly dataset = input.required<string>();
@@ -162,8 +169,6 @@ export class LinkAnalysisDatasetDiscoverComponent {
     readonly drawWhyNot = input('');
 
     readonly draw = output<PresetDraw>();
-    /** A busiest row was clicked: its entity (an alias when masked). */
-    readonly entityPicked = output<string>();
 
     readonly result = signal<DiscoverResult | null>(null);
     readonly busy = signal(false);
@@ -202,9 +207,26 @@ export class LinkAnalysisDatasetDiscoverComponent {
         this.error.set('');
     }
 
-    pick(row: Record<string, unknown>): void {
+    /** A busiest row opens that entity's summary (LA-ENTITY-SUMMARY-1); its *Draw it* draws through this panel's `draw`. */
+    pick(row: Record<string, unknown>, end: 'from' | 'to'): void {
         const e = row['entity'];
-        if (e !== null && e !== undefined && String(e) !== '') this.entityPicked.emit(String(e));
+        const type = end === 'from' ? this.result()?.busiest.fromType : this.result()?.busiest.toType;
+        if (e === null || e === undefined || String(e) === '' || !type) return;
+        const data: EntitySummaryDialogData = {
+            type,
+            key: String(e),
+            dataset: this.dataset(),
+            drawWhyNot: this.drawWhyNot(),
+        };
+        this.dialog
+            .open<EntitySummaryDialog, EntitySummaryDialogData, PresetDraw>(EntitySummaryDialog, {
+                data,
+                width: '44rem',
+            })
+            .afterClosed()
+            .subscribe((d) => {
+                if (d) this.draw.emit(d);
+            });
     }
 
     drawThese(): void {

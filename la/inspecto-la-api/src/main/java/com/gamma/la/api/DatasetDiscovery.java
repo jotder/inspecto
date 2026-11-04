@@ -102,7 +102,10 @@ final class DatasetDiscovery {
         out.put("entityTypes", entityTypes(t, held, settings.effectiveMaskingMode(), policy));
         out.put("period", period(t, pass, passFailed));
         out.put("linkKinds", linkKinds(t, policy));
-        out.put("busiest", busiest(api, writeRoot, t, fences));
+        Map<String, Object> busiest = busiest(api, writeRoot, t, fences);
+        busiest.put("fromType", typeHolding(held, t.roles().from()));
+        busiest.put("toType", typeHolding(held, t.roles().to()));
+        out.put("busiest", busiest);
         out.put("measures", measureTotals(measures, pass, passFailed));
         if (stamp != null && !failedAnywhere(out)) Cache.put(key, stamp, out);
         return out;
@@ -147,6 +150,12 @@ final class DatasetDiscovery {
     private static EntityTypes.EntityType typeOf(String classification, List<EntityTypes.EntityType> types) {
         for (EntityTypes.EntityType t : types)
             for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(classification.trim())) return t;
+        return null;
+    }
+
+    /** The id of the Entity Type {@code column} holds (what an entity summary of a busiest row asks for), or null. */
+    private static String typeHolding(List<Held> held, String column) {
+        if (column != null) for (Held h : held) if (h.columns().contains(column)) return h.type().id();
         return null;
     }
 
