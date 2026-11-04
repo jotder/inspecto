@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `ENTITY-TYPE-CATALOG-1` | P2 | feature | a comprehensive Entity Type catalogue per domain: neutral families in the core (Party, Organisation, Account, Identifier, Device, Place,… | — |
+| `ENTITY-TYPE-RECORD-ROLES-1` | P3 | feature | a record type also says which columns are usually its times, measures and categories, so Add data and the Data page propose column roles… | — |

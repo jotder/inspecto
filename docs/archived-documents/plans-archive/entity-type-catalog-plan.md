@@ -1,5 +1,7 @@
 # A domain Entity Type catalogue: families, pack types and record types (`ENTITY-TYPE-CATALOG-1`)
 
+> **SHIPPED 2026-11-04 (P0-P3; archived).** As-built truth: [entity-store spec](../../okf/product/module/entity-store/spec.md) "Industry packs"; open remainder: BACKLOG `ENTITY-TYPE-RECORD-ROLES-1`.
+>
 > **PLAN 2026-11-04 — decisions Q-1…Q-6 accepted by the operator 2026-11-04 (the recommended options, §5).** Operator ask, on the Data page's
 > "what does this column hold" picker: *"this list would be different for different types of record, is it possible
 > to make a comprehensive Entity Type for a domain? how user will read and use generic"*. Board row
