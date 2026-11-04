@@ -22,6 +22,8 @@ final class DatasetEntryRules {
 
     static final String PRIMARY_ENTITY_TYPE = "primaryEntityType";
     static final String DEFAULT_LINK_MAPPING = "defaultLinkMapping";
+    /** What one row is (ENTITY-TYPE-CATALOG-1 P2): a record type id of the Space's packs. */
+    static final String RECORD_TYPE = "recordType";
 
     private static final Set<String> MAPPING_KEYS = Set.of("from", "to", "kind", "time", "amount", "details");
 
@@ -35,6 +37,9 @@ final class DatasetEntryRules {
         Object primary = content.get(PRIMARY_ENTITY_TYPE);
         if (primary != null && (!(primary instanceof String s) || s.isBlank()))
             throw new IllegalArgumentException(PRIMARY_ENTITY_TYPE + " must be an Entity Type id (a non-blank string)");
+        Object recordType = content.get(RECORD_TYPE);
+        if (recordType != null && (!(recordType instanceof String s) || s.isBlank()))
+            throw new IllegalArgumentException(RECORD_TYPE + " must be a record type id (a non-blank string)");
         Object raw = content.get(DEFAULT_LINK_MAPPING);
         if (raw == null) return;
         if (!(raw instanceof Map<?, ?> m))

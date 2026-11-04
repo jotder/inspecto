@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { EntityFamily, OTHER_FAMILY, entityTypeHint, entityTypeOptions } from './entity-type-options';
+import {
+    EntityFamily,
+    OTHER_FAMILY,
+    RecordTypeGuide,
+    SHAPE_MATCHES,
+    entityTypeHint,
+    entityTypeOptions,
+    likelyGroup,
+} from './entity-type-options';
 
 /** A synthetic catalogue: the families the server serves, in its order. */
 const FAMILIES: EntityFamily[] = [
@@ -79,5 +87,64 @@ describe('entityTypeOptions (ENTITY-TYPE-CATALOG-1 P0)', () => {
         expect(entityTypeHint({ id: 'a', label: 'A', definition: ' Def. ' })).toBe('Def.');
         expect(entityTypeHint({ id: 'a', label: 'A', example: 'X-1' })).toBe('e.g. X-1');
         expect(entityTypeHint({ id: 'a', label: 'A', definition: ' ', example: null })).toBeUndefined();
+    });
+});
+
+describe('entityTypeOptions narrowed by record type and sample (ENTITY-TYPE-CATALOG-1 P2)', () => {
+    const TYPES = [
+        { id: 'subscriber', label: 'Subscriber', family: 'party', shape: 'free' },
+        { id: 'wallet', label: 'Wallet', family: 'account' },
+        { id: 'msisdn', label: 'Phone number', family: 'identifier', shape: 'e164', definition: 'A number.' },
+        { id: 'imsi', label: 'Card identity', family: 'identifier', shape: 'digits(15)' },
+        { id: 'cell', label: 'Location', family: 'place' },
+    ];
+    const CALL: RecordTypeGuide = { id: 'call', label: 'Call record', likelyTypes: ['cell', 'msisdn', 'gone'] };
+
+    it('puts the record type likely types first, in its order, then every other type by family', () => {
+        const options = entityTypeOptions(TYPES, FAMILIES, { recordType: CALL });
+        expect(options.map((o) => [o.group, o.value])).toEqual([
+            ['Likely in a call record', 'cell'],
+            ['Likely in a call record', 'msisdn'],
+            ['Party', 'subscriber'],
+            ['Account', 'wallet'],
+            ['Identifier', 'imsi'],
+        ]);
+        expect(options.map((o) => o.value)).toHaveLength(TYPES.length);
+    });
+
+    it('marks a type whose shape every sampled value fits, first in its group', () => {
+        const options = entityTypeOptions(TYPES, FAMILIES, {
+            recordType: CALL,
+            sample: ['+447700900123', ' ', '447700900124'],
+        });
+        expect(options[0]).toEqual({
+            value: 'msisdn',
+            label: 'Phone number',
+            group: 'Likely in a call record',
+            hint: 'Shape matches. A number.',
+        });
+        expect(options[1].value).toBe('cell');
+        expect(options.find((o) => o.value === 'subscriber')?.hint).toBeUndefined();
+    });
+
+    it('without a record type, the shape-matching types lead in a group of their own', () => {
+        const options = entityTypeOptions(TYPES, FAMILIES, { sample: ['001010123456789'] });
+        expect(options[0]).toEqual({
+            value: 'imsi',
+            label: 'Card identity',
+            group: SHAPE_MATCHES,
+            hint: 'Shape matches.',
+        });
+        // 15 bare digits fit a phone number only weakly: it follows the strong fit
+        expect(options.filter((o) => o.group === SHAPE_MATCHES).map((o) => o.value)).toEqual(['imsi', 'msisdn']);
+        // a sample that one value spoils marks nothing, and no context is P0's grouping
+        expect(entityTypeOptions(TYPES, FAMILIES, { sample: ['001010123456789', 'n/a'] })[0].group).toBe('Party');
+        expect(entityTypeOptions(TYPES, FAMILIES)).toEqual(entityTypeOptions(TYPES, FAMILIES, {}));
+    });
+
+    it('reads the record type label as a sentence', () => {
+        expect(likelyGroup({ id: 'a', label: 'Transfer', likelyTypes: [] })).toBe('Likely in a transfer');
+        expect(likelyGroup({ id: 'a', label: 'SMS record', likelyTypes: [] })).toBe('Likely in an SMS record');
+        expect(likelyGroup({ id: 'a', label: 'Airtime top-up', likelyTypes: [] })).toBe('Likely in an airtime top-up');
     });
 });

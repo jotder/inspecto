@@ -334,10 +334,67 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
     });
 
     it('offers what a column holds grouped by family, with a definition and an example (ENTITY-TYPE-CATALOG-1)', () => {
-        const { c } = create();
+        const { c, el } = create();
         expect((c as unknown as { typeOptions: () => unknown[] }).typeOptions()).toEqual([
             { value: '', label: 'Nothing: a detail' },
             { value: 'account', label: 'Account', group: 'Account', hint: 'An account a party holds. e.g. ACC-1' },
         ]);
+        expect(q(el, 'record-type')).toBeNull(); // no record type in force: the question is not asked
+    });
+
+    it('asks what a row is when the Space has record types, puts its likely types first and saves a change (ENTITY-TYPE-CATALOG-1 P2)', async () => {
+        TestBed.configureTestingModule({
+            imports: [DataPageComponent],
+            providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()],
+        });
+        http = TestBed.inject(HttpTestingController);
+        const fixture = TestBed.createComponent(DataPageComponent);
+        fixture.detectChanges();
+        const typed = DATASETS.map((d) =>
+            d.name === 'transfers' ? { ...d, content: { ...d.content, recordType: 'transfer' } } : d,
+        );
+        http.expectOne(apiUrl('/components/dataset')).flush(typed);
+        http.match((r) => r.url.includes('/entity-types')).forEach((r) =>
+            r.flush({
+                items: [
+                    { id: 'account', label: 'Account', classifications: ['ACCOUNT_ID'], family: 'account' },
+                    { id: 'phone', label: 'Phone number', classifications: ['PHONE'], family: 'identifier' },
+                ],
+                families: [
+                    { id: 'account', label: 'Account', definition: 'Holds a balance.' },
+                    { id: 'identifier', label: 'Identifier', definition: 'A number.' },
+                ],
+                recordTypes: [{ id: 'transfer', label: 'Transfer', definition: 'Money sent.', likelyTypes: ['phone'] }],
+            }),
+        );
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const c = fixture.componentInstance as unknown as {
+            holdsOptions: () => ReadonlyMap<string, { value: string; group?: string }[]>;
+            recordTypeControls: () => ReadonlyMap<string, { value: string; setValue(v: string): void }>;
+        };
+
+        const card = el.querySelector<HTMLElement>('[data-testid="columns"]')!;
+        expect(card.querySelector('[data-testid="record-type"]')).not.toBeNull();
+        expect(c.recordTypeControls().get('transfers')!.value).toBe('transfer');
+        expect(
+            c
+                .holdsOptions()
+                .get('transfers')!
+                .map((o) => [o.group, o.value]),
+        ).toEqual([
+            [undefined, ''],
+            ['Likely in a transfer', 'phone'],
+            ['Account', 'account'],
+        ]);
+        // a base with no record type keeps the family order
+        expect(c.holdsOptions().get('wallet_txn')![1].group).toBe('Account');
+        await expectNoA11yViolations(el);
+
+        c.recordTypeControls().get('transfers')!.setValue('');
+        const req = http.expectOne((r) => r.method === 'PUT' && r.url === apiUrl('/datasets/transfers/record-type'));
+        expect(req.request.body).toEqual({ recordType: null });
+        req.flush({ dataset: 'transfers', recordType: null });
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
     });
 });

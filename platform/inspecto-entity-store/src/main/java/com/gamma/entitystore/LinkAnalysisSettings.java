@@ -382,6 +382,14 @@ public record LinkAnalysisSettings(Integer projectionNodeCap, Integer analysisNo
     }
 
     /**
+     * The record types in force (ENTITY-TYPE-CATALOG-1 Q-3): those of {@link #activePacks}, merged by id, the Domain Profile's
+     * first. Empty when no pack is in force.
+     */
+    public List<IndustryPack.RecordType> effectiveRecordTypes() {
+        return IndustryPack.recordTypes(activePacks());
+    }
+
+    /**
      * Every installed pack in force for this Space, the Domain Profile's first (it wins a label two packs both give), then
      * each of {@code extra_packs} (ENTITY-TYPE-CATALOG-1 Q-5: a telecom operator that runs mobile money). Ids that are not
      * installed are skipped; a repeated id counts once.

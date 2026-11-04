@@ -23,6 +23,7 @@ import java.util.Map;
  *   industry-pack-entity-types.toon  entity_types[n] - core Entity Types restated, or added under a family
  *                                    (normaliser, masked, classifications, family, shape, example)
  *   industry-pack-link-kinds.toon    link_kinds[n] - the link kinds the pack's terms may name
+ *   industry-pack-record-types.toon  OPTIONAL record_types[n]{id, likely_types[]} - what a row of a Dataset can be
  * </pre>
  * ⛔ <b>Fail closed.</b> A pack whose files are missing, do not parse or break any {@link IndustryPack#parse} rule, or
  * whose id two jars both declare, or that does not read together with the packs installed before it (the same Entity Type
@@ -106,7 +107,8 @@ public final class IndustryPacks {
             }
             try {
                 IndustryPack p = IndustryPack.parse(id, read(loader, id, "industry-pack.toon"), read(loader, id, "industry-pack-terms.toon"),
-                        read(loader, id, "industry-pack-entity-types.toon"), read(loader, id, "industry-pack-link-kinds.toon"));
+                        read(loader, id, "industry-pack-entity-types.toon"), read(loader, id, "industry-pack-link-kinds.toon"),
+                        readOptional(loader, id, "industry-pack-record-types.toon"));
                 // Several packs may be in force in one Space: every installed pack must read together with the ones before it.
                 List<IndustryPack> together = new ArrayList<>(installed);
                 together.add(p);
@@ -121,6 +123,11 @@ public final class IndustryPacks {
             }
         }
         return new Catalogue(installed, refused);
+    }
+
+    /** {@link #read}, or {@code null} when the pack has no such file. */
+    private static Map<String, Object> readOptional(ClassLoader loader, String id, String file) throws IOException {
+        return loader.getResource(DIR + id + "/" + file) == null ? null : read(loader, id, file);
     }
 
     private static Map<String, Object> read(ClassLoader loader, String id, String file) throws IOException {

@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.IndustryPack;
 import com.gamma.entitystore.ValueShapes;
 
 import java.util.ArrayList;
@@ -207,6 +208,35 @@ final class EntityShapes {
             if (ok) fit++;
         }
         return fit;
+    }
+
+    /**
+     * The record type of a draft (ENTITY-TYPE-CATALOG-1 P2): the one whose likely Entity Types the most proposed columns hold
+     * (distinct types; ties go to the first in force). {@code high} when at least two of its likely types are held and no other
+     * record type ties. {@code entityTypes} is the block {@link #propose} answered.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> recordType(Map<String, Object> entityTypes, List<IndustryPack.RecordType> recordTypes) {
+        Set<String> held = new LinkedHashSet<>();
+        for (Object o : (List<Object>) entityTypes.getOrDefault("columns", List.of()))
+            if (o instanceof Map<?, ?> row && row.get("entityType") instanceof Map<?, ?> ch && ch.get("value") != null)
+                held.add(String.valueOf(ch.get("value")));
+        IndustryPack.RecordType best = null;
+        List<String> bestHeld = List.of();
+        boolean tie = false;
+        for (IndustryPack.RecordType r : recordTypes) {
+            List<String> hits = r.likelyTypes().stream().filter(held::contains).toList();
+            if (hits.size() > bestHeld.size()) {
+                best = r;
+                bestHeld = hits;
+                tie = false;
+            } else if (!hits.isEmpty() && hits.size() == bestHeld.size()) tie = true;
+        }
+        if (best == null)
+            return OnboardDraft.choice(null, "no column holds an Entity Type a record type of this Space usually holds", false);
+        String why = (bestHeld.size() == 1 ? "a column holds " : "the columns hold ") + String.join(", ", bestHeld)
+                + ", which a " + best.label().toLowerCase(Locale.ROOT) + " usually holds" + (tie ? " - a tie, the first is proposed" : "");
+        return OnboardDraft.choice(best.id(), why, bestHeld.size() >= 2 && !tie);
     }
 
     // ── the Dataset level ────────────────────────────────────────────────────────────────────────────────────

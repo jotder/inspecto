@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
  *   <li>{@code link_kind.<id>} — a link kind the pack's own {@code link_kinds} list declares (link kinds are data values);</li>
  *   <li>{@code measure.<id>} — a Value Measure ({@link #MEASURES});</li>
  *   <li>{@code pattern.<id>} — a pattern pack the pack's own {@code pattern_packs} list references;</li>
+ *   <li>{@code record_type.<id>} — a record type the pack's own {@code record_types} list defines (its label and definition);</li>
  *   <li>{@code term.<id>} — a glossary entry only (a typology such as a fraud scheme): shown in the pack's term list,
  *       relabels nothing.</li>
  * </ul>
@@ -33,7 +34,7 @@ import java.util.regex.Pattern;
  */
 public record IndustryPack(String id, String name, String description, List<String> spaceTemplates,
                            List<String> patternPacks, Profile profile, List<Term> terms,
-                           List<EntityTypes.EntityType> entityTypes, List<String> linkKinds) {
+                           List<EntityTypes.EntityType> entityTypes, List<String> linkKinds, List<RecordType> recordTypes) {
 
     public IndustryPack {
         spaceTemplates = List.copyOf(spaceTemplates);
@@ -41,7 +42,34 @@ public record IndustryPack(String id, String name, String description, List<Stri
         terms = List.copyOf(terms);
         entityTypes = List.copyOf(entityTypes);
         linkKinds = List.copyOf(linkKinds);
+        recordTypes = List.copyOf(recordTypes);
     }
+
+    /**
+     * A <b>record type</b> (ENTITY-TYPE-CATALOG-1 Q-3): what one row of a Dataset is in this domain (a call record, a
+     * transfer, a registration), and the Entity Types such a record usually holds, most telling first. Its label and
+     * definition are the pack's {@code record_type.<id>} term. A Dataset names its record type ({@code recordType}); the
+     * "what does this column hold" picker then offers the likely types first. It only orders and groups: identity is the
+     * Entity Type id, the same in every Dataset.
+     */
+    public record RecordType(String id, String label, String definition, List<String> likelyTypes) {
+        public RecordType {
+            likelyTypes = List.copyOf(likelyTypes);
+        }
+
+        /** The wire shape: {@code {id, label, definition, likelyTypes}}. */
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", id);
+            m.put("label", label);
+            m.put("definition", definition);
+            m.put("likelyTypes", likelyTypes);
+            return m;
+        }
+    }
+
+    /** The most record types one pack may define. */
+    static final int MAX_RECORD_TYPES = 60;
 
     /** One relabel: the display name, an optional abbreviation and the hover definition of a canonical concept key. */
     public record Term(String key, String label, String abbreviation, String definition) {}
@@ -110,12 +138,20 @@ public record IndustryPack(String id, String name, String description, List<Stri
     private static final Set<String> INVESTIGATE_NUMBERS = Set.of("window_days", "min_events", "max_fan_out", "budget",
             "max_degree");
 
-    /**
-     * Parse and validate a pack from its four decoded files. {@code dirId} is the directory the files were read from;
-     * the manifest's {@code id} must equal it. Throws {@link IllegalArgumentException} naming the first problem.
-     */
+    /** {@link #parse(String, Map, Map, Map, Map, Map)} of a pack that defines no record types. */
     public static IndustryPack parse(String dirId, Map<String, Object> manifest, Map<String, Object> termsDoc,
                                      Map<String, Object> entityTypesDoc, Map<String, Object> linkKindsDoc) {
+        return parse(dirId, manifest, termsDoc, entityTypesDoc, linkKindsDoc, null);
+    }
+
+    /**
+     * Parse and validate a pack from its decoded files ({@code recordTypesDoc} is optional: {@code null} = none). {@code dirId}
+     * is the directory the files were read from; the manifest's {@code id} must equal it. Throws
+     * {@link IllegalArgumentException} naming the first problem.
+     */
+    public static IndustryPack parse(String dirId, Map<String, Object> manifest, Map<String, Object> termsDoc,
+                                     Map<String, Object> entityTypesDoc, Map<String, Object> linkKindsDoc,
+                                     Map<String, Object> recordTypesDoc) {
         String id = str(manifest, "id");
         if (!id.equals(dirId)) throw new IllegalArgumentException("manifest id '" + id + "' differs from its directory '" + dirId + "'");
         if (!ID.matcher(id).matches()) throw new IllegalArgumentException("pack id must match " + ID.pattern() + ", got '" + id + "'");
@@ -166,6 +202,29 @@ public record IndustryPack(String id, String name, String description, List<Stri
         Set<String> typeIds = new HashSet<>(coreIds);
         typeIds.addAll(seenTypes);
 
+        // record types: ids and likely types now; label and definition from their terms below
+        Map<String, List<String>> records = new LinkedHashMap<>();
+        if (recordTypesDoc != null) {
+            List<?> rawRecords = list(recordTypesDoc.get("record_types"), "record_types");
+            if (rawRecords.size() > MAX_RECORD_TYPES)
+                throw new IllegalArgumentException("at most " + MAX_RECORD_TYPES + " record types, got " + rawRecords.size());
+            for (Object o : rawRecords) {
+                if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each record type must be an object");
+                String rid = str(m, "id");
+                if (!KIND.matcher(rid).matches())
+                    throw new IllegalArgumentException("record type id must match ^[a-z][a-z0-9_]{0,31}$, got '" + rid + "'");
+                if (records.containsKey(rid)) throw new IllegalArgumentException("record type '" + rid + "' is listed twice");
+                List<String> likely = strings(m.get("likely_types"), "record type '" + rid + "' likely_types");
+                for (String t : likely)
+                    if (!typeIds.contains(t))
+                        throw new IllegalArgumentException("record type '" + rid + "': likely type '" + t
+                                + "' is neither a core Entity Type nor one the pack lists");
+                if (new HashSet<>(likely).size() != likely.size())
+                    throw new IllegalArgumentException("record type '" + rid + "' lists a likely type twice");
+                records.put(rid, likely);
+            }
+        }
+
         List<Term> terms = new ArrayList<>();
         Set<String> keys = new HashSet<>();
         List<?> rawTerms = list(termsDoc.get("terms"), "terms");
@@ -174,7 +233,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
             if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each term must be an object");
             String key = str(m, "key");
             if (!keys.add(key)) throw new IllegalArgumentException("term '" + key + "' is listed twice");
-            checkKey(key, typeIds, kinds, patterns);
+            checkKey(key, typeIds, kinds, patterns, records.keySet());
             String label = bounded(str(m, "label"), "term '" + key + "' label", MAX_LABEL);
             String abbreviation = m.get("abbreviation") == null ? "" : bounded(optStr(m, "abbreviation"), "term '" + key + "' abbreviation", MAX_ABBREVIATION);
             String definition = bounded(str(m, "definition"), "term '" + key + "' definition", MAX_DEFINITION);
@@ -188,7 +247,14 @@ public record IndustryPack(String id, String name, String description, List<Stri
                 throw new IllegalArgumentException("entity type '" + t.id() + "' is added by the pack, so it needs a term 'entity_type."
                         + t.id() + "' for its label and definition");
         profile.check(typeIds);
-        IndustryPack pack = new IndustryPack(id, name, description, templates, patterns, profile, terms, types, kinds);
+        List<RecordType> recordTypes = new ArrayList<>();
+        for (var r : records.entrySet()) {
+            Term term = terms.stream().filter(t -> t.key().equals("record_type." + r.getKey())).findFirst().orElseThrow(
+                    () -> new IllegalArgumentException("record type '" + r.getKey() + "' needs a term 'record_type." + r.getKey()
+                            + "' for its label and definition"));
+            recordTypes.add(new RecordType(r.getKey(), term.label(), term.definition(), r.getValue()));
+        }
+        IndustryPack pack = new IndustryPack(id, name, description, templates, patterns, profile, terms, types, kinds, recordTypes);
         EntityTypes.validate(pack.overlay(EntityTypes.DEFAULTS), Integer.MAX_VALUE);
         return pack;
     }
@@ -203,7 +269,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
         return null;
     }
 
-    private static void checkKey(String key, Set<String> typeIds, List<String> kinds, List<String> patterns) {
+    private static void checkKey(String key, Set<String> typeIds, List<String> kinds, List<String> patterns, Set<String> records) {
         int dot = key.indexOf('.');
         String ns = dot < 0 ? "" : key.substring(0, dot);
         String rest = dot < 0 ? "" : key.substring(dot + 1);
@@ -213,12 +279,13 @@ public record IndustryPack(String id, String name, String description, List<Stri
             case "link_kind" -> kinds.contains(rest);
             case "measure" -> MEASURES.contains(rest);
             case "pattern" -> patterns.contains(rest);
+            case "record_type" -> records.contains(rest);
             case "term" -> ID.matcher(rest).matches();
             default -> false;
         };
         if (!ok)
             throw new IllegalArgumentException("term '" + key + "' names no core concept (concept.* " + CONCEPTS.keySet()
-                    + ", entity_type.<core or listed type>, link_kind.<listed kind>, measure.<Value Measure>, pattern.<listed pattern pack>"
+                    + ", entity_type.<core or listed type>, record_type.<listed record type>, link_kind.<listed kind>, measure.<Value Measure>, pattern.<listed pattern pack>"
                     + " or term.<id>) - a pack relabels, it never adds a concept");
     }
 
@@ -264,6 +331,16 @@ public record IndustryPack(String id, String name, String description, List<Stri
                     t.classifications(), t.family(), term != null ? term.definition() : t.definition(), t.example(), t.shape()));
         }
         return List.copyOf(out);
+    }
+
+    /**
+     * The record types {@code packs} define, merged by id: the first pack's definition of an id wins (ENTITY-TYPE-CATALOG-1
+     * Q-5), in pack order.
+     */
+    public static List<RecordType> recordTypes(List<IndustryPack> packs) {
+        Map<String, RecordType> out = new LinkedHashMap<>();
+        for (IndustryPack p : packs) for (RecordType r : p.recordTypes) out.putIfAbsent(r.id(), r);
+        return List.copyOf(out.values());
     }
 
     /**
@@ -330,6 +407,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
         m.put("terms", ts);
         m.put("entityTypes", EntityTypes.shape(overlay(EntityTypes.DEFAULTS)));
         m.put("linkKinds", linkKinds);
+        m.put("recordTypes", recordTypes.stream().map(RecordType::toMap).toList());
         return m;
     }
 

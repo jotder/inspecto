@@ -288,6 +288,59 @@ class IndustryPacksTest {
         assertRefused(c, "toy", "relabels to its neutral label");
     }
 
+    // ── ENTITY-TYPE-CATALOG-1 P2: record types ─────────────────────────────────────────────────────────────────
+
+    private static final String SHIP_LOG_TERMS = "terms[2]{key,label,abbreviation,definition}:\n  entity_type.starship,Starship,\"\",\"A vessel.\"\n"
+            + "  record_type.ship_log,Ship log,\"\",\"One line of a vessel's log.\"\n";
+
+    /** A pack {@code id} with a record-type file {@code recordTypes} beside the four files. */
+    private static Path withRecordTypes(Path root, String id, String types, String terms, String recordTypes) throws IOException {
+        write(root, id, f -> f.equals("types") ? types : f.equals("terms") ? terms : null);
+        Files.writeString(root.resolve(IndustryPacks.DIR + id + "/industry-pack-record-types.toon"), recordTypes, StandardCharsets.UTF_8);
+        return root;
+    }
+
+    @Test
+    void aPackDefinesRecordTypesLabelledByTheirTermsNamingItsOwnTypes() throws IOException {
+        IndustryPacks.Catalogue c = load(withRecordTypes(tmp.resolve("jar1"), "toy", starship("    family: device\n"), SHIP_LOG_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[2]: starship,account\n"));
+        assertEquals(List.of(), c.refused());
+        assertEquals(List.of(new IndustryPack.RecordType("ship_log", "Ship log", "One line of a vessel's log.", List.of("starship", "account"))),
+                c.find("toy").recordTypes());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> wire = (List<Map<String, Object>>) c.find("toy").toMap().get("recordTypes");
+        assertEquals(List.of("starship", "account"), wire.get(0).get("likelyTypes"));
+        assertEquals(List.of(), load(write(tmp.resolve("jar0"), "bare", f -> null)).find("bare").recordTypes(), "the file is optional");
+    }
+
+    @Test
+    void aRecordTypeNamingNoTypeOrWithoutItsTermOrTwiceRefusesThePack() throws IOException {
+        String types = starship("    family: device\n");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar1"), "toy", types, SHIP_LOG_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: comet\n")), "toy", "likely type 'comet'");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar2"), "toy", types, STARSHIP_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n")), "toy", "needs a term 'record_type.ship_log'");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar3"), "toy", types, SHIP_LOG_TERMS,
+                "record_types[2]:\n  - id: ship_log\n    likely_types[1]: starship\n  - id: ship_log\n    likely_types[1]: account\n")),
+                "toy", "listed twice");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar4"), "toy", types,
+                SHIP_LOG_TERMS.replace("terms[2]", "terms[3]") + "  record_type.dock,Dock,\"\",\"x\"\n",
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n")), "toy", "names no core concept");
+    }
+
+    @Test
+    void theShippedPacksDefineRecordTypesAndASpaceReadsThoseOfEveryPackInForce() throws IOException {
+        IndustryPack telecom = IndustryPacks.bundled().find("telecom");
+        assertTrue(telecom.recordTypes().stream().anyMatch(r -> r.id().equals("voice_call") && r.likelyTypes().contains("msisdn")));
+        Path file = tmp.resolve(LinkAnalysisSettings.FILE);
+        Files.writeString(file, "domain_profile: telecom\nextra_packs[1]: mobile-money\n");
+        List<String> ids = LinkAnalysisSettings.read(file).effectiveRecordTypes().stream().map(IndustryPack.RecordType::id).toList();
+        assertTrue(ids.contains("voice_call") && ids.contains("transfer"), ids.toString());
+        assertTrue(ids.indexOf("voice_call") < ids.indexOf("transfer"), "the Domain Profile's first");
+        Files.writeString(file, "masking_mode: typed\n");
+        assertEquals(List.of(), LinkAnalysisSettings.read(file).effectiveRecordTypes(), "no pack, no record type");
+    }
+
     // ── the Space side ──────────────────────────────────────────────────────────────────────────────────────────
 
     @Test

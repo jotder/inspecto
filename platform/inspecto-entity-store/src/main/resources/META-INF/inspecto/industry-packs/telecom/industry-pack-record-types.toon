@@ -1,0 +1,5 @@
+record_types[2]:
+  - id: voice_call
+    likely_types[4]: msisdn,imsi,imei,cell
+  - id: sms
+    likely_types[3]: msisdn,imsi,cell

@@ -1,4 +1,4 @@
-terms[20]{key,label,abbreviation,definition}:
+terms[22]{key,label,abbreviation,definition}:
   concept.node,Subscribers,"","The lines and identities on the canvas."
   concept.link,Calls,"","Calls, messages and other contacts between two lines, folded into one link per pair and kind."
   concept.row,Call detail records,CDR / XDR,"The usage records behind the links: a CDR for voice and SMS, an XDR for data and signalling events."
@@ -19,3 +19,5 @@ terms[20]{key,label,abbreviation,definition}:
   term.simbox,SIM box,"","A gateway holding many SIM cards that turns international calls into local ones to bypass interconnect charges."
   term.irsf,IRSF,"","International Revenue Share Fraud: traffic pumped to high-cost international numbers whose operator shares the revenue."
   term.wangiri,Wangiri,"","One-ring fraud: a short missed call from a premium-rate number that tempts the victim to call back."
+  record_type.voice_call,Voice call record,"","One call between two lines: who called whom, from which card and handset, and which cell served it."
+  record_type.sms,Text message record,"","One text message between two lines, with the cell that served the sender."

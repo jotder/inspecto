@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-357 route(s) registered; 357 in the OpenAPI contract, 0 not.
+358 route(s) registered; 358 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -148,6 +148,7 @@ tags: [api, routes, generated]
 | POST | `/datasets/{datasetId}/files` | Add a file to an imported Dataset and run it | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/datasets/{datasetId}/freshness` | GET /datasets/{datasetId}/freshness (generated skeleton) | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | POST | `/datasets/{datasetId}/materialize` | POST /datasets/{datasetId}/materialize (generated skeleton) | datasets | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
+| PUT | `/datasets/{datasetId}/record-type` | Say what one row of a Dataset is (its record type) | datasets | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/datasets/{datasetId}/rows` | GET /datasets/{datasetId}/rows | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | POST | `/datasets/{datasetId}/run` | Run now: run an imported Dataset's Pipeline over what waits in its inbox | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | GET | `/datasources` | GET /datasources (generated skeleton) | datasources | — | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java` |

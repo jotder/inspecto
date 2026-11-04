@@ -47,4 +47,20 @@ export class DatasetColumnsService {
             )
             .pipe(tap(() => this.reads.clear())); // it rewrites the Dataset entry: a replayed Dataset list would be stale
     }
+
+    /**
+     * Set (a record type id of the Space's packs) or clear (`null`) what one row of `dataset` is (ENTITY-TYPE-CATALOG-1 P2):
+     * `PUT /datasets/{id}/record-type`. It only orders the "what does this column hold" choices; 422 for an unknown id.
+     */
+    setRecordType(
+        dataset: string,
+        recordType: string | null,
+    ): Observable<{ dataset: string; recordType: string | null }> {
+        return this.http
+            .put<{
+                dataset: string;
+                recordType: string | null;
+            }>(apiUrl(`/datasets/${encodeURIComponent(dataset)}/record-type`), { recordType })
+            .pipe(tap(() => this.reads.clear()));
+    }
 }

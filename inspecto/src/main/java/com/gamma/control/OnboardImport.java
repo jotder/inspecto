@@ -5,6 +5,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.entitystore.IndustryPack;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
@@ -158,6 +159,8 @@ final class OnboardImport {
             Map<String, Object> schema = plan.schema(id);
             Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, String.valueOf(draft.get("type")));
             Map<String, Object> dataset = plan.dataset(id, kind, fileName, String.valueOf(draft.get("type")));
+            String recordType = commitRecordType(draft, body, LinkAnalysisSettings.forRoot(writeRoot));
+            if (recordType != null) dataset.put(DatasetEntryRules.RECORD_TYPE, recordType);
             // Shared with the Space like every other Dataset in it (LA-ONBOARD-DEFECTS-1): no `shares` key, so `owner` (the
             // importer, stamped here) is provenance, not a restriction. It was `shares: []`, private to the importer, and no
             // screen could share it, so colleagues saw "No Dataset in this Space has a link yet".
@@ -1090,6 +1093,58 @@ final class OnboardImport {
     }
 
     // ── PUT /datasets/{id}/columns/{column} ─────────────────────────────────────────────────────────────────
+
+    /**
+     * The record type a commit writes (ENTITY-TYPE-CATALOG-1 P2): the body's {@code recordType} when stated ({@code null} =
+     * none), else the draft's proposal. One the Space's packs do not define is refused (422).
+     */
+    @SuppressWarnings("unchecked")
+    static String commitRecordType(Map<String, Object> draft, Map<String, Object> body, LinkAnalysisSettings settings) {
+        Map<String, Object> et = (Map<String, Object>) draft.getOrDefault("entityTypes", Map.of());
+        String rt = body.containsKey("recordType") ? (body.get("recordType") == null ? null : String.valueOf(body.get("recordType")).trim())
+                : Plan.proposed(et.get("recordType"));
+        if (rt == null || rt.isEmpty()) return null;
+        String want = rt;
+        if (settings.effectiveRecordTypes().stream().noneMatch(r -> r.id().equals(want)))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "recordType '" + rt + "' is not a record type of this Space"
+                    + "; in force: " + settings.effectiveRecordTypes().stream().map(IndustryPack.RecordType::id).toList());
+        return rt;
+    }
+
+    /**
+     * {@code PUT /datasets/{id}/record-type} {@code {recordType: "<id>" | null}} (ENTITY-TYPE-CATALOG-1 P2): what one row of the
+     * Dataset is. It only orders the "what does this column hold" choices. Gates as {@link #setColumn}: no write root 503,
+     * unknown or unseen Dataset 404, view-only 403, an approval policy 409; 422 for a missing key or a record type the Space's
+     * packs do not define. Answers {@code {dataset, recordType}}.
+     */
+    @SuppressWarnings("unchecked")
+    static Object setRecordType(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Path writeRoot = com.gamma.access.WriteGates.requireWriteRoot(api, "dataset record type change");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Map<String, Object> current = store.get("dataset", id).map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset component '" + id + "'"));
+        OnboardRoutes.requireEdit(ex, id, current);
+        PendingChanges.holdRefusing(api, List.of("dataset"), "what a row is is a Dataset change");
+        if (body == null || !body.containsKey("recordType"))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "recordType is required: a record type id, or null to clear it");
+        if (body.get("recordType") != null && !(body.get("recordType") instanceof String))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "recordType must be a string or null");
+        String rt = commitRecordType(Map.of(), body, LinkAnalysisSettings.forRoot(writeRoot));
+        Map<String, Object> content = new LinkedHashMap<>(current);
+        content.remove("name");
+        if (rt == null) content.remove(DatasetEntryRules.RECORD_TYPE);
+        else content.put(DatasetEntryRules.RECORD_TYPE, rt);
+        try {
+            ComponentRoutes.validateKind(api, "dataset", id, content);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        }
+        store.write("dataset", id, content);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("dataset", id);
+        out.put("recordType", rt);
+        return out;
+    }
 
     /**
      * Change one column's Entity Type: body {@code {entityType: "<id>" | null}} or {@code {classification: "<X>" | null}};

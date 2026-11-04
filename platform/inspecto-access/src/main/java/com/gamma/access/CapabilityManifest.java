@@ -217,6 +217,7 @@ public final class CapabilityManifest {
             new Entry("POST", "/datasets/([^/]+)/files", Roles.CAN_UPLOAD_DATA),
             new Entry("POST", "/datasets/([^/]+)/run", Roles.CAN_UPLOAD_DATA),
             new Entry("PUT", "/datasets/([^/]+)/columns/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("PUT", "/datasets/([^/]+)/record-type", Roles.CAN_AUTHOR_WORKBENCH),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

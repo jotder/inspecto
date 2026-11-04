@@ -21,7 +21,9 @@ describe('shapeFit (browser half of the shared value-shape fixture)', () => {
     });
 
     it('the fixture covers every shape and every fit', () => {
-        const names = new Set(cases.map((c) => (c.shape.includes('(') ? c.shape.slice(0, c.shape.indexOf('(')) : c.shape)));
+        const names = new Set(
+            cases.map((c) => (c.shape.includes('(') ? c.shape.slice(0, c.shape.indexOf('(')) : c.shape)),
+        );
         expect([...names].sort()).toEqual([...VALUE_SHAPE_NAMES].sort());
         expect([...new Set(cases.map((c) => c.expected))].sort()).toEqual(['none', 'strong', 'weak']);
     });
@@ -38,8 +40,18 @@ describe('shapeSpecificity', () => {
 
 describe('sampleFits', () => {
     it('counts fitting non-blank values and says whether all fit', () => {
-        expect(sampleFits('e164', ['+447700900123', '447700900123', '', null, ' '])).toEqual({ fit: 2, of: 2, all: true, strong: false });
-        expect(sampleFits('e164', ['+447700900123', '+447700900124'])).toEqual({ fit: 2, of: 2, all: true, strong: true });
+        expect(sampleFits('e164', ['+447700900123', '447700900123', '', null, ' '])).toEqual({
+            fit: 2,
+            of: 2,
+            all: true,
+            strong: false,
+        });
+        expect(sampleFits('e164', ['+447700900123', '+447700900124'])).toEqual({
+            fit: 2,
+            of: 2,
+            all: true,
+            strong: true,
+        });
         expect(sampleFits('e164', ['+447700900123', 'n/a'])).toEqual({ fit: 1, of: 2, all: false, strong: false });
         expect(sampleFits('free', ['anything'])).toEqual({ fit: 0, of: 1, all: false, strong: false });
         expect(sampleFits('e164', [])).toEqual({ fit: 0, of: 0, all: false, strong: false });

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from '@inspecto/core/api/api-base';
-import type { EntityFamily } from './entity-type-options';
+import type { EntityFamily, RecordTypeGuide } from './entity-type-options';
 
 /**
  * The Entity profile reads (la-entity-profile-plan section 4.5, the contract fixed 2026-10-15). Every section carries
@@ -55,6 +55,8 @@ export interface EntityTypeList {
     items: EntityTypeSummary[];
     /** The closed family set, in picker order (absent from an older server). */
     families?: EntityFamily[];
+    /** What one row of a Dataset can be, from the Space's packs (ENTITY-TYPE-CATALOG-1 P2; absent from an older server). */
+    recordTypes?: RecordTypeGuide[];
 }
 
 export interface EntityTypeIdentity {

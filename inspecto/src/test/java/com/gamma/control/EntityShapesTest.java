@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.EntityTypes.EntityType;
+import com.gamma.entitystore.IndustryPack;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -60,6 +61,36 @@ class EntityShapesTest {
         assertEquals("imei", p.get("value"), p.toString());
         Map<String, Object> plain = propose(List.of("001010123456789", "001010123456780"));
         assertEquals("imsi", plain.get("value"), "without a check digit they are the plain-digits type: " + plain);
+    }
+
+    // ── ENTITY-TYPE-CATALOG-1 P2: the record type of a draft ──────────────────────────────────────────────────
+
+    private static final List<IndustryPack.RecordType> RECORDS = List.of(
+            new IndustryPack.RecordType("call", "Call", "", List.of("msisdn", "imei", "cell")),
+            new IndustryPack.RecordType("sms", "Text message", "", List.of("msisdn", "cell")),
+            new IndustryPack.RecordType("payment", "Payment", "", List.of("bank")));
+
+    private static Map<String, Object> held(String... types) {
+        List<Map<String, Object>> cols = new ArrayList<>();
+        for (String t : types) cols.add(Map.of("column", t, "entityType", OnboardDraft.choice(t, "", true)));
+        cols.add(Map.of("column", "detail", "entityType", OnboardDraft.choice(null, "", true)));
+        return Map.of("columns", cols);
+    }
+
+    @Test
+    void theRecordTypeWhoseLikelyTypesTheColumnsHoldIsProposed() {
+        Map<String, Object> call = EntityShapes.recordType(held("msisdn", "imei"), RECORDS);
+        assertEquals("call", call.get("value"));
+        assertEquals("high", call.get("confidence"), call.toString());
+        assertTrue(String.valueOf(call.get("evidence")).contains("msisdn, imei"), call.toString());
+
+        Map<String, Object> tie = EntityShapes.recordType(held("msisdn", "cell"), RECORDS);
+        assertEquals("call", tie.get("value"), "a tie goes to the first in force");
+        assertEquals("low", tie.get("confidence"));
+        assertEquals("low", EntityShapes.recordType(held("bank"), RECORDS).get("confidence"), "one held type is a guess");
+
+        Map<String, Object> nothing = EntityShapes.recordType(held("note"), RECORDS);
+        assertNull(nothing.get("value"), nothing.toString());
     }
 
     @Test

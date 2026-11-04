@@ -1121,12 +1121,26 @@ definition and a made-up example; the "what does this column hold" picker groups
 reader who does not know a domain word picks by family and example. Reader guidance only: ⛔ never part of an
 Entity's identity (the id and classifications are). ⛔ Not a **Store family** (a module's group of operational files).
 
+**Value shape** *(Link Analysis; ✅ P1 built 2026-11-04, `ENTITY-TYPE-CATALOG-1`: `ValueShapes`, `value-shape.ts`)* — What one
+value of an **Entity Type** looks like, from a closed vocabulary: `free · e164 · digits(n) · luhn(n) · iban · email ·
+uuid` (a range `a-b` for digits and luhn). Add data proposes a column's type from the shape its sampled values fit, and
+the "what does this column hold" picker marks a type whose shape fits as *Shape matches*. ⛔ Never a free regular
+expression; ⛔ not a **Grammar** (how raw bytes become rows) nor a schema field type.
+
+**Record type** *(Link Analysis; ✅ P2 built 2026-11-04, `ENTITY-TYPE-CATALOG-1`: a pack's `record_types`, a Dataset's
+`recordType`, `PUT /datasets/{id}/record-type`)* — What one row of a **Dataset** is in a domain (a voice call record, a
+wallet transfer, a registration), defined by the Space's **Industry packs** with the Entity Types such a record usually
+holds. Add data proposes it; the picker offers its likely types first (*Likely in a …*). It only orders the choices:
+⛔ never part of identity. ⛔ Not a schema *record* of a Grammar (a parsed row layout) and not a *Case type*.
+
 **Domain Profile** *(Link Analysis; settles `LDP-D7`; ✅ built 2026-10-17, LA-EDITIONS-1: `domain_profile` in
 `link-analysis.toon`, `GET|PUT /settings/link-analysis/domain-profile`)* — The **Industry pack** a Space reads Link
 Analysis in: which words name the canonical concepts (the working-set tiles, the two ends of a link, Entity Types,
 link kinds, Value Measures, patterns), with an abbreviation and a hover definition for each. None selected = the
-neutral vocabulary (`generic`). A Domain Profile **relabels; it never adds a concept**, so the core holds no industry
-word (AC-09). ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
+neutral vocabulary (`generic`). A Domain Profile relabels the core's concepts, and since `ENTITY-TYPE-CATALOG-1` its
+pack may add Entity Types — each under a core **Entity Type family** — and **Record types**; the core still holds no
+industry word (AC-09). Further packs whose Entity Types and Record types join the Space's are `extra_packs` (one id
+means one Entity Type in every pack); the Domain Profile alone gives the vocabulary. ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
 **Entity Profile** pages below (facts about the data). ⛔ Never bare *pack* for it: *pack* alone is ambiguous (pattern
 pack, Job Pack, Solution pack); say *Industry pack* (§15). As built:
 [`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §3.6.

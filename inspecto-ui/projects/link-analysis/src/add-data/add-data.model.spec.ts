@@ -100,6 +100,42 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
             expect(body.identifyingColumn).toBe('account_id');
             expect(body.link).toBeUndefined();
         });
+
+        it('sends the record type asked, and none when it was not asked (ENTITY-TYPE-CATALOG-1 P2)', () => {
+            const rt = {
+                value: 'transfer',
+                evidence: 'the columns hold what a transfer holds',
+                confidence: 'low' as const,
+            };
+            const d = transfersDraft({ entityTypes: { ...transfersDraft().entityTypes, recordType: rt } });
+            expect(initialRoles(d).recordType).toBe('transfer');
+            const asked = buildCommit(d, 'x', '', initialColumns(d), initialRoles(d), { withEntityTypes: true });
+            expect(asked.recordType).toBe('transfer');
+            const cleared = buildCommit(
+                d,
+                'x',
+                '',
+                initialColumns(d),
+                { ...initialRoles(d), recordType: '' },
+                { withEntityTypes: true },
+            );
+            expect(cleared.recordType).toBeNull();
+            const { recordType: _, ...notAsked } = initialRoles(d);
+            expect(
+                'recordType' in buildCommit(d, 'x', '', initialColumns(d), notAsked, { withEntityTypes: true }),
+            ).toBe(false);
+            // the step not opened: a low guess is not applied, a high one is
+            expect(
+                buildCommit(d, 'x', '', initialColumns(d), initialRoles(d), { withEntityTypes: false }).recordType,
+            ).toBeNull();
+            const sure = transfersDraft({
+                entityTypes: { ...transfersDraft().entityTypes, recordType: { ...rt, confidence: 'high' } },
+            });
+            expect(
+                buildCommit(sure, 'x', '', initialColumns(sure), initialRoles(sure), { withEntityTypes: false })
+                    .recordType,
+            ).toBe('transfer');
+        });
     });
 
     it('suggestDatasetName mirrors the server (OnboardImport.datasetId)', () => {

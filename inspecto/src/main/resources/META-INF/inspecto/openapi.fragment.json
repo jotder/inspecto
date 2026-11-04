@@ -8451,7 +8451,7 @@
         ],
         "summary" : "Add data: one confirm - write the import Pipeline, run it once, register the Dataset",
         "operationId" : "postOnboardFilesByFileIdCommit",
-        "description" : "LA-ONBOARD-1 OB-2/OB-3/OB-4/OB-8. {fileId} is the draftId. Body (every key optional; absent = the draft's proposal): {name (Dataset and Pipeline id, lower-case), description, columns:[{name (the draft column), type?, format?, entityType? (id or null), rename?, drop?}], primaryEntityType?, link?:{from, to, kind?, time?, amount?, details?[]} | null (stream), identifyingColumn? (reference), format? (must equal the draft's: re-draft to change it)}. Writes imports/<id>_schema.toon (index selectors for delimited files) and imports/<id>_pipeline.toon (an ordinary Pipeline, origin: import, trigger {type: manual}, local inbox, accepts_upload, PARQUET), both through the save gate; registers it, lands the file, runs it once, registers the Dataset {physicalRef <id>/database, origin import, kind, columns[].classification, primaryEntityType, defaultLinkMapping, eventDate, identifyingColumn}, then - inside the same run (DT-16) unless pipeline.automation is present - builds the link index and evaluates the Expectations targeting the Pipeline. Answers the run summary {dataset, pipeline, kind, file, rowsIn, rowsRejected, rejectedDetail?, quarantined:[{file, reason}], rowsBefore, rowsAfter, rowsChanged, replaced, followOnInRun, index:{result, message, code?, edges?, nodes?}, expectations:[{name, status, violations}]}; above import.inline_max_bytes 202 {runId, dataset, action, state, startedAt, poll}. A failed commit leaves nothing behind (config files, registration, data and inbox directories, Dataset entry); the draft keeps its file. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown/expired draft (or another person's); 409 the name is taken (Dataset, Pipeline, config files or data directory), an approval policy holds Datasets, the same import is in flight, or import.max_datasets is reached; 422 a choice naming nothing real, a save-gate refusal, or a run that imported nothing.",
+        "description" : "LA-ONBOARD-1 OB-2/OB-3/OB-4/OB-8. {fileId} is the draftId. Body (every key optional; absent = the draft's proposal): {name (Dataset and Pipeline id, lower-case), description, columns:[{name (the draft column), type?, format?, entityType? (id or null), rename?, drop?}], primaryEntityType?, recordType? (a record type of the Space's packs, or null), link?:{from, to, kind?, time?, amount?, details?[]} | null (stream), identifyingColumn? (reference), format? (must equal the draft's: re-draft to change it)}. Writes imports/<id>_schema.toon (index selectors for delimited files) and imports/<id>_pipeline.toon (an ordinary Pipeline, origin: import, trigger {type: manual}, local inbox, accepts_upload, PARQUET), both through the save gate; registers it, lands the file, runs it once, registers the Dataset {physicalRef <id>/database, origin import, kind, columns[].classification, primaryEntityType, defaultLinkMapping, eventDate, identifyingColumn}, then - inside the same run (DT-16) unless pipeline.automation is present - builds the link index and evaluates the Expectations targeting the Pipeline. Answers the run summary {dataset, pipeline, kind, file, rowsIn, rowsRejected, rejectedDetail?, quarantined:[{file, reason}], rowsBefore, rowsAfter, rowsChanged, replaced, followOnInRun, index:{result, message, code?, edges?, nodes?}, expectations:[{name, status, violations}]}; above import.inline_max_bytes 202 {runId, dataset, action, state, startedAt, poll}. A failed commit leaves nothing behind (config files, registration, data and inbox directories, Dataset entry); the draft keeps its file. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 404 unknown/expired draft (or another person's); 409 the name is taken (Dataset, Pipeline, config files or data directory), an approval policy holds Datasets, the same import is in flight, or import.max_datasets is reached; 422 a choice naming nothing real, a save-gate refusal, or a run that imported nothing.",
         "parameters" : [
           {
             "name" : "fileId",
@@ -8645,6 +8645,41 @@
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped {dataset, column, classification, entityType?, columns}."
+          }
+        }
+      }
+    },
+    "/datasets/{datasetId}/record-type" : {
+      "put" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Say what one row of a Dataset is (its record type)",
+        "operationId" : "putDatasetsByDatasetIdRecordType",
+        "description" : "ENTITY-TYPE-CATALOG-1 P2. canAuthorWorkbench. Body {recordType: '<id>' | null}: a record type of the Space's Industry packs (GET /inv/entity-types answers recordTypes), or null to clear it. It only orders the 'what does this column hold' choices: the record type's likely Entity Types first. Gates: 401/403; 503 no write root; 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 an approval policy holds Datasets; 422 recordType missing, not a string or null, or not a record type of this Space. Answers {dataset, recordType}.",
+        "parameters" : [
+          {
+            "name" : "datasetId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {dataset, recordType}."
           }
         }
       }
