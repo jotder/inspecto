@@ -1,6 +1,6 @@
 # A domain Entity Type catalogue: families, pack types and record types (`ENTITY-TYPE-CATALOG-1`)
 
-> **PLAN 2026-11-04 — decisions Q-1…Q-6 OPEN (recommendations marked, §5).** Operator ask, on the Data page's
+> **PLAN 2026-11-04 — decisions Q-1…Q-6 accepted by the operator 2026-11-04 (the recommended options, §5).** Operator ask, on the Data page's
 > "what does this column hold" picker: *"this list would be different for different types of record, is it possible
 > to make a comprehensive Entity Type for a domain? how user will read and use generic"*. Board row
 > `ENTITY-TYPE-CATALOG-1`. Companion of `LA-COLUMN-ROLES-1` (the Columns card this picker lives in) and
@@ -66,7 +66,7 @@ nothing beyond a label.
 | **P2** | Record types: defined by the pack (likely types, and likely roles with `LA-COLUMN-ROLES-1`); a Dataset's `recordType`; Add data proposes it; the picker's *Likely in a …* group with "shape matches" from the column's sample | M |
 | **P3** | Content: the telecom and mobile-money packs made comprehensive (types + record types + examples), and a neutral starter catalogue for a Space with no pack | M |
 
-## 5. Decisions (open)
+## 5. Decisions (operator 2026-11-04: accepted as recommended)
 
 - **Q-1 Families.** (a) a closed core set: Party · Organisation · Account · Identifier · Device · Place · Document ⟵
   *recommended*; (b) families are pack data too.

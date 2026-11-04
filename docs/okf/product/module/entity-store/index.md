@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `ENTITY-TYPE-CATALOG-1` | P2 | feature | a comprehensive Entity Type catalogue per domain: neutral families in the core (Party, Organisation, Account, Identifier, Device, Place,… | operator |
+| `ENTITY-TYPE-CATALOG-1` | P2 | feature | a comprehensive Entity Type catalogue per domain: neutral families in the core (Party, Organisation, Account, Identifier, Device, Place,… | — |
