@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { validateGroup } from 'app/inspecto/query/condition-rules';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { ColumnMeta, ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
@@ -39,6 +40,7 @@ import {
         MatInputModule,
         MatSelectModule,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         QueryConditionGroupComponent,
     ],
     template: `
@@ -49,18 +51,14 @@ import {
                     @if (rowErrors()[i]; as e) {
                         <p class="text-warn mb-2 text-xs" role="alert" data-testid="factor-error">{{ e }}</p>
                     }
-                    <div class="grid grid-cols-1 gap-x-3 sm:grid-cols-3">
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Id</mat-label>
-                            <input matInput formControlName="id" />
-                            @if (g.controls['id'].hasError('required')) {
-                                <mat-error>Id is required</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Label</mat-label>
-                            <input matInput formControlName="label" />
-                        </mat-form-field>
+                    <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                        <inspecto-pen-field
+                            label="Id"
+                            [required]="true"
+                            formControlName="id"
+                            [error]="fieldError(g, 'id', { required: 'Id is required', pattern: 'Id may hold only letters, digits and _' })"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field label="Label" formControlName="label" [error]="fieldError(g, 'label', {})"></inspecto-pen-field>
                         <inspecto-option-picker
                             label="Dataset"
                             formControlName="dataset"
@@ -72,31 +70,35 @@ import {
                             formControlName="key"
                             [options]="columnOptions(i)"
                         ></inspecto-option-picker>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Measure</mat-label>
-                            <input matInput formControlName="measure" placeholder="count or sum(field)" />
-                            @if (g.controls['measure'].hasError('required')) {
-                                <mat-error>Measure is required</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Weight</mat-label>
-                            <input matInput formControlName="weight" inputmode="decimal" />
-                            <mat-hint>Negative = protective</mat-hint>
-                            @if (g.controls['weight'].hasError('pattern')) {
-                                <mat-error>Weight must be a number</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Cap</mat-label>
-                            <input matInput formControlName="cap" inputmode="decimal" />
-                            @if (g.controls['cap'].hasError('pattern')) {
-                                <mat-error>Cap must be a number ≥ 0</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic" class="sm:col-span-2">
+                        <inspecto-pen-field
+                            label="Measure"
+                            [required]="true"
+                            [mono]="true"
+                            placeholder="count or sum(field)"
+                            formControlName="measure"
+                            [error]="fieldError(g, 'measure', { required: 'Measure is required' })"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Weight"
+                            [required]="true"
+                            formControlName="weight"
+                            help="Negative = protective"
+                            [error]="fieldError(g, 'weight', { required: 'Weight is required', pattern: 'Weight must be a number' })"
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Cap"
+                            formControlName="cap"
+                            [error]="fieldError(g, 'cap', { pattern: 'Cap must be a number ≥ 0' })"
+                        ></inspecto-pen-field>
+                        <!-- form-allow: a multiple choice (the evidence columns), not one --><mat-form-field
+                            subscriptSizing="dynamic"
+                            class="sm:col-span-2"
+                        >
                             <mat-label>Evidence columns (up to {{ maxEvidence }})</mat-label>
-                            <mat-select formControlName="evidence" multiple>
+                            <!-- form-allow: a multiple choice, not one --><mat-select
+                                formControlName="evidence"
+                                multiple
+                            >
                                 @for (c of columnOptions(i); track c.value) {
                                     <mat-option [value]="c.value">{{ c.label }}</mat-option>
                                 }
@@ -111,24 +113,37 @@ import {
                         <span class="text-secondary text-xs">Filters (all must hold)</span>
                         @for (fg of filtersOf(i).controls; track fg; let j = $index) {
                             <div class="flex flex-wrap items-center gap-2" [formGroupName]="j">
-                                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                                <!-- form-allow: a table-cell select of a repeating row (one filter) --><mat-form-field
+                                    subscriptSizing="dynamic"
+                                    class="w-40"
+                                >
                                     <mat-label>Column</mat-label>
-                                    <mat-select formControlName="field">
+                                    <!-- form-allow: a table-cell select of a repeating row (one filter) --><mat-select
+                                        formControlName="field"
+                                    >
                                         @for (c of columnOptions(i); track c.value) {
                                             <mat-option [value]="c.value">{{ c.label }}</mat-option>
                                         }
                                     </mat-select>
                                 </mat-form-field>
-                                <mat-form-field subscriptSizing="dynamic" class="w-36">
+                                <!-- form-allow: a table-cell select of a repeating row (one filter) --><mat-form-field
+                                    subscriptSizing="dynamic"
+                                    class="w-36"
+                                >
                                     <mat-label>Operator</mat-label>
-                                    <mat-select formControlName="op">
+                                    <!-- form-allow: a table-cell select of a repeating row (one filter) --><mat-select
+                                        formControlName="op"
+                                    >
                                         @for (o of ops; track o.op) {
                                             <mat-option [value]="o.op">{{ o.label }}</mat-option>
                                         }
                                     </mat-select>
                                 </mat-form-field>
                                 @if (arity(fg) !== 0) {
-                                    <mat-form-field subscriptSizing="dynamic" class="w-40">
+                                    <!-- form-allow: a table-cell field of a repeating row (one filter) --><mat-form-field
+                                        subscriptSizing="dynamic"
+                                        class="w-40"
+                                    >
                                         <mat-label>Value</mat-label>
                                         <input matInput formControlName="value" />
                                     </mat-form-field>
@@ -323,6 +338,18 @@ export class RiskScoreFactorsComponent implements OnInit {
         });
     }
 
+    /**
+     * A card row's error line, once the control was left (or validate() ran): the message of the first of its
+     * validators that fails, in the order given. A row has no red outline, so every validator needs its line, or Save
+     * refuses with nothing on screen. A field the server refused (setRowError) points at the card's message rather
+     * than repeating it; any edit re-runs the validators and clears it. A local error wins: it is the one to fix first.
+     */
+    fieldError(g: FormGroup, name: string, messages: Record<string, string>): string {
+        const c = g.controls[name];
+        if (c.touched) for (const [error, message] of Object.entries(messages)) if (c.hasError(error)) return message;
+        return c.hasError('server') ? 'Refused: see the message above.' : '';
+    }
+
     columnOptions(i: number): PickerOption[] {
         return this.columnMeta(i).map((c) => ({ value: c.name, label: c.name }));
     }
@@ -386,7 +413,7 @@ export class RiskScoreFactorsComponent implements OnInit {
     remove(i: number): void {
         this.rows.removeAt(i);
         this.rows.markAsDirty();
-        this.rowErrors.set({});
+        this.clearServerMarks();
     }
 
     move(i: number, by: -1 | 1): void {
@@ -394,7 +421,14 @@ export class RiskScoreFactorsComponent implements OnInit {
         this.rows.removeAt(i);
         this.rows.insert(i + by, g);
         this.rows.markAsDirty();
+        this.clearServerMarks();
+    }
+
+    /** The card messages are keyed by position, so a remove or move drops them - and the row marks that point at them. */
+    private clearServerMarks(): void {
         this.rowErrors.set({});
+        for (const g of this.rows.controls)
+            for (const c of Object.values(g.controls)) if (c.hasError('server')) c.updateValueAndValidity({ emitEvent: false });
     }
 
     addFilter(i: number): void {

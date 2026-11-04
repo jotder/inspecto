@@ -32,6 +32,7 @@ import {
     ToleranceType,
 } from 'app/inspecto/reconciliation';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface ReconciliationFormResult {
     name: string;
@@ -87,6 +88,7 @@ type SideColumn = ReconDatasetColumns['columns'][number];
         MatFormFieldModule,
         MatInputModule,
         MatSelectModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -95,13 +97,14 @@ type SideColumn = ReconDatasetColumns['columns'][number];
         </h2>
         <form [formGroup]="form" (ngSubmit)="submit()">
             <mat-dialog-content class="flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input matInput formControlName="name" placeholder="e.g. switch vs billing" cdkFocusInitial />
-                    @if (form.controls.name.hasError('required')) {
-                        <mat-error>A name is required.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Name"
+                    [required]="true"
+                    placeholder="e.g. switch vs billing"
+                    formControlName="name"
+                    [error]="touchedError('name', 'required', 'A name is required.')"
+                    cdkFocusInitial
+                ></inspecto-pen-field>
 
                 <div class="flex gap-3">
                     <div class="flex-1">
@@ -147,9 +150,12 @@ type SideColumn = ReconDatasetColumns['columns'][number];
                     </ul>
                 }
 
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <!-- form-allow: a multiple choice (the key columns, in order), not one --><mat-form-field
+                    class="w-full"
+                    subscriptSizing="dynamic"
+                >
                     <mat-label>Key column(s) — selection order is the Board tree</mat-label>
-                    <mat-select formControlName="keyColumns" multiple>
+                    <!-- form-allow: a multiple choice, not one --><mat-select formControlName="keyColumns" multiple>
                         @for (c of columnOptions(); track c) {
                             <mat-option [value]="c">{{ c }}</mat-option>
                         }
@@ -176,9 +182,14 @@ type SideColumn = ReconDatasetColumns['columns'][number];
                 <div [formArrayName]="'compareRows'" class="flex flex-col gap-2">
                     @for (row of compareRowsArray.controls; track $index; let i = $index) {
                         <div class="flex items-center gap-2" [formGroupName]="i">
-                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                            <!-- form-allow: a table-cell select of a repeating row (one compare column) --><mat-form-field
+                                class="flex-1"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Column</mat-label>
-                                <mat-select formControlName="column">
+                                <!-- form-allow: a table-cell select of a repeating row (one compare column) --><mat-select
+                                    formControlName="column"
+                                >
                                     @for (c of columnOptions(); track c) {
                                         <mat-option [value]="c">{{ c }}</mat-option>
                                     }
@@ -187,23 +198,36 @@ type SideColumn = ReconDatasetColumns['columns'][number];
                                     <mat-error>Required</mat-error>
                                 }
                             </mat-form-field>
-                            <mat-form-field class="w-24" subscriptSizing="dynamic">
+                            <!-- form-allow: a table-cell select of a repeating row (one compare column) --><mat-form-field
+                                class="w-24"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Agg</mat-label>
-                                <mat-select formControlName="agg">
+                                <!-- form-allow: a table-cell select of a repeating row (one compare column) --><mat-select
+                                    formControlName="agg"
+                                >
                                     <mat-option value="sum">sum</mat-option>
                                     <mat-option value="count">count</mat-option>
                                 </mat-select>
                             </mat-form-field>
-                            <mat-form-field class="w-32" subscriptSizing="dynamic">
+                            <!-- form-allow: a table-cell select of a repeating row (one compare column) --><mat-form-field
+                                class="w-32"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Tolerance</mat-label>
-                                <mat-select formControlName="toleranceType">
+                                <!-- form-allow: a table-cell select of a repeating row (one compare column) --><mat-select
+                                    formControlName="toleranceType"
+                                >
                                     <mat-option value="exact">exact</mat-option>
                                     <mat-option value="absolute">± absolute</mat-option>
                                     <mat-option value="percent">± percent</mat-option>
                                 </mat-select>
                             </mat-form-field>
                             @if (row.get('toleranceType')?.value !== 'exact') {
-                                <mat-form-field class="w-24" subscriptSizing="dynamic">
+                                <!-- form-allow: a table-cell field of a repeating row (one compare column) --><mat-form-field
+                                    class="w-24"
+                                    subscriptSizing="dynamic"
+                                >
                                     <mat-label>Value</mat-label>
                                     <input matInput type="number" formControlName="tolerance" />
                                 </mat-form-field>
@@ -224,25 +248,30 @@ type SideColumn = ReconDatasetColumns['columns'][number];
                 </div>
 
                 <span class="text-secondary text-xs font-semibold uppercase tracking-wider">Board bands (|Δ%|)</span>
-                <div class="flex items-center gap-3">
-                    <mat-form-field class="w-32" subscriptSizing="dynamic">
-                        <mat-label>Warn from %</mat-label>
-                        <input matInput type="number" min="0" formControlName="warnPct" />
-                        @if (form.controls.warnPct.hasError('min')) {
-                            <mat-error>Must be ≥ 0.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field class="w-32" subscriptSizing="dynamic">
-                        <mat-label>Breach over %</mat-label>
-                        <input matInput type="number" min="0" formControlName="breachPct" />
-                        @if (form.controls.breachPct.hasError('min')) {
-                            <mat-error>Must be ≥ 0.</mat-error>
-                        } @else if (form.controls.breachPct.hasError('belowWarn')) {
-                            <mat-error>Must be ≥ warn %.</mat-error>
-                        }
-                    </mat-form-field>
-                    <span class="text-secondary text-xs">ok &lt; warn · warn–breach · breach &gt;</span>
+                <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                    <inspecto-pen-field
+                        label="Warn from %"
+                        type="number"
+                        [min]="0"
+                        formControlName="warnPct"
+                        [error]="
+                            touchedError('warnPct', 'required', 'A percentage is required.') ||
+                            touchedError('warnPct', 'min', 'Must be ≥ 0.')
+                        "
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Breach over %"
+                        type="number"
+                        [min]="0"
+                        formControlName="breachPct"
+                        [error]="
+                            touchedError('breachPct', 'required', 'A percentage is required.') ||
+                            touchedError('breachPct', 'min', 'Must be ≥ 0.') ||
+                            touchedError('breachPct', 'belowWarn', 'Must be ≥ warn %.')
+                        "
+                    ></inspecto-pen-field>
                 </div>
+                <span class="text-secondary text-xs">ok &lt; warn · warn–breach · breach &gt;</span>
 
                 @if (testError(); as err) {
                     <inspecto-alert variant="error" title="Test failed">
@@ -538,6 +567,12 @@ export class ReconciliationFormDialog {
                     this.testError.set(apiErrorMessage(e, 'The comparison could not run.'));
                 },
             });
+    }
+
+    /** A row's error line: `message` once the control was left (or Save refused the form) and holds `error`. */
+    touchedError(name: string, error: string, message: string): string {
+        const c = this.form.controls[name];
+        return c.touched && c.hasError(error) ? message : '';
     }
 
     get compareRowsArray(): FormArray<FormGroup> {

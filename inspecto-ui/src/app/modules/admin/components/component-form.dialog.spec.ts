@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { AgentService, ComponentDef, ComponentsService, LensService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ComponentFormDialog } from './component-form.dialog';
 
 const SAVED: ComponentDef = {
@@ -351,18 +352,15 @@ describe('ComponentFormDialog', () => {
         });
     });
 
-    it('shows "Id is required." only after submit — never on open (the error lands in the subscript)', () => {
+    it('shows "Id is required." only after submit — never on open (the error lands under the Id row)', () => {
         const { fixture, c } = create();
-        const field = fieldOf(fixture.nativeElement, 'form', 'id');
-        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
-        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
-        expect(field.querySelector('mat-error')).toBeNull();
+        const field = penByLabel(fixture.nativeElement, 'Id')!;
+        // Untouched: no error. An earlier template rendered the error before any touch/submit.
+        expect(penError(field)).toBe('');
         expect(field.textContent).not.toContain('Id is required.');
         c.submit();
-        fixture.detectChanges();
-        const err = field.querySelector('mat-error');
-        expect(err?.textContent).toContain('Id is required.');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(field)).toBe('Id is required.');
     });
 
     it('shows "Config must be valid JSON." only after submit, in the subscript (the hint shows until then)', () => {

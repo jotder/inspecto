@@ -2,11 +2,10 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ExchangeGrant } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface GrantGovernanceData {
     field: 'pin' | 'expiry';
@@ -26,7 +25,7 @@ export type GrantGovernanceResult = string | number | null;
  */
 @Component({
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ isPin ? 'Pin snapshot version' : 'Set grant expiry' }}</h2>
@@ -41,15 +40,19 @@ export type GrantGovernanceResult = string | number | null;
             </div>
             <form [formGroup]="form">
                 @if (isPin) {
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Version</mat-label>
-                        <input matInput formControlName="pin" placeholder="e.g. v3" cdkFocusInitial />
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Version"
+                        placeholder="e.g. v3"
+                        formControlName="pin"
+                        cdkFocusInitial
+                    ></inspecto-pen-field>
                 } @else {
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Expires at</mat-label>
-                        <input matInput type="datetime-local" formControlName="expiry" cdkFocusInitial />
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Expires at"
+                        type="datetime-local"
+                        formControlName="expiry"
+                        cdkFocusInitial
+                    ></inspecto-pen-field>
                 }
             </form>
         </mat-dialog-content>

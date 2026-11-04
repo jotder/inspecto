@@ -4,6 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ReconAssignDialog } from './recon-assign.dialog';
 
 function create(assignee: string) {
@@ -25,13 +26,12 @@ function create(assignee: string) {
 describe('ReconAssignDialog', () => {
     it('closes with the trimmed assignee, and refuses a blank one with a visible error', async () => {
         const { fixture, c, ref } = create('   ');
-        c.save();
-        fixture.detectChanges();
-        expect(ref.close).not.toHaveBeenCalled();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain(
-            'Name who owns this break.',
-        );
+        expect(penError(penByLabel(el, 'Assignee')!)).toBe(''); // nothing red on a fresh form
+        c.save();
+        refresh(fixture);
+        expect(ref.close).not.toHaveBeenCalled();
+        expect(penError(penByLabel(el, 'Assignee')!)).toBe('Name who owns this break.');
 
         c.form.controls.assignee.setValue('  dana ');
         c.save();

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, PipelineSummary, PipelinesService, SpacesService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { STREAM_BUNDLE_FORMAT, StreamBundle } from 'app/inspecto/transfer/stream-bundle';
 import { OnboardingCreateData, OnboardingCreateDialog } from './onboarding-create.dialog';
 
@@ -134,18 +135,15 @@ describe('OnboardingCreateDialog', () => {
         expect(api.write).not.toHaveBeenCalled();
     });
 
-    it('shows "A name is required." only after submit — never on open (the error lands in the subscript)', () => {
+    it('shows "A name is required." only after submit — never on open (the error lands under the Name row)', () => {
         const { fixture, api } = create({ kind: 'stream' });
         const el = fixture.nativeElement as HTMLElement;
-        // Untouched: no error anywhere. The old nested "@if (…; as c)" wrapper mis-projected the
-        // <mat-error> into the form field's DEFAULT slot, so it rendered beside the input on open.
-        expect(el.querySelector('mat-error')).toBeNull();
+        // Untouched: no error anywhere. An earlier template rendered the required line on open.
+        expect(el.querySelector('[role="alert"]')).toBeNull();
         expect(el.textContent).not.toContain('A name is required');
         fixture.componentInstance.create();
-        fixture.detectChanges();
-        const err = el.querySelector('mat-error');
-        expect(err?.textContent).toContain('A name is required');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(penByLabel(el, 'Name')!)).toBe('A name is required.');
         expect(api.write).not.toHaveBeenCalled();
     });
 

@@ -2,9 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { Observable, catchError, forkJoin, map, of } from 'rxjs';
@@ -18,6 +16,7 @@ import {
     PipelinesService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { TRANSFORM_TYPES } from 'app/inspecto/mapping';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
@@ -131,10 +130,9 @@ const COLUMNS: EditableGridColumn[] = [
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTooltipModule,
+        PenFieldComponent,
         EditableGridComponent,
         InspectoAlertComponent,
         ChipComponent,
@@ -171,14 +169,14 @@ const COLUMNS: EditableGridColumn[] = [
         </h2>
         <mat-dialog-content>
             @if (!isEdit) {
-                <mat-form-field class="w-full" appearance="outline" subscriptSizing="dynamic">
-                    <mat-label>Id</mat-label>
-                    <input matInput [formControl]="id" cdkFocusInitial />
-                    @if (id.hasError('required') && id.touched) {
-                        <mat-error>An id is required.</mat-error>
-                    }
-                    <mat-hint>Unique — this is the mapping id pipeline Steps reference.</mat-hint>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Id"
+                    [required]="true"
+                    [formControl]="id"
+                    help="Unique — this is the mapping id pipeline Steps reference."
+                    [error]="id.touched && id.hasError('required') ? 'An id is required.' : ''"
+                    cdkFocusInitial
+                ></inspecto-pen-field>
             }
             <p class="text-secondary mb-2 mt-3 text-sm">
                 One row per target column. Transform type DIRECT (or blank) copies the source column; EXPR treats the

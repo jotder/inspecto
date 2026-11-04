@@ -2,15 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { map, Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ComponentDef, ComponentsService, ConfigService, Finding } from 'app/inspecto/api';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { DerivedSchemaPanelComponent } from 'app/inspecto/schema';
 import {
     CellFinding,
@@ -119,9 +118,8 @@ const COLUMNS: EditableGridColumn[] = [
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
+        PenFieldComponent,
         EditableGridComponent,
         InspectoAlertComponent,
         DerivedSchemaPanelComponent,
@@ -135,14 +133,14 @@ const COLUMNS: EditableGridColumn[] = [
         </h2>
         <mat-dialog-content>
             @if (!isEdit) {
-                <mat-form-field class="w-full" appearance="outline" subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input matInput [formControl]="name" cdkFocusInitial />
-                    @if (name.hasError('required') && name.touched) {
-                        <mat-error>A name is required.</mat-error>
-                    }
-                    <mat-hint>Unique — this is the schema's identity (raw.name).</mat-hint>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Name"
+                    [required]="true"
+                    [formControl]="name"
+                    help="Unique — this is the schema's identity (raw.name)."
+                    [error]="name.touched && name.hasError('required') ? 'A name is required.' : ''"
+                    cdkFocusInitial
+                ></inspecto-pen-field>
             }
             <p class="text-secondary mb-2 mt-3 text-sm">
                 One row per typed field. Selector is the raw column the field reads from; type is a DuckDB SQL type

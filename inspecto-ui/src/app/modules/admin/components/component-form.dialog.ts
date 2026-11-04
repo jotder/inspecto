@@ -41,6 +41,7 @@ import { isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 
@@ -93,6 +94,7 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
     imports: [
         AiAssistComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
         ReactiveFormsModule,
         FormsModule,
         MatDialogModule,
@@ -182,6 +184,15 @@ export class ComponentFormDialog {
         format: ['parquet'],
         partitions: [[] as string[]],
     });
+
+    /** The Id row's error line, once the row was left or Save refused the form - never on open. */
+    idError(): string {
+        const c = this.form.controls['id'];
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Id is required.';
+        if (c.hasError('pattern')) return 'Start with a letter or digit; then letters, digits, . _ - only.';
+        return '';
+    }
 
     /** The form as a signal, so the transform AI check's args recompute as the operator types. */
     private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });

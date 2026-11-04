@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -24,23 +23,20 @@ export const MAX_ASSIGNEE = 200;
 @Component({
     selector: 'app-recon-assign-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Assign break</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <mat-dialog-content>
                 <p class="text-secondary mb-4 text-sm">{{ data.label }}</p>
-                <mat-form-field class="w-full">
-                    <mat-label>Assignee</mat-label>
-                    <input matInput formControlName="assignee" cdkFocusInitial />
-                    @if (form.controls.assignee.hasError('required')) {
-                        <mat-error>Name who owns this break.</mat-error>
-                    }
-                    @if (form.controls.assignee.hasError('maxlength')) {
-                        <mat-error>At most {{ max }} characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Assignee"
+                    [required]="true"
+                    formControlName="assignee"
+                    [error]="assigneeError()"
+                    cdkFocusInitial
+                ></inspecto-pen-field>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">Cancel</button>
@@ -60,6 +56,15 @@ export class ReconAssignDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    /** The Assignee row's error line, once the row was left or Assign refused it - never on open. */
+    assigneeError(): string {
+        const c = this.form.controls.assignee;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Name who owns this break.';
+        if (c.hasError('maxlength')) return `At most ${this.max} characters.`;
+        return '';
+    }
 
     save(): void {
         const assignee = this.form.controls.assignee.value.trim();

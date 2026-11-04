@@ -2,12 +2,11 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ExchangeOffer } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface RequestShareData {
     offer: ExchangeOffer;
@@ -27,14 +26,7 @@ export interface RequestShareResult {
  */
 @Component({
     standalone: true,
-    imports: [
-        InspectoOptionPickerComponent,
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
-    ],
+    imports: [InspectoOptionPickerComponent, PenFieldComponent, ReactiveFormsModule, MatButtonModule, MatDialogModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Request access</h2>
@@ -44,16 +36,13 @@ export interface RequestShareResult {
                 reviews and approves your request before anything is shared.
             </div>
             <form [formGroup]="form" class="flex flex-col gap-2" (ngSubmit)="submit()">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Purpose (optional)</mat-label>
-                    <textarea
-                        matInput
-                        formControlName="purpose"
-                        rows="3"
-                        placeholder="Why your space needs this data — shown to the owner"
-                        cdkFocusInitial
-                    ></textarea>
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Purpose (optional)"
+                    [multiline]="true"
+                    placeholder="Why your space needs this data — shown to the owner"
+                    formControlName="purpose"
+                    cdkFocusInitial
+                ></inspecto-pen-field>
                 <inspecto-option-picker label="Delivery mode" [options]="modeOptions" formControlName="mode" />
             </form>
         </mat-dialog-content>

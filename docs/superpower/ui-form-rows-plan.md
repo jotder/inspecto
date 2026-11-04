@@ -277,3 +277,25 @@ allow-list (114 to 103).
 - Known and lower: a reactive picker marks its form dirty when its current value is picked again (bind, format, auth
   method); the picker reports every pick, which the dashboard filter bar relies on, so a host that must ignore a re-pick
   guards it (connection type, reconciliation day and filter, model provider).
+
+**Batch 6 - Catalog, Components, Reconciliation, Risk Scores, 2026-11-04.** 10 files leave the allow-list (47 to 37).
+- Rows: the lineage toolbar (from node, depth, node and edge kinds; direction is a picker), grant governance (version,
+  expiry), request-share purpose, the onboarding dialog (name, description, inbox and output directories), the
+  component form (id, skip lines, quote, escape, encoding, store), the mapping and schema editor ids, the break
+  assignee, the reconciliation name and bands, and the Risk Score factor card (id, label, measure, weight, cap).
+- Kept boxed with `form-allow`: the grammar **Delimiter** (a row trims, so a tab or space delimiter would save as
+  ","), the component config JSON, partitions, sample boxes, the reconciliation key columns and the factor evidence
+  columns (**multiple** choices), and the cells of the compare-row and factor filter-row editors.
+- **A server refusal that names a field marks its row.** `setRowError` sets `{ server: true }` on the field and puts
+  the server's message on the card; the old boxed field showed only a red outline, which a row lacks. The row now
+  reads "Refused: see the message above." until an edit of that row clears it; a local error on the same field wins.
+  A remove or move drops these marks with the positional card messages they point at.
+- **Every validator needs its line** (verification finding). A row has no red outline, so a validator with no message
+  makes Save refuse with nothing on screen: the factor Id's pattern and a cleared Weight did exactly that. The card's
+  `fieldError` now takes every message of a field (first failing wins); new wording where the old field had only the
+  outline: "Id may hold only letters, digits and _", "Weight is required", and the reconciliation bands' "A percentage
+  is required.".
+- Behaviour to know: Enter no longer submits the onboarding, component, assign-break or reconciliation forms. Per
+  commit, not per keystroke: the onboarding directory defaults and import notes, the component form's value for its
+  id and grammar rows, the reconciliation name and bands (each commit resets the test result). Weight and cap lost the
+  decimal keypad.

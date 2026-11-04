@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ReconApiService } from 'app/inspecto/api';
 import { ReconRunResult } from 'app/inspecto/reconciliation';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { Dataset } from '../studio/datasets/dataset-types';
 import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
@@ -99,6 +100,25 @@ describe('ReconciliationFormDialog', () => {
         expect(c.form.controls['breachPct'].hasError('belowWarn')).toBe(true);
         c.form.patchValue({ breachPct: 10 });
         expect(c.form.controls['breachPct'].hasError('belowWarn')).toBe(false);
+    });
+
+    it('shows the breach line under its row once the row is left, never before', () => {
+        const { fixture, c } = create();
+        const el = fixture.nativeElement as HTMLElement;
+        c.form.patchValue({ warnPct: 5, breachPct: 2 }); // invalid, but not yet visited
+        refresh(fixture);
+        expect(penError(penByLabel(el, 'Breach over %')!)).toBe('');
+        penEdit(fixture, penByLabel(el, 'Breach over %')!, '1');
+        expect(c.form.controls['breachPct'].value).toBe(1);
+        expect(penError(penByLabel(el, 'Breach over %')!)).toBe('Must be ≥ warn %.');
+        expect(penError(penByLabel(el, 'Warn from %')!)).toBe('');
+    });
+
+    it('a cleared band says it is required, so a disabled Save has a reason on screen', () => {
+        const { fixture } = create();
+        const el = fixture.nativeElement as HTMLElement;
+        penEdit(fixture, penByLabel(el, 'Warn from %')!, '');
+        expect(penError(penByLabel(el, 'Warn from %')!)).toBe('A percentage is required.');
     });
 
     it('prefills from an existing reconciliation in edit mode and keeps its bands', () => {

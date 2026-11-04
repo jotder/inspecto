@@ -1,15 +1,13 @@
 <h2 mat-dialog-title>{{ title() }}</h2>
 <form [formGroup]="form" (ngSubmit)="submit()">
     <mat-dialog-content class="space-y-3">
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
-            <mat-label>Id</mat-label>
-            <input matInput formControlName="id" required cdkFocusInitial />
-            @if (form.get('id')?.hasError('required')) {
-            <mat-error>Id is required.</mat-error>
-            } @else if (form.get('id')?.hasError('pattern')) {
-            <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
-            }
-        </mat-form-field>
+        <inspecto-pen-field
+            label="Id"
+            [required]="true"
+            formControlName="id"
+            [error]="idError()"
+            cdkFocusInitial
+        ></inspecto-pen-field>
 
         <!-- ── grammar ─────────────────────────────────────────────────────────── -->
         @if (kind === 'grammar') { @if (grammarUnauthorable; as reason) {
@@ -18,27 +16,21 @@
             settings, and saving would replace the stored parser. Edit it from the pipeline's Parse step.
         </inspecto-alert>
         } @else {
-        <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            <mat-form-field subscriptSizing="dynamic">
+        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+            <!-- form-allow: a delimiter may be whitespace (a tab, a space), which a row trims to blank on commit --><mat-form-field
+                subscriptSizing="dynamic"
+            >
                 <mat-label>Delimiter</mat-label>
                 <input matInput formControlName="delimiter" />
             </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Skip header lines</mat-label>
-                <input matInput type="number" formControlName="skipHeaderLines" />
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Quote</mat-label>
-                <input matInput formControlName="quote" />
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Escape</mat-label>
-                <input matInput formControlName="escape" />
-            </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Encoding</mat-label>
-                <input matInput formControlName="encoding" />
-            </mat-form-field>
+            <inspecto-pen-field
+                label="Skip header lines"
+                type="number"
+                formControlName="skipHeaderLines"
+            ></inspecto-pen-field>
+            <inspecto-pen-field label="Quote" formControlName="quote"></inspecto-pen-field>
+            <inspecto-pen-field label="Escape" formControlName="escape"></inspecto-pen-field>
+            <inspecto-pen-field label="Encoding" formControlName="encoding"></inspecto-pen-field>
         </div>
         <mat-slide-toggle formControlName="hasHeader">Has header row</mat-slide-toggle>
         } }
@@ -51,7 +43,7 @@
             [options]="transformSubtypes"
             formControlName="subtype"
         />
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
+        <!-- form-allow: a JSON editor --><mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>Config (JSON)</mat-label>
             <textarea matInput formControlName="config" rows="6" spellcheck="false"></textarea>
             @if (form.get('config')?.hasError('invalidJson')) {
@@ -92,14 +84,13 @@
 
         <!-- ── sink ────────────────────────────────────────────────────────────── -->
         @if (kind === 'sink') {
-        <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
             <inspecto-option-picker label="Sink kind" [options]="sinkKinds" formControlName="sinkKind" />
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Store</mat-label>
-                <input matInput formControlName="store" />
-            </mat-form-field>
+            <inspecto-pen-field label="Store" formControlName="store"></inspecto-pen-field>
             <inspecto-option-picker label="Format" [options]="sinkFormats" formControlName="format" />
-            <mat-form-field subscriptSizing="dynamic">
+            <!-- form-allow: a chip list of many partition columns, not one value --><mat-form-field
+                subscriptSizing="dynamic"
+            >
                 <mat-label>Partitions</mat-label>
                 <mat-chip-grid #partitionGrid aria-label="Partition columns">
                     @for (p of form.controls.partitions.value; track p) {
@@ -130,7 +121,10 @@
             }
             <!-- A transform's sample shows on create too: the AI check above is judged by previewing over it. -->
             @if (isEdit && kind === 'grammar') {
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <!-- form-allow: a sample box (many lines pasted to test the Grammar) --><mat-form-field
+                class="w-full"
+                subscriptSizing="dynamic"
+            >
                 <mat-label>Sample text</mat-label>
                 <textarea
                     matInput
@@ -141,7 +135,10 @@
                 ></textarea>
             </mat-form-field>
             } @else if (isEdit || kind === 'transform') {
-            <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <!-- form-allow: a sample box (JSON rows pasted to test the component) --><mat-form-field
+                class="w-full"
+                subscriptSizing="dynamic"
+            >
                 <mat-label>Sample rows (JSON array)</mat-label>
                 <textarea
                     matInput

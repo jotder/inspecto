@@ -3,10 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ColDef } from 'ag-grid-community';
@@ -23,6 +20,8 @@ import {
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoRowAction, fmtDateTime } from 'app/inspecto/grid';
 import { OnboardingCreateDialog, OnboardingCreateResult } from './onboarding/onboarding-create.dialog';
@@ -55,14 +54,13 @@ type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' |
         FormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
-        MatSelectModule,
         MatTabsModule,
         DataTableComponent,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
+        InspectoOptionPickerComponent,
+        PenFieldComponent,
         GraphViewComponent,
         RegistryComponent,
         SharingComponent,
@@ -115,7 +113,8 @@ export class CatalogComponent implements OnInit {
     graphEdgeKinds = '';
     graphOverlay = true;
     readonly graph = signal<MetadataGraph | null>(null);
-    readonly directions: GraphDirection[] = ['out', 'in', 'both'];
+    /** The traversal directions, as the Direction picker's choices (the value is the label). */
+    readonly directionOptions = pickerOptions(['out', 'in', 'both'] satisfies GraphDirection[]);
 
     // graph view (derived from `graph` on each successful traversal)
     readonly g6Data = signal<G6GraphData | null>(null);

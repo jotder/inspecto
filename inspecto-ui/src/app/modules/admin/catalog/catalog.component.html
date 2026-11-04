@@ -113,31 +113,29 @@
 
         <!-- Graph -->
         @if (activeTab === 'graph') {
-            <div class="mt-6 flex flex-wrap items-center gap-3">
-                <mat-form-field class="gamma-mat-dense w-72" subscriptSizing="dynamic">
-                    <mat-label>From node id (blank = whole graph)</mat-label>
-                    <input matInput [(ngModel)]="graphFrom" />
-                </mat-form-field>
-                <mat-form-field class="gamma-mat-dense w-24" subscriptSizing="dynamic">
-                    <mat-label>Depth</mat-label>
-                    <input matInput type="number" min="1" max="6" [(ngModel)]="graphDepth" />
-                </mat-form-field>
-                <mat-form-field class="gamma-mat-dense w-32" subscriptSizing="dynamic">
-                    <mat-label>Direction</mat-label>
-                    <mat-select [(ngModel)]="graphDirection">
-                        @for (d of directions; track d) {
-                            <mat-option [value]="d">{{ d }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
-                    <mat-label>Node kinds (csv)</mat-label>
-                    <input matInput [(ngModel)]="graphKinds" />
-                </mat-form-field>
-                <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
-                    <mat-label>Edge kinds (csv)</mat-label>
-                    <input matInput [(ngModel)]="graphEdgeKinds" />
-                </mat-form-field>
+            <div class="mt-6 grid grid-cols-1 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+                <inspecto-pen-field
+                    label="From node id"
+                    placeholder="blank = whole graph"
+                    [(ngModel)]="graphFrom"
+                ></inspecto-pen-field>
+                <inspecto-pen-field
+                    label="Depth"
+                    type="number"
+                    [min]="1"
+                    [max]="6"
+                    [(ngModel)]="graphDepth"
+                ></inspecto-pen-field>
+                <inspecto-option-picker
+                    class="block"
+                    label="Direction"
+                    [options]="directionOptions"
+                    [(ngModel)]="graphDirection"
+                />
+                <inspecto-pen-field label="Node kinds (csv)" [(ngModel)]="graphKinds"></inspecto-pen-field>
+                <inspecto-pen-field label="Edge kinds (csv)" [(ngModel)]="graphEdgeKinds"></inspecto-pen-field>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-3">
                 <mat-checkbox [(ngModel)]="graphOverlay">overlay</mat-checkbox>
                 <button mat-flat-button color="primary" [disabled]="loading()" (click)="runGraph()">Traverse</button>
             </div>

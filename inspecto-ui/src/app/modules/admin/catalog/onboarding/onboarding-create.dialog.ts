@@ -3,14 +3,13 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidatorFn, Validat
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, PipelineSummary, PipelinesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { configPipelineId, pipelineScaffold } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -80,12 +79,11 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         MatButtonModule,
         MatButtonToggleModule,
         MatDialogModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
+        PenFieldComponent,
     ],
     template: `
         <h2 mat-dialog-title>Onboard {{ kind() === 'reference' ? 'Reference' : 'Stream' }}</h2>
@@ -214,28 +212,20 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <mat-button-toggle value="reference">Reference — dimension</mat-button-toggle>
                 </mat-button-toggle-group>
 
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input matInput formControlName="name" required cdkFocusInitial placeholder="orders_feed" />
-                    <!-- ⚠ Each branch's ONLY root is the <mat-error>. Content projection matches a control-flow
-                         block only by its single root element, so the old outer "@if (… ; as c)" wrapper made
-                         the errors miss mat-form-field's error slot and land in its DEFAULT slot beside the
-                         input — rendered always, touched or not ("A name is required." on open). -->
-                    @if (form.controls.name.hasError('required')) {
-                        <mat-error>A name is required.</mat-error>
-                    } @else if (form.controls.name.hasError('pattern')) {
-                        <mat-error
-                            >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
-                        >
-                    } @else if (form.controls.name.hasError('duplicate')) {
-                        <mat-error>A pipeline with this name already exists.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Name"
+                    [required]="true"
+                    placeholder="orders_feed"
+                    formControlName="name"
+                    [error]="nameError()"
+                    cdkFocusInitial
+                ></inspecto-pen-field>
 
-                <mat-form-field class="mt-3 w-full" subscriptSizing="dynamic">
-                    <mat-label>Description (optional)</mat-label>
-                    <input matInput formControlName="description" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="mt-1"
+                    label="Description (optional)"
+                    formControlName="description"
+                ></inspecto-pen-field>
 
                 <button
                     type="button"
@@ -253,15 +243,15 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 </button>
                 @if (advancedOpen()) {
                     <div class="mt-2 flex flex-col gap-1">
-                        <mat-form-field class="w-full" subscriptSizing="dynamic">
-                            <mat-label>Inbox (poll) directory</mat-label>
-                            <input matInput formControlName="poll" />
-                            <mat-hint>Where dropped files are collected from.</mat-hint>
-                        </mat-form-field>
-                        <mat-form-field class="mt-2 w-full" subscriptSizing="dynamic">
-                            <mat-label>Database (output) directory</mat-label>
-                            <input matInput formControlName="database" />
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Inbox (poll) directory"
+                            formControlName="poll"
+                            help="Where dropped files are collected from."
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Database (output) directory"
+                            formControlName="database"
+                        ></inspecto-pen-field>
                     </div>
                 }
             </form>
@@ -349,6 +339,16 @@ export class OnboardingCreateDialog {
     });
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
+
+    /** The Name row's error line, once the row was left or Create refused the form - never on open. */
+    nameError(): string {
+        const c = this.form.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A name is required.';
+        if (c.hasError('pattern')) return 'Start with a letter or digit; then letters, digits, . _ - only.';
+        if (c.hasError('duplicate')) return 'A pipeline with this name already exists.';
+        return '';
+    }
 
     constructor() {
         // Directory defaults follow the Space-relative `data/...` convention, live while the author hasn't overridden.

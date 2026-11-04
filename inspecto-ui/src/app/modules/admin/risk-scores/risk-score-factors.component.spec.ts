@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { ColumnMeta, Condition } from 'app/inspecto/query/query-types';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { factorDrafts, toRiskScoreContent } from 'app/inspecto/risk/risk-score-form';
 import { RiskScoreFactorsComponent } from './risk-score-factors.component';
 
@@ -149,6 +150,53 @@ describe('RiskScoreFactorsComponent advanced filter (when)', () => {
         expect(f.debugElement.query(By.directive(QueryConditionGroupComponent))).toBeNull();
         const saved = toRiskScoreContent('sim_box', {}, f.componentInstance.value(), body);
         expect((saved['factors'] as Record<string, unknown>[])[0]['when']).toEqual(opaque);
+    });
+
+    it('shows a card row error once the row is left or validate() ran, never on a fresh card', async () => {
+        const f = await mount(STORED(false));
+        const el = f.nativeElement as HTMLElement;
+        f.componentInstance.rows.at(0).controls['id'].setValue(''); // invalid, but not yet visited
+        refresh(f);
+        expect(penError(penByLabel(el, 'Id')!)).toBe('');
+        expect(penError(penByLabel(el, 'Weight')!)).toBe('');
+        penEdit(f, penByLabel(el, 'Weight')!, 'abc');
+        expect(penError(penByLabel(el, 'Weight')!)).toBe('Weight must be a number');
+        expect(penError(penByLabel(el, 'Id')!)).toBe('');
+        expect(f.componentInstance.validate()).toBe(false);
+        refresh(f);
+        expect(penError(penByLabel(el, 'Id')!)).toBe('Id is required');
+    });
+
+    it('marks the field a server refusal names, and an edit of that row clears the mark', async () => {
+        const f = await mount(STORED(false));
+        const el = f.nativeElement as HTMLElement;
+        f.componentInstance.setRowError(0, 'Measure total_amt is not a column of the Dataset', 'measure');
+        refresh(f);
+        expect(penError(penByLabel(el, 'Measure')!)).toBe('Refused: see the message above.');
+        expect(penError(penByLabel(el, 'Id')!)).toBe(''); // only the named field
+        penEdit(f, penByLabel(el, 'Measure')!, 'sum(amount)');
+        expect(penError(penByLabel(el, 'Measure')!)).toBe('');
+    });
+
+    it('every validator of a row has its line: an Id with a dash, a cleared Weight', async () => {
+        const f = await mount(STORED(false));
+        const el = f.nativeElement as HTMLElement;
+        penEdit(f, penByLabel(el, 'Id')!, 'risk-1');
+        expect(penError(penByLabel(el, 'Id')!)).toBe('Id may hold only letters, digits and _');
+        penEdit(f, penByLabel(el, 'Weight')!, '');
+        expect(penError(penByLabel(el, 'Weight')!)).toBe('Weight is required');
+    });
+
+    it('a remove drops the server marks with the card messages they pointed at', async () => {
+        const f = await mount(STORED(false));
+        const el = f.nativeElement as HTMLElement;
+        f.componentInstance.add();
+        f.componentInstance.setRowError(0, 'Measure total_amt is not a column of the Dataset', 'measure');
+        refresh(f);
+        expect(penError(penByLabel(el, 'Measure')!)).toBe('Refused: see the message above.');
+        f.componentInstance.remove(1); // a different card: the messages are positional, so all go
+        refresh(f);
+        expect(penError(penByLabel(el, 'Measure')!)).toBe('');
     });
 
     it('has no axe violations, collapsed and expanded', async () => {
