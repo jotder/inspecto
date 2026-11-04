@@ -13,11 +13,12 @@ import java.util.regex.Pattern;
  * defaults mapped onto the neutral Link Analysis concepts. A Space names the pack it reads in as its <b>Domain
  * Profile</b> ({@code domain_profile} in {@code link-analysis.toon}); none named = the neutral vocabulary.
  *
- * <p>⛔ <b>A pack relabels; it never adds a concept.</b> Every term is keyed by a canonical concept key, and every key
- * must name something the core already has:
+ * <p>⛔ <b>A pack relabels the core's concepts and may add Entity Types, but only under a core family</b>
+ * (ENTITY-TYPE-CATALOG-1 Q-2: the family is the neutral word every reader and every other pack shares). Every term is keyed
+ * by a canonical concept key, and every key must name something the core or the pack's own lists have:
  * <ul>
  *   <li>{@code concept.<name>} — one of {@link #CONCEPTS} (the working-set tiles and the two ends of a link);</li>
- *   <li>{@code entity_type.<id>} — a core Entity Type ({@link EntityTypes#DEFAULTS});</li>
+ *   <li>{@code entity_type.<id>} — a core Entity Type ({@link EntityTypes#DEFAULTS}) or one the pack adds;</li>
  *   <li>{@code link_kind.<id>} — a link kind the pack's own {@code link_kinds} list declares (link kinds are data values);</li>
  *   <li>{@code measure.<id>} — a Value Measure ({@link #MEASURES});</li>
  *   <li>{@code pattern.<id>} — a pattern pack the pack's own {@code pattern_packs} list references;</li>
@@ -25,8 +26,10 @@ import java.util.regex.Pattern;
  *       relabels nothing.</li>
  * </ul>
  * The pack's Entity Types restate core types (normaliser from the closed {@link EntityTypes#NORMALISERS} set, masking,
- * classifications); an id the core does not have is refused. Everything is validated at load and a pack that fails
- * any rule is refused whole ({@link IndustryPacks}), never partly applied.
+ * classifications, and optionally a value shape from the closed {@link ValueShapes} vocabulary and an example) or add new
+ * ones: an added type names its {@code family} (one of {@link EntityTypes#FAMILIES}), and its label and definition are the
+ * pack's {@code entity_type.<id>} term, which it must have. A restated core type keeps its core family. Everything is
+ * validated at load and a pack that fails any rule is refused whole ({@link IndustryPacks}), never partly applied.
  */
 public record IndustryPack(String id, String name, String description, List<String> spaceTemplates,
                            List<String> patternPacks, Profile profile, List<Term> terms,
@@ -57,11 +60,22 @@ public record IndustryPack(String id, String name, String description, List<Stri
             investigate = investigate == null ? null : Map.copyOf(investigate);
             suggestedLists = List.copyOf(suggestedLists);
         }
+
+        /** Every Entity Type the profile names is one of {@code typeIds} (the core's and the pack's own). */
+        void check(Set<String> typeIds) {
+            if (investigate != null && !typeIds.contains(String.valueOf(investigate.get("entity_type"))))
+                throw new IllegalArgumentException("profile.investigate.entity_type '" + investigate.get("entity_type")
+                        + "' is neither a core Entity Type nor one the pack lists");
+            for (SuggestedList l : suggestedLists)
+                if (!typeIds.contains(l.entityType()))
+                    throw new IllegalArgumentException("profile.suggested_lists '" + l.title() + "': entity_type '" + l.entityType()
+                            + "' is neither a core Entity Type nor one the pack lists");
+        }
     }
 
     /**
      * A first Entity List the pack suggests (LA-ONBOARD-1 phase 7, UC-10): a title in the pack's words ("Call centres"),
-     * a purpose from {@link #LIST_PURPOSES}, the core Entity Type its members are, and one line on why. A suggestion only:
+     * a purpose from {@link #LIST_PURPOSES}, the Entity Type its members are (core or the pack's own), and one line on why. A suggestion only:
      * nothing is created until a person creates it.
      */
     public record SuggestedList(String title, String purpose, String entityType, String why) {}
@@ -126,8 +140,6 @@ public record IndustryPack(String id, String name, String description, List<Stri
         for (Object o : list(entityTypesDoc.get("entity_types"), "entity_types")) {
             if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each entity type must be an object");
             String tid = str(m, "id");
-            if (!coreIds.contains(tid))
-                throw new IllegalArgumentException("entity type '" + tid + "' is not a core Entity Type - a pack relabels, it never adds one");
             if (!seenTypes.add(tid)) throw new IllegalArgumentException("entity type '" + tid + "' is listed twice");
             String normaliser = str(m, "normaliser");
             if (!EntityTypes.NORMALISERS.contains(normaliser))
@@ -136,9 +148,23 @@ public record IndustryPack(String id, String name, String description, List<Stri
             if (!(m.get("masked") instanceof Boolean masked))
                 throw new IllegalArgumentException("entity type '" + tid + "': masked must be true or false");
             List<String> cls = strings(m.get("classifications"), "entity type '" + tid + "' classifications");
-            String coreLabel = EntityTypes.DEFAULTS.stream().filter(t -> t.id().equals(tid)).findFirst().orElseThrow().label();
-            types.add(new EntityTypes.EntityType(tid, coreLabel, normaliser, masked, cls));
+            EntityTypes.EntityType core = EntityTypes.coreDefault(tid);
+            String family = m.get("family") == null ? null : str(m, "family");
+            if (core != null && family != null && !family.equals(core.family()))
+                throw new IllegalArgumentException("entity type '" + tid + "' is a core Entity Type of family '" + core.family()
+                        + "'; a pack keeps it there, got '" + family + "'");
+            if (core == null && family == null)
+                throw new IllegalArgumentException("entity type '" + tid + "' is added by the pack, so it must name its family, one of "
+                        + EntityTypes.familyIds());
+            String shape = m.get("shape") == null ? (core == null ? null : core.shape()) : str(m, "shape");
+            String example = m.get("example") == null ? (core == null ? null : core.example())
+                    : bounded(str(m, "example"), "entity type '" + tid + "' example", EntityTypes.MAX_EXAMPLE);
+            String label = core != null ? core.label() : tid;   // an added type's label is its term, checked below
+            types.add(new EntityTypes.EntityType(tid, label, normaliser, masked, cls,
+                    core != null ? core.family() : family, core != null ? core.definition() : null, example, shape));
         }
+        Set<String> typeIds = new HashSet<>(coreIds);
+        typeIds.addAll(seenTypes);
 
         List<Term> terms = new ArrayList<>();
         Set<String> keys = new HashSet<>();
@@ -148,7 +174,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
             if (!(o instanceof Map<?, ?> m)) throw new IllegalArgumentException("each term must be an object");
             String key = str(m, "key");
             if (!keys.add(key)) throw new IllegalArgumentException("term '" + key + "' is listed twice");
-            checkKey(key, coreIds, kinds, patterns);
+            checkKey(key, typeIds, kinds, patterns);
             String label = bounded(str(m, "label"), "term '" + key + "' label", MAX_LABEL);
             String abbreviation = m.get("abbreviation") == null ? "" : bounded(optStr(m, "abbreviation"), "term '" + key + "' abbreviation", MAX_ABBREVIATION);
             String definition = bounded(str(m, "definition"), "term '" + key + "' definition", MAX_DEFINITION);
@@ -157,6 +183,11 @@ public record IndustryPack(String id, String name, String description, List<Stri
                 throw new IllegalArgumentException("term '" + key + "' relabels to its neutral label '" + neutral + "' - drop it");
             terms.add(new Term(key, label, abbreviation, definition));
         }
+        for (EntityTypes.EntityType t : types)
+            if (!coreIds.contains(t.id()) && !keys.contains("entity_type." + t.id()))
+                throw new IllegalArgumentException("entity type '" + t.id() + "' is added by the pack, so it needs a term 'entity_type."
+                        + t.id() + "' for its label and definition");
+        profile.check(typeIds);
         IndustryPack pack = new IndustryPack(id, name, description, templates, patterns, profile, terms, types, kinds);
         EntityTypes.validate(pack.overlay(EntityTypes.DEFAULTS), Integer.MAX_VALUE);
         return pack;
@@ -172,13 +203,13 @@ public record IndustryPack(String id, String name, String description, List<Stri
         return null;
     }
 
-    private static void checkKey(String key, Set<String> coreIds, List<String> kinds, List<String> patterns) {
+    private static void checkKey(String key, Set<String> typeIds, List<String> kinds, List<String> patterns) {
         int dot = key.indexOf('.');
         String ns = dot < 0 ? "" : key.substring(0, dot);
         String rest = dot < 0 ? "" : key.substring(dot + 1);
         boolean ok = switch (ns) {
             case "concept" -> CONCEPTS.containsKey(rest);
-            case "entity_type" -> coreIds.contains(rest);
+            case "entity_type" -> typeIds.contains(rest);
             case "link_kind" -> kinds.contains(rest);
             case "measure" -> MEASURES.contains(rest);
             case "pattern" -> patterns.contains(rest);
@@ -187,7 +218,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
         };
         if (!ok)
             throw new IllegalArgumentException("term '" + key + "' names no core concept (concept.* " + CONCEPTS.keySet()
-                    + ", entity_type.<core type>, link_kind.<listed kind>, measure.<Value Measure>, pattern.<listed pattern pack>"
+                    + ", entity_type.<core or listed type>, link_kind.<listed kind>, measure.<Value Measure>, pattern.<listed pattern pack>"
                     + " or term.<id>) - a pack relabels, it never adds a concept");
     }
 
@@ -197,20 +228,64 @@ public record IndustryPack(String id, String name, String description, List<Stri
         return null;
     }
 
-    /**
-     * {@code base} as this pack reads it: each type the pack restates takes its normaliser, masking and classifications,
-     * and each type with an {@code entity_type.*} term takes that label and its definition. Order, membership, family and
-     * example are {@code base}'s (a pack relabels; the family stays the neutral word every reader shares).
-     */
+    /** {@code base} as this pack alone reads it: {@link #overlay(List, List)} of this one pack. */
     public List<EntityTypes.EntityType> overlay(List<EntityTypes.EntityType> base) {
+        return overlay(List.of(this), base);
+    }
+
+    /**
+     * {@code base} as {@code packs} read it, the first pack winning (ENTITY-TYPE-CATALOG-1 Q-5: several packs in one Space
+     * merge by id). A type of {@code base} takes the normaliser, masking, classifications, shape and example of the first pack
+     * that restates it, and the label and definition of the first pack with an {@code entity_type.*} term for it; its family
+     * stays {@code base}'s. Each type a pack adds follows, in pack order. The same id in two packs must agree on family,
+     * normaliser, masking and classifications, else {@link IllegalArgumentException} (installed packs are checked at load, {@link IndustryPacks}).
+     */
+    public static List<EntityTypes.EntityType> overlay(List<IndustryPack> packs, List<EntityTypes.EntityType> base) {
+        Map<String, EntityTypes.EntityType> stated = new LinkedHashMap<>();   // id -> first pack's statement
+        for (IndustryPack p : packs)
+            for (EntityTypes.EntityType t : p.entityTypes) {
+                EntityTypes.EntityType prev = stated.putIfAbsent(t.id(), t);
+                if (prev != null) agree(prev, t, p.id);
+            }
         List<EntityTypes.EntityType> out = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
         for (EntityTypes.EntityType b : base) {
-            EntityTypes.EntityType t = entityTypes.stream().filter(p -> p.id().equals(b.id())).findFirst().orElse(b);
-            Term term = term("entity_type." + b.id());
+            EntityTypes.EntityType t = stated.getOrDefault(b.id(), b);
+            Term term = firstTerm(packs, "entity_type." + b.id());
             out.add(new EntityTypes.EntityType(b.id(), term != null ? term.label() : b.label(), t.normaliser(), t.masked(),
-                    t.classifications(), b.family(), term != null ? term.definition() : b.definition(), b.example()));
+                    t.classifications(), b.family(), term != null ? term.definition() : b.definition(),
+                    t.example() != null ? t.example() : b.example(), t.shape() != null ? t.shape() : b.shape()));
+            ids.add(b.id());
+        }
+        for (EntityTypes.EntityType t : stated.values()) {
+            if (!ids.add(t.id())) continue;
+            Term term = firstTerm(packs, "entity_type." + t.id());
+            out.add(new EntityTypes.EntityType(t.id(), term != null ? term.label() : t.label(), t.normaliser(), t.masked(),
+                    t.classifications(), t.family(), term != null ? term.definition() : t.definition(), t.example(), t.shape()));
         }
         return List.copyOf(out);
+    }
+
+    /**
+     * Refuses two statements of one id that disagree on family, normaliser, masking or classifications. ⚠ Classifications too
+     * (beyond the plan's three): with them equal, a set of packs that reads together reads together in any order and any
+     * subset, so the load-time check of every installed pack covers every Space's choice.
+     */
+    static void agree(EntityTypes.EntityType a, EntityTypes.EntityType b, String packId) {
+        if (!java.util.Objects.equals(a.family(), b.family()) || !a.normaliser().equals(b.normaliser()) || a.masked() != b.masked()
+                || !new HashSet<>(a.classifications()).equals(new HashSet<>(b.classifications())))
+            throw new IllegalArgumentException("entity type '" + b.id() + "' in pack '" + packId + "' differs from another pack's on "
+                    + "family, normaliser, masking or classifications (" + a.family() + "/" + a.normaliser() + "/" + a.masked() + "/"
+                    + a.classifications() + " vs " + b.family() + "/" + b.normaliser() + "/" + b.masked() + "/" + b.classifications()
+                    + ") - one id is one Entity Type in every pack");
+    }
+
+    private static Term firstTerm(List<IndustryPack> packs, String key) {
+        for (IndustryPack p : packs) {
+            Term t = p.term(key);
+            if (t != null) return t;
+        }
+        return null;
     }
 
     /** The wire shape {@code GET /settings/link-analysis/domain-profile} answers for this pack. */
@@ -300,9 +375,6 @@ public record IndustryPack(String id, String name, String description, List<Stri
             }
             for (String req : List.of("entity_type", "dataset", "source_col", "target_col"))
                 if (!inv.containsKey(req)) throw new IllegalArgumentException("profile.investigate needs '" + req + "'");
-            Object type = inv.get("entity_type");
-            if (EntityTypes.DEFAULTS.stream().noneMatch(t -> t.id().equals(type)))
-                throw new IllegalArgumentException("profile.investigate.entity_type '" + type + "' is not a core Entity Type");
         }
         return new Profile(measure, time, tools, inv, suggestedLists(m.get("suggested_lists")));
     }
@@ -325,8 +397,6 @@ public record IndustryPack(String id, String name, String description, List<Stri
                 throw new IllegalArgumentException("profile.suggested_lists '" + title + "': purpose must be one of " + LIST_PURPOSES
                         + ", got '" + purpose + "'");
             String type = str(l, "entity_type");
-            if (EntityTypes.DEFAULTS.stream().noneMatch(t -> t.id().equals(type)))
-                throw new IllegalArgumentException("profile.suggested_lists '" + title + "': entity_type '" + type + "' is not a core Entity Type");
             String why = bounded(str(l, "why"), "profile.suggested_lists '" + title + "' why", MAX_DEFINITION);
             out.add(new SuggestedList(title, purpose, type, why));
         }

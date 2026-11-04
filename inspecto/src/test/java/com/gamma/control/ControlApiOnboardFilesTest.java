@@ -234,7 +234,7 @@ class ControlApiOnboardFilesTest {
             JsonNode s = draft(c, "shapes.csv", "stream", sb.toString(), null);
             JsonNode imei = entityOf(s, "a");
             assertEquals("imei", imei.get("value").asText(), imei.toString());
-            assertTrue(imei.get("evidence").asText().contains("valid IMEI check digit"), imei.toString());
+            assertTrue(imei.get("evidence").asText().contains("15-digit numbers with a valid check digit"), imei.toString());
             assertEquals("high", imei.get("confidence").asText());
             JsonNode phone = entityOf(s, "b");
             assertEquals("msisdn", phone.get("value").asText(), phone.toString());
@@ -249,7 +249,7 @@ class ControlApiOnboardFilesTest {
     }
 
     private static char luhnDigit(String body) {
-        for (char d = '0'; d <= '9'; d++) if (EntityShapes.luhn(body + d)) return d;
+        for (char d = '0'; d <= '9'; d++) if (com.gamma.entitystore.ValueShapes.fits("luhn(15)", body + d)) return d;
         throw new AssertionError();
     }
 

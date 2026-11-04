@@ -373,7 +373,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:54` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:86` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:89` |
-| PUT | `/settings/link-analysis/domain-profile` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DomainProfileRoutes.java:37` |
+| PUT | `/settings/link-analysis/domain-profile` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DomainProfileRoutes.java:41` |
 | PUT | `/settings/link-analysis/limits` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java:47` |
 | PUT | `/settings/list-limit` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:95` |
 | PUT | `/settings/mail-attachments` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/MailAttachmentRoutes.java:39` |

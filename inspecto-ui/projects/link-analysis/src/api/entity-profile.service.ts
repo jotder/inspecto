@@ -45,6 +45,8 @@ export interface EntityTypeSummary {
     family?: string;
     definition?: string;
     example?: string;
+    /** The value shape, from the closed vocabulary of `inspecto/graph/value-shape.ts` (absent = free). */
+    shape?: string;
     bindings: EntityTypeBinding[];
     headline: EntityTypeHeadline;
 }

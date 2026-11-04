@@ -6712,7 +6712,7 @@
         "tags" : [ "settings" ],
         "summary" : "The Space's Domain Profile: the active Industry pack's terminology and the installed packs",
         "operationId" : "getSettingsLinkAnalysisDomainProfile",
-        "description" : "Answers {active, stated, profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. A pack that failed validation at load is listed under refused, never installed.",
+        "description" : "Answers {active, stated, extraPacks[], profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. extraPacks are the further installed packs whose Entity Types join the Domain Profile's, merged by id (ENTITY-TYPE-CATALOG-1). A pack that failed validation at load, or does not read together with the packs installed before it, is listed under refused, never installed.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
@@ -6723,7 +6723,7 @@
         "tags" : [ "settings" ],
         "summary" : "Select the Space's Domain Profile (canAuthorWorkbench)",
         "operationId" : "putSettingsLinkAnalysisDomainProfile",
-        "description" : "Body {domainProfile: pack id | generic | null}. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack; 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and answers the GET shape.",
+        "description" : "Body {domainProfile: pack id | generic | null, extraPacks?: [pack id]}. extraPacks left out keeps the stored ones, [] clears them. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack, or when extraPacks is not a list of installed pack ids, or the chosen packs do not read together (one Entity Type id stated differently); 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and extra_packs and answers the GET shape.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."

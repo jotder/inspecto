@@ -8375,7 +8375,7 @@
         "tags" : [ "settings" ],
         "summary" : "The Space's Domain Profile: the active Industry pack's terminology and the installed packs",
         "operationId" : "getSettingsLinkAnalysisDomainProfile",
-        "description" : "Answers {active, stated, profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. A pack that failed validation at load is listed under refused, never installed.",
+        "description" : "Answers {active, stated, extraPacks[], profile, installed[], refused[]}. active is the pack id in force, or generic (the neutral vocabulary) when none is stated or the stated one is not installed (then diagnostic says so). profile is the active pack in full: terms keyed by canonical concept key, the profile hints, the relabelled Entity Types and the link kinds. extraPacks are the further installed packs whose Entity Types join the Domain Profile's, merged by id (ENTITY-TYPE-CATALOG-1). A pack that failed validation at load, or does not read together with the packs installed before it, is listed under refused, never installed.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
@@ -8386,7 +8386,7 @@
         "tags" : [ "settings" ],
         "summary" : "Select the Space's Domain Profile (canAuthorWorkbench)",
         "operationId" : "putSettingsLinkAnalysisDomainProfile",
-        "description" : "Body {domainProfile: pack id | generic | null}. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack; 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and answers the GET shape.",
+        "description" : "Body {domainProfile: pack id | generic | null, extraPacks?: [pack id]}. extraPacks left out keeps the stored ones, [] clears them. 503 without a writable Space; 422 when domainProfile is missing, not a string or null, or not an installed Industry pack, or when extraPacks is not a list of installed pack ids, or the chosen packs do not read together (one Entity Type id stated differently); 409 when link-analysis.toon does not parse (left as it is). Writes only domain_profile and extra_packs and answers the GET shape.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
@@ -12868,7 +12868,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the Entity Types in force with their bindings and cached headline",
         "operationId" : "getInvEntityTypes",
-        "description" : "la-entity-profile-plan section 4.5. {items: [{id, label, normaliser, masked, classifications, family?, definition?, example?, bindings: [{dataset, column, role}], headline: {distinct, approximate, rows, dataAsOf, computedAt, assessed, reason}}], families: [{id, label, definition}]}. family is one of the closed families (ENTITY-TYPE-CATALOG-1: party, organisation, account, identifier, device, place, document), listed in families in picker order; family, definition and example are reader guidance, absent when nothing states them. A binding is every Dataset column whose classification the type claims; role is source / target when the column is a link end of a saved Link Analysis view or a published index mapping, else attribute. The headline is the last computed type profile (cached, never a query on this request): assessed:false with reason 'not computed yet' until the type's profile has been read once. Only Datasets the caller may view are walked. Gated by the geoLink feature and a write root; no capability. Audited as LINK_ENTITY_TYPES_LISTED.",
+        "description" : "la-entity-profile-plan section 4.5. {items: [{id, label, normaliser, masked, classifications, family?, definition?, example?, shape?, bindings: [{dataset, column, role}], headline: {distinct, approximate, rows, dataAsOf, computedAt, assessed, reason}}], families: [{id, label, definition}]}. family is one of the closed families (ENTITY-TYPE-CATALOG-1: party, organisation, account, identifier, device, place, document), listed in families in picker order; family, definition and example are reader guidance, and shape is the value shape from the closed vocabulary (free, e164, digits(n|a-b), luhn(n|a-b), iban, email, uuid), each absent when nothing states it. A binding is every Dataset column whose classification the type claims; role is source / target when the column is a link end of a saved Link Analysis view or a published index mapping, else attribute. The headline is the last computed type profile (cached, never a query on this request): assessed:false with reason 'not computed yet' until the type's profile has been read once. Only Datasets the caller may view are walked. Gated by the geoLink feature and a write root; no capability. Audited as LINK_ENTITY_TYPES_LISTED.",
         "responses" : {
           "200" : {
             "description" : "{items, families}."

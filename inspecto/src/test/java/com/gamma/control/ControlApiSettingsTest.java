@@ -686,7 +686,7 @@ class ControlApiSettingsTest {
             // a stated core id without guidance takes the core default's; a new id (till) has none
             String stored = "[{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":true,"
                     + "\"classifications\":[\"MSISDN\"],\"family\":\"identifier\",\"definition\":\"A telephone number, best in "
-                    + "international form.\",\"example\":\"+44 7700 900123\"},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
+                    + "international form.\",\"example\":\"+44 7700 900123\",\"shape\":\"e164\"},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
                     + "\"upper-trim\",\"masked\":false,\"classifications\":[\"TILL\",\"AGENT\"]}]";
             HttpResponse<String> put = send(c.port, "PUT", path, "{\"maskingMode\":\"all\",\"entityTypes\":" + list + "}");
             assertEquals(200, put.statusCode(), put.body());
