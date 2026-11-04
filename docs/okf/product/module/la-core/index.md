@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `ENTITY-TYPE-CATALOG-1` | P2 | feature | a comprehensive Entity Type catalogue per domain: neutral families in the core (Party, Organisation, Account, Identifier, Device, Place,… | operator |
 | `LA-COLUMN-ROLES-1` | P2 | feature | a column has a role: Entity, Time, Measure, Category or Detail, several of each, so play and filter can use every date, measure and categ… | — |
 | `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
 | `LA-BASIC-DISCOVER-1` | P3 | feature | Discover a Dataset in Basic: entities per Entity Type, busiest entities, link kinds, period, amount totals (LA-BASIC-DISCOVERY-1 P0 + P1,… | — |
