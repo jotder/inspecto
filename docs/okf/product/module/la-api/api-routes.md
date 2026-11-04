@@ -11,13 +11,14 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-100 route(s) registered; 100 in the OpenAPI contract, 0 not.
+101 route(s) registered; 101 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
 | POST | `/geo/projection` | POST /geo/projection (generated skeleton) | geo | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java` |
 | POST | `/geo/routes` | POST /geo/routes (generated skeleton) | geo | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/GeoRoutes.java` |
 | POST | `/inv/case-history` | The Incidents and Cases referencing one Entity, for a key that may be a masking alias | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java` |
+| GET | `/inv/datasets/{datasetId}/discover` | What is in one Dataset: entities, busiest, kinds of link, period, Measure totals | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DiscoverRoutes.java` |
 | GET | `/inv/datasets/{datasetId}/files` | List the Files recorded towards a Dataset, with each File's index state | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DatasetFilesRoutes.java` |
 | POST | `/inv/deep-links/resolve` | Validate an Open in Inspecto LA link's parameters | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java` |
 | GET | `/inv/entities/{entityType}/{entityKey}/profile` | Read one Entity's profile by raw value or exploration alias | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/EntityPageRoutes.java` |

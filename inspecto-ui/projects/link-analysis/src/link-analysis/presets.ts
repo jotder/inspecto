@@ -38,7 +38,7 @@ export function presetEntityValues(r: PresetRunResult | null): string[] {
 }
 
 /** Where the answer came from, in one line: the link index (and whether it is behind), else nothing - the Dataset is the default. */
-export function presetSourceLine(r: PresetRunResult | null): string {
+export function presetSourceLine(r: Pick<PresetRunResult, 'source'> | null): string {
     const s = r?.source;
     if (!s || s.kind !== 'index') return '';
     const behind = s.stale ? ` It is behind the data (${s.staleReason ?? 'files were added since it was built'}).` : '';

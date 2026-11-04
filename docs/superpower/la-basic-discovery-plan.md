@@ -122,6 +122,31 @@ the contract test), rate-classed EXPENSIVE; the GET (a zero-row column probe) EX
 `module.toon` route list. UI: `link-analysis-presets.component.ts` + `presets.ts`; *Draw these* is the Start box's
 `found` start (25 values per start).
 
+**V3 (2026-11-05): yes, in the browser - over the loaded graph only.** The toolbox's motif builder runs a pattern pack
+(the shipped built-ins plus the Space's `pattern-pack` components, `patternPackFromContent`) client side through
+`matchPattern` (linear) and `matchBranchingPattern` (branching) over the graph on screen, on every edition. The
+whole-Dataset run is the server's `POST /inv/pattern/branching` (*Run over the whole Dataset*); an Investigation's own run
+goes there too. So Discover does not run packs: over a Dataset nothing is loaded yet, and the server run is a question of
+its own (a preset), not a summary.
+
+**V4 (2026-11-05, IMS on the Basic install, 39.4 M links, 12.35 M distinct numbers; timings only).**
+
+| Read | Time |
+|---|---|
+| `EntityProfiles` union read (`suggest`, empty prefix: `COUNT(DISTINCT k)` + group by raw over every binding) | 112 s, 113 s (no cache) |
+| a preset from the index `nodes` table (Reached by many) | 0.8 s |
+| the same grouped over the Dataset (a kinds filter) | past the Space's 10 s timeout |
+| rows + min / max time | 0.1 s |
+| link kinds (`GROUP BY kind`) | 0.2 s |
+| `approx_count_distinct` over both ends (`UNION ALL`); exact `UNION` count | 2.6 s (0.15 % off); 18.5 s |
+| one pass: rows, period, 2 approx distincts, 2 measures (sum + `approx_quantile` 0.5) | 5.2 s |
+
+So Discover never uses the `EntityProfiles` union read (one Entity Type across every Dataset, 100+ s on IMS): it reads
+THIS Dataset's columns in a few cheap passes, approximate distinct counts said as such, and takes the busiest entities
+from the link index when one is current, else from the Dataset under the statement timeout (a timeout = not assessed,
+with "a link index answers it quickly"). Cold Discover on IMS is about 6 s, over plan §5's 3 s; the cached answer is
+what meets it.
+
 **Gotcha.** DuckDB refuses the zone id `Z`: pass `ZoneId.of("UTC")`, never `ZoneOffset.UTC` (the first test run failed on it).
 
 A `kinds` filter on a Dataset that maps no kind of link is refused 422 (the panel does not show that field there), never

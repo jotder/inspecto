@@ -1554,6 +1554,57 @@ export interface PresetRunResult {
     };
 }
 
+/** LA-BASIC-DISCOVER-1: every Discover section says whether it was measured, and why not - never a 0 nobody counted. */
+export interface DiscoverSection {
+    assessed: boolean;
+    reason: string | null;
+}
+
+/** One Entity Type the Dataset holds: its columns and about how many distinct entities. */
+export interface DiscoverEntityType {
+    type: string;
+    label: string;
+    columns: string[];
+    distinct: number | null;
+    approximate: boolean;
+    masked: boolean;
+}
+
+/** One of the busiest entities at one end of the links (an alias when the Space masks it). */
+export interface DiscoverBusy {
+    entity: string;
+    links: number;
+    counterparts: number;
+}
+
+export interface DiscoverMeasure {
+    column: string;
+    unit: string | null;
+    /** Rows holding a number. */
+    rows: number;
+    sum: number | null;
+    median: number | null;
+}
+
+/** `GET /inv/datasets/{id}/discover`: what is in a Dataset, at a glance. */
+export interface DiscoverResult {
+    dataset: string;
+    computedAt: string;
+    cached: boolean;
+    rows: number | null;
+    roles: { from: string | null; to: string | null; kind: string | null; time: string | null };
+    entityTypes: DiscoverSection & { items: DiscoverEntityType[] };
+    period: DiscoverSection & { column: string | null; from: string | null; to: string | null; days: number | null };
+    linkKinds: DiscoverSection & { column: string | null; items: { kind: string; links: number }[]; truncated: boolean };
+    busiest: DiscoverSection & {
+        from: DiscoverBusy[];
+        to: DiscoverBusy[];
+        source?: PresetRunResult['source'];
+    };
+    measures: DiscoverSection & { items: DiscoverMeasure[] };
+    masking?: { mode: string; masked: boolean; basis?: string };
+}
+
 /** `POST …/alert-rules` for a value Measure: fires when ≥ 1 entity breaches (comparator/threshold are the server's). */
 export interface ValueMeasureAlertRuleRequest {
     name: string;
@@ -2274,6 +2325,11 @@ export class InvService {
     /** LA-PRESET-QUERIES-1: run one preset. Read-only; 404 unknown Dataset or preset · 422 unmapped role or bad parameter. */
     runPreset(id: string, dataset: string, params: Record<string, string>): Observable<PresetRunResult> {
         return this.http.post<PresetRunResult>(apiUrl(`/inv/presets/${encodeURIComponent(id)}/run`), { dataset, params });
+    }
+
+    /** LA-BASIC-DISCOVER-1: what is in one Dataset. Read-only; 404 unknown Dataset · 422 unreadable link mapping. */
+    discover(dataset: string): Observable<DiscoverResult> {
+        return this.http.get<DiscoverResult>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/discover`));
     }
 
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──

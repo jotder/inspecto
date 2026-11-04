@@ -39,6 +39,10 @@ public final class LinkEventTypes {
      *  {@code rows} and {@code truncated} carry what the analyst was told. */
     public static final String LINK_PRESET_RUN = "LINK_PRESET_RUN";
 
+    /** One Dataset was discovered ({@code GET /inv/datasets/{id}/discover}, LA-BASIC-DISCOVER-1): its counts, period, kinds,
+     *  totals and busiest entities. {@code dataset}, {@code cached} and {@code masked} carry the reach; no entity id is recorded. */
+    public static final String LINK_DATASET_DISCOVERED = "LINK_DATASET_DISCOVERED";
+
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */

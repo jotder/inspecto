@@ -61,13 +61,13 @@ public final class PresetRoutes implements RouteModule {
     }
 
     /** The presets a link index answers without scanning the Dataset: from its {@code nodes} table or its derived tables. */
-    private static final java.util.Set<String> INDEX_SERVED = java.util.Set.of("fan_in", "fan_out", "newcomers", "two_way", "short_loops");
+    static final java.util.Set<String> INDEX_SERVED = java.util.Set.of("fan_in", "fan_out", "newcomers", "two_way", "short_loops");
 
     /** Two-way pairs and Short loops read the build's derived tables (LA-INDEX-PAIRS-LOOPS-1), never {@code nodes}. */
     private static final java.util.Set<String> DERIVED = java.util.Set.of("two_way", "short_loops");
 
     /** An index answer ({@code rows} set), or only the {@code source} saying why the Dataset answers instead. */
-    private record Answer(List<PresetQueries.Column> columns, List<Map<String, Object>> rows, boolean truncated,
+    record Answer(List<PresetQueries.Column> columns, List<Map<String, Object>> rows, boolean truncated,
                           Map<String, Object> source) {}
 
     /**
@@ -76,7 +76,7 @@ public final class PresetRoutes implements RouteModule {
      * Space's index switch and the staleness refusal apply exactly as they do for exploration. A kinds filter, no index, or a
      * refused one: null rows, and the Dataset answers. {@code null} for every other preset.
      */
-    private static Answer fromIndex(ApiContext api, Path writeRoot, Target t, PresetQueries.Preset p, Map<String, String> given,
+    static Answer fromIndex(ApiContext api, Path writeRoot, Target t, PresetQueries.Preset p, Map<String, String> given,
                                     int limit) throws SQLException, java.io.IOException {
         if (!INDEX_SERVED.contains(p.id())) return null;
         if (p.param("kinds") != null && !PresetQueries.kinds(PresetQueries.value(p, given, "kinds")).isEmpty())
@@ -184,9 +184,9 @@ public final class PresetRoutes implements RouteModule {
     }
 
     /** What a Dataset is, for presets: its relation, its roles, and the Space's pack. */
-    private record Target(String datasetId, String relationSql, PresetQueries.Roles roles, String packId) {}
+    record Target(String datasetId, String relationSql, PresetQueries.Roles roles, String packId) {}
 
-    private static Target target(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
+    static Target target(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, datasetId);
         Map<String, Object> dataset = DatasetProviders.require().dataset(writeRoot, datasetId).orElseThrow();
         List<DatasetProvider.Column> columns;

@@ -12699,6 +12699,35 @@
         "x-optional-module" : true
       }
     },
+    "/inv/datasets/{datasetId}/discover" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "What is in one Dataset: entities, busiest, kinds of link, period, Measure totals",
+        "operationId" : "getInvDatasetDiscover",
+        "description" : "LA-BASIC-DISCOVER-1 (Basic and up). {dataset, computedAt, cached, rows, roles {from, to, kind, time}, entityTypes {items [{type, label, columns, distinct, approximate, masked}]}, period {column, from, to, days}, linkKinds {column, items [{kind, links}], truncated}, busiest {from [{entity, links, counterparts}], to [...], source}, measures {items [{column, unit, rows, sum, median}]}, masking}. Every section carries assessed and reason: a role the Dataset does not map, or a read that failed or ran past the Space's statement timeout, is not assessed - never a zero. Distinct entities and medians are approximate. The busiest (top 10 per end, by distinct counterparts) come from a current link index when one exists, else from the Dataset. Busiest entity ids are exploration aliases when the Space masks them. Cached until the Dataset's input files change. Gated by the geoLink feature, a write root and R3 view access to the Dataset. Audited as LINK_DATASET_DISCOVERED (no entity id).",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The Discover answer."
+          },
+          "404" : {
+            "description" : "No such Dataset, or not viewable by the caller (the same answer)."
+          },
+          "422" : {
+            "description" : "A link mapping that names a column the data has not got, or a Dataset that cannot be read."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/datasets/{datasetId}/files" : {
       "get" : {
         "tags" : [ "inv" ],
