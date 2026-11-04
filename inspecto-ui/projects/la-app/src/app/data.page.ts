@@ -640,7 +640,9 @@ export class DataPageComponent implements OnInit {
             if (held) this.save(d, c, { role, entityType: held });
             return;
         }
-        this.save(d, c, this.typeOf(c.classification) ? { role, entityType: null } : { role });
+        // a Measure holds no Entity Type at all (the server refuses one that does, LA-COLUMN-ROLES-1 P3)
+        const clears = this.typeOf(c.classification) || (role === 'measure' && !!c.classification);
+        this.save(d, c, clears ? { role, entityType: null } : { role });
     }
 
     private setRecordType(d: DataEntry, recordType: string): void {

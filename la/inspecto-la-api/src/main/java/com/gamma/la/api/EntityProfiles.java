@@ -867,6 +867,7 @@ final class EntityProfiles {
             out.put("coveredDays", covered);
             out.put("perDay", perDay);
             out.put("where", where);
+            out.put("measures", measures(f, key, window));
             out.put("links", entityLinks(f, key));
             List<Map<String, Object>> related = related(f, key);
             truncated |= truncated(related);
@@ -937,6 +938,75 @@ final class EntityProfiles {
             out.putAll(failed(e));
         }
         return out;
+    }
+
+    /** The relation name a binding's Dataset is registered under for its measure read. */
+    private static final String MEASURE_ROWS = "__entity_measure_rows";
+
+    /**
+     * LA-COLUMN-ROLES-1 P3: every Measure of every Dataset the Entity is bound in, over the rows that name it there - how
+     * many rows hold a number, their sum, lowest and highest, and the Measure's unit when the Dataset says one. Inside the
+     * profile's window when the binding has a time column. A Dataset with no Measure column adds nothing; a value that is
+     * no number is not counted (TRY_CAST). One read per binding, so a Dataset's own column names are never mixed up.
+     */
+    static List<Map<String, Object>> measures(Frame f, String key, String[] window) throws Exception {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (EntityTypeBindings.Binding b : f.usable) {
+            Map<String, Object> content = f.resolved.datasets().get(b.dataset());
+            if (content == null || !(content.get("columns") instanceof List<?> cols)) continue;
+            List<String[]> present = new ArrayList<>();                                       // {measure, its own spelling, unit}
+            for (Object o : cols)
+                if (o instanceof Map<?, ?> c && "measure".equalsIgnoreCase(String.valueOf(c.get("role")))
+                        && c.get("name") instanceof String n && f.column(b.dataset(), n) != null
+                        && !n.equalsIgnoreCase(b.column())
+                        // a column that holds an Entity Type is an identifier, never summed: under masking its raw values
+                        // would come back as a sum, a lowest and a highest (the Dataset rules refuse such a Measure too)
+                        && !(c.get("classification") instanceof String k && !k.isBlank()))
+                    present.add(new String[] {n, f.column(b.dataset(), n), c.get("unit") instanceof String u ? u : null});
+            if (present.isEmpty()) continue;
+            StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS n");
+            for (int i = 0; i < present.size(); i++) {
+                String v = "TRY_CAST(" + q(present.get(i)[1]) + " AS DOUBLE)";
+                sql.append(", COUNT(").append(v).append(") AS c").append(i).append(", SUM(").append(v).append(") AS s").append(i)
+                        .append(", MIN(").append(v).append(") AS lo").append(i).append(", MAX(").append(v).append(") AS hi").append(i);
+            }
+            String col = q(f.column(b.dataset(), b.column()));
+            sql.append(" FROM ").append(MEASURE_ROWS).append(" WHERE ").append(EntityKeySql.key(f.type.normaliser(), col)).append(" = ?");
+            List<String> binds = new ArrayList<>(List.of(key));
+            String time = b.timeColumn() == null ? null : f.column(b.dataset(), b.timeColumn());
+            if (window != null && time == null) continue;   // undated rows are outside every window, as `where` counts them
+            if (window != null) {
+                if (window[0] != null) {
+                    sql.append(" AND TRY_CAST(").append(q(time)).append(" AS TIMESTAMP) >= CAST(? AS TIMESTAMP)");
+                    binds.add(LocalDateTime.ofInstant(Instant.parse(window[0]), UTC).toString());
+                }
+                if (window[1] != null) {
+                    sql.append(" AND TRY_CAST(").append(q(time)).append(" AS TIMESTAMP) < CAST(? AS TIMESTAMP)");
+                    binds.add(LocalDateTime.ofInstant(Instant.parse(window[1]), UTC).toString());
+                }
+            }
+            Map<String, Object> r = f.run(MEASURE_ROWS, f.relationSql.get(b.dataset()), sql.toString(), 1, binds).rows().get(0);
+            for (int i = 0; i < present.size(); i++) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("dataset", b.dataset());
+                m.put("column", b.column());
+                m.put("measure", present.get(i)[0]);
+                m.put("unit", present.get(i)[2]);
+                m.put("rows", ColumnProfile.num(r.get("c" + i)));
+                m.put("sum", number(r.get("s" + i)));
+                m.put("min", number(r.get("lo" + i)));
+                m.put("max", number(r.get("hi" + i)));
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
+    /** A DOUBLE aggregate as a JSON number (null when no row held a number), at most 6 decimals. */
+    static Double number(Object v) {
+        if (!(v instanceof Number n) || !Double.isFinite(n.doubleValue())) return null;
+        // BigDecimal, not Math.round(v * 1e6): that saturates at Long.MAX_VALUE, so any total from 9.2e12 up came back wrong
+        return java.math.BigDecimal.valueOf(n.doubleValue()).setScale(6, java.math.RoundingMode.HALF_UP).doubleValue();
     }
 
     private static Map<String, Object> entityLinks(Frame f, String key) {

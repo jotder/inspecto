@@ -167,6 +167,44 @@ class ControlApiOnboardLinkAnalysisTest {
     }
 
     /**
+     * LA-COLUMN-ROLES-1 P3: a role filter (a Measure range, a Category list, a Time window) on a link read is answered from the link index's
+     * attribute columns - which Add data's first build carries - with exactly the rows the Dataset read gives, and narrows them.
+     */
+    @Test
+    void aRoleFilterIsServedFromTheIndexAndAgreesWithTheDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode s = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("BUILT", s.get("index").get("result").asText(), s.get("index").toString());
+            String filter = "{\"kind\":\"group\",\"op\":\"AND\",\"items\":["
+                    + "{\"kind\":\"condition\",\"field\":\"channel\",\"operator\":\"in\",\"value\":\"mobile,online\"},"
+                    + "{\"kind\":\"condition\",\"field\":\"amount\",\"operator\":\"between\",\"value\":\"100\",\"value2\":\"600\"},"
+                    // a window on the Time column, as the role panel writes it (datetime-local, no zone)
+                    + "{\"kind\":\"condition\",\"field\":\"booked_at\",\"operator\":\">=\",\"value\":\"2026-09-05T00:00\"},"
+                    + "{\"kind\":\"condition\",\"field\":\"booked_at\",\"operator\":\"<\",\"value\":\"2026-09-25T12:30\"}]}";
+            String read = "{\"dataset\":\"" + id + "\",\"sourceCol\":\"from_account\",\"targetCol\":\"to_account\",\"value\":\"ACC-0001\"";
+            JsonNode all = data(send(c, "POST", "/inv/projection/neighbors", (read + "}").getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode viaIndex = data(send(c, "POST", "/inv/projection/neighbors",
+                    (read + ",\"filter\":" + filter + "}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("index", viaIndex.at("/source/kind").asText(), viaIndex.get("source").toString());
+            Files.writeString(root.resolve("link-analysis.toon"), "index:\n  enabled: false\n");
+            JsonNode viaDataset = data(send(c, "POST", "/inv/projection/neighbors",
+                    (read + ",\"filter\":" + filter + "}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals(sorted(viaDataset.get("rows")), sorted(viaIndex.get("rows")), "the index answers as the Dataset does");
+            assertTrue(viaIndex.get("rows").size() > 0, viaIndex.toString());
+            assertTrue(viaIndex.get("rows").size() < all.get("rows").size(), "the filter narrows the hub's links");
+        }
+    }
+
+    private static List<String> sorted(JsonNode rows) {
+        List<String> out = new java.util.ArrayList<>();
+        for (JsonNode r : rows) out.add(r.toString());
+        out.sort(null);
+        return out;
+    }
+
+    /**
      * LA-ONBOARD-DEFECTS-1 (1): after Add a file in append mode the index summary says what the index now HOLDS - every link
      * and each entity once - not what the appended batch added ("2,215 links between 624 entities" for 4,430 rows over 312
      * accounts). Red on the old code: the APPEND build's own counts were reported (200 edges, the node rows of both builds).

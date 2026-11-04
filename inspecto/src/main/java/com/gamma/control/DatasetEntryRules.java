@@ -105,6 +105,8 @@ final class DatasetEntryRules {
                 throw new IllegalArgumentException("column '" + name + "' is an Entity column but holds no Entity Type (classification)");
             if (c.get(CARRIED) != null && !(c.get(CARRIED) instanceof Boolean))
                 throw new IllegalArgumentException("column '" + name + "' has carried '" + c.get(CARRIED) + "' (true or false)");
+            if ("measure".equals(role) && c.get("classification") instanceof String k && !k.isBlank())
+                throw new IllegalArgumentException("column '" + name + "' holds an Entity Type (" + k + "), so it is an identifier, not a measure");
             if ("measure".equals(role) && !numeric(c.get("type")))
                 throw new IllegalArgumentException("column '" + name + "' is a measure but holds " + c.get("type") + " values, not numbers");
             if (unit == null) continue;

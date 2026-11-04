@@ -109,6 +109,8 @@ class DatasetEntryRulesRolesTest {
 
     @Test
     void aMeasureHoldsNumbers() {
+        assertTrue(refusal(entry(col("name", "msisdn", "type", "number", "role", "measure", "classification", "MSISDN")))
+                .contains("holds an Entity Type (MSISDN), so it is an identifier, not a measure"));
         assertTrue(refusal(entry(col("name", "currency", "type", "string", "role", "measure")))
                 .contains("is a measure but holds string values, not numbers"));
         assertTrue(refusal(linked(Map.of("from", "a", "to", "b", "amount", "currency"), A, B, col("name", "currency", "type", "VARCHAR")))

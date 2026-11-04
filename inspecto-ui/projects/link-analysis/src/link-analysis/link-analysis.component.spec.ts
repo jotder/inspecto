@@ -1539,6 +1539,63 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('inspecto-option-picker[label="Domain profile"]')).toBeNull();
     });
+    it('LA-COLUMN-ROLES-1 P3: Filter by role writes its conditions into the tree and pushes it to the server', async () => {
+        const roles = {
+            ...DS,
+            columns: [
+                { name: 'amount', type: 'number', role: 'measure' },
+                { name: 'channel', type: 'string', role: 'dimension' },
+                { name: 'when', type: 'date', role: 'temporal' },
+            ],
+        } as unknown as Dataset;
+        const { fixture, queried } = create({ datasets: [roles] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.roleColumns()).toEqual({ measures: ['amount'], categories: ['channel'], times: ['when'] });
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'a' }); // the analyst's own
+        await c.applyRoleFilters({
+            measures: { amount: { min: '10', max: '' } },
+            categories: { channel: ['app'] },
+            time: { column: '', from: '', to: '' },
+        });
+        const pushed = (queried.at(-1) as { filter?: { items: unknown[] } }).filter!;
+        expect(pushed.items).toEqual([
+            { kind: 'condition', field: 'source', operator: '=', value: 'a' },
+            { kind: 'condition', field: 'amount', operator: '>=', value: '10' },
+            { kind: 'condition', field: 'channel', operator: 'in', value: 'app' },
+        ]);
+        // applied again: the panel's own conditions are replaced, the analyst's kept
+        await c.applyRoleFilters({
+            measures: { amount: { min: '20', max: '' } },
+            categories: {},
+            time: { column: '', from: '', to: '' },
+        });
+        expect((queried.at(-1) as { filter?: { items: unknown[] } }).filter!.items).toEqual([
+            { kind: 'condition', field: 'source', operator: '=', value: 'a' },
+            { kind: 'condition', field: 'amount', operator: '>=', value: '20' },
+        ]);
+        // a saved view's conditions are its own: one equal to the panel's last is kept by the next apply
+        const viewCond = { kind: 'condition', field: 'amount', operator: '>=', value: '20' } as const;
+        await c.loadView({
+            id: 'v',
+            name: 'v',
+            sourceId: c.lastRun()!.sourceId,
+            query: { ...c.lastRun()!.query, filter: { kind: 'group', op: 'AND', items: [viewCond] } },
+        });
+        await c.applyRoleFilters({
+            measures: {},
+            categories: { channel: ['app'] },
+            time: { column: '', from: '', to: '' },
+        });
+        expect((queried.at(-1) as { filter?: { items: unknown[] } }).filter!.items).toEqual([
+            viewCond,
+            { kind: 'condition', field: 'channel', operator: 'in', value: 'app' },
+        ]);
+        c.clearFilter();
+        expect(c.roleFilters().measures).toEqual({});
+    });
+
     it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {
         const FILTERED: G6GraphData = { nodes: GRAPH.nodes.slice(0, 3), edges: GRAPH.edges.slice(0, 2) }; // a–b–c only
         const { fixture, queried } = create({ filtered: FILTERED });

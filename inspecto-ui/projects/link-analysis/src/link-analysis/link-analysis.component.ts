@@ -255,6 +255,8 @@ import { PivotService } from '@inspecto/link-analysis/investigation/pivot.servic
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { carriedColumns, columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
 import { timeColumnChoices } from './timeline-playback';
+import { LinkAnalysisRoleFilterComponent, RoleFilterCategory } from './link-analysis-role-filter.component';
+import { NO_ROLE_FILTERS, RoleFilters, categoryValuesSql, withRoleFilters } from './role-filters';
 import {
     LA_AI_ASSIST,
     LA_DATASETS,
@@ -542,6 +544,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
         LinkAnalysisFilterComponent,
+        LinkAnalysisRoleFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         LinkAnalysisInvestigationComponent,
@@ -3408,6 +3411,55 @@ Its prior copies stay in its version history.`,
     clearFilter(): void {
         this.filterWhere.set(emptyGroup());
         this.localFilter.set(null);
+        this.roleFilters.set(NO_ROLE_FILTERS);
+    }
+
+    // ── Filter by role (LA-COLUMN-ROLES-1 P3): a range per Measure, a list per Category, a window on a Time column ──
+    /** What the role panel last applied. */
+    readonly roleFilters = signal<RoleFilters>(NO_ROLE_FILTERS);
+    /** The loaded Dataset's role columns the panel offers (empty when the read spans several Datasets). */
+    readonly roleColumns = computed(() => {
+        const cols = this.loadedDataset()?.columns;
+        return {
+            measures: columnsOfRole(cols, 'measure'),
+            categories: columnsOfRole(cols, 'dimension'),
+            times: columnsOfRole(cols, 'temporal'),
+        };
+    });
+    readonly hasRoleColumns = computed(() => {
+        const r = this.roleColumns();
+        return r.measures.length + r.categories.length + r.times.length > 0;
+    });
+    /** Each Category column's distinct values, read from the Dataset once the filter is open. */
+    private readonly categoryValues = signal<Record<string, string[]>>({});
+    readonly roleCategories = computed<RoleFilterCategory[]>(() =>
+        this.roleColumns().categories.map((name) => ({ name, values: this.categoryValues()[name] ?? [] })),
+    );
+    /** The Dataset whose Category values are read (or being read): one read per Dataset, not per opening of the filter. */
+    private categoryValuesOf = '';
+    private readonly loadCategoryValues = effect(() => {
+        const ds = this.loadedDataset();
+        const cols = this.roleColumns().categories;
+        if (!this.filterOpen() || !ds?.sourceName || !cols.length || this.categoryValuesOf === ds.id) return;
+        this.categoryValuesOf = ds.id;
+        untracked(() => void this.readCategoryValues(ds.id, ds.sourceName, cols));
+    });
+
+    private async readCategoryValues(id: string, source: string, cols: readonly string[]): Promise<void> {
+        const out: Record<string, string[]> = {};
+        for (const c of cols) {
+            const res = await this.datasetRows.sql(source, categoryValuesSql(source, c), 200);
+            out[c] = res.error ? [] : res.rows.map((r) => String(r['v']));
+        }
+        if (this.categoryValuesOf === id) this.categoryValues.set(out); // a read for a Dataset no longer drawn is dropped
+    }
+
+    /** Write the role filters into the predicate tree (replacing the panel's own conditions) and push it to the server. */
+    applyRoleFilters(f: RoleFilters): Promise<void> {
+        const previous = this.roleFilters();
+        this.roleFilters.set(f);
+        this.filterWhere.set(withRoleFilters(this.filterWhere(), f, previous));
+        return this.pushFilter();
     }
 
     /**
@@ -5113,6 +5165,7 @@ Its prior copies stay in its version history.`,
         this.boundProfile.set(null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
+        this.roleFilters.set(NO_ROLE_FILTERS); // the view's conditions are its own, not the panel's: none is taken out
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
         this.lassoMode.set(false);
         this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };

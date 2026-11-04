@@ -13,6 +13,7 @@ import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.com
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { EntityNormaliser, typedEntityKey } from '@inspecto/core/graph/entity-key';
 import {
+    EntityMeasure,
     EntityProfile,
     EntityProfileService,
     EntityTypeSummary,
@@ -28,6 +29,7 @@ import {
     calendar,
     count,
     day,
+    measureValue,
     dayStart,
     entitiesBase,
     freshness,
@@ -136,6 +138,22 @@ type Identity = { members: string[] | null; note: string } | null;
                             "
                         ></inspecto-data-table>
                     </mat-expansion-panel>
+
+                    <!-- Measures (LA-COLUMN-ROLES-1 P3) -->
+                    @if (p.measures?.length) {
+                        <mat-expansion-panel data-section="measures">
+                            <mat-expansion-panel-header>
+                                <mat-panel-title>Measures</mat-panel-title>
+                                <mat-panel-description>{{ p.measures!.length }}</mat-panel-description>
+                            </mat-expansion-panel-header>
+                            <inspecto-data-table
+                                tier="mini"
+                                [rows]="p.measures!"
+                                [columns]="measureCols"
+                                noRowsTitle="No Measure in the Datasets this Entity is in"
+                            ></inspecto-data-table>
+                        </mat-expansion-panel>
+                    }
 
                     <!-- Links -->
                     <mat-expansion-panel data-section="links">
@@ -327,6 +345,16 @@ export class EntityComponent implements OnInit {
             canHide: false,
         };
     });
+
+    /** LA-COLUMN-ROLES-1 P3: every Measure of the Datasets the Entity is in, over its rows there. */
+    readonly measureCols: ColDef[] = [
+        { field: 'dataset', headerName: 'Dataset' },
+        { field: 'measure', headerName: 'Measure' },
+        { headerName: 'Rows', valueGetter: (p) => count((p.data as EntityMeasure | undefined)?.rows) },
+        { headerName: 'Sum', valueGetter: (p) => measureValue(p.data as EntityMeasure | undefined, 'sum') },
+        { headerName: 'Lowest', valueGetter: (p) => measureValue(p.data as EntityMeasure | undefined, 'min') },
+        { headerName: 'Highest', valueGetter: (p) => measureValue(p.data as EntityMeasure | undefined, 'max') },
+    ];
 
     readonly whereCols: ColDef[] = [
         { field: 'dataset', headerName: 'Dataset' },

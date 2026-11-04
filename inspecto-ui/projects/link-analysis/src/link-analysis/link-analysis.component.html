@@ -1911,6 +1911,18 @@
                                 (clear)="clearFilter()"
                                 (advanced)="openAdvancedSearch()"
                             ></inspecto-link-analysis-filter>
+                            <!-- LA-COLUMN-ROLES-1 P3: Measure ranges, Category lists, a Time window - pushed to the server -->
+                            @if (hasRoleColumns()) {
+                                <inspecto-link-analysis-role-filter
+                                    class="mb-3 block"
+                                    [measures]="roleColumns().measures"
+                                    [categories]="roleCategories()"
+                                    [times]="roleColumns().times"
+                                    [initial]="roleFilters()"
+                                    [busy]="pushing()"
+                                    (apply)="applyRoleFilters($event)"
+                                ></inspecto-link-analysis-role-filter>
+                            }
                         }
                         <inspecto-data-table
                             stateKey="link-analysis-rows"
