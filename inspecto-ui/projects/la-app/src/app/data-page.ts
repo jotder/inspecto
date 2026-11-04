@@ -20,6 +20,8 @@ export interface DataColumn {
     role: ColumnRole | null;
     /** What a Measure counts in (USD, s, bytes); null when not said. */
     unit: string | null;
+    /** False when a Time, Measure or Category column is kept off the links (LA-COLUMN-ROLES-1 P2); else absent. */
+    carried?: false;
 }
 
 /** A link mapping: its ends, its kind, and the primary Time and Measure among the role columns (LA-COLUMN-ROLES-1 P1). */
@@ -101,6 +103,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
                   classification: str(x['classification']),
                   role: ROLES.find((r) => r === str(x['role'])?.toLowerCase()) ?? null,
                   unit: str(x['unit']),
+                  ...(x['carried'] === false ? { carried: false as const } : {}),
               }))
         : [];
     // the server's base rule (DatasetEntryRules.validateMapping), plus what the form needs: two columns to pick from
@@ -204,6 +207,7 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
             ...(classification ? { classification } : {}),
             ...(role ? { role } : {}),
             ...(role === 'measure' && c.unit ? { unit: c.unit } : {}),
+            ...(c.carried === false ? { carried: false } : {}),
         };
     });
     const mapping: Record<string, string> = { from: f.from, to: f.to };

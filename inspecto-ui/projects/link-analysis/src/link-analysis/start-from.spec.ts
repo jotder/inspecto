@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
 import { readLinkMapping, type LaDataset } from '@inspecto/link-analysis/la-host';
 import { domainProfile } from '@inspecto/link-analysis/graph/domain-profile';
+import { projectEntities, type ProjectedGraph } from './entity-projection';
 import { installTelecomFixture } from '@inspecto/link-analysis/graph/domain-profile.testing';
 import { presetRung } from './investigate-number';
 import type { LinkAnalysisView } from './link-analysis.service';
@@ -232,6 +233,32 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
         });
         expect(readLinkMapping({ from: 'a' })).toBeUndefined();
         expect(readLinkMapping(null)).toBeUndefined();
+    });
+
+    it('LA-COLUMN-ROLES-1 P2 (decision A): a default link read carries no role column and folds exactly as before', () => {
+        const cols = [
+            { name: 'from_account', role: 'entity' },
+            { name: 'to_account', role: 'entity' },
+            { name: 'channel', role: 'dimension' },
+            { name: 'ts', role: 'temporal' },
+            { name: 'amount', role: 'measure' },
+        ] as unknown as LaDataset['columns'];
+        const link = { from: 'from_account', to: 'to_account', kind: 'channel', primaryTime: 'ts' };
+        const withRoles = startMapping(ds('t', { columns: cols, defaultLinkMapping: link }), [], []);
+        const before = startMapping(ds('t', { defaultLinkMapping: link }), [], []); // the same entry before roles
+        expect(withRoles?.mapping).toEqual(before?.mapping);
+        expect(withRoles?.mapping.attrCols).toBeUndefined();
+        expect(withRoles?.timeCol).toBe('ts');
+        // four rows, two pairs: two folded links, counted as before, whatever their times and amounts
+        const rows = [
+            { from_account: 'A', to_account: 'B', channel: 'app', ts: '2026-01-01', amount: 5 },
+            { from_account: 'A', to_account: 'B', channel: 'app', ts: '2026-01-02', amount: 7 },
+            { from_account: 'A', to_account: 'B', channel: 'app', ts: '2026-01-03', amount: 9 },
+            { from_account: 'B', to_account: 'C', channel: 'app', ts: '2026-01-04', amount: 1 },
+        ];
+        const g = projectEntities(rows, withRoles!.mapping) as ProjectedGraph;
+        expect(g.edges.map((e) => e.data.kind)).toEqual(['app · 3', 'app']);
+        expect(g).toEqual(projectEntities(rows, before!.mapping));
     });
 
     it('hasRoute finds a shell child route', () => {

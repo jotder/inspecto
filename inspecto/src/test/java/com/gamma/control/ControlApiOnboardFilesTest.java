@@ -1007,6 +1007,14 @@ class ControlApiOnboardFilesTest {
             HttpResponse<String> textMeasure = json(c, "PUT", "/datasets/calls/columns/a_party", "{\"entityType\":null,\"role\":\"measure\"}", null);
             assertEquals(422, textMeasure.statusCode(), textMeasure.body());
             assertTrue(error(textMeasure).contains("is a measure but holds string values"), textMeasure.body());
+            // LA-COLUMN-ROLES-1 P2: a column kept off the links stores carried: false; null carries it again
+            data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"carried\":false}", null), 200);
+            assertTrue(data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString()
+                    .contains("\"carried\":false"));
+            data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"carried\":null}", null), 200);
+            assertFalse(data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString()
+                    .contains("carried"));
+            assertEquals(422, json(c, "PUT", "/datasets/calls/columns/b_party", "{\"carried\":\"no\"}", null).statusCode());
             HttpResponse<String> badRole = json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"amount\"}", null);
             assertEquals(422, badRole.statusCode(), badRole.body());
             assertEquals(422, json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"entity\"}", null).statusCode(),

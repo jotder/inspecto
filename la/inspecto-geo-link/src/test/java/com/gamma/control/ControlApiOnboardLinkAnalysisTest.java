@@ -114,7 +114,11 @@ class ControlApiOnboardLinkAnalysisTest {
             assertTrue(s.get("index").get("edges").asLong() > 0, s.get("index").toString());
             boolean indexed = false;
             for (JsonNode ix : data(send(c, "GET", "/inv/index", null), 200).get("indexes"))
-                if (id.equals(ix.get("dataset").asText())) indexed = true;
+                if (id.equals(ix.get("dataset").asText())) {
+                    indexed = true;
+                    // LA-COLUMN-ROLES-1 P2: every Time, Measure and Category column rides in the index, in column order
+                    assertEquals("[\"channel\",\"amount\",\"booked_at\"]", ix.at("/mapping/attrCols").toString(), ix.toString());
+                }
             assertTrue(indexed, "the index is published for the Dataset");
 
             // LA-ONBOARD-1 OB-13: the commit counted the first Dataset where it happened; no graph is drawn yet

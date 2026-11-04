@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -116,5 +117,28 @@ class DatasetEntryRulesRolesTest {
         assertDoesNotThrow(() -> DatasetEntryRules.validate(entry(col("name", "amount", "role", "measure"))));
         for (String t : List.of("number", "BIGINT", "double", "DECIMAL(10,2)", "integer"))
             assertDoesNotThrow(() -> DatasetEntryRules.validate(entry(col("name", "amount", "type", t, "role", "measure"))), t);
+    }
+
+    // ── P2: what rides on the links ─────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void everyTimeMeasureAndCategoryIsCarriedUnlessKeptOff() {
+        Map<String, Object> e = linked(Map.of("from", "a", "to", "b", "kind", "channel"),
+                A, B, col("name", "channel", "role", "dimension"), col("name", "booked_at", "role", "temporal"),
+                col("name", "fee", "role", "measure", "carried", false), col("name", "amount", "role", "Measure"),
+                col("name", "note", "role", "detail"), col("name", "plain"));
+        assertDoesNotThrow(() -> DatasetEntryRules.validate(e));
+        assertEquals(List.of("channel", "booked_at", "amount"), DatasetEntryRules.carriedColumns(e));
+        // a link end is never an attribute, even when it states a carried role
+        assertEquals(List.of(), DatasetEntryRules.carriedColumns(linked(Map.of("from", "a", "to", "b"),
+                col("name", "a", "role", "dimension"), col("name", "b", "role", "temporal"))));
+        assertEquals(List.of(), DatasetEntryRules.carriedColumns(Map.of("physicalRef", "t")));
+        // at most the index build's bound, in column order
+        List<Map<String, Object>> wide = new java.util.ArrayList<>();
+        for (int i = 0; i < 60; i++) wide.add(col("name", "m" + i, "role", "measure"));
+        List<String> capped = DatasetEntryRules.carriedColumns(Map.of("columns", wide));
+        assertEquals(DatasetEntryRules.MAX_CARRIED, capped.size());
+        assertEquals("m49", capped.get(capped.size() - 1));
+        assertTrue(refusal(entry(col("name", "fee", "role", "measure", "carried", "no"))).contains("true or false"));
     }
 }

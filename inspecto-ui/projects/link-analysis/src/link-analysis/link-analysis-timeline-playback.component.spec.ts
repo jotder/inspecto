@@ -28,13 +28,17 @@ const EXTENT: [number, number] = [Date.parse('2026-01-01T00:00:00Z'), Date.parse
     template: `<inspecto-link-analysis-timeline-playback
         [graph]="graph()"
         column="ts"
+        [columns]="columns()"
         [extent]="extent()"
         [sealable]="sealable()"
         (highlight)="lit($event)"
         (seal)="sealed($event)"
+        (columnChange)="picked($event)"
     />`,
 })
 class HostComponent {
+    readonly columns = signal<{ value: string; label: string }[]>([]);
+    readonly picked = vi.fn<(c: string) => void>();
     readonly graph = signal<G6GraphData | null>(GRAPH);
     readonly extent = signal<[number, number]>(EXTENT);
     readonly sealable = signal(false);
@@ -201,6 +205,23 @@ describe('LinkAnalysisTimelinePlaybackComponent', () => {
         fade.dispatchEvent(new Event('change'));
         fixture.detectChanges();
         expect(host.lit.mock.lastCall![0]!.edgeOpacity).toBeUndefined();
+    });
+
+    it('LA-COLUMN-ROLES-1 P2: with two Time columns on the links, a picker chooses which one to play through', async () => {
+        const { fixture, host, q, el } = setup();
+        expect(q('playback-column')).toBeNull(); // one column: nothing to choose
+        host.columns.set([
+            { value: 'ts', label: 'ts (primary)' },
+            { value: 'settled_at', label: 'settled_at' },
+        ]);
+        fixture.detectChanges();
+        const pick = q('playback-column') as unknown as HTMLSelectElement;
+        expect(Array.from(pick.options).map((o) => o.textContent?.trim())).toEqual(['ts (primary)', 'settled_at']);
+        pick.value = 'settled_at';
+        pick.dispatchEvent(new Event('change'));
+        expect(host.picked).toHaveBeenCalledWith('settled_at');
+        vi.useRealTimers(); // axe schedules with timers
+        await expectNoA11yViolations(el);
     });
 
     it('offers Seal only when the host allows it, and emits the window as [from, to)', () => {

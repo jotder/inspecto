@@ -373,6 +373,53 @@ describe('LinkAnalysisComponent', () => {
         expect(c.timeCutoff()).toBeNull();
     });
 
+    it('LA-COLUMN-ROLES-1 P2 (decision A): a Dataset Time column the links do not carry re-reads them carrying it alone', async () => {
+        const roles = {
+            ...DS,
+            columns: [
+                { name: 'source', type: 'string', role: 'entity' },
+                { name: 'target', type: 'string', role: 'entity' },
+                { name: 'when', type: 'date', role: 'temporal' },
+                { name: 'settled', type: 'date', role: 'temporal' },
+                { name: 'amount', type: 'number', role: 'measure' },
+            ],
+            defaultLinkMapping: { from: 'source', to: 'target', primaryTime: 'settled' },
+        } as unknown as Dataset;
+        const { fixture, queried } = create({ datasets: [roles] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const first = queried.at(-1) as { projection?: { attrCols?: string[] } };
+        expect(first.projection?.attrCols ?? []).toEqual([]); // the read carries no role column: links fold as before
+        expect(c.timeColumnOptions().map((o) => o.value)).toEqual(['', 'settled', 'when']); // the primary first
+        expect(c.timeColumnOptions()[1].label).toBe('settled (primary)');
+        c.setTimeColumn('when');
+        await fixture.whenStable();
+        const again = queried.at(-1) as { projection?: { attrCols?: string[] } };
+        expect(queried.length).toBe(2);
+        expect(again.projection?.attrCols).toEqual(['when']); // only that Time column, never the Measures
+        // the index's first build carries every Time, Measure and Category column of the Dataset (not the read's own)
+        expect(c.indexMappings()[0].attrCols).toEqual(['when', 'settled', 'amount']);
+    });
+
+    it('LA-COLUMN-ROLES-1 P2: once the canvas is no longer the plain query result, Play offers no re-read', async () => {
+        const roles = {
+            ...DS,
+            columns: [{ name: 'when', type: 'date', role: 'temporal' }],
+        } as unknown as Dataset;
+        const { fixture, queried } = create({ datasets: [roles] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.timeColumnOptions().map((o) => o.value)).toEqual(['', 'when']);
+        // a seeded start, an Investigation, an expand or a push draws another graph than the last query's
+        c.graph.set({ ...c.graph()!, nodes: [...c.graph()!.nodes] });
+        expect(c.timeColumnOptions().map((o) => o.value)).toEqual(['']);
+        c.setTimeColumn('when');
+        await fixture.whenStable();
+        expect(queried.length).toBe(1); // nothing re-read: the drawn graph stays
+    });
+
     it('the rows table names its columns in plain words and never shows the internal id (T-070)', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;

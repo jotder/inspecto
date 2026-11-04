@@ -90,6 +90,26 @@ export function ageOpacity(
     return out;
 }
 
+/**
+ * The Time columns the timeline and playback offer (LA-COLUMN-ROLES-1 P2, operator decision A): the dated columns the
+ * loaded links carry, then the Dataset's Time columns they do not carry yet (picking one re-reads the links with it), the
+ * link mapping's primary Time first and named as such. Names compare without case.
+ */
+export function timeColumnChoices(
+    onLinks: readonly string[],
+    datasetTimes: readonly string[],
+    primary: string,
+): { value: string; label: string }[] {
+    const seen = new Set(onLinks.map((c) => c.toLowerCase()));
+    const all = [...onLinks, ...datasetTimes.filter((c) => !seen.has(c.toLowerCase()))];
+    const p = primary.toLowerCase();
+    const first = all.filter((c) => p && c.toLowerCase() === p);
+    return [
+        ...first.map((c) => ({ value: c, label: `${c} (primary)` })),
+        ...all.filter((c) => !p || c.toLowerCase() !== p).map((c) => ({ value: c, label: c })),
+    ];
+}
+
 /** The Investigation `window` op that seals `range` (`[from, to)`, UTC ISO instants; the last slice's end is kept in). */
 export function sealedWindow(range: PlaybackSlice): { from: string; to: string } {
     return {

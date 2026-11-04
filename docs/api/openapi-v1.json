@@ -12453,7 +12453,7 @@
         ],
         "summary" : "Change which Entity Type one Dataset column holds",
         "operationId" : "putDatasetsByDatasetIdColumnsByColumnId",
-        "description" : "LA-ONBOARD-1 UC-07. canAuthorWorkbench. Body exactly one of {entityType: '<id>' | null} or {classification: '<X>' | null} (null clears it). The Dataset is re-assessed on the next Entity profile read. Gates: 401/403; 503 no write root; 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 an approval policy holds Datasets; 422 unknown column or Entity Type, or the entry then breaks the Dataset rules. Answers {dataset, column, classification, entityType?, columns}.",
+        "description" : "LA-ONBOARD-1 UC-07. canAuthorWorkbench. Body: at most one of {entityType: '<id>' | null} or {classification: '<X>' | null}, and/or (LA-COLUMN-ROLES-1) role (entity|temporal|measure|dimension|detail), unit (a measure's) and carried (false keeps a Time, Measure or Category column off the links and their index; true or null carries it again); null clears each, at least one key. The Dataset is re-assessed on the next Entity profile read. Gates: 401/403; 503 no write root; 404 unknown Dataset or one the caller cannot see; 403 view-only; 409 an approval policy holds Datasets; 422 unknown column or Entity Type, or the entry then breaks the Dataset rules. Answers {dataset, column, classification, entityType?, columns}.",
         "parameters" : [
           {
             "name" : "datasetId",

@@ -791,7 +791,9 @@ final class OnboardImport {
                 LinkIndexAccess.Outcome o = builder.build(space.writeRoot(), space.dataRoot(), new LinkIndexAccess.Request(
                         "onboard:" + id, id, (String) m.get("from"), (String) m.get("to"), (String) m.get("kind"),
                         DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_TIME, "time"), null,
-                        DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount"), List.of(), space.actor(), true, 300_000L, 0L));
+                        // LA-COLUMN-ROLES-1 P2: every Time, Measure and Category column rides in the index
+                        DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount"), DatasetEntryRules.carriedColumns(content),
+                        space.actor(), true, 300_000L, 0L));
                 Map<String, Object> r = outcome(o.result(), o.message());
                 r.put("code", o.code());
                 r.put("edges", o.edges());
@@ -1160,7 +1162,8 @@ final class OnboardImport {
     /**
      * Change one column's Entity Type: body {@code {entityType: "<id>" | null}} or {@code {classification: "<X>" | null}};
      * and/or its role (LA-COLUMN-ROLES-1: {@code role: entity|temporal|measure|dimension|detail | null}) and a measure's
-     * {@code unit} ({@code null} clears either; the Dataset rules judge the result).
+     * {@code unit} ({@code null} clears either; the Dataset rules judge the result); and whether a Time, Measure or
+     * Category column rides on the links ({@code carried: false}; {@code true} or {@code null} clears it, P2).
      * The Dataset is re-assessed on the next profile read (its binding signature changes). Gates: capability → write root
      * 503 → unknown or unseen Dataset 404 → view-only 403 → approval policy over Datasets 409 → unknown column or Entity
      * Type 422 → the entry still passes the Dataset rules (a column in the link mapping keeps working) → write.
@@ -1174,12 +1177,15 @@ final class OnboardImport {
         OnboardRoutes.requireEdit(ex, id, current);
         PendingChanges.holdRefusing(api, List.of("dataset"), "a column's role or Entity Type is a Dataset change");
         boolean byType = body.containsKey("entityType"), byClass = body.containsKey("classification");
-        boolean byRole = body.containsKey("role"), byUnit = body.containsKey("unit");
+        boolean byRole = body.containsKey("role"), byUnit = body.containsKey("unit"), byCarried = body.containsKey(DatasetEntryRules.CARRIED);
         if (byType && byClass)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "state one of entityType or classification, not both");
-        if (!byType && !byClass && !byRole && !byUnit)
+        if (!byType && !byClass && !byRole && !byUnit && !byCarried)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
-                    "state entityType or classification, role or unit (null clears it)");
+                    "state entityType or classification, role, unit or carried (null clears it)");
+        Object carried = body.get(DatasetEntryRules.CARRIED);
+        if (carried != null && !(carried instanceof Boolean))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "carried is true, false or null");
         // stored lower-case: Studio and Explore compare the role as written
         String role = byRole && body.get("role") != null ? String.valueOf(body.get("role")).trim().toLowerCase(Locale.ROOT) : null;
         String unit = byUnit && body.get("unit") != null ? String.valueOf(body.get("unit")).trim() : null;
@@ -1227,6 +1233,11 @@ final class OnboardImport {
                 if (byUnit) {
                     if (unit == null || unit.isEmpty()) m.remove("unit");
                     else m.put("unit", unit);
+                }
+                // only "not carried" is stored: carrying is the default (plan Q-5)
+                if (byCarried) {
+                    if (Boolean.FALSE.equals(carried)) m.put(DatasetEntryRules.CARRIED, false);
+                    else m.remove(DatasetEntryRules.CARRIED);
                 }
                 next.add(m);
                 found = true;

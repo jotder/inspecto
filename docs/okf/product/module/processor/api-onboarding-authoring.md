@@ -335,7 +335,7 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 | `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
 | `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
 | `POST /datasets/{id}/run` | `canUploadData` | **Run now**: runs the import Pipeline over what waits in its inbox |
-| `PUT /datasets/{id}/columns/{column}` | `canAuthorWorkbench` | one column's Entity Type: `{entityType: id\|null}` or `{classification: X\|null}` |
+| `PUT /datasets/{id}/columns/{column}` | `canAuthorWorkbench` | one column's Entity Type: `{entityType: id\|null}` or `{classification: X\|null}`; and/or its `role`, a measure's `unit`, and `carried` (`false` keeps a Time, Measure or Category column off the links and the index; LA-COLUMN-ROLES-1) |
 | `GET` / `PUT /settings/data` | open / `canAdminister` | the Space's `data.self_import`: `{selfImport, selfImportDefault, selfImportInForce}` |
 
 **Gate order** for the Add data routes: capability 401/403 → no write root 503 → `data.self_import` off 403 ("Add

@@ -326,6 +326,27 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
     });
 
+    it('LA-COLUMN-ROLES-1 P2: a Time, Measure or Category has an "On each link" row; Not carried saves carried: false', () => {
+        const { fixture, el, c } = create();
+        expect(el.querySelector('[data-testid="carried-channel"]')).toBeNull(); // a Detail rides along anyway
+        c.roles().get('transfers')!.get('channel')!.setValue('dimension');
+        put('channel').flush({});
+        const typed = structuredClone(DATASETS);
+        (typed[0].content.columns as Record<string, unknown>[])[2] = {
+            name: 'channel',
+            type: 'string',
+            role: 'dimension',
+        };
+        http.expectOne(apiUrl('/components/dataset')).flush(typed);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="carried-channel"]')!.textContent).toContain('Carried');
+        c.carried().get('transfers')!.get('channel')!.setValue('no');
+        const req = put('channel');
+        expect(req.request.body).toEqual({ carried: false });
+        req.flush({});
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
     it('a refused change says why and reads the stored value back', () => {
         const { fixture, el, c } = create();
         c.roles().get('transfers')!.get('channel')!.setValue('measure');

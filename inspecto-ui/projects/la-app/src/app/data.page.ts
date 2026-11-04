@@ -153,6 +153,15 @@ import {
                                                 [attr.data-testid]="'unit-' + col.name"
                                             ></inspecto-pen-field>
                                         }
+                                        <!-- LA-COLUMN-ROLES-1 P2: a Time, Measure or Category rides on every link unless kept off -->
+                                        @if (r === 'temporal' || r === 'measure' || r === 'dimension') {
+                                            <inspecto-option-picker
+                                                label="On each link"
+                                                [options]="carriedOptions"
+                                                [formControl]="carried().get(d.id)!.get(col.name)!"
+                                                [attr.data-testid]="'carried-' + col.name"
+                                            ></inspecto-option-picker>
+                                        }
                                     </div>
                                 }
                             </div>
@@ -419,6 +428,21 @@ export class DataPageComponent implements OnInit {
         this.controls<string>(
             (_, c) => c.unit ?? '',
             (d, c, v) => this.save(d, c, { role: 'measure', unit: (v ?? '').trim() || null }),
+        ),
+    );
+    /** Whether a Time, Measure or Category column rides on each link (and in its index); only "no" is stored. */
+    protected readonly carriedOptions: PickerOption[] = [
+        { value: 'yes', label: 'Carried', hint: 'Play, filters and profiles can use it; the link index carries it' },
+        {
+            value: 'no',
+            label: 'Not carried',
+            hint: 'Kept off the links: a narrower index, but no filter or play on it',
+        },
+    ];
+    readonly carried = computed(() =>
+        this.controls<string>(
+            (_, c) => (c.carried === false ? 'no' : 'yes'),
+            (d, c, v) => this.save(d, c, { carried: v === 'no' ? false : null }),
         ),
     );
     /** A role picked but not saved yet: Entity, until what it holds is picked. Cleared on every read. */

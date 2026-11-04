@@ -456,6 +456,21 @@ describe('LinkAnalysisIndexBuildComponent - cancel and a new mapping (LA-INDEX-S
         });
     });
 
+    it('LA-COLUMN-ROLES-1 P2: a first build of the loaded mapping is prefilled with the columns its links carry', () => {
+        const { c } = makeBuild({
+            mappings: [
+                { dataset: 'wires', sourceCol: 'from', targetCol: 'to', attrCols: ['ts', 'amount'], label: 'wires' },
+            ],
+        });
+        expect(c.mappingInitial()).toEqual({
+            dataset: 'wires',
+            sourceCol: 'from',
+            targetCol: 'to',
+            kindCol: '',
+            attrCols: ['ts', 'amount'],
+        });
+    });
+
     it('does not start a new mapping until its Dataset and two columns are given', () => {
         const runs = runsMock({ startBuild: vi.fn() });
         const { q, fixture } = makeBuild({ runs });

@@ -1217,6 +1217,8 @@
                         <inspecto-link-analysis-timeline-playback
                             [graph]="displayed()"
                             [column]="timeColumn()"
+                            [columns]="playColumns()"
+                            (columnChange)="setTimeColumn($event)"
                             [extent]="ext"
                             [sealable]="playbackSealable()"
                             (highlight)="emphasis.set($event)"
