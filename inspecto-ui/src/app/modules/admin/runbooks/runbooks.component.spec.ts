@@ -9,6 +9,7 @@ import { ComponentsService } from 'app/inspecto/api/components.service';
 import { LensService } from 'app/inspecto/api/lens.service';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { RunbooksComponent } from './runbooks.component';
 
 const STORED = {
@@ -55,10 +56,13 @@ describe('RunbooksComponent', () => {
 
         c.startNew();
         fixture.detectChanges();
+        expect(el.querySelectorAll('[role="alert"]').length, 'nothing red on a fresh form').toBe(0);
         c.save();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(api.create).not.toHaveBeenCalled();
-        expect(el.querySelectorAll('mat-error').length).toBeGreaterThan(0);
+        expect(penError(penByLabel(el, 'Id')!)).toBe('An id is required.');
+        expect(penError(penByLabel(el, 'Title')!)).toBe('A title is required.');
+        expect(penError(penByLabel(el, 'Step 1')!)).toBe('A step needs text.');
 
         c.form.patchValue({ id: 'wangiri', title: 'Wangiri runbook', tags: 'fraud, telco' });
         c.steps.at(0).patchValue({ text: 'Block the number', linkKind: 'case', linkId: 'c-1' });

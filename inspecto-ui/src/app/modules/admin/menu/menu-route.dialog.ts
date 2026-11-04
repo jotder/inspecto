@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
@@ -53,24 +54,23 @@ function routeValidator(c: AbstractControl): ValidationErrors | null {
         MatDialogModule,
         MatFormFieldModule,
         MatInputModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ data.heading }}</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <mat-dialog-content class="flex flex-col gap-2 pt-1">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input matInput formControlName="title" cdkFocusInitial placeholder="e.g. Cases" />
-                    @if (form.controls.title.hasError('required')) {
-                        <mat-error>A name is required.</mat-error>
-                    }
-                    @if (form.controls.title.hasError('duplicate')) {
-                        <mat-error>A menu item with this name already exists here.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Name"
+                    [required]="true"
+                    placeholder="e.g. Cases"
+                    formControlName="title"
+                    [error]="titleError()"
+                ></inspecto-pen-field>
 
-                <mat-form-field subscriptSizing="dynamic">
+                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a typeahead with an autocomplete panel (the screen route suggestions) -->
                     <mat-label>Screen</mat-label>
                     <input
                         matInput
@@ -110,6 +110,16 @@ export class MenuRouteDialog {
         title: [this.data.title ?? '', [Validators.required, uniqueNameValidator(() => this.data.takenTitles)]],
         route: [this.data.route ?? '', [routeValidator]],
     });
+
+    /** The name row's error lines: shown once the row was left or Save was pressed. */
+    titleError(): string {
+        const c = this.form.controls.title;
+        if (!c.touched) return '';
+        const lines: string[] = [];
+        if (c.hasError('required')) lines.push('A name is required.');
+        if (c.hasError('duplicate')) lines.push('A menu item with this name already exists here.');
+        return lines.join(' ');
+    }
 
     private readonly routeValue = toSignal(this.form.controls.route.valueChanges, {
         initialValue: this.form.controls.route.value,

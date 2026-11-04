@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input, OnInit, inject, input, signal } from '@angular/core';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import {
     ANOMALY_DIRECTIONS,
     AnomalyFeatureDraft,
@@ -15,6 +13,7 @@ import {
     emptyFilter,
 } from 'app/inspecto/anomaly/anomaly-model-form';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { measureError } from 'app/inspecto/query/measure-grammar';
 import { ColumnMeta } from 'app/inspecto/query/query-types';
 
@@ -43,14 +42,7 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
     selector: 'app-anomaly-model-features',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatFormFieldModule,
-        MatIconModule,
-        MatInputModule,
-        InspectoOptionPickerComponent,
-    ],
+    imports: [ReactiveFormsModule, MatButtonModule, MatIconModule, InspectoOptionPickerComponent, PenFieldComponent],
     template: `
         <div class="flex flex-col gap-3">
             @for (g of rows.controls; track g; let i = $index) {
@@ -59,21 +51,23 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                     @if (rowErrors()[i]; as e) {
                         <p class="text-warn mb-2 text-xs" role="alert" data-testid="feature-error">{{ e }}</p>
                     }
-                    <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Id</mat-label>
-                            <input matInput formControlName="id" />
-                            @if (g.controls['id'].hasError('required')) {
-                                <mat-error>Id is required</mat-error>
-                            }
-                            @if (g.controls['id'].hasError('pattern')) {
-                                <mat-error>Letters, digits and _ only</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Label</mat-label>
-                            <input matInput formControlName="label" />
-                        </mat-form-field>
+                    <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                        <inspecto-pen-field
+                            label="Id"
+                            formControlName="id"
+                            [required]="true"
+                            [error]="
+                                fieldError(g.controls['id'], {
+                                    required: 'Id is required',
+                                    pattern: 'Letters, digits and _ only',
+                                })
+                            "
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Label"
+                            formControlName="label"
+                            [error]="fieldError(g.controls['label'], {})"
+                        ></inspecto-pen-field>
                         <inspecto-option-picker
                             label="Dataset"
                             formControlName="dataset"
@@ -96,38 +90,40 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                             [options]="timeOptions(i)"
                             help="A TIMESTAMP or DATE column; rows are bucketed by day (UTC)."
                         ></inspecto-option-picker>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Measure</mat-label>
-                            <input matInput formControlName="measure" placeholder="count or sum(field)" />
-                            @if (g.controls['measure'].hasError('required')) {
-                                <mat-error>Measure is required</mat-error>
-                            } @else if (g.controls['measure'].hasError('measure')) {
-                                <mat-error>{{ g.controls['measure'].getError('measure') }}</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Measure"
+                            formControlName="measure"
+                            placeholder="count or sum(field)"
+                            [mono]="true"
+                            [required]="true"
+                            [error]="
+                                fieldError(g.controls['measure'], { required: 'Measure is required', measure: '' })
+                            "
+                        ></inspecto-pen-field>
                         <inspecto-option-picker
                             label="Direction"
                             formControlName="direction"
                             [options]="directions"
                             help="Up: higher than usual is unusual. Down: lower than usual is unusual."
                         ></inspecto-option-picker>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Weight</mat-label>
-                            <input matInput formControlName="weight" inputmode="decimal" />
-                            @if (g.controls['weight'].hasError('required')) {
-                                <mat-error>Weight is required</mat-error>
-                            } @else if (g.controls['weight'].hasError('pattern')) {
-                                <mat-error>Weight must be a number above 0</mat-error>
-                            }
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Spread floor (unit)</mat-label>
-                            <input matInput formControlName="unit" inputmode="decimal" placeholder="1" />
-                            <mat-hint>The smallest spread a change is measured against. Blank = 1.</mat-hint>
-                            @if (g.controls['unit'].hasError('unit')) {
-                                <mat-error>Spread floor must be a number above 0</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Weight"
+                            formControlName="weight"
+                            [required]="true"
+                            [error]="
+                                fieldError(g.controls['weight'], {
+                                    required: 'Weight is required',
+                                    pattern: 'Weight must be a number above 0',
+                                })
+                            "
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Spread floor (unit)"
+                            formControlName="unit"
+                            placeholder="1"
+                            help="The smallest spread a change is measured against. Blank = 1."
+                            [error]="fieldError(g.controls['unit'], { unit: 'Spread floor must be a number above 0' })"
+                        ></inspecto-pen-field>
                     </div>
                     <div class="mt-3" formArrayName="filters">
                         <p class="text-sm font-semibold">Filters</p>
@@ -151,17 +147,13 @@ const isTimeType = (t: string): boolean => /time|date/i.test(t);
                                 ></inspecto-option-picker>
                                 <!-- Value and the remove button go on the next line, so Operator keeps half the width ("equals (=)" clipped at 1024 px) -->
                                 @if (takesValue(fg)) {
-                                    <mat-form-field subscriptSizing="dynamic" class="sm:col-span-2">
-                                        <mat-label>Value</mat-label>
-                                        <input
-                                            matInput
-                                            formControlName="value"
-                                            [placeholder]="fg.value['op'] === 'in' ? 'a, b, c' : ''"
-                                        />
-                                        @if (fg.controls['value'].hasError('required')) {
-                                            <mat-error>Value is required</mat-error>
-                                        }
-                                    </mat-form-field>
+                                    <inspecto-pen-field
+                                        class="sm:col-span-2"
+                                        label="Value"
+                                        formControlName="value"
+                                        [placeholder]="fg.value['op'] === 'in' ? 'a, b, c' : ''"
+                                        [error]="fieldError(fg.controls['value'], { required: 'Value is required' })"
+                                    ></inspecto-pen-field>
                                 } @else {
                                     <span class="sm:col-span-2"></span>
                                 }
@@ -346,6 +338,10 @@ export class AnomalyModelFeaturesComponent implements OnInit {
         this.rows.removeAt(i);
         this.rows.markAsDirty();
         this.rowErrors.set({});
+        // The row pointers ("see the message above") go with the messages they point at: re-validating drops a
+        // `server` mark, which no validator sets.
+        for (const g of this.rows.controls)
+            for (const c of Object.values(g.controls)) if (c.hasError('server')) c.updateValueAndValidity({ emitEvent: false });
     }
 
     isDirty(): boolean {
@@ -381,6 +377,17 @@ export class AnomalyModelFeaturesComponent implements OnInit {
                 extra: (v.extra ?? {}) as Record<string, unknown>,
             };
         });
+    }
+
+    /**
+     * A typed row's error line once it was left or the form validated: the first failed check's message (`''` = the
+     * error's own text, as the Measure grammar gives it), else a pointer to a server refusal placed by
+     * {@link setRowError} (a boxed field only turned red for it; a row has no outline, so it says so).
+     */
+    fieldError(c: AbstractControl, messages: Record<string, string>): string {
+        if (!c.touched) return '';
+        for (const [k, m] of Object.entries(messages)) if (c.hasError(k)) return m || String(c.getError(k));
+        return c.hasError('server') ? 'Refused: see the message above.' : '';
     }
 
     /** Show a server refusal on row `i`, and on its named field when the editor has one. */

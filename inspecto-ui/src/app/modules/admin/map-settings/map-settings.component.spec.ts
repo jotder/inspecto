@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { GeoSettings, GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { MapSettingsComponent } from './map-settings.component';
 
 function create(opts: { current?: string | null; failSave?: number } = {}) {
@@ -36,6 +37,10 @@ describe('MapSettingsComponent', () => {
         fixture.componentInstance.save();
         expect(ctrl.hasError('tileTemplate')).toBe(true);
         expect(save).not.toHaveBeenCalled();
+        refresh(fixture);
+        expect(penError(penByLabel(fixture.nativeElement, 'Tile server URL')!)).toBe(
+            'Must contain {z}, {x} and {y} placeholders, or start with pmtiles://',
+        );
         ctrl.setValue('pmtiles://https://tiles.example.com/world.pmtiles');
         expect(ctrl.valid).toBe(true);
         ctrl.setValue('');

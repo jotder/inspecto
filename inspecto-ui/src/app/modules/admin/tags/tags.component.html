@@ -59,15 +59,13 @@
                     <div class="flex items-center justify-between gap-4">
                         @if (renaming()) {
                             <form class="flex items-center gap-2" (ngSubmit)="commitRename()">
-                                <mat-form-field subscriptSizing="dynamic">
-                                    <mat-label>Rename tag</mat-label>
-                                    <input matInput [formControl]="renameCtrl" autocomplete="off" />
-                                    @if (renameCtrl.hasError('required')) {
-                                        <mat-error>A tag name is required</mat-error>
-                                    } @else if (renameCtrl.hasError('pattern')) {
-                                        <mat-error>Tag names may not contain commas</mat-error>
-                                    }
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    label="Rename tag"
+                                    [required]="true"
+                                    [formControl]="renameCtrl"
+                                    [error]="renameError()"
+                                    (entered)="commitRename()"
+                                ></inspecto-pen-field>
                                 <button mat-flat-button color="primary" type="submit">Rename</button>
                                 <button mat-button type="button" (click)="cancelRename()">Cancel</button>
                             </form>

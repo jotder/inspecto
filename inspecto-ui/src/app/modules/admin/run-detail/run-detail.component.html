@@ -42,7 +42,7 @@
         <!-- Lineage batch filter -->
         @if (activeTab === 'lineage') {
             <div class="mt-4 flex items-center gap-3">
-                <mat-form-field class="gamma-mat-dense w-72" subscriptSizing="dynamic">
+                <!-- form-allow: a toolbar filter box over the lineage list --><mat-form-field class="gamma-mat-dense w-72" subscriptSizing="dynamic">
                     <mat-label>Consignment id (optional)</mat-label>
                     <input matInput [(ngModel)]="lineageBatchId" placeholder="filter by batch id" />
                 </mat-form-field>
@@ -53,13 +53,13 @@
         <!-- Report tab -->
         @if (activeTab === 'report') {
             <div class="mt-4 flex flex-wrap items-center gap-3">
-                <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
+                <!-- form-allow: a report date filter with a calendar panel --><mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
                     <mat-label>From</mat-label>
                     <input matInput [matDatepicker]="fromPicker" [(ngModel)]="from" />
                     <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
                     <mat-datepicker #fromPicker></mat-datepicker>
                 </mat-form-field>
-                <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
+                <!-- form-allow: a report date filter with a calendar panel --><mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
                     <mat-label>To</mat-label>
                     <input matInput [matDatepicker]="toPicker" [(ngModel)]="to" />
                     <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
@@ -190,9 +190,9 @@
                 ; the status counts cover <b>processed</b> files recorded in the durable audit.
             </p>
             <div class="mt-3 flex items-center gap-3">
-                <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
+                <!-- form-allow: a grid-toolbar filter select over the files table --><mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
                     <mat-label>Status</mat-label>
-                    <mat-select [(ngModel)]="fileStatus">
+                    <!-- form-allow: a grid-toolbar filter select (a dropdown, by the rulebook) --><mat-select [(ngModel)]="fileStatus">
                         @for (f of fileFilters; track f) {
                             <mat-option [value]="f">{{ f }}</mat-option>
                         }

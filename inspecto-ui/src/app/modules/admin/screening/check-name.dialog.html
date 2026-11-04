@@ -6,7 +6,7 @@
     </inspecto-alert>
 
     <form [formGroup]="form" (ngSubmit)="run()" class="flex flex-col gap-4" id="check-name-form">
-        <mat-form-field subscriptSizing="dynamic">
+        <!-- form-allow: a many-line paste box (one name per line, up to the check's limit; Enter must break a line) --><mat-form-field subscriptSizing="dynamic">
             <mat-label>Names to check</mat-label>
             <textarea matInput formControlName="names" rows="3" aria-describedby="cn-names-hint"></textarea>
             <mat-hint id="cn-names-hint">One name per line, up to {{ limits.maxSubjects }}.</mat-hint>
@@ -33,23 +33,22 @@
         </fieldset>
 
         <div class="flex flex-col gap-2 sm:flex-row">
-            <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                <mat-label>Threshold (optional)</mat-label>
-                <input matInput type="number" step="0.01" formControlName="threshold" />
-                <mat-hint>{{ limits.minThreshold }} to 1; blank = {{ limits.defaultThreshold }}</mat-hint>
-                @if (form.controls.threshold.hasError('min') || form.controls.threshold.hasError('max')) {
-                <mat-error>A number from {{ limits.minThreshold }} to 1.</mat-error>
-                }
-            </mat-form-field>
-            <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                <mat-label>Most matches per name (optional)</mat-label>
-                <input matInput type="number" step="1" formControlName="maxMatches" />
-                <mat-hint>1 to {{ limits.maxMatchesCeiling }}; blank = {{ limits.defaultMaxMatches }}</mat-hint>
-                @if ( form.controls.maxMatches.hasError('min') || form.controls.maxMatches.hasError('max') ||
-                form.controls.maxMatches.hasError('pattern') ) {
-                <mat-error>A whole number from 1 to {{ limits.maxMatchesCeiling }}.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                class="flex-1"
+                label="Threshold (optional)"
+                type="number"
+                formControlName="threshold"
+                [help]="limits.minThreshold + ' to 1; blank = ' + limits.defaultThreshold"
+                [error]="thresholdError()"
+            ></inspecto-pen-field>
+            <inspecto-pen-field
+                class="flex-1"
+                label="Most matches per name (optional)"
+                type="number"
+                formControlName="maxMatches"
+                [help]="'1 to ' + limits.maxMatchesCeiling + '; blank = ' + limits.defaultMaxMatches"
+                [error]="maxMatchesError()"
+            ></inspecto-pen-field>
         </div>
     </form>
 

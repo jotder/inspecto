@@ -8,6 +8,7 @@ import { GammaConfigService } from '@gamma/services/config';
 import { LensService, ScreeningHit, ScreeningHitPage, ScreeningService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ToastrService } from 'ngx-toastr';
 import { CheckNameDialog } from './check-name.dialog';
 import { allowedDecisions, hitTone, ScreeningComponent, scorePercent, subjectLabel } from './screening.component';
@@ -129,12 +130,11 @@ describe('ScreeningComponent', () => {
         const c = fixture.componentInstance;
         c.open({ id: HIT.id });
         fixture.detectChanges();
+        expect(penError(penByLabel(fixture.nativeElement, 'Reason')!), 'nothing red before a decision').toBe('');
         c.decide('dismiss');
-        fixture.detectChanges();
+        refresh(fixture);
         expect(api.decide).not.toHaveBeenCalled();
-        expect(
-            fixture.nativeElement.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent,
-        ).toContain('A reason is required');
+        expect(penError(penByLabel(fixture.nativeElement, 'Reason')!)).toContain('A reason is required');
 
         c.reason.setValue('different date of birth');
         c.decide('dismiss');

@@ -1,9 +1,7 @@
 import { Component, OnInit, ViewEncapsulation, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ColDef } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
@@ -23,6 +21,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /**
  * **Tags** (BACKLOG D7) — the operator surface over the cross-entity label graph. Picking a tag from the
@@ -56,8 +55,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
         ReactiveFormsModule,
         DataTableComponent,
         InspectoEmptyStateComponent,
@@ -91,6 +89,15 @@ export class TagsComponent implements OnInit {
         nonNullable: true,
         validators: [Validators.required, Validators.pattern(/^[^,]*$/)],
     });
+
+    /** The rename row's error line: shown once the row was left or Rename was pressed. */
+    renameError(): string {
+        const c = this.renameCtrl;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A tag name is required';
+        if (c.hasError('pattern')) return 'Tag names may not contain commas';
+        return '';
+    }
 
     readonly canAuthor = computed(() => this.lens.canAuthorWorkbench());
 

@@ -3,13 +3,12 @@ import { AbstractControl, FormControl, ReactiveFormsModule, ValidatorFn, Validat
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ConnectionWarning, ImportPreview, SpacesService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -45,11 +44,10 @@ export interface ImportBundleData {
         MatDialogModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -59,17 +57,14 @@ export interface ImportBundleData {
         </h2>
         <mat-dialog-content class="space-y-4">
             @if (!isImport) {
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>New space id</mat-label>
-                    <input matInput [formControl]="newId" required autocomplete="off" cdkFocusInitial />
-                    @if (newId.hasError('required') && newId.touched) {
-                        <mat-error>Id is required.</mat-error>
-                    } @else if (newId.hasError('pattern')) {
-                        <mat-error>Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.</mat-error>
-                    } @else if (newId.hasError('duplicate')) {
-                        <mat-error>A space with this id already exists.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="New space id"
+                    [required]="true"
+                    [mono]="true"
+                    [formControl]="newId"
+                    [error]="newIdError()"
+                ></inspecto-pen-field>
             }
 
             <!-- File picker -->
@@ -212,6 +207,16 @@ export class ImportBundleDialog {
         ],
     });
     readonly overwrite = new FormControl(false, { nonNullable: true });
+
+    /** The new id row's error line: shown once the row was left or Create was pressed. */
+    newIdError(): string {
+        const c = this.newId;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Id is required.';
+        if (c.hasError('pattern')) return 'Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.';
+        if (c.hasError('duplicate')) return 'A space with this id already exists.';
+        return '';
+    }
 
     file: File | null = null;
     readonly preview = signal<ImportPreview | null>(null);

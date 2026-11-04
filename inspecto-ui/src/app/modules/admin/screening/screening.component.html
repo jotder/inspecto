@@ -148,16 +148,14 @@
 
             @if (decisions().length) {
                 <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Reason</mat-label>
-                        <input matInput [formControl]="reason" maxlength="500" required />
-                        @if (reason.hasError('required')) {
-                            <mat-error>A reason is required.</mat-error>
-                        }
-                        @if (reason.hasError('maxlength')) {
-                            <mat-error>At most 500 characters.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        class="flex-1"
+                        label="Reason"
+                        [required]="true"
+                        [maxlength]="500"
+                        [formControl]="reason"
+                        [error]="reasonError()"
+                    ></inspecto-pen-field>
                     @for (d of decisions(); track d) {
                         @if (d === 'confirm') {
                             <button mat-flat-button color="warn" [disabled]="deciding()" (click)="decide(d)">

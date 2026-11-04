@@ -12,8 +12,6 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidatorFn, Validat
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
@@ -40,6 +38,7 @@ import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition
 import { dbColumnType } from 'app/inspecto/query/query-columns';
 import { Condition, ColumnMeta, ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import { EXPECTATION_ATTRIBUTES } from './expectation-attributes';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** The distinct fields an existing when-clause already references (typed string until probed) — the
  *  same seeding idiom `decision-rule-form.dialog` uses so a stored condition tree's fields render
@@ -90,12 +89,11 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         QueryConditionGroupComponent,
         AiAssistComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -160,23 +158,18 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 <!-- Save step (create only): id + description, asked only now. -->
                 <form [formGroup]="saveForm" aria-label="Name this expectation" class="space-y-1">
                     <div class="text-secondary text-sm">Check configured — give it a unique id to save it.</div>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Expectation id</mat-label>
-                        <input matInput formControlName="name" required cdkFocusInitial />
-                        @if (saveForm.controls.name.hasError('required')) {
-                            <mat-error>An id is required.</mat-error>
-                        } @else if (saveForm.controls.name.hasError('pattern')) {
-                            <mat-error
-                                >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
-                            >
-                        } @else if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>An expectation with this id already exists.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Description</mat-label>
-                        <textarea matInput formControlName="description" rows="2"></textarea>
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Expectation id"
+                        formControlName="name"
+                        [required]="true"
+                        [error]="nameError()"
+                        cdkFocusInitial
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Description"
+                        formControlName="description"
+                        [multiline]="true"
+                    ></inspecto-pen-field>
                 </form>
             }
         </mat-dialog-content>
@@ -239,6 +232,16 @@ export class ExpectationFormDialog implements AfterViewInit {
         ],
         description: [''],
     });
+
+    /** The Expectation id row's error line: shown once the row was left or Create was pressed, never on a fresh step. */
+    nameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'An id is required.';
+        if (c.hasError('pattern')) return 'Start with a letter or digit; then letters, digits, . _ - only.';
+        if (c.hasError('duplicate')) return 'An expectation with this id already exists.';
+        return '';
+    }
 
     readonly initialValue: Record<string, unknown> | undefined = this.data.expectation
         ? {

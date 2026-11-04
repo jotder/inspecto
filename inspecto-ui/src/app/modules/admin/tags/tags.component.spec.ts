@@ -7,6 +7,7 @@ import { LensService, ObjectsService, SessionService, Tag, TagAssignment, TagsSe
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penError } from 'app/inspecto/testing/pen-field';
 import { ToastrService } from 'ngx-toastr';
 import { TagsComponent } from './tags.component';
 
@@ -111,6 +112,21 @@ describe('TagsComponent', () => {
         c.commitRename();
         expect(api.rename).not.toHaveBeenCalled();
         expect(c.renaming()).toBe(true);
+    });
+
+    it('Enter in the rename row renames; a comma shows why it did not', async () => {
+        const { fixture, api } = await create();
+        const c = fixture.componentInstance;
+        c.startRename();
+        fixture.detectChanges();
+        const row = penByLabel(fixture.nativeElement, 'Rename tag')!;
+        expect(penError(row), 'nothing red when the rename opens').toBe('');
+        penEdit(fixture, row, 'a,b');
+        expect(api.rename).not.toHaveBeenCalled();
+        expect(penError(row)).toBe('Tag names may not contain commas');
+        penEdit(fixture, row, 'finance');
+        expect(api.rename).toHaveBeenCalledWith('billing', 'finance');
+        expect(c.renaming()).toBe(false);
     });
 
     it('renaming to the same name is a no-op, not a request', async () => {

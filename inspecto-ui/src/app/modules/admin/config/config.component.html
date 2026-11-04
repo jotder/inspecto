@@ -100,10 +100,13 @@
         <!-- Validate file -->
         @if (mode === 'file') {
             <div class="mt-6 flex items-center gap-3">
-                <mat-form-field class="gamma-mat-dense w-112" subscriptSizing="dynamic">
-                    <mat-label>Config path</mat-label>
-                    <input matInput [formControl]="configPathCtrl" placeholder="path to a saved .toon config" />
-                </mat-form-field>
+                <inspecto-pen-field
+                    class="w-112"
+                    label="Config path"
+                    [formControl]="configPathCtrl"
+                    placeholder="path to a saved .toon config"
+                    [mono]="true"
+                ></inspecto-pen-field>
                 <button mat-flat-button color="primary" [disabled]="validating()" (click)="validateFile()">
                     Validate file
                 </button>

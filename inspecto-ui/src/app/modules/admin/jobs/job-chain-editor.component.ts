@@ -92,7 +92,10 @@ import { ChainRow, chainToParams, parseChain, rowConfigError } from './job-chain
                     >
                         <div class="flex items-center gap-2">
                             <span class="text-secondary text-xs font-semibold">Step {{ i + 1 }}</span>
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic">
+                            <!-- form-allow: a typeahead with an autocomplete panel (deployed processor ids), in a repeating row --><mat-form-field
+                                class="flex-auto"
+                                subscriptSizing="dynamic"
+                            >
                                 <mat-label>Processor id</mat-label>
                                 <input
                                     matInput
@@ -142,7 +145,7 @@ import { ChainRow, chainToParams, parseChain, rowConfigError } from './job-chain
                                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
                             </button>
                         </div>
-                        <mat-form-field subscriptSizing="dynamic">
+                        <!-- form-allow: a JSON config editor (code) --><mat-form-field subscriptSizing="dynamic">
                             <mat-label>Config (JSON)</mat-label>
                             <textarea matInput formControlName="configText" rows="3" spellcheck="false"></textarea>
                             @if (asGroup(row).controls.configText.hasError('json')) {

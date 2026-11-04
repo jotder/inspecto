@@ -53,9 +53,12 @@
         <img class="h-7 w-7 shrink-0" [src]="previewSrc(type, category)" alt="" />
         <span class="w-40 text-sm font-medium">{{ label }}</span>
 
-        <mat-form-field subscriptSizing="dynamic" class="w-44">
+        <!-- form-allow: a table-cell select of a repeating row (one processor type's icon; each option draws its glyph) --><mat-form-field
+            subscriptSizing="dynamic"
+            class="w-44"
+        >
             <mat-label>Icon</mat-label>
-            <mat-select
+            <!-- form-allow: a table-cell select of a repeating row (one processor type's icon) --><mat-select
                 [value]="selectedGlyph(key)"
                 (selectionChange)="setGlyph(key, type, category, $event.value)"
                 [attr.aria-label]="'Icon for ' + label"

@@ -4,9 +4,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -20,6 +18,7 @@ import {
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
@@ -69,12 +68,11 @@ export function subjectLabel(h: Pick<ScreeningHit, 'subjectName' | 'subjectIdent
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         DataTableComponent,
         InspectoAlertComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     templateUrl: './screening.component.html',
@@ -103,6 +101,16 @@ export class ScreeningComponent implements OnInit {
         nonNullable: true,
         validators: [Validators.required, Validators.maxLength(500)],
     });
+
+    /** The reason row's error lines: shown once the row was left or a decision was pressed. */
+    reasonError(): string {
+        const c = this.reason;
+        if (!c.touched) return '';
+        const lines: string[] = [];
+        if (c.hasError('required')) lines.push('A reason is required.');
+        if (c.hasError('maxlength')) lines.push('At most 500 characters.');
+        return lines.join(' ');
+    }
 
     readonly revealed = signal<ScreeningReveal | null>(null);
     readonly revealing = signal(false);

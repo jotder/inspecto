@@ -198,13 +198,13 @@
 
             @if (canRequestApproval() || canDecide()) {
                 <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Reason (optional)</mat-label>
-                        <input matInput [formControl]="reason" maxlength="500" />
-                        @if (reason.hasError('maxlength')) {
-                            <mat-error>At most 500 characters.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        class="flex-1"
+                        label="Reason (optional)"
+                        [maxlength]="500"
+                        [formControl]="reason"
+                        [error]="reason.touched && reason.hasError('maxlength') ? 'At most 500 characters.' : ''"
+                    ></inspecto-pen-field>
                     @if (canRequestApproval()) {
                         <button mat-flat-button color="primary" [disabled]="acting()" (click)="requestApproval()">
                             Send for approval

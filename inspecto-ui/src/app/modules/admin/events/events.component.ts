@@ -12,7 +12,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -40,6 +39,7 @@ import { ToastrService } from 'ngx-toastr';
 import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { EventDetailDialog, EventDrilldown } from './event-detail.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** Selectable live-tail poll cadences (seconds) — polling pauses while the tab is hidden via {@link visibleInterval}. */
 const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
@@ -60,7 +60,6 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatMenuModule,
         MatSelectModule,
         MatSlideToggleModule,
@@ -70,6 +69,7 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         DataTableComponent,
+        PenFieldComponent,
     ],
     templateUrl: './events.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,

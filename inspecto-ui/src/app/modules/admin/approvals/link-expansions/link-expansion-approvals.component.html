@@ -87,13 +87,15 @@
                     @if (r.status === 'pending') {
                         @if (denying() === key(r)) {
                             <form class="mt-3 flex flex-wrap items-start gap-2" (ngSubmit)="deny(r)">
-                                <mat-form-field class="min-w-64 flex-auto" subscriptSizing="dynamic">
-                                    <mat-label>Reason (optional)</mat-label>
-                                    <input matInput [formControl]="reason" maxlength="200" />
-                                    @if (reason.hasError('maxlength')) {
-                                        <mat-error>At most 200 characters.</mat-error>
-                                    }
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    class="min-w-64 flex-auto"
+                                    label="Reason (optional)"
+                                    [formControl]="reason"
+                                    [maxlength]="200"
+                                    [error]="
+                                        reason.touched && reason.hasError('maxlength') ? 'At most 200 characters.' : ''
+                                    "
+                                ></inspecto-pen-field>
                                 <button mat-flat-button color="warn" type="submit" [disabled]="busy() === key(r)">
                                     Deny
                                 </button>

@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { apiErrorMessage, RegulatoryReportsService, ReportTemplate } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -69,6 +70,7 @@ function jsonObject(c: AbstractControl<string>): ValidationErrors | null {
         MatFormFieldModule,
         MatInputModule,
         InspectoAlertComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -81,16 +83,14 @@ function jsonObject(c: AbstractControl<string>): ValidationErrors | null {
                         replaces it here.</inspecto-alert
                     >
                 }
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Template id</mat-label>
-                    <input matInput formControlName="id" autocomplete="off" />
-                    @if (form.controls.id.hasError('required')) {
-                        <mat-error>An id is required.</mat-error>
-                    } @else if (form.controls.id.hasError('pattern')) {
-                        <mat-error>Lower-case letters, digits and hyphens, 2 to 64 characters.</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
+                <inspecto-pen-field
+                    label="Template id"
+                    [required]="true"
+                    [mono]="true"
+                    formControlName="id"
+                    [error]="idError()"
+                ></inspecto-pen-field>
+                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a JSON editor (the whole template) -->
                     <mat-label>Template (JSON)</mat-label>
                     <textarea matInput rows="16" class="font-mono" spellcheck="false" formControlName="body"></textarea>
                     @if (form.controls.body.hasError('required')) {
@@ -130,6 +130,15 @@ export class ReportTemplateDialog {
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly saving = signal(false);
     readonly error = signal<string | null>(null);
+
+    /** The id row's error line: shown once the row was left or Save was pressed. */
+    idError(): string {
+        const c = this.form.controls.id;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'An id is required.';
+        if (c.hasError('pattern')) return 'Lower-case letters, digits and hyphens, 2 to 64 characters.';
+        return '';
+    }
 
     save(): void {
         if (this.form.invalid) {

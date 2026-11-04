@@ -10,6 +10,7 @@ import { ComponentDef } from 'app/inspecto/api/components.service';
 import { LensService } from 'app/inspecto/api/lens.service';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError } from 'app/inspecto/testing/pen-field';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { AnomalyModelFormDialog, heldAnomalyChange } from './anomaly-model-form.dialog';
@@ -137,6 +138,11 @@ function submitPreview(el: HTMLElement, key: string): void {
     (el.querySelector('app-anomaly-model-preview form') as HTMLFormElement).dispatchEvent(new Event('submit'));
 }
 
+/** The first Feature card's row labelled `label` (a pen field). */
+function featureRow(el: HTMLElement, label: string): HTMLElement {
+    return penByLabel(el.querySelector('app-anomaly-model-features')!, label)!;
+}
+
 const savedFeature = (update: ReturnType<typeof vi.fn>, call = 0): Record<string, unknown> =>
     ((update.mock.calls[call][1] as Record<string, unknown>)['features'] as Record<string, unknown>[])[0];
 
@@ -197,7 +203,44 @@ describe('AnomalyModelFormDialog', () => {
         cmp.save();
         fixture.detectChanges();
         expect(update).not.toHaveBeenCalled();
-        expect(fixture.nativeElement.querySelector('mat-error')?.textContent).toContain('is not an aggregate');
+        expect(penError(featureRow(fixture.nativeElement, 'Measure'))).toContain('is not an aggregate');
+    });
+
+    it('marks the Feature field a 422 names with a pointer to the message (a row has no red outline)', async () => {
+        const msg = "anomaly-model.features[0].measure 'sum(mb)' is not a Measure of this Dataset";
+        const { fixture, cmp } = setup(EXISTING, () =>
+            throwError(
+                () =>
+                    new HttpErrorResponse({
+                        status: 422,
+                        error: { error: { code: 'CONFIG_VALIDATION_FAILED', message: msg } },
+                    }),
+            ),
+        );
+        await flush();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        cmp.save();
+        fixture.detectChanges();
+        expect(penError(featureRow(el, 'Measure'))).toBe('Refused: see the message above.');
+        expect(penError(featureRow(el, 'Weight'))).toBe('');
+    });
+
+    it('drops the row pointer with the message it points at when a Feature is removed', async () => {
+        const { fixture, cmp } = setup(EXISTING);
+        await flush();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const editor = cmp.featureEditor!;
+        editor.add();
+        editor.setRowError(0, "anomaly-model.features[0].measure 'sum(mb)' is refused", 'measure');
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="feature-error"]')).not.toBeNull();
+        expect(penError(featureRow(el, 'Measure'))).toBe('Refused: see the message above.');
+        editor.remove(1);
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="feature-error"]')).toBeNull();
+        expect(penError(featureRow(el, 'Measure'))).toBe('');
     });
 
     it('lands a 422 on the Feature row it names, verbatim', async () => {
@@ -248,7 +291,7 @@ describe('AnomalyModelFormDialog', () => {
         ) as HTMLElement;
         // jsdom has no layout: pin the tracks. Operator in a 1fr of four columns clipped "equals (=)" at 1024 px.
         expect(row.className).toContain('sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]');
-        expect(row.querySelector('mat-form-field')!.classList).toContain('sm:col-span-2');
+        expect(row.querySelector('inspecto-pen-field')!.classList).toContain('sm:col-span-2');
     });
 
     it('writes edited filters per operator and leaves no key for an empty list or a blank unit', async () => {
@@ -292,8 +335,7 @@ describe('AnomalyModelFormDialog', () => {
         const el = fixture.nativeElement as HTMLElement;
         const alerts = Array.from(el.querySelectorAll('[role="group"] [role="alert"]')).map((a) => a.textContent);
         expect(alerts.join(' ')).toContain('Choose: Column');
-        const errors = Array.from(el.querySelectorAll('.mat-mdc-form-field-subscript-wrapper mat-error'));
-        expect(errors.map((e) => e.textContent).join(' ')).toContain('Spread floor must be a number above 0');
+        expect(penError(featureRow(el, 'Spread floor'))).toBe('Spread floor must be a number above 0');
     });
 
     it('previews the UNSAVED draft by sending its content, not the saved id', async () => {

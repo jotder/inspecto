@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ToastrService } from 'ngx-toastr';
 import { LinkExpansionApprovalsComponent } from './link-expansion-approvals.component';
 import {
@@ -105,6 +106,8 @@ describe('LinkExpansionApprovalsComponent', () => {
         fixture.componentInstance.reason.setValue('x'.repeat(201));
         fixture.componentInstance.deny(HELD);
         expect(api.deny).not.toHaveBeenCalled();
+        refresh(fixture);
+        expect(penError(penByLabel(fixture.nativeElement, 'Reason')!)).toBe('At most 200 characters.');
     });
 
     // The server never lists the caller's own request (four-eyes); if one is decided elsewhere or the requester

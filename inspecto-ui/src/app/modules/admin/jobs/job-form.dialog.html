@@ -121,11 +121,17 @@
             <div formArrayName="params" class="flex flex-col gap-2">
                 @for (p of paramsArray.controls; track $index; let i = $index) {
                 <div [formGroupName]="i" class="flex items-center gap-2">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                    <!-- form-allow: a table-cell field of a repeating row (one parameter) --><mat-form-field
+                        class="flex-1"
+                        subscriptSizing="dynamic"
+                    >
                         <mat-label>Key</mat-label>
                         <input matInput formControlName="key" />
                     </mat-form-field>
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                    <!-- form-allow: a table-cell field of a repeating row (one parameter; whitespace in a value is meaningful) --><mat-form-field
+                        class="flex-1"
+                        subscriptSizing="dynamic"
+                    >
                         <mat-label>Value</mat-label>
                         <input matInput formControlName="value" />
                     </mat-form-field>
@@ -153,17 +159,13 @@
     <!-- Save step (create only): the job id, asked only now. -->
     <form [formGroup]="saveForm" aria-label="Name this job" class="space-y-1">
         <div class="text-secondary text-sm">Job configured — give it a unique id to save it.</div>
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
-            <mat-label>Job id</mat-label>
-            <input matInput formControlName="name" required cdkFocusInitial />
-            @if (saveForm.controls.name.hasError('required')) {
-            <mat-error>A job id is required.</mat-error>
-            } @else if (saveForm.controls.name.hasError('pattern')) {
-            <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
-            } @else if (saveForm.controls.name.hasError('duplicate')) {
-            <mat-error>A job with this id already exists.</mat-error>
-            }
-        </mat-form-field>
+        <inspecto-pen-field
+            label="Job id"
+            formControlName="name"
+            [required]="true"
+            [error]="nameError()"
+            cdkFocusInitial
+        ></inspecto-pen-field>
     </form>
     }
 </mat-dialog-content>

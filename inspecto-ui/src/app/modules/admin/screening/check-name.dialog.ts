@@ -13,6 +13,7 @@ import {
     ScreeningService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -55,6 +56,7 @@ export function parseSubjects(text: string): string[] {
         MatInputModule,
         InspectoAlertComponent,
         InspectoSkeletonComponent,
+        PenFieldComponent,
     ],
     templateUrl: './check-name.dialog.html',
 })
@@ -130,6 +132,20 @@ export class CheckNameDialog implements OnInit {
         if (n.some((x) => x.length > LIMITS.maxValueLength))
             return `Each name is at most ${LIMITS.maxValueLength} characters.`;
         return null;
+    }
+
+    /** The threshold row's error line: shown once the row was left or Run check was pressed. */
+    thresholdError(): string {
+        const c = this.form.controls.threshold;
+        return c.touched && (c.hasError('min') || c.hasError('max')) ? `A number from ${LIMITS.minThreshold} to 1.` : '';
+    }
+
+    /** The most-matches row's error line: shown once the row was left or Run check was pressed. */
+    maxMatchesError(): string {
+        const c = this.form.controls.maxMatches;
+        return c.touched && (c.hasError('min') || c.hasError('max') || c.hasError('pattern'))
+            ? `A whole number from 1 to ${LIMITS.maxMatchesCeiling}.`
+            : '';
     }
 
     listsPickError(): string | null {

@@ -12,9 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
@@ -28,6 +26,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 import { ConfigPreviewComponent } from './config-preview.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 const CONFIG_TYPES: ConfigType[] = ['pipeline', 'enrichment', 'job', 'schema', 'meta'];
 
@@ -118,15 +117,14 @@ export function assembleConfig(fields: FieldSpec[], values: Record<string, unkno
         ReactiveFormsModule,
         MatButtonModule,
         MatCheckboxModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatTabsModule,
         ConfigPreviewComponent,
         InspectoEmptyStateComponent,
         InspectoSchemaFormComponent,
         InspectoSkeletonComponent,
         StatusBadgeComponent,
+        PenFieldComponent,
     ],
     templateUrl: './config.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,

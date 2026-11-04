@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { GeoSettingsService } from '@inspecto/link-analysis/api/geo-settings.service';
 import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** Empty is fine (bundled offline basemap); a value must be a {z}/{x}/{y} raster template or a pmtiles:// archive. */
 function tileTemplateValidator(c: AbstractControl): ValidationErrors | null {
@@ -26,14 +25,7 @@ function tileTemplateValidator(c: AbstractControl): ValidationErrors | null {
 @Component({
     selector: 'app-map-settings',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatFormFieldModule,
-        MatIconModule,
-        MatInputModule,
-        InspectoAlertComponent,
-    ],
+    imports: [ReactiveFormsModule, MatButtonModule, MatIconModule, InspectoAlertComponent, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
@@ -50,24 +42,14 @@ function tileTemplateValidator(c: AbstractControl): ValidationErrors | null {
             }
 
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-6 flex max-w-xl flex-col gap-2">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Tile server URL (optional)</mat-label>
-                    <input
-                        matInput
-                        formControlName="tileServerUrl"
-                        placeholder="https://tiles.example.com/{z}/{x}/{y}.png"
-                    />
-                    <mat-hint
-                        >A raster template with {{ '{' }}z{{ '}' }}/{{ '{' }}x{{ '}' }}/{{ '{' }}y{{ '}' }}, or a
-                        pmtiles:// archive. Leave empty for the offline basemap.</mat-hint
-                    >
-                    @if (form.controls.tileServerUrl.hasError('tileTemplate')) {
-                        <mat-error
-                            >Must contain {{ '{' }}z{{ '}' }}, {{ '{' }}x{{ '}' }} and {{ '{' }}y{{ '}' }} placeholders,
-                            or start with pmtiles://</mat-error
-                        >
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Tile server URL (optional)"
+                    formControlName="tileServerUrl"
+                    [placeholder]="tilePlaceholder"
+                    [help]="tileHelp"
+                    [mono]="true"
+                    [error]="tileError()"
+                ></inspecto-pen-field>
                 <div>
                     <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
                         <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
@@ -89,6 +71,18 @@ export class MapSettingsComponent implements OnInit {
     readonly form = this.fb.group({
         tileServerUrl: ['', [tileTemplateValidator]],
     });
+
+    readonly tilePlaceholder = 'https://tiles.example.com/{z}/{x}/{y}.png';
+    readonly tileHelp =
+        'A raster template with {z}/{x}/{y}, or a pmtiles:// archive. Leave empty for the offline basemap.';
+
+    /** The Tile server URL row's error line, once the row was left or Save was pressed. */
+    tileError(): string {
+        const c = this.form.controls.tileServerUrl;
+        return c.touched && c.hasError('tileTemplate')
+            ? 'Must contain {z}, {x} and {y} placeholders, or start with pmtiles://'
+            : '';
+    }
 
     ngOnInit(): void {
         this.api.get().subscribe({

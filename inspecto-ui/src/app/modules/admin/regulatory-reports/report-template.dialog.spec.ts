@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { RegulatoryReportsService, ReportTemplate } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ReportTemplateDialog, ReportTemplateDialogData, templateBody } from './report-template.dialog';
 
 const TEMPLATE: ReportTemplate = {
@@ -43,11 +44,11 @@ describe('ReportTemplateDialog', () => {
         const { fixture, ref, saveTemplate } = create();
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('mat-error')).toBeNull();
+        expect(el.querySelector('mat-error, [role="alert"]')).toBeNull();
         c.save(); // id empty
-        fixture.detectChanges();
+        refresh(fixture);
         expect(saveTemplate).not.toHaveBeenCalled();
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain('id');
+        expect(penError(penByLabel(el, 'Template id')!)).toContain('id');
         c.form.controls.id.setValue('my-tpl');
         c.save();
         expect(saveTemplate).toHaveBeenCalledWith('my-tpl', expect.objectContaining({ format: 'json' }));

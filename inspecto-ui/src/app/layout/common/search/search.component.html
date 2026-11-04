@@ -39,7 +39,10 @@
 <!-- Basic search -->
 @if (appearance === 'basic') {
     <div class="w-full sm:min-w-80">
-        <mat-form-field class="w-full" [subscriptSizing]="'dynamic'">
+        <!-- form-allow: the global search box (a typeahead with an autocomplete panel, not a value of a record) --><mat-form-field
+            class="w-full"
+            [subscriptSizing]="'dynamic'"
+        >
             <mat-icon matPrefix [svgIcon]="'heroicons_outline:magnifying-glass'"></mat-icon>
             <input
                 matInput

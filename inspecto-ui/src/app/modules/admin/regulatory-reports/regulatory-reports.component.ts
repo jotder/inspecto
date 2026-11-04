@@ -4,9 +4,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { RouterLink } from '@angular/router';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
@@ -23,6 +21,7 @@ import {
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -54,12 +53,11 @@ type Verb = 'request-approval' | 'approve' | 'decline' | 'retry';
         RouterLink,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         DataTableComponent,
         InspectoAlertComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     templateUrl: './regulatory-reports.component.html',

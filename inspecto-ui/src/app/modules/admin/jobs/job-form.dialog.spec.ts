@@ -1,5 +1,6 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { sfOpen } from 'app/inspecto/testing/schema-form';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -62,11 +63,6 @@ function create(
     const fixture = TestBed.createComponent(JobFormDialog);
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, ref, save };
-}
-
-/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
-function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
-    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
 }
 
 describe('JobFormDialog', () => {
@@ -580,23 +576,21 @@ describe('JobFormDialog', () => {
         });
     });
 
-    it('shows "A job id is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+    it('shows "A job id is required." only after save — never when the save step first renders (the error is the row’s own line)', () => {
         const { fixture, c } = create({});
         c.schemaForm.form.patchValue({ scheduleMode: 'manual' });
         c.save();
         expect(c.step()).toBe('save');
         c.saveForm.controls.name.setValue('');
-        fixture.detectChanges();
-        const field = fieldOf(fixture.nativeElement, 'form[aria-label="Name this job"]', 'name');
-        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
-        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
-        expect(field.querySelector('mat-error')).toBeNull();
+        refresh(fixture);
+        const form = fixture.nativeElement.querySelector('form[aria-label="Name this job"]') as HTMLElement;
+        const field = penByLabel(form, 'Job id')!;
+        // Untouched: no error line, and nothing red anywhere in the row.
+        expect(penError(field)).toBe('');
         expect(field.textContent).not.toContain('A job id is required.');
         c.save();
-        fixture.detectChanges();
-        const err = field.querySelector('mat-error');
-        expect(err?.textContent).toContain('A job id is required.');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(field)).toBe('A job id is required.');
     });
 });
 

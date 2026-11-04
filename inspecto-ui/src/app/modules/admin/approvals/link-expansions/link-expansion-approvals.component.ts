@@ -2,9 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
@@ -18,6 +16,7 @@ import {
     LinkExpansionRequest,
     LinkExpansionStatusFilter,
 } from './link-expansion-approvals.service';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /**
  * Link expansions (D-U7 four-eyes) — the approver's inbox. A Link Analysis expand above the Space's thresholds does not
@@ -36,13 +35,12 @@ import {
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         StatusBadgeComponent,
+        PenFieldComponent,
     ],
     templateUrl: './link-expansion-approvals.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,

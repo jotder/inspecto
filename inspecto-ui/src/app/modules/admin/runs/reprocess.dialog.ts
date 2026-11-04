@@ -2,8 +2,7 @@ import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -11,7 +10,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 @Component({
     selector: 'app-reprocess-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule],
+    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Reprocess batch</h2>
@@ -20,20 +19,16 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
                 Reprocess a committed batch of <b>{{ data.pipeline }}</b
                 >.
             </p>
-            <mat-form-field class="w-full">
-                <mat-label>Batch id</mat-label>
-                <input
-                    matInput
-                    [formControl]="batchId"
-                    placeholder="batch id"
-                    required
-                    (keyup.enter)="submit()"
-                    cdkFocusInitial
-                />
-                @if (batchId.hasError('required') && batchId.touched) {
-                    <mat-error>Batch id is required.</mat-error>
-                }
-            </mat-form-field>
+            <inspecto-pen-field
+                cdkFocusInitial
+                label="Batch id"
+                [required]="true"
+                [mono]="true"
+                placeholder="batch id"
+                [formControl]="batchId"
+                [error]="batchId.hasError('required') && batchId.touched ? 'Batch id is required.' : ''"
+                (entered)="submit()"
+            ></inspecto-pen-field>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button (click)="requestClose()">Cancel</button>

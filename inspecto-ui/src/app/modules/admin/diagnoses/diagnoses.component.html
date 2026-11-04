@@ -2,7 +2,10 @@
     <!-- Header -->
     <inspecto-page-header title="Diagnoses" subtitle="Recent failure root-cause analyses (assist agent)">
         <ng-container actions>
-            <mat-form-field class="gamma-mat-dense w-28" subscriptSizing="dynamic">
+            <!-- form-allow: a list toolbar control (how many diagnoses to fetch), not a value of a record --><mat-form-field
+                class="gamma-mat-dense w-28"
+                subscriptSizing="dynamic"
+            >
                 <mat-label>Limit</mat-label>
                 <input matInput type="number" min="1" max="500" [(ngModel)]="limit" />
             </mat-form-field>

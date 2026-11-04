@@ -3,9 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } 
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -21,6 +19,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoLineDiffComponent } from 'app/inspecto/components/line-diff.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -49,9 +48,8 @@ export type PendingChangesFilter = 'pending' | 'all';
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
+        PenFieldComponent,
         DataTableComponent,
         InspectoAlertComponent,
         InspectoLineDiffComponent,

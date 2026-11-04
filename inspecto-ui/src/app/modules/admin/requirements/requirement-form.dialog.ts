@@ -2,12 +2,11 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { RequirementKind } from 'app/inspecto/requirement';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 export interface RequirementFormResult {
     title: string;
@@ -33,47 +32,39 @@ const KINDS: { value: RequirementKind; label: string }[] = [
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
-        MatInputModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>New requirement</h2>
         <mat-dialog-content>
             <form [formGroup]="form" class="flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Title</mat-label>
-                    <input
-                        matInput
-                        formControlName="title"
-                        placeholder="e.g. daily churn KPI by region"
-                        cdkFocusInitial
-                    />
-                    @if (form.controls.title.hasError('required') && form.controls.title.touched) {
-                        <mat-error>Title is required</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Title"
+                    [required]="true"
+                    placeholder="e.g. daily churn KPI by region"
+                    formControlName="title"
+                    [error]="form.controls.title.touched && form.controls.title.hasError('required') ? 'Title is required' : ''"
+                ></inspecto-pen-field>
                 <inspecto-option-picker class="w-full" label="Kind" [options]="kinds" formControlName="kind" />
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Description</mat-label>
-                    <textarea
-                        matInput
-                        rows="4"
-                        formControlName="description"
-                        placeholder="What do you need, and why?"
-                    ></textarea>
-                    @if (form.controls.description.hasError('required') && form.controls.description.touched) {
-                        <mat-error>A description is required</mat-error>
-                    }
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Target Component / Pipeline (optional)</mat-label>
-                    <input
-                        matInput
-                        formControlName="targetComponent"
-                        placeholder="e.g. pipeline/orders_etl or dataset/mart_sales"
-                    />
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Description"
+                    [required]="true"
+                    [multiline]="true"
+                    placeholder="What do you need, and why?"
+                    formControlName="description"
+                    [error]="
+                        form.controls.description.touched && form.controls.description.hasError('required')
+                            ? 'A description is required'
+                            : ''
+                    "
+                ></inspecto-pen-field>
+                <inspecto-pen-field
+                    label="Target Component / Pipeline (optional)"
+                    placeholder="e.g. pipeline/orders_etl or dataset/mart_sales"
+                    formControlName="targetComponent"
+                ></inspecto-pen-field>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">

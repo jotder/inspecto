@@ -18,6 +18,7 @@ import {
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -46,6 +47,7 @@ export interface RegulatoryReportDraftData {
         MatInputModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -92,7 +94,7 @@ export interface RegulatoryReportDraftData {
                 </div>
 
                 @for (key of inputKeys(); track key) {
-                    <mat-form-field subscriptSizing="dynamic">
+                    <mat-form-field subscriptSizing="dynamic"><!-- form-allow: the report's own text written as prose (a message composer) -->
                         <mat-label>{{ label(key) }}</mat-label>
                         <textarea matInput rows="3" [formControl]="inputControl(key)"></textarea>
                         @if (inputControl(key).hasError('required')) {
@@ -106,13 +108,16 @@ export interface RegulatoryReportDraftData {
                     </mat-form-field>
                 }
 
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Reason (optional)</mat-label>
-                    <input matInput formControlName="reason" maxlength="500" />
-                    @if (form.controls.reason.hasError('maxlength')) {
-                        <mat-error>At most 500 characters.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    label="Reason (optional)"
+                    [maxlength]="500"
+                    formControlName="reason"
+                    [error]="
+                        form.controls.reason.touched && form.controls.reason.hasError('maxlength')
+                            ? 'At most 500 characters.'
+                            : ''
+                    "
+                ></inspecto-pen-field>
             </form>
             @if (error()) {
                 <inspecto-alert variant="error" title="Not drafted">{{ error() }}</inspecto-alert>

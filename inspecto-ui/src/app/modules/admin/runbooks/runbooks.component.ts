@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
@@ -12,6 +10,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import {
     RUNBOOK_LINK_KINDS,
     RunbookLinkKind,
@@ -33,12 +32,11 @@ const NO_LINK = '';
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         InspectoEmptyStateComponent,
         InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
+        PenFieldComponent,
     ],
     template: `
         <inspecto-page-header
@@ -76,38 +74,32 @@ const NO_LINK = '';
                 <form class="flex flex-1 flex-col gap-2" [formGroup]="form" (ngSubmit)="save()" aria-label="Runbook">
                     <h2 class="text-lg font-semibold">{{ editingId() ? 'Edit ' + editingId() : 'New Runbook' }}</h2>
                     @if (!editingId()) {
-                        <mat-form-field>
-                            <mat-label>Id</mat-label>
-                            <input matInput formControlName="id" />
-                            @if (form.controls['id'].hasError('required')) {
-                                <mat-error>An id is required.</mat-error>
-                            } @else if (form.controls['id'].hasError('pattern')) {
-                                <mat-error>Letters, digits, dot, dash or underscore.</mat-error>
-                            }
-                        </mat-form-field>
+                        <inspecto-pen-field
+                            label="Id"
+                            [required]="true"
+                            [mono]="true"
+                            formControlName="id"
+                            [error]="idError()"
+                        ></inspecto-pen-field>
                     }
-                    <mat-form-field>
-                        <mat-label>Title</mat-label>
-                        <input matInput formControlName="title" />
-                        @if (form.controls['title'].hasError('required')) {
-                            <mat-error>A title is required.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field>
-                        <mat-label>Summary</mat-label>
-                        <textarea matInput formControlName="summary" rows="2"></textarea>
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Title"
+                        [required]="true"
+                        formControlName="title"
+                        [error]="titleError()"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field label="Summary" [multiline]="true" formControlName="summary"></inspecto-pen-field>
                     <h3 class="text-sm font-semibold">Steps</h3>
                     <ol class="flex flex-col gap-2" formArrayName="steps">
                         @for (s of steps.controls; track s; let i = $index) {
                             <li class="flex flex-col gap-1 rounded border p-2" [formGroupName]="i">
-                                <mat-form-field>
-                                    <mat-label>Step {{ i + 1 }}</mat-label>
-                                    <textarea matInput formControlName="text" rows="2"></textarea>
-                                    @if (s.get('text')?.hasError('required')) {
-                                        <mat-error>A step needs text.</mat-error>
-                                    }
-                                </mat-form-field>
+                                <inspecto-pen-field
+                                    [label]="'Step ' + (i + 1)"
+                                    [required]="true"
+                                    [multiline]="true"
+                                    formControlName="text"
+                                    [error]="s.get('text')?.touched && s.get('text')?.hasError('required') ? 'A step needs text.' : ''"
+                                ></inspecto-pen-field>
                                 <div class="flex flex-wrap items-end gap-2">
                                     <inspecto-option-picker
                                         label="Link to"
@@ -115,10 +107,11 @@ const NO_LINK = '';
                                         [options]="linkKinds"
                                     />
                                     @if (s.get('linkKind')?.value) {
-                                        <mat-form-field>
-                                            <mat-label>Link id</mat-label>
-                                            <input matInput formControlName="linkId" />
-                                        </mat-form-field>
+                                        <inspecto-pen-field
+                                            label="Link id"
+                                            [mono]="true"
+                                            formControlName="linkId"
+                                        ></inspecto-pen-field>
                                     }
                                     <button
                                         mat-icon-button
@@ -136,14 +129,8 @@ const NO_LINK = '';
                     <div>
                         <button mat-stroked-button type="button" (click)="addStep()">Add step</button>
                     </div>
-                    <mat-form-field>
-                        <mat-label>Owner role</mat-label>
-                        <input matInput formControlName="ownerRole" />
-                    </mat-form-field>
-                    <mat-form-field>
-                        <mat-label>Tags (comma-separated)</mat-label>
-                        <input matInput formControlName="tags" />
-                    </mat-form-field>
+                    <inspecto-pen-field label="Owner role" formControlName="ownerRole"></inspecto-pen-field>
+                    <inspecto-pen-field label="Tags (comma-separated)" formControlName="tags"></inspecto-pen-field>
                     <div class="flex gap-2">
                         <button mat-flat-button color="primary" type="submit" [disabled]="!lens.canAuthorWorkbench()">
                             Save
@@ -179,6 +166,21 @@ export class RunbooksComponent implements OnInit {
         ownerRole: [''],
         tags: [''],
     });
+
+    /** The id row's error line: shown once the row was left or Save was pressed. */
+    idError(): string {
+        const c = this.form.controls['id'];
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'An id is required.';
+        if (c.hasError('pattern')) return 'Letters, digits, dot, dash or underscore.';
+        return '';
+    }
+
+    /** The title row's error line: shown once the row was left or Save was pressed. */
+    titleError(): string {
+        const c = this.form.controls['title'];
+        return c.touched && c.hasError('required') ? 'A title is required.' : '';
+    }
 
     get steps(): FormArray {
         return this.form.get('steps') as FormArray;

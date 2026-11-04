@@ -11,10 +11,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { AlertRule, AlertRuleUpsert, AlertsService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import {
@@ -131,9 +130,8 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
         InspectoAlertComponent,
+        PenFieldComponent,
         InspectoSchemaFormComponent,
         QueryConditionGroupComponent,
     ],
@@ -206,17 +204,13 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 <!-- Save step (create only): the rule id, asked only now. -->
                 <form [formGroup]="saveForm" aria-label="Name this alert rule" class="space-y-1">
                     <div class="text-secondary text-sm">Rule configured — give it a unique id to save it.</div>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Rule id</mat-label>
-                        <input matInput formControlName="name" required cdkFocusInitial />
-                        @if (saveForm.controls.name.hasError('required')) {
-                            <mat-error>A rule id is required.</mat-error>
-                        } @else if (saveForm.controls.name.hasError('pattern')) {
-                            <mat-error>Start with a letter; then letters, digits, dash, underscore only.</mat-error>
-                        } @else if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>An alert rule with this id already exists.</mat-error>
-                        }
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Rule id"
+                        formControlName="name"
+                        [required]="true"
+                        [error]="nameError()"
+                        cdkFocusInitial
+                    ></inspecto-pen-field>
                 </form>
             }
             @if (saveError()) {
@@ -318,6 +312,16 @@ export class AlertRuleFormDialog implements AfterViewInit {
             ],
         ],
     });
+
+    /** The Rule id row's error line: shown once the row was left or Save was pressed, never on a fresh step. */
+    nameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A rule id is required.';
+        if (c.hasError('pattern')) return 'Start with a letter; then letters, digits, dash, underscore only.';
+        if (c.hasError('duplicate')) return 'An alert rule with this id already exists.';
+        return '';
+    }
 
     readonly initialValue: Record<string, unknown> | undefined = this.data.rule
         ? {

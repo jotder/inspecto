@@ -57,6 +57,7 @@ import {
     paramValueToForm,
 } from './job-parameter-specs';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** Dialog input: an existing job ⇒ edit; absent ⇒ create. `focusSchedule` opens with the schedule emphasized
  *  (the "Reschedule" action). */
@@ -152,6 +153,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         ChipComponent,
         InspectoSchemaFormComponent,
         JobChainEditorComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './job-form.dialog.html',
@@ -231,6 +233,16 @@ export class JobFormDialog implements AfterViewInit {
             ],
         ],
     });
+
+    /** The Job id row's error line: shown once the row was left or Create was pressed, never on a fresh step. */
+    nameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'A job id is required.';
+        if (c.hasError('pattern')) return 'Start with a letter or digit; then letters, digits, . _ - only.';
+        if (c.hasError('duplicate')) return 'A job with this id already exists.';
+        return '';
+    }
 
     /** The selected Job Type's declared parameters (R3), rendered as a typed form (P3c). */
     readonly paramSpecs = signal<AttributeSpec[]>([]);

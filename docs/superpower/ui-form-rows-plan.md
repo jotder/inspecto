@@ -1,6 +1,6 @@
 # One form idiom: property rows (`UI-FORM-ROWS-1`)
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9); P3 in batches from 2026-11-04 (§10).** Operator ask: *"we need uniform look and feel
+> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §5). P0 and P1 BUILT 2026-11-03 (§7, §8); P2 BUILT 2026-11-04 (§9); P3 BUILT 2026-11-04 in seven batches (§10) - the allow-list holds only `schema-form`; P4 open.** Operator ask: *"we need uniform look and feel
 > for the form items"* - single-line field / value rows with a pencil to edit (as elsewhere), a short description in
 > tiny type under a field whose name does not explain itself, the whole form at one glance without scrolling (fold
 > groups or a wizard for long ones), and every dropdown a popup dialog that can carry hints, search, groups and nested
@@ -299,3 +299,29 @@ allow-list (114 to 103).
   commit, not per keystroke: the onboarding directory defaults and import notes, the component form's value for its
   id and grammar rows, the reconciliation name and bands (each commit resets the test result). Weight and cap lost the
   decimal keypad.
+
+**Batch 7 - the remaining 36 admin and layout files, 2026-11-04.** The allow-list ends at ONE file (37 to 1):
+`schema-form.component.ts`, for its in-row editor (P1).
+- Rows: the alert, decision, expectation and Job ids (each with its required / pattern / duplicate line), the anomaly
+  model features (id, label, measure, weight, spread floor, filter value), the action-request, link-expansion,
+  pending-change, report and screening reasons, the config path, the tile server URL, "Save current as" in Events
+  (saves on Enter, through `(entered)`), the menu names, the template id, the requirement and decision notes, every
+  runbook field (each step is a card, not a table cell), the reprocess batch id and the tag rename (both act on Enter,
+  through `(entered)`), the screening threshold and match limit, the import and template-gallery Space ids.
+- Kept boxed with `form-allow`: the global search and the icon / screen / delivered-via / processor typeaheads, the
+  agent chat and the regulatory report narrative (composers), the Data Browser filter, report and lineage toolbar
+  filters and date ranges, the list limits and poll cadence, the JSON config editors and sample boxes, the names to
+  check (a many-line paste box), the icon select (each option draws its glyph), and the cells of the decision
+  consequence, Job parameter and transfer rows.
+- The anomaly features card follows batch 6: every validator has its line, a server refusal marks the named field
+  "Refused: see the message above." and a remove clears it.
+- Behaviour to know: Enter no longer submits the link-expansion deny, map settings, menu, report draft, template,
+  runbook, screening check or template-gallery forms. Per commit, not per keystroke: the import-bundle and gallery
+  Create buttons. The id messages lost their `<code>` markup; the import and gallery ids lost `autocomplete="off"`;
+  the screening threshold lost its 0.01 step; the anomaly weight and spread floor lost the decimal keypad
+  (`inputmode`), and the template id and tag rename lost `autocomplete="off"`.
+
+**P3 is done.** Every boxed field left in the app is a marked exception of a named kind (`grep -rn form-allow`), and
+`lint:forms` refuses any new one. Still open: P4 (nested and disabled picker options, the per-picker layout),
+`schema-form`'s in-row editor, and the lower items noted per batch (decimal keypads, `autocomplete="off"`, the
+picker's re-pick dirtying a reactive form).

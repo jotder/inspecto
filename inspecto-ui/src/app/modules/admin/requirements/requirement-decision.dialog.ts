@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { componentRefOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { LensService } from 'app/inspecto/api';
@@ -42,6 +43,7 @@ export type RequirementDetail = Requirement & { kpiPending?: boolean };
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
+        PenFieldComponent,
         StatusBadgeComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,17 +66,19 @@ export type RequirementDetail = Requirement & { kpiPending?: boolean };
             }
 
             @if (lens.canTriageRequirements() && data.status === 'submitted') {
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Note (optional)</mat-label>
-                    <textarea matInput rows="2" [formControl]="note" cdkFocusInitial></textarea>
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Note (optional)"
+                    [multiline]="true"
+                    [formControl]="note"
+                ></inspecto-pen-field>
                 <div class="flex gap-2">
                     <button mat-flat-button color="primary" (click)="decide(true)">Accept</button>
                     <button mat-stroked-button color="warn" (click)="decide(false)">Reject</button>
                 </div>
             }
             @if (lens.canTriageRequirements() && data.status === 'accepted') {
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a typeahead with an autocomplete panel (component suggestions) -->
                     <mat-label>Delivered via (optional)</mat-label>
                     <input
                         matInput

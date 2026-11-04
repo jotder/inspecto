@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ScreeningCheckResponse, ScreeningService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { CheckNameDialog, parseSubjects } from './check-name.dialog';
 
 const LISTS = {
@@ -117,11 +118,9 @@ describe('CheckNameDialog', () => {
         c.form.patchValue({ names: 'X', threshold: 0.2 });
         c.toggle('sanctions', true);
         c.run();
-        fixture.detectChanges();
+        refresh(fixture);
         expect(api.check).not.toHaveBeenCalled();
-        expect(el.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')?.textContent).toContain(
-            'A number from 0.5 to 1.',
-        );
+        expect(penError(penByLabel(el, 'Threshold')!)).toContain('A number from 0.5 to 1.');
     });
 
     it('shows a Checked row for a clean name, beside the names that matched', async () => {

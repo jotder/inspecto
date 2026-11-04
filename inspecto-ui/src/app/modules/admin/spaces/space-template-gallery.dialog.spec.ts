@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { CreateSpaceRequest, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 
 const TEMPLATES: SpaceTemplateInfo[] = [
@@ -50,11 +51,6 @@ function create(existingIds: string[] = ['default'], templates: SpaceTemplateInf
     const fixture = TestBed.createComponent(SpaceTemplateGalleryDialog);
     fixture.detectChanges();
     return { fixture, created, closed };
-}
-
-/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
-function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
-    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
 }
 
 describe('SpaceTemplateGalleryDialog', () => {
@@ -135,22 +131,19 @@ describe('SpaceTemplateGalleryDialog', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('shows the id pattern error only after submit — never before (the error lands in the subscript)', () => {
+    it("shows the id pattern error only after submit — never before (the error is the Id row's own line)", () => {
         const { fixture, created } = create();
         const c = fixture.componentInstance;
         c.choose(TEMPLATES[0]);
         c.form.patchValue({ id: 'Bad Id' });
         fixture.detectChanges();
-        const field = fieldOf(fixture.nativeElement, 'form', 'id');
-        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
-        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
-        expect(field.querySelector('mat-error')).toBeNull();
+        const field = penByLabel(fixture.nativeElement, 'Id')!;
+        // Untouched: no error.
+        expect(penError(field)).toBe('');
         expect(field.textContent).not.toContain('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
         c.submit();
-        fixture.detectChanges();
-        const err = field.querySelector('mat-error');
-        expect(err?.textContent).toContain('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(field)).toBe('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
         expect(created).not.toHaveBeenCalled();
     });
 });

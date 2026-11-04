@@ -41,7 +41,10 @@
 
                 @if (activeTab === 'lineage') {
                     <div class="mt-4 flex items-center gap-3">
-                        <mat-form-field class="gamma-mat-dense w-72" subscriptSizing="dynamic">
+                        <!-- form-allow: a toolbar filter box over the lineage list --><mat-form-field
+                            class="gamma-mat-dense w-72"
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>Run id (optional)</mat-label>
                             <input matInput [(ngModel)]="lineageRunId" placeholder="filter by run id" />
                         </mat-form-field>
@@ -51,13 +54,19 @@
 
                 @if (activeTab === 'report') {
                     <div class="mt-4 flex flex-wrap items-center gap-3">
-                        <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
+                        <!-- form-allow: a report date filter with a calendar panel --><mat-form-field
+                            class="gamma-mat-dense w-56"
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>From</mat-label>
                             <input matInput [matDatepicker]="fromPicker" [(ngModel)]="from" />
                             <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
                             <mat-datepicker #fromPicker></mat-datepicker>
                         </mat-form-field>
-                        <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
+                        <!-- form-allow: a report date filter with a calendar panel --><mat-form-field
+                            class="gamma-mat-dense w-56"
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>To</mat-label>
                             <input matInput [matDatepicker]="toPicker" [(ngModel)]="to" />
                             <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>

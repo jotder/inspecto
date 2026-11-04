@@ -54,6 +54,7 @@ import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition
 import { dbColumnType } from 'app/inspecto/query/query-columns';
 import { Condition, ColumnMeta, ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import { DECISION_RULE_ATTRIBUTES } from './decision-rule-attributes';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 
 /** Dialog input: an existing rule ⇒ edit; absent ⇒ create (optionally pre-filled from an AI proposal). */
 export interface DecisionRuleFormData {
@@ -127,6 +128,7 @@ const ROUTING_OPTIONS: ActionOption[] = ROUTING_ACTIONS.map((a) => ({
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         QueryConditionGroupComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -172,9 +174,14 @@ const ROUTING_OPTIONS: ActionOption[] = ROUTING_ACTIONS.map((a) => ({
                     <div formArrayName="consequences" class="flex flex-col gap-2">
                         @for (g of consequencesArray.controls; track g; let i = $index) {
                             <div [formGroupName]="i" class="flex flex-wrap items-center gap-3">
-                                <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
+                                <!-- form-allow: a table-cell select of a repeating row (one consequence; an uninstalled action is a disabled option) --><mat-form-field
+                                    class="gamma-mat-dense w-56"
+                                    subscriptSizing="dynamic"
+                                >
                                     <mat-label>Action</mat-label>
-                                    <mat-select formControlName="action">
+                                    <!-- form-allow: a table-cell select of a repeating row (one consequence) --><mat-select
+                                        formControlName="action"
+                                    >
                                         @for (a of optionsFor(g.get('action')?.value); track a.value) {
                                             <mat-option
                                                 [value]="a.value"
@@ -186,7 +193,10 @@ const ROUTING_OPTIONS: ActionOption[] = ROUTING_ACTIONS.map((a) => ({
                                 </mat-form-field>
                                 @if (inputSpec(i); as d) {
                                     @if (d.show) {
-                                        <mat-form-field class="gamma-mat-dense flex-auto" subscriptSizing="dynamic">
+                                        <!-- form-allow: a table-cell field of a repeating row (one consequence) --><mat-form-field
+                                            class="gamma-mat-dense flex-auto"
+                                            subscriptSizing="dynamic"
+                                        >
                                             <mat-label>{{ d.label }}</mat-label>
                                             <input matInput formControlName="detail" />
                                             @if (g.get('detail')?.hasError('required')) {
@@ -230,23 +240,18 @@ const ROUTING_OPTIONS: ActionOption[] = ROUTING_ACTIONS.map((a) => ({
                 <!-- Save step (create only): id + description, asked only now. -->
                 <form [formGroup]="saveForm" aria-label="Name this decision rule" class="space-y-1">
                     <div class="text-secondary text-sm">Rule configured — give it a unique id to save it.</div>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Rule id</mat-label>
-                        <input matInput formControlName="name" required cdkFocusInitial />
-                        @if (saveForm.controls.name.hasError('required')) {
-                            <mat-error>An id is required.</mat-error>
-                        } @else if (saveForm.controls.name.hasError('pattern')) {
-                            <mat-error
-                                >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
-                            >
-                        } @else if (saveForm.controls.name.hasError('duplicate')) {
-                            <mat-error>A decision rule with this id already exists.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Description</mat-label>
-                        <textarea matInput formControlName="description" rows="2"></textarea>
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        label="Rule id"
+                        formControlName="name"
+                        [required]="true"
+                        [error]="nameError()"
+                        cdkFocusInitial
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Description"
+                        formControlName="description"
+                        [multiline]="true"
+                    ></inspecto-pen-field>
                 </form>
             }
         </mat-dialog-content>
@@ -296,6 +301,16 @@ export class DecisionRuleFormDialog implements AfterViewInit {
         ],
         description: [''],
     });
+
+    /** The Rule id row's error line: shown once the row was left or Create was pressed, never on a fresh step. */
+    nameError(): string {
+        const c = this.saveForm.controls.name;
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'An id is required.';
+        if (c.hasError('pattern')) return 'Start with a letter or digit; then letters, digits, . _ - only.';
+        if (c.hasError('duplicate')) return 'A decision rule with this id already exists.';
+        return '';
+    }
 
     /** Suggestion source: `target` follows the target-type picker. */
     readonly optionLoaders = { target: pipelineOrJobOptionLoader() };

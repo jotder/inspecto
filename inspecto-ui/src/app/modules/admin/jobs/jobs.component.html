@@ -81,19 +81,30 @@
                 } @else {
                     <!-- Filter toolbar -->
                     <div class="mb-4 flex flex-wrap items-center gap-3">
-                        <mat-form-field class="gamma-mat-dense w-44" subscriptSizing="dynamic">
+                        <!-- form-allow: a toolbar filter box over the job report --><mat-form-field
+                            class="gamma-mat-dense w-44"
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>Job</mat-label>
                             <input matInput [(ngModel)]="fJob" placeholder="all jobs" (keyup.enter)="loadReport()" />
                         </mat-form-field>
-                        <mat-form-field class="gamma-mat-dense w-28" subscriptSizing="dynamic">
+                        <!-- form-allow: a toolbar select (how many runs the report reads) --><mat-form-field
+                            class="gamma-mat-dense w-28"
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>Runs</mat-label>
-                            <mat-select [(ngModel)]="fLimit">
+                            <!-- form-allow: a toolbar select (how many runs the report reads) --><mat-select
+                                [(ngModel)]="fLimit"
+                            >
                                 @for (n of limitOptions; track n) {
                                     <mat-option [value]="n">{{ n }}</mat-option>
                                 }
                             </mat-select>
                         </mat-form-field>
-                        <mat-form-field class="gamma-mat-dense w-28" subscriptSizing="dynamic">
+                        <!-- form-allow: a toolbar filter over the job report (trend window) --><mat-form-field
+                            class="gamma-mat-dense w-28"
+                            subscriptSizing="dynamic"
+                        >
                             <mat-label>Trend days</mat-label>
                             <input matInput type="number" min="1" [(ngModel)]="fDays" (keyup.enter)="loadReport()" />
                         </mat-form-field>

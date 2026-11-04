@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ExpectationsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ExpectationFormData, ExpectationFormDialog } from './expectation-form.dialog';
 
 function create(data: ExpectationFormData) {
@@ -24,11 +25,6 @@ function create(data: ExpectationFormData) {
     const fixture = TestBed.createComponent(ExpectationFormDialog);
     fixture.detectChanges();
     return fixture;
-}
-
-/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
-function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
-    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
 }
 
 describe('ExpectationFormDialog', () => {
@@ -329,23 +325,21 @@ describe('ExpectationFormDialog', () => {
         expect(c.step()).toBe('config');
     });
 
-    it('shows "An id is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+    it('shows "An id is required." only after save — never when the save step first renders (the error is the row’s own line)', () => {
         const fixture = create({});
         const c = fixture.componentInstance;
         c.schemaForm.form.patchValue({ target: 'cdr_ingest', column: 'msisdn', kind: 'non_null' });
         c.save();
         expect(c.step()).toBe('save');
         c.saveForm.controls.name.setValue('');
-        fixture.detectChanges();
-        const field = fieldOf(fixture.nativeElement, 'form[aria-label="Name this expectation"]', 'name');
-        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
-        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
-        expect(field.querySelector('mat-error')).toBeNull();
+        refresh(fixture);
+        const form = fixture.nativeElement.querySelector('form[aria-label="Name this expectation"]') as HTMLElement;
+        const field = penByLabel(form, 'Expectation id')!;
+        // Untouched: no error line, and nothing red anywhere in the row.
+        expect(penError(field)).toBe('');
         expect(field.textContent).not.toContain('An id is required.');
         c.save();
-        fixture.detectChanges();
-        const err = field.querySelector('mat-error');
-        expect(err?.textContent).toContain('An id is required.');
-        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        refresh(fixture);
+        expect(penError(field)).toBe('An id is required.');
     });
 });

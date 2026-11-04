@@ -47,11 +47,17 @@ type PreviewResult =
             <p class="text-secondary m-0 text-sm">{{ hint() }}</p>
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <mat-form-field class="gamma-mat-dense" subscriptSizing="dynamic">
+                <!-- form-allow: a JSON config editor (code) --><mat-form-field
+                    class="gamma-mat-dense"
+                    subscriptSizing="dynamic"
+                >
                     <mat-label>Draft config (JSON)</mat-label>
                     <textarea matInput rows="10" class="font-mono text-xs" [formControl]="draftCtrl"></textarea>
                 </mat-form-field>
-                <mat-form-field class="gamma-mat-dense" subscriptSizing="dynamic">
+                <!-- form-allow: a sample-text box (many-line paste) --><mat-form-field
+                    class="gamma-mat-dense"
+                    subscriptSizing="dynamic"
+                >
                     <mat-label>{{ sampleLabel() }}</mat-label>
                     <textarea matInput rows="10" class="font-mono text-xs" [formControl]="sampleCtrl"></textarea>
                 </mat-form-field>

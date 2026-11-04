@@ -18,7 +18,10 @@
             } @else if (visibleGroups().length === 0) {
                 <inspecto-empty-state title="No data" message="This space has no browsable stores yet." />
             } @else {
-                <mat-form-field class="gamma-mat-dense mb-2 w-full" subscriptSizing="dynamic">
+                <!-- form-allow: a live filter box over the store list --><mat-form-field
+                    class="gamma-mat-dense mb-2 w-full"
+                    subscriptSizing="dynamic"
+                >
                     <mat-icon matPrefix class="icon-size-4" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                     <input
                         matInput

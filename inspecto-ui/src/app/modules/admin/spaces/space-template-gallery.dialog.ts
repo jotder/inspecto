@@ -2,12 +2,11 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -45,11 +44,10 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -113,26 +111,17 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <p class="text-secondary text-sm">
                         {{ selected()!.description }}
                     </p>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Id</mat-label>
-                        <input matInput formControlName="id" required autocomplete="off" cdkFocusInitial />
-                        <mat-hint>lowercase letters, digits and hyphens — becomes the space folder</mat-hint>
-                        @if (form.get('id')?.hasError('required')) {
-                            <mat-error>Id is required.</mat-error>
-                        } @else if (form.get('id')?.hasError('pattern')) {
-                            <mat-error>Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.</mat-error>
-                        } @else if (form.get('id')?.hasError('duplicate')) {
-                            <mat-error>A space with this id already exists.</mat-error>
-                        }
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Display name</mat-label>
-                        <input matInput formControlName="display_name" autocomplete="off" />
-                    </mat-form-field>
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Description</mat-label>
-                        <input matInput formControlName="description" autocomplete="off" />
-                    </mat-form-field>
+                    <inspecto-pen-field
+                        cdkFocusInitial
+                        label="Id"
+                        [required]="true"
+                        [mono]="true"
+                        formControlName="id"
+                        help="lowercase letters, digits and hyphens — becomes the space folder"
+                        [error]="idError()"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field label="Display name" formControlName="display_name"></inspecto-pen-field>
+                    <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
                 </mat-dialog-content>
                 <mat-dialog-actions align="end">
                     <button type="button" mat-button (click)="back()">Back</button>
@@ -173,6 +162,16 @@ export class SpaceTemplateGalleryDialog {
         display_name: [''],
         description: [''],
     });
+
+    /** The id row's error line: shown once the row was left or Create space was pressed. */
+    idError(): string {
+        const c = this.form.controls['id'];
+        if (!c.touched) return '';
+        if (c.hasError('required')) return 'Id is required.';
+        if (c.hasError('pattern')) return 'Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.';
+        if (c.hasError('duplicate')) return 'A space with this id already exists.';
+        return '';
+    }
 
     constructor() {
         this.api.templates().subscribe({

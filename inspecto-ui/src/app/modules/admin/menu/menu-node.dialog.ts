@@ -7,6 +7,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { HEROICONS_OUTLINE_IDS, heroiconOutline } from 'app/inspecto/menu/heroicons-outline-ids';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -63,26 +64,25 @@ export interface MenuNodeDialogResult {
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
+        PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ data.heading }}</h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <mat-dialog-content class="flex flex-col gap-2 pt-1">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Name</mat-label>
-                    <input matInput formControlName="title" cdkFocusInitial placeholder="e.g. Revenue" />
-                    @if (form.controls.title.hasError('required')) {
-                        <mat-error>A name is required.</mat-error>
-                    }
-                    @if (form.controls.title.hasError('duplicate')) {
-                        <mat-error>A menu with this name already exists here.</mat-error>
-                    }
-                </mat-form-field>
+                <inspecto-pen-field
+                    cdkFocusInitial
+                    label="Name"
+                    [required]="true"
+                    placeholder="e.g. Revenue"
+                    formControlName="title"
+                    [error]="titleError()"
+                ></inspecto-pen-field>
 
                 <!-- Searchable icon picker over the full heroicons-outline set (menu-builder-plan O2).
                      Free text filters; only a real icon id is accepted (else the control errors). -->
-                <mat-form-field subscriptSizing="dynamic">
+                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a typeahead with an autocomplete panel (the icon search) -->
                     <mat-label>Icon (optional)</mat-label>
                     @if (selectedIcon()) {
                         <mat-icon matPrefix class="icon-size-5 ml-1 mr-2" [svgIcon]="selectedIcon()!"></mat-icon>
@@ -135,6 +135,16 @@ export class MenuNodeDialog {
         title: [this.data.title ?? '', [Validators.required, uniqueNameValidator(() => this.data.takenTitles)]],
         icon: [this.data.icon ?? '', [MenuNodeDialog.iconValidator]],
     });
+
+    /** The name row's error lines: shown once the row was left or Save was pressed. */
+    titleError(): string {
+        const c = this.form.controls.title;
+        if (!c.touched) return '';
+        const lines: string[] = [];
+        if (c.hasError('required')) lines.push('A name is required.');
+        if (c.hasError('duplicate')) lines.push('A menu with this name already exists here.');
+        return lines.join(' ');
+    }
 
     /** The current icon control value as a live signal, for the prefix preview + option filtering. */
     private readonly iconValue = toSignal(this.form.controls.icon.valueChanges, {
