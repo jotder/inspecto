@@ -72,6 +72,91 @@ class EntityTypesTest {
         assertDoesNotThrow(() -> EntityTypes.validate(many.subList(0, 64)));
     }
 
+    /** ENTITY-TYPE-CATALOG-1 P0: the ids and classifications are data contracts; families only add guidance. */
+    @Test
+    void theDefaultIdsAndClassificationsAreUnchangedAndEachSitsUnderOneFamily() {
+        Map<String, List<String>> want = new LinkedHashMap<>();
+        want.put("subscriber", List.of("SUBSCRIBER"));
+        want.put("imsi", List.of("IMSI"));
+        want.put("imei", List.of("IMEI"));
+        want.put("msisdn", List.of("MSISDN"));
+        want.put("wallet", List.of("WALLET"));
+        want.put("account", List.of("ACCOUNT"));
+        want.put("agent", List.of("AGENT", "TILL"));
+        want.put("handset", List.of("HANDSET"));
+        want.put("cell", List.of("CELL", "CELL_ID"));
+        Map<String, List<String>> got = new LinkedHashMap<>();
+        for (EntityType t : EntityTypes.DEFAULTS) got.put(t.id(), t.classifications());
+        assertEquals(want, got);
+
+        Map<String, String> families = new LinkedHashMap<>();
+        for (EntityType t : EntityTypes.DEFAULTS) {
+            families.put(t.id(), t.family());
+            assertFalse(t.definition() == null || t.definition().isBlank(), t.id() + " has a definition");
+            assertFalse(t.example() == null || t.example().isBlank(), t.id() + " has an example");
+        }
+        assertEquals(Map.of("subscriber", "party", "imsi", "identifier", "imei", "device", "msisdn", "identifier",
+                "wallet", "account", "account", "account", "agent", "organisation", "handset", "device", "cell", "place"), families);
+    }
+
+    @Test
+    void theFamiliesAreTheClosedSevenInPickerOrder() {
+        assertEquals(List.of("party", "organisation", "account", "identifier", "device", "place", "document"), EntityTypes.familyIds());
+        for (Map<String, Object> f : EntityTypes.familiesShape()) {
+            assertEquals(List.of("id", "label", "definition"), List.copyOf(f.keySet()));
+            assertFalse(((String) f.get("definition")).isBlank());
+        }
+    }
+
+    @Test
+    void aStatedTypeWithoutGuidanceTakesTheCoreDefaultsOfItsIdAndANewIdHasNone() {
+        List<EntityType> parsed = EntityTypes.parse(List.of(
+                Map.of("id", "msisdn", "label", "Line", "normaliser", "e164", "masked", true, "classifications", List.of("MSISDN")),
+                Map.of("id", "note", "label", "Free text", "normaliser", "default", "masked", false, "classifications", List.of())));
+        EntityType core = EntityTypes.coreDefault("msisdn");
+        assertEquals(new EntityType("msisdn", "Line", "e164", true, List.of("MSISDN"), "identifier", core.definition(), core.example()),
+                parsed.get(0));
+        assertEquals(new EntityType("note", "Free text", "default", false, List.of()), parsed.get(1));
+        assertFalse(EntityTypes.shape(List.of(parsed.get(1))).get(0).containsKey("family"), "unstated guidance is not written");
+    }
+
+    @Test
+    void statedGuidanceWinsAndABadFamilyOrOverlongGuidanceIsRefused() {
+        Map<String, Object> t = new LinkedHashMap<>(Map.of("id", "msisdn", "label", "Line", "normaliser", "e164", "masked", true,
+                "classifications", List.of("MSISDN"), "family", "party", "definition", " Who called. ", "example", "+1"));
+        EntityType p = EntityTypes.parse(List.of(t)).get(0);
+        assertEquals("party", p.family());
+        assertEquals("Who called.", p.definition());
+        assertEquals("+1", p.example());
+
+        t.put("family", "telephony");
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("family must be one of"));
+        t.put("family", 7);
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("family must be a string"));
+        t.put("family", "party");
+        t.put("definition", "x".repeat(400));
+        assertEquals(400, EntityTypes.parse(List.of(t)).get(0).definition().length(), "the pack's term bound, not a tighter one");
+        t.put("definition", "x".repeat(401));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("definition is longer"));
+        t.put("definition", "ok");
+        t.put("example", "x".repeat(65));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntityTypes.parse(List.of(t))).getMessage().contains("example is longer"));
+    }
+
+    /** A pack relabels a type and lends it its term's definition; the family and example stay the core's. */
+    @Test
+    void aPackOverlayKeepsTheFamilyAndTakesTheTermDefinition() {
+        IndustryPack telecom = IndustryPacks.bundled().find("telecom");
+        IndustryPack money = IndustryPacks.bundled().find("mobile-money");
+        EntityType core = EntityTypes.coreDefault("msisdn");
+        EntityType tel = telecom.overlay(EntityTypes.DEFAULTS).stream().filter(x -> x.id().equals("msisdn")).findFirst().orElseThrow();
+        assertEquals("identifier", tel.family());
+        assertEquals(core.example(), tel.example());
+        assertEquals(telecom.term("entity_type.msisdn").definition(), tel.definition());
+        EntityType mm = money.overlay(EntityTypes.DEFAULTS).stream().filter(x -> x.id().equals("msisdn")).findFirst().orElseThrow();
+        assertEquals(core.definition(), mm.definition(), "no term, the core definition stands");
+    }
+
     @Test
     void parseRefusesAMalformedShape() {
         Map<String, Object> t = new LinkedHashMap<>(EntityTypes.shape(List.of(EntityTypes.DEFAULTS.get(0))).get(0));
@@ -85,8 +170,10 @@ class EntityTypesTest {
     @Test
     void entityTypesRoundTripThroughLinkAnalysisToon(@TempDir Path dir) throws Exception {
         List<EntityType> types = List.of(
-                new EntityType("agent", "Agent / till", "upper-trim", false, List.of("AGENT", "TILL")),
-                new EntityType("msisdn", "MSISDN", "e164", true, List.of("MSISDN")),
+                new EntityType("agent", "Agent / till", "upper-trim", false, List.of("AGENT", "TILL"),
+                        "organisation", "A shop that serves customers.", "TILL-1"),
+                new EntityType("msisdn", "MSISDN", "e164", true, List.of("MSISDN"),
+                        "identifier", "A telephone number.", "+44 7700 900001"),
                 new EntityType("note", "Free text", "default", false, List.of()));
         Path f = dir.resolve(LinkAnalysisSettings.FILE);
         new LinkAnalysisSettings(1200, null, null, "all", null, null, types, null, null, null, null, null, null, null, null).write(f);

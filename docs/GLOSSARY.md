@@ -1114,6 +1114,13 @@ untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — 
 label (`columns[].classification`); the Entity Type is what that label maps to. Design:
 [`archived-documents/plans-archive/link-analysis-entity-model-design.md`](archived-documents/plans-archive/link-analysis-entity-model-design.md).
 
+**Entity Type family** *(Link Analysis; ✅ P0 built 2026-11-04, `ENTITY-TYPE-CATALOG-1`: `EntityTypes.FAMILIES`,
+`GET /inv/entity-types` `families`)* — The neutral group every **Entity Type** sits under, from a closed core set:
+*Party · Organisation · Account · Identifier · Device · Place · Document*. A type also carries a one-line
+definition and a made-up example; the "what does this column hold" picker groups by family and shows both, so a
+reader who does not know a domain word picks by family and example. Reader guidance only: ⛔ never part of an
+Entity's identity (the id and classifications are). ⛔ Not a **Store family** (a module's group of operational files).
+
 **Domain Profile** *(Link Analysis; settles `LDP-D7`; ✅ built 2026-10-17, LA-EDITIONS-1: `domain_profile` in
 `link-analysis.toon`, `GET|PUT /settings/link-analysis/domain-profile`)* — The **Industry pack** a Space reads Link
 Analysis in: which words name the canonical concepts (the working-set tiles, the two ends of a link, Entity Types,

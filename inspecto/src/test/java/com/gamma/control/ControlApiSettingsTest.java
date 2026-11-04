@@ -678,17 +678,23 @@ class ControlApiSettingsTest {
             assertEquals("upper-trim", agent.get("normaliser").asText());
             assertFalse(agent.get("masked").asBoolean());
             assertEquals("[\"AGENT\",\"TILL\"]", agent.get("classifications").toString());
+            assertEquals("organisation", agent.get("family").asText(), "ENTITY-TYPE-CATALOG-1: each default sits under a family");
 
             String list = "[{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":true,"
                     + "\"classifications\":[\"MSISDN\"]},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
                     + "\"upper-trim\",\"masked\":false,\"classifications\":[\"TILL\",\"AGENT\"]}]";
+            // a stated core id without guidance takes the core default's; a new id (till) has none
+            String stored = "[{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":true,"
+                    + "\"classifications\":[\"MSISDN\"],\"family\":\"identifier\",\"definition\":\"A telephone number, best in "
+                    + "international form.\",\"example\":\"+44 7700 900123\"},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
+                    + "\"upper-trim\",\"masked\":false,\"classifications\":[\"TILL\",\"AGENT\"]}]";
             HttpResponse<String> put = send(c.port, "PUT", path, "{\"maskingMode\":\"all\",\"entityTypes\":" + list + "}");
             assertEquals(200, put.statusCode(), put.body());
-            assertEquals(JSON.readTree(list), json(put).get("entityTypes"));
-            assertEquals(JSON.readTree(list), json(put).get("entityTypesInForce"), "a stated list replaces the defaults");
+            assertEquals(JSON.readTree(stored), json(put).get("entityTypes"));
+            assertEquals(JSON.readTree(stored), json(put).get("entityTypesInForce"), "a stated list replaces the defaults");
             assertTrue(Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"))
                     .contains("entity_types"));
-            assertEquals(JSON.readTree(list), json(send(c.port, "GET", path, null)).get("entityTypes"),
+            assertEquals(JSON.readTree(stored), json(send(c.port, "GET", path, null)).get("entityTypes"),
                     "survives the round trip through link-analysis.toon");
 
             String one = "{\"id\":\"%s\",\"label\":\"%s\",\"normaliser\":\"%s\",\"masked\":%s,\"classifications\":%s}";
@@ -712,7 +718,7 @@ class ControlApiSettingsTest {
                 assertEquals(422, r.statusCode(), b.getValue() + " → " + r.body());
                 assertTrue(r.body().contains(b.getValue()), "the 422 names the problem: " + r.body());
             }
-            assertEquals(JSON.readTree(list), json(send(c.port, "GET", path, null)).get("entityTypes"),
+            assertEquals(JSON.readTree(stored), json(send(c.port, "GET", path, null)).get("entityTypes"),
                     "a refused write left the last good list standing");
             // LA-CONFIG-LIMITS-1 P3: the cap is the Space's input.entity_types - stated at 1, the two-type list is refused naming 1
             assertEquals(200, send(c.port, "PUT", path + "/limits", "{\"input.entity_types\":1}").statusCode());

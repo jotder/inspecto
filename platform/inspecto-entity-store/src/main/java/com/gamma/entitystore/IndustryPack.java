@@ -89,7 +89,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
     private static final Pattern TOOL = Pattern.compile("^[a-z][a-z0-9-]{0,31}$");
     private static final int MAX_LABEL = 60;
     private static final int MAX_ABBREVIATION = 16;
-    private static final int MAX_DEFINITION = 400;
+    static final int MAX_DEFINITION = 400;
     private static final int MAX_TERMS = 200;
     private static final Set<String> INVESTIGATE_STRINGS = Set.of("entity_type", "dataset", "source_col", "target_col",
             "link_kind_col", "time_col", "events_col");
@@ -199,7 +199,8 @@ public record IndustryPack(String id, String name, String description, List<Stri
 
     /**
      * {@code base} as this pack reads it: each type the pack restates takes its normaliser, masking and classifications,
-     * and each type with an {@code entity_type.*} term takes that label. Order and membership are {@code base}'s.
+     * and each type with an {@code entity_type.*} term takes that label and its definition. Order, membership, family and
+     * example are {@code base}'s (a pack relabels; the family stays the neutral word every reader shares).
      */
     public List<EntityTypes.EntityType> overlay(List<EntityTypes.EntityType> base) {
         List<EntityTypes.EntityType> out = new ArrayList<>();
@@ -207,7 +208,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
             EntityTypes.EntityType t = entityTypes.stream().filter(p -> p.id().equals(b.id())).findFirst().orElse(b);
             Term term = term("entity_type." + b.id());
             out.add(new EntityTypes.EntityType(b.id(), term != null ? term.label() : b.label(), t.normaliser(), t.masked(),
-                    t.classifications()));
+                    t.classifications(), b.family(), term != null ? term.definition() : b.definition(), b.example()));
         }
         return List.copyOf(out);
     }

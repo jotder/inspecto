@@ -81,7 +81,19 @@ function create() {
     fixture.detectChanges();
     http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
     http.match((r) => r.url.includes('/entity-types')).forEach((r) =>
-        r.flush({ items: [{ id: 'account', label: 'Account', classifications: ['ACCOUNT_ID'] }] }),
+        r.flush({
+            items: [
+                {
+                    id: 'account',
+                    label: 'Account',
+                    classifications: ['ACCOUNT_ID'],
+                    family: 'account',
+                    definition: 'An account a party holds.',
+                    example: 'ACC-1',
+                },
+            ],
+            families: [{ id: 'account', label: 'Account', definition: 'Holds a balance.' }],
+        }),
     );
     fixture.detectChanges();
     return { fixture, el: fixture.nativeElement as HTMLElement, c: fixture.componentInstance };
@@ -319,5 +331,13 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         fixture.detectChanges();
         c.form.controls.name.setValue('mm_links');
         expect(c.form.controls.name.hasError('taken')).toBe(true);
+    });
+
+    it('offers what a column holds grouped by family, with a definition and an example (ENTITY-TYPE-CATALOG-1)', () => {
+        const { c } = create();
+        expect((c as unknown as { typeOptions: () => unknown[] }).typeOptions()).toEqual([
+            { value: '', label: 'Nothing: a detail' },
+            { value: 'account', label: 'Account', group: 'Account', hint: 'An account a party holds. e.g. ACC-1' },
+        ]);
     });
 });

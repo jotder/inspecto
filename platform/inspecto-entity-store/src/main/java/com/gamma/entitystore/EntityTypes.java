@@ -28,11 +28,64 @@ public final class EntityTypes {
 
     private EntityTypes() {}
 
-    /** One configured Entity Type; {@code classifications} are the Dataset column classifications it claims. */
-    public record EntityType(String id, String label, String normaliser, boolean masked, List<String> classifications) {
+    /**
+     * One configured Entity Type; {@code classifications} are the Dataset column classifications it claims.
+     * {@code family} is one of {@link #FAMILIES} (ENTITY-TYPE-CATALOG-1), {@code definition} one line on what it is and
+     * {@code example} a made-up value of its shape: the three are reader guidance for the "what does this column hold"
+     * picker, never part of identity. Each is {@code null} when nothing states it (a Space's own type of a new id).
+     */
+    public record EntityType(String id, String label, String normaliser, boolean masked, List<String> classifications,
+                             String family, String definition, String example) {
         public EntityType {
             classifications = List.copyOf(classifications);
         }
+
+        /** A type with no reader guidance (family, definition and example unstated). */
+        public EntityType(String id, String label, String normaliser, boolean masked, List<String> classifications) {
+            this(id, label, normaliser, masked, classifications, null, null, null);
+        }
+    }
+
+    /**
+     * A family: the small, closed, NEUTRAL layer every Entity Type sits under (ENTITY-TYPE-CATALOG-1 Q-1), so a reader who
+     * does not know a domain word picks by family and example.
+     */
+    public record Family(String id, String label, String definition) {}
+
+    /** The closed family set, in the order a picker shows them. ⛔ Neutral words only ({@code IndustryPackNeutralityTest}). */
+    public static final List<Family> FAMILIES = List.of(
+            new Family("party", "Party", "A person or customer the records are about."),
+            new Family("organisation", "Organisation", "A business or body that serves customers: a shop, a merchant, a branch."),
+            new Family("account", "Account", "Something that holds a balance or a service for a party."),
+            new Family("identifier", "Identifier",
+                    "A number or code that names a party or an account: a phone number, a card number, an email address."),
+            new Family("device", "Device", "A phone, terminal or other piece of equipment, or the serial number that names it."),
+            new Family("place", "Place", "Where something happened: a site, a branch, an area."),
+            new Family("document", "Document", "A paper or record that identifies a party or evidences a deal: an ID document, a contract."));
+
+    /**
+     * The most characters a stated definition, and a stated example, may hold. ⚠ The definition bound IS the Industry pack's
+     * term bound: an overlay lends a type its {@code entity_type.*} term's definition and the pack's load validates the
+     * overlay, so a tighter bound here would refuse a pack that loads today.
+     */
+    static final int MAX_DEFINITION = IndustryPack.MAX_DEFINITION, MAX_EXAMPLE = 64;
+
+    /** The family ids of {@link #FAMILIES}, in order. */
+    public static List<String> familyIds() {
+        return FAMILIES.stream().map(Family::id).toList();
+    }
+
+    /** The wire shape of {@link #FAMILIES}: one {@code {id, label, definition}} each. */
+    public static List<Map<String, Object>> familiesShape() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Family f : FAMILIES) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", f.id());
+            m.put("label", f.label());
+            m.put("definition", f.definition());
+            out.add(m);
+        }
+        return out;
     }
 
     /** The closed normaliser set, in declaration order. */
@@ -41,18 +94,33 @@ public final class EntityTypes {
     /**
      * The seeded types a space inherits until it states its own (design §2.6). ⛔ The labels are NEUTRAL (AC-09): an
      * industry word ("MSISDN", "Wallet") is the Space's {@link IndustryPack} relabelling the type, never the core's.
-     * The ids and classifications are data contracts and stay as they are.
+     * The ids and classifications are data contracts and stay as they are; each type sits under one {@link #FAMILIES} family.
      */
     public static final List<EntityType> DEFAULTS = List.of(
-            new EntityType("subscriber", "Subscriber", "default", true, List.of("SUBSCRIBER")),
-            new EntityType("imsi", "Subscriber identity", "digits", true, List.of("IMSI")), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
-            new EntityType("imei", "Device identity", "digits", true, List.of("IMEI")), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
-            new EntityType("msisdn", "Phone number", "e164", true, List.of("MSISDN")), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
-            new EntityType("wallet", "Stored-value account", "upper-trim", true, List.of("WALLET")),
-            new EntityType("account", "Account", "upper-trim", true, List.of("ACCOUNT")),
-            new EntityType("agent", "Intermediary / till", "upper-trim", false, List.of("AGENT", "TILL")),
-            new EntityType("handset", "Device", "default", false, List.of("HANDSET")),
-            new EntityType("cell", "Location", "upper-trim", false, List.of("CELL", "CELL_ID")));
+            new EntityType("subscriber", "Subscriber", "default", true, List.of("SUBSCRIBER"),
+                    "party", "A customer of the service.", "C-104233"),
+            new EntityType("imsi", "Subscriber identity", "digits", true, List.of("IMSI"), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
+                    "identifier", "The identity the service stores on a customer's card: up to 15 digits.", "001010123456789"),
+            new EntityType("imei", "Device identity", "digits", true, List.of("IMEI"), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
+                    "device", "The serial number of a phone or terminal: 15 digits.", "490154203237518"),
+            new EntityType("msisdn", "Phone number", "e164", true, List.of("MSISDN"), // vocab-allow: the classification is a data contract; the label is neutral (IndustryPackNeutralityTest)
+                    "identifier", "A telephone number, best in international form.", "+44 7700 900123"),
+            new EntityType("wallet", "Stored-value account", "upper-trim", true, List.of("WALLET"),
+                    "account", "An account that holds a stored balance, spent from a phone or a card.", "SV-00012345"),
+            new EntityType("account", "Account", "upper-trim", true, List.of("ACCOUNT"),
+                    "account", "An account a party holds with a provider.", "ACC-0042-7781"),
+            new EntityType("agent", "Intermediary / till", "upper-trim", false, List.of("AGENT", "TILL"),
+                    "organisation", "A business that serves customers on a provider's behalf: a shop, a till, an intermediary.", "TILL-0381"),
+            new EntityType("handset", "Device", "default", false, List.of("HANDSET"),
+                    "device", "A phone or terminal, by its make and model.", "Model X-200"),
+            new EntityType("cell", "Location", "upper-trim", false, List.of("CELL", "CELL_ID"),
+                    "place", "The network site or area that served an event.", "SITE-0451-B"));
+
+    /** The core default of {@code id}, else {@code null} (a Space's own type). */
+    public static EntityType coreDefault(String id) {
+        for (EntityType t : DEFAULTS) if (t.id().equals(id)) return t;
+        return null;
+    }
 
     /** The JavaScript {@code \s} set as an explicit class (see the class note — never Java's {@code \s}). */
     static final String WS = "[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]";
@@ -89,7 +157,8 @@ public final class EntityTypes {
     }
 
     /**
-     * The types in {@code raw} — a list of {@code {id, label, normaliser, masked, classifications}} objects, the
+     * The types in {@code raw} — a list of {@code {id, label, normaliser, masked, classifications}} objects (optional
+     * {@code family}, {@code definition}, {@code example}; left out, they are the core default's of the same id), the
      * shape both the wire and {@code link-analysis.toon} carry — validated. Label and classifications are
      * trimmed. Throws {@link IllegalArgumentException} naming the first problem; nothing is clamped or dropped. At most
      * the catalogue default of {@link LaLimit#INPUT_ENTITY_TYPES} types.
@@ -115,10 +184,25 @@ public final class EntityTypes {
                     throw new IllegalArgumentException("entity type '" + id + "': each classification must be a string");
                 classifications.add(s.trim());
             }
-            out.add(new EntityType(id, str(m, "label").trim(), str(m, "normaliser"), masked, classifications));
+            // Guidance a stated type leaves out is the core default's of the same id (a stated list copies the defaults).
+            EntityType core = coreDefault(id);
+            String family = opt(m, id, "family", core == null ? null : core.family());
+            String definition = opt(m, id, "definition", core == null ? null : core.definition());
+            String example = opt(m, id, "example", core == null ? null : core.example());
+            out.add(new EntityType(id, str(m, "label").trim(), str(m, "normaliser"), masked, classifications,
+                    family, definition, example));
         }
         validate(out, maxTypes);
         return List.copyOf(out);
+    }
+
+    /** An optional trimmed string; absent or blank reads as {@code fallback}. */
+    private static String opt(Map<?, ?> m, String id, String key, String fallback) {
+        Object v = m.get(key);
+        if (v == null) return fallback;
+        if (!(v instanceof String s))
+            throw new IllegalArgumentException("entity type '" + id + "': " + key + " must be a string");
+        return s.isBlank() ? fallback : s.trim();
     }
 
     private static String str(Map<?, ?> m, String key) {
@@ -148,6 +232,13 @@ public final class EntityTypes {
                 throw new IllegalArgumentException("entity type id 'entity' is reserved (untyped ids are entity:<value>)");
             if (!ids.add(t.id())) throw new IllegalArgumentException("duplicate entity type id '" + t.id() + "'");
             if (t.label().isBlank()) throw new IllegalArgumentException("entity type '" + t.id() + "': label is blank");
+            if (t.family() != null && !familyIds().contains(t.family()))
+                throw new IllegalArgumentException("entity type '" + t.id() + "': family must be one of " + familyIds()
+                        + ", got '" + t.family() + "'");
+            if (t.definition() != null && t.definition().length() > MAX_DEFINITION)
+                throw new IllegalArgumentException("entity type '" + t.id() + "': definition is longer than " + MAX_DEFINITION + " characters");
+            if (t.example() != null && t.example().length() > MAX_EXAMPLE)
+                throw new IllegalArgumentException("entity type '" + t.id() + "': example is longer than " + MAX_EXAMPLE + " characters");
             if (!NORMALISERS.contains(t.normaliser()))
                 throw new IllegalArgumentException("entity type '" + t.id() + "': normaliser must be one of "
                         + NORMALISERS + ", got '" + t.normaliser() + "'");
@@ -164,7 +255,10 @@ public final class EntityTypes {
         }
     }
 
-    /** The wire/TOON shape of {@code types}: one {@code {id, label, normaliser, masked, classifications}} each. */
+    /**
+     * The wire/TOON shape of {@code types}: one {@code {id, label, normaliser, masked, classifications}} each, plus
+     * {@code family}, {@code definition} and {@code example} where stated.
+     */
     public static List<Map<String, Object>> shape(List<EntityType> types) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (EntityType t : types) {
@@ -174,8 +268,16 @@ public final class EntityTypes {
             m.put("normaliser", t.normaliser());
             m.put("masked", t.masked());
             m.put("classifications", t.classifications());
+            putGuidance(m, t);
             out.add(m);
         }
         return out;
+    }
+
+    /** Adds {@code family}, {@code definition} and {@code example} to {@code m}, each only when stated. */
+    public static void putGuidance(Map<String, Object> m, EntityType t) {
+        if (t.family() != null) m.put("family", t.family());
+        if (t.definition() != null) m.put("definition", t.definition());
+        if (t.example() != null) m.put("example", t.example());
     }
 }

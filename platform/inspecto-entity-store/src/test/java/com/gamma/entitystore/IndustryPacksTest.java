@@ -137,6 +137,21 @@ class IndustryPacksTest {
                 "toy", "is not a core Entity Type");
     }
 
+    /**
+     * ENTITY-TYPE-CATALOG-1: the overlay lends an Entity Type its term's definition and the load validates the overlay, so a
+     * term definition at the pack's own bound (400) still loads - no pack rule change.
+     */
+    @Test
+    void anEntityTypeTermDefinitionAtThePackBoundStillLoads() throws IOException {
+        String def = "d".repeat(400);
+        IndustryPacks.Catalogue c = load(write(tmp.resolve("jar1"), "toy", f -> f.equals("terms")
+                ? "terms[1]{key,label,abbreviation,definition}:\n  entity_type.account,Ledger,\"\",\"" + def + "\"\n" : null));
+        assertEquals(List.of(), c.refused(), "a 400-character term definition is within the pack's bound");
+        EntityTypes.EntityType account = c.find("toy").overlay(EntityTypes.DEFAULTS).stream()
+                .filter(t -> t.id().equals("account")).findFirst().orElseThrow();
+        assertEquals(def, account.definition());
+    }
+
     @Test
     void aTermNamingNoCoreConceptRefusesThePackWhole() throws IOException {
         IndustryPacks.Catalogue c = load(write(tmp.resolve("jar1"), "toy",

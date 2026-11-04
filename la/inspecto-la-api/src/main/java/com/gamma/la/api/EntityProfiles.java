@@ -1007,6 +1007,7 @@ final class EntityProfiles {
         m.put("normaliser", t.normaliser());
         m.put("masked", t.masked());
         m.put("classifications", t.classifications());
+        EntityTypes.putGuidance(m, t);
         return m;
     }
 

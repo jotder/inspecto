@@ -29,6 +29,7 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import { statusEdgeClasses, statusRowClasses } from '@inspecto/core/components/status-badge.component';
 import { DataTableComponent } from '@inspecto/core/data-table/data-table.component';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
+import { OTHER_FAMILY, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { AddDataAccess } from './add-data-access';
@@ -240,7 +241,12 @@ export class AddDataComponent implements OnInit {
         return [
             { value: NONE, label: 'Nothing: a detail', hint: 'Shown on links or entities, not drawn as a node' },
             ...known,
-            ...[...new Set(proposed)].map((v) => ({ value: v, label: v })),
+            // a proposal the Space does not know: under Other when the known types are grouped by family
+            ...[...new Set(proposed)].map((v) => ({
+                value: v,
+                label: v,
+                ...(known.some((o) => o.group) ? { group: OTHER_FAMILY } : {}),
+            })),
         ];
     });
     protected readonly columnOptions = computed<PickerOption[]>(() =>
@@ -356,8 +362,7 @@ export class AddDataComponent implements OnInit {
             .entityTypes()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: (l) =>
-                    this.entityTypes.set((l.items ?? []).map((t) => ({ value: t.id, label: t.label || t.id }))),
+                next: (l) => this.entityTypes.set(entityTypeOptions(l.items ?? [], l.families ?? [])),
                 error: () => this.entityTypes.set([]),
             });
         this.formSub = this.form.valueChanges.subscribe(() => this.formTick.update((n) => n + 1));

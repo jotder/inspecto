@@ -54,6 +54,16 @@ class IndustryPackNeutralityTest {
             assertEquals(List.of(), hits(t.label(), words), "core Entity Type '" + t.id() + "' label '" + t.label() + "'");
     }
 
+    /** ENTITY-TYPE-CATALOG-1: the families and the core's reader guidance are core words too. */
+    @Test
+    void theFamiliesAndTheCoreGuidanceHoldNoPackWord() {
+        Set<String> words = packWords();
+        for (EntityTypes.Family f : EntityTypes.FAMILIES)
+            assertEquals(List.of(), hits(f.label() + " " + f.definition(), words), "family '" + f.id() + "'");
+        for (EntityTypes.EntityType t : EntityTypes.DEFAULTS)
+            assertEquals(List.of(), hits(t.definition() + " " + t.example(), words), "core Entity Type '" + t.id() + "' guidance");
+    }
+
     @Test
     void theCoreConceptLabelsHoldNoPackWord() {
         Set<String> words = packWords();

@@ -12868,10 +12868,10 @@
         "tags" : [ "inv" ],
         "summary" : "List the Entity Types in force with their bindings and cached headline",
         "operationId" : "getInvEntityTypes",
-        "description" : "la-entity-profile-plan section 4.5. {items: [{id, label, normaliser, masked, classifications, bindings: [{dataset, column, role}], headline: {distinct, approximate, rows, dataAsOf, computedAt, assessed, reason}}]}. A binding is every Dataset column whose classification the type claims; role is source / target when the column is a link end of a saved Link Analysis view or a published index mapping, else attribute. The headline is the last computed type profile (cached, never a query on this request): assessed:false with reason 'not computed yet' until the type's profile has been read once. Only Datasets the caller may view are walked. Gated by the geoLink feature and a write root; no capability. Audited as LINK_ENTITY_TYPES_LISTED.",
+        "description" : "la-entity-profile-plan section 4.5. {items: [{id, label, normaliser, masked, classifications, family?, definition?, example?, bindings: [{dataset, column, role}], headline: {distinct, approximate, rows, dataAsOf, computedAt, assessed, reason}}], families: [{id, label, definition}]}. family is one of the closed families (ENTITY-TYPE-CATALOG-1: party, organisation, account, identifier, device, place, document), listed in families in picker order; family, definition and example are reader guidance, absent when nothing states them. A binding is every Dataset column whose classification the type claims; role is source / target when the column is a link end of a saved Link Analysis view or a published index mapping, else attribute. The headline is the last computed type profile (cached, never a query on this request): assessed:false with reason 'not computed yet' until the type's profile has been read once. Only Datasets the caller may view are walked. Gated by the geoLink feature and a write root; no capability. Audited as LINK_ENTITY_TYPES_LISTED.",
         "responses" : {
           "200" : {
-            "description" : "{items}."
+            "description" : "{items, families}."
           },
           "503" : {
             "description" : "No write root, or no Dataset provider."

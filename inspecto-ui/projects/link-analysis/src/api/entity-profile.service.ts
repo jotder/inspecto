@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from '@inspecto/core/api/api-base';
+import type { EntityFamily } from './entity-type-options';
 
 /**
  * The Entity profile reads (la-entity-profile-plan section 4.5, the contract fixed 2026-10-15). Every section carries
@@ -40,12 +41,18 @@ export interface EntityTypeSummary {
     normaliser: string;
     masked: boolean;
     classifications: string[];
+    /** Reader guidance (ENTITY-TYPE-CATALOG-1): a family id of `families`, a one-line definition, a made-up example. */
+    family?: string;
+    definition?: string;
+    example?: string;
     bindings: EntityTypeBinding[];
     headline: EntityTypeHeadline;
 }
 
 export interface EntityTypeList {
     items: EntityTypeSummary[];
+    /** The closed family set, in picker order (absent from an older server). */
+    families?: EntityFamily[];
 }
 
 export interface EntityTypeIdentity {
