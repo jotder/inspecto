@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  * under {@code /inv}. The verb is <i>Onboard</i> (GLOSSARY); the screens call it <i>Add data</i>.
  *
  * <ul>
- *   <li>{@code POST /onboard/files?name=&kind=stream|reference[&delimiter=&header=&quote=&decimal=&recordPath=]} - raw file body; stores it in
+ *   <li>{@code POST /onboard/files?name=&kind=stream|reference[&delimiter=&header=&quote=&encoding=&decimal=&recordPath=]} - raw file body; stores it in
  *       the Space's draft area and answers the DRAFT ({@link OnboardDraft}, {@link EntityShapes}): every proposed choice is
  *       {@code {value, evidence, confidence}}. Nothing is written to config.</li>
  *   <li>{@code POST /onboard/files/{draftId}/commit} - the confirmed choices; writes the schema and an ordinary Pipeline
@@ -70,13 +70,13 @@ final class OnboardRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose (CapabilityManifestTest's scanner).
-        api.post("/onboard/files", ApiContext.withCapability("canUploadData", (e, m) -> draft(api, e)));
+        api.post("/onboard/files", ApiContext.withCapability("canUploadData", (e, m) -> fixable(e, () -> draft(api, e))));
         api.post("/onboard/files/([^/]+)/commit", ApiContext.withCapability("canUploadData",
-                (e, m) -> OnboardImport.commit(api, e, ApiContext.name(m), api.body(e))));
+                (e, m) -> fixable(e, () -> OnboardImport.commit(api, e, ApiContext.name(m), api.body(e)))));
         api.get("/onboard/runs/([^/]+)", ApiContext.withCapability("canUploadData",
                 (e, m) -> OnboardImport.run(e, ApiContext.name(m))));
         api.post("/datasets/([^/]+)/files", ApiContext.withCapability("canUploadData",
-                (e, m) -> OnboardImport.addFile(api, e, ApiContext.name(m))));
+                (e, m) -> fixable(e, () -> OnboardImport.addFile(api, e, ApiContext.name(m)))));
         api.post("/datasets/([^/]+)/run", ApiContext.withCapability("canUploadData",
                 (e, m) -> OnboardImport.runNow(api, e, ApiContext.name(m))));
         api.put("/datasets/([^/]+)/columns/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
@@ -88,6 +88,25 @@ final class OnboardRoutes implements RouteModule {
         InboxWatch.registerRoutes(api);   // BASIC-ONBOARD-1 P2
         InboxWatch.attach(api);
         PostgresSnapshot.register(api);   // BASIC-ONBOARD-1 P3
+    }
+
+    interface Call {
+        Object call() throws IOException;
+    }
+
+    /**
+     * {@code ONBOARDING-FIRST-RUN-1} C2: a refusal that matches the fix catalogue ({@link OnboardFixes}) is answered as the
+     * usual error with its findings under {@code error.details.findings}, so the screen can offer the one-click fix.
+     */
+    static Object fixable(HttpExchange ex, Call call) throws IOException {
+        try {
+            return call.call();
+        } catch (OnboardFixes.Refusal r) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("error", r.getMessage());
+            body.put("findings", r.findings);
+            return ApiContext.respondJson(ex, r.status, body);
+        }
     }
 
     /** The standard rate-limit bucket covers these (each reads, or runs, a whole file). */
@@ -248,6 +267,7 @@ final class OnboardRoutes implements RouteModule {
         out.put("rows", a.preview());
         out.put("entityTypes", entity);
         out.put("limits", limitsShape(writeRoot, lim));
+        out.put("findings", a.findings());   // C2: the fix catalogue's findings, each {entry, column?, cause, fix}
         if (snapshot != null) out.put("snapshot", snapshot);
 
         Map<String, Object> record = new LinkedHashMap<>(out);
@@ -303,6 +323,14 @@ final class OnboardRoutes implements RouteModule {
             if (!decimal.equals(".") && !decimal.equals(","))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decimal must be '.' or ','");
             o.put("decimal", decimal);
+        }
+        String encoding = ApiContext.query(ex, "encoding");   // C2: the encoding entry's fix
+        if (encoding != null) {
+            if (!type.equals("csv") && !type.equals("tsv"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'encoding' applies to delimited text only");
+            if (!encoding.equals("utf-8") && !encoding.equals("latin-1"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "encoding must be utf-8 or latin-1");
+            o.put("encoding", encoding);
         }
         String recordPath = ApiContext.query(ex, "recordPath");
         if (recordPath != null) {

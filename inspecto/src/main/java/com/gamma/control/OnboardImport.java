@@ -188,6 +188,7 @@ final class OnboardImport {
 
             Space space = new Space(writeRoot, dataRoot, service, ApiContext.actor(ex));
             Job job = new Job(space, id, kind, draftFile, fileName, dataset, false);
+            job.fromDraft = true;
             try {
                 // ── write: schema, then the pipeline (gated against the schema now on disk), register, land ──────
                 Files.createDirectories(configDir);
@@ -561,6 +562,7 @@ final class OnboardImport {
                 csv.put("has_header", Boolean.parseBoolean(String.valueOf(formatValue("header"))));
                 Object q = formatValue("quote");
                 if (q != null && !String.valueOf(q).isEmpty()) csv.put("quote", String.valueOf(q));
+                if ("latin-1".equals(formatValue("encoding"))) csv.put("encoding", "latin-1");   // C2: the encoding fix
             }
             csv.put("date_formats", List.of("%Y-%m-%d"));
             csv.put("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S"));
@@ -667,6 +669,8 @@ final class OnboardImport {
         final Deque<Undo> undo = new ArrayDeque<>();
         Path landed;
         Path aside;
+        /** C2: this run is a commit of a draft, so a set-aside file is explained with fixes that edit that draft. */
+        boolean fromDraft;
         /** The ledger's {@code consignment_id} of the last batch {@link #runChecked} saw this run add; null if none. */
         String runBatch;
         /** sha256 of the uploaded file (LA-ARRIVAL-LEDGER-1), read as it lands; null for Run now. */
@@ -821,11 +825,16 @@ final class OnboardImport {
                 m.put("reason", q.get("reason"));
                 quarantined.add(m);
             }
+            // C2: a commit whose run set the file aside or rejected rows says why with the catalogue, from the draft's file
+            List<Map<String, Object>> findings = fromDraft && (rejected > 0 || !quarantined.isEmpty()) ? explain(cfg) : List.of();
+            if (!findings.isEmpty())
+                for (Map<String, Object> m : quarantined) m.put("findings", findings);
             s.put("rowsIn", parsed);
             s.put("rowsRejected", rejected);
             if (rejected > 0)
                 s.put("rejectedDetail", "GET /runs/" + id + "/errors?file=" + landed.getFileName());
             s.put("quarantined", quarantined);
+            if (!findings.isEmpty()) s.put("findings", findings);
             s.put("rowsBefore", before);
             s.put("rowsAfter", after);
             s.put("rowsChanged", after - before);
@@ -833,10 +842,27 @@ final class OnboardImport {
             if (landed != null && (!quarantined.isEmpty() || after <= (replace ? 0 : before))) {
                 String why = !quarantined.isEmpty() ? "the file was set aside (" + quarantined.get(0).get("reason") + ")"
                         : rejected > 0 ? "all " + rejected + " rows were rejected" : "no row could be read";
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing was imported from '" + fileName + "': " + why
-                        + "; nothing was kept - check the column types and formats and try again");
+                String msg = "nothing was imported from '" + fileName + "': " + why + "; nothing was kept - check the column types and formats and try again";
+                if (!findings.isEmpty()) throw new OnboardFixes.Refusal(422, msg, findings);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, msg);
             }
             return s;
+        }
+
+        /**
+         * C2: the catalogue's reading of the draft's file when its run set it aside or rejected rows (delimited text only;
+         * empty when nothing explains it). The draft keeps its file until the commit succeeds, so it is read there.
+         */
+        private List<Map<String, Object>> explain(PipelineConfig cfg) {
+            String type = String.valueOf(dataset.get("importFormat"));
+            if (!"csv".equals(type) && !"tsv".equals(type) || !Files.isRegularFile(source)) return List.of();
+            PipelineConfig.CsvSettings c = cfg.csv();
+            try {
+                return OnboardDraft.diagnose(source, fileName, c.delimiter() == null || c.delimiter().isEmpty() ? "," : c.delimiter(),
+                        c.quote() == null ? "" : c.quote(), c.hasHeader(), c.encoding());
+            } catch (IOException unreadable) {
+                return List.of();
+            }
         }
 
         /**
@@ -1255,6 +1281,7 @@ final class OnboardImport {
      */
     private static List<String> requireSameColumns(Path dir, Path file, String name, String type, Path schema, String id) throws IOException {
         ColumnCheck c = checkColumns(dir, file, name, type, schema, id);
+        if (c.refusal() != null && !c.missing().isEmpty()) throw new OnboardFixes.Refusal(422, c.refusal(), missingFindings(c, name, id));
         if (c.refusal() != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, c.refusal());
         keepReadColumns(dir, file, c);
         return c.newColumns();
@@ -1264,9 +1291,33 @@ final class OnboardImport {
      * A later file judged against the Dataset's columns: why it is refused (null = accepted), its new columns, and - for
      * delimited text with new columns - the columns to keep ({@code keep}, in order) and the file's delimiter and quote.
      */
-    record ColumnCheck(String refusal, List<String> newColumns, List<String> keep, String delimiter, String quote) {
-        ColumnCheck(String refusal, List<String> newColumns) {
-            this(refusal, newColumns, List.of(), null, null);
+    record ColumnCheck(String refusal, List<String> newColumns, List<String> keep, String delimiter, String quote, List<String> missing) {
+        ColumnCheck(String refusal, List<String> newColumns, List<String> keep, String delimiter, String quote) {
+            this(refusal, newColumns, keep, delimiter, quote, List.of());
+        }
+
+        ColumnCheck(String refusal, List<String> newColumns, List<String> missing) {
+            this(refusal, newColumns, List.of(), null, null, missing);
+        }
+    }
+
+    /** C2: the missing-column entry, once per column the Dataset reads that the file lacks. */
+    static List<Map<String, Object>> missingFindings(ColumnCheck c, String file, String id) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String m : c.missing()) out.add(OnboardFixes.missingColumn(file, id, m));
+        return out;
+    }
+
+    /** The Latin-1 encoding an import's Pipeline reads with ({@code csv_settings.encoding}), else {@code null} (UTF-8). */
+    private static String importEncoding(Path schema) {
+        String n = schema.getFileName().toString();
+        if (!n.endsWith("_schema.toon")) return null;
+        try {
+            Map<String, Object> p = com.gamma.util.ToonHelper.load(schema.resolveSibling(n.replace("_schema.toon", "_pipeline.toon")).toString());
+            return p.get("processing") instanceof Map<?, ?> proc && proc.get("csv_settings") instanceof Map<?, ?> csv
+                    && "latin-1".equals(csv.get("encoding")) ? "latin-1" : null;
+        } catch (Exception unreadable) {
+            return null;
         }
     }
 
@@ -1315,6 +1366,7 @@ final class OnboardImport {
         if (fields.isEmpty())   // fail closed: no file lands against a schema nobody can read
             throw new ApiException(409, ErrorCodes.CONFLICT, "the schema of '" + id + "' cannot be read, so no file can be added to it");
         List<String> problems = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
         List<String> fresh = new ArrayList<>();
         Set<String> read = new LinkedHashSet<>();
         if ("csv".equals(type) || "tsv".equals(type)) {
@@ -1329,7 +1381,16 @@ final class OnboardImport {
             } catch (NumberFormatException notAnIndex) {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the schema of '" + id + "' does not read columns by position");
             }
-            OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, headerless ? Map.of() : Map.of("header", "true"));
+            Map<String, String> how = new LinkedHashMap<>();
+            if (!headerless) how.put("header", "true");
+            String enc = importEncoding(schema);
+            if (enc != null) how.put("encoding", enc);
+            OnboardDraft.Analysis a;
+            try {
+                a = OnboardDraft.analyse(dir, file, name, type, how);
+            } catch (OnboardFixes.Refusal notReadable) {   // its fix edits a draft: a later file has none
+                throw new ApiException(notReadable.status, ErrorCodes.CONFIG_VALIDATION_FAILED, notReadable.getMessage());
+            }
             if (headerless) {
                 if (a.cols().size() <= max)
                     problems.add("it has " + a.cols().size() + " columns and '" + id + "' reads " + (max + 1));
@@ -1340,6 +1401,7 @@ final class OnboardImport {
                     read.add(f[1]);
                     if (sel < actual.size() && actual.get(sel).equals(f[1])) continue;
                     int at = actual.indexOf(f[1]);
+                    if (at < 0) missing.add(f[1]);
                     problems.add(at < 0 ? "'" + f[1] + "' is missing"
                             : "'" + f[1] + "' is column " + (at + 1) + " here and column " + (sel + 1) + " in '" + id + "'");
                 }
@@ -1357,13 +1419,16 @@ final class OnboardImport {
             for (OnboardDraft.Col c : a.cols()) headers.add(c.selector());   // a flattened JSON field by its dotted path
             for (String[] f : fields) {
                 read.add(f[0]);
-                if (!headers.contains(f[0])) problems.add("'" + f[0] + "' is missing");
+                if (!headers.contains(f[0])) {
+                    problems.add("'" + f[0] + "' is missing");
+                    missing.add(f[0]);
+                }
             }
             for (String h : headers) if (!read.contains(h)) fresh.add(h);
         }
         String refusal = problems.isEmpty() ? null : "'" + name + "' does not have the columns of '" + id + "': "
                 + String.join("; ", problems) + ". Nothing was imported; fix the file's columns and add it again";
-        return new ColumnCheck(refusal, List.copyOf(fresh));
+        return new ColumnCheck(refusal, List.copyOf(fresh), List.copyOf(missing));
     }
 
     static Object runNow(ApiContext api, HttpExchange ex, String id) throws IOException {
@@ -1466,6 +1531,7 @@ final class OnboardImport {
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("file", name);
                 r.put("reason", c.refusal());
+                if (!c.missing().isEmpty()) r.put("findings", missingFindings(c, name, id));   // C2
                 r.put("setAside", REFUSED_DIR + "/" + to.getFileName());
                 out.add(r);
                 DatasetArrivals.recordRefused(dataRoot, pipeline, name, c.refusal(), r.get("setAside").toString());

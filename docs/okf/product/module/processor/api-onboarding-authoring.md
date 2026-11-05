@@ -330,7 +330,7 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 
 | Route | Capability | What it does |
 |---|---|---|
-| `POST /onboard/files?name=&kind=stream\|reference[&delimiter=&header=&quote=&decimal=&recordPath=]` | `canUploadData` | raw body, streamed to `<data root>/_onboard/<draftId>/`; answers the draft |
+| `POST /onboard/files?name=&kind=stream\|reference[&delimiter=&header=&quote=&encoding=&decimal=&recordPath=]` | `canUploadData` | raw body, streamed to `<data root>/_onboard/<draftId>/`; answers the draft |
 | `POST /onboard/files/{draftId}/commit` | `canUploadData` | one confirm: writes, registers, lands, runs once, registers the Dataset; 200 run summary, or 202 above `import.inline_max_bytes` |
 | `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
 | `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
@@ -357,7 +357,8 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
  entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence},
                         role:{value, evidence, confidence}, distinct? (text columns)}],
               primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)},
- limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}}
+ limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel},
+ findings:[{entry, column?, cause, fix:{label, redraft? | columns? | newDataset?}}]}   // C2, the fix catalogue (below)
 ```
 
 * **Every proposed choice is `{value, evidence, confidence}`**. OF-2 (operator 2026-10-25): `high` when every sampled
@@ -419,6 +420,40 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   took 3.2 s and 20 s. A 500 MB file would hold a request for about 40 s plus the index build, hence the 202
   threshold.
 * Drafts expire after 24 hours (pruned on the next upload); a signed-in caller sees only their own (404 otherwise).
+
+### The fix catalogue (`OnboardFixes`; `ONBOARDING-FIRST-RUN-1` C2, 2026-11-05)
+
+"Problems in plain words" for both apps, server side, every edition. Seven entries (`OnboardFixes.ENTRIES`); a matching
+draft finding, commit refusal or set-aside/rejected run carries `{entry, column?, cause, fix}`. A fix only edits what the
+user is about to confirm - `redraft:{param: value}` (add the same file again to `POST /onboard/files` with these
+parameters), `columns:[{name, type, format}]` (send them in the commit body) or `newDataset: true` (add the file as its
+own Dataset) - and the user re-runs it; nothing is applied silently.
+
+| Entry | Where it is found | Cause (example) | Fix |
+|---|---|---|---|
+| `decimal_mark` | draft: a text column whose values (≥ 4 in 5) are numbers that need the OTHER mark | "'amount' has numbers like '1.001,50' in 240 of 240 sampled rows: this file uses ',' as the decimal mark" | `redraft {decimal}` |
+| `date_format` | draft: a text column whose values (≥ 4 in 5) are dates in one of seven formats (`%d/%m/%Y` before `%m/%d/%Y`) | "239 of 240 sampled values of 'ordered' are dates written %d/%m/%Y; 1 is not a real date (e.g. '31/02/2026') and would stay empty" | `columns [{name, type: DATE, format}]` |
+| `delimiter` | draft: lines split into one column, or unevenly, and another of `, ; tab \|` splits every sampled line alike | "every sampled line is one column on ','; every line splits into 3 columns on ';'" | `redraft {delimiter}` |
+| `header_row` | draft: no header line, yet the first line is distinct non-number names over a number column; or a header whose names over number columns are numbers | "the first line (meter, reading, zone) holds names, not values like the rows below" | `redraft {header}` |
+| `encoding` | draft refusal (422) of a file that is not UTF-8; a commit whose run rejected rows or set the file aside, the whole draft file decoded | "'customers.csv' is not UTF-8 text; it reads as Latin-1 (Windows Western)" | `redraft {encoding: latin-1}` |
+| `quote` | draft: lines split unevenly under the quote, and no quote (else `"` or `'`) makes them split alike | "only 120 of 240 sampled lines split alike when '\"' quotes a field; with no character every line splits into 3 columns" | `redraft {quote}` |
+| `missing_column` | Add a file refusal (422) and Run now's refused arrivals: a column the Dataset reads is not in the file | "'later.csv' has no column 'amount', which 'sales' reads" | `newDataset` |
+
+* **Answers.** Draft: `findings` (stored in `draft.json` too). A refusal that matches is the usual error with
+  `error.details.findings` (`OnboardRoutes.fixable` answers `OnboardFixes.Refusal`): the non-UTF-8 draft, Add a file's
+  missing column. A commit whose run rejected rows or set the file aside explains it from the draft's file
+  (`Job.explain` → `OnboardDraft.diagnose`): `findings` in the 200 summary (and on each `quarantined[]` entry), or in
+  `error.details.findings` of the 422 "nothing was imported". Run now's refused arrivals carry `findings` per file.
+* **Encoding.** `?encoding=utf-8|latin-1` (delimited text only; DuckDB's `read_csv` names). The draft reads the lines and
+  `sniff_csv` / `read_csv` with it and proposes `format.encoding`; the commit writes `csv_settings.encoding: latin-1`,
+  which the engine passes to `read_csv`; Add a file reads a later file with the import's encoding. A redraft fix does not
+  apply to a later file, so Add a file answers a non-UTF-8 file as before (plain 422).
+* **Measured (2026-11-05):** a stray `"` inside values does not set the file aside - the engine imports every row - so
+  the quote entry is a draft finding only; bytes that stop being UTF-8 after the sampled lines make the run reject those
+  rows (200, `rowsRejected`), which is where the run-time encoding finding comes from.
+* Tests: `ControlApiOnboardFixesTest` - one test per entry (named after it; a reflection check fails when an entry has
+  none) that produces the problem, applies the fix exactly as the finding states it, and re-runs to an imported Dataset;
+  four mutants (no decimal finding, no run diagnosis, no missing-column finding, no quote search) each killed.
 
 ### The commit
 

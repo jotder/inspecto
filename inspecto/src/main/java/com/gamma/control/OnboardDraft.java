@@ -82,7 +82,7 @@ final class OnboardDraft {
 
     /** What was read: the draft's format and columns, the row count, and the sample. */
     record Analysis(Map<String, Object> format, List<Map<String, Object>> columns, List<Col> cols, long rows,
-                    List<Map<String, Object>> preview, List<EntityShapes.Column> sampled) {}
+                    List<Map<String, Object>> preview, List<EntityShapes.Column> sampled, List<Map<String, Object>> findings) {}
 
     /** The file type from its name, confirmed (or overruled) by its first bytes. */
     static String fileType(Path file, String name) throws IOException {
@@ -205,8 +205,13 @@ final class OnboardDraft {
             throws SQLException, IOException {
         String delim = ",", quote = "\"";
         boolean header = true, sniffed = true;
+        // C2: the encoding entry - UTF-8 unless the user chose Latin-1 (a fix the catalogue offers when a file is not UTF-8)
+        String encoding = overrides.getOrDefault("encoding", "utf-8");
+        java.nio.charset.Charset cs = "latin-1".equals(encoding) ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8;
+        String encodingArg = "latin-1".equals(encoding) ? ", encoding = 'latin-1'" : "";
+        if (cs == StandardCharsets.UTF_8) requireUtf8(file, name);
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT Delimiter, Quote, HasHeader FROM sniff_csv(" + SqlIdent.pathStr(file) + ")")) {
+             ResultSet rs = st.executeQuery("SELECT Delimiter, Quote, HasHeader FROM sniff_csv(" + SqlIdent.pathStr(file) + encodingArg + ")")) {
             if (rs.next()) {
                 // sniff_csv spells "none found" as "(empty)" (or NUL): keep the safe default then - '"' is harmless when unused
                 delim = oneChar(rs.getString(1), ",");
@@ -217,7 +222,7 @@ final class OnboardDraft {
             // DuckDB could not settle the dialect (mixed line endings, ragged lines): guess the delimiter that splits the
             // first lines most evenly, keep a header and '"', and say so - every format choice is then low confidence
             sniffed = false;
-            delim = guessDelimiter(file);
+            delim = guessDelimiter(file, cs);
         }
         if ("tsv".equals(type) && !"\t".equals(delim)) delim = "\t";
         // the user's own choice wins over the sniff, and is high confidence by definition
@@ -229,12 +234,15 @@ final class OnboardDraft {
         // field-count evidence over the first lines (quote-aware; an embedded newline makes it approximate)
         Map<Integer, Integer> widths = new TreeMap<>();
         int lines = 0, quotedFields = 0;
-        try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+        List<String> kept = new ArrayList<>();   // the first sampled lines, for the catalogue's delimiter / quote / header checks
+        String firstLine = null;
+        try (BufferedReader r = Files.newBufferedReader(file, cs)) {
             String line;
             boolean first = true;
             while (lines < SAMPLE_ROWS && (line = r.readLine()) != null) {
                 if (first) {
                     first = false;
+                    firstLine = line;
                     if (header) continue;
                 }
                 if (line.isBlank()) continue;
@@ -242,9 +250,10 @@ final class OnboardDraft {
                 widths.merge(fields(line, delim.charAt(0), quote.isEmpty() ? 0 : quote.charAt(0), q), 1, Integer::sum);
                 quotedFields += q[0];
                 lines++;
+                if (kept.size() < 200) kept.add(line);
             }
         } catch (java.nio.charset.MalformedInputException notUtf8) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' is not UTF-8 text; save it as CSV UTF-8 and add it again");
+            throw notUtf8(name);
         }
         int mode = 0, modeCount = 0;
         for (var e : widths.entrySet()) if (e.getValue() > modeCount) {
@@ -261,7 +270,7 @@ final class OnboardDraft {
         };
 
         String relation = "read_csv(" + SqlIdent.pathStr(file) + ", delim = " + SqlIdent.sqlStr(delim) + ", quote = " + SqlIdent.sqlStr(quote)
-                + ", header = " + header + ", all_varchar = true, null_padding = true, ignore_errors = true)";
+                + ", header = " + header + encodingArg + ", all_varchar = true, null_padding = true, ignore_errors = true)";
         Analysis base = typed(conn, file, relation, null, false, null, overrides.get("decimal"));
 
         Map<String, Object> format = new LinkedHashMap<>();
@@ -278,6 +287,8 @@ final class OnboardDraft {
                 ? "no sampled field is quoted; '" + quote + "' is honoured if one is" : quotedFields + " sampled fields are quoted with '" + quote + "'",
                 allLinesAgree && sniffed && lines >= MIN_SAMPLE));
         format.put("decimalMark", base.format().get("decimalMark"));
+        format.put("encoding", overrides.containsKey("encoding") ? choice(encoding, "you chose " + encoding, true)
+                : choice(encoding, "every sampled line is valid UTF-8 text", true));
         // header=false ⇒ DuckDB named the columns column0..; give them positional names the user can rename
         List<Col> cols = new ArrayList<>();
         for (int i = 0; i < base.cols().size(); i++) {
@@ -288,7 +299,156 @@ final class OnboardDraft {
         List<Map<String, Object>> columns = header ? base.columns() : renameColumns(base.columns(), cols);
         List<EntityShapes.Column> sampled = header ? base.sampled() : renameSampled(base.sampled(), cols);
         List<Map<String, Object>> preview = header ? base.preview() : renamePreview(base.preview(), base.cols(), cols);
-        return new Analysis(format, columns, cols, base.rows(), preview, sampled);
+
+        // C2: the catalogue's findings - the column ones (typed) under the columns' final names, then the file's own
+        List<Map<String, Object>> findings = new ArrayList<>();
+        for (Map<String, Object> f : base.findings()) {
+            Map<String, Object> g = f;
+            if (!header)
+                for (int i = 0; i < cols.size(); i++) g = OnboardFixes.renamed(g, base.cols().get(i).name(), cols.get(i).name());
+            findings.add(g);
+        }
+        Map<String, Object> split = splitFinding(kept, delim, quote, allLinesAgree, mode, modeCount, lines);
+        if (split != null) findings.add(split);
+        Map<String, Object> head = headerFinding(header, firstLine, kept, delim, quote);
+        if (head != null) findings.add(head);
+        return new Analysis(format, columns, cols, base.rows(), preview, sampled, findings);
+    }
+
+    private static final String[] DELIMITERS = {",", ";", "	", "|"};
+    private static final String[] QUOTES = {"", "\"", "'"};   // no quote first: a stray '"' in a value is the common case
+
+    /** The one field count every line has under {@code d} / {@code q}, else -1. */
+    private static int evenWidth(List<String> lines, String d, String q) {
+        int w = -1;
+        for (String l : lines) {
+            int n = fields(l, d.charAt(0), q.isEmpty() ? 0 : q.charAt(0), new int[1]);
+            if (w == -1) w = n;
+            else if (w != n) return -1;
+        }
+        return w;
+    }
+
+    /**
+     * The delimiter or quote entry: the lines do not split alike (or into one column) under the draft's choice, and another
+     * quote (when the delimiter splits) or another delimiter makes every sampled line split into the same columns.
+     */
+    private static Map<String, Object> splitFinding(List<String> kept, String delim, String quote, boolean allAgree, int mode,
+                                                    int modeCount, int lines) {
+        if (kept.isEmpty() || (allAgree && mode > 1)) return null;
+        if (mode > 1)
+            for (String q : QUOTES) {
+                if (q.equals(quote)) continue;
+                int w = evenWidth(kept, delim, q);
+                if (w > 1) return OnboardFixes.quote(quote, modeCount, lines, q, w);
+            }
+        for (String d : DELIMITERS) {
+            if (d.equals(delim)) continue;
+            int w = evenWidth(kept, d, quote);
+            if (w > 1) return OnboardFixes.delimiter(delim, modeCount, lines, d, w);
+        }
+        return null;
+    }
+
+    /**
+     * The header-row entry. No header line, yet the first line is distinct non-number names over at least one column of
+     * numbers: offer to use it as names. A header line whose every name in a number column is itself a number: offer to
+     * read it as data.
+     */
+    private static Map<String, Object> headerFinding(boolean header, String firstLine, List<String> kept, String delim, String quote) {
+        if (firstLine == null || kept.size() < 2) return null;
+        char d = delim.charAt(0), q = quote.isEmpty() ? 0 : quote.charAt(0);
+        List<String> names = split(firstLine, d, q);
+        List<List<String>> rows = new ArrayList<>();
+        for (String l : header ? kept : kept.subList(1, kept.size())) rows.add(split(l, d, q));
+        List<Integer> numberColumns = new ArrayList<>();
+        for (int j = 0; j < names.size(); j++) {
+            int nums = 0, n = 0;
+            for (List<String> r : rows)
+                if (j < r.size() && !r.get(j).isBlank()) {
+                    n++;
+                    if (NUMBER.matcher(r.get(j).trim()).matches()) nums++;
+                }
+            if (n > 0 && nums * 10 >= n * 9) numberColumns.add(j);
+        }
+        if (numberColumns.isEmpty()) return null;
+        if (!header) {
+            if (new HashSet<>(names).size() != names.size()) return null;
+            for (String nm : names) if (nm.isBlank() || NUMBER.matcher(nm.trim()).matches()) return null;
+            return OnboardFixes.headerRow(false, names);
+        }
+        for (int j : numberColumns) if (j >= names.size() || !NUMBER.matcher(names.get(j).trim()).matches()) return null;
+        return OnboardFixes.headerRow(true, names);
+    }
+
+    /** The fields of {@code line} split on {@code d}, honouring {@code q} quotes (the quotes removed). */
+    static List<String> split(String line, char d, char q) {
+        List<String> out = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean in = false;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (q != 0 && ch == q) in = !in;
+            else if (ch == d && !in) {
+                out.add(cur.toString());
+                cur.setLength(0);
+            } else cur.append(ch);
+        }
+        out.add(cur.toString());
+        return out;
+    }
+
+    /**
+     * C2: why a run may have set a delimited file aside, as catalogue findings: not UTF-8 text (encoding), or lines that do
+     * not split alike under the import's delimiter and quote (delimiter / quote). Empty when none of these explains it.
+     */
+    static List<Map<String, Object>> diagnose(Path file, String name, String delim, String quote, boolean header, String encoding)
+            throws IOException {
+        java.nio.charset.Charset cs = "latin-1".equals(encoding) ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8;
+        if (cs == StandardCharsets.UTF_8)   // the whole file: the draft sampled only its first lines
+            try (BufferedReader r = Files.newBufferedReader(file, cs)) {
+                while (r.readLine() != null) { /* decoding is the check */ }
+            } catch (java.nio.charset.MalformedInputException notUtf8) {
+                return List.of(OnboardFixes.encoding(name));
+            }
+        Map<Integer, Integer> widths = new TreeMap<>();
+        List<String> kept = new ArrayList<>();
+        try (BufferedReader r = Files.newBufferedReader(file, cs)) {
+            String line;
+            boolean first = true;
+            while (kept.size() < 200 && (line = r.readLine()) != null) {
+                if (first) {
+                    first = false;
+                    if (header) continue;
+                }
+                if (line.isBlank()) continue;
+                widths.merge(fields(line, delim.charAt(0), quote.isEmpty() ? 0 : quote.charAt(0), new int[1]), 1, Integer::sum);
+                kept.add(line);
+            }
+        } catch (java.nio.charset.MalformedInputException notUtf8) {
+            return List.of(OnboardFixes.encoding(name));
+        }
+        int mode = 0, modeCount = 0;
+        for (var e : widths.entrySet()) if (e.getValue() > modeCount) {
+            mode = e.getKey();
+            modeCount = e.getValue();
+        }
+        Map<String, Object> split = splitFinding(kept, delim, quote, widths.size() == 1, mode, modeCount, kept.size());
+        return split == null ? List.of() : List.of(split);
+    }
+
+    /** The encoding entry: a file that is not UTF-8 is refused with the fix that reads it as Latin-1. */
+    private static void requireUtf8(Path file, String name) throws IOException {
+        try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            for (int i = 0; i < SAMPLE_ROWS && r.readLine() != null; i++) { /* decoding is the check */ }
+        } catch (java.nio.charset.MalformedInputException notUtf8) {
+            throw notUtf8(name);
+        }
+    }
+
+    private static OnboardFixes.Refusal notUtf8(String name) {
+        return new OnboardFixes.Refusal(422, "'" + name + "' is not UTF-8 text; read it as Latin-1, or save it as CSV UTF-8 and add it again",
+                List.of(OnboardFixes.encoding(name)));
     }
 
     private static Map<String, Object> headerChoice(boolean header, Analysis base, int lines) {
@@ -329,9 +489,9 @@ final class OnboardDraft {
     }
 
     /** The candidate that splits the first lines into the same field count (more than one) most often; {@code ,} by default. */
-    private static String guessDelimiter(Path file) throws IOException {
+    private static String guessDelimiter(Path file, java.nio.charset.Charset cs) throws IOException {
         List<String> lines = new ArrayList<>();
-        try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+        try (BufferedReader r = Files.newBufferedReader(file, cs)) {
             for (String l; lines.size() < 200 && (l = r.readLine()) != null; ) if (!l.isBlank()) lines.add(l);
         }
         String best = ",";
@@ -606,8 +766,59 @@ final class OnboardDraft {
             cols.add(new Col(n, headers.get(i), selectors == null ? headers.get(i) : selectors.get(i), type, fmt, colMark));
             sampled.add(new EntityShapes.Column(n, type, values));
         }
+        List<Map<String, Object>> findings = new ArrayList<>();
+        if (!declaredTypes)
+            for (int i = 0; i < cols.size(); i++) {
+                if (!"VARCHAR".equals(cols.get(i).type())) continue;
+                Map<String, Object> f = decimalFinding(names.get(i), valuesOf.get(i), mark);
+                if (f == null) f = dateFinding(conn, names.get(i), valuesOf.get(i).size());
+                if (f != null) findings.add(f);
+            }
         List<Map<String, Object>> preview = sample.subList(0, Math.min(PREVIEW_ROWS, sample.size()));
-        return new Analysis(format, columns, cols, rows, new ArrayList<>(preview), sampled);
+        return new Analysis(format, columns, cols, rows, new ArrayList<>(preview), sampled, findings);
+    }
+
+    /**
+     * The decimal-mark entry: a text column whose values (at least 4 in 5) are numbers that need the OTHER mark to be read
+     * ({@code 1.234,50} in a file read with {@code .}).
+     */
+    private static Map<String, Object> decimalFinding(String column, List<String> values, String mark) {
+        if (mark == null || values.isEmpty()) return null;
+        String other = ".".equals(mark) ? "," : ".";
+        List<String> reading = new ArrayList<>();
+        for (String v : values) if (DecimalMark.reads(v, other)) reading.add(v);
+        if (reading.isEmpty() || reading.size() * 5 < values.size() * 4 || DecimalMark.numberType(reading, other) == null) return null;
+        return OnboardFixes.decimalMark(column, DecimalMark.example(reading, other), reading.size(), values.size(), other);
+    }
+
+    /** Date formats the date-format entry tries on a text column, most common first ({@code %d/%m} before {@code %m/%d}). */
+    static final List<String> DATE_FORMATS = List.of("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y", "%d-%m-%Y", "%Y/%m/%d", "%d %b %Y");
+
+    /**
+     * The date-format entry: a text column whose values (at least 4 in 5) are dates in one format - the rest are not real
+     * dates (31/02/2026) or the format is one the type vote does not know - so it is offered as a DATE with that format.
+     */
+    private static Map<String, Object> dateFinding(Connection conn, String column, int n) throws SQLException {
+        if (n == 0) return null;
+        String c = SqlIdent.q(column);
+        String best = null;
+        long bestCount = 0;
+        for (String f : DATE_FORMATS)
+            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM onboard_sample WHERE "
+                    + c + " IS NOT NULL AND trim(" + c + ") <> '' AND TRY_STRPTIME(trim(" + c + "), " + SqlIdent.sqlStr(f) + ") IS NOT NULL")) {
+                rs.next();
+                if (rs.getLong(1) > bestCount) {
+                    bestCount = rs.getLong(1);
+                    best = f;
+                }
+            }
+        if (best == null || bestCount * 5 < (long) n * 4) return null;
+        String odd = null;
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT " + c + " FROM onboard_sample WHERE " + c
+                + " IS NOT NULL AND trim(" + c + ") <> '' AND TRY_STRPTIME(trim(" + c + "), " + SqlIdent.sqlStr(best) + ") IS NULL LIMIT 1")) {
+            if (rs.next()) odd = rs.getString(1);
+        }
+        return OnboardFixes.dateFormat(column, best, (int) bestCount, n, odd == null ? null : clip(odd));
     }
 
     /** The one {@link #TIMESTAMP_FORMATS} entry every non-blank sampled value parses with, else {@code null} (a bare cast). */
