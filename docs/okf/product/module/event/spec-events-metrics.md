@@ -176,6 +176,33 @@ timestamp: 2026-07-16T00:00:00Z
     MAC fails or its record no longer hashes to what it names.
   - **Records from before 2026-09-27 carry no seq and are outside the chain**: it starts at seq 1 with the first
     row linked after the upgrade.
+  - 🔴 **Anchors need a durable event store** (`BASIC-EVENTS-DURABLE-1`, 2026-11-06). The in-memory store restarts
+    the chain at seq 1 on every boot, so the anchor written before a restart names a record the next boot no
+    longer holds, and every later roll answers 409 — forever. Basic ran that store until 2026-11-06 (its
+    `serve.*` set no `-Devents.backend`), and a Basic install sharing Spaces with a Preview one (`spaces\<id>.ref`)
+    also met the anchors Preview wrote over its Parquet chain. Every edition's launcher now passes
+    `-Devents.backend=parquet` (`offerings/basic.toon` posture, `tools/check-launchers.mjs`). Three code rules
+    follow (operator decision A, 2026-11-06; `AuditAnchorsDurableRestartTest`, mutation-checked):
+    - **Never anchor over a memory store.** The scheduled roll skips it with one INFO line per Space;
+      `POST /audit/anchors` answers 409 *events are kept in memory; nothing to anchor*, and
+      `POST /audit/anchors/rebaseline` 409 *… nothing to rebaseline* (a break over a memory chain would strand
+      the Space again at the next boot).
+    - **Every anchor carries a MAC'd `store` tag** (`memory|parquet|db|other`), so an anchor written since
+      2026-11-06 can never be mistaken for a memory-era one.
+    - **One automatic signed BREAK for a memory-era anchor file** (`AuditAnchors.legacyBreakIfDue`), written by the
+      rebaseline machinery — the old file moved aside and pinned by digest, `by: system`, reason *anchored over a
+      non-durable store before <day the durable chain starts>*, a WARN logged once, verify lists it, and the roll
+      resumes at seq 1 of the durable chain. ONLY when all five hold: the store is durable; the anchor file
+      verifies; the chain does not hold the record the last anchor names; the whole durable chain is newer than
+      that anchor (it starts at seq 1, after the anchor's `createdAt`); and the anchor has no `store` tag. Any
+      other case still refuses (409) as before — an operator rebaseline is the remedy.
+    - ⚠ **Accepted cost (operator, 2026-11-06):** a Space whose last anchor predates the tag — on ANY edition,
+      Standard+ anchors from before 2026-11-06 are untagged too — and whose WHOLE durable event store is wiped
+      or replaced meets the same five conditions, and is labelled as this transition once. The window closes at
+      that Space's first tagged anchor. It is
+      still a visible, signed break in verify (`acknowledged-break`) and the anchor export — never silent — and
+      no anchor written since the tag can qualify. ⚠ Until the durable chain holds its first record the roll
+      still answers 409 and backs off (5 min, doubling): the break needs that first record to prove condition 4.
   - ⚠ **What it cannot see.** SHA-256 needs no key, so a chain rewritten end to end AFTER the last anchor
     verifies — only an anchor catches it (`AuditVerifierTest.aChainRewrittenEndToEndIsCaughtOnlyByTheAnchor`
     pins both halves). Rows deleted from the FRONT look exactly like retention (`prune` drops whole old days), so

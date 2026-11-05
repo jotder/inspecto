@@ -93,7 +93,9 @@ Moved to [Events and event log — API](api-events.md).
 
 - ⚠ Emission is synchronous. A subscriber that starts the same Pipeline inline deadlocks on the run claim the
   publishing thread holds - always hand off.
-- ⚠ The default backend is `memory`: the audit trail is lost on restart unless `events.backend` is set.
+- ⚠ The engine default backend is `memory`: the audit trail is lost on restart unless `events.backend` is set.
+  Every edition's `serve.*` sets `parquet` (Basic too since 2026-11-06, `BASIC-EVENTS-DURABLE-1`); the daily
+  audit anchors cannot roll over a memory store after a restart.
 - ⚠ SHA-256 needs no key, so a chain rewritten after the last anchor still verifies; only an anchor catches it.
   Anchors live in the Space's `.secrets` sibling and are not backed up.
 - Rows written before 2026-09-27 carry no `audit_seq` and are outside the chain.

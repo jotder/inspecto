@@ -17,10 +17,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code EVENTS-DURABLE-1}: whether an audited mutation survives a service restart is decided entirely by
  * {@code -Devents.backend}, and this test makes both halves of that a <b>choice</b> rather than an accident.
  *
- * <p>The engine default is {@code memory} — a bounded ring that forgets everything on restart. That is the
- * right default for Basic (zero files, zero configuration), and it is why the Standard/Advanced
- * launchers emitted by {@code inspecto/package.ps1} pass {@code -Devents.backend=parquet}: the
- * tamper-evident, append-only audit trail those editions sell cannot be a ring that empties on a restart.
+ * <p>The engine default is {@code memory} — a bounded ring that forgets everything on restart. That is why
+ * every edition's launcher emitted by {@code inspecto/package.ps1} passes {@code -Devents.backend=parquet}
+ * (Basic too since 2026-11-06, {@code BASIC-EVENTS-DURABLE-1}): an append-only audit trail with daily
+ * anchors cannot be a ring that empties on a restart.
  *
  * <p>⚠ The memory case below asserts the <b>drop</b>. It is not a wish — it pins the documented behaviour
  * ({@code observability.md} §3.1) so that a future change to the default has to come here and say so.
@@ -112,7 +112,7 @@ class EventStoreDurabilityTest {
                 "an events dir resolved outside the space would pool every space's audit trail in the CWD");
     }
 
-    /** The default, unchanged: Basic forgets on restart, and that is the documented behaviour. */
+    /** The engine default, unchanged: it forgets on restart, which is why no launcher runs it. */
     @Test
     void theDefaultBackendDropsTheAuditTrailOnRestart(@TempDir Path dir) {
         SpaceRoot root = SpaceRoot.under(dir);

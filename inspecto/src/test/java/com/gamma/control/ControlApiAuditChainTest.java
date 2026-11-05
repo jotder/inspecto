@@ -59,6 +59,9 @@ class ControlApiAuditChainTest {
     private Ctx open(Path dir, boolean writeRoot) throws Exception {
         Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
         if (writeRoot) System.setProperty("assist.write.root", Files.createDirectories(dir.resolve("wr")).toString());
+        // BASIC-EVENTS-DURABLE-1: anchors are written only over a durable store, as every launcher now runs
+        System.setProperty("events.backend", "parquet");
+        System.setProperty("events.dir", dir.resolve("events").toString());
         try {
             CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
             ControlApi api = new ControlApi(svc, 0);
@@ -66,6 +69,8 @@ class ControlApiAuditChainTest {
             return new Ctx(svc, api, api.port());
         } finally {
             System.clearProperty("assist.write.root");
+            System.clearProperty("events.backend");
+            System.clearProperty("events.dir");
         }
     }
 

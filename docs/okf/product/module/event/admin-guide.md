@@ -17,7 +17,7 @@ Set at boot with `-Devents.backend` (read by `ServiceStores.openEventStore`):
 
 | Value | Store | Survives restart | Notes |
 |---|---|---|---|
-| `memory` (default) | `InMemoryEventStore`, ring of 8192 events | no | oldest dropped first; health shows `NOT_CONFIGURED` |
+| `memory` (engine default) | `InMemoryEventStore`, ring of 8192 events | no | oldest dropped first; health shows `NOT_CONFIGURED`. No edition's `serve.*` uses it: they all pass `parquet` (Basic since 2026-11-06). Over it the audit anchors fail after a restart |
 | `parquet` | `ParquetEventStore`, Hive-partitioned Parquet by level/year/month/day | yes | root `-Devents.dir`, default the Space's events directory |
 | `db`, `postgres`, `postgresql` or a `jdbc:` URL | `DbEventStore` | yes | the only backend several pods can read; credentials `-Devents.db.user` / `-Devents.db.password` |
 

@@ -127,6 +127,10 @@ selected off the same `inspecto-oidc.jar` presence check that turns on OIDC. `-D
 deliberately left unset: it falls back to `SpaceRoot.eventsDir()`, so discover mode keeps **one trail per
 space** rather than pooling every space's audit into one directory. Both halves are pinned by
 `EventStoreDurabilityTest` — including the memory drop, so the default is a choice and not an accident.
+🔴 **Basic too, since 2026-11-06 (`BASIC-EVENTS-DURABLE-1`, operator decision).** Basic's zero-file promise
+cost it the audit anchors: the memory chain restarts at seq 1 on every boot, so the anchor written before a
+restart names a record the next boot no longer holds and the daily roll answered 409 in every Space. Every
+edition's `serve.*` now passes `-Devents.backend=parquet`; the engine default stays `memory`.
 ✅ **CLOSED 2026-09-11 by scale-out phase A.** This row used to read *"still open, and deliberately not
 built here… hangs on `-Dinspecto.topology=partitioned`, a switch that does not exist in the tree."* The
 switch now exists (`com.gamma.util.Topology`, D12), so the residual is discharged: a `parquet` backend that
@@ -480,7 +484,7 @@ host's — the rules are `DAT`'s.
 
 | Flag | Default | Reader |
 |---|---|---|
-| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ launcher sets `parquet` on Standard+; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
+| `-Devents.backend` / `-Devents.dir` | `memory` (⚠ every edition's launcher sets `parquet` — Basic since 2026-11-06; `db`/`postgres`/`jdbc:` since 2026-09-12) / `SpaceRoot.eventsDir()` — `<space>/data/events`, and only `inspecto-events` in the CWD under the legacy root | `ServiceStores.java`, `inspecto/package.ps1` |
 | `-Devents.db.url` / `.user` / `.password` | `SpaceRoot.eventsDbUrl()` — `<space>/duckdb/inspecto-events.db` | `OperationalDb.Family.EVENTS`, `DbEventStore` |
 | `-Dstatus.backend` | `db` | `OperationalDb.java`, `ServiceStores.java` |
 | `-Djobs.backend` | `none` | `ServiceStores.java`, `DbJobRunStore.java`, `HealthDetails.java` |

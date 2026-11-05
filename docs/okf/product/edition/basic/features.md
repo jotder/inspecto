@@ -21,7 +21,9 @@ Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis stu
 ## Platform posture
 
 - Sign-in mode: `none`
-- Events backend: `default`
+- Events backend: `parquet` — the audit trail and its hash chain survive a restart, so the daily anchors keep
+  rolling (`BASIC-EVENTS-DURABLE-1`, 2026-11-06; Basic ran the in-memory store before, which restarted the chain
+  at seq 1 on every boot)
 - Objects backend: `default`
 - PostgreSQL sidecar: `absent`
 

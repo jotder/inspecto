@@ -3,7 +3,7 @@ title: Basic
 tier: basic
 posture:
   authMode: none
-  eventsBackend: default
+  eventsBackend: parquet
   objectsBackend: default
   postgresSidecar: absent
 modules[6]: connectors,entity-list,la-storage,la-core,la-api,geo-link

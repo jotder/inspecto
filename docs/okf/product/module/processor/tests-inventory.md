@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-379 test class(es): 139 unit, 240 real-HTTP control-plane, 0 IT.
+380 test class(es): 140 unit, 240 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -38,6 +38,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ApproverCheckParityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ApproverCheckParityTest.java` | MODULE-REORG-P7 (Action Requests): the base approver-eligibility check ({@link ApproverCheck}) the Pending Change |
 | `AuditAnchorExportProviderTckTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AuditAnchorExportProviderTckTest.java` | {@link AuditAnchorExportProvider} against the platform's MaintenanceTaskProvider TCK (MODULE-REORG-1 P5b). |
 | `AuditAnchorExportTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AuditAnchorExportTest.java` | ASSURE-AUDIT-CHAIN-RESIDUALS-1 (1): the scheduled off-box export of the signed audit anchors |
+| `AuditAnchorsDurableRestartTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AuditAnchorsDurableRestartTest.java` | BASIC-EVENTS-DURABLE-1 (2026-11-06): Basic used to run the in-memory event store, so its audit chain restarted at |
 | `AuditAnchorsReconcileTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AuditAnchorsReconcileTest.java` | ASSURE-AUDIT-CHAIN-RESIDUALS-1 (6): {@code AuditAnchors.write} appends and fsyncs an anchor BEFORE it moves |
 | `AuditLogRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AuditLogRoutesTest.java` | {@code /audit/*} — the audit projection that stayed in CORE when the {@code /events*} feed moved to the |
 | `AuditReadMaskingOpenedEventTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AuditReadMaskingOpenedEventTest.java` | {@link AuditReadMasking#maskOpened}: an {@code OBJECT_OPENED} row's raw title is masked with the object's own keys. |

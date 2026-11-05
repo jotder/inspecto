@@ -166,9 +166,9 @@ export const SCENARIOS = [
   ed('Basic', {
     name: 'Basic — no OIDC jar',
     env: {},
-    expect: ALWAYS,
-    // The whole point of the edition seam: Basic is byte-for-byte the historic auth-free bundle.
-    rejectPrefix: ['-Dauth.mode', '-Devents.backend', '-Dauth.oidc.', '-Dobjects.backend'],
+    // BASIC-EVENTS-DURABLE-1 (2026-11-06): Basic keeps its audit events on disk like every edition; it stays auth-free.
+    expect: [...ALWAYS, '-Devents.backend=parquet'],
+    rejectPrefix: ['-Dauth.mode', '-Dauth.oidc.', '-Dobjects.backend'],
   }),
   ed('Standard', {
     name: 'Standard — OIDC + secrets + geo jars, no OIDC env',
@@ -220,8 +220,8 @@ export const SCENARIOS = [
     name: 'Basic — stray inspecto-oidc.jar + inspecto-policy.jar beside it are NOT on the classpath and do not make it Advanced',
     jars: [...CP.Basic, 'inspecto-oidc.jar', 'inspecto-policy.jar'],
     env: OIDC_ENV,
-    expect: ALWAYS,
-    rejectPrefix: ['-Dauth.mode', '-Devents.backend', '-Dauth.oidc.', '-Dobjects.backend'],
+    expect: [...ALWAYS, '-Devents.backend=parquet'],
+    rejectPrefix: ['-Dauth.mode', '-Dauth.oidc.', '-Dobjects.backend'],
   }),
   // FALLBACKS (documented in package.ps1): hand-assembled directories keep booting.
   ed('Standard', {

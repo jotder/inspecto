@@ -1669,16 +1669,16 @@ case "${EDITION}" in
     Basic|Standard|Advanced|Preview) ;;
     *) echo "[serve.sh] edition.properties names an unknown edition '${EDITION}' (expected Basic, Standard, Advanced or Preview)" >&2; exit 1 ;;
 esac
-# Every edition above Basic authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
-# those editions because the Offering puts it there. Basic stays byte-for-byte the historic auth-free flag set.
+# Every edition above Basic authenticates (OIDC); the OIDC module is on the classpath for exactly
+# those editions because the Offering puts it there. Basic stays the auth-free flag set.
+# EVENTS-DURABLE-1 (2026-09-11) + BASIC-EVENTS-DURABLE-1 (2026-11-06): EVERY edition keeps the API audit trail
+# across restarts. The engine default is the bounded in-memory ring (ServiceStores.openEventStore), which restarts
+# the audit chain at seq 1 on every boot: the daily anchors then name records the chain no longer holds and the
+# roll fails forever -- so Basic is durable too. -Devents.dir is deliberately NOT set: it defaults to
+# SpaceRoot.eventsDir(), so discover mode keeps one trail per space instead of one shared pile.
+JAVA_OPTS+=("-Devents.backend=parquet")
 if [ "${EDITION}" != "Basic" ]; then
     JAVA_OPTS+=("-Dauth.mode=oidc")
-    # EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts. The engine
-    # default is the bounded in-memory ring (ServiceStores.openEventStore), which forgets every audited
-    # mutation on restart -- correct for Basic's zero-file promise, false for the tamper-evident,
-    # append-only audit story Standard+ sells. -Devents.dir is deliberately NOT set: it defaults to
-    # SpaceRoot.eventsDir(), so discover mode keeps one trail per space instead of one shared pile.
-    JAVA_OPTS+=("-Devents.backend=parquet")
     [ -n "${AUTH_OIDC_ISSUER:-}" ]    && JAVA_OPTS+=("-Dauth.oidc.issuer=${AUTH_OIDC_ISSUER}")
     [ -n "${AUTH_OIDC_JWKS_URI:-}" ]  && JAVA_OPTS+=("-Dauth.oidc.jwksUri=${AUTH_OIDC_JWKS_URI}")
     [ -n "${AUTH_OIDC_AUDIENCE:-}" ]  && JAVA_OPTS+=("-Dauth.oidc.audience=${AUTH_OIDC_AUDIENCE}")
@@ -1786,8 +1786,8 @@ if exist edition.properties for /f "usebackq tokens=1,* delims==" %%A in ("editi
 set "EDITION_OK="
 for %%E in (Basic Standard Advanced Preview) do if "%EDITION%"=="%%E" set "EDITION_OK=1"
 if not defined EDITION_OK echo [serve.bat] edition.properties names an unknown edition "%EDITION%" - expected Basic, Standard, Advanced or Preview & exit /b 1
-rem Every edition above Basic authenticates (OIDC) and keeps its audit trail; the OIDC module is on the classpath for exactly
-rem those editions because the Offering puts it there. Basic stays byte-for-byte the historic auth-free flag set.
+rem Every edition above Basic authenticates (OIDC); the OIDC module is on the classpath for exactly
+rem those editions because the Offering puts it there. Basic stays the auth-free flag set.
 rem 🔴 SERVEBAT-OPTS-1 (2026-09-11): these are single-line `if`s, NOT a parenthesized block, and that
 rem is load-bearing. cmd.exe expands every %OPTS% in a parenthesized block ONCE, when the block is
 rem PARSED, so N `set "OPTS=%OPTS% ..."` statements inside one block all expand to the value OPTS had
@@ -1799,8 +1799,8 @@ rem instead: these values carry operator secrets and keystore passwords, and del
 rem inside them. One statement per line is the only form that is correct for both. serve.sh has no
 rem such hazard -- bash expands at execution -- which is why only this half is written out flat.
 if not "%EDITION%"=="Basic" set "OPTS=%OPTS% -Dauth.mode=oidc"
-rem EVENTS-DURABLE-1 (2026-09-11): Standard+ keeps the API audit trail across restarts; see serve.sh.
-if not "%EDITION%"=="Basic" set "OPTS=%OPTS% -Devents.backend=parquet"
+rem EVENTS-DURABLE-1 + BASIC-EVENTS-DURABLE-1 (2026-11-06): every edition keeps the API audit trail across restarts; see serve.sh.
+set "OPTS=%OPTS% -Devents.backend=parquet"
 if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
 if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_JWKS_URI%"=="" set "OPTS=%OPTS% -Dauth.oidc.jwksUri=%AUTH_OIDC_JWKS_URI%"
 if not "%EDITION%"=="Basic" if not "%AUTH_OIDC_AUDIENCE%"=="" set "OPTS=%OPTS% -Dauth.oidc.audience=%AUTH_OIDC_AUDIENCE%"

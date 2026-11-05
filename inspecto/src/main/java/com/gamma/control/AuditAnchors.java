@@ -299,6 +299,12 @@ final class AuditAnchors {
     static void rollIfDue(EventStore store, Path root, long nowMs) {
         if (store == null || root == null) return;
         Path key = root.toAbsolutePath().normalize();
+        if (!durable(store)) {
+            if (MEMORY_NOTED.add(key))
+                log.info("Audit anchors for {} are not rolled: events are kept in memory, so the chain restarts on "
+                        + "every boot (set -Devents.backend=parquet)", key);
+            return;
+        }
         LocalDate today = Instant.ofEpochMilli(nowMs).atZone(ZoneOffset.UTC).toLocalDate();
         LocalDate done = ROLLED.get(key);
         if (done != null && !done.isBefore(today)) return;
@@ -321,8 +327,9 @@ final class AuditAnchors {
      * found in is not anchored at all. Refuses (409) over a broken or missing anchor file (see class doc).
      */
     static int roll(EventStore store, Path root, LocalDate today) throws IOException {
+        if (!durable(store)) return 0;
         synchronized (lock(root)) {
-            AnchorFile file = readFile(root);
+            AnchorFile file = legacyBreakIfDue(store, root, readFile(root), today);
             Anchor last = lastValid(store, file, today);
             Long from = last == null ? null : last.lastSeq() + 1;
             Event head = store.chainHead();
@@ -338,7 +345,7 @@ final class AuditAnchors {
                 if (!d.isBefore(today)) return false;
                 if (curDay[0] != null && !d.equals(curDay[0])) {
                     try {
-                        prevMac[0] = append(root, "daily", curDay[0], dayFirst[0], prev[0], prevMac[0]).mac();
+                        prevMac[0] = append(store, root, "daily", curDay[0], dayFirst[0], prev[0], prevMac[0]).mac();
                         written[0]++;
                     } catch (IOException io) {
                         failed[0] = io;
@@ -358,7 +365,7 @@ final class AuditAnchors {
                 return written[0];
             }
             if (curDay[0] != null) {   // the walk ran out, or reached today: the day it was in is over
-                append(root, "daily", curDay[0], dayFirst[0], prev[0], prevMac[0]);
+                append(store, root, "daily", curDay[0], dayFirst[0], prev[0], prevMac[0]);
                 written[0]++;
             }
             return written[0];
@@ -380,6 +387,9 @@ final class AuditAnchors {
      *         the chain or the anchor file does not verify — an anchor over either would sign it
      */
     static OnDemand onDemand(EventStore store, Path root) throws IOException {
+        if (!durable(store))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "events are kept in memory; nothing to anchor (the audit "
+                    + "chain restarts on every boot - set -Devents.backend=parquet)");
         Path key = root.toAbsolutePath().normalize();
         long now = System.currentTimeMillis();
         Long prior = LAST_ON_DEMAND.get(key);
@@ -402,7 +412,7 @@ final class AuditAnchors {
             if (!r.ok())
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the audit chain does not verify at seq "
                         + r.bad().seq() + " (" + r.bad().reason() + "): " + r.bad().detail());
-            return new OnDemand(append(root, "on-demand", day(tip[0]), r.from(), tip[0],
+            return new OnDemand(append(store, root, "on-demand", day(tip[0]), r.from(), tip[0],
                     last == null ? "" : last.mac()), true);
         }
     }
@@ -410,6 +420,75 @@ final class AuditAnchors {
     /** Test seam: forget the on-demand rate limit for {@code root}. */
     static void resetRateLimit(Path root) {
         LAST_ON_DEMAND.remove(root.toAbsolutePath().normalize());
+    }
+
+    /** Whether the chain still holds the record {@code a} names, with the hash it names. */
+    private static boolean holds(EventStore store, Anchor a) {
+        List<Event> at = store.chainPage(a.lastSeq(), 1);
+        return !at.isEmpty() && AuditChain.seq(at.get(0)) == a.lastSeq()
+                && a.lastHash().equals(AuditChain.storedHash(at.get(0)))
+                && a.lastHash().equals(AuditChain.hash(at.get(0)));
+    }
+
+    // -- BASIC-EVENTS-DURABLE-1: the store an anchor was written over --
+
+    /** The MAC'd field every anchor written since 2026-11-06 carries: the event store it was written over. */
+    static final String STORE = "store";
+    static final String LEGACY_REASON = "anchored over a non-durable store before ";
+    private static final java.util.Set<Path> MEMORY_NOTED = ConcurrentHashMap.newKeySet();
+
+    /** {@code memory}, {@code parquet}, {@code db}, or {@code other} for a store this class does not know. */
+    static String storeKind(EventStore store) {
+        if (store instanceof com.gamma.event.InMemoryEventStore) return "memory";
+        if (store instanceof com.gamma.event.ParquetEventStore) return "parquet";
+        if (store instanceof com.gamma.event.DbEventStore) return "db";
+        return "other";
+    }
+
+    /** Anchors are written only over a store that keeps the chain across a restart: the in-memory store restarts
+     *  it at seq 1 on every boot, so an anchor over it names a record the next boot no longer holds. */
+    static boolean durable(EventStore store) {
+        return !"memory".equals(storeKind(store));
+    }
+
+    /**
+     * The one-time transition for an anchor file written over the in-memory store (Basic before 2026-11-06, operator
+     * decision A): a signed BREAK anchor, written by the rebaseline machinery (the old file moved aside, pinned by
+     * digest, listed by verify), opening a new epoch at seq 1 of the durable chain — ONLY when all five hold:
+     * <ol>
+     *   <li>the store is durable ({@link #roll} returns before this over a memory store);</li>
+     *   <li>the anchor file verifies;</li>
+     *   <li>the chain does not hold the record the last anchor names;</li>
+     *   <li>the whole durable chain is newer than that anchor (it starts at seq 1, after the anchor was written);</li>
+     *   <li>the anchor predates the {@link #STORE} tag — no anchor written since can ever qualify.</li>
+     * </ol>
+     * ⚠ Accepted cost: a legacy-anchored Space whose whole durable event store is wiped meets the same five, and is
+     * labelled this way once — still a visible, signed break. Anything else is left to {@link #lastValid} (409).
+     */
+    private static AnchorFile legacyBreakIfDue(EventStore store, Path root, AnchorFile file, LocalDate today)
+            throws IOException {
+        if (file.firstProblem() != null) return file;   // (1) durable: roll() refuses a memory store first
+        Anchor last = file.last();
+        if (last == null || last.extra().containsKey(STORE)) return file;
+        if ((last.isBreak() && last.lastSeq() < 1) || holds(store, last)) return file;
+        List<Event> first = store.chainPage(1, 1);
+        if (first.isEmpty() || AuditChain.seq(first.get(0)) != 1 || first.get(0).ts() <= last.createdAt()) return file;
+        long now = System.currentTimeMillis();
+        Map<String, Object> base = fields(BREAK, today.toString(), 1, 0, "", 0, now, last.mac());
+        Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("reason", LEGACY_REASON + day(first.get(0)));
+        extra.put("problem", "anchor-mismatch at seq " + last.lastSeq() + ": the durable chain does not hold the record "
+                + "the last anchor (" + last.day() + ") names");
+        extra.put("lastGoodSeq", last.lastSeq());
+        extra.put("by", "system");
+        extra.put(STORE, storeKind(store));
+        String rotateTo = "audit-anchors." + now + ".replaced.jsonl";
+        extra.put("replacedFile", rotateTo);
+        extra.put("replacedSha256", sha256(file(root)));
+        write(root, base, extra, rotateTo);
+        log.warn("Audit anchors for {} were written over a non-durable event store; a signed break now opens a new "
+                + "epoch at seq 1 of the durable chain ({})", root, extra.get("reason"));
+        return readFile(root);
     }
 
     /**
@@ -434,20 +513,17 @@ final class AuditAnchors {
             return null;
         }
         if (last.isBreak() && last.lastSeq() < 1) return last;   // a break over an empty chain names no record
-        List<Event> at = store.chainPage(last.lastSeq(), 1);
-        if (at.isEmpty() || AuditChain.seq(at.get(0)) != last.lastSeq()
-                || !last.lastHash().equals(AuditChain.storedHash(at.get(0)))
-                || !last.lastHash().equals(AuditChain.hash(at.get(0))))
+        if (!holds(store, last))
             throw new ApiException(409, ErrorCodes.CONFLICT, "the audit chain no longer holds the record the last "
                     + "anchor (" + last.day() + ") names at seq " + last.lastSeq() + "; no anchor is written after it");
         return last;
     }
 
-    private static Anchor append(Path root, String kind, LocalDate day, long firstSeq, Event lastRec, String prevMac)
-            throws IOException {
+    private static Anchor append(EventStore store, Path root, String kind, LocalDate day, long firstSeq, Event lastRec,
+                                 String prevMac) throws IOException {
         long lastSeq = AuditChain.seq(lastRec);
         return write(root, fields(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
-                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac), Map.of(), null);
+                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac), Map.of(STORE, storeKind(store)), null);
     }
 
     /** MAC and append one anchor line (a {@code rotate} starts a NEW file with it, moving the old one aside), then
@@ -494,6 +570,9 @@ final class AuditAnchors {
      */
     static Anchor rebaseline(EventStore store, Path root, String reason, AuditVerifier.Policy policy, String by)
             throws IOException {
+        if (!durable(store))   // a break over a memory chain would name a record the next boot never holds
+            throw new ApiException(409, ErrorCodes.CONFLICT, "events are kept in memory; nothing to rebaseline (the "
+                    + "audit chain restarts on every boot - set -Devents.backend=parquet)");
         Path key = root.toAbsolutePath().normalize();
         long now = System.currentTimeMillis();
         Long prior = LAST_REBASELINE.get(key);
@@ -529,6 +608,7 @@ final class AuditAnchors {
             extra.put("problem", r.bad().reason() + " at seq " + r.bad().seq() + ": " + r.bad().detail());
             extra.put("lastGoodSeq", lastGood == null ? 0 : lastGood.lastSeq());
             extra.put("by", by);
+            extra.put(STORE, storeKind(store));
             // the file this break replaces is KEPT and pinned by digest: verify checks it as the prior epoch
             Path old = file(root);
             String rotateTo = "audit-anchors." + now + ".replaced.jsonl";
@@ -629,7 +709,7 @@ final class AuditAnchors {
     }
 
     /** HMAC-SHA256 (hex) with the Space's key over the domain prefix + the anchor's canonical JSON. */
-    private static String mac(Path root, Map<String, Object> anchor) throws IOException {
+    static String mac(Path root, Map<String, Object> anchor) throws IOException {   // package: the legacy-anchor test fixture
         try {
             javax.crypto.Mac m = javax.crypto.Mac.getInstance("HmacSHA256");
             m.init(new javax.crypto.spec.SecretKeySpec(PendingChanges.key(root), "HmacSHA256"));

@@ -228,7 +228,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | Posture | Basic | Standard | Advanced | Preview |
 |---|:-:|:-:|:-:|:-:|
 | authMode | none | oidc | oidc | oidc |
-| eventsBackend | default | parquet | parquet | parquet |
+| eventsBackend | parquet | parquet | parquet | parquet |
 | objectsBackend | default | default | postgres | default |
 | postgresSidecar | absent | bundled | bundled | bundled |
 
