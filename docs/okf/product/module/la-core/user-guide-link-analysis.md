@@ -227,6 +227,15 @@ Dataset). A Dataset that Mappings read cannot be deleted until they are.
   an Entity List's store, or list fewer than two columns, so no Mapping is offered for them.
 - A Mapping of a large Dataset has no link index of its own until an administrator adds an index build Job for it. Until
   then, preset questions over it read the Dataset.
+- **Discover** (every edition, Basic included) says what is in a Dataset before you draw anything. Choose *Show what is
+  in it*: its link rows and the period its Time covers, about how many entities of each Entity Type it holds, its kinds
+  of link with their counts, the total and median of every Measure (in its unit), and the ten busiest entities at each
+  end (sending to and reached by the most others). A part the Dataset cannot answer says why (no Time column, no
+  Measure, a ranking that took longer than the Space allows) - never a 0 nobody counted. Counts of entities and medians
+  are close estimates and say so. The answer is kept until a file arrives, so the second look is instant; on a large
+  Dataset the first one takes a few seconds, and the busiest come from its link index when it has one. Click a busiest
+  row for that entity's summary ([§6.2](#62-the-node-detail-dialog)). To draw the busiest, use the same panel under the
+  Start box in Explore ([§5.1](#51-start-a-graph)).
 
 ---
 
@@ -346,6 +355,18 @@ Short loops leaves out entities with more than 50 links in and out by default, t
 more and the Dataset itself answers. The other questions read the Dataset and can run out of time on tens of millions of
 links: they then say so in a sentence.
 
+**About <Dataset>** (Basic, under the preset queries) is the Data page's *Discover* for the Dataset picked in the Start
+box ([§3.4](#34-the-data-page-datasets-entities-and-mappings)); its **Draw these** starts a graph from the busiest
+entities, and a busiest row opens that entity's summary, whose *Draw it* starts from that one entity.
+
+**Build a question** (Basic, under the preset queries) asks a question of your own over the same Dataset: rank the
+senders or the receivers by their links, their distinct counterparts or the total of a Measure; keep one sender or
+receiver, some kinds of link, a period on any Time column (*From day* is included, *Before day* is not), a range on
+any Measure (both ends included), groups with at least a value, and how many rows (at most 500). Only the columns the
+Dataset gives that role are offered, and the server refuses anything else. **Draw these** starts from the answer;
+**Save as preset** names the question and adds it, for everyone in this Space, to the *Question* list of every Dataset
+that has its columns (*… (saved here)*). A saved question is shown only to those it is shared with.
+
 **Investigate** on an Entity's page, and **Investigate … in Link Analysis** on an Incident or Case page, open a short
 *Investigate {number}* form in the Investigation tab that asks only for the purpose.
 
@@ -452,6 +473,11 @@ dialog. Three sections look up only the entities they need on the server, so the
   type it is on.
 * **Case history** — Standard and up. Opening it reads the Incidents and Cases that reference the entity, newest
   first; *Show* filters all / open / closed. A masked node is looked up by alias and the number is never shown.
+* **Summary** — every edition. *Summarise its links in <Dataset>* reads the node's links in the Dataset the graph was
+  drawn from: links in and out, distinct counterparts, first and last seen, the counterparts with the most links and
+  with the most money (the Dataset's primary Measure, sent and received), its kinds of link and its activity per day
+  over the 90 days before it was last seen. A masked entity is read by its alias, and its counterparts show as aliases.
+  The full Entity page (every Dataset, lineage, relationships, cases) is Standard and up.
 * **Actions** — **Add to <list name>** asks for a reason (a list under four-eyes answers
   *Waiting for approval*); needs *Manage incidents*. **Hide on canvas** (exploring only) takes the node off the canvas.
 

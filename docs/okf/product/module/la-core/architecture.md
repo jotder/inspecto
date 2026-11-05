@@ -128,7 +128,7 @@ entry at write time, so an index rebuild or a Dataset change cannot alter a reco
 | `graph` (platform, base) | Leaf algorithm library (package `com.gamma.graph`), line-for-line port of the SPA's `graph-analysis.ts`; not LA-only since D-AN2 (2026-10-17) — a core thin jar in every edition so Fraud, AML and Case Management can use it without Link Analysis | `GraphAlgorithms`, `GraphCentrality`, `GraphIterative`, `GraphPaths`, `GraphStructure`, `GraphSuspicion`, `GraphPropagation` (server-only), `UnionFind`, `RunControl`, `GraphAborted` |
 | `la-core` (platform, optional, boot) | Domain + ports, no HTTP routes | `InvestigationEvaluator`, `InvestigationStore`/`InvestigationStores`/`FsInvestigationStore`, `InvestigationMembers`, `DraftStore`/`DraftLifecycle`/`DraftCheckpoints`/`DraftIndex`, `GraphRunService`, `GraphEngine`, `InMemoryGraphEngine`, `GraphInput`, `Algorithm`, `GraphBudget`, `LinkEventTypes`, ports `DatasetProvider`/`CasePort`/`CollectorCoveragePort` |
 | `la-storage` | The link index (D-3) and the index-backed engine | `IndexBuilder`, `IndexBuildService`, `IndexStore`, `IndexManifest`, `IndexMapping`, `IndexPlan`, `IndexReader`, `IndexPins`, `BucketFunction`, `IndexedTraversal`, `SqlGraphEngine`, `RoutingGraphEngine` |
-| `la-api` (feature `geoLink`) | HTTP surface and orchestration | 28 `RouteModule`s (97 routes, §6), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
+| `la-api` (feature `geoLink`) | HTTP surface and orchestration | 32 `RouteModule`s (103 routes, §6), `EntityMasking`, `InvestigationMemberStore`, `DraftAdmission`/`DraftRebase`/`DraftPromote`, `IndexedRead` + `Indexed*`, `IndexStaleness`, `IndexBuildServices`, `GraphRunServices`, `StandingDetection`, `ScheduledIndexBuild` |
 | `geo-link` | Bridge to the host | `EngineDatasetProvider`, `HostCasePort`, `HostCollectorCoveragePort`, `ScheduledLinkIndexBuilder`, `WorkingSetMeasures`, `InvestigationMeasureRoutes`, `InvestigationDataChangesRoutes` (7 routes), `EmbedExpirySweepModule`, `IntegrationWebhooks` (route-less) |
 | `la-store-pg` (provider) | Postgres backend for Investigations | `PgInvestigationStore`, `PgInvestigationStoreProvider` |
 | `entity-store` (platform, base) | Space-wide identity data; not LA-only | `EntityFactLog`, `EntityRegistry`, `EntityTypes`, `EntityListEntries`, `EntityListFacts`, `EntityListSidecar`, `MaskTokens`, `LinkAnalysisSettings` |
@@ -735,7 +735,7 @@ optional pack field; no route was added.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-28 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` and `InvestigationDataChangesRoutes` in geo-link (its other two, `EmbedExpirySweepModule` and `IntegrationWebhooks`, serve no route), **110**<!--count:la-routes--> routes (**103**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+32 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` and `InvestigationDataChangesRoutes` in geo-link (its other two, `EmbedExpirySweepModule` and `IntegrationWebhooks`, serve no route), **110**<!--count:la-routes--> routes (**103**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -1696,6 +1696,91 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
 - **Deliberately not built** (board row `LA-COLUMN-ROLES-2`): the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the
   primary Measure (the canvas still weighs links by their count); a Mapping-level override of `carried` (a Mapping keeps
   its base's mark); Category values for a multi-Dataset read (the panel offers a single read's Dataset only).
+
+### 6.16 Discovery in Basic: presets, Discover, entity summary, query builder (LA-BASIC-DISCOVERY-1, as built 2026-11-03/05)
+
+The operator's ask: profiling and discovery in Basic, querying the relationship data without SQL, preset queries. Four
+read-only surfaces, all **Basic and up** (feature `geoLink`, Q-1), all over ONE Dataset's mapped roles, masked like
+exploration, capped by the Space's limits and audited. The full Entity profile pages stay Standard (D-LAE4 unchanged).
+Rows closed: `LA-PRESET-QUERIES-1`, `LA-BASIC-DISCOVER-1`, `LA-ENTITY-SUMMARY-1`, `LA-QUERY-BUILDER-1`; plan
+[`la-basic-discovery-plan.md`](../../../../archived-documents/plans-archive/la-basic-discovery-plan.md).
+
+| Route | Class | What |
+|---|---|---|
+| `GET /inv/presets?dataset=` | `PresetRoutes` | the pack's preset questions the Dataset can answer, its roles, the builder's role columns (`columns {time, measure}`) and the Space presets saved from the builder (`saved`) |
+| `POST /inv/presets/{id}/run` | `PresetRoutes` + `PresetQueries` | one preset; read-shaped, EXPENSIVE, `LINK_PRESET_RUN` |
+| `GET /inv/datasets/{id}/discover` | `DiscoverRoutes` + `DatasetDiscovery` | what is in a Dataset; EXPENSIVE, `LINK_DATASET_DISCOVERED` |
+| `GET /inv/entities/{type}/{key}/summary?dataset=` | `EntitySummaryRoutes` + `EntitySummary` | one entity over one Dataset; EXPENSIVE, `LINK_ENTITY_SUMMARIZED` |
+| `POST /inv/datasets/{id}/query` | `QueryRoutes` + `QueryBuilder` | a builder question (or a saved preset's); read-shaped, EXPENSIVE, `LINK_QUERY_RUN` |
+
+**Never free SQL (Q-2).** la-api may not depend on the engine (LA separation D-1), so `MeasureCompiler` is out of reach:
+each surface renders its own fixed statement over the Dataset's real, quoted columns with bound values. The builder's
+`QueryBuilder.parse` accepts exactly `by, rank, sumColumn, from, to, kinds, timeColumn, after, before, measureColumn,
+measureMin, measureMax, min, top` and checks each column's ROLE (Time = `columns[].role: temporal` or the primary Time;
+Measure = `role: measure` without a classification, else the mapping's primary Measure). A saved preset is parsed again
+each time it is listed or run, so a stored query is never trusted as written. The window is half-open (`after`
+included, `before` not), a Measure range inclusive.
+
+**Roles.** `PresetQueries.roles` gives From, To, Kind and the primaries (`defaultLinkMapping.primaryTime` /
+`primaryMeasure`, or their old names `time` / `amount`; else the classified columns, `*_kind`, the event date, the pack's
+`measure_hints`). `DatasetDiscovery.measures` and `QueryBuilder.columns` add every Measure and Time column
+(LA-COLUMN-ROLES-1). A role the Dataset lacks: the preset or saved question is not offered (Q-5); a Discover section is
+`assessed:false` with why; a summary part is null.
+
+**Presets (P3).** Code keyed by Industry pack id (`PresetQueries.forPack`; mobile money and telecom put one question
+ahead of the core set), not `industry-pack.toon` entries: a preset's compile rule is code either way. Shapes: the
+aggregate (group by one end; counterparts, links, total; a HAVING on the first measure), graph statements over the links
+joined to themselves (`graphSql`: Two-way pairs, Short loops, Newcomers, Two steps), and the `timeToCashOut` Value
+Measure. Reached by many, Reaching many and Newcomers read the link index's `nodes` table, Two-way pairs and Short loops
+its `pairs_back` / `loops` (`LA-INDEX-PAIRS-LOOPS-1`), through `IndexedRead.select` (the Space's index switch and the
+staleness refusal apply); each answer carries `source`. Counting from the index differs (each side apart, per kind of
+link) and says so. **Space presets (Q-3)** are registry components `preset-query/<id>` `{label, description, query}`
+(`ComponentStore`, read through the `DatasetProvider.presetQueries` seam), listed only to callers who may view them
+(`ComponentAccess.canView`), a raw From / To in a stored query echoed as its alias.
+
+**Discover (P1).** V4 measured the `EntityProfiles` union read (one Entity Type across every bound Dataset) at **112 s**
+on IMS (39.4 M links, 12.35 M distinct numbers), so Discover never uses it. It reads THIS Dataset in cheap statements:
+one pass for rows, the period on the primary Time and each Measure's count, sum and `approx_quantile(0.5)`; one
+`approx_count_distinct` per Entity Type over its columns, keys normalised as the profiles normalise (`EntityKeySql`;
+2.6 s on IMS, 0.15 % off the exact 18.5 s count); one `GROUP BY` on the kind (at most 50); and the 10 busiest per end
+through the presets' path (`PresetRoutes.fromIndex` with Reaching / Reached by many, else the aggregate over the Dataset
+under the statement timeout; a timeout is `assessed:false`, "a link index answers it quickly"). Cold Discover on IMS is
+about 6 s (over the plan's 3 s); cached it is instant. **Cache:** per Space, Dataset entry, roles, limits, held types and
+masking mode; stamped with the Dataset's `files:` input fingerprint AND the link-index versions currently published for
+it, so an arrival or a new index recomputes. Entity ids are cached raw and masked on the way out. A failed or timed-out
+read is answered but never kept (`retryable`; an unmeasured row count carries `rowsReason`). A Dataset without a
+`files:` fingerprint (a view) is never cached. `busiest.fromType` / `toType` name the Entity Type a busiest row's
+summary asks for.
+
+**Entity summary (P2).** One statement per entity: the links naming it at either end (keys compared normalised under
+the type's normaliser), grouped once by `GROUPING SETS ((), (o), (k), (d))` - headline, per counterpart, per kind, per
+day - each set cut by a window rank (top 20 by links and top 20 by the primary Measure, 50 kinds, the 90 days before its
+last seen). V4: a one-key read of IMS costs 3-4 s, so four statements would not do. A self-link or an empty other end
+counts as a link but is no counterpart. **Key rule** as the Entity profile's: for a type masked under the Space's mode
+the URL takes only the alias (a raw key is refused 422, never read; the UI resolves a raw key through
+`POST .../resolve` in a body first); when the queried type is masked EVERY returned id is an alias
+(`ExplorationMasking.forced`), whatever its columns are classified as - the first review found raw counterparts over
+unclassified columns, the entity's own key among them through a self-link.
+
+**V3 (pattern packs in the browser):** yes, over the loaded graph only (`matchPattern`, `matchBranchingPattern`); the
+whole-Dataset run is `POST /inv/pattern/branching`. Discover therefore runs no pack.
+
+**UI.** `link-analysis-presets` (under Basic's Start box) holds the pack questions, the saved ones (*... (saved here)*)
+and `link-analysis-query-builder` (shown when the Dataset maps From and To; *Save as preset* writes the component).
+`link-analysis-dataset-discover` sits on the la-app Data page (one card per Dataset; Draw is offered from Explore) and
+under the Start box as *About <Dataset>*, following the Start box's pick; it drops its answer when its Dataset changes.
+A busiest row opens `EntitySummaryDialog`; the node dialog's on-demand *Summary* reads the Dataset the graph was drawn
+from (`summaryDataset`). Everything is read on demand: a large Dataset takes seconds.
+
+**Gotchas.** DuckDB refuses the zone id `Z`: pass `ZoneId.of("UTC")`. The graph's own *Find something interesting*
+already owns `discover.ts` / `link-analysis-discover.component.ts` - the Dataset panel is `dataset-discover`. A
+component that imports `DataTableComponent` brings `MatDialogModule` into its injector, so a host spec mocking
+`MatDialog` needs `TestBed.overrideProvider`. Section landmarks repeated per Dataset need unique names (axe
+`landmark-unique`).
+
+**Deliberately not done.** Bridges, Shared counterparts and Bursts presets; a Category value-list filter in the builder
+beyond the kind of link (`LA-COLUMN-ROLES-2`); drawing from the Data page (it points to Explore); a live drive on the
+Basic install (the plan's §5 check over IMS and Mobile money) waits for a redeploy.
 
 ## 7. Host registration, Jobs and live detection
 

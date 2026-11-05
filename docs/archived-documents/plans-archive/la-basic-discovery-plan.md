@@ -1,6 +1,6 @@
 # LA-BASIC-DISCOVERY-1 — discovery, an entity summary and preset queries in Basic
 
-> **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6; presets first). P0 + P3 BUILT 2026-11-03 (§7); P1, P2, P4 open.** Operator ask: "entity profiling and some kind of
+> **SHIPPED 2026-11-05 — archived.** P0 + P3 built 2026-11-03 (§7), P1, P2, P4 2026-11-05. The as-built facts live in `okf/product/module/la-core/architecture.md` §6.16 and the user guide (§3.4, §5.1, §6.2). Decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6; presets first). Operator ask: "entity profiling and some kind of
 > discovery in Basic also; the user should be able to query the entity relationship data; some preset queries would be
 > nice." Product hub `docs/okf/product/module/la-core/`. Related: `la-data-arrival-plan.md` (the Data page, Mappings),
 > `docs/EDITIONS.md` (D-LAE4: the Entity profile **pages** are Standard and up). Board rows: `LA-BASIC-DISCOVER-1`,
@@ -187,7 +187,7 @@ is NOT folded - `out`/`in` hold every link - but its `nodes` table holds per ent
   upper bound (`source.approximate`). Without deltas the rows are read as they are.
 - **Two-way pairs, Short loops** need every link folded: 48 s and out of memory even over the index. Since
   `LA-INDEX-PAIRS-LOOPS-1` (shipped 2026-11-03) the index build writes `pairs_back` and `loops` and the two presets read them
-  ([`la-index-pairs-loops-plan.md`](../archived-documents/plans-archive/la-index-pairs-loops-plan.md) §8-10).
+  ([`la-index-pairs-loops-plan.md`](la-index-pairs-loops-plan.md) §8-10).
 - Every answer carries `source` (`{kind: index, version, stale…}` or `{kind: dataset, reason}`); the panel says when the
   index answered and when it is behind.
 - **Counting differs, and is said.** Newcomers from the index counts each side apart: `links` = edges in + out (self-links

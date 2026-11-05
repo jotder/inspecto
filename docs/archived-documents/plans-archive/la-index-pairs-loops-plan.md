@@ -2,7 +2,7 @@
 
 > **PLAN 2026-11-03 — decisions Q-1…Q-5 accepted by the operator 2026-11-03 (the recommended options, §6). P0 and P1 BUILT 2026-11-03 (§8, §9); P2 measured 2026-11-03 (§10): reads 0.2-0.4 s, build +~30 s; both follow-ups fixed. SHIPPED 2026-11-03, archived.** Operator ask: make the *Two-way pairs*
 > and *Short loops* preset queries fast on large Datasets. Follows `LA-PRESET-QUERIES-1`
-> ([`la-basic-discovery-plan.md`](../../superpower/la-basic-discovery-plan.md) §7.2), where *Reached by many*, *Reaching many* and
+> ([`la-basic-discovery-plan.md`](la-basic-discovery-plan.md) §7.2), where *Reached by many*, *Reaching many* and
 > *Newcomers* moved to the link index's `nodes` table. Board row `LA-INDEX-PAIRS-LOOPS-1`.
 
 ## 1. The problem, measured

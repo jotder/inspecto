@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import static com.gamma.util.SqlIdent.q;
 
 /**
- * Preset queries (LA-PRESET-QUERIES-1, plan {@code docs/superpower/la-basic-discovery-plan.md} §3 P3): the questions an
+ * Preset queries (LA-PRESET-QUERIES-1, plan {@code docs/archived-documents/plans-archive/la-basic-discovery-plan.md} §3 P3): the questions an
  * industry already asks of its relationship data, run with a few parameters and answered as a table that can be drawn.
  *
  * <p><b>Declarative, never free SQL</b> (Q-2). An {@code aggregate} preset is one fixed shape - group the links by one

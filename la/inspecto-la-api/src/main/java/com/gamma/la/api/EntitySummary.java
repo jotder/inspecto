@@ -14,7 +14,7 @@ import java.util.Map;
 import static com.gamma.util.SqlIdent.q;
 
 /**
- * The entity summary (LA-ENTITY-SUMMARY-1, plan {@code docs/superpower/la-basic-discovery-plan.md} §3 P2): the lite profile of
+ * The entity summary (LA-ENTITY-SUMMARY-1, plan {@code docs/archived-documents/plans-archive/la-basic-discovery-plan.md} §3 P2): the lite profile of
  * one entity over ONE Dataset's links, for Basic - first and last seen, its links in and out, its counterparts ranked by links
  * and by the primary Measure, its kinds of link and its activity per day. The full Entity profile pages (every bound Dataset,
  * lineage, relationships, shapes) stay Standard (D-LAE4).

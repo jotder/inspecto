@@ -23,7 +23,7 @@ import java.util.Map;
 import static com.gamma.util.SqlIdent.q;
 
 /**
- * Discover one Dataset (LA-BASIC-DISCOVER-1, plan {@code docs/superpower/la-basic-discovery-plan.md} §3 P1): what is in it
+ * Discover one Dataset (LA-BASIC-DISCOVER-1, plan {@code docs/archived-documents/plans-archive/la-basic-discovery-plan.md} §3 P1): what is in it
  * before anything is drawn - its rows and period, the distinct entities per Entity Type, the kinds of link, the totals of
  * every Measure and the busiest entities at each end of the links.
  *

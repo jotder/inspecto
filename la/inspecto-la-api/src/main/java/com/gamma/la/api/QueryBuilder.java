@@ -16,7 +16,7 @@ import java.util.Set;
 import static com.gamma.util.SqlIdent.q;
 
 /**
- * The no-code query builder (LA-QUERY-BUILDER-1, plan {@code docs/superpower/la-basic-discovery-plan.md} §3 P4): a question over
+ * The no-code query builder (LA-QUERY-BUILDER-1, plan {@code docs/archived-documents/plans-archive/la-basic-discovery-plan.md} §3 P4): a question over
  * a Dataset's ROLE columns - who, grouped by From or To, has the most links, distinct counterparts or total of a Measure, with
  * From is / To is / Kind of link is / When between (any Time column) / Measure between (any Measure column) / at least -
  * answered as a table that can be drawn and saved as a Space preset ({@code preset-query/<id>}).
