@@ -2272,8 +2272,16 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return true;
     }
 
+    /** JOB-SHUTDOWN-FAILED-1: the Space is about to close - no Job Run starts from now on, and one that breaks is a
+     *  planned stop ({@link JobService#beginClose}). The server calls it before closing the control plane. */
+    public void beginClose() {
+        JobService j = jobs;
+        if (j != null) j.beginClose();
+    }
+
     @Override
     public void close() {
+        beginClose();
         // HA-GRACEFUL-STOP-LEASE-RELEASE-1: ask in-flight runs to stop at their next checkpoint BEFORE draining, so
         // the drain below finishes inside SpaceManager's deadline and each run thread releases its own claim.
         // Idempotent (a second close just re-sets it). Nothing here releases a lease: see RunLease#cancelRuns.

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-374 test class(es): 374 unit, 0 real-HTTP control-plane, 0 IT.
+375 test class(es): 375 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -192,6 +192,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobServiceRetryAlarmTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceRetryAlarmTest.java` | D8: transient failures retry, permanent ones do not, and a final failure raises the alarm. |
 | `JobServiceSharedPipelineAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceSharedPipelineAuditTest.java` | The default-on shared-pipeline audit ({@link JobService#auditSharedPipelines()}) — |
 | `JobServiceTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceTest.java` | Tests for the {@link JobService} registry/scheduler: manual / cron / event triggers, |
+| `JobShutdownTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobShutdownTest.java` | JOB-SHUTDOWN-FAILED-1 (Basic live check 2026-11-06): on a graceful stop a scheduled {@code la_index_build} started |
 | `JobTaskGateTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTaskGateTest.java` | {@code MODULE-REORG-1 P4f}: the task half of the Space's module gate. A {@code maintenance} Job whose {@code task:} |
 | `JobTemplateDiscoveryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTemplateDiscoveryTest.java` | ASSURE-XLSX-ATTACHMENTS-1 round 5 item 3: ONE template discovery for the loader, the hold and the approve. |
 | `JobTemplateTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTemplateTest.java` | PIP-6 job templates: load, parameter substitution, required-param enforcement, instance overrides. |

@@ -577,6 +577,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
 
         java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            spaces.beginClose();   // JOB-SHUTDOWN-FAILED-1: before api.close() stops services a Job Run calls
             api.close();
             spaces.close();
             latch.countDown();

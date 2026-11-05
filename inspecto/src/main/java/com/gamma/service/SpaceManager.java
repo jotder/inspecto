@@ -937,6 +937,18 @@ public final class SpaceManager implements AutoCloseable {
         return spaces.size();
     }
 
+    /** JOB-SHUTDOWN-FAILED-1: tell every Space it is about to close, before the control plane's close hooks stop the
+     *  services a Job Run may call (see {@link CollectorService#beginClose}). Never throws. */
+    public void beginClose() {
+        for (SpaceContext c : spaces.values()) {
+            try {
+                c.service().beginClose();
+            } catch (RuntimeException e) {
+                log.warn("Error marking space '{}' as closing: {}", c.id(), e.getMessage());
+            }
+        }
+    }
+
     @Override
     public void close() {
         for (SpaceContext c : spaces.values()) {

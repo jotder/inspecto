@@ -777,6 +777,18 @@ public final class JobService implements AutoCloseable {
      *  enabled config's cron the first time. */
     private volatile boolean started = false;
 
+    /** JOB-SHUTDOWN-FAILED-1: set when the Space starts to close ({@link #beginClose}, then {@link #close}). A Run due
+     *  after it is SKIPPED, and a Run whose body throws after it is CANCELLED - the services it calls are being
+     *  closed under it, so neither is a Job failure (no FAILED row, no CRITICAL signal, no Incident). */
+    private volatile boolean closing = false;
+    static final String SHUTTING_DOWN = "the Space is shutting down";
+
+    /** The Space is closing: from now on no Run starts, and a Run that breaks is recorded as a planned stop. The server
+     *  calls it before it stops the control plane, whose close hooks stop services a Run may call. Idempotent. */
+    public void beginClose() {
+        closing = true;
+    }
+
     /** Wire the event/signal subscribers and arm cron schedules. */
     public void start() {
         bus.subscribe(this::onConsignmentEvent);
@@ -1507,6 +1519,11 @@ public final class JobService implements AutoCloseable {
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
                         String correlationId, String causationId, int chainDepth, Firing firing) {
+        if (closing) {   // JOB-SHUTDOWN-FAILED-1
+            log.info("job '{}' ({}) skipped: shutting down", name, trigger);
+            recordSkip(runId, name, job, trigger, start, SHUTTING_DOWN);
+            return;
+        }
         // The Space's module gate comes before the three exclusions: a Job whose module is switched off here is not
         // run at all, and says why. Config untouched; the next fire after the module is back on runs normally.
         String off = typeGate.apply(job.type());
@@ -1726,11 +1743,17 @@ public final class JobService implements AutoCloseable {
                 ctx.log().info("run cancelled", "reason", String.valueOf(e.getMessage()));
                 res = JobResult.cancelled(String.valueOf(e.getMessage()), (System.nanoTime() - t0) / 1_000_000L);
             } catch (Exception e) {
-                threw = true;
-                log.error("Job '{}' ({}) failed", name, trigger, e);
-                ctx.log().error("run failed", e);
-                res = JobResult.failed(String.valueOf(e.getMessage()),
-                        0L);
+                if (closing) {   // JOB-SHUTDOWN-FAILED-1: the Space closed under the Run - a planned stop, not a failure
+                    log.info("Job '{}' ({}) cancelled: {} ({})", name, trigger, SHUTTING_DOWN, e.toString());
+                    ctx.log().info("run cancelled", "reason", SHUTTING_DOWN, "error", e.toString());
+                    res = JobResult.cancelled(SHUTTING_DOWN, (System.nanoTime() - t0) / 1_000_000L);
+                } else {
+                    threw = true;
+                    log.error("Job '{}' ({}) failed", name, trigger, e);
+                    ctx.log().error("run failed", e);
+                    res = JobResult.failed(String.valueOf(e.getMessage()),
+                            0L);
+                }
             } finally {
                 if (watch.finish()) {
                     threw = true;
@@ -1739,6 +1762,14 @@ public final class JobService implements AutoCloseable {
                     ctx.log().error("run failed: " + reason, null);
                     res = JobResult.failed(reason, (System.nanoTime() - t0) / 1_000_000L);
                 }
+            }
+            // JOB-SHUTDOWN-FAILED-1: a body that REPORTS a failure while the Space closes (la.index.build returns FAILED
+            // when the index service it calls was stopped) is the same planned stop as one that throws. A deadline
+            // expiry (threw) stays FAILED.
+            if (closing && !threw && "FAILED".equals(res.status())) {
+                log.info("Job '{}' ({}) cancelled: {} (it reported: {})", name, trigger, SHUTTING_DOWN, res.message());
+                ctx.log().info("run cancelled", "reason", SHUTTING_DOWN, "reported", String.valueOf(res.message()));
+                res = JobResult.cancelled(SHUTTING_DOWN, res.durationMs());
             }
         } finally {
             packs.releaseRun(packOwner);
@@ -1786,7 +1817,7 @@ public final class JobService implements AutoCloseable {
             try {
                 return job.run(ctx);
             } catch (Exception e) {
-                if (retry > policy.retries() || !RetryPolicy.transientFailure(e)) throw e;
+                if (closing || retry > policy.retries() || !RetryPolicy.transientFailure(e)) throw e;   // no retry into a closing Space
                 java.time.Duration wait = policy.waitBefore(retry);
                 log.warn("Job '{}' attempt {} failed transiently ({}); retrying in {}s",
                         name, retry, e.getMessage(), wait.toSeconds());
@@ -2470,6 +2501,7 @@ public final class JobService implements AutoCloseable {
 
     @Override
     public void close() {
+        closing = true;
         if (eventLog != null && signalSubscriber != null) eventLog.removeSubscriber(signalSubscriber);
         packs.close();     // P2c: stop the watch thread, close pack classloaders
         workers.close();   // virtual-thread executor: awaits in-flight job runs
