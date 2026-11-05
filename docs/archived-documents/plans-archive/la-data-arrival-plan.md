@@ -1,5 +1,9 @@
 # LA-DATA-ARRIVAL-1 — how entity and link data arrives, and how the analyst knows it
 
+> **SHIPPED 2026-11-05 — archived.** P0 - P2 (`LA-ARRIVAL-LEDGER-1`, `LA-ARRIVAL-MODES-1`) and P3 + P4 (`LA-ARRIVAL-FEEDS-1`,
+> `LA-DATASET-COMPACT-1`); as built: `okf/product/module/la-core/architecture.md` §6.17 - §6.19. Open remainder on the board:
+> `LA-ARRIVAL-NEW-COLUMNS-1`, `LA-DATASET-COMPACT-2`.
+>
 > **PLAN 2026-11-03 — decisions D-1…D-5 accepted by the operator 2026-11-03 (the recommended options, §6).**
 > Board rows: `LA-ARRIVAL-LEDGER-1` (P0 + P1), `LA-ARRIVAL-MODES-1` (P2), `LA-ARRIVAL-FEEDS-1` (P3),
 > `LA-DATASET-COMPACT-1` (P4). Product hub: `docs/okf/product/module/la-core/`

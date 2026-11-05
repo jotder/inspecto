@@ -1,3 +1,5 @@
+import { FeedSummary, feedSummaryLine } from './dataset-feed.model';
+import { DatasetStorageState, storageStatusLine } from './dataset-storage.model';
 import { formatNumber } from '@inspecto/core/viz/number-format';
 import type { ColumnRole } from '../api/column-roles';
 
@@ -175,6 +177,10 @@ export interface Arrivals {
     arrivals: Arrival[];
     truncated: boolean;
     reason: string | null;
+    /** LA-ARRIVAL-FEEDS-1: how files come and how many wait (never the inbox path); absent on a Dataset no import made. */
+    feed?: FeedSummary | null;
+    /** LA-DATASET-COMPACT-1: the Dataset's files, the last compaction and what it keeps. */
+    storage?: DatasetStorageState | null;
 }
 
 /** What an added file does (`POST /datasets/{id}/files?mode=`): replace everything, add rows, or replace its days. */
@@ -733,7 +739,12 @@ export function coversText(from: string | null, to: string | null): string {
  */
 export function dataStatusLines(read: Arrivals | null): string[] {
     const clocks = dataStatusLine(read?.arrivals ?? []);
-    return clocks ? [clocks] : [];
+    const lines = clocks ? [clocks] : [];
+    const feed = feedSummaryLine(read?.feed ?? null); // LA-ARRIVAL-FEEDS-1
+    if (feed) lines.push(feed);
+    const storage = storageStatusLine(read?.storage ?? null); // LA-DATASET-COMPACT-1
+    if (storage) lines.push(storage);
+    return lines;
 }
 
 const INDEXED = new Set(['BUILT', 'UP_TO_DATE']);

@@ -1817,11 +1817,11 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
 **Deliberately not done.** Keeping new columns as details (`LA-ARRIVAL-NEW-COLUMNS-1`); row-key upserts (with SCD2,
 D-ING4); the inbox and *Keep this up to date* (`LA-ARRIVAL-FEEDS-1`); Dataset Parquet compaction (`LA-DATASET-COMPACT-1`);
 a refresh of the Start box / dock status after a run (each reads once per Dataset); a live drive on Basic and Preview.
-Plan: `docs/superpower/la-data-arrival-plan.md` §5a-§5d, §6.
+Plan: `docs/archived-documents/plans-archive/la-data-arrival-plan.md` §5a-§5d, §6.
 
 ### 6.18 Arrival feeds: the inbox and Keep this up to date (LA-ARRIVAL-FEEDS-1, as built 2026-11-05)
 
-Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P3, decision D-1. Class
+Plan [`la-data-arrival-plan.md`](../../../../archived-documents/plans-archive/la-data-arrival-plan.md) P3, decision D-1. Class
 `inspecto/.../control/DatasetFeed.java`, registered from `OnboardRoutes`; gates as *Add a file* (`canUploadData`, 503 no
 write root, 403 `data.self_import` off, then `OnboardImport.importDataset`: 404 unknown, 409 not an import Add data wrote
 for THIS id).
@@ -1856,11 +1856,11 @@ for THIS id).
 - **UI:** `add-data/dataset-feed.component.ts` (Inbox, *Import waiting files* = the card's Run now, the Keep form with
   option pickers and a pen field, *Stop*), mounted in the card's *Keep this up to date* block; the card keeps *Open in
   editor* (console) for more settings. The *Data status* line (`feedStatusLine`: *Inbox: N files waiting* or *Kept up to
-  date: …*) is written but joins the shared `<inspecto-la-data-status>` through the arrivals answer once the ledger
-  lane's component is on master (one read for the card, the Start box and the Rows dock).
+  date: …*) reaches the shared `<inspecto-la-data-status>` through the arrivals answer's `feed` (one read for the card, the
+  Start box and the Rows dock).
 - **Decisions taken (review on return):** (a) `on_change: ignore` - a corrected file re-sent under the SAME name is
-  skipped, because a feed's arrivals add rows and re-reading it would double them; send corrections under a new name
-  until *Replace the period* (`LA-ARRIVAL-MODES-1`, D-2) lands, then the feed default follows D-2; (b) an SFTP feed
+  skipped, because a feed's arrivals add rows and re-reading it would double them; send corrections under a new name. D-2 (a watched
+  feed defaults to *Replace the period*) is not applied to scheduled runs: a scheduled run has no upload to take its days from; (b) an SFTP feed
   only (no FTP / FTPS / S3) - the plan names SFTP; (c) a Reference is not offered a feed (a feed adds rows; a
   Reference is replaced); (d) the routes are `canUploadData`, like Add a file, not `canAuthorWorkbench`: the PUT
   changes only the import's own Pipeline, within fixed safe defaults.
@@ -1869,7 +1869,7 @@ for THIS id).
 
 ### 6.19 Dataset storage: compaction, the merge map and retention (LA-DATASET-COMPACT-1, as built 2026-11-05)
 
-Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P4, decisions D-5, D-7…D-10 (operator
+Plan [`la-data-arrival-plan.md`](../../../../archived-documents/plans-archive/la-data-arrival-plan.md) P4, decisions D-5, D-7…D-10 (operator
 2026-11-05). Class `inspecto/.../control/DatasetCompaction.java`, registered from `OnboardRoutes`.
 
 | Route | Gate | What |
@@ -1905,16 +1905,28 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   (`retentionInForce`): Basic never drops a row.
 - **Link index (D-10).** The files are rewritten, so the index's next build is a full one (its own advice, nothing added).
 - **UI:** `add-data/dataset-storage.component.ts` in the card (*Storage* line, *Compact now*, on Standard the *Keep*
-  picker for a person who may author); `storageStatusLine` is the *Data status* line, joined through the ledger lane's
-  `<inspecto-la-data-status>` once that is on master.
-- **Deliberately not done (review on return):** (a) a Standard feed's SCHEDULED runs do not pass through
-  `OnboardImport`, so they compact only at the next Add a file / Run now or *Compact now* - a `dataset.compact` step on
-  `pipeline.commit` is a follow-up; (b) `DatasetArrivals` reads the merge map (D-7) once the ledger lane's version of
-  that class is on master - until then a merged arrival reads as *set aside* in that list, so this lane is pushed
-  only with that read; (c) *Compact now* with a retention policy does not rebuild the index - the graph follows at
-  the next import; (d) the policy is gated on `pipeline.automation` (the Standard marker the data-tier plan already uses).
-- Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept, Compact now, Replace resets the
-  map, retention by arrivals / by event date / never on Basic, the crash heal, armed gates), `dataset-storage.component.spec.ts`.
+  picker for a person who may author); `storageStatusLine` is its *Data status* line.
+- **Arrivals and Data status.** `DatasetArrivals` reads the merge map: an arrival whose own output a compaction merged is
+  still *kept*, with the period of its segment. The arrivals answer carries `feed` (`DatasetFeed.summary`: kind, interval,
+  Connection, `waiting`, `alreadyImported` - never the inbox path) and `storage` (`describe`), and `dataStatusLines()` adds
+  one line for each (`feedSummaryLine`, `storageStatusLine`), so the card, the Start box and the Rows dock say them.
+- **A merged file rewritten since** (*Replace the period*, §6.17, removes days from every older file, the merged one
+  included): the map keeps the merged file's `mergedBytes` and `mergedModified` and trusts its row segments only while
+  both match. Otherwise its arrivals stay *kept* with no known period, and the next compaction carries the file as ONE
+  block (`holds` names the arrivals in it) - never sliced by stale offsets.
+- **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2`):** (a) a Standard feed's SCHEDULED runs do
+  not pass through `OnboardImport`, so they compact only at the next Add a file / Run now or *Compact now* - a
+  `dataset.compact` step on `pipeline.commit` would close it; (b) *Compact now* with a retention policy does not rebuild
+  the index - the graph follows at the next import; (c) the policy is gated on `pipeline.automation` (the Standard marker
+  the data-tier plan already uses); (d) a leftover that can never be deleted (a folder named `*.parquet`) keeps
+  compaction waiting, saying why each time - nothing is lost or doubled; (e) *keep N arrivals* counts a rewritten merged
+  file (a `holds` block) as ONE arrival, and its removal names that file; (f) the arrivals answer has no capability (as
+  before), so its `feed` tells a viewer of the Dataset the Connection's name, the ready marker and the waiting count -
+  never the inbox path.
+- Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept and listed as kept by the arrivals
+  answer, Compact now, a Replace the period that rewrites the merged file, Replace resets the map, retention by arrivals /
+  by event date / an unreadable date / a missing When column / never on Basic, the crash heal, a file held open, armed
+  gates), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
 
 ## 7. Host registration, Jobs and live detection
 

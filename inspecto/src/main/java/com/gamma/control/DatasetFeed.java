@@ -121,6 +121,25 @@ final class DatasetFeed {
         return out;
     }
 
+    /**
+     * The feed for the arrivals answer (one read for every Data status line): how files come and how many wait - never
+     * the inbox path, which {@code GET /datasets/{id}/feed} shows under {@code canUploadData}.
+     */
+    static Map<String, Object> summary(PipelineConfig cfg, Path dataRoot, String id, Map<String, Object> content) {
+        Map<String, Object> f = new LinkedHashMap<>(feedOf(cfg));
+        try {
+            Path inbox = OnboardImport.inbox(dataRoot, id).toAbsolutePath().normalize();
+            List<Path> waiting = waiting(inbox, "." + OnboardImport.extension(String.valueOf(content.get("importFormat"))));
+            int taken = 0;
+            for (Path p : waiting) if (MarkerManager.isAlreadyProcessed(p.toFile(), cfg)) taken++;
+            f.put("waiting", waiting.size());
+            f.put("alreadyImported", taken);
+        } catch (IOException unreadable) {
+            f.put("waiting", null);
+        }
+        return f;
+    }
+
     /** The import's own files in its inbox, oldest first: never a hidden file (a landing upload, a marker). */
     static List<Path> waiting(Path inbox, String ext) throws IOException {
         if (!Files.isDirectory(inbox)) return List.of();

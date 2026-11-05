@@ -9,6 +9,7 @@ import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { DatasetFeedComponent } from './dataset-feed.component';
 import { DatasetFeedState, everyWords, feedStatusLine, waitingWords } from './dataset-feed.model';
+import { dataStatusLines } from './add-data.model';
 
 @Component({
     standalone: true,
@@ -231,6 +232,33 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
 });
 
 describe('dataset-feed wording', () => {
+    it('Data status: the feed and storage lines follow the clocks, from the ONE arrivals read', () => {
+        const read = {
+            dataset: 'calls',
+            eventDateColumn: null,
+            arrivals: [],
+            truncated: false,
+            reason: null,
+            feed: { kind: 'folder' as const, every: '15m', waiting: 2, alreadyImported: 0 },
+            storage: {
+                dataset: 'calls',
+                files: 1,
+                bytes: 2048,
+                threshold: 20,
+                compactedAt: '2026-11-05T10:02:00Z',
+                compactedArrivals: 21,
+                removedArrivals: 0,
+                retention: { days: 90 },
+                retentionAvailable: true,
+            },
+        };
+        expect(dataStatusLines(read)).toEqual([
+            'Kept up to date: the inbox is watched, every 15 minutes · 2 files waiting',
+            'Storage: 1 file · 2 KB · compacted 2026-11-05 10:02 (21 arrivals) · keeps the last 90 days',
+        ]);
+        expect(dataStatusLines({ ...read, feed: { kind: 'uploads', waiting: 0 }, storage: null })).toEqual([]);
+    });
+
     it('says the interval and the files waiting in words', () => {
         expect(everyWords('15m')).toBe('every 15 minutes');
         expect(everyWords('1h')).toBe('every hour');

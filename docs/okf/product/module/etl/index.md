@@ -42,5 +42,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `BASIC-ONBOARD-1` | P2 | feature | Basic data onboarding as a platform feature every application reuses: three ways in (an inbox directory, a one-time upload, a Postgres ta… | — |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | — |
+| `LA-DATASET-COMPACT-2` | P3 | feature | compaction for a feed's scheduled runs, and the graph after a retention compaction (deferred from LA-DATASET-COMPACT-1, 2026-11-05). | — |
 | `LA-ARRIVAL-NEW-COLUMNS-1` | P3 | feature | keep a later file's new columns as details of an import Dataset (schema evolution with union-by-name reads), filed 2026-11-05 from D-6. | — |
-| `LA-DATASET-COMPACT-1` | P3 | feature | compaction of an import Dataset's Parquet in every edition, a retention policy on Standard+ (LA-DATA-ARRIVAL-1 P4, decision D-5). | — |

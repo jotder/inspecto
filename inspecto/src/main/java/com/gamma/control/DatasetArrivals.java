@@ -237,10 +237,12 @@ final class DatasetArrivals {
         List<Map<String, String>> rows = new ArrayList<>(service.statusStore().files(cfg));
         java.util.Collections.reverse(rows);   // the ledger is oldest first
         List<Map<String, Object>> arrivals = new ArrayList<>();
+        // LA-DATASET-COMPACT-1 (D-8): arrivals a compaction merged keep their period through the merge map
+        Map<String, DatasetCompaction.Segment> merged = DatasetCompaction.merged(dataRoot, pipeline);
         try (Connection duck = periodReader(dataRoot, pipeline, eventDate)) {
             for (Map<String, String> r : rows) {
                 if (arrivals.size() == MAX_LISTED) break;
-                arrivals.add(arrival(r, extras, dataRoot, pipeline, eventDate, duck));
+                arrivals.add(arrival(r, extras, dataRoot, pipeline, eventDate, duck, merged));
             }
         } catch (java.sql.SQLException noReader) {
             // closing failed: the list is already built
@@ -262,11 +264,19 @@ final class DatasetArrivals {
         out.put("arrivals", arrivals);
         out.put("truncated", rows.size() + refused > MAX_LISTED);
         out.put("reason", null);
+        // one read for every Data status line: how files come (LA-ARRIVAL-FEEDS-1) and the storage (LA-DATASET-COMPACT-1)
+        out.put("feed", DatasetFeed.summary(cfg, dataRoot, id, dataset));
+        try {
+            out.put("storage", DatasetCompaction.describe(dataRoot, id, dataset));
+        } catch (java.io.IOException unreadable) {
+            out.put("storage", null);
+        }
         return out;
     }
 
     private static Map<String, Object> arrival(Map<String, String> r, Map<String, Map<String, Object>> extras, Path dataRoot,
-                                               String pipeline, String eventDate, Connection duck) {
+                                               String pipeline, String eventDate, Connection duck,
+                                               Map<String, DatasetCompaction.Segment> merged) {
         String landed = r.getOrDefault("filename", "");
         String batch = r.getOrDefault("consignment_id", "");
         Map<String, Object> extra = extras.get(landed + "|" + batch);
@@ -287,15 +297,26 @@ final class DatasetArrivals {
         a.put("indexMode", extra == null ? null : extra.get("indexMode"));
         a.put("consignment", batch);
         List<Path> outputs = new ArrayList<>();
+        List<DatasetCompaction.Segment> inMerge = new ArrayList<>();
         Path base = dataRoot.resolve(pipeline);
         for (String p : r.getOrDefault("output_paths", "").split(";")) {
             if (p.isBlank()) continue;
             Path o = Path.of(p.trim()).toAbsolutePath().normalize();
             if (PathJail.contains(base, o) && Files.isRegularFile(o)) outputs.add(o);   // never read outside the Dataset
+            else if (PathJail.contains(base, o)) {   // merged by a compaction: the map names it, with its period
+                String rel = base.resolve("database").relativize(o).toString().replace(java.io.File.separatorChar, '/');
+                DatasetCompaction.Segment s = merged.get(rel);
+                if (s != null) inMerge.add(s);
+            }
         }
         boolean wrote = !r.getOrDefault("output_paths", "").isBlank();
-        a.put("kept", !wrote || !outputs.isEmpty());   // false: a later Replace everything set its rows aside
+        // false: a later Replace everything set its rows aside
+        a.put("kept", !wrote || !outputs.isEmpty() || !inMerge.isEmpty());
         String[] period = period(duck, outputs, eventDate);
+        for (DatasetCompaction.Segment s : inMerge) {   // a rewritten merged file knows no period (null): left unsaid
+            if (s.coversFrom() != null && (period[0] == null || s.coversFrom().compareTo(period[0]) < 0)) period[0] = s.coversFrom();
+            if (s.coversTo() != null && (period[1] == null || s.coversTo().compareTo(period[1]) > 0)) period[1] = s.coversTo();
+        }
         a.put("coversFrom", period[0]);
         a.put("coversTo", period[1]);
         a.put("newColumns", extra == null ? null : extra.get("newColumns"));

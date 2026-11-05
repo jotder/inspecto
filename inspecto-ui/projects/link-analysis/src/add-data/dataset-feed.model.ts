@@ -100,14 +100,22 @@ export function feedWords(f: Feed): string {
     return f.connection ? `${f.kind}, Connection ${f.connection}` : f.kind;
 }
 
+/** The feed as the arrivals answer carries it (one read for every *Data status*): no inbox path. */
+export type FeedSummary = Feed & { waiting: number | null; alreadyImported?: number };
+
 /**
  * The ONE *Data status* line about the feed (D-1): on a kept-up-to-date Dataset how and how often, else only the files
  * waiting in the inbox; null when there is nothing to say (uploads, no file waiting).
  */
-export function feedStatusLine(s: DatasetFeedState | null): string | null {
-    if (!s) return null;
-    const waiting = s.waiting ? waitingWords(s.waiting, s.alreadyImported) : '';
-    if (s.feed.kind === 'uploads') return waiting ? `Inbox: ${waiting}` : null;
-    const how = `Kept up to date: ${feedWords(s.feed)}${s.feed.every ? `, ${everyWords(s.feed.every)}` : ''}`;
+export function feedSummaryLine(f: FeedSummary | null): string | null {
+    if (!f) return null;
+    const waiting = f.waiting ? waitingWords(f.waiting, f.alreadyImported) : '';
+    if (f.kind === 'uploads') return waiting ? `Inbox: ${waiting}` : null;
+    const how = `Kept up to date: ${feedWords(f)}${f.every ? `, ${everyWords(f.every)}` : ''}`;
     return waiting ? `${how} · ${waiting}` : how;
+}
+
+/** {@link feedSummaryLine} over the feed route's own answer. */
+export function feedStatusLine(s: DatasetFeedState | null): string | null {
+    return s ? feedSummaryLine({ ...s.feed, waiting: s.waiting, alreadyImported: s.alreadyImported }) : null;
 }

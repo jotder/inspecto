@@ -92,4 +92,4 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
 
 - `docs/superpower/data-tier-editions-plan.md` (DT-2, DT-3, DT-4, DT-5, DT-8, DT-10, DT-15, DT-16, DT-17)
 - `docs/superpower/first-run-onboarding-plan.md` (C3)
-- `docs/superpower/la-data-arrival-plan.md` (arrival rules)
+- `docs/archived-documents/plans-archive/la-data-arrival-plan.md` (arrival rules)

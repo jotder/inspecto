@@ -171,6 +171,19 @@ class ControlApiDatasetCompactionTest {
             assertFalse(storage.get("compactedAt").isNull());
             assertFalse(storage.get("retentionAvailable").asBoolean(), "Basic keeps every file");
 
+            // the arrivals answer reads the merge map (D-8): every merged arrival is still kept, with its own day; and it carries
+            // the storage and feed lines of Data status (one read)
+            JsonNode listed = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200);
+            assertEquals(21, listed.get("arrivals").size(), listed.toString());
+            for (JsonNode a : listed.get("arrivals")) {
+                assertTrue(a.get("kept").asBoolean(), a.toString());
+                assertEquals(a.get("coversFrom").asText().substring(0, 10), a.get("coversTo").asText().substring(0, 10), a.toString());
+            }
+            assertTrue(listed.get("arrivals").get(0).get("coversFrom").asText().startsWith(day(21)), listed.toString());
+            assertEquals(1, listed.at("/storage/files").asInt(), listed.toString());
+            assertEquals("uploads", listed.at("/feed/kind").asText(), listed.toString());
+            assertFalse(listed.get("feed").has("inbox"), "the arrivals read never names the server path");
+
             // one more arrival: two files, under the threshold; Compact now merges them, the older arrivals' map carried over
             append(c, id, "day22.csv", transfersOn(day(22), 5), null);
             assertEquals(2, parquetFiles(id));
@@ -182,6 +195,27 @@ class ControlApiDatasetCompactionTest {
             DatasetCompaction.Segment last = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values()).get(21);
             assertEquals(105, last.firstRow(), last.toString());
             assertTrue(last.coversFrom().startsWith(day(22)), last.toString());
+
+            // Replace the period rewrites the merged file (day 5 goes): its segments no longer hold, so its arrivals stay kept with
+            // no known period - and the next compaction carries it as ONE block, never slicing it by stale offsets
+            JsonNode period = data(send(c, "POST", "/datasets/" + id + "/files?name=day5again.csv&mode=period",
+                    transfersOn(day(5), 3).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(5, period.at("/period/rowsReplaced").asLong(), period.toString());
+            long afterPeriod = OnboardImport.countRows(Path.of("database", id, "database"));
+            assertEquals(108, afterPeriod);
+            Map<String, DatasetCompaction.Segment> stale = DatasetCompaction.merged(Path.of("database"), id);
+            assertEquals(22, stale.size());
+            assertTrue(stale.values().stream().allMatch(seg -> seg.rows() < 0 && seg.coversFrom() == null), stale.toString());
+            JsonNode recompacted = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
+            assertEquals("COMPACTED", recompacted.at("/compaction/result").asText(), recompacted.toString());
+            assertEquals(afterPeriod, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
+            Map<String, DatasetCompaction.Segment> carried = DatasetCompaction.merged(Path.of("database"), id);
+            assertEquals(24, carried.size(), "the 22 held arrivals, the block itself and the new upload: " + carried.keySet());
+            assertEquals(23, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt(),
+                    "the block's own old file is not an arrival");
+            assertTrue(carried.keySet().stream().anyMatch(f -> f.contains("_day5again_")), carried.keySet().toString());
+            assertTrue(data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").findValues("kept")
+                    .stream().allMatch(JsonNode::asBoolean), "every arrival still kept");
 
             // a Replace everything sets the folder aside: the map falls silent with it
             data(send(c, "POST", "/datasets/" + id + "/files?name=fresh.csv&mode=replace",

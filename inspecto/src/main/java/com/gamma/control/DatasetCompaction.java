@@ -77,8 +77,16 @@ final class DatasetCompaction {
 
     // ── the merge map ──────────────────────────────────────────────────────────────────────────────────────────
 
-    /** One arrival inside the merged file: its own output name, when received, its rows and the period it covers. */
-    record Segment(String file, String received, long firstRow, long rows, String coversFrom, String coversTo) {}
+    /**
+     * One arrival inside the merged file: its own output name, when received, its rows and the period it covers. A segment
+     * with {@code rows < 0} is an arrival whose rows are in the merged file at no known place (its file was rewritten since,
+     * e.g. by <i>Replace the period</i>): kept, period unknown. {@code holds} names the arrivals such a block carries.
+     */
+    record Segment(String file, String received, long firstRow, long rows, String coversFrom, String coversTo, List<String> holds) {
+        Segment {
+            holds = holds == null ? List.of() : List.copyOf(holds);
+        }
+    }
 
     static Path dir(Path dataRoot, String id) {
         return dataRoot.resolve(id);
@@ -95,12 +103,37 @@ final class DatasetCompaction {
      */
     static Map<String, Segment> merged(Path dataRoot, String id) {
         Map<String, Object> map = readMap(dir(dataRoot, id).resolve(MAP));
-        if (map == null || !(map.get("merged") instanceof String merged)
-                || !Files.isRegularFile(database(dataRoot, id).resolve(merged), LinkOption.NOFOLLOW_LINKS))
-            return Map.of();
+        Path file = mergedFile(map, database(dataRoot, id));
+        if (file == null) return Map.of();
+        boolean exact = unchanged(map, file);
         Map<String, Segment> out = new LinkedHashMap<>();
-        for (Segment s : segments(map)) out.put(s.file(), s);
+        for (Segment s : segments(map)) {
+            // rewritten since (Replace the period removed some of its days): every arrival is still in it, at no known row
+            out.put(s.file(), exact ? s : unknown(s.file(), s.received()));
+            for (String h : s.holds()) out.putIfAbsent(h, unknown(h, s.received()));
+        }
         return out;
+    }
+
+    private static Segment unknown(String file, String received) {
+        return new Segment(file, received, -1, -1, null, null, List.of());
+    }
+
+    /** The map's merged file when it is there, else null (a Replace everything set it aside with the folder). */
+    private static Path mergedFile(Map<String, Object> map, Path db) {
+        if (map == null || !(map.get("merged") instanceof String merged)) return null;
+        Path f = db.resolve(merged).normalize();
+        return f.startsWith(db.normalize()) && Files.isRegularFile(f, LinkOption.NOFOLLOW_LINKS) ? f : null;
+    }
+
+    /** Whether the merged file is the one the map describes (size and time): its row segments hold only then. */
+    private static boolean unchanged(Map<String, Object> map, Path file) {
+        try {
+            return map.get("mergedBytes") instanceof Number b && b.longValue() == Files.size(file)
+                    && map.get("mergedModified") instanceof Number t && t.longValue() == Files.getLastModifiedTime(file).toMillis();
+        } catch (IOException gone) {
+            return false;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -110,7 +143,8 @@ final class DatasetCompaction {
             for (Object o : list)
                 if (o instanceof Map<?, ?> m)
                     out.add(new Segment(str(m.get("file")), str(m.get("received")), num(m.get("firstRow")), num(m.get("rows")),
-                            str(m.get("coversFrom")), str(m.get("coversTo"))));
+                            str(m.get("coversFrom")), str(m.get("coversTo")),
+                            m.get("holds") instanceof List<?> h ? h.stream().map(String::valueOf).toList() : List.of()));
         return out;
     }
 
@@ -169,15 +203,25 @@ final class DatasetCompaction {
 
         // the arrivals in order: those inside the current merged file first (its map's order), then each other file
         Map<String, Object> map = readMap(dir(dataRoot, id).resolve(MAP));
-        String mergedName = map == null ? null : str(map.get("merged"));
-        Path merged = mergedName == null ? null : db.resolve(mergedName);
+        Path merged = mergedFile(map, db);
         List<Input> inputs = new ArrayList<>();
-        if (merged != null && files.contains(merged))
-            for (Segment s : segments(map)) inputs.add(new Input(s.file(), s.received(), merged, s.firstRow(), s.rows()));
+        if (merged != null && files.contains(merged)) {
+            if (unchanged(map, merged))
+                for (Segment s : segments(map)) inputs.add(new Input(s.file(), s.received(), merged, s.firstRow(), s.rows(), s.holds()));
+            else {
+                // rewritten since: its segments no longer hold, so it is carried as ONE block naming every arrival it holds
+                List<String> holds = new ArrayList<>();
+                for (Segment s : segments(map)) {
+                    holds.add(s.file());
+                    holds.addAll(s.holds());
+                }
+                inputs.add(new Input(db.relativize(merged).toString().replace('\\', '/'), str(map.get("at")), merged, -1, -1, holds));
+            }
+        }
         List<Path> loose = new ArrayList<>(files);
         if (merged != null) loose.remove(merged);
         loose.sort(Comparator.comparing((Path p) -> modified(p)).thenComparing(Path::toString));
-        for (Path p : loose) inputs.add(new Input(db.relativize(p).toString().replace('\\', '/'), modified(p), p, -1, -1));
+        for (Path p : loose) inputs.add(new Input(db.relativize(p).toString().replace('\\', '/'), modified(p), p, -1, -1, List.of()));
 
         String declared = content.get(DatasetRoutes.EVENT_DATE_KEY) instanceof String s && !s.isBlank() ? s : null;
         Path temp = dir(dataRoot, id).resolve("temp");
@@ -247,6 +291,7 @@ final class DatasetCompaction {
                 a.put("rows", n);
                 a.put("coversFrom", period.get(i)[0]);
                 a.put("coversTo", period.get(i)[1]);
+                if (!in.holds().isEmpty()) a.put("holds", in.holds());
                 arrivals.add(a);
                 first += n;
             }
@@ -264,6 +309,10 @@ final class DatasetCompaction {
         // ── the swap: pending map, merged file in, inputs out, map committed ──
         Map<String, Object> next = new LinkedHashMap<>();
         next.put("merged", arrivals.isEmpty() ? null : name);
+        if (!arrivals.isEmpty()) {   // the file the map describes: a later rewrite (Replace the period) is noticed
+            next.put("mergedBytes", Files.size(written));
+            next.put("mergedModified", Files.getLastModifiedTime(written).toMillis());
+        }
         next.put("at", Instant.now().toString());
         next.put("arrivals", arrivals);
         next.put("removed", removed);
@@ -288,7 +337,7 @@ final class DatasetCompaction {
     }
 
     /** One arrival to carry into the merged file: from its own file ({@code from < 0}) or a segment of the merged one. */
-    private record Input(String file, String received, Path source, long from, long rows) {}
+    private record Input(String file, String received, Path source, long from, long rows, List<String> holds) {}
 
     /** {@code UNION ALL BY NAME} of the inputs, each row tagged with its arrival ({@code __seq}) and its order ({@code __rn}). */
     private static String union(List<Input> inputs) {
@@ -438,7 +487,9 @@ final class DatasetCompaction {
         out.put("bytes", bytes);
         out.put("threshold", THRESHOLD);
         out.put("compactedAt", map == null ? null : map.get("at"));
-        out.put("compactedArrivals", merged.size());
+        int arrivals = 0;   // a carried block counts the arrivals it holds, never its own old file name
+        if (!merged.isEmpty() && map != null) for (Segment s : segments(map)) arrivals += s.holds().isEmpty() ? 1 : s.holds().size();
+        out.put("compactedArrivals", arrivals);
         out.put("removedArrivals", map != null && map.get("removed") instanceof List<?> r ? r.size() : 0);
         Retention r = retentionOf(content);
         out.put(RETENTION, r == null ? null : r.asMap());

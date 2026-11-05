@@ -37,9 +37,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `BASIC-ONBOARD-1` | P2 | feature | Basic data onboarding as a platform feature every application reuses: three ways in (an inbox directory, a one-time upload, a Postgres ta… | — |
 | `LA-COLUMN-ROLES-2` | P3 | feature | what LA-COLUMN-ROLES-1 deliberately left out, on demand: | — |
 | `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
+| `LA-DATASET-COMPACT-2` | P3 | feature | compaction for a feed's scheduled runs, and the graph after a retention compaction (deferred from LA-DATASET-COMPACT-1, 2026-11-05). | — |
 | `LA-ARRIVAL-NEW-COLUMNS-1` | P3 | feature | keep a later file's new columns as details of an import Dataset (schema evolution with union-by-name reads), filed 2026-11-05 from D-6. | — |
-| `LA-ARRIVAL-FEEDS-1` | P3 | feature | files from a foreign process, made visible (LA-DATA-ARRIVAL-1 P3, decision D-1). | — |
-| `LA-DATASET-COMPACT-1` | P3 | feature | compaction of an import Dataset's Parquet in every edition, a retention policy on Standard+ (LA-DATA-ARRIVAL-1 P4, decision D-5). | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
