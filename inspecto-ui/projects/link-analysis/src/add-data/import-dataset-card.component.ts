@@ -25,7 +25,16 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { AddDataAccess } from './add-data-access';
-import { Arrival, ImportDataset, ImportSummary, arrivalLine, dataStatusLine, fileProblem } from './add-data.model';
+import {
+    AddFileMode,
+    Arrival,
+    Arrivals,
+    ImportDataset,
+    ImportSummary,
+    arrivalLine,
+    fileProblem,
+} from './add-data.model';
+import { DataStatusComponent } from './data-status.component';
 import { ImportSummaryComponent } from './import-summary.component';
 import { DatasetFeedComponent } from './dataset-feed.component';
 import { DatasetStorageComponent } from './dataset-storage.component';
@@ -54,6 +63,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         ChipComponent,
         LockedActionComponent,
         ImportSummaryComponent,
+        DataStatusComponent,
         DatasetFeedComponent,
         DatasetStorageComponent,
     ],
@@ -73,11 +83,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             @if (dataset().description) {
                 <p class="text-secondary m-0 text-sm">{{ dataset().description }}</p>
             }
-            @if (statusLine(); as line) {
-                <p class="m-0 text-sm" data-testid="data-status">
-                    <span class="font-semibold">Data status:</span> {{ line }}
-                </p>
-            }
+            <inspecto-la-data-status [arrivals]="arrivalsAnswer()"></inspecto-la-data-status>
             @if (last(); as s) {
                 <div class="flex flex-col gap-1">
                     <h4 class="m-0 text-sm font-semibold">Last import</h4>
@@ -124,6 +130,11 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 >
                     <mat-radio-button value="replace">A new file replaces the data</mat-radio-button>
                     <mat-radio-button value="append">A new file adds its rows</mat-radio-button>
+                    @if (arrivalsAnswer()?.eventDateColumn) {
+                        <mat-radio-button value="period" data-testid="add-file-period"
+                            >A new file replaces the days it covers</mat-radio-button
+                        >
+                    }
                 </mat-radio-group>
             }
             <div class="flex flex-wrap items-center gap-2">
@@ -223,7 +234,7 @@ export class ImportDatasetCardComponent {
     readonly imported = output<ImportSummary>();
 
     protected readonly titleId = `inspecto-import-card-${ImportDatasetCardComponent.nextId++}`;
-    protected readonly mode = new FormControl<'replace' | 'append'>('replace', { nonNullable: true });
+    protected readonly mode = new FormControl<AddFileMode>('replace', { nonNullable: true });
     protected readonly last = signal<ImportSummary | null>(null);
     protected readonly busy = signal(false);
     protected readonly following = signal(false);
@@ -240,14 +251,15 @@ export class ImportDatasetCardComponent {
     /** LA-DATASET-COMPACT-1: the files and the last compaction, re-read after every import (it may have compacted). */
     private readonly storagePanel = viewChild(DatasetStorageComponent);
 
-    /** LA-ARRIVAL-LEDGER-1: every file the import took, newest first; [] while unread or when the read fails. */
-    protected readonly arrivals = signal<Arrival[]>([]);
+    /** LA-ARRIVAL-LEDGER-1: the last `GET /datasets/{id}/arrivals` answer; null while unread or when the read fails. */
+    protected readonly arrivalsAnswer = signal<Arrivals | null>(null);
+    /** Every file the import took, newest first. */
+    protected readonly arrivals = computed<Arrival[]>(() => this.arrivalsAnswer()?.arrivals ?? []);
     protected readonly arrivalsShown = 5;
     protected readonly allArrivals = signal(false);
     protected readonly shownArrivals = computed(() =>
         this.allArrivals() ? this.arrivals() : this.arrivals().slice(0, this.arrivalsShown),
     );
-    protected readonly statusLine = computed(() => dataStatusLine(this.arrivals()));
     protected readonly line = arrivalLine;
     protected readonly received = (a: Arrival): string => (a.received ?? '').replace('T', ' ').slice(0, 16);
 
@@ -271,8 +283,8 @@ export class ImportDatasetCardComponent {
             .arrivals(id)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: (r) => this.arrivals.set(r.arrivals ?? []),
-                error: () => this.arrivals.set([]), // the card stays usable; only the history is missing
+                next: (r) => this.arrivalsAnswer.set(r),
+                error: () => this.arrivalsAnswer.set(null), // the card stays usable; only the history is missing
             });
     }
 

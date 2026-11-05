@@ -29,7 +29,7 @@ import {
 import { OnboardService } from './onboard.service';
 
 /**
- * An import Dataset's **Storage** (`LA-DATASET-COMPACT-1`, plan P4, D-6…D-8), inside the Dataset card: its files and the
+ * An import Dataset's **Storage** (`LA-DATASET-COMPACT-1`, plan P4, D-7…D-9), inside the Dataset card: its files and the
  * last compaction (an import compacts on its own past the threshold, every edition), **Compact now**, and on Standard and
  * up the **retention policy** (keep N days by the rows' date, or N arrivals) for a person who may author Datasets; it
  * applies at the next compaction.

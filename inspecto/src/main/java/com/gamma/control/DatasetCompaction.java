@@ -35,30 +35,30 @@ import java.util.stream.Stream;
 
 /**
  * <b>Storage hygiene of an import Dataset</b> ({@code LA-DATASET-COMPACT-1}, plan {@code la-data-arrival-plan.md} P4,
- * D-5…D-9). Every arrival lands as its own Parquet file under {@code <dataRoot>/<id>/database}; after weeks of daily files
+ * D-5, D-7…D-10). Every arrival lands as its own Parquet file under {@code <dataRoot>/<id>/database}; after weeks of daily files
  * reads slow down.
  * <ul>
- *   <li><b>Compaction</b> (every edition, D-5, D-6): once the Dataset holds more than {@link #THRESHOLD} files, the import's
+ *   <li><b>Compaction</b> (every edition, D-5, D-7): once the Dataset holds more than {@link #THRESHOLD} files, the import's
  *       own follow-on work (inside the person's run, before the index build) merges them into ONE file, ordered by arrival;
  *       {@code POST /datasets/{id}/compact} (<i>Compact now</i>) does it at any count.</li>
- *   <li><b>The merge map</b> (D-7) {@code <dataRoot>/<id>/compaction.json}: the merged file and, per arrival it holds, the
+ *   <li><b>The merge map</b> (D-8) {@code <dataRoot>/<id>/compaction.json}: the merged file and, per arrival it holds, the
  *       arrival's own output name, when it was received, its row segment in the merged file and the period it covers - so
  *       every arrival keeps its period and stays <i>kept</i> ({@link #merged}). Trusted only while its merged file exists:
  *       a <i>Replace everything</i> sets the whole folder aside, and the map with it falls silent.</li>
- *   <li><b>Retention</b> (Standard and up, D-8): the Dataset entry's {@code retention {days | arrivals}}, applied at
+ *   <li><b>Retention</b> (Standard and up, D-9): the Dataset entry's {@code retention {days | arrivals}}, applied at
  *       compaction time: <i>keep N days</i> by the event date (the When column), else by when the file was received;
  *       <i>keep N arrivals</i> drops the oldest arrivals' rows. Set with {@code PUT /datasets/{id}/storage}.</li>
  * </ul>
  * The swap is crash-safe the way a pending map makes it: the merged file is written aside, a {@code .pending} map names it
  * and its inputs, the merged file moves in, the inputs go, the map is committed; {@link #heal} finishes or drops a pending
- * map. Between the move and the deletes a reader may count both briefly. The link index's next build is a full one (D-9:
+ * map. Between the move and the deletes a reader may count both briefly. The link index's next build is a full one (D-10:
  * its inputs were rewritten - the index's own advice).
  */
 final class DatasetCompaction {
 
     private DatasetCompaction() {}
 
-    /** More files than this, and the import compacts on its own (D-6). */
+    /** More files than this, and the import compacts on its own (D-7). */
     static final int THRESHOLD = 20;
     static final String MAP = "compaction.json";
     static final String RETENTION = "retention";
@@ -138,7 +138,7 @@ final class DatasetCompaction {
     }
 
     /**
-     * The import's own follow-on step (D-6): compact once more than {@link #THRESHOLD} files lie there. Never throws: a
+     * The import's own follow-on step (D-7): compact once more than {@link #THRESHOLD} files lie there. Never throws: a
      * compaction that fails leaves the files as they were and says so (the import itself succeeded).
      */
     static Map<String, Object> afterImport(Path dataRoot, String id, Map<String, Object> content) {
@@ -392,7 +392,7 @@ final class DatasetCompaction {
         return m;
     }
 
-    // ── retention (D-8, Standard and up) ───────────────────────────────────────────────────────────────────────
+    // ── retention (D-9, Standard and up) ───────────────────────────────────────────────────────────────────────
 
     /** Keep {@code days} days, or {@code arrivals} arrivals (exactly one is set). */
     record Retention(Integer days, Integer arrivals) {

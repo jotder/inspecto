@@ -35,6 +35,7 @@ import { onboardRedirect } from './onboard-redirect';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { AddDataDropComponent } from 'app/modules/admin/add-data/add-data-drop.component';
 
 type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' | 'shared-with-me' | 'shared-by-me';
 
@@ -49,6 +50,7 @@ type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' |
 @Component({
     standalone: true,
     imports: [
+        AddDataDropComponent,
         InspectoPageHeaderComponent,
         AiExplainComponent,
         FormsModule,

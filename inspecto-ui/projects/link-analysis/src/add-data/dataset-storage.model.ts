@@ -66,7 +66,7 @@ export function storageWords(s: DatasetStorageState): string {
 }
 
 /**
- * The ONE *Data status* line about storage (D-6, D-8): how many files and, on Standard, what the policy keeps; null
+ * The ONE *Data status* line about storage (D-7, D-9): how many files and, on Standard, what the policy keeps; null
  * while nothing was read.
  */
 export function storageStatusLine(s: DatasetStorageState | null): string | null {

@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@code LA-DATASET-COMPACT-1} over real HTTP: an import compacts its files on its own past the threshold (every edition,
- * D-6), every arrival keeps its period through the merge map (D-7), Compact now, a Replace everything resets the map,
- * retention on Standard by arrivals and by event date (D-8) and never on Basic, the crash heal, and the gates. Synthetic
+ * D-7), every arrival keeps its period through the merge map (D-8), Compact now, a Replace everything resets the map,
+ * retention on Standard by arrivals and by event date (D-9) and never on Basic, the crash heal, and the gates. Synthetic
  * fixtures only: transfers on a stated day.
  */
 class ControlApiDatasetCompactionTest {

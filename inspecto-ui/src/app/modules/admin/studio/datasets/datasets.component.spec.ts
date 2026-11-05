@@ -1,6 +1,7 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,6 +11,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
+import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
 import { DatasetsComponent } from './datasets.component';
 
 const D1: Dataset = {
@@ -24,7 +26,13 @@ const D1: Dataset = {
 
 function create(
     datasets: Dataset[] = [D1],
-    opts: { canShare?: boolean; offerResult?: { description: string }; signals?: ReturnType<typeof vi.fn> } = {},
+    opts: {
+        canShare?: boolean;
+        offerResult?: { description: string };
+        signals?: ReturnType<typeof vi.fn>;
+        /** Why Add data is locked for this person here (no right, or `data.self_import` off); null = may add data. */
+        addDataLock?: string | null;
+    } = {},
 ) {
     const remove = vi.fn(() => of(null));
     const offer = vi.fn(() => of({} as never));
@@ -56,6 +64,10 @@ function create(
                 },
             },
             { provide: ExchangeService, useValue: { offer } },
+            {
+                provide: AddDataAccess,
+                useValue: { lockReason: signal(opts.addDataLock ?? null), load: () => undefined },
+            },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
             { provide: EventsService, useValue: { signals: opts.signals ?? vi.fn(() => of([])) } },
             {
@@ -69,6 +81,25 @@ function create(
 }
 
 describe('DatasetsComponent', () => {
+    it('empty: a dropped file or Add data opens the console Add data (ONBOARDING-FIRST-RUN-1 B1) (no violations)', async () => {
+        const { fixture } = create([]);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        fixture.detectChanges();
+        const empty = fixture.nativeElement.querySelector('[data-testid="datasets-empty"]') as HTMLElement;
+        expect(empty.textContent).toContain('Drop a file here to add it as data');
+        (empty.querySelector('button') as HTMLButtonElement).click();
+        expect(navigate).toHaveBeenCalledWith('/add-data');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('empty but Add data locked here: no drop offer and no Add data button', () => {
+        const { fixture } = create([], { addDataLock: 'Adding data is off in this Space.' });
+        fixture.detectChanges();
+        const empty = fixture.nativeElement.querySelector('[data-testid="datasets-empty"]') as HTMLElement;
+        expect(empty.textContent).not.toContain('Drop a file');
+        expect(empty.querySelector('button')).toBeNull();
+    });
+
     it('renders a read-time freshness badge from the dataset.write ledger (DUCKLE-C1 residual 4)', async () => {
         const signals = vi.fn(() => of([{ ts: Date.now() - 60_000 }]));
         const { fixture } = create([D1], { signals });

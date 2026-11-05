@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `BASIC-ONBOARD-1` | P2 | feature | Basic data onboarding as a platform feature every application reuses: three ways in (an inbox directory, a one-time upload, a Postgres ta… | — |
 | `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | — |

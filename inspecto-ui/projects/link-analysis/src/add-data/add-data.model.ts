@@ -152,13 +152,21 @@ export interface Arrival {
     status: string | null;
     rowsRead: number | null;
     rowsRejected: number | null;
-    mode: 'replace' | 'append' | null;
+    mode: 'replace' | 'append' | 'period' | null;
     sha256: string | null;
+    /** The link index outcome of the run that took this file (BUILT, UP_TO_DATE, DEFERRED, FAILED, …); null = not recorded. */
     index: string | null;
+    /** How that build ran: `append` (the new file only), `full`, `compact`, `none`; null = not recorded. */
+    indexMode?: string | null;
     consignment: string;
     kept: boolean;
     coversFrom: string | null;
     coversTo: string | null;
+    /** LA-ARRIVAL-MODES-1: columns the file carried that the Dataset does not read (accepted, not kept). */
+    newColumns?: string[] | null;
+    /** A `REFUSED` arrival: why, and where the file was set aside (relative to the Dataset's folder). */
+    reason?: string | null;
+    setAside?: string | null;
 }
 
 export interface Arrivals {
@@ -168,6 +176,9 @@ export interface Arrivals {
     truncated: boolean;
     reason: string | null;
 }
+
+/** What an added file does (`POST /datasets/{id}/files?mode=`): replace everything, add rows, or replace its days. */
+export type AddFileMode = 'replace' | 'append' | 'period';
 
 /** The run summary the commit, Add a file and Run now answer (200), or a followed run's `summary`. */
 export interface ImportSummary {
@@ -185,6 +196,12 @@ export interface ImportSummary {
     replaced: boolean;
     index?: ImportIndexOutcome;
     expectations?: ImportExpectation[];
+    /** LA-ARRIVAL-MODES-1, *Replace the period it covers*: the days the file covered and the older rows it removed. */
+    period?: { days: number; from: string | null; to: string | null; rowsReplaced: number; filesRewritten: number };
+    /** Columns the file carried that the Dataset does not read: accepted, not kept. */
+    newColumns?: string[];
+    /** Waiting files refused by the columns rule and set aside (`setAside` is relative to the Dataset's folder). */
+    refused?: { file: string; reason: string; setAside: string }[];
 }
 
 /** A followed (202) run: `GET /onboard/runs/{runId}`. */
@@ -569,7 +586,13 @@ export function summaryLines(s: ImportSummary): SummaryLine[] {
     const out: SummaryLine[] = [];
     const kept = Math.max(0, s.rowsIn - s.rowsRejected);
     const from = s.file ? ` from ${s.file}` : '';
+    // LA-ARRIVAL-MODES-1: waiting files refused by the columns rule were set aside before the run
+    const refused: SummaryLine[] = (s.refused ?? []).map((r) => ({
+        tone: 'warning',
+        text: `${r.file} was set aside in ${r.setAside}: ${r.reason}`,
+    }));
     if (s.rowsIn === 0 && !s.file && (s.quarantined ?? []).length === 0) {
+        if (refused.length) return [...refused, ...indexAndExpectations(s)];
         // Run now with nothing waiting: say so, not "0 rows were read".
         out.push({
             tone: 'info',
@@ -587,7 +610,20 @@ export function summaryLines(s: ImportSummary): SummaryLine[] {
             text: `${plural(s.rowsRejected, 'row was', 'rows were')} set aside because ${s.rowsRejected === 1 ? 'it' : 'they'} did not match the column types.`,
         });
     for (const q of s.quarantined ?? []) out.push({ tone: 'warning', text: `${q.file} was set aside: ${q.reason}.` });
-    if (s.replaced)
+    out.push(...refused);
+    if (s.newColumns?.length)
+        out.push({
+            tone: 'info',
+            text: `New ${s.newColumns.length === 1 ? 'column' : 'columns'} not kept: ${s.newColumns.join(', ')}. The Dataset reads the columns it was made with.`,
+        });
+    if (s.period)
+        out.push({
+            tone: 'info',
+            text: s.period.days
+                ? `It replaced ${coversText(s.period.from, s.period.to)} (${plural(s.period.days, 'day', 'days')}): ${plural(s.period.rowsReplaced, 'older row was', 'older rows were')} removed, ${plural(s.rowsAfter, 'row', 'rows')} now.`
+                : `It covers no day, so nothing older was replaced: ${plural(s.rowsAfter, 'row', 'rows')} now.`,
+        });
+    else if (s.replaced)
         out.push({
             tone: 'info',
             text: `This replaced the previous data: ${plural(s.rowsBefore, 'row', 'rows')} before, ${plural(s.rowsAfter, 'row', 'rows')} now.`,
@@ -692,10 +728,38 @@ export function coversText(from: string | null, to: string | null): string {
 }
 
 /**
- * The Dataset's **Data status** in one line, from its newest arrival: when data last arrived, the period the data still kept
- * covers, and whether the graph has it - said only when the import recorded it (a file from a system has no such record).
+ * Every line of a Dataset's **Data status** (`<inspecto-la-data-status>`), the three clocks first. ⚠ Extension point: a
+ * later line (files waiting in the inbox, storage) is one more entry here from a field of `GET /datasets/{id}/arrivals`.
  */
-export function dataStatusLine(list: readonly Arrival[]): string | null {
+export function dataStatusLines(read: Arrivals | null): string[] {
+    const clocks = dataStatusLine(read?.arrivals ?? []);
+    return clocks ? [clocks] : [];
+}
+
+const INDEXED = new Set(['BUILT', 'UP_TO_DATE']);
+
+/** What the graph holds, from the arrivals' recorded index outcomes, newest first; '' when nothing was recorded. */
+function graphClock(list: readonly Arrival[]): string {
+    const newest = list[0];
+    if (newest?.index === 'DEFERRED') return "the graph is updated by the Space's Jobs";
+    const k = list.findIndex((a) => !!a.index && INDEXED.has(a.index));
+    if (k === 0) return 'graph up to date';
+    // the arrivals after the newest one the graph took, counted only when their own outcome was recorded
+    const behind = (k < 0 ? list : list.slice(0, k)).filter(
+        (a) => !!a.index && a.index !== 'SKIPPED' && a.index !== 'NOT_AVAILABLE',
+    ).length;
+    if (k > 0 && behind) return `graph ${plural(behind, 'file', 'files')} behind`;
+    if (newest?.index === 'FAILED' || newest?.index === 'REFUSED') return 'the graph was not updated';
+    return '';
+}
+
+/**
+ * The Dataset's **Data status** in one line, from its arrivals (newest first): **Received** (when data last arrived) ·
+ * **covers** (the period the data still kept covers) · the **graph** (up to date, or how many files behind) - the graph
+ * part only when the runs recorded an index outcome.
+ */
+export function dataStatusLine(all: readonly Arrival[]): string | null {
+    const list = all.filter((a) => a.status !== 'REFUSED'); // a refused file never arrived in the data
     const newest = list[0];
     if (!newest) return null;
     const parts = [`Received ${when(newest.received)}`];
@@ -710,17 +774,22 @@ export function dataStatusLine(list: readonly Arrival[]): string | null {
               )
             : '';
     if (covers) parts.push(`covers ${covers}`);
-    if (newest.index === 'BUILT' || newest.index === 'UP_TO_DATE') parts.push('graph up to date');
-    else if (newest.index === 'DEFERRED') parts.push("the graph is updated by the Space's Jobs");
-    else if (newest.index === 'FAILED' || newest.index === 'REFUSED') parts.push('the graph was not updated');
+    const graph = graphClock(list);
+    if (graph) parts.push(graph);
     return parts.join(' · ');
 }
 
 /** One arrival in words: who sent it, what it did, its rows and period, and whether its rows are still kept. */
 export function arrivalLine(a: Arrival): string {
     const parts = [a.sender === 'upload' ? 'uploaded' : 'from a system'];
+    if (a.status === 'REFUSED') {
+        parts.push(`refused: ${a.reason ?? 'its columns do not match'}`);
+        if (a.setAside) parts.push(`set aside in ${a.setAside}`);
+        return parts.join(' · ');
+    }
     if (a.mode === 'replace') parts.push('replaced the data');
     else if (a.mode === 'append') parts.push('added its rows');
+    else if (a.mode === 'period') parts.push('replaced the days it covers');
     if (typeof a.rowsRead === 'number')
         parts.push(
             a.rowsRejected
@@ -729,6 +798,7 @@ export function arrivalLine(a: Arrival): string {
         );
     const covers = coversText(a.coversFrom, a.coversTo);
     if (covers) parts.push(`covers ${covers}`);
+    if (a.newColumns?.length) parts.push(`not kept: ${a.newColumns.join(', ')}`);
     if (!a.kept) parts.push('set aside by a later replace');
     return parts.join(' · ');
 }

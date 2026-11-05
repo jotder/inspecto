@@ -12,6 +12,8 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { REMOTE_FALLBACK, SELF_IMPORT_OFF } from '@inspecto/link-analysis/add-data/add-data.model';
+import { AddDataHandoff } from './add-data-drop.component';
+import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
 import { ConsoleAddDataPageComponent } from './add-data.page';
 
 let http: HttpTestingController;
@@ -20,6 +22,8 @@ interface Opts {
     edition?: 'basic' | 'standard';
     selfImport?: boolean;
     canOnboard?: boolean;
+    /** A file dropped on another pane, waiting for this screen. */
+    dropped?: File;
 }
 
 function create(o: Opts = {}) {
@@ -55,6 +59,11 @@ function create(o: Opts = {}) {
             { provide: EntityProfileService, useValue: { entityTypes: () => of({ items: [] }) } },
         ],
     });
+    if (o.dropped) {
+        TestBed.inject(AddDataHandoff).put(o.dropped);
+        // the pane the file was dropped on has already read the Space's switch (the access service is shared)
+        TestBed.inject(AddDataAccess).selfImport.set(o.selfImport ?? true);
+    }
     const fixture = TestBed.createComponent(ConsoleAddDataPageComponent);
     fixture.detectChanges();
     http = TestBed.inject(HttpTestingController);
@@ -73,7 +82,7 @@ function create(o: Opts = {}) {
 
 describe('ConsoleAddDataPageComponent (/add-data, ONBOARDING-FIRST-RUN-1 C3)', () => {
     afterEach(() => {
-        // the Dataset card reads its arrivals (LA-ARRIVAL-LEDGER-1), its inbox and feed (LA-ARRIVAL-FEEDS-1); not looked at here
+        // LA-ARRIVAL-LEDGER-1: the Dataset card reads its arrivals; a test that does not look at them answers none
         http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
         // LA-ARRIVAL-FEEDS-1: and its inbox and feed (and, where Keep this up to date is offered, the Connections)
         http
@@ -127,5 +136,21 @@ describe('ConsoleAddDataPageComponent (/add-data, ONBOARDING-FIRST-RUN-1 C3)', (
         const { el } = create({ selfImport: false });
         expect(el.querySelector('[data-testid="add-data-locked"]')!.textContent).toContain(SELF_IMPORT_OFF);
         expect(el.querySelector('[data-testid="imported-datasets"]')).toBeNull();
+    });
+
+    it('reads a file dropped on another pane at once, as if dropped here, and only once (B1 drop zones)', () => {
+        const file = new File(['a,b\n1,2\n'], 'orders.csv', { type: 'text/csv' });
+        create({ dropped: file });
+        const req = http.expectOne((r) => r.url === apiUrl('/onboard/files'));
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toBe(file);
+        expect(TestBed.inject(AddDataHandoff).take()).toBeNull();
+    });
+
+    it('does not send a dropped file when Add data is off here: the screen is the reason', () => {
+        const file = new File(['a\n1\n'], 'orders.csv', { type: 'text/csv' });
+        const { el } = create({ selfImport: false, dropped: file });
+        expect(http.match((r) => r.url === apiUrl('/onboard/files'))).toHaveLength(0);
+        expect(el.querySelector('[data-testid="add-data-locked"]')).not.toBeNull();
     });
 });

@@ -1782,7 +1782,44 @@ component that imports `DataTableComponent` brings `MatDialogModule` into its in
 beyond the kind of link (`LA-COLUMN-ROLES-2`); drawing from the Data page (it points to Explore); a live drive on the
 Basic install (the plan's §5 check over IMS and Mobile money) waits for a redeploy.
 
-### 6.17 Arrival feeds: the inbox and Keep this up to date (LA-ARRIVAL-FEEDS-1, as built 2026-11-05)
+### 6.17 Arrivals: the ledger, Data status and what a later file does (LA-ARRIVAL-LEDGER-1 + LA-ARRIVAL-MODES-1, as built 2026-11-03/05)
+
+Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrivals).
+
+- **`GET /datasets/{id}/arrivals`** (`inspecto/.../control/DatasetArrivals.java`) is a READ over the engine's per-file
+  audit ledger (`StatusStore.files`) joined to a sidecar `<dataRoot>/<id>/arrivals.jsonl`. The covered period is the
+  min / max of the Dataset's `eventDate` over the arrival's own Parquet, read in a DuckDB sealed to `<dataRoot>/<id>`.
+  Gates as `/freshness` (no capability); an entry whose import fields do not name ITS OWN Add data Pipeline reads nothing.
+- **The sidecar** gets one line per file a run took (`DatasetArrivals.recordRun`): the upload's name, mode, sha256; every
+  file's index outcome and its mode (`append` / `full` / `compact`). *Run now* records the drops it took (`sender: system`).
+  A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A refused
+  waiting file has only its sidecar line (`status: REFUSED`, `reason`, `setAside`) and is merged in by time.
+- **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`),
+  on the Dataset card, under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up
+  to date / N files behind*. A refused arrival is left out. Extension point: `dataStatusLines()` in `add-data.model.ts`.
+- **V4:** on Basic every append (Add a file, or a drop Run now takes) builds the link index in mode `append`; only the
+  first build is `full`. About 7 to 11 s per 10,000-row append at 1 M rows, end to end
+  (`ControlApiOnboardLinkAnalysisTest#v4MeasuredAtScale`).
+- **Three modes** for *Add a file*: `replace` (everything), `append` (add rows), `period` (D-2: the file's rows are added,
+  then every older Parquet file loses its rows on the calendar days the file covers; `DatasetPeriod`, originals kept in
+  `database.period-<stamp>/` until the import succeeded). `period` needs a When column. A rewritten file makes the next
+  index build `full`.
+- **The same bytes again** (D-3): append or period whose sha256 matches an upload whose rows are still held answers 409
+  with the first import's date (`DatasetArrivals.alreadyImported`). Replace everything may always reload. A folder drop
+  under the same name is skipped by the import Pipeline's duplicate policy and stays in the inbox.
+- **Schema drift** (D-6, operator 2026-11-05): `OnboardImport.checkColumns` judges a later file by column NAME before
+  anything lands. A missing column, or a delimited column at another position, refuses it naming each (422 for an upload;
+  Run now, and Add a file for the drops its run takes, move a refused waiting file to `<id>/refused/`). A new column is
+  accepted, not kept (delimited files are rewritten with the read columns only, because the engine sets aside rows with
+  more fields than it reads) and named in the result and the arrival. An import with no header line is judged by its
+  column count only.
+
+**Deliberately not done.** Keeping new columns as details (`LA-ARRIVAL-NEW-COLUMNS-1`); row-key upserts (with SCD2,
+D-ING4); the inbox and *Keep this up to date* (`LA-ARRIVAL-FEEDS-1`); Dataset Parquet compaction (`LA-DATASET-COMPACT-1`);
+a refresh of the Start box / dock status after a run (each reads once per Dataset); a live drive on Basic and Preview.
+Plan: `docs/superpower/la-data-arrival-plan.md` §5a-§5d, §6.
+
+### 6.18 Arrival feeds: the inbox and Keep this up to date (LA-ARRIVAL-FEEDS-1, as built 2026-11-05)
 
 Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P3, decision D-1. Class
 `inspecto/.../control/DatasetFeed.java`, registered from `OnboardRoutes`; gates as *Add a file* (`canUploadData`, 503 no
@@ -1830,9 +1867,9 @@ for THIS id).
 - Tests: `ControlApiDatasetFeedTest` (real HTTP: Basic inbox + Run now, Standard PUT/DELETE and the reloaded config,
   every refusal, armed 401/403/200), `dataset-feed.component.spec.ts`, `import-dataset-card.component.spec.ts`.
 
-### 6.18 Dataset storage: compaction, the merge map and retention (LA-DATASET-COMPACT-1, as built 2026-11-05)
+### 6.19 Dataset storage: compaction, the merge map and retention (LA-DATASET-COMPACT-1, as built 2026-11-05)
 
-Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P4, decisions D-5…D-9 (operator
+Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P4, decisions D-5, D-7…D-10 (operator
 2026-11-05). Class `inspecto/.../control/DatasetCompaction.java`, registered from `OnboardRoutes`.
 
 | Route | Gate | What |
@@ -1843,14 +1880,14 @@ Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md)
 
 All three after Add a file's gates (503 no write root, 403 `data.self_import`, 404 / 409 `importDataset`).
 
-- **On its own (D-6).** `OnboardImport.Job.followOn` calls `DatasetCompaction.afterImport` first, so every import path
+- **On its own (D-7).** `OnboardImport.Job.followOn` calls `DatasetCompaction.afterImport` first, so every import path
   (commit, Add a file, Run now) compacts past 20 files inside the person's run, before the index build; the summary
   carries `compaction`. Never throws: a failed compaction leaves the files and says so. Every edition.
 - **How.** Every Parquet file under `<dataRoot>/<id>/database` (no hidden file, no link) is read in a DuckDB sealed to
   `<dataRoot>/<id>`, each row tagged with its arrival (`__seq`) and its row number, and written ONE file
   `compacted_<stamp>.parquet` ordered by arrival (`UNION ALL BY NAME`, so drifted columns line up). Arrival order: the
   segments the previous merged file holds (its map's order), then the loose files by modification time.
-- **The merge map (D-7)** `<dataRoot>/<id>/compaction.json`: `merged`, `at`, `arrivals[{file, received, firstRow, rows,
+- **The merge map (D-8)** `<dataRoot>/<id>/compaction.json`: `merged`, `at`, `arrivals[{file, received, firstRow, rows,
   coversFrom, coversTo}]` (the arrival's own output name, its row segment, the period of its kept rows),
   `removed[{file, at, reason}]` (at most 500), `retention`. `DatasetCompaction.merged(dataRoot, id)` answers it ONLY
   while the merged file exists, so a *Replace everything* (which sets the whole `database` folder aside) silences it.
@@ -1861,12 +1898,12 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   named in the pending file and is counted twice until the next compaction removes it - the outcome says so. While a
   pending file still names one, compaction waits (`NOT_NEEDED`): its rows are in the merged file already, and merging
   it again would keep them twice for good.
-- **Retention (D-8), Standard and up**, applied at compaction: *keep N arrivals* drops the oldest arrivals whole; *keep N
+- **Retention (D-9), Standard and up**, applied at compaction: *keep N arrivals* drops the oldest arrivals whole; *keep N
   days* keeps rows whose event date (`eventDate`, the When column) is within N days - a row whose date is missing or
   cannot be read as a timestamp always stays - and without a When column (or one the files do not have, checked with
   `DESCRIBE`) drops whole arrivals received before the cutoff. A policy stored on Basic is ignored
   (`retentionInForce`): Basic never drops a row.
-- **Link index (D-9).** The files are rewritten, so the index's next build is a full one (its own advice, nothing added).
+- **Link index (D-10).** The files are rewritten, so the index's next build is a full one (its own advice, nothing added).
 - **UI:** `add-data/dataset-storage.component.ts` in the card (*Storage* line, *Compact now*, on Standard the *Keep*
   picker for a person who may author); `storageStatusLine` is the *Data status* line, joined through the ledger lane's
   `<inspecto-la-data-status>` once that is on master.

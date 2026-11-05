@@ -220,8 +220,9 @@ class ControlApiOnboardLinkAnalysisTest {
             long entities = first.get("nodes").asLong();
             assertTrue(entities > 0 && entities <= 42, "at most the 42 accounts the fixture names: " + first);
 
+            // the same rows in other bytes (CRLF): the same bytes again would be refused as already imported (D-3)
             JsonNode app = data(send(c, "POST", "/datasets/" + id + "/files?name=again.csv&mode=append",
-                    transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+                    transfers(200).replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8)), 200);
             assertEquals(400, app.get("rowsAfter").asLong(), app.toString());
             JsonNode ix = app.get("index");
             assertEquals("BUILT", ix.get("result").asText(), ix.toString());
@@ -233,5 +234,71 @@ class ControlApiOnboardLinkAnalysisTest {
             assertEquals(400, now.get("edges").asLong(), now.toString());
             assertEquals(entities, now.get("nodes").asLong(), "an index that is already current counts each entity once too: " + now);
         }
+    }
+
+    /**
+     * LA-ARRIVAL-LEDGER-1 V4: on Basic every Add a file (append) and every Run now that takes a dropped file builds the link
+     * index INCREMENTALLY - mode {@code append}, never a full rebuild - so an append costs the new file, not the Dataset. The
+     * arrivals list records each file's index outcome and mode, Run now's dropped file included.
+     */
+    @Test
+    void onBasicEachAppendIsIndexedAsAnAppendAndTheArrivalsSayIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            long[] ms = v4(c, 2_000, 3, 200);
+            JsonNode list = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals");
+            assertEquals(5, list.size(), list.toString());   // the commit, three appends, one drop
+            assertEquals("system", list.get(0).get("sender").asText(), list.get(0).toString());
+            for (JsonNode a : list) assertEquals("BUILT", a.get("index").asText(), a.toString());
+            assertEquals("full", list.get(4).get("indexMode").asText(), "the first build is the only full one: " + list.get(4));
+            for (int i = 0; i < 4; i++) assertEquals("append", list.get(i).get("indexMode").asText(), list.get(i).toString());
+            System.out.printf("V4 base=2000 first=%dms appends=%s%n", ms[0], java.util.Arrays.toString(java.util.Arrays.copyOfRange(ms, 1, ms.length)));
+        }
+    }
+
+    /**
+     * V4 at scale, run by hand: {@code -Dla.v4.rows=1000000} (the base file) and optionally {@code -Dla.v4.appendRows}.
+     * Prints the commit's and each append's wall time; asserts only that every append stayed an append.
+     */
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "la.v4.rows", matches = "\\d+")
+    void v4MeasuredAtScale(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        int rows = Integer.parseInt(System.getProperty("la.v4.rows"));
+        int appendRows = Integer.parseInt(System.getProperty("la.v4.appendRows", "10000"));
+        try (Ctx c = open(cfg, root)) {
+            long[] ms = v4(c, rows, 3, appendRows);
+            System.out.printf("V4 base=%d appendRows=%d first=%dms appends+drop=%s%n", rows, appendRows, ms[0],
+                    java.util.Arrays.toString(java.util.Arrays.copyOfRange(ms, 1, ms.length)));
+        }
+    }
+
+    /** Commit {@code base} rows, then {@code appends} Add a file appends and one dropped file Run now; the wall time of each. */
+    private long[] v4(Ctx c, int base, int appends, int appendRows) throws Exception {
+        long[] ms = new long[appends + 2];
+        JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(base).getBytes(StandardCharsets.UTF_8)), 200);
+        long t = System.nanoTime();
+        JsonNode first = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200).get("index");
+        ms[0] = (System.nanoTime() - t) / 1_000_000;
+        assertEquals("BUILT", first.get("result").asText(), first.toString());
+        assertEquals("full", first.get("mode").asText(), first.toString());
+        long edges = first.get("edges").asLong();
+        for (int i = 1; i <= appends; i++) {
+            t = System.nanoTime();
+            // each part its own ids, so no part is the same bytes as another (refused as already imported, D-3)
+            JsonNode ix = data(send(c, "POST", "/datasets/" + id + "/files?name=part" + i + ".csv&mode=append",
+                    transfers(appendRows).replace("\nT", "\nP" + i + "T").getBytes(StandardCharsets.UTF_8)), 200).get("index");
+            ms[i] = (System.nanoTime() - t) / 1_000_000;
+            assertEquals("BUILT", ix.get("result").asText(), ix.toString());
+            assertEquals("append", ix.get("mode").asText(), "an append is indexed as an append, not rebuilt: " + ix);
+            assertEquals(edges + appendRows, ix.get("edges").asLong(), ix.toString());
+            edges = ix.get("edges").asLong();
+        }
+        Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(appendRows));
+        t = System.nanoTime();
+        JsonNode now = data(send(c, "POST", "/datasets/" + id + "/run", new byte[0]), 200).get("index");
+        ms[appends + 1] = (System.nanoTime() - t) / 1_000_000;
+        assertEquals("BUILT", now.get("result").asText(), now.toString());
+        assertEquals("append", now.get("mode").asText(), "Run now's dropped file is indexed as an append: " + now);
+        return ms;
     }
 }

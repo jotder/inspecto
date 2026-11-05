@@ -22,6 +22,7 @@ import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.DuckDbUtil;
+import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -613,6 +614,8 @@ final class OnboardImport {
 
     /** The registry entry's key for {@link Job#lastImport}. */
     static final String LAST_IMPORT = "lastImport";
+    /** Add a file's third mode (LA-ARRIVAL-MODES-1): the file replaces the days it covers. */
+    static final String PERIOD = "period";
 
     /** One run of an import Pipeline: commit, Add a file or Run now. */
     static final class Job {
@@ -628,6 +631,56 @@ final class OnboardImport {
         String runBatch;
         /** sha256 of the uploaded file (LA-ARRIVAL-LEDGER-1), read as it lands; null for Run now. */
         String sha256;
+        /** The per-file ledger rows {@link #runChecked} saw this run add: the files it took (LA-ARRIVAL-LEDGER-1). */
+        List<Map<String, String>> taken = List.of();
+        /** LA-ARRIVAL-MODES-1: the upload replaces the days it covers (its rows are added, then those days' older rows go). */
+        boolean period;
+        /** Columns the upload carries that the Dataset does not read: accepted, not kept, named in the result. */
+        List<String> newColumns = List.of();
+        /** The same for each waiting file Run now judged, by inbox file name. */
+        Map<String, List<String>> inboxNewColumns = Map.of();
+        private DatasetPeriod periodAside;
+
+        String mode() {
+            return replace ? "replace" : period ? PERIOD : "append";
+        }
+
+        /**
+         * Replace the period: remove, from every older Parquet file, the rows on a day this upload's own output covers.
+         * Undone by {@link #rollback}; the originals are discarded by {@link #dropAside}. Answers {@code {days, from, to,
+         * rowsReplaced, filesRewritten}}.
+         */
+        Map<String, Object> replacePeriod(String eventDate) throws IOException {
+            List<Path> covering = new ArrayList<>(), fresh = new ArrayList<>();
+            String landedName = landed == null ? null : landed.getFileName().toString();
+            for (Map<String, String> r : taken) {
+                List<Path> out = DatasetPeriod.outputs(r);
+                fresh.addAll(out);
+                if (String.valueOf(r.get("filename")).equals(landedName)) covering.addAll(out);
+            }
+            periodAside = new DatasetPeriod(space.dataRoot(), id, STAMP.format(Instant.now()));
+            final DatasetPeriod p = periodAside;
+            // undone in this order: the originals come back, then the upload's own rows go - no day is left doubled. Only
+            // the upload's output: another file this run took is already marked processed, so its rows must stay. Once
+            // the import succeeded (dropAside discarded the originals) this undo does nothing.
+            final List<Path> added = List.copyOf(covering);
+            undo.push(() -> {
+                if (periodAside != p) return;
+                for (Path f : added) {
+                    Path abs = f.toAbsolutePath().normalize();
+                    if (com.gamma.config.safety.PathJail.contains(database().toAbsolutePath().normalize(), abs)) Files.deleteIfExists(abs);
+                }
+            });
+            undo.push(p::restore);
+            DatasetPeriod.Result r = p.replace(covering, fresh, eventDate);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("days", r.days().size());
+            m.put("from", r.days().isEmpty() ? null : r.days().get(0));
+            m.put("to", r.days().isEmpty() ? null : r.days().get(r.days().size() - 1));
+            m.put("rowsReplaced", r.rowsRemoved());
+            m.put("filesRewritten", r.filesTouched());
+            return m;
+        }
 
         Job(Space space, String id, String kind, Path source, String fileName, Map<String, Object> dataset, boolean replace) {
             this.space = space;
@@ -655,7 +708,7 @@ final class OnboardImport {
             String stem = source.getFileName().toString().replaceFirst("\\.[^.]*$", "");
             Path dest = in.resolve("add_" + stamp() + "_" + stem + "." + extension(type));
             Path tmp = in.resolve(".landing-" + dest.getFileName());
-            sha256 = DatasetArrivals.sha256(source);
+            if (sha256 == null) sha256 = DatasetArrivals.sha256(source);   // Add a file hashed the bytes as uploaded
             Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
             Files.move(tmp, dest, StandardCopyOption.ATOMIC_MOVE);   // the poll never sees a half-written file
             landed = dest;
@@ -696,11 +749,17 @@ final class OnboardImport {
             for (Map<String, String> b : space.service().statusStore().batches(cfg)) batchesBefore.add(String.valueOf(b.get("consignment_id")));
             Set<String> quarantineBefore = new HashSet<>();
             for (Map<String, String> q : space.service().statusStore().quarantine(cfg)) quarantineBefore.add(String.valueOf(q.get("path")));
+            Set<String> filesBefore = new HashSet<>();
+            for (Map<String, String> f : space.service().statusStore().files(cfg)) filesBefore.add(f.get("filename") + "|" + f.get("consignment_id"));
             try {
                 space.service().runPipeline(id).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + id + "' is not registered"));
             } catch (IllegalStateException notRunnable) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import could not run: " + notRunnable.getMessage());
             }
+            List<Map<String, String>> took = new ArrayList<>();
+            for (Map<String, String> f : space.service().statusStore().files(cfg))
+                if (!filesBefore.contains(f.get("filename") + "|" + f.get("consignment_id"))) took.add(f);
+            taken = took;
             long after = countRows(database());
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("dataset", id);
@@ -749,6 +808,7 @@ final class OnboardImport {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("at", Instant.now().toString());
             m.put("replaced", replace);
+            m.put("mode", mode());
             m.put("rowsBefore", summary.get("rowsBefore"));
             m.put("rowsAfter", summary.get("rowsAfter"));
             if (runBatch != null) m.put("batch", runBatch);
@@ -756,9 +816,14 @@ final class OnboardImport {
             return m;
         }
 
-        /** LA-ARRIVAL-LEDGER-1: what the run ledger cannot know about this upload, for {@code GET /datasets/{id}/arrivals}. */
+        /**
+         * LA-ARRIVAL-LEDGER-1: what the run ledger cannot know about the files this run took (the upload's name, mode and
+         * sha256; every file's index outcome), for {@code GET /datasets/{id}/arrivals}. Run now records its files too.
+         */
         void recordArrival(Map<String, Object> summary) {
-            DatasetArrivals.recordUpload(space.dataRoot(), id, runBatch, landed, fileName, replace, sha256, summary);
+            Map<String, List<String>> fresh = new LinkedHashMap<>(inboxNewColumns);
+            if (landed != null && !newColumns.isEmpty()) fresh.put(landed.getFileName().toString(), newColumns);
+            DatasetArrivals.recordRun(space.dataRoot(), id, taken, landed, fileName, mode(), sha256, fresh, summary);
         }
 
         /**
@@ -777,7 +842,7 @@ final class OnboardImport {
         void followOn(Map<String, Object> summary) {
             Map<String, Object> current = new ComponentStore(space.writeRoot().resolve("registry")).get("dataset", id)
                     .map(ComponentRegistry.Component::content).orElse(dataset);
-            // LA-DATASET-COMPACT-1 (D-6): merge the files once there are many, before the index reads them
+            // LA-DATASET-COMPACT-1 (D-7): merge the files once there are many, before the index reads them
             summary.put("compaction", DatasetCompaction.afterImport(space.dataRoot(), id, current));
             boolean inRun = !EditionFeatures.present(AUTOMATION_FEATURE);
             summary.put("followOnInRun", inRun);
@@ -800,6 +865,7 @@ final class OnboardImport {
                         DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount"), DatasetEntryRules.carriedColumns(content),
                         space.actor(), true, 300_000L, 0L));
                 Map<String, Object> r = outcome(o.result(), o.message());
+                r.put("mode", o.mode());   // append / full / compact / none: what the build cost (V4)
                 r.put("code", o.code());
                 r.put("edges", o.edges());
                 r.put("nodes", o.nodes());
@@ -853,6 +919,8 @@ final class OnboardImport {
         void dropAside() {
             if (aside != null) OnboardRoutes.deleteTree(aside);
             aside = null;
+            if (periodAside != null) periodAside.drop();
+            periodAside = null;
         }
     }
 
@@ -999,10 +1067,16 @@ final class OnboardImport {
         String name = OnboardRoutes.fileName(ex);
         String mode = ApiContext.query(ex, "mode");
         boolean replace = mode == null || mode.isBlank() || mode.equals("replace");
-        if (!replace && !"append".equals(mode))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "mode must be replace (the default) or append");
+        boolean period = PERIOD.equals(mode);
+        if (!replace && !period && !"append".equals(mode))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "mode must be replace (the default), append or period");
         if (!replace && "reference".equals(content.get("kind")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a Reference is replaced, never appended to");
+        // LA-ARRIVAL-MODES-1: Replace the period it covers needs the Dataset's When column to say which days a file covers
+        String eventDate = content.get("eventDate") instanceof String e && !e.isBlank() ? e.trim() : null;
+        if (period && eventDate == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + id + "' has no When column, so a file cannot replace "
+                    + "the days it covers; add its rows or replace everything");
         LaLimitValues lim = OnboardRoutes.limits(writeRoot);
         CollectorService service = HostContext.of(api).service();
         PipelineConfig cfg = service.configFor(pipeline)
@@ -1021,9 +1095,28 @@ final class OnboardImport {
             if (!type.equals(expected))   // the import's parser and file_pattern are fixed: a TSV is not a CSV import's file
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' is " + type.toUpperCase(Locale.ROOT)
                         + "; '" + id + "' was imported from " + expected.toUpperCase(Locale.ROOT));
-            requireSameColumns(stage, file, name, type, writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), id);
+            String sha = DatasetArrivals.sha256(file);   // the bytes as uploaded, before any column is left out
+            List<String> newColumns = requireSameColumns(stage, file, name, type,
+                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), id);
+            // D-3: the same bytes added again would count their rows twice; Replace everything may always reload a file
+            if (!replace && sha != null) {
+                Map<String, Object> first = DatasetArrivals.alreadyImported(dataRoot, pipeline, sha);
+                if (first != null)
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "'" + name + "' was already imported"
+                            + (first.get("at") instanceof String at && at.length() >= 10 ? " on " + at.substring(0, 10) : "")
+                            + (first.get("file") != null && !name.equals(first.get("file")) ? " as '" + first.get("file") + "'" : "")
+                            + " and its rows are in '" + id + "'; adding it again would count them twice. To load it again, replace everything");
+            }
+            // the run also takes any file waiting in the inbox: judged by the same columns policy as Run now
+            Map<String, List<String>> waitingNew = new LinkedHashMap<>();
+            List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, type,
+                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), waitingNew);
             Space space = new Space(writeRoot, dataRoot, service, ApiContext.actor(ex));
             job = new Job(space, pipeline, String.valueOf(content.get("kind")), file, name, content, replace);
+            job.period = period;
+            job.newColumns = newColumns;
+            job.inboxNewColumns = waitingNew;
+            job.sha256 = sha;
             long before = countRows(job.database());
             final Job j = job;
             if (replace) job.setAside();
@@ -1031,6 +1124,12 @@ final class OnboardImport {
             Work rest = () -> {
                 try {
                     Map<String, Object> s = j.runChecked(replace ? 0 : before);
+                    if (period) {
+                        s.put("period", j.replacePeriod(eventDate));
+                        s.put("rowsAfter", countRows(j.database()));
+                    }
+                    if (!newColumns.isEmpty()) s.put("newColumns", newColumns);
+                    if (!refused.isEmpty()) s.put("refused", refused);
                     s.put("rowsBefore", before);
                     s.put("rowsChanged", ((Number) s.get("rowsAfter")).longValue() - before);
                     s.put("dataset", id);
@@ -1064,36 +1163,121 @@ final class OnboardImport {
         }
     }
 
-    /** The added file must carry the columns the import reads (by index for delimited text, by name otherwise). */
-    private static void requireSameColumns(Path dir, Path file, String name, String type, Path schema, String id) throws IOException {
-        OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, Map.of());
-        List<String> selectors = new ArrayList<>();
+    /**
+     * The added file must carry the columns the import reads (by index for delimited text, by name otherwise); answers the
+     * columns it carries that the Dataset does not read (accepted, not kept). 422 naming every missing or moved column.
+     */
+    private static List<String> requireSameColumns(Path dir, Path file, String name, String type, Path schema, String id) throws IOException {
+        ColumnCheck c = checkColumns(dir, file, name, type, schema, id);
+        if (c.refusal() != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, c.refusal());
+        keepReadColumns(dir, file, c);
+        return c.newColumns();
+    }
+
+    /**
+     * A later file judged against the Dataset's columns: why it is refused (null = accepted), its new columns, and - for
+     * delimited text with new columns - the columns to keep ({@code keep}, in order) and the file's delimiter and quote.
+     */
+    record ColumnCheck(String refusal, List<String> newColumns, List<String> keep, String delimiter, String quote) {
+        ColumnCheck(String refusal, List<String> newColumns) {
+            this(refusal, newColumns, List.of(), null, null);
+        }
+    }
+
+    /**
+     * New columns of delimited text are not kept: the engine reads by position and sets aside a file whose rows have more
+     * fields than the import reads, so the file is rewritten in place with the read columns only (they lead the line: a
+     * read column at another position is refused). DuckDB reads and writes it, so quoting is kept right; values stay text.
+     */
+    static void keepReadColumns(Path dir, Path file, ColumnCheck c) throws IOException {
+        if (c.keep().isEmpty() || c.newColumns().isEmpty()) return;
+        Path tmp = file.resolveSibling(".keep-" + file.getFileName());
+        String delim = SqlIdent.sqlStr(c.delimiter() == null ? "," : c.delimiter());
+        String quote = SqlIdent.sqlStr(c.quote() == null ? "\"" : c.quote());
+        String cols = String.join(", ", c.keep().stream().map(SqlIdent::q).toList());
+        try {
+            DuckDbUtil.loadDriver();
+            try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir));
+                 Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT " + cols + " FROM read_csv(" + SqlIdent.pathStr(file) + ", header = true, all_varchar = true, delim = "
+                        + delim + ", quote = " + quote + ")) TO " + SqlIdent.pathStr(tmp) + " (FORMAT CSV, HEADER, DELIMITER " + delim + ")");
+            }
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (ClassNotFoundException | java.sql.SQLException failed) {
+            Files.deleteIfExists(tmp);
+            throw new IOException("the new columns of '" + file.getFileName() + "' could not be left out: " + failed.getMessage(), failed);
+        }
+    }
+
+    /**
+     * LA-ARRIVAL-MODES-1, the schema-drift policy (operator 2026-11-05, plan §6 D-6): a later file is judged against the
+     * columns the import reads BY NAME before anything lands. A missing column, or - for delimited text read by position - a
+     * column at another position, refuses the file and names each one (a reordered header no longer loads into the wrong
+     * columns). A column the Dataset does not read is accepted, not kept, and named. An import with no header line can be
+     * judged by its column count only.
+     */
+    static ColumnCheck checkColumns(Path dir, Path file, String name, String type, Path schema, String id) throws IOException {
+        List<String[]> fields = new ArrayList<>();   // {selector, name}
         try {
             Map<String, Object> s = com.gamma.util.ToonHelper.load(schema.toString());
             if (s.get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fs)
-                for (Object f : fs) if (f instanceof Map<?, ?> fm) selectors.add(String.valueOf(fm.get("selector")));
+                for (Object f : fs)
+                    if (f instanceof Map<?, ?> fm) fields.add(new String[] {String.valueOf(fm.get("selector")), String.valueOf(fm.get("name"))});
         } catch (Exception unreadable) {
-            selectors.clear();
+            fields.clear();
         }
-        if (selectors.isEmpty())   // fail closed: no file lands against a schema nobody can read
+        if (fields.isEmpty())   // fail closed: no file lands against a schema nobody can read
             throw new ApiException(409, ErrorCodes.CONFLICT, "the schema of '" + id + "' cannot be read, so no file can be added to it");
+        List<String> problems = new ArrayList<>();
+        List<String> fresh = new ArrayList<>();
+        Set<String> read = new LinkedHashSet<>();
         if ("csv".equals(type) || "tsv".equals(type)) {
             int max = -1;
+            boolean headerless = true;
             try {
-                for (String sel : selectors) max = Math.max(max, Integer.parseInt(sel));
+                for (String[] f : fields) {
+                    int sel = Integer.parseInt(f[0]);
+                    max = Math.max(max, sel);
+                    headerless &= ("col_" + (sel + 1)).equals(f[1]);
+                }
             } catch (NumberFormatException notAnIndex) {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the schema of '" + id + "' does not read columns by position");
             }
-            if (a.cols().size() <= max)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' has " + a.cols().size()
-                        + " columns; '" + id + "' reads " + (max + 1));
+            OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, headerless ? Map.of() : Map.of("header", "true"));
+            if (headerless) {
+                if (a.cols().size() <= max)
+                    problems.add("it has " + a.cols().size() + " columns and '" + id + "' reads " + (max + 1));
+            } else {
+                List<String> actual = a.cols().stream().map(OnboardDraft.Col::name).toList();
+                for (String[] f : fields) {
+                    int sel = Integer.parseInt(f[0]);
+                    read.add(f[1]);
+                    if (sel < actual.size() && actual.get(sel).equals(f[1])) continue;
+                    int at = actual.indexOf(f[1]);
+                    problems.add(at < 0 ? "'" + f[1] + "' is missing"
+                            : "'" + f[1] + "' is column " + (at + 1) + " here and column " + (sel + 1) + " in '" + id + "'");
+                }
+                for (String n : actual) if (!read.contains(n)) fresh.add(n);
+                if (problems.isEmpty() && !fresh.isEmpty()) {
+                    // the file's OWN header text: read_csv names its columns by it, not by the cleaned-up name
+                    List<String> keep = a.cols().subList(0, max + 1).stream().map(OnboardDraft.Col::header).toList();
+                    return new ColumnCheck(null, List.copyOf(fresh), keep,
+                            choiceValue(a.format(), "delimiter"), choiceValue(a.format(), "quote"));
+                }
+            }
         } else {
+            OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, Map.of());
             Set<String> headers = new LinkedHashSet<>();
             for (OnboardDraft.Col c : a.cols()) headers.add(c.header());
-            for (String sel : selectors)
-                if (!headers.contains(sel))
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' has no '" + sel + "' field, which '" + id + "' reads");
+            for (String[] f : fields) {
+                read.add(f[0]);
+                if (!headers.contains(f[0])) problems.add("'" + f[0] + "' is missing");
+            }
+            for (String h : headers) if (!read.contains(h)) fresh.add(h);
         }
+        String refusal = problems.isEmpty() ? null : "'" + name + "' does not have the columns of '" + id + "': "
+                + String.join("; ", problems) + ". Nothing was imported; fix the file's columns and add it again";
+        return new ColumnCheck(refusal, List.copyOf(fresh));
     }
 
     static Object runNow(ApiContext api, HttpExchange ex, String id) {
@@ -1106,14 +1290,88 @@ final class OnboardImport {
         try {
             Job job = new Job(new Space(writeRoot, dataRoot, HostContext.of(api).service(), ApiContext.actor(ex)), pipeline,
                     String.valueOf(content.get("kind")), null, null, content, false);
+            // LA-ARRIVAL-MODES-1: a waiting file is judged by the columns policy first; a refused one is set aside, named
+            Map<String, List<String>> fresh = new LinkedHashMap<>();
+            List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, String.valueOf(content.get("importFormat")),
+                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), fresh);
+            job.inboxNewColumns = fresh;
             long before = countRows(job.database());
             Map<String, Object> s = job.runChecked(before);
             s.put("dataset", id);
+            if (!refused.isEmpty()) s.put("refused", refused);
             job.followOn(s);
+            job.recordArrival(s);   // LA-ARRIVAL-LEDGER-1: each file Run now took, with the index outcome
             return s;
         } finally {
             IN_FLIGHT.remove(key);
         }
+    }
+
+    private static String choiceValue(Map<String, Object> format, String key) {
+        return format != null && format.get(key) instanceof Map<?, ?> m && m.get("value") != null ? String.valueOf(m.get("value")) : null;
+    }
+
+    /** Where Run now sets a refused waiting file aside: {@code <dataRoot>/<id>/refused/}. */
+    static final String REFUSED_DIR = "refused";
+
+    /**
+     * Judge every file waiting in the import inbox by {@link #checkColumns}: a refused one is moved to
+     * {@code <dataRoot>/<id>/refused/} and recorded as a refused arrival (with the reason); an accepted one's new columns go
+     * into {@code fresh} by file name. Answers {@code [{file, reason, setAside}]}. A file that cannot be read at all is left
+     * for the run, which quarantines it as before.
+     */
+    private static List<Map<String, Object>> judgeInbox(Path dataRoot, String pipeline, String id, String type, Path schema,
+                                                        Map<String, List<String>> fresh) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Path in = inbox(dataRoot, pipeline);
+        if (!Files.isDirectory(in)) return out;
+        String ext = "." + extension(type);
+        List<Path> waiting;
+        try (var w = Files.walk(in)) {   // the import's file_pattern is glob:**/*.<ext>: sub-folders too
+            waiting = w.filter(Files::isRegularFile)
+                    .filter(p -> !p.getFileName().toString().startsWith(".")
+                            && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(ext))
+                    .sorted().toList();
+        } catch (IOException unreadable) {
+            return out;
+        }
+        for (Path f : waiting) {
+            String name = f.getFileName().toString();
+            ColumnCheck c;
+            try {
+                c = checkColumns(in, f, name, type, schema, id);
+            } catch (IOException | RuntimeException unreadableFile) {
+                if (unreadableFile instanceof ApiException a && a.status == 409) throw a;   // the schema itself: the run cannot go on
+                continue;
+            }
+            if (c.refusal() == null) {
+                if (!c.newColumns().isEmpty()) {
+                    try {
+                        keepReadColumns(in, f, c);
+                        fresh.put(name, c.newColumns());
+                    } catch (IOException notRewritten) {
+                        // left as it is: the run quarantines it, as before
+                    }
+                }
+                continue;
+            }
+            try {
+                Path dir = dataRoot.resolve(pipeline).resolve(REFUSED_DIR);
+                Files.createDirectories(dir);
+                Path to = dir.resolve(name);
+                if (Files.exists(to)) to = dir.resolve(stamp() + "_" + name);
+                Files.move(f, to, StandardCopyOption.ATOMIC_MOVE);
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("file", name);
+                r.put("reason", c.refusal());
+                r.put("setAside", REFUSED_DIR + "/" + to.getFileName());
+                out.add(r);
+                DatasetArrivals.recordRefused(dataRoot, pipeline, name, c.refusal(), r.get("setAside").toString());
+            } catch (IOException cannotMove) {
+                // left in the inbox: the run reads it as before
+            }
+        }
+        return out;
     }
 
     // ── deleting an import Dataset (LA-ONBOARD-ORPHAN-PIPELINE-1) ──────────────────────────────────────────
