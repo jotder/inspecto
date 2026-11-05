@@ -437,10 +437,10 @@ own Dataset) - and the user re-runs it; nothing is applied silently.
 | Entry | Where it is found | Cause (example) | Fix |
 |---|---|---|---|
 | `decimal_mark` | draft: a text column whose values (≥ 4 in 5) are numbers that need the OTHER mark | "'amount' has numbers like '1.001,50' in 240 of 240 sampled rows: this file uses ',' as the decimal mark" | `redraft {decimal}` |
-| `date_format` | draft: a text column whose values (≥ 4 in 5) are dates in one of seven formats (`%d/%m/%Y` before `%m/%d/%Y`) | "239 of 240 sampled values of 'ordered' are dates written %d/%m/%Y; 1 is not a real date (e.g. '31/02/2026') and would stay empty" | `columns [{name, type: DATE, format}]` |
+| `date_format` | draft: a text column whose values (≥ 4 in 5) are dates in one of seven formats; when another format reads exactly as many (`03/04/2026`: day or month first) the cause names it and the fix carries it under `alternatives` - the user chooses | "239 of 240 sampled values of 'ordered' are dates written %d/%m/%Y; 1 is not a real date (e.g. '31/02/2026') and would stay empty" | `columns [{name, type: DATE, format}]` (+ `alternatives`) |
 | `delimiter` | draft: lines split into one column, or unevenly, and another of `, ; tab \|` splits every sampled line alike | "every sampled line is one column on ','; every line splits into 3 columns on ';'" | `redraft {delimiter}` |
 | `header_row` | draft: no header line, yet the first line is distinct non-number names over a number column; or a header whose names over number columns are numbers | "the first line (meter, reading, zone) holds names, not values like the rows below" | `redraft {header}` |
-| `encoding` | draft refusal (422) of a file that is not UTF-8; a commit whose run rejected rows or set the file aside, the whole draft file decoded | "'customers.csv' is not UTF-8 text; it reads as Latin-1 (Windows Western)" | `redraft {encoding: latin-1}` |
+| `encoding` | draft refusal (422) of a file that is not UTF-8; a commit whose run rejected rows or set the file aside, the whole draft file decoded | "'customers.csv' is not UTF-8 text; it reads as Latin-1 (Windows Western)", or, for a file starting with a UTF-16 byte-order mark (Excel's "Unicode Text"), "… is UTF-16 text" | `redraft {encoding: latin-1 \| utf-16}` |
 | `quote` | draft: lines split unevenly under the quote, and no quote (else `"` or `'`) makes them split alike | "only 120 of 240 sampled lines split alike when '\"' quotes a field; with no character every line splits into 3 columns" | `redraft {quote}` |
 | `missing_column` | Add a file refusal (422) and Run now's refused arrivals: a column the Dataset reads is not in the file | "'later.csv' has no column 'amount', which 'sales' reads" | `newDataset` |
 
@@ -448,9 +448,11 @@ own Dataset) - and the user re-runs it; nothing is applied silently.
   `error.details.findings` (`OnboardRoutes.fixable` answers `OnboardFixes.Refusal`): the non-UTF-8 draft, Add a file's
   missing column. A commit whose run rejected rows or set the file aside explains it from the draft's file
   (`Job.explain` → `OnboardDraft.diagnose`): `findings` in the 200 summary (and on each `quarantined[]` entry), or in
-  `error.details.findings` of the 422 "nothing was imported". Run now's refused arrivals carry `findings` per file.
-* **Encoding.** `?encoding=utf-8|latin-1` (delimited text only; DuckDB's `read_csv` names). The draft reads the lines and
-  `sniff_csv` / `read_csv` with it and proposes `format.encoding`; the commit writes `csv_settings.encoding: latin-1`,
+  `error.details.findings` of the 422 "nothing was imported"; a followed (202) commit refused so keeps them on its run
+  (`GET /onboard/runs/{id}` → `findings`). Run now's refused arrivals carry `findings` per file.
+* **Encoding.** `?encoding=utf-8|latin-1|utf-16` (delimited text only; DuckDB's `read_csv` names; Java reads UTF-16 by
+  its byte-order mark). The draft reads the lines and
+  `sniff_csv` / `read_csv` with it and proposes `format.encoding`; the commit writes `csv_settings.encoding`,
   which the engine passes to `read_csv`; Add a file reads a later file with the import's encoding. A redraft fix does not
   apply to a later file, so Add a file answers a non-UTF-8 file as before (plain 422).
 * **Measured (2026-11-05):** a stray `"` inside values does not set the file aside - the engine imports every row - so
@@ -458,7 +460,11 @@ own Dataset) - and the user re-runs it; nothing is applied silently.
   rows (200, `rowsRejected`), which is where the run-time encoding finding comes from.
 * Tests: `ControlApiOnboardFixesTest` - one test per entry (named after it; a reflection check fails when an entry has
   none) that produces the problem, applies the fix exactly as the finding states it, and re-runs to an imported Dataset;
-  four mutants (no decimal finding, no run diagnosis, no missing-column finding, no quote search) each killed.
+  seven mutants (no decimal finding, no run diagnosis, no missing-column finding, no quote search, no date tie, no UTF-16
+  mark, no findings on a followed run) each killed.
+* **Not covered (seen 2026-11-05):** a ragged CSV that sniffs as one column split on `|`, and a pivot header
+  (`country,2022,2023`) sniffed as no header, get no finding; a quoted multi-line field is a 422 from DuckDB's parallel
+  reader with `null_padding` (outside the catalogue).
 
 ### The commit
 

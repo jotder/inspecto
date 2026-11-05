@@ -14074,7 +14074,7 @@
             "name" : "encoding",
             "in" : "query",
             "required" : false,
-            "description" : "Delimited text only: utf-8 (default) or latin-1 (the encoding fix)",
+            "description" : "Delimited text only: utf-8 (default), latin-1 or utf-16 (the encoding fix)",
             "schema" : {
               "type" : "string"
             }

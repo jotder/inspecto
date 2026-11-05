@@ -562,7 +562,8 @@ final class OnboardImport {
                 csv.put("has_header", Boolean.parseBoolean(String.valueOf(formatValue("header"))));
                 Object q = formatValue("quote");
                 if (q != null && !String.valueOf(q).isEmpty()) csv.put("quote", String.valueOf(q));
-                if ("latin-1".equals(formatValue("encoding"))) csv.put("encoding", "latin-1");   // C2: the encoding fix
+                Object enc = formatValue("encoding");   // C2: the encoding fix
+                if (enc != null && !"utf-8".equals(enc)) csv.put("encoding", String.valueOf(enc));
             }
             csv.put("date_formats", List.of("%Y-%m-%d"));
             csv.put("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S"));
@@ -1086,6 +1087,7 @@ final class OnboardImport {
                 synchronized (rec) {
                     rec.put("state", "failed");
                     rec.put("message", failed.getMessage());
+                    if (failed instanceof OnboardFixes.Refusal r) rec.put("findings", r.findings);   // C2: as the inline refusal
                 }
             } finally {
                 synchronized (rec) {
@@ -1308,9 +1310,10 @@ final class OnboardImport {
         return out;
     }
 
-    /** The Latin-1 encoding an import's Pipeline reads with ({@code csv_settings.encoding}), else {@code null} (UTF-8). */
+    /** The encoding an import's Pipeline reads with ({@code csv_settings.encoding}), else {@code null} (UTF-8). */
     private static String importEncoding(Path schema) {
-        return "latin-1".equals(importSetting(schema, "processing", "csv_settings", "encoding")) ? "latin-1" : null;
+        String e = importSetting(schema, "processing", "csv_settings", "encoding");
+        return e != null && OnboardDraft.ENCODINGS.contains(e) ? e : null;   // List.of(..).contains(null) throws
     }
 
     /** One {@code <block>.<sub>.<key>} value of the Pipeline Add data wrote beside {@code schema}, else {@code null}. */

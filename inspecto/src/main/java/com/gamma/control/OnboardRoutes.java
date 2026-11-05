@@ -328,8 +328,8 @@ final class OnboardRoutes implements RouteModule {
         if (encoding != null) {
             if (!type.equals("csv") && !type.equals("tsv"))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'encoding' applies to delimited text only");
-            if (!encoding.equals("utf-8") && !encoding.equals("latin-1"))
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "encoding must be utf-8 or latin-1");
+            if (!OnboardDraft.ENCODINGS.contains(encoding))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "encoding must be one of " + OnboardDraft.ENCODINGS);
             o.put("encoding", encoding);
         }
         String recordPath = ApiContext.query(ex, "recordPath");

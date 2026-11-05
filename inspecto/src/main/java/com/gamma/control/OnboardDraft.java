@@ -207,8 +207,8 @@ final class OnboardDraft {
         boolean header = true, sniffed = true;
         // C2: the encoding entry - UTF-8 unless the user chose Latin-1 (a fix the catalogue offers when a file is not UTF-8)
         String encoding = overrides.getOrDefault("encoding", "utf-8");
-        java.nio.charset.Charset cs = "latin-1".equals(encoding) ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8;
-        String encodingArg = "latin-1".equals(encoding) ? ", encoding = 'latin-1'" : "";
+        java.nio.charset.Charset cs = charset(encoding);
+        String encodingArg = "utf-8".equals(encoding) ? "" : ", encoding = " + SqlIdent.sqlStr(encoding);
         if (cs == StandardCharsets.UTF_8) requireUtf8(file, name);
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery("SELECT Delimiter, Quote, HasHeader FROM sniff_csv(" + SqlIdent.pathStr(file) + encodingArg + ")")) {
@@ -253,7 +253,7 @@ final class OnboardDraft {
                 if (kept.size() < 200) kept.add(line);
             }
         } catch (java.nio.charset.MalformedInputException notUtf8) {
-            throw notUtf8(name);
+            throw notUtf8(name, utf16(file));
         }
         int mode = 0, modeCount = 0;
         for (var e : widths.entrySet()) if (e.getValue() > modeCount) {
@@ -404,12 +404,12 @@ final class OnboardDraft {
      */
     static List<Map<String, Object>> diagnose(Path file, String name, String delim, String quote, boolean header, String encoding)
             throws IOException {
-        java.nio.charset.Charset cs = "latin-1".equals(encoding) ? StandardCharsets.ISO_8859_1 : StandardCharsets.UTF_8;
+        java.nio.charset.Charset cs = charset(encoding);
         if (cs == StandardCharsets.UTF_8)   // the whole file: the draft sampled only its first lines
             try (BufferedReader r = Files.newBufferedReader(file, cs)) {
                 while (r.readLine() != null) { /* decoding is the check */ }
             } catch (java.nio.charset.MalformedInputException notUtf8) {
-                return List.of(OnboardFixes.encoding(name));
+                return List.of(OnboardFixes.encoding(name, utf16(file)));
             }
         Map<Integer, Integer> widths = new TreeMap<>();
         List<String> kept = new ArrayList<>();
@@ -426,7 +426,7 @@ final class OnboardDraft {
                 kept.add(line);
             }
         } catch (java.nio.charset.MalformedInputException notUtf8) {
-            return List.of(OnboardFixes.encoding(name));
+            return List.of(OnboardFixes.encoding(name, utf16(file)));
         }
         int mode = 0, modeCount = 0;
         for (var e : widths.entrySet()) if (e.getValue() > modeCount) {
@@ -437,18 +437,39 @@ final class OnboardDraft {
         return split == null ? List.of() : List.of(split);
     }
 
-    /** The encoding entry: a file that is not UTF-8 is refused with the fix that reads it as Latin-1. */
+    /** The encodings Add data reads delimited text in ({@code ?encoding=}; DuckDB's {@code read_csv} names). */
+    static final List<String> ENCODINGS = List.of("utf-8", "latin-1", "utf-16");
+
+    private static java.nio.charset.Charset charset(String encoding) {
+        return switch (encoding == null ? "utf-8" : encoding) {
+            case "latin-1" -> StandardCharsets.ISO_8859_1;
+            case "utf-16" -> StandardCharsets.UTF_16;   // honours the byte-order mark
+            default -> StandardCharsets.UTF_8;
+        };
+    }
+
+    /** Whether the file starts with a UTF-16 byte-order mark (little or big endian). */
+    private static boolean utf16(Path file) throws IOException {
+        byte[] b = new byte[2];
+        try (InputStream in = Files.newInputStream(file)) {
+            if (in.readNBytes(b, 0, 2) < 2) return false;
+        }
+        return (b[0] == (byte) 0xFF && b[1] == (byte) 0xFE) || (b[0] == (byte) 0xFE && b[1] == (byte) 0xFF);
+    }
+
+    /** The encoding entry: a file that is not UTF-8 is refused with the fix that reads it right (UTF-16 by its mark, else Latin-1). */
     private static void requireUtf8(Path file, String name) throws IOException {
+        if (utf16(file)) throw notUtf8(name, true);
         try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             for (int i = 0; i < SAMPLE_ROWS && r.readLine() != null; i++) { /* decoding is the check */ }
         } catch (java.nio.charset.MalformedInputException notUtf8) {
-            throw notUtf8(name);
+            throw notUtf8(name, false);
         }
     }
 
-    private static OnboardFixes.Refusal notUtf8(String name) {
-        return new OnboardFixes.Refusal(422, "'" + name + "' is not UTF-8 text; read it as Latin-1, or save it as CSV UTF-8 and add it again",
-                List.of(OnboardFixes.encoding(name)));
+    private static OnboardFixes.Refusal notUtf8(String name, boolean utf16) {
+        return new OnboardFixes.Refusal(422, "'" + name + "' is not UTF-8 text; read it as " + (utf16 ? "UTF-16" : "Latin-1")
+                + ", or save it as CSV UTF-8 and add it again", List.of(OnboardFixes.encoding(name, utf16)));
     }
 
     private static Map<String, Object> headerChoice(boolean header, Analysis base, int lines) {
@@ -801,7 +822,7 @@ final class OnboardDraft {
     private static Map<String, Object> dateFinding(Connection conn, String column, int n) throws SQLException {
         if (n == 0) return null;
         String c = SqlIdent.q(column);
-        String best = null;
+        String best = null, tie = null;
         long bestCount = 0;
         for (String f : DATE_FORMATS)
             try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM onboard_sample WHERE "
@@ -810,7 +831,8 @@ final class OnboardDraft {
                 if (rs.getLong(1) > bestCount) {
                     bestCount = rs.getLong(1);
                     best = f;
-                }
+                    tie = null;
+                } else if (rs.getLong(1) == bestCount && bestCount > 0 && tie == null) tie = f;
             }
         if (best == null || bestCount * 5 < (long) n * 4) return null;
         String odd = null;
@@ -818,7 +840,7 @@ final class OnboardDraft {
                 + " IS NOT NULL AND trim(" + c + ") <> '' AND TRY_STRPTIME(trim(" + c + "), " + SqlIdent.sqlStr(best) + ") IS NULL LIMIT 1")) {
             if (rs.next()) odd = rs.getString(1);
         }
-        return OnboardFixes.dateFormat(column, best, (int) bestCount, n, odd == null ? null : clip(odd));
+        return OnboardFixes.dateFormat(column, best, (int) bestCount, n, odd == null ? null : clip(odd), tie);
     }
 
     /** The one {@link #TIMESTAMP_FORMATS} entry every non-blank sampled value parses with, else {@code null} (a bare cast). */

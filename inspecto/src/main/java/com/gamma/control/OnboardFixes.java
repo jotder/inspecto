@@ -49,7 +49,7 @@ final class OnboardFixes {
                 + " sampled rows: this file uses '" + mark + "' as the decimal mark", redraft("Switch decimal mark", "decimal", mark));
     }
 
-    static Map<String, Object> dateFormat(String column, String format, int matching, int of, String odd) {
+    private static Map<String, Object> dateFix(String column, String format) {
         Map<String, Object> col = new LinkedHashMap<>();
         col.put("name", column);
         col.put("type", "DATE");
@@ -57,8 +57,19 @@ final class OnboardFixes {
         Map<String, Object> fix = new LinkedHashMap<>();
         fix.put("label", "Read '" + column + "' as dates (" + format + ")");
         fix.put("columns", List.of(col));
+        return fix;
+    }
+
+    /**
+     * {@code alsoAs}: another format that reads exactly as many values ({@code 03/04/2026} is day first or month first) -
+     * then the cause says so, and the fix carries it under {@code alternatives}, so the user chooses: never a silent guess.
+     */
+    static Map<String, Object> dateFormat(String column, String format, int matching, int of, String odd, String alsoAs) {
+        Map<String, Object> fix = dateFix(column, format);
+        if (alsoAs != null) fix.put("alternatives", List.of(dateFix(column, alsoAs)));
         return finding("date_format", column, matching + " of " + of + " sampled values of '" + column + "' are dates written " + format
-                + (odd == null ? ", so it is read as text" : "; " + (of - matching) + (of - matching == 1 ? " is" : " are")
+                + (alsoAs == null ? "" : " - or " + alsoAs + ", which reads them just as well; say which")
+                + (odd == null ? (alsoAs == null ? ", so it is read as text" : "") : "; " + (of - matching) + (of - matching == 1 ? " is" : " are")
                 + " not a real date (e.g. '" + odd + "') and would stay empty"), fix);
     }
 
@@ -83,9 +94,13 @@ final class OnboardFixes {
                         redraft("Use the first line as column names", "header", "true"));
     }
 
-    static Map<String, Object> encoding(String file) {
-        return finding("encoding", null, "'" + file + "' is not UTF-8 text; it reads as Latin-1 (Windows Western)",
-                redraft("Read it as Latin-1", "encoding", "latin-1"));
+    /** {@code utf16}: the file starts with a UTF-16 byte-order mark (Excel's "Unicode Text"), else it is read as Latin-1. */
+    static Map<String, Object> encoding(String file, boolean utf16) {
+        return utf16
+                ? finding("encoding", null, "'" + file + "' is UTF-16 text (it starts with a UTF-16 byte-order mark)",
+                        redraft("Read it as UTF-16", "encoding", "utf-16"))
+                : finding("encoding", null, "'" + file + "' is not UTF-8 text; it reads as Latin-1 (Windows Western)",
+                        redraft("Read it as Latin-1", "encoding", "latin-1"));
     }
 
     static Map<String, Object> missingColumn(String file, String dataset, String column) {

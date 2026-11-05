@@ -211,6 +211,20 @@ class ControlApiOnboardFixesTest {
             data(commit(c, d, id, ",\"columns\":" + f.at("/fix/columns")), 200);
             assertEquals(239, parquet(id, "SELECT count(ordered) FROM t"), "the one unreal date stays empty");
             assertEquals(4, parquet(id, "SELECT count(*) FROM t WHERE ordered = DATE '2026-02-14'"), "read day first (rows 1, 61, 121, 181)");
+
+            // both parts at most 12 (03/04/2026): day first and month first read alike - the finding says so and the
+            // user picks; here the alternative, month first, is applied
+            byte[] us = rows(240, i -> "U" + i + "," + (i == 9 ? "13/13/2026" : String.format("%02d/%02d/2026", 1 + i % 12, 1 + (i / 12) % 12)),
+                    "order_id,ordered").getBytes(StandardCharsets.UTF_8);
+            JsonNode du = draft(c, "us.csv", us, "");
+            JsonNode a = finding(du.get("findings"), "date_format");
+            assertTrue(a.get("cause").asText().contains("%m/%d/%Y"), "the other reading is named: " + a);
+            JsonNode alt = a.at("/fix/alternatives/0/columns");
+            assertEquals("%m/%d/%Y", alt.at("/0/format").asText(), a.toString());
+            String usId = id("us");
+            data(commit(c, du, usId, ",\"columns\":" + alt), 200);
+            // row 2: 03/01/2026 month first is March 1
+            assertEquals(1, parquet(usId, "SELECT count(*) FROM t WHERE order_id = 'U2' AND ordered = DATE '2026-03-01'"));
             FIXED.add("date_format");
         }
     }
@@ -277,6 +291,47 @@ class ControlApiOnboardFixesTest {
             JsonNode fixedLate = draft(c, "late.csv", late.toByteArray(), redraftQuery(why));
             String lateId = id("late");
             assertEquals(1105, data(commit(c, fixedLate, lateId, ""), 200).get("rowsAfter").asLong());
+
+            // UTF-16 (Excel's "Unicode Text", with its byte-order mark): the fix reads it as UTF-16, never as Latin-1
+            String tsv = rows(240, i -> "C" + i + "\tMüller " + i + "\tKöln", "customer\tholder\tcity");
+            java.io.ByteArrayOutputStream u16 = new java.io.ByteArrayOutputStream();
+            u16.write(0xFF);
+            u16.write(0xFE);
+            u16.writeBytes(tsv.getBytes(StandardCharsets.UTF_16LE));
+            HttpResponse<String> wide = post(c, "/onboard/files?name=unicode.tsv", u16.toByteArray());
+            assertEquals(422, wide.statusCode(), wide.body());
+            JsonNode w = finding(errorFindings(wide), "encoding");
+            assertEquals("utf-16", w.at("/fix/redraft/encoding").asText(), w.toString());
+            JsonNode fixedWide = draft(c, "unicode.tsv", u16.toByteArray(), redraftQuery(w));
+            assertEquals("holder", fixedWide.at("/columns/1/name").asText(), fixedWide.get("columns").toString());
+            String wideId = id("unicode");
+            data(commit(c, fixedWide, wideId, ""), 200);
+            assertEquals(240, parquet(wideId, "SELECT count(*) FROM t WHERE city = 'Köln'"));
+            FIXED.add("encoding");
+        }
+    }
+
+    /** A followed (202) commit refused for its encoding keeps the findings on the run, as the inline refusal does. */
+
+    @Test
+    void encodingFindingsSurviveAFollowedRun(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpRequest put = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/settings/link-analysis/limits"))
+                    .PUT(BodyPublishers.ofString("{\"import.inline_max_bytes\":0}")).header("Content-Type", "application/json").build();
+            assertEquals(200, client.send(put, BodyHandlers.ofString()).statusCode());
+            JsonNode d = draft(c, "people.csv", rows(240, i -> "P" + i + ",Holder " + i, "person,holder").getBytes(StandardCharsets.UTF_8), "");
+            // the draft's own file swapped for one whose every row is Latin-1: the run rejects them all
+            java.nio.file.Files.write(Path.of("database", OnboardRoutes.DRAFTS, d.get("draftId").asText(), "people.csv"),
+                    rows(240, i -> "P" + i + ",Müller " + i, "person,holder").getBytes(StandardCharsets.ISO_8859_1));
+            JsonNode r = data(commit(c, d, id("people"), ""), 202);
+            JsonNode run = null;
+            for (int i = 0; i < 600; i++) {
+                run = data(get(c, "/onboard/runs/" + r.get("runId").asText()), 200);
+                if (!"running".equals(run.get("state").asText())) break;
+                Thread.sleep(100);
+            }
+            assertEquals("failed", run.get("state").asText(), run.toString());
+            assertEquals("latin-1", finding(run.get("findings"), "encoding").at("/fix/redraft/encoding").asText(), run.toString());
             FIXED.add("encoding");
         }
     }
