@@ -60,131 +60,164 @@ import { OnboardService } from './onboard.service';
     host: { class: 'flex flex-col gap-3' },
     template: `
         @if (state(); as s) {
-            <section class="flex flex-col gap-1" [attr.aria-labelledby]="ids + '-inbox'" data-testid="dataset-inbox">
-                <h4 class="m-0 text-sm font-semibold" [id]="ids + '-inbox'">Inbox</h4>
-                <p class="text-secondary m-0 text-xs">
-                    @if (s.automatic && s.feed.kind !== 'uploads') {
-                        Files another system writes into this folder on the server are imported on their own.
-                    } @else if (s.watch) {
-                        Files another system writes into this folder on the server are imported on their own once they
-                        have stopped changing; the folder is checked every 30 seconds.
-                    } @else {
-                        Files another system writes into this folder on the server wait there until you import them.
-                    }
-                </p>
-                <code class="break-all text-xs" data-testid="inbox-path">{{ s.inbox }}</code>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm" data-testid="waiting">{{ waiting(s.waiting, s.alreadyImported) }}</span>
-                    @if (s.waiting) {
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            data-testid="import-waiting"
-                            [disabled]="busy() || !!locked()"
-                            (click)="importWaiting.emit()"
+            @if (snapshot()) {
+                <section
+                    class="flex flex-col gap-1"
+                    [attr.aria-labelledby]="ids + '-refresh'"
+                    data-testid="snapshot-refresh"
+                >
+                    <h4 class="m-0 text-sm font-semibold" [id]="ids + '-refresh'">Refresh on its own</h4>
+                    <p class="text-secondary m-0 text-xs">
+                        Copies the table again every 30 seconds and replaces everything; nothing is added while the
+                        table has not changed.
+                    </p>
+                    @if (s.watchable) {
+                        <mat-slide-toggle
+                            class="self-start"
+                            data-testid="refresh-every"
+                            [checked]="!!s.watch"
+                            [disabled]="saving() || !!locked()"
+                            (change)="setWatch($event)"
+                            >Refresh every 30 seconds</mat-slide-toggle
                         >
-                            <mat-icon svgIcon="heroicons_outline:inbox-arrow-down"></mat-icon>
-                            Import waiting files
-                        </button>
                     }
-                </div>
-                @if (s.watchable) {
-                    <mat-slide-toggle
-                        class="self-start"
-                        data-testid="watch-folder"
-                        [checked]="!!s.watch"
-                        [disabled]="saving() || !!locked()"
-                        (change)="setWatch($event)"
-                        >Watch this folder</mat-slide-toggle
-                    >
                     @if (s.watch && s.watchError) {
                         <inspecto-alert variant="warning" data-testid="watch-error"
-                            >The last import of this folder failed: {{ s.watchError }}</inspecto-alert
+                            >The last refresh failed: {{ s.watchError }}</inspecto-alert
                         >
-                    }
-                }
-                @if (s.files.length) {
-                    <ul class="text-secondary m-0 flex list-none flex-col p-0 text-xs" data-testid="waiting-files">
-                        @for (f of shownFiles(); track f.name) {
-                            <li>{{ fileLine(f) }}</li>
-                        }
-                        @if (s.waiting > shownFiles().length) {
-                            <li>and {{ s.waiting - shownFiles().length }} more</li>
-                        }
-                    </ul>
-                }
-            </section>
-
-            @if (offerKeep()) {
-                <section class="flex flex-col gap-2" [attr.aria-labelledby]="ids + '-keep'" data-testid="keep-form">
-                    <h4 class="m-0 text-sm font-semibold" [id]="ids + '-keep'">Keep this up to date</h4>
-                    @if (s.feed.kind !== 'uploads') {
-                        <p class="m-0 text-sm" data-testid="feed-on">
-                            New files are imported on their own: {{ words(s) }}.
-                        </p>
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            class="self-start"
-                            data-testid="stop-feed"
-                            [disabled]="saving() || !!locked()"
-                            (click)="stop()"
-                        >
-                            Stop - import only when asked
-                        </button>
-                    } @else {
-                        <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-                            <inspecto-option-picker
-                                label="Files come from"
-                                data-testid="feed-kind"
-                                [formControl]="kind"
-                                [options]="kindOptions"
-                            ></inspecto-option-picker>
-                            <inspecto-option-picker
-                                label="Check"
-                                data-testid="feed-every"
-                                [formControl]="every"
-                                [options]="everyOptions"
-                            ></inspecto-option-picker>
-                            @if (kindValue() === 'sftp') {
-                                <inspecto-option-picker
-                                    label="Connection"
-                                    data-testid="feed-connection"
-                                    placeholder="Choose a Connection"
-                                    [formControl]="connection"
-                                    [options]="sftpConnections()"
-                                    [help]="
-                                        sftpConnections().length
-                                            ? ''
-                                            : 'This Space has no SFTP Connection yet: ask an administrator to add one.'
-                                    "
-                                ></inspecto-option-picker>
-                            }
-                            <inspecto-pen-field
-                                label="Ready marker"
-                                data-testid="feed-marker"
-                                placeholder="none"
-                                help="Optional: read name.csv only once name.csv.done is there (write .done)."
-                                [formControl]="marker"
-                                [maxlength]="40"
-                            ></inspecto-pen-field>
-                        </div>
-                        @if (formError()) {
-                            <p class="text-warn m-0 text-xs" role="alert">{{ formError() }}</p>
-                        }
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            class="self-start"
-                            data-testid="keep-up-to-date"
-                            [disabled]="saving() || !!locked()"
-                            (click)="keep()"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                            Keep this up to date
-                        </button>
                     }
                 </section>
+            } @else {
+                <section
+                    class="flex flex-col gap-1"
+                    [attr.aria-labelledby]="ids + '-inbox'"
+                    data-testid="dataset-inbox"
+                >
+                    <h4 class="m-0 text-sm font-semibold" [id]="ids + '-inbox'">Inbox</h4>
+                    <p class="text-secondary m-0 text-xs">
+                        @if (s.automatic && s.feed.kind !== 'uploads') {
+                            Files another system writes into this folder on the server are imported on their own.
+                        } @else if (s.watch) {
+                            Files another system writes into this folder on the server are imported on their own once
+                            they have stopped changing; the folder is checked every 30 seconds.
+                        } @else {
+                            Files another system writes into this folder on the server wait there until you import them.
+                        }
+                    </p>
+                    <code class="break-all text-xs" data-testid="inbox-path">{{ s.inbox }}</code>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-sm" data-testid="waiting">{{ waiting(s.waiting, s.alreadyImported) }}</span>
+                        @if (s.waiting) {
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="import-waiting"
+                                [disabled]="busy() || !!locked()"
+                                (click)="importWaiting.emit()"
+                            >
+                                <mat-icon svgIcon="heroicons_outline:inbox-arrow-down"></mat-icon>
+                                Import waiting files
+                            </button>
+                        }
+                    </div>
+                    @if (s.watchable) {
+                        <mat-slide-toggle
+                            class="self-start"
+                            data-testid="watch-folder"
+                            [checked]="!!s.watch"
+                            [disabled]="saving() || !!locked()"
+                            (change)="setWatch($event)"
+                            >Watch this folder</mat-slide-toggle
+                        >
+                        @if (s.watch && s.watchError) {
+                            <inspecto-alert variant="warning" data-testid="watch-error"
+                                >The last import of this folder failed: {{ s.watchError }}</inspecto-alert
+                            >
+                        }
+                    }
+                    @if (s.files.length) {
+                        <ul class="text-secondary m-0 flex list-none flex-col p-0 text-xs" data-testid="waiting-files">
+                            @for (f of shownFiles(); track f.name) {
+                                <li>{{ fileLine(f) }}</li>
+                            }
+                            @if (s.waiting > shownFiles().length) {
+                                <li>and {{ s.waiting - shownFiles().length }} more</li>
+                            }
+                        </ul>
+                    }
+                </section>
+
+                @if (offerKeep()) {
+                    <section class="flex flex-col gap-2" [attr.aria-labelledby]="ids + '-keep'" data-testid="keep-form">
+                        <h4 class="m-0 text-sm font-semibold" [id]="ids + '-keep'">Keep this up to date</h4>
+                        @if (s.feed.kind !== 'uploads') {
+                            <p class="m-0 text-sm" data-testid="feed-on">
+                                New files are imported on their own: {{ words(s) }}.
+                            </p>
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                class="self-start"
+                                data-testid="stop-feed"
+                                [disabled]="saving() || !!locked()"
+                                (click)="stop()"
+                            >
+                                Stop - import only when asked
+                            </button>
+                        } @else {
+                            <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                                <inspecto-option-picker
+                                    label="Files come from"
+                                    data-testid="feed-kind"
+                                    [formControl]="kind"
+                                    [options]="kindOptions"
+                                ></inspecto-option-picker>
+                                <inspecto-option-picker
+                                    label="Check"
+                                    data-testid="feed-every"
+                                    [formControl]="every"
+                                    [options]="everyOptions"
+                                ></inspecto-option-picker>
+                                @if (kindValue() === 'sftp') {
+                                    <inspecto-option-picker
+                                        label="Connection"
+                                        data-testid="feed-connection"
+                                        placeholder="Choose a Connection"
+                                        [formControl]="connection"
+                                        [options]="sftpConnections()"
+                                        [help]="
+                                            sftpConnections().length
+                                                ? ''
+                                                : 'This Space has no SFTP Connection yet: ask an administrator to add one.'
+                                        "
+                                    ></inspecto-option-picker>
+                                }
+                                <inspecto-pen-field
+                                    label="Ready marker"
+                                    data-testid="feed-marker"
+                                    placeholder="none"
+                                    help="Optional: read name.csv only once name.csv.done is there (write .done)."
+                                    [formControl]="marker"
+                                    [maxlength]="40"
+                                ></inspecto-pen-field>
+                            </div>
+                            @if (formError()) {
+                                <p class="text-warn m-0 text-xs" role="alert">{{ formError() }}</p>
+                            }
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                class="self-start"
+                                data-testid="keep-up-to-date"
+                                [disabled]="saving() || !!locked()"
+                                (click)="keep()"
+                            >
+                                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                                Keep this up to date
+                            </button>
+                        }
+                    </section>
+                }
             }
         }
         @if (note(); as n) {
@@ -202,6 +235,8 @@ export class DatasetFeedComponent {
     readonly datasetId = input.required<string>();
     /** *Keep this up to date* is on offer (the host shows the edition lock otherwise). */
     readonly offerKeep = input(false);
+    /** A Postgres table snapshot (P3): only its 30 s refresh toggle is shown - it has no inbox to fill. */
+    readonly snapshot = input(false);
     /** The card is running an import. */
     readonly busy = input(false);
     /** Why the person may not change data here, or null. */

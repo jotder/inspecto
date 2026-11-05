@@ -148,8 +148,12 @@ final class OnboardImport {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "a Pipeline '" + id + "' already exists; choose another name");
             Path configDir = writeRoot.resolve(CONFIG_DIR);
             Path pipelineFile = configDir.resolve(id + "_pipeline.toon"), schemaFile = configDir.resolve(id + "_schema.toon");
-            if (Files.exists(pipelineFile) || Files.exists(schemaFile))
+            Path snapshotFile = PostgresSnapshot.configFile(writeRoot, id);
+            if (Files.exists(pipelineFile) || Files.exists(schemaFile) || Files.exists(snapshotFile))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "config files for '" + id + "' already exist; choose another name");
+            // BASIC-ONBOARD-1 P3: a draft copied from Postgres keeps its connection and table, so Run now can copy it again
+            Map<String, Object> snapshot = draft.get("snapshot") instanceof Map<?, ?> sm
+                    ? PostgresSnapshot.config((Map<String, Object>) sm) : null;
             if (Files.exists(dataRoot.resolve(id)) || Files.exists(inbox(dataRoot, id)))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the data directory already holds '" + id + "'; choose another name");
             long max = lim.get(LaLimit.IMPORT_MAX_DATASETS);
@@ -162,6 +166,11 @@ final class OnboardImport {
             Map<String, Object> dataset = plan.dataset(id, kind, fileName, String.valueOf(draft.get("type")));
             String recordType = commitRecordType(draft, body, LinkAnalysisSettings.forRoot(writeRoot));
             if (recordType != null) dataset.put(DatasetEntryRules.RECORD_TYPE, recordType);
+            if (snapshot != null) {
+                dataset.put("importSource", PostgresSnapshot.SOURCE);
+                if (!(body.get("description") instanceof String d && !d.isBlank()))
+                    dataset.put("description", "Copied from Postgres with Add data");
+            }
             // Shared with the Space like every other Dataset in it (LA-ONBOARD-DEFECTS-1): no `shares` key, so `owner` (the
             // importer, stamped here) is provenance, not a restriction. It was `shares: []`, private to the importer, and no
             // screen could share it, so colleagues saw "No Dataset in this Space has a link yet".
@@ -187,6 +196,10 @@ final class OnboardImport {
                 }
                 AtomicFiles.write(pipelineFile, ConfigCodec.toToon(pipeline).getBytes(StandardCharsets.UTF_8), ".cfg-");
                 job.undo.push(() -> Files.deleteIfExists(pipelineFile));
+                if (snapshot != null) {
+                    PostgresSnapshot.write(snapshotFile, snapshot);
+                    job.undo.push(() -> Files.deleteIfExists(snapshotFile));
+                }
                 job.undo.push(() -> {
                     service.unregisterPipeline(pipelineFile);
                     OnboardRoutes.deleteTree(dataRoot.resolve(id));
@@ -1053,15 +1066,20 @@ final class OnboardImport {
 
     /** {@link #importDataset}'s 409s without a request: {@code content} is an import Add data wrote for THIS id. */
     static void requireOwnImport(Path writeRoot, String id, Map<String, Object> content, CollectorService service) {
-        Path expected = writeRoot.resolve(CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
-        boolean ours = "import".equals(String.valueOf(content.get("origin"))) && id.equals(content.get("importPipeline"))
-                && service.pathFor(id).map(p -> p.toAbsolutePath().normalize().equals(expected)).orElse(false)
-                && service.configFor(id).isPresent();
+        boolean ours = isOurs(writeRoot, id, content, service);
         if (!ours && DatasetEntryRules.ORIGIN_MAPPING.equals(String.valueOf(content.get("origin"))))   // LA-DATA-PAGE-1
             throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is a Mapping of '" + content.get(DatasetEntryRules.BASED_ON)
                     + "': it reads that Dataset's data, so add files to '" + content.get(DatasetEntryRules.BASED_ON) + "'");
         if (!ours)
             throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is kept up to date by a Pipeline, not by Add data; add files to that Pipeline's Collector");
+    }
+
+    /** Whether {@code content} is the entry Add data wrote for {@code id} and its Pipeline is the registered {@code imports/<id>_pipeline.toon}. */
+    static boolean isOurs(Path writeRoot, String id, Map<String, Object> content, CollectorService service) {
+        Path expected = writeRoot.resolve(CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
+        return "import".equals(String.valueOf(content.get("origin"))) && id.equals(content.get("importPipeline"))
+                && service.pathFor(id).map(p -> p.toAbsolutePath().normalize().equals(expected)).orElse(false)
+                && service.configFor(id).isPresent();
     }
 
     static Object addFile(ApiContext api, HttpExchange ex, String id) throws IOException {
@@ -1084,17 +1102,40 @@ final class OnboardImport {
                     + "the days it covers; add its rows or replace everything");
         LaLimitValues lim = OnboardRoutes.limits(writeRoot);
         CollectorService service = HostContext.of(api).service();
-        PipelineConfig cfg = service.configFor(pipeline)
+        service.configFor(pipeline)
                 .orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + pipeline + "' is not registered"));
 
         String key = writeRoot + "|" + pipeline;
         if (!IN_FLIGHT.add(key)) throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is being imported right now");
         Path stage = dataRoot.resolve(OnboardRoutes.DRAFTS).resolve("a" + UUID.randomUUID().toString().replace("-", ""));
+        Path file = stage.resolve(OnboardRoutes.storedName(name));
+        try {
+            OnboardRoutes.receive(api, ex, file, lim.get(LaLimit.IMPORT_MAX_BYTES));
+        } catch (IOException | RuntimeException fault) {
+            IN_FLIGHT.remove(key);
+            OnboardRoutes.deleteTree(stage);
+            throw fault;
+        }
+        return addStaged(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), content, id, key, stage, file, name,
+                replace ? "replace" : period ? PERIOD : "append", ex);
+    }
+
+    /**
+     * Add the file staged at {@code file} (in its own {@code stage} directory) to the import {@code id} and run it - the part
+     * of Add a file after the body is received, shared with a Postgres snapshot's refresh ({@link PostgresSnapshot#refresh}).
+     * The caller has claimed {@code key} in {@link #IN_FLIGHT}; this releases it and removes {@code stage}, success or not
+     * (a followed run, when it ends). {@code ex == null} (the poll) always runs inline.
+     */
+    static Object addStaged(Space space, Map<String, Object> content, String id, String key, Path stage, Path file, String name,
+                            String mode, HttpExchange ex) throws IOException {
+        Path writeRoot = space.writeRoot(), dataRoot = space.dataRoot();
+        String pipeline = String.valueOf(content.get("importPipeline"));
+        boolean replace = "replace".equals(mode), period = PERIOD.equals(mode);
+        String eventDate = content.get("eventDate") instanceof String e && !e.isBlank() ? e.trim() : null;
+        LaLimitValues lim = OnboardRoutes.limits(writeRoot);
         boolean handedOff = false;
         Job job = null;
         try {
-            Path file = stage.resolve(OnboardRoutes.storedName(name));
-            OnboardRoutes.receive(api, ex, file, lim.get(LaLimit.IMPORT_MAX_BYTES));
             String type = OnboardDraft.fileType(file, name);
             String expected = String.valueOf(content.get("importFormat"));
             if (!type.equals(expected))   // the import's parser and file_pattern are fixed: a TSV is not a CSV import's file
@@ -1116,7 +1157,6 @@ final class OnboardImport {
             Map<String, List<String>> waitingNew = new LinkedHashMap<>();
             List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, type,
                     writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), waitingNew);
-            Space space = new Space(writeRoot, dataRoot, service, ApiContext.actor(ex));
             job = new Job(space, pipeline, String.valueOf(content.get("kind")), file, name, content, replace);
             job.period = period;
             job.newColumns = newColumns;
@@ -1148,7 +1188,7 @@ final class OnboardImport {
                     OnboardRoutes.deleteTree(stage);   // the staged copy, success or not (a followed run too)
                 }
             };
-            if (Files.size(job.landed) > lim.get(LaLimit.IMPORT_INLINE_MAX_BYTES)) {
+            if (ex != null && Files.size(job.landed) > lim.get(LaLimit.IMPORT_INLINE_MAX_BYTES)) {
                 Map<String, Object> rec = follow(job, "add-file", rest);
                 handedOff = true;
                 return ApiContext.respondJson(ex, 202, rec);
@@ -1285,11 +1325,16 @@ final class OnboardImport {
         return new ColumnCheck(refusal, List.copyOf(fresh));
     }
 
-    static Object runNow(ApiContext api, HttpExchange ex, String id) {
+    static Object runNow(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path writeRoot = OnboardRoutes.requireSelfImport(api, "Run now");
         Path dataRoot = OnboardRoutes.requireDataRoot(api);
         CollectorService service = HostContext.of(api).service();
         Map<String, Object> content = importDataset(writeRoot, ex, id, service);
+        // BASIC-ONBOARD-1 P3: a Postgres snapshot's Run now copies the table again, replacing everything
+        Map<String, Object> snapshot = PostgresSnapshot.read(writeRoot, id);
+        if (snapshot != null)
+            return PostgresSnapshot.refresh(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)),
+                    content, id, snapshot, ex, false);
         return importWaiting(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), id, content);
     }
 
@@ -1427,6 +1472,7 @@ final class OnboardImport {
         void retire() throws IOException {
             service.unregisterPipeline(pipelineFile);
             Files.deleteIfExists(schemaFile);
+            Files.deleteIfExists(PostgresSnapshot.configFile(writeRoot, id));   // BASIC-ONBOARD-1 P3: a snapshot's settings go too
             PipelineHistory.purge(writeRoot, id);
             Files.deleteIfExists(pipelineFile);
         }

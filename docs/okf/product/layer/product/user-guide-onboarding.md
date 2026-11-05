@@ -38,6 +38,22 @@ timestamp: 2026-07-16T00:00:00Z
 > *Open in editor* on the review screen (before Create, no Pipeline exists yet) is **moved to `BASIC-ONBOARD-1`
 > (operator 2026-11-05)**: not built and not declined. Not built yet: the Getting started panel and console Space guide
 > (C4), and the console Dataset page (C5) — `docs/BACKLOG.md`.
+>
+> **Choose a table: a Postgres snapshot (`BASIC-ONBOARD-1` P3, 2026-11-05; every edition, Basic included).** Step 1
+> is now *1. Choose the data*: **A file** (as above) or **A Postgres table**. For a table, give the host, port, database
+> and user, and the password as `${ENV:INSPECTO_PG_…}` - the name of an environment variable on the server holding it,
+> which an administrator sets (only a name starting `INSPECTO_PG_` is accepted, so no other server secret can be sent to
+> a database); the screen refuses anything else before sending, and the password itself is never typed, stored or
+> shown. **Test
+> connection** says *Connected as <user>, read-only - N tables*; a login that could change the database (superuser, or
+> INSERT / UPDATE / DELETE / TRUNCATE on any table) is refused with what to grant instead (CONNECT, USAGE on the schema,
+> SELECT on its tables). Pick a table, or write one read-only query (`SELECT` or `WITH … SELECT`), then **Read the
+> rows**: the rows are copied and the columns reviewed exactly as a file's, and *Create and run* makes the Dataset. Its
+> card says *Postgres snapshot* and offers **Refresh now** in place of *Add a file* / *Run now*: the table is copied
+> again and replaces everything (the arrival rules apply: name-checked columns, the arrivals list, compaction). No inbox
+> and no *Add a file* on a snapshot. Turning on the 30-second refresh is the shared poll's toggle (P2). *Another database
+> or a remote system* stays locked on Basic. As built: `add-data/postgres-table.component.ts` on
+> `/onboard/postgres/test` and `/onboard/postgres` (`module/processor/api-onboarding-authoring.md`, *Choose a table*).
 
 > 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e, plan
 > archived).** Onboarding a data origin now means: this **create dialog**, then the **guided pipeline

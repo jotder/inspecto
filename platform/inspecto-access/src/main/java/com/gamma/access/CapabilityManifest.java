@@ -230,6 +230,9 @@ public final class CapabilityManifest {
             new Entry("GET", "/datasets/([^/]+)/storage", Roles.CAN_UPLOAD_DATA),
             new Entry("PUT", "/datasets/([^/]+)/storage", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/datasets/([^/]+)/compact", Roles.CAN_UPLOAD_DATA),
+            // PostgresSnapshot (BASIC-ONBOARD-1 P3): Choose a table is the third way into Add data - the upload verb, as a file.
+            new Entry("POST", "/onboard/postgres/test", Roles.CAN_UPLOAD_DATA),
+            new Entry("POST", "/onboard/postgres", Roles.CAN_UPLOAD_DATA),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

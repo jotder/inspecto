@@ -178,7 +178,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/datasets/([^/]+)/record-type` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:84` |
 | POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |
 | PUT | `/datasets/([^/]+)/storage` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:73` |
-| PUT | `/datasets/([^/]+)/watch` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/InboxWatch.java:295` |
+| PUT | `/datasets/([^/]+)/watch` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/InboxWatch.java:371` |
 | POST | `/db/query` | exempt | group-gated | `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java:62` |
 | POST | `/decision-rules` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:64` |
 | DELETE | `/decision-rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:68` |
@@ -321,6 +321,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/objects/([^/]+)/transition` | gated | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:85` |
 | POST | `/onboard/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:73` |
 | POST | `/onboard/files/([^/]+)/commit` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:74` |
+| POST | `/onboard/postgres` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:84` |
+| POST | `/onboard/postgres/test` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:83` |
 | POST | `/onboarding/events` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java:40` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:43` |
 | POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:74` |

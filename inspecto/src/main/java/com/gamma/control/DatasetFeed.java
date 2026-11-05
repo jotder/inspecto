@@ -121,7 +121,7 @@ final class DatasetFeed {
         out.put("feed", feedOf(cfg));
         watch(out, cfg, imp.dataRoot(), imp.id(), imp.content());   // BASIC-ONBOARD-1 P2
         // the toggle is offered: not a Reference (it is replaced, a watched inbox adds rows), no schedule runs the Pipeline
-        out.put("watchable", !"reference".equals(imp.content().get("kind"))
+        out.put("watchable", (InboxWatch.snapshot(imp.content()) || !"reference".equals(imp.content().get("kind")))
                 && PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL);
         return out;
     }
@@ -150,6 +150,7 @@ final class DatasetFeed {
     private static void watch(Map<String, Object> out, PipelineConfig cfg, Path dataRoot, String id, Map<String, Object> content) {
         boolean on = InboxWatch.watched(content, cfg);
         out.put("watch", on);
+        if (InboxWatch.snapshot(content)) out.put("snapshot", true);   // the poll refreshes the table, not an inbox
         String error = on ? InboxWatch.lastError(dataRoot, id) : null;
         if (error != null) out.put("watchError", error);
     }

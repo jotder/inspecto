@@ -40,6 +40,8 @@ export interface DatasetFeedState {
     feed: Feed;
     /** BASIC-ONBOARD-1 P2: *Watch this folder* is on - the inbox is looked at every 30 seconds. */
     watch?: boolean;
+    /** A Postgres table snapshot (P3): the 30 s poll copies the table again instead of watching an inbox. */
+    snapshot?: boolean;
     /** *Watch this folder* is offered: not a Reference, and no schedule keeps the Dataset up to date. */
     watchable?: boolean;
     /** Why the poll's last import of this inbox failed; absent once one succeeds. */
@@ -112,8 +114,11 @@ export type FeedSummary = Feed & {
     alreadyImported?: number;
     watch?: boolean;
     watchError?: string;
+    snapshot?: boolean;
 };
 
+/** The 30 s refresh of a table snapshot in words (P3 with P2's toggle). */
+export const REFRESH_WORDS = 'Refreshed from its table every 30 seconds';
 /** *Watch this folder* in words: one interval, fixed (BASIC-ONBOARD-1 P2). */
 export const WATCH_WORDS = 'Inbox watched, checked every 30 seconds';
 
@@ -125,7 +130,7 @@ export function feedSummaryLine(f: FeedSummary | null): string | null {
     if (!f) return null;
     const waiting = f.waiting ? waitingWords(f.waiting, f.alreadyImported) : '';
     if (f.kind === 'uploads' && f.watch) {
-        const parts = [WATCH_WORDS];
+        const parts = [f.snapshot ? REFRESH_WORDS : WATCH_WORDS];
         if (waiting) parts.push(waiting);
         if (f.watchError) parts.push(`the last import failed: ${f.watchError}`);
         return parts.join(' · ');
@@ -144,6 +149,7 @@ export function feedStatusLine(s: DatasetFeedState | null): string | null {
               alreadyImported: s.alreadyImported,
               watch: s.watch,
               watchError: s.watchError,
+              snapshot: s.snapshot,
           })
         : null;
 }

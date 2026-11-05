@@ -229,6 +229,30 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         await expectNoA11yViolations(el);
     });
 
+    it('BASIC-ONBOARD-1 P3: a Postgres snapshot is refreshed from its table - no Add a file, no inbox (no violations)', async () => {
+        const { fixture, el } = create();
+        fixture.componentInstance.dataset.set({
+            id: 'transfers',
+            kind: 'stream',
+            importPipeline: 'transfers',
+            importSource: 'postgres',
+        });
+        fixture.detectChanges();
+        expect(el.textContent).toContain('Postgres snapshot');
+        expect(q(el, 'add-a-file')).toBeNull();
+        expect(q(el, 'add-file-mode')).toBeNull();
+        // P2 + P3: the feed is mounted in snapshot mode - the 30 s refresh toggle, never an inbox
+        expect(el.querySelector('inspecto-dataset-feed')).not.toBeNull();
+        expect(q(el, 'dataset-inbox')).toBeNull();
+        expect(q(el, 'run-now')!.textContent).toContain('Refresh now');
+        expect(q(el, 'snapshot-note')!.textContent).toContain('replaces everything');
+        q(el, 'run-now')!.click();
+        http.expectOne(apiUrl('/datasets/transfers/run')).flush(summary());
+        fixture.detectChanges();
+        expect(fixture.componentInstance.got.length).toBe(1);
+        await expectNoA11yViolations(el);
+    });
+
     it('a Reference is always replaced (no mode choice)', () => {
         const { el } = create({ kind: 'reference' });
         expect(q(el, 'add-file-mode')).toBeNull();

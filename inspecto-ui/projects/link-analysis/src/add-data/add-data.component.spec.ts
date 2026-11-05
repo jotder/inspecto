@@ -306,10 +306,50 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         );
         expect(q(el, 'excel-line')!.textContent).toContain('otherwise save the sheet as CSV');
         const locked = el.querySelector('inspecto-locked-action')!;
-        expect(locked.textContent).toContain('Read from a database or a remote system');
+        expect(locked.textContent).toContain('Read from another database or a remote system');
         expect(locked.textContent).toContain(REMOTE_FALLBACK);
         expect(q(el, 'step-columns')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it('BASIC-ONBOARD-1 P3: step 1 offers a Postgres table on Basic; its draft reads as a file draft (no violations)', async () => {
+        const { fixture, el } = create();
+        const postgres = q(el, 'data-origin')!.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
+        postgres.click();
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-postgres-table')).not.toBeNull();
+        expect(q(el, 'drop-zone')).toBeNull();
+        await expectNoA11yViolations(el);
+
+        const d = transfersDraft();
+        const snap = {
+            ...d,
+            snapshot: {
+                source: 'postgres' as const,
+                connection: {
+                    host: 'h',
+                    port: 5432,
+                    database: 'sales',
+                    user: 'reader',
+                    password: '${ENV:INSPECTO_PG_SALES}',
+                },
+                schema: 'public',
+                table: 'transfers',
+            },
+        };
+        (
+            fixture.debugElement.children[0].componentInstance as unknown as { adoptSnapshot(x: unknown): void }
+        ).adoptSnapshot(snap);
+        fixture.detectChanges();
+        expect(q(el, 'chosen-file')!.textContent).toContain('sales.public.transfers');
+        expect(q(el, 'choose-another')!.textContent).toContain('Choose another table');
+        expect(q(el, 'step-columns')).not.toBeNull();
+
+        // after Create, the result card is the snapshot's: Refresh now, no Add a file
+        commit(fixture, el).flush(summary());
+        fixture.detectChanges();
+        expect(q(el, 'import-dataset-card')!.textContent).toContain('Postgres snapshot');
+        expect(q(el, 'add-a-file')).toBeNull();
     });
 
     it('step 1 on Standard: the database is not locked (a hand-off line instead)', () => {

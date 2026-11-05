@@ -18,12 +18,14 @@ import { dataStatusLines } from './add-data.model';
     template: `<inspecto-dataset-feed
         datasetId="calls"
         [offerKeep]="offerKeep()"
+        [snapshot]="snapshot()"
         (importWaiting)="imports = imports + 1"
         (feedChange)="last = $event"
     ></inspecto-dataset-feed>`,
 })
 class HostComponent {
     readonly offerKeep = signal(false);
+    readonly snapshot = signal(false);
     readonly feed = viewChild(DatasetFeedComponent);
     imports = 0;
     last: DatasetFeedState | null = null;
@@ -41,7 +43,7 @@ const STATE: DatasetFeedState = {
 
 let http: HttpTestingController;
 
-function create(o: { offerKeep?: boolean; canAuthor?: boolean } = {}) {
+function create(o: { offerKeep?: boolean; canAuthor?: boolean; snapshot?: boolean } = {}) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -65,6 +67,7 @@ function create(o: { offerKeep?: boolean; canAuthor?: boolean } = {}) {
     });
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.offerKeep.set(o.offerKeep ?? false);
+    fixture.componentInstance.snapshot.set(o.snapshot ?? false);
     fixture.detectChanges();
     http = TestBed.inject(HttpTestingController);
     return { fixture, el: fixture.nativeElement as HTMLElement };
@@ -139,6 +142,23 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         expect(q(el, 'dataset-inbox')!.textContent).toContain('checked every 30 seconds');
         expect(q(el, 'watch-error')!.textContent).toContain('disk full');
         expect(fixture.componentInstance.last!.watch).toBe(true);
+        await expectNoA11yViolations(el);
+    });
+
+    it('a table snapshot: only Refresh every 30 seconds, no inbox (BASIC-ONBOARD-1 P3, no violations)', async () => {
+        const { fixture, el } = create({ snapshot: true });
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...STATE, watchable: true, snapshot: true });
+        fixture.detectChanges();
+        expect(q(el, 'dataset-inbox')).toBeNull();
+        expect(q(el, 'watch-folder')).toBeNull();
+        const toggle = () => el.querySelector<HTMLButtonElement>('[data-testid="refresh-every"] button')!;
+        toggle().click();
+        const req = http.expectOne(apiUrl('/datasets/calls/watch'));
+        expect(req.request.body).toEqual({ watch: true });
+        req.flush({ ...STATE, watchable: true, snapshot: true, watch: true, watchError: 'Postgres refused the login' });
+        fixture.detectChanges();
+        expect(toggle().getAttribute('aria-checked')).toBe('true');
+        expect(q(el, 'watch-error')!.textContent).toContain('The last refresh failed: Postgres refused the login');
         await expectNoA11yViolations(el);
     });
 
@@ -325,6 +345,9 @@ describe('dataset-feed wording', () => {
         expect(feedStatusLine(null)).toBeNull();
         expect(feedStatusLine(STATE)).toBeNull();
         expect(feedStatusLine({ ...STATE, watch: true })).toBe('Inbox watched, checked every 30 seconds');
+        expect(feedStatusLine({ ...STATE, watch: true, snapshot: true })).toBe(
+            'Refreshed from its table every 30 seconds',
+        );
         expect(feedStatusLine({ ...STATE, watch: true, waiting: 2, watchError: 'disk full' })).toBe(
             'Inbox watched, checked every 30 seconds · 2 files waiting · the last import failed: disk full',
         );

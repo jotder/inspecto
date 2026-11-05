@@ -110,6 +110,7 @@ export class ConsoleAddDataPageComponent implements OnInit {
                                 typeof c.content['description'] === 'string' ? c.content['description'] : undefined,
                             primaryEntityType: (c.content['primaryEntityType'] as string | undefined) ?? null,
                             importPipeline: (c.content['importPipeline'] as string | undefined) ?? c.name,
+                            importSource: c.content['importSource'] as string | undefined,
                         })),
                 ),
             error: () => this.imports.set([]),
