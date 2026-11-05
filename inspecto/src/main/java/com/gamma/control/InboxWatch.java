@@ -91,6 +91,8 @@ final class InboxWatch {
     private static final Object START = new Object();   // not the class monitor: tick() holds that while it imports
     /** Tests drive {@link #tick} themselves; the daemon's own ticks are skipped while this is set. */
     static volatile boolean pausedForTest;
+    /** Tests: runs between the poll's settle check and its import (a file created in that instant). */
+    static volatile Runnable afterSettleCheckForTest;
     /** What Data status says for a failure that is not a refusal: exception text never reaches the wire (ERR-5XX-ROUTE-BODIES). */
     static final String SERVER_FAULT = "the import failed on the server; the server log has the detail";
 
@@ -280,9 +282,14 @@ final class InboxWatch {
             Path inbox = OnboardImport.inbox(dataRoot, id).toAbsolutePath().normalize();
             List<Path> waiting = DatasetFeed.waiting(inbox, "." + OnboardImport.extension(String.valueOf(content.get("importFormat"))));
             if (!settled(waiting, cfg, System.currentTimeMillis())) return true;
+            // BASIC-ONBOARD-SETTLE-1: the run takes only the files just checked; one created since waits for a later poll
+            java.util.Set<Path> checked = new java.util.HashSet<>();
+            for (Path p : seen.keySet()) checked.add(p.toAbsolutePath().normalize());
+            Runnable hook = afterSettleCheckForTest;
+            if (hook != null) hook.run();
             final Path data = dataRoot;
             record(writeRoot, dataRoot, id, content.get("importPipeline"), () ->
-                    OnboardImport.importWaiting(new OnboardImport.Space(writeRoot, data, service, "inbox-watch"), id, content));
+                    OnboardImport.importWaiting(new OnboardImport.Space(writeRoot, data, service, "inbox-watch"), id, content, checked));
             seen = new HashMap<>();
             return true;
         }

@@ -527,6 +527,8 @@ public class CollectorProcessor {
         // X1: files waiting out a COMMIT-retry backoff are skipped on the run path only — they are still
         // pending, so the read-only count keeps reporting them.
         if (emitSignals) candidates = CommitRetry.due(cfg, candidates);
+        // BASIC-ONBOARD-SETTLE-1: a caller that checked the files itself (the inbox poll) takes only those
+        if (emitSignals) candidates = RunFiles.narrow(candidates);
         // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
         // read-only pending scan must keep reporting the true backlog — and only when an operator set
         // -Dingest.maxFilesPerCycle or the pipeline's own processing.intake block (per-pipeline override),

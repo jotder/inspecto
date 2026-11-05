@@ -178,7 +178,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/datasets/([^/]+)/record-type` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:84` |
 | POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |
 | PUT | `/datasets/([^/]+)/storage` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:73` |
-| PUT | `/datasets/([^/]+)/watch` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/InboxWatch.java:371` |
+| PUT | `/datasets/([^/]+)/watch` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/InboxWatch.java:378` |
 | POST | `/db/query` | exempt | group-gated | `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java:62` |
 | POST | `/decision-rules` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:64` |
 | DELETE | `/decision-rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:68` |

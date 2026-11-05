@@ -2015,9 +2015,15 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   imported under the same name are ignored) and EVERY such file is unmodified for 30 s and was seen at the same size on
   two polls - the numbers a folder feed writes into its Pipeline (`stability {window: 30s, size_checks: 2}`). Not the
   `StabilityGate` class: it forgets a file once it releases it, and the run takes the whole inbox, so the poll must
-  see all of it settled at once (with the gate, two files settling on alternate ticks would never run). **Known gap:**
-  a file created in the instant between the poll's listing and the run's own listing is taken unchecked; closing it
-  needs a per-run stability override in `CollectorService.runPipeline` (not built; BACKLOG `BASIC-ONBOARD-SETTLE-1`).
+  see all of it settled at once (with the gate, two files settling on alternate ticks would never run).
+- **The run takes only the checked files** (`BASIC-ONBOARD-SETTLE-1`, 2026-11-05). The poll hands the files it just
+  checked to `importWaiting(…, only)`: the columns check judges only those, and the run is narrowed to them by
+  `com.gamma.inspector.RunFiles.only(inbox, files)`, a scope keyed by the inbox folder's real path (not the Pipeline
+  name, so two Spaces never narrow each other) that `CollectorProcessor.collect` applies on the run path only (a
+  pending count still sees the whole inbox). A file created between the check and the run stays in the inbox and is
+  checked by later polls. Run now passes no set: it takes the whole inbox, as before. Not covered: a file already
+  checked that is rewritten in that instant is still taken (the scope matches by path, since the columns check may
+  rewrite a file it accepts).
 - **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
   watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
   the poll target is dropped.

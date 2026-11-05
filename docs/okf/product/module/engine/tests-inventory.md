@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-373 test class(es): 373 unit, 0 real-HTTP control-plane, 0 IT.
+374 test class(es): 374 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -149,6 +149,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ReprocessCommandTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/ReprocessCommandTest.java` |  |
 | `RouteIngestEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RouteIngestEndToEndTest.java` | Arming plan S2, end to end: an authored {@code route:} pipeline executes on the REAL ingest path |
 | `RunCancellationTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RunCancellationTest.java` | HA-GRACEFUL-STOP-LEASE-RELEASE-1, engine side: a run whose host is closing (its fence answers |
+| `RunFilesTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RunFilesTest.java` | BASIC-ONBOARD-SETTLE-1: a run takes from a scoped folder only the files the caller checked. |
 | `SchemaDriftIngestTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/SchemaDriftIngestTest.java` | {@code quality.schema.drift} end to end through the real CSV ingest: the hook sits in |
 | `SegmentRouteEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/SegmentRouteEndToEndTest.java` | Branch-aware segment lift S6, end to end on the REAL ingest path ({@code CollectorProcessor.run}): a copy |
 | `SegmentScopedRouteTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/SegmentScopedRouteTest.java` | Branch-aware segment-scoped lift (design {@code branch-aware-segment-lift-design.md}): a {@code route:} |

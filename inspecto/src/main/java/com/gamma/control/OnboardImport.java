@@ -1175,7 +1175,7 @@ final class OnboardImport {
             // the run also takes any file waiting in the inbox: judged by the same columns policy as Run now
             Map<String, List<String>> waitingNew = new LinkedHashMap<>();
             List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, type,
-                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), waitingNew);
+                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), waitingNew, null);
             job = new Job(space, pipeline, String.valueOf(content.get("kind")), file, name, content, replace);
             job.period = period;
             job.newColumns = newColumns;
@@ -1354,16 +1354,18 @@ final class OnboardImport {
         if (snapshot != null)
             return PostgresSnapshot.refresh(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)),
                     content, id, snapshot, ex, false);
-        return importWaiting(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), id, content);
+        return importWaiting(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), id, content, null);
     }
 
     /**
      * <b>Import waiting files</b>: the files in the import's inbox, each judged by the columns policy first (a refused one
      * set aside with its reason), then the run, the follow-on and the arrivals. The ONE path for Run now and the inbox
      * poll ({@link InboxWatch}, {@code BASIC-ONBOARD-1} P2); the caller has passed the family's gates. 409 while the same
-     * import is running.
+     * import is running. {@code only}, when not null, is the set of inbox files the caller checked (the poll's settled
+     * files): nothing else is judged or taken, so a file created after the check waits for a later run
+     * (BASIC-ONBOARD-SETTLE-1). Run now passes null: the whole inbox.
      */
-    static Map<String, Object> importWaiting(Space space, String id, Map<String, Object> content) {
+    static Map<String, Object> importWaiting(Space space, String id, Map<String, Object> content, Set<Path> only) {
         Path writeRoot = space.writeRoot(), dataRoot = space.dataRoot();
         String pipeline = String.valueOf(content.get("importPipeline"));
         String key = writeRoot + "|" + pipeline;
@@ -1373,10 +1375,17 @@ final class OnboardImport {
             // LA-ARRIVAL-MODES-1: a waiting file is judged by the columns policy first; a refused one is set aside, named
             Map<String, List<String>> fresh = new LinkedHashMap<>();
             List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, String.valueOf(content.get("importFormat")),
-                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), fresh);
+                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), fresh, only);
             job.inboxNewColumns = fresh;
             long before = countRows(job.database());
-            Map<String, Object> s = job.runChecked(before);
+            Map<String, Object> s;
+            if (only == null) {
+                s = job.runChecked(before);
+            } else {
+                try (com.gamma.inspector.RunFiles.Scope scope = com.gamma.inspector.RunFiles.only(inbox(dataRoot, pipeline), only)) {
+                    s = job.runChecked(before);
+                }
+            }
             s.put("dataset", id);
             if (!refused.isEmpty()) s.put("refused", refused);
             job.followOn(s);
@@ -1401,7 +1410,7 @@ final class OnboardImport {
      * for the run, which quarantines it as before.
      */
     private static List<Map<String, Object>> judgeInbox(Path dataRoot, String pipeline, String id, String type, Path schema,
-                                                        Map<String, List<String>> fresh) {
+                                                        Map<String, List<String>> fresh, Set<Path> only) {
         List<Map<String, Object>> out = new ArrayList<>();
         Path in = inbox(dataRoot, pipeline);
         if (!Files.isDirectory(in)) return out;
@@ -1411,6 +1420,7 @@ final class OnboardImport {
             waiting = w.filter(Files::isRegularFile)
                     .filter(p -> !p.getFileName().toString().startsWith(".")
                             && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(ext))
+                    .filter(p -> only == null || only.contains(p.toAbsolutePath().normalize()))
                     .sorted().toList();
         } catch (IOException unreadable) {
             return out;

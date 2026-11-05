@@ -201,6 +201,42 @@ class ControlApiInboxWatchTest {
     }
 
     @Test
+    void aFileCreatedAfterTheSettleCheckIsLeftForALaterPoll(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // BASIC-ONBOARD-SETTLE-1: the run takes only the files the poll checked, not whatever the inbox holds by then
+        EditionFeatures.overrideForTest(Set.of());
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "late", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            dropSettled(id, "checked.csv", ControlApiOnboardFilesTest.transfers(5));
+            Path late = inbox(id).resolve("late.csv");
+            InboxWatch.tick();
+            InboxWatch.afterSettleCheckForTest = () -> {
+                try {
+                    Files.writeString(late, "colour,shape\nred,square\n");   // still being written, wrong so far
+                } catch (java.io.IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            };
+            try {
+                InboxWatch.tick();
+            } finally {
+                InboxWatch.afterSettleCheckForTest = null;
+            }
+            assertTrue(Files.exists(late), "the late file stays in the inbox: not taken, not judged and set aside");
+            assertFalse(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "late.csv")), "never judged half-written");
+            assertEquals(1, feed(c, id).get("waiting").asInt(), "only the checked file was taken");
+            String all = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").toString();
+            assertTrue(all.contains("checked.csv") && !all.contains("late.csv"), all);
+
+            Files.writeString(late, ControlApiOnboardFilesTest.transfers(4));   // the writer finishes
+            Files.setLastModifiedTime(late, SETTLED);
+            InboxWatch.tick();
+            InboxWatch.tick();
+            assertEquals(0, feed(c, id).get("waiting").asInt(), "settled on later polls: taken then");
+        }
+    }
+
+    @Test
     void offStopsThePollAndARestartPicksTheWatchUpAgain(@TempDir Path cfg, @TempDir Path root) throws Exception {
         EditionFeatures.overrideForTest(Set.of());
         try (Ctx c = open(cfg, root)) {
