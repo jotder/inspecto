@@ -46,7 +46,9 @@ public final class LinkIndexFollowOn implements ImportFollowOn {
                     LinkMapping.primary(m, LinkMapping.PRIMARY_TIME, "time"), null,
                     // LA-COLUMN-ROLES-1 P2: every Time, Measure and Category column rides in the index
                     LinkMapping.primary(m, LinkMapping.PRIMARY_MEASURE, "amount"), LinkMapping.carriedColumns(c.entry()),
-                    c.actor(), true, 300_000L, 0L));
+                    // wait budget -1: a build already running (a kept-up-to-date feed's index Job on the same commit) is
+                    // waited for and re-planned, a bounded number of times within the timeout - never "not built" for it
+                    c.actor(), true, 300_000L, -1L));
             Map<String, Object> r = outcome(o.result(), o.message());
             r.put("mode", o.mode());   // append / full / compact / none: what the build cost (V4)
             r.put("code", o.code());

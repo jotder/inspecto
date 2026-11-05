@@ -1398,7 +1398,8 @@ limits and the commit's write order are in
   own (`pipeline.automation`, declared by `inspecto-ops` since 2026-11-05), a feed's scheduled runs are indexed by the
   Space's Job; the index layer makes a build that meets a running one wait and re-plan (`BUILD_IN_PROGRESS`). Until
   2026-11-05 the in-run build was skipped where that feature was present (`followOnInRun`, `ImportFollowOn.deferred`,
-  both removed). Expectations are still left to the Space's Jobs there. The summary reports `index:{result, edges, nodes}`.
+  both removed); the Expectations are evaluated in the run in every edition too (DT-15). The in-run build waits for a
+  running build of the same index (wait budget -1: bounded waits within its 300 s timeout). The summary reports `index:{result, edges, nodes}`.
 - **The entry keeps its last import (`LA-ONBOARD-RESIDUALS-1` item 7, as built 2026-10-28).** The commit and *Add a file*
   write `lastImport {at, replaced, rowsBefore, rowsAfter, batch, file}` onto the Dataset's registry entry
   (`OnboardImport.Job.lastImport`; `batch` = the run's ledger `consignment_id`). The commit puts it in the entry it

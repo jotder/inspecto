@@ -192,7 +192,7 @@ export interface CommitBody {
 
 /** `index` of a run summary: the link index built inside the user's run (DT-16). */
 export interface ImportIndexOutcome {
-    result: 'BUILT' | 'UP_TO_DATE' | 'REFUSED' | 'FAILED' | 'SKIPPED' | 'NOT_AVAILABLE' | 'DEFERRED' | string;
+    result: 'BUILT' | 'UP_TO_DATE' | 'REFUSED' | 'FAILED' | 'SKIPPED' | 'NOT_AVAILABLE' | string;
     message?: string | null;
     edges?: number | null;
     nodes?: number | null;
@@ -218,7 +218,7 @@ export interface Arrival {
     rowsRejected: number | null;
     mode: 'replace' | 'append' | 'period' | null;
     sha256: string | null;
-    /** The link index outcome of the run that took this file (BUILT, UP_TO_DATE, DEFERRED, FAILED, …); null = not recorded. */
+    /** The link index outcome of the run that took this file (BUILT, UP_TO_DATE, FAILED, …); null = not recorded. */
     index: string | null;
     /** How that build ran: `append` (the new file only), `full`, `compact`, `none`; null = not recorded. */
     indexMode?: string | null;
@@ -760,7 +760,6 @@ function indexAndExpectations(s: ImportSummary): SummaryLine[] {
                 break;
             case 'SKIPPED':
             case 'NOT_AVAILABLE':
-            case 'DEFERRED':
                 out.push({ tone: 'info', text: `No link index was built: ${ix.message ?? 'nothing to build'}.` });
                 break;
             default:
@@ -849,7 +848,6 @@ const INDEXED = new Set(['BUILT', 'UP_TO_DATE']);
 /** What the graph holds, from the arrivals' recorded index outcomes, newest first; '' when nothing was recorded. */
 function graphClock(list: readonly Arrival[]): string {
     const newest = list[0];
-    if (newest?.index === 'DEFERRED') return "the graph is updated by the Space's Jobs";
     const k = list.findIndex((a) => !!a.index && INDEXED.has(a.index));
     if (k === 0) return 'graph up to date';
     // the arrivals after the newest one the graph took, counted only when their own outcome was recorded

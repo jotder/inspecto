@@ -501,7 +501,7 @@ re-draft with `?delimiter=…`), because the columns were read with it. Order:
    no `shares` key, so the Dataset is shared with its Space like every other Dataset in it (`LA-ONBOARD-DEFECTS-1`,
    2026-10-23; it was `shares: []`, private to the importer, and no screen could share it).
 5. Follow-on work **inside the same run** (DT-16), in every edition (operator 2026-11-05: a person's import always gives
-   a fresh graph; where `pipeline.automation` is present only the Expectations are left to the Space's Jobs): each installed application's follow-on
+   a fresh graph; the Expectations too, DT-15): each installed application's follow-on
    step, registered through the `ImportFollowOn` SPI and reported under its own key (`BASIC-ONBOARD-1` P1; the
    draft lists them as `followOns:[{key, does, needs}]`). Link Analysis registers its link index
    (`LinkIndexFollowOn`, `la/inspecto-geo-link`): `index:{result: BUILT|UP_TO_DATE|REFUSED|FAILED|SKIPPED, edges,

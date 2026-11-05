@@ -67,8 +67,7 @@ import java.util.regex.Pattern;
  *   <li>The Dataset is registered ({@code physicalRef: <id>/database}) with column classifications,
  *       {@code primaryEntityType} and {@code defaultLinkMapping} (OB-8), {@code origin: import}, {@code kind}.</li>
  *   <li>Inside the same user-started run (DT-16; not a signal-driven Job): the Dataset's link index is built and the
- *       Expectations that target the Pipeline are evaluated. Skipped where {@code pipeline.automation} is present (a
- *       Space whose Jobs do it), and reported either way.</li>
+ *       Expectations that target the Pipeline are evaluated, in every edition (operator 2026-11-05).</li>
  * </ol>
  * <b>A failed commit leaves nothing behind</b>: every write above is undone in reverse (config files, registration,
  * data and inbox directories, the Dataset entry), and the uploaded file goes back to its draft so the user can change
@@ -91,8 +90,8 @@ final class OnboardImport {
     private static final Pattern COLUMN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,63}");
     private static final Set<String> TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN");
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS").withZone(ZoneOffset.UTC);
-    /** Pipelines that run on their own (Standard and up): feeds, retention, and the Space's Jobs evaluate Expectations (DATA-TIERS-1 §6). */
-    static final String AUTOMATION_FEATURE = com.gamma.etl.EditionFeatures.PIPELINE_AUTOMATION;
+    /** Pipelines that run on their own (Standard and up): <i>Keep this up to date</i> and a retention policy. */
+    static final String AUTOMATION_FEATURE = EditionFeatures.PIPELINE_AUTOMATION;
     /**
      * BASIC-ONBOARD-1 P1: the default Pipeline's four steps, named in every import's Pipeline config. Read by no engine
      * code (like {@code origin}); an import written before carries none and means the same.
@@ -907,10 +906,10 @@ final class OnboardImport {
 
         /**
          * The default Pipeline's fourth step (BASIC-ONBOARD-1 P1, DT-16): the import's follow-on work, inside the user's
-         * run - compaction, each application's registered {@link ImportFollowOn} under its key, then the Expectations (the
-         * Space's Jobs evaluate them instead where Pipelines run on their own). No follow-on registered: the import ends at
-         * its Parquet. The follow-ons run in every edition (operator 2026-11-05): a person's import always gives a fresh
-         * graph; files a scheduled feed takes are indexed by the Space's Job.
+         * run - compaction, each application's registered {@link ImportFollowOn} under its key, then the Expectations
+         * (DT-15: every edition). No follow-on registered: the import ends at its Parquet. All of it runs in every edition
+         * (operator 2026-11-05): a person's import always gives a fresh graph; files a scheduled feed takes are indexed by
+         * the Space's Job.
          */
         void followOn(Map<String, Object> summary) {
             Map<String, Object> current = new ComponentStore(space.writeRoot().resolve("registry")).get("dataset", id)
@@ -919,7 +918,7 @@ final class OnboardImport {
             summary.put("compaction", DatasetCompaction.afterImport(space.writeRoot(), space.dataRoot(), id, current, space.actor()));
             for (ImportFollowOn f : followOns())
                 summary.put(f.key(), runFollowOn(f, current));
-            summary.put("expectations", EditionFeatures.present(AUTOMATION_FEATURE) ? List.of() : evaluateExpectations());
+            summary.put("expectations", evaluateExpectations());
         }
 
         private Map<String, Object> runFollowOn(ImportFollowOn f, Map<String, Object> content) {

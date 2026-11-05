@@ -370,7 +370,6 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         };
         expect(dataStatusLine([base])).toBe('Received 2026-11-02 08:00');
         expect(dataStatusLine([{ ...base, index: 'BUILT' }])).toBe('Received 2026-11-02 08:00 · graph up to date');
-        expect(dataStatusLine([{ ...base, index: 'DEFERRED' }])).toContain("updated by the Space's Jobs");
         expect(dataStatusLine([])).toBeNull();
         // the graph clock: how many files arrived after the newest one the graph took (Run now records its own outcome)
         const drop: Arrival = { ...base, sender: 'system', index: 'FAILED' };

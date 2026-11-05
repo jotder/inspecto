@@ -80,6 +80,14 @@ class ControlApiKeepUpToDateStandardTest {
             JsonNode d = call(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", csv, 200);
             call(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", 200);
 
+            // DT-15: Expectations stay in every edition - a person's Add a file evaluates them in its own run on Standard too
+            call(c, "POST", "/expectations", "{\"name\":\"" + id + "_ids\",\"targetType\":\"pipeline\",\"target\":\"" + id
+                    + "\",\"column\":\"transfer_id\",\"kind\":\"non_null\",\"severity\":\"MAJOR\"}", 200);
+            JsonNode added = call(c, "POST", "/datasets/" + id + "/files?name=more.csv&mode=append",
+                    "transfer_id,from_account,to_account,amount\nT3,ACC-3,ACC-4,30\nT4,ACC-4,ACC-5,40\n", 200);
+            assertEquals(1, added.get("expectations").size(), added.toString());
+            assertEquals("PASSED", added.at("/expectations/0/status").asText(), added.toString());
+
             assertTrue(call(c, "GET", "/datasets/" + id + "/feed", null, 200).get("automatic").asBoolean(), "the screens offer Keep");
             JsonNode kept = call(c, "PUT", "/datasets/" + id + "/feed", "{\"kind\":\"folder\",\"every\":\"15m\"}", 200);
             assertEquals("folder", kept.at("/feed/kind").asText(), kept.toString());
