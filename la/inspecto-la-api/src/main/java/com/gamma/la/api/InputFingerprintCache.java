@@ -13,7 +13,9 @@ import java.util.function.Supplier;
  * A short-TTL cache of a Dataset's current {@link InputFingerprint} for the traversal hot path (D-3 design 5.3a): taking one
  * is a directory listing of the Dataset's files (~0.19 ms per file), too much to pay on EVERY request. Keyed by
  * (write root, dataset, mapping hash); bounded ({@link #MAX_ENTRIES}, least-recently-used out); an entry lives {@link #DEFAULT_TTL_MS}.
- * An index build that COMPLETES invalidates its dataset+mapping entries, so the next request sees the files the build read.
+ * An index build that COMPLETES invalidates its dataset+mapping entries, so the next request sees the files the build read;
+ * a compaction of an import Dataset {@link #forget}s the Dataset's entries (LA-DATASET-COMPACT-2), so a retention's removed
+ * rows are never served from the index.
  *
  * <p>A cached {@code null} (the provider cannot say) is a real answer and is cached too. The trade-off is stated, not hidden:
  * a file added or removed within the TTL is noticed at most one TTL later.
@@ -59,6 +61,13 @@ public final class InputFingerprintCache {
     static void invalidate(String dataset, String mapping) {
         synchronized (ENTRIES) {
             ENTRIES.keySet().removeIf(k -> k.dataset().equals(dataset) && k.mapping().equals(mapping));
+        }
+    }
+
+    /** Drops every entry of {@code dataset} (any root, any mapping): its files were rewritten outside an index build (a compaction). */
+    public static void forget(String dataset) {
+        synchronized (ENTRIES) {
+            ENTRIES.keySet().removeIf(k -> k.dataset().equals(dataset));
         }
     }
 

@@ -63,6 +63,17 @@ public final class LinkIndexFollowOn implements ImportFollowOn {
         }
     }
 
+    /**
+     * LA-DATASET-COMPACT-2: a compaction rewrote the Dataset's files. The index is now stale by its own check (its input
+     * files are gone), but a read within the input-fingerprint cache's lifetime would still compare the OLD files and serve
+     * rows a retention removed; dropping the cached fingerprint makes the very next read see the change. The next build is a
+     * full one (D-10).
+     */
+    @Override
+    public void filesRewritten(Context c) {
+        com.gamma.la.api.InputFingerprintCache.forget(c.dataset());
+    }
+
     private static Map<String, Object> outcome(String result, String message) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("result", result);

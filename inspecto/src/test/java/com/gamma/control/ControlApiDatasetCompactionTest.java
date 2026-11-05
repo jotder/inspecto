@@ -230,6 +230,41 @@ class ControlApiDatasetCompactionTest {
         }
     }
 
+    /**
+     * LA-DATASET-COMPACT-2 (a): a run of the import Pipeline that does not pass through Add data - the scheduler's run of a
+     * watched folder or SFTP feed (Standard) - compacts on its commit too, before the Space's Jobs (the index build) see it.
+     * While an import, Compact now or a delete holds the Dataset, the commit leaves it: that holder compacts itself.
+     */
+    @Test
+    void aRunOutsideAddDataCompactsOnItsCommit(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));   // Standard: a feed runs on the scheduler
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "scheduled", transfersOn(day(1), 5), null);
+            for (int d = 2; d <= DatasetCompaction.THRESHOLD; d++) append(c, id, "day" + d + ".csv", transfersOn(day(d), 5), null);
+            assertEquals(DatasetCompaction.THRESHOLD, parquetFiles(id));
+            Path inbox = Path.of("database", "inbox", id).toAbsolutePath();
+
+            // held (an import in flight): the commit does not compact behind the holder's back
+            String key = c.root() + "|" + id;
+            assertTrue(OnboardImport.IN_FLIGHT.add(key));
+            try {
+                Files.createDirectories(inbox);
+                Files.writeString(inbox.resolve("feed21.csv"), transfersOn(day(21), 5));
+                assertTrue(c.svc().runPipeline(id).isPresent(), "the import Pipeline ran");
+            } finally {
+                OnboardImport.IN_FLIGHT.remove(key);
+            }
+            assertEquals(DatasetCompaction.THRESHOLD + 1, parquetFiles(id), "left to the run that holds the Dataset");
+
+            // the scheduler's run: nobody holds the Dataset, so its commit compacts
+            Files.writeString(inbox.resolve("feed22.csv"), transfersOn(day(22), 5));
+            assertTrue(c.svc().runPipeline(id).isPresent(), "the import Pipeline ran");
+            assertEquals(1, parquetFiles(id), "the feed's run compacted every file into one");
+            assertEquals(110, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
+            assertEquals(22, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
+        }
+    }
+
     // ── retention (Standard and up) ──────────────────────────────────────────────────────────────────────────
 
     @Test

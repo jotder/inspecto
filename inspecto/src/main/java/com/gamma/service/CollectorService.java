@@ -153,6 +153,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final ReportService reports = new ReportService(this);
     /** Config-driven cron/event jobs (v2.8.0); null when none are registered. */
     private volatile JobService jobs;
+    /** LA-DATASET-COMPACT-2: what a committed batch needs before the Space's Jobs see it, set by the control plane (Add data's compaction). */
+    private static volatile java.util.function.BiConsumer<CollectorService, ConsignmentEvent> commitStep = (s, e) -> { };
+
+    /**
+     * LA-DATASET-COMPACT-2: the work every commit of every Space runs first, on the publishing thread and before the Space's
+     * Jobs are handed it - the control plane's compaction of an Add data import that the scheduler ran. It must not throw
+     * and must not start a run (the thread holds the run's claim).
+     */
+    public static void commitStep(java.util.function.BiConsumer<CollectorService, ConsignmentEvent> step) {
+        commitStep = step;
+    }
     /** This space's boot-built Platform Service registry (platform-services plan S1-1) — the one
      *  place engine facilities are bound to grantable service ids. The v1 built-in services
      *  (notifications / incidents / schema / consignment-status) register here at S1-3…S1-6. */
@@ -630,6 +641,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.addSubscriber(indexLagSubscriber);
         alerting.indexLagProbe(indexLag);
         bus.subscribe(this::onConsignmentEvent);
+        // LA-DATASET-COMPACT-2: subscribed HERE, before JobService.start() subscribes, so the step runs on the publishing
+        // thread (under the run's claim) BEFORE this Space's Jobs - the link index build - are handed the commit
+        bus.subscribe(e -> commitStep.accept(this, e));
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
         // Subscribed on the EventLog (the unified event stream, so it sees BATCH_FAILED/SEQUENCE_GAP/…);
         // each match is handed to NotificationService's own virtual-thread executor — never run inline on
