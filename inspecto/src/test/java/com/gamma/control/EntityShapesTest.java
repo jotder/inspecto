@@ -116,6 +116,7 @@ class EntityShapesTest {
         assertEquals("dimension", cause.get("value"), cause.toString());
         assertEquals("high", cause.get("confidence"));
         assertEquals("detail", cause.get("base"), "the role without the record type, to undo it");
+        assertEquals("high", cause.get("baseConfidence"), "and how sure that role was");
         assertTrue(String.valueOf(cause.get("evidence")).contains("a voice call record usually has a Category"), cause.toString());
         // a Measure hint on a text column does not make it a Measure; it may still be a Category
         assertEquals("detail", roleOf(et, "charge_band").get("value"), "'charge' is a Measure hint, and the column holds text");

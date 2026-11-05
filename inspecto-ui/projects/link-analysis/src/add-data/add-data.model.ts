@@ -85,7 +85,7 @@ export interface OnboardDraft {
             column: string;
             entityType: DraftEntityTypeChoice;
             /** `base`: the role proposed without the draft's record type, when that record type changed it (ENTITY-TYPE-RECORD-ROLES-1). */
-            role?: Choice<ColumnRole> & { base?: ColumnRole | null };
+            role?: Choice<ColumnRole> & { base?: ColumnRole | null; baseConfidence?: 'high' | 'low' | null };
             distinct?: number;
         }[];
         primary: Choice<string | null>;
@@ -570,7 +570,7 @@ export function roleUnder(
         ? {
               value: drafted.base,
               evidence: `${column} reads as a ${ROLE_LABELS[drafted.base]} by its values`,
-              confidence: 'high',
+              confidence: drafted.baseConfidence ?? 'high',
           }
         : drafted;
     const rt = recordTypes.find((r) => r.id === recordType);

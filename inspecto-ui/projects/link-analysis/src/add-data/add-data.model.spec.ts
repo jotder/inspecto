@@ -329,5 +329,8 @@ describe('roleUnder - roles under another record type (ENTITY-TYPE-RECORD-ROLES-
         expect(roleUnder(d, 'txn_id', 'transfer', [transfer])!.value).toBe('dimension');
         const without = roleUnder(d, 'txn_id', '', [transfer])!;
         expect(without).toMatchObject({ value: 'detail', confidence: 'high' });
+        // a guessed base stays a guess, so it still asks for a click
+        row.role = { ...row.role!, baseConfidence: 'low' };
+        expect(roleUnder(d, 'txn_id', '', [transfer])!.confidence).toBe('low');
     });
 });

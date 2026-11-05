@@ -156,7 +156,7 @@ final class EntityShapes {
      * ENTITY-TYPE-RECORD-ROLES-1: the draft's role proposals, with the proposed record type's usual roles applied. A column
      * that holds an Entity Type, or is the link's kind, time or measure, keeps its role; any other column a hint names
      * (with a type that can hold that role, {@link #hintedRole}) takes the hinted role, sure when the record type is,
-     * and remembers the role proposed without it ({@code base}) so the screen can undo it when another record type is
+     * and remembers the role proposed without it ({@code base}, with its {@code baseConfidence}) so the screen can undo it when another record type is
      * picked. {@code entityTypes} is the block {@link #propose} answered, with its {@code recordType} set.
      */
     @SuppressWarnings("unchecked")
@@ -183,6 +183,7 @@ final class EntityShapes {
             Map<String, Object> ch = OnboardDraft.choice(hinted[0], (label.matches("^[aeiou].*") ? "an " : "a ") + label + " usually has a "
                     + HINT_WORDS.get(hinted[0]) + " named like '" + hinted[1] + "'", sure);
             ch.put("base", current);
+            ch.put("baseConfidence", row.get("role") instanceof Map<?, ?> r ? r.get("confidence") : null);
             row.put("role", ch);
         }
     }
