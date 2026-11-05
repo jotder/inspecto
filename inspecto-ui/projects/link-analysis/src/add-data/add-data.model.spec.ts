@@ -11,6 +11,7 @@ import {
     initialRoles,
     limitsLine,
     lowChoices,
+    roleUnder,
     suggestDatasetName,
     summaryLines,
 } from './add-data.model';
@@ -289,5 +290,47 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
                 editionLock('pipelineAutomation', { pipelineAutomation: true }, {}, 'basic', AUTOMATION_FALLBACK),
             ).toBeNull();
         });
+    });
+});
+
+describe('roleUnder - roles under another record type (ENTITY-TYPE-RECORD-ROLES-1)', () => {
+    const transfer = {
+        id: 'transfer',
+        label: 'Transfer',
+        likelyTypes: [],
+        roleHints: { category: ['txn', 'channel'], measure: ['amount'] },
+    };
+
+    it("the draft's proposal stands under the record type it was drafted with", () => {
+        const d = transfersDraft();
+        expect(roleUnder(d, 'txn_id', '', [transfer])).toBe(
+            d.entityTypes.columns.find((c) => c.column === 'txn_id')!.role,
+        );
+    });
+
+    it('another record type gives its usual role where its hints name the column, but never to an Entity or a link column', () => {
+        const d = transfersDraft();
+        const txn = roleUnder(d, 'txn_id', 'transfer', [transfer])!;
+        expect(txn).toMatchObject({ value: 'dimension', confidence: 'high' });
+        expect(txn.evidence).toContain("a transfer usually has a Category named like 'txn'");
+        expect(roleUnder(d, 'amount', 'transfer', [transfer])!.value).toBe('measure'); // the link's measure keeps its role
+        // a column holding an Entity Type keeps what the draft proposed for it
+        expect(roleUnder(d, 'from_account', 'transfer', [transfer])).toBe(
+            d.entityTypes.columns.find((c) => c.column === 'from_account')!.role,
+        );
+        expect(roleUnder(d, 'txn_id', 'unknown', [transfer])!.value).toBe('detail');
+    });
+
+    it('a role the drafted record type gave goes back to the role proposed without it', () => {
+        const d = transfersDraft();
+        d.entityTypes.recordType = { value: 'transfer', evidence: '', confidence: 'high' };
+        const row = d.entityTypes.columns.find((c) => c.column === 'txn_id')!;
+        row.role = { value: 'dimension', evidence: 'a transfer usually has', confidence: 'high', base: 'detail' };
+        expect(roleUnder(d, 'txn_id', 'transfer', [transfer])!.value).toBe('dimension');
+        const without = roleUnder(d, 'txn_id', '', [transfer])!;
+        expect(without).toMatchObject({ value: 'detail', confidence: 'high' });
+        // a guessed base stays a guess, so it still asks for a click
+        row.role = { ...row.role!, baseConfidence: 'low' };
+        expect(roleUnder(d, 'txn_id', '', [transfer])!.confidence).toBe('low');
     });
 });

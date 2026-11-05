@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.analytics.ColumnProfiler;
+import com.gamma.analytics.QuantileMode;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
@@ -57,7 +59,7 @@ final class EntityProfiles {
 
     private EntityProfiles() {}
 
-    static final List<String> SECTIONS = List.of("bindings", "volume", "shapes", "time", "lineage", "links", "relationships");
+    static final List<String> SECTIONS = List.of("bindings", "volume", "shapes", "time", "lineage", "links", "relationships", "measures");
 
     /** D-EP8: the built-in sentinels, matched on the trimmed value case-insensitively and shown by value. */
     static final List<String> BUILTIN_SENTINELS = List.of("", "-99", "0", "NULL", "null", "unknown", "n/a");
@@ -74,14 +76,15 @@ final class EntityProfiles {
 
     /** The {@code entity_profile.*} limits in force (plan §4.5), plus the Space's hub threshold. */
     record Limits(int timeoutS, int maxDatasets, long sampleRows, int topN, int sentinelSharePct, int timelineDays,
-                  int relationshipThreshold, int hubThreshold) {
+                  int relationshipThreshold, int hubThreshold, int measureSampleEntities) {
         static Limits of(Path writeRoot) {
             LaLimitValues v = SpaceLimits.of(writeRoot);
             return new Limits(SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_TIMEOUT_S), SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_MAX_DATASETS),
                     v.get(LaLimit.ENTITY_PROFILE_SHAPE_SAMPLE_ROWS), SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_TOP_N),
                     SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_SENTINEL_SHARE), SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_TIMELINE_DAYS),
                     SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_RELATIONSHIP_THRESHOLD),
-                    LinkAnalysisSettings.forRoot(writeRoot).effectiveHubThreshold());
+                    LinkAnalysisSettings.forRoot(writeRoot).effectiveHubThreshold(),
+                    SpaceLimits.get(v, LaLimit.ENTITY_PROFILE_MEASURE_SAMPLE_ENTITIES));
         }
     }
 
@@ -210,18 +213,26 @@ final class EntityProfiles {
 
     // ── the Entity Type profile ───────────────────────────────────────────────────────────────────────────────────
 
-    /** The requested sections of the type's profile, served from the cache when the fingerprint stamp still matches. */
-    static Map<String, Object> typeProfile(Frame f, List<String> sections) {
+    /**
+     * The requested sections of the type's profile, served from the cache when the fingerprint stamp still matches. A
+     * {@code window} ({@code {from, to}}, either null; null = whole history) scopes the {@code measures} section only, which is
+     * cached per window.
+     */
+    static Map<String, Object> typeProfile(Frame f, List<String> sections, String[] window) {
         String stamp = stamp(f);
         Cache.Key key = new Cache.Key(f.writeRoot, f.type.id(), bindingSignature(f));
         Map<String, Section> have = stamp == null ? Map.of() : Cache.sections(key, stamp);
-        boolean cached = !sections.isEmpty() && have.keySet().containsAll(sections);
+        java.util.function.UnaryOperator<String> slot = s -> "measures".equals(s) && window != null ? s + "@" + window[0] + "/" + window[1] : s;
+        boolean cached = !sections.isEmpty() && sections.stream().map(slot).allMatch(have::containsKey);
         Map<String, Section> computed = new LinkedHashMap<>();
-        for (String s : sections) computed.put(s, have.containsKey(s) ? have.get(s) : new Section(compute(f, s), Instant.now()));
+        for (String s : sections) {
+            String at = slot.apply(s);
+            computed.put(s, have.containsKey(at) ? have.get(at) : new Section("measures".equals(s) ? typeMeasures(f, window) : compute(f, s), Instant.now()));
+        }
         // A section whose read FAILED is answered but never cached, so the next read retries it (a cached failure would
         // answer "not assessed" until the input files change).
-        Map<String, Section> keep = new LinkedHashMap<>(computed);
-        keep.values().removeIf(s -> failed(s.value()));
+        Map<String, Section> keep = new LinkedHashMap<>();
+        for (var e : computed.entrySet()) if (!failed(e.getValue().value())) keep.put(slot.apply(e.getKey()), e.getValue());
         if (stamp != null) Cache.put(key, stamp, keep);
         Section volume = keep.get("volume"), time = keep.get("time");
         if (volume != null) Cache.headline(key, headline(volume, time == null ? null : time.value(), f));
@@ -231,6 +242,12 @@ final class EntityProfiles {
         Instant at = computed.values().stream().map(Section::computedAt).min(Instant::compareTo).orElse(Instant.now());
         out.put("computedAt", at.toString());
         out.put("cached", cached);
+        if (window != null && sections.contains("measures")) {
+            Map<String, Object> echo = new LinkedHashMap<>();
+            echo.put("from", window[0]);
+            echo.put("to", window[1]);
+            out.put("window", echo);
+        }
         boolean truncated = f.datasetsTruncated;
         for (var e : computed.entrySet()) {
             out.put(e.getKey(), e.getValue().value());
@@ -247,7 +264,7 @@ final class EntityProfiles {
     private record Section(Object value, Instant computedAt) {}
 
     private static boolean truncated(Object section) {
-        if (section instanceof Map<?, ?> m) return Boolean.TRUE.equals(m.get("truncated"));
+        if (section instanceof Map<?, ?> m) return Boolean.TRUE.equals(m.get("truncated")) || truncated(m.get("distribution"));
         if (section instanceof List<?> l) for (Object o : l) if (truncated(o)) return true;
         return false;
     }
@@ -298,9 +315,9 @@ final class EntityProfiles {
         return m;
     }
 
-    /** True when {@code section} (a section map, or a list of them) holds a {@link #failed} read. */
+    /** True when {@code section} (a section map, or a list of them, or a Measure row's distribution) holds a {@link #failed} read. */
     static boolean failed(Object section) {
-        if (section instanceof Map<?, ?> m) return Boolean.TRUE.equals(m.get("retryable"));
+        if (section instanceof Map<?, ?> m) return Boolean.TRUE.equals(m.get("retryable")) || failed(m.get("distribution"));
         if (section instanceof List<?> l) for (Object o : l) if (failed(o)) return true;
         return false;
     }
@@ -679,6 +696,169 @@ final class EntityProfiles {
                 + " GROUP BY e) AS g", 1, List.of()).rows().get(0);
     }
 
+    /**
+     * Headroom of the per-Entity Measure sample: 1 Entity in {@code ceil(distinct x this / measure_sample_entities)}, so the hash
+     * spread and the approximate distinct count rarely carry the sample to the cap. The read's LIMIT is the hard bound.
+     */
+    static final double MEASURE_SAMPLE_HEADROOM = 1.1;
+
+    /**
+     * Measures (LA-COLUMN-ROLES-2 D-1 b): one row per binding x Measure of its Dataset ({@link #measureColumns}) over the rows
+     * where the bound column names an Entity (a non-empty normalised key), inside {@code window} on the binding's time column -
+     * rows holding a number, sum, lowest, highest, unit - in ONE aggregate statement per bound Dataset (each binding is its own
+     * row, so no Dataset row is summed twice). Plus each row's {@code distribution}: p50 / p90 / max of the per-Entity totals and
+     * the Entities measured, one GROUP BY per binding over at most {@code entity_profile.measure_sample_entities} Entities -
+     * above it over a key-hash sample of 1 Entity in {@code every}, as {@code relationships} samples, and said so.
+     */
+    static List<Map<String, Object>> typeMeasures(Frame f, String[] window) {
+        Map<EntityTypeBindings.Binding, List<Map<String, Object>>> rowsOf = new LinkedHashMap<>();
+        for (String ds : f.datasets()) {
+            List<EntityTypeBindings.Binding> read = new ArrayList<>();
+            List<List<String[]>> measuresOf = new ArrayList<>();
+            for (EntityTypeBindings.Binding b : f.usable) {
+                if (!b.dataset().equals(ds)) continue;
+                List<String[]> ms = measureColumns(f, b);
+                if (ms.isEmpty()) continue;
+                List<Map<String, Object>> rows = new ArrayList<>();
+                for (String[] m : ms) rows.add(measureRow(b, m));
+                rowsOf.put(b, rows);
+                if (window != null && timeColumn(f, b) == null) {   // undated rows are outside every window
+                    for (Map<String, Object> r : rows) r.putAll(notAssessed("the binding has no time column, so none of its rows is inside the window"));
+                    continue;
+                }
+                read.add(b);
+                measuresOf.add(ms);
+            }
+            if (read.isEmpty()) continue;
+            String rel = f.relationSql.get(ds);
+            int cap = f.lim.measureSampleEntities();
+            List<String> binds = new ArrayList<>();
+            StringBuilder inner = new StringBuilder("SELECT 0 AS z"), agg = new StringBuilder("SELECT 0 AS z");
+            for (int i = 0; i < read.size(); i++) {
+                String k = entityKey(f, read.get(i));
+                inner.append(", ").append(k).append(" AS k").append(i).append(", COALESCE(").append(k).append(" <> ''")
+                        .append(within(f, read.get(i), window, binds)).append(", false) AS n").append(i);
+                agg.append(", APPROX_COUNT_DISTINCT(k").append(i).append(") FILTER (WHERE n").append(i).append(") AS d").append(i);
+                for (int j = 0; j < measuresOf.get(i).size(); j++) {
+                    String a = i + "_" + j, w = ") FILTER (WHERE n" + i + ") AS ";
+                    inner.append(", TRY_CAST(").append(q(measuresOf.get(i).get(j)[1])).append(" AS DOUBLE) AS v").append(a);
+                    agg.append(", COUNT(v").append(a).append(w).append("c").append(a).append(", SUM(v").append(a).append(w).append("s").append(a)
+                            .append(", MIN(v").append(a).append(w).append("lo").append(a).append(", MAX(v").append(a).append(w).append("hi").append(a);
+                }
+            }
+            Map<String, Object> r;
+            try {
+                r = f.run(MEASURE_ROWS, rel, agg + " FROM (" + inner + " FROM " + MEASURE_ROWS + ") AS r", 1, binds).rows().get(0);
+            } catch (Exception e) {
+                for (EntityTypeBindings.Binding b : read) for (Map<String, Object> row : rowsOf.get(b)) row.putAll(failed(e));
+                continue;
+            }
+            for (int i = 0; i < read.size(); i++) {
+                List<Map<String, Object>> rows = rowsOf.get(read.get(i));
+                for (int j = 0; j < rows.size(); j++) {
+                    String a = i + "_" + j;
+                    Map<String, Object> row = rows.get(j);
+                    row.put("rows", ColumnProfile.num(r.get("c" + a)));
+                    row.put("sum", number(r.get("s" + a)));
+                    row.put("min", number(r.get("lo" + a)));
+                    row.put("max", number(r.get("hi" + a)));
+                }
+                long distinct = ColumnProfile.num(r.get("d" + i));
+                long every = distinct > cap ? Math.max(2, (long) Math.ceil(distinct * MEASURE_SAMPLE_HEADROOM / cap)) : 1;
+                List<Map<String, Object>> dist;
+                try {
+                    dist = distribution(f, read.get(i), measuresOf.get(i), window, every, cap);
+                } catch (Exception e) {
+                    dist = new ArrayList<>();
+                    for (int j = 0; j < rows.size(); j++) dist.add(failed(e));
+                }
+                for (int j = 0; j < rows.size(); j++) {
+                    rows.get(j).put("distribution", dist.get(j));
+                    assessed(rows.get(j));
+                }
+            }
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (List<Map<String, Object>> rows : rowsOf.values()) out.addAll(rows);
+        return out;
+    }
+
+    /**
+     * The per-Entity totals of one binding's Measures: GROUP BY the Entity key (over the 1-in-{@code every} key-hash sample when
+     * {@code every > 1}), at most {@code cap} Entities, then p50 / p90 / max of each Measure's totals and the Entities holding one.
+     */
+    private static List<Map<String, Object>> distribution(Frame f, EntityTypeBindings.Binding b, List<String[]> measures, String[] window,
+                                                          long every, int cap) throws Exception {
+        List<String> binds = new ArrayList<>();
+        StringBuilder rows = new StringBuilder("SELECT ").append(entityKey(f, b)).append(" AS k");
+        StringBuilder per = new StringBuilder("SELECT k");
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS e");
+        for (int j = 0; j < measures.size(); j++) {
+            rows.append(", TRY_CAST(").append(q(measures.get(j)[1])).append(" AS DOUBLE) AS v").append(j);
+            per.append(", SUM(v").append(j).append(") AS t").append(j);
+            String t = "t" + j;
+            sql.append(", COUNT(").append(t).append(") AS e").append(j)
+               .append(", ").append(ColumnProfiler.quantile(t, 0.5, QuantileMode.DISCRETE)).append(" AS p50_").append(j)
+               .append(", ").append(ColumnProfiler.quantile(t, 0.9, QuantileMode.DISCRETE)).append(" AS p90_").append(j)
+               .append(", MAX(").append(t).append(") AS mx").append(j);
+        }
+        rows.append(" FROM ").append(MEASURE_ROWS).append(" WHERE TRUE").append(within(f, b, window, binds));
+        per.append(" FROM (").append(rows).append(") AS r WHERE k <> ''").append(every > 1 ? " AND hash(k) % " + every + " = 0" : "")
+           .append(" GROUP BY k LIMIT ").append(cap);
+        Map<String, Object> r = f.run(MEASURE_ROWS, f.relationSql.get(b.dataset()), sql.append(" FROM (").append(per).append(") AS g").toString(),
+                1, binds).rows().get(0);
+        long entities = ColumnProfile.num(r.get("e"));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (int j = 0; j < measures.size(); j++) {
+            Map<String, Object> d = new LinkedHashMap<>();
+            d.put("entities", ColumnProfile.num(r.get("e" + j)));
+            d.put("p50", number(r.get("p50_" + j)));
+            d.put("p90", number(r.get("p90_" + j)));
+            d.put("max", number(r.get("mx" + j)));
+            d.put("sampled", every > 1);
+            d.put("every", every);
+            d.put("sampleEntities", cap);
+            if (every > 1) d.put("approximate", true);
+            d.put("truncated", entities >= cap);   // the cap's LIMIT may have cut the Entities read
+            assessed(d);
+            out.add(d);
+        }
+        return out;
+    }
+
+    private static Map<String, Object> measureRow(EntityTypeBindings.Binding b, String[] measure) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("dataset", b.dataset());
+        m.put("column", b.column());
+        m.put("measure", measure[0]);
+        m.put("unit", measure[2]);
+        return m;
+    }
+
+    /** The normalised key of a binding's column, over its Dataset's own relation. */
+    private static String entityKey(Frame f, EntityTypeBindings.Binding b) {
+        return EntityKeySql.key(f.type.normaliser(), q(f.column(b.dataset(), b.column())));
+    }
+
+    private static String timeColumn(Frame f, EntityTypeBindings.Binding b) {
+        return b.timeColumn() == null ? null : f.column(b.dataset(), b.timeColumn());
+    }
+
+    /** {@code window}'s predicate on the binding's time column ("" for none), its instants appended to {@code binds}. */
+    private static String within(Frame f, EntityTypeBindings.Binding b, String[] window, List<String> binds) {
+        if (window == null) return "";
+        String t = "TRY_CAST(" + q(timeColumn(f, b)) + " AS TIMESTAMP)", out = "";
+        if (window[0] != null) {
+            out += " AND " + t + " >= CAST(? AS TIMESTAMP)";
+            binds.add(LocalDateTime.ofInstant(Instant.parse(window[0]), UTC).toString());
+        }
+        if (window[1] != null) {
+            out += " AND " + t + " < CAST(? AS TIMESTAMP)";
+            binds.add(LocalDateTime.ofInstant(Instant.parse(window[1]), UTC).toString());
+        }
+        return out;
+    }
+
     // ── headline + cache ─────────────────────────────────────────────────────────────────────────────────────────
 
     /** The list route's headline: the last computed volume (and the oldest data-as-of of the type's Datasets). */
@@ -731,6 +911,8 @@ final class EntityProfiles {
                     () -> DatasetProviders.require().inputFingerprint(content, f.api.dataRoot(), f.writeRoot));
             if (fp == null || fp.value() == null || !fp.value().startsWith(InputFingerprint.FILES)) return null;
             sb.append('|').append(ds).append('=').append(fp.value());
+            // LA-COLUMN-ROLES-2: the Measures section reads each Dataset's column roles and units, so a role edit re-reads it
+            sb.append('|').append(content == null ? null : content.get("columns"));
         }
         return sha256(sb.toString());
     }
@@ -952,17 +1134,7 @@ final class EntityProfiles {
     static List<Map<String, Object>> measures(Frame f, String key, String[] window) throws Exception {
         List<Map<String, Object>> out = new ArrayList<>();
         for (EntityTypeBindings.Binding b : f.usable) {
-            Map<String, Object> content = f.resolved.datasets().get(b.dataset());
-            if (content == null || !(content.get("columns") instanceof List<?> cols)) continue;
-            List<String[]> present = new ArrayList<>();                                       // {measure, its own spelling, unit}
-            for (Object o : cols)
-                if (o instanceof Map<?, ?> c && "measure".equalsIgnoreCase(String.valueOf(c.get("role")))
-                        && c.get("name") instanceof String n && f.column(b.dataset(), n) != null
-                        && !n.equalsIgnoreCase(b.column())
-                        // a column that holds an Entity Type is an identifier, never summed: under masking its raw values
-                        // would come back as a sum, a lowest and a highest (the Dataset rules refuse such a Measure too)
-                        && !(c.get("classification") instanceof String k && !k.isBlank()))
-                    present.add(new String[] {n, f.column(b.dataset(), n), c.get("unit") instanceof String u ? u : null});
+            List<String[]> present = measureColumns(f, b);
             if (present.isEmpty()) continue;
             StringBuilder sql = new StringBuilder("SELECT COUNT(*) AS n");
             for (int i = 0; i < present.size(); i++) {
@@ -1000,6 +1172,25 @@ final class EntityProfiles {
             }
         }
         return out;
+    }
+
+    /**
+     * The Measures a binding's rows are summed over: its Dataset's {@code columns[].role: measure} columns present in the
+     * relation, as {@code {measure, its own spelling, unit}} - never the bound column, never a column holding an Entity Type.
+     */
+    static List<String[]> measureColumns(Frame f, EntityTypeBindings.Binding b) {
+        List<String[]> present = new ArrayList<>();
+        Map<String, Object> content = f.resolved.datasets().get(b.dataset());
+        if (content == null || !(content.get("columns") instanceof List<?> cols)) return present;
+        for (Object o : cols)
+            if (o instanceof Map<?, ?> c && "measure".equalsIgnoreCase(String.valueOf(c.get("role")))
+                    && c.get("name") instanceof String n && f.column(b.dataset(), n) != null
+                    && !n.equalsIgnoreCase(b.column())
+                    // a column that holds an Entity Type is an identifier, never summed: under masking its raw values
+                    // would come back as a sum, a lowest and a highest (the Dataset rules refuse such a Measure too)
+                    && !(c.get("classification") instanceof String k && !k.isBlank()))
+                present.add(new String[] {n, f.column(b.dataset(), n), c.get("unit") instanceof String u ? u : null});
+        return present;
     }
 
     /** A DOUBLE aggregate as a JSON number (null when no row held a number), at most 6 decimals. */

@@ -221,8 +221,9 @@ public final class EntityProfileRoutes implements RouteModule {
     static Object typeProfile(ApiContext api, HttpExchange ex, String id) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity type profile");
         List<String> sections = sections(ApiContext.query(ex, "sections"));
+        String[] window = window(ApiContext.query(ex, "from"), ApiContext.query(ex, "to"));   // scopes the measures section only
         EntityProfiles.Frame f = frame(api, ex, writeRoot, id);
-        Map<String, Object> out = EntityProfiles.typeProfile(f, sections);
+        Map<String, Object> out = EntityProfiles.typeProfile(f, sections, window);
         audit(ex, LinkEventTypes.LINK_ENTITY_TYPE_PROFILED, "link.entity_type.profiled",
                 "link.entity_type.profiled " + id + " - " + String.join(",", sections) + (Boolean.TRUE.equals(out.get("cached")) ? " (cached)" : ""),
                 b -> b.target("entity_type", id).attr("entityType", id).attr("sections", String.join(",", sections))

@@ -202,7 +202,7 @@ public final class PresetRoutes implements RouteModule {
         IndustryPack pack = settings.activePack();
         PresetQueries.Roles roles;
         try {
-            roles = PresetQueries.roles(dataset, columns, settings.effectiveEntityTypes(), pack);
+            roles = PresetQueries.roles(dataset, columns, settings.effectiveEntityTypes(), pack, settings.effectiveRecordTypes());
         } catch (IllegalArgumentException drifted) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + datasetId + "': " + drifted.getMessage());
         }

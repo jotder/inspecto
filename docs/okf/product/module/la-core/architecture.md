@@ -735,7 +735,7 @@ optional pack field; no route was added.
 
 ## 6. HTTP surface (la-api, geo-link)
 
-32 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` and `InvestigationDataChangesRoutes` in geo-link (its other two, `EmbedExpirySweepModule` and `IntegrationWebhooks`, serve no route), **110**<!--count:la-routes--> routes (**103**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
+32 `RouteModule`s in la-api plus `InvestigationMeasureRoutes` and `InvestigationDataChangesRoutes` in geo-link (its other two, `EmbedExpirySweepModule` and `IntegrationWebhooks`, serve no route), **111**<!--count:la-routes--> routes (**104**<!--count:la-api-routes--> in la-api + **7**<!--count:geo-link-routes--> in geo-link;
 the live `GET /audit/route-inventory` lists 78 for `/inv` and `/geo`, all present in `openapi-v1.json`):
 
 | Area | Routes | Write capability |
@@ -842,7 +842,8 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
 
 * **Routes** (la-api, gated and audited like the exploration reads): on `EntityProfileRoutes`, every edition, `GET /inv/entity-types`
   (cheap, reads the cache only) and `POST /inv/entities/{type}/resolve {key}`; on `EntityPageRoutes`, Standard and up (`entityPages`,
-  D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships) and
+  D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships,
+  measures - §6.15) and
   `GET /inv/entities/{type}/{key}/profile`. Audit events `LINK_ENTITY_*` (three).
 * **A raw identifier never travels in a URL.** The SPA resolves a typed value with the POST and navigates by the key it returns; for a masked type
   the GET is alias-only (`masked:<16 hex>`) and answers 422 to a raw key. Type pages are aggregates only (D-EP3): a dominant value is reported as
@@ -874,7 +875,8 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
   1 GB the dominant-value and relationship reads fail; at 4 GB they take 58 s and 149 s; hash-sampled at 1 GB 41 s and 123 s.
   Pinned by `ControlApiEntityProfileScaleTest`.
 * **Limits** (Space layer, server-gated): `entity_profile.timeout_s` 30, `.max_datasets` 20, `.shape_sample_rows` 1,000,000, `.top_n` 20,
-  `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6; install layer (system admin, `la-limits.toon`):
+  `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6, `.measure_sample_entities` 100,000;
+  install layer (system admin, `la-limits.toon`):
   `entity_profile.memory_limit_mb` 4,096.
 * **Data as of** reads `GET /datasets/{id}/freshness`, a read gate only (D-EP7).
 * **Not built (retired to BACKLOG §6, operator 2026-10-28):** P4 — no scheduled `la.entity.profile` Job, profile Dataset, drift
@@ -1693,9 +1695,39 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   Measure that holds an Entity Type ("an identifier, not a measure"), because its sums would surface raw ids the
   profile masks; the Data page drops an unclaimed Entity Type when a column becomes a Measure. The Entity page shows
   them as **Measures** (absent when there are none).
-- **Deliberately not built** (board row `LA-COLUMN-ROLES-2`): the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the
-  primary Measure (the canvas still weighs links by their count); a Mapping-level override of `carried` (a Mapping keeps
-  its base's mark); Category values for a multi-Dataset read (the panel offers a single read's Dataset only).
+- **Entity Type profile measures** (`LA-COLUMN-ROLES-2` D-1 b, 2026-11-05; `EntityProfiles.typeMeasures`, section
+  `measures`): one row per binding x Measure (the same column rule, `measureColumns`) over the rows where the bound
+  column names an Entity (non-empty normalised key) - rows, sum, lowest, highest, unit - in ONE aggregate statement per
+  bound Dataset (each binding is its own row, so no row is summed twice), plus `distribution`: p50 / p90 / max of the
+  per-Entity totals (`quantile_disc`) and the Entities measured, one GROUP BY per binding. That read groups at most
+  `entity_profile.measure_sample_entities` Entities (Space limit, default 100,000, 1..10,000,000): above it a key-hash
+  sample, `hash(k) % every = 0` with `every = ceil(approx distinct x 1.1 / cap)` (the headroom keeps the hash spread under
+  the cap), the cap as a hard `LIMIT`; the answer says `sampled`, `every`, `sampleEntities`, `approximate`, and
+  `truncated` when the LIMIT may have cut it. Optional `from` / `to` on `GET /inv/entity-types/{type}/profile` scope this
+  section only (on each binding's time column; a binding with none is not assessed inside a window), cached per window.
+  A failed or timed-out per-Entity read is `distribution: {assessed:false, retryable}` beside the row's sums and keeps
+  the section out of the cache. The Entity Type page shows it as **Measures**. Measured on 200,000 synthetic Entities
+  with a cap of 1,000: 1 in 232, under 1,000 grouped, the LIMIT not reached (`ControlApiEntityProfileScaleTest`).
+- **Roles from the record type (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05).** A record type names its usual Time,
+  Measure and Category columns by hints (entity-store `spec.md` *A record type's usual roles*; the one rule is
+  `EntityShapes.hintedRole` / UI `hintedRole` in `column-roles.ts`, kept alike). **Add data:** after the record type is
+  proposed, `EntityShapes.recordTypeRoles` gives each column a hint names its role - never one holding an Entity Type
+  or chosen as the link's kind, time or measure - sure when the record type is, and keeps the role proposed without it
+  as `base`. Picking another record type on the screen re-proposes (`roleUnder`) every role still as proposed: back to
+  `base`, then the new record type's hint; a role the person picked stays. **Data page:** under *Each row is*, the
+  roles the record type proposes for columns that state none or Detail and are none of the link mapping's
+  (`recordTypeProposals`; a role the column already reads as is not repeated), saved together by *Use these roles*;
+  a role the person set is never proposed over. The Holds picker marks *Shape matches* per column from
+  `GET /inv/datasets/{id}/shapes` (read once per page per Dataset).
+- **A Mapping's own carriage (`LA-COLUMN-ROLES-2`, 2026-11-05).** The Mapping form has an *On each link* row per Time,
+  Measure and Category column of its base (as the page reads the base's roles; never the Mapping's From or To),
+  seeded from the base for a new Mapping and from the Mapping when editing it (`MappingForm.notCarried`,
+  `carriedChoices`). The Mapping's entry writes its OWN `carried: false` marks, so its link index carries what it says,
+  whatever its base says; a kept-off column whose base states no role gets the role the page shows (a date is a Time).
+- **Still being built** (board row `LA-COLUMN-ROLES-2`, decisions in [`plan-column-roles-2.md`](plan-column-roles-2.md)):
+  edge width from the primary Measure (the canvas
+  still weighs links by their count); Category values for a multi-Dataset read (the panel offers a single read's
+  Dataset only).
 
 ### 6.16 Discovery in Basic: presets, Discover, entity summary, query builder (LA-BASIC-DISCOVERY-1, as built 2026-11-03/05)
 
@@ -1710,6 +1742,7 @@ Rows closed: `LA-PRESET-QUERIES-1`, `LA-BASIC-DISCOVER-1`, `LA-ENTITY-SUMMARY-1`
 | `GET /inv/presets?dataset=` | `PresetRoutes` | the pack's preset questions the Dataset can answer, its roles, the builder's role columns (`columns {time, measure}`) and the Space presets saved from the builder (`saved`) |
 | `POST /inv/presets/{id}/run` | `PresetRoutes` + `PresetQueries` | one preset; read-shaped, EXPENSIVE, `LINK_PRESET_RUN` |
 | `GET /inv/datasets/{id}/discover` | `DiscoverRoutes` + `DatasetDiscovery` | what is in a Dataset; EXPENSIVE, `LINK_DATASET_DISCOVERED` |
+| `GET /inv/datasets/{id}/shapes` | `DiscoverRoutes` | the Entity Types whose shape each column's first 200 rows fit, marks only (the Data page's *Shape matches*; `ENTITY-TYPE-RECORD-ROLES-1`); cheap, not audited (no value leaves) |
 | `GET /inv/entities/{type}/{key}/summary?dataset=` | `EntitySummaryRoutes` + `EntitySummary` | one entity over one Dataset; EXPENSIVE, `LINK_ENTITY_SUMMARIZED` |
 | `POST /inv/datasets/{id}/query` | `QueryRoutes` + `QueryBuilder` | a builder question (or a saved preset's); read-shaped, EXPENSIVE, `LINK_QUERY_RUN` |
 
@@ -1723,7 +1756,10 @@ included, `before` not), a Measure range inclusive.
 
 **Roles.** `PresetQueries.roles` gives From, To, Kind and the primaries (`defaultLinkMapping.primaryTime` /
 `primaryMeasure`, or their old names `time` / `amount`; else the classified columns, `*_kind`, the event date, the pack's
-`measure_hints`). `DatasetDiscovery.measures` and `QueryBuilder.columns` add every Measure and Time column
+`measure_hints`). Without a mapping, From / To are (`PresetQueries.ends`, `LA-PRESET-ROLES-1` fixed 2026-11-05) the
+Dataset's record type's parties (its `from_hints` / `to_hints` among the classified columns), else the first two
+columns holding the SAME Entity Type, else the first two - so a subscriber's number and SIM are no longer read as a
+link when the call's two parties are classified too. `DatasetDiscovery.measures` and `QueryBuilder.columns` add every Measure and Time column
 (LA-COLUMN-ROLES-1). A role the Dataset lacks: the preset or saved question is not offered (Q-5); a Discover section is
 `assessed:false` with why; a summary part is null.
 

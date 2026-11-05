@@ -1,10 +1,17 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { AbstractControl, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormBuilder,
+    FormControl,
+    FormsModule,
+    ReactiveFormsModule,
+    Validators,
+} from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, map, of } from 'rxjs';
+import { catchError, forkJoin, map, of } from 'rxjs';
 import { ComponentsService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
@@ -12,11 +19,16 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { ColumnChange, DatasetColumnsService } from '@inspecto/link-analysis/api/dataset-columns.service';
+import {
+    ColumnChange,
+    DatasetColumnsService,
+    DatasetShapes,
+} from '@inspecto/link-analysis/api/dataset-columns.service';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { EntityFamily, RecordTypeGuide, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
 import { LinkAnalysisDatasetDiscoverComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-dataset-discover.component';
+import { recordPhrase } from '@inspecto/link-analysis/api/column-roles';
 import { ADD_DATA_ROUTE } from './first-run';
 import {
     ColumnRole,
@@ -26,12 +38,15 @@ import {
     MappingForm,
     ROLE_HINTS,
     ROLE_LABELS,
+    RoleProposal,
     TypeChoice,
     dataEntry,
     driftedColumns,
     formOf,
     mappingEntry,
+    carriedChoices,
     mappingLine,
+    recordTypeProposals,
     roleOf,
     typeOf,
 } from './data-page';
@@ -48,6 +63,7 @@ import {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        FormsModule,
         ReactiveFormsModule,
         RouterLink,
         MatButtonModule,
@@ -131,6 +147,27 @@ import {
                                     data-testid="record-type"
                                 ></inspecto-option-picker>
                             }
+                            <!-- ENTITY-TYPE-RECORD-ROLES-1: the roles such a record usually gives its columns, not said yet -->
+                            @if (proposals().get(d.id); as p) {
+                                <div class="flex flex-wrap items-center gap-2 text-sm" data-testid="record-roles">
+                                    <span class="text-secondary">
+                                        {{ p.phrase }} usually has
+                                        @for (r of p.roles; track r.column; let last = $last) {
+                                            <span class="font-medium">{{ r.column }}</span> as a {{ roleLabel(r.role)
+                                            }}{{ last ? '.' : ',' }}
+                                        }
+                                    </span>
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        [disabled]="applying()"
+                                        (click)="applyProposals(d, p.roles)"
+                                        data-testid="record-roles-apply"
+                                    >
+                                        Use these roles
+                                    </button>
+                                </div>
+                            }
                             <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                                 @for (col of d.columns; track col.name) {
                                     @let r = roleShown(d, col);
@@ -144,7 +181,7 @@ import {
                                         @if (r === 'entity') {
                                             <inspecto-option-picker
                                                 [label]="col.name + ' holds'"
-                                                [options]="holdsOptions().get(d.id) ?? typeOptions()"
+                                                [options]="holdsOptions().get(d.id + '/' + col.name) ?? typeOptions()"
                                                 [formControl]="holds().get(d.id)!.get(col.name)!"
                                                 [attr.data-testid]="'entity-' + col.name"
                                             ></inspecto-option-picker>
@@ -322,6 +359,17 @@ import {
                                             formControlName="toType"
                                             [options]="typeOptions()"
                                         ></inspecto-option-picker>
+                                        <!-- LA-COLUMN-ROLES-2: this Mapping's own "On each link" marks -->
+                                        @for (col of mappingCarried(); track col) {
+                                            <inspecto-option-picker
+                                                [label]="col + ' on each link'"
+                                                [options]="carriedOptions"
+                                                [ngModel]="isCarried(col) ? 'yes' : 'no'"
+                                                [ngModelOptions]="{ standalone: true }"
+                                                (ngModelChange)="setCarried(col, $event)"
+                                                [attr.data-testid]="'mapping-carried-' + col"
+                                            ></inspecto-option-picker>
+                                        }
                                         @for (opt of optional; track opt.key) {
                                             <inspecto-option-picker
                                                 [label]="opt.label"
@@ -399,21 +447,79 @@ export class DataPageComponent implements OnInit {
         })),
     ]);
 
-    /** What an Entity column of each base may hold: as {@link typeOptions}, the base's record type's likely types first. */
-    protected readonly holdsOptions = computed(
-        () =>
-            new Map(
-                this.bases().map((d) => [
-                    d.id,
-                    [
-                        { value: '', label: 'Nothing: a detail' },
-                        ...entityTypeOptions(this.types(), this.families(), {
-                            recordType: this.recordTypes().find((r) => r.id === d.recordType) ?? null,
-                        }),
-                    ],
-                ]),
-            ),
-    );
+    /**
+     * What an Entity column of each base may hold (keyed `<dataset>/<column>`): as {@link typeOptions}, the base's record
+     * type's likely types first, and a type whose shape the column's values fit marked "Shape matches" - read on the
+     * server over an unmasked sample (`shapes`, ENTITY-TYPE-RECORD-ROLES-1), since this page's own rows are masked.
+     */
+    protected readonly holdsOptions = computed(() => {
+        const out = new Map<string, PickerOption[]>();
+        for (const d of this.bases()) {
+            const recordType = this.recordTypes().find((r) => r.id === d.recordType) ?? null;
+            const marks = this.shapes().get(d.id);
+            for (const c of d.columns) {
+                const fits = marks ? new Map((marks[c.name] ?? []).map((f) => [f.type, { strong: f.strong }])) : null;
+                out.set(`${d.id}/${c.name}`, [
+                    { value: '', label: 'Nothing: a detail' },
+                    ...entityTypeOptions(this.types(), this.families(), { recordType, fits }),
+                ]);
+            }
+        }
+        return out;
+    });
+
+    /** Each base's shape marks once read (`GET /inv/datasets/{id}/shapes`); a base whose read failed has none. */
+    readonly shapes = signal<ReadonlyMap<string, DatasetShapes['columns']>>(new Map());
+    /** The bases whose marks were asked for: once per page, not on every re-read after a save. */
+    private readonly shapesAsked = new Set<string>();
+
+    private readShapes(list: readonly DataEntry[]): void {
+        for (const d of list) {
+            if (this.shapesAsked.has(d.id)) continue;
+            this.shapesAsked.add(d.id);
+            this.columns
+                .shapes(d.id)
+                .pipe(catchError(() => of(null)))
+                .subscribe((r) => {
+                    if (r?.columns) this.shapes.update((m) => new Map(m).set(d.id, r.columns));
+                });
+        }
+    }
+
+    /** What each base's record type proposes for the columns it does not say yet (ENTITY-TYPE-RECORD-ROLES-1); none = absent. */
+    protected readonly proposals = computed(() => {
+        const out = new Map<string, { phrase: string; roles: RoleProposal[] }>();
+        for (const d of this.bases()) {
+            const rt = this.recordTypes().find((r) => r.id === d.recordType);
+            const roles = recordTypeProposals(d, rt, this.types());
+            if (!rt || !roles.length) continue;
+            const phrase = recordPhrase(rt.label);
+            out.set(d.id, { phrase: phrase.charAt(0).toUpperCase() + phrase.slice(1), roles });
+        }
+        return out;
+    });
+    readonly applying = signal(false);
+
+    protected roleLabel(role: ColumnRole): string {
+        return ROLE_LABELS[role];
+    }
+
+    /** Save every proposed role at once, then read the Datasets again. */
+    applyProposals(d: DataEntry, roles: readonly RoleProposal[]): void {
+        this.error.set('');
+        this.applying.set(true);
+        forkJoin(roles.map((r) => this.columns.setColumn(d.id, r.column, { role: r.role }))).subscribe({
+            next: () => {
+                this.applying.set(false);
+                this.load();
+            },
+            error: (e) => {
+                this.applying.set(false);
+                this.error.set(apiErrorMessage(e, `The roles of ${d.id} could not be changed.`));
+                this.load();
+            },
+        });
+    }
 
     /** A base's columns to pick From / To from, each with what the base says it holds. */
     protected columnOptions(d: DataEntry): PickerOption[] {
@@ -567,9 +673,28 @@ export class DataPageComponent implements OnInit {
         kind: [''],
         primaryTime: [''],
         primaryMeasure: [''],
+        notCarried: [[] as string[]],
     });
 
+    /** The open Mapping form's columns that may be kept off its links (re-read as From and To change). */
+    protected readonly mappingCarried = computed(() => {
+        this.formTick();
+        const e = this.editing();
+        return e ? carriedChoices(e.base, this.form.getRawValue(), this.types()) : [];
+    });
+    private readonly formTick = signal(0);
+
+    protected isCarried(column: string): boolean {
+        return !this.form.controls.notCarried.value.includes(column);
+    }
+
+    protected setCarried(column: string, v: string): void {
+        const rest = this.form.controls.notCarried.value.filter((c) => c !== column);
+        this.form.controls.notCarried.setValue(v === 'no' ? [...rest, column] : rest);
+    }
+
     constructor() {
+        this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.formTick.update((n) => n + 1));
         this.form.controls.from.valueChanges.pipe(takeUntilDestroyed()).subscribe((from) => {
             this.form.controls.to.updateValueAndValidity({ emitEvent: false });
             this.holdsOf(from, this.form.controls.fromType);
@@ -615,6 +740,7 @@ export class DataPageComponent implements OnInit {
             .subscribe((list) => {
                 this.picked.set(new Map());
                 this.entries.set(list);
+                this.readShapes(this.bases());
                 this.form.controls.name.updateValueAndValidity({ emitEvent: false }); // "taken" reads this list
             });
     }

@@ -350,6 +350,30 @@ class IndustryPacksTest {
         assertEquals(List.of(), load(write(tmp.resolve("jar0"), "bare", f -> null)).find("bare").recordTypes(), "the file is optional");
     }
 
+    /** ENTITY-TYPE-RECORD-ROLES-1: a record type also names its usual Time, Measure and Category columns and its two parties. */
+    @Test
+    void aRecordTypeNamesItsUsualColumnRolesAndParties() throws IOException {
+        IndustryPacks.Catalogue c = load(withRecordTypes(tmp.resolve("jar1"), "toy", starship("    family: device\n"), SHIP_LOG_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n    time_hints[1]: logged\n"
+                        + "    measure_hints[2]: fuel,^distance$\n    category_hints[1]: sector\n    from_hints[1]: origin\n    to_hints[1]: dest\n"));
+        assertEquals(List.of(), c.refused());
+        IndustryPack.RoleHints h = c.find("toy").recordTypes().get(0).roleHints();
+        assertEquals(new IndustryPack.RoleHints(List.of("logged"), List.of("fuel", "^distance$"), List.of("sector"), List.of("origin"),
+                List.of("dest")), h);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> wire = (List<Map<String, Object>>) c.find("toy").toMap().get("recordTypes");
+        assertEquals(h.toMap(), wire.get(0).get("roleHints"));
+        // matched as the profile's hints are: case-insensitive, anywhere unless anchored
+        assertEquals("fuel", IndustryPack.RoleHints.matching(h.measure(), "Fuel_Used"));
+        assertEquals("^distance$", IndustryPack.RoleHints.matching(h.measure(), "DISTANCE"));
+        assertNull(IndustryPack.RoleHints.matching(h.measure(), "distance_km"), "an anchored hint names the whole name only");
+        assertEquals(IndustryPack.RoleHints.NONE, load(withRecordTypes(tmp.resolve("jar2"), "toy", starship("    family: device\n"),
+                SHIP_LOG_TERMS, "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n")).find("toy").recordTypes().get(0).roleHints(),
+                "the hints are optional");
+        assertRefused(load(withRecordTypes(tmp.resolve("jar3"), "toy", starship("    family: device\n"), SHIP_LOG_TERMS,
+                "record_types[1]:\n  - id: ship_log\n    likely_types[1]: starship\n    time_hints[1]: \"log(ged)\"\n")), "toy", "time_hints");
+    }
+
     @Test
     void aRecordTypeNamingNoTypeOrWithoutItsTermOrTwiceRefusesThePack() throws IOException {
         String types = starship("    family: device\n");
@@ -369,6 +393,16 @@ class IndustryPacksTest {
     void theShippedPacksDefineRecordTypesAndASpaceReadsThoseOfEveryPackInForce() throws IOException {
         IndustryPack telecom = IndustryPacks.bundled().find("telecom");
         assertTrue(telecom.recordTypes().stream().anyMatch(r -> r.id().equals("voice_call") && r.likelyTypes().contains("msisdn")));
+        // ENTITY-TYPE-RECORD-ROLES-1: a call record knows its usual duration and its two parties
+        IndustryPack.RoleHints call = telecom.recordTypes().stream().filter(r -> r.id().equals("voice_call")).findFirst().orElseThrow().roleHints();
+        assertEquals("duration", IndustryPack.RoleHints.matching(call.measure(), "call_duration"));
+        assertNotNull(IndustryPack.RoleHints.matching(call.from(), "calling_number"));
+        assertNotNull(IndustryPack.RoleHints.matching(call.to(), "called_number"));
+        assertNull(IndustryPack.RoleHints.matching(call.from(), "called_number"), "the callee is no caller");
+        IndustryPack.RoleHints transfer = IndustryPacks.bundled().find("mobile-money").recordTypes().stream()
+                .filter(r -> r.id().equals("transfer")).findFirst().orElseThrow().roleHints();
+        assertNotNull(IndustryPack.RoleHints.matching(transfer.to(), "to_wallet"));
+        assertNull(IndustryPack.RoleHints.matching(transfer.to(), "total"), "'to' alone is anchored: a total is no payee");
         Path file = tmp.resolve(LinkAnalysisSettings.FILE);
         Files.writeString(file, "domain_profile: telecom\nextra_packs[1]: mobile-money\n");
         List<String> ids = LinkAnalysisSettings.read(file).effectiveRecordTypes().stream().map(IndustryPack.RecordType::id).toList();

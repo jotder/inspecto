@@ -148,3 +148,38 @@ describe('entityTypeOptions narrowed by record type and sample (ENTITY-TYPE-CATA
         expect(likelyGroup({ id: 'a', label: 'Airtime top-up', likelyTypes: [] })).toBe('Likely in an airtime top-up');
     });
 });
+
+describe('shape marks read on the server (ENTITY-TYPE-RECORD-ROLES-1)', () => {
+    const types = [
+        { id: 'account', label: 'Account', family: 'account', shape: 'digits(10)' },
+        { id: 'phone', label: 'Phone number', family: 'identifier', shape: 'e164' },
+    ];
+    const families = [
+        { id: 'account', label: 'Account', definition: '' },
+        { id: 'identifier', label: 'Identifier', definition: '' },
+    ];
+
+    it('marks and leads with the types the server says the values fit, a strong fit first', () => {
+        const fits = new Map([
+            ['account', { strong: false }],
+            ['phone', { strong: true }],
+        ]);
+        const opts = entityTypeOptions(types, families, { fits });
+        expect(opts.map((o) => [o.group, o.value])).toEqual([
+            ['Shape matches', 'phone'],
+            ['Shape matches', 'account'],
+        ]);
+        expect(opts.every((o) => (o.hint ?? '').startsWith('Shape matches.'))).toBe(true);
+    });
+
+    it("marks nothing for an empty answer, and a sample of the screen's own wins over the server's marks", () => {
+        expect(entityTypeOptions(types, families, { fits: new Map() }).some((o) => o.group === 'Shape matches')).toBe(
+            false,
+        );
+        const own = entityTypeOptions(types, families, {
+            sample: ['+447700900123'],
+            fits: new Map([['account', { strong: true }]]),
+        });
+        expect(own[0]).toMatchObject({ value: 'phone', group: 'Shape matches' });
+    });
+});

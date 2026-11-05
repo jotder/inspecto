@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Link analysis core and ports - plan of record](plan.md) |
+| plan | current | [LA-COLUMN-ROLES-2 — design notes for the three parts that need a decision (2026-11-05)](plan-column-roles-2.md) · [Link analysis core and ports - plan of record](plan.md) |
 | spec | current | [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis core and ports - spec](spec.md) |
 | architecture | current | [Link Analysis](architecture-overview.md) · [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture.md) |
 | features | current | [Link Analysis — features](features-link-analysis.md) |
@@ -35,8 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `BASIC-ONBOARD-1` | P2 | feature | Basic data onboarding as a platform feature every application reuses: three ways in (an inbox directory, a one-time upload, a Postgres ta… | — |
-| `LA-COLUMN-ROLES-2` | P3 | feature | what LA-COLUMN-ROLES-1 deliberately left out, on demand: | — |
-| `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
+| `LA-COLUMN-ROLES-2` | P3 | feature | what LA-COLUMN-ROLES-1 deliberately left out (operator decisions D-1 b, D-2 a, D-3 b, 2026-11-05). | — |
 | `LA-DATASET-COMPACT-2` | P3 | feature | compaction for a feed's scheduled runs, and the graph after a retention compaction (deferred from LA-DATASET-COMPACT-1, 2026-11-05). | — |
 | `LA-ARRIVAL-NEW-COLUMNS-1` | P3 | feature | keep a later file's new columns as details of an import Dataset (schema evolution with union-by-name reads), filed 2026-11-05 from D-6. | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
@@ -48,4 +47,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
-| `ENTITY-TYPE-RECORD-ROLES-1` | P3 | feature | a record type also says which columns are usually its times, measures and categories, so Add data and the Data page propose column roles… | — |

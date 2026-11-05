@@ -43,7 +43,7 @@ interface Opts {
     selfImport?: boolean | 'unknown';
     mode?: 'ask' | 'optional';
     limits?: { key: string; inForce: number }[];
-    recordTypes?: { id: string; label: string; likelyTypes: string[] }[];
+    recordTypes?: { id: string; label: string; likelyTypes: string[]; roleHints?: { category?: string[] } }[];
 }
 
 const LIMITS = [
@@ -207,6 +207,38 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         fixture.detectChanges();
         const req = commit(fixture, el);
         expect(bodyOf(req).recordType).toBeNull();
+        req.flush(summary());
+    });
+
+    it('another record type re-proposes the roles still as proposed, and back (ENTITY-TYPE-RECORD-ROLES-1)', () => {
+        const { fixture, el } = create({
+            recordTypes: [
+                { id: 'transfer', label: 'Transfer', likelyTypes: ['account'], roleHints: { category: ['txn'] } },
+            ],
+        });
+        upload(fixture, el, transfersDraft()); // drafted with no record type
+        const add = fixture.debugElement.children[0].componentInstance as unknown as {
+            form: {
+                controls: {
+                    recordType: { setValue(v: string): void };
+                    columns: { controls: { controls: { name: { value: string }; role: { value: string } } }[] };
+                };
+            };
+        };
+        const role = (n: string) =>
+            add.form.controls.columns.controls.find((g) => g.controls.name.value === n)!.controls.role.value;
+        expect(role('txn_id')).toBe('detail');
+        add.form.controls.recordType.setValue('transfer');
+        fixture.detectChanges();
+        expect(role('txn_id')).toBe('dimension');
+        expect(el.textContent).toContain("a transfer usually has a Category named like 'txn'");
+        add.form.controls.recordType.setValue('');
+        fixture.detectChanges();
+        expect(role('txn_id')).toBe('detail');
+        add.form.controls.recordType.setValue('transfer');
+        fixture.detectChanges();
+        const req = commit(fixture, el);
+        expect(bodyOf(req).columns.find((c) => c.name === 'txn_id')).toMatchObject({ role: 'dimension' });
         req.flush(summary());
     });
 

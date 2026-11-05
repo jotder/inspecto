@@ -103,7 +103,9 @@ describe('entity-profile-view', () => {
             lineage: [{ dataset: 'calls', assessed: true, reason: null }],
             shapes: { assessed: true, reason: null },
             links: { assessed: true, reason: null },
+            measures: [{ dataset: 'calls', column: 'a', measure: 'secs', assessed: false, reason: 'no time column' }],
         });
+        expect(gaps).toContain('Measure secs over calls.a: not assessed: no time column.');
         expect(gaps).toContain('calls.a has no time column: it has no timeline.');
         expect(gaps).toContain('calls.a: not assessed: timeout.');
         expect(gaps).toContain('calls has no data-as-of (no freshness column).');

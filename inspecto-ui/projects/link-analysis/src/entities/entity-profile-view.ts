@@ -1,7 +1,7 @@
 import type { ActivatedRoute } from '@angular/router';
 import { formatNumber } from '@inspecto/core/viz/number-format';
 import { rampColor, sequentialLevel } from '@inspecto/core/viz/heatmap';
-import type { Assessed, EntityMeasure } from '@inspecto/link-analysis/api/entity-profile.service';
+import type { Assessed, EntityMeasure, ProfileMeasure } from '@inspecto/link-analysis/api/entity-profile.service';
 import { formatDay, formatDayStart } from '@inspecto/link-analysis/link-analysis/data-trust';
 
 /**
@@ -26,9 +26,30 @@ export function count(n: number | null | undefined): string {
  * dash when no row held a number (LA-COLUMN-ROLES-1 P3).
  */
 export function measureValue(m: EntityMeasure | undefined, k: 'sum' | 'min' | 'max'): string {
-    const v = m?.[k];
+    return withUnit(m?.[k], m?.unit);
+}
+
+/**
+ * One quantile of a Measure's per-Entity totals (LA-COLUMN-ROLES-2 D-1), with the unit; "not assessed" when that read
+ * failed, an em dash when no Entity held a number.
+ */
+export function distributionValue(m: ProfileMeasure | undefined, k: 'p50' | 'p90' | 'max'): string {
+    const d = m?.distribution;
+    if (!d) return '—';
+    return d.assessed ? withUnit(d[k], m?.unit) : 'not assessed';
+}
+
+/** How many Entities the per-Entity totals read, and the sample when there was one ("909 (1 in 220)"). */
+export function distributionEntities(m: ProfileMeasure | undefined): string {
+    const d = m?.distribution;
+    if (!d) return '—';
+    if (!d.assessed) return 'not assessed';
+    return d.sampled ? `${count(d.entities)} (1 in ${count(d.every)} sampled)` : count(d.entities);
+}
+
+function withUnit(v: number | null | undefined, unit: string | null | undefined): string {
     if (v == null || !Number.isFinite(v)) return '—';
-    return m?.unit ? `${formatNumber(v)} ${m.unit}` : formatNumber(v);
+    return unit ? `${formatNumber(v)} ${unit}` : formatNumber(v);
 }
 
 /** A row count with its noun in the right number: "1 row", "2 rows". */
@@ -192,6 +213,7 @@ export const PROFILE_SECTIONS = [
     { key: 'time', title: 'Time' },
     { key: 'links', title: 'Links' },
     { key: 'relationships', title: 'Relationships' },
+    { key: 'measures', title: 'Measures' },
 ] as const;
 
 type ProfileSectionKey = (typeof PROFILE_SECTIONS)[number]['key'];
@@ -214,6 +236,7 @@ export function notHere(p: {
     time?: Assessed & { dataAsOf: { dataset: string; dataAsOf: string | null }[] };
     lineage?: (Assessed & { dataset: string })[];
     relationships?: (Assessed & { otherType: string; dataset: string })[];
+    measures?: (Assessed & { dataset: string; column: string; measure: string; distribution?: Assessed })[];
     [k: string]: unknown;
 }): string[] {
     const out: string[] = [];
@@ -228,6 +251,12 @@ export function notHere(p: {
     for (const l of p.lineage ?? []) if (!l.assessed) out.push(`Lineage of ${l.dataset}: ${notAssessedText(l, true)}.`);
     for (const r of p.relationships ?? [])
         if (!r.assessed) out.push(`Relationship with ${r.otherType} in ${r.dataset}: ${notAssessedText(r, true)}.`);
+    for (const m of p.measures ?? []) {
+        const at = `${m.measure} over ${m.dataset}.${m.column}`;
+        if (!m.assessed) out.push(`Measure ${at}: ${notAssessedText(m, true)}.`);
+        else if (m.distribution && !m.distribution.assessed)
+            out.push(`Per-Entity totals of ${at}: ${notAssessedText(m.distribution, true)}.`);
+    }
     for (const s of PROFILE_SECTIONS) {
         const v = p[s.key as ProfileSectionKey];
         if (v === undefined) out.push(`${s.title}: ${notAssessedText(NOT_RETURNED, true)}.`);

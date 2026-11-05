@@ -1,6 +1,6 @@
 import type { ComponentDef } from '@inspecto/core/api';
-import type { EntityTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
-import { ColumnRole, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
+import { CARRIED_ROLES, ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/link-analysis/api/column-roles';
+import type { EntityTypeGuide, RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
 export { ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
 export type { ColumnRole } from '@inspecto/link-analysis/api/column-roles';
@@ -157,6 +157,42 @@ export function roleOf(col: DataColumn, entry: DataEntry, types: readonly TypeCh
     return 'detail';
 }
 
+/** One role a Dataset's record type proposes for a column (ENTITY-TYPE-RECORD-ROLES-1). */
+export interface RoleProposal {
+    column: string;
+    role: ColumnRole;
+    /** The record type's hint that names the column. */
+    hint: string;
+}
+
+/**
+ * The roles a Dataset's record type usually gives its columns that the entry does not say yet: a column whose role is
+ * unstated or Detail (Add data's "nothing said") and that holds no Entity Type, is none of the link mapping's columns,
+ * and is named by one of the record type's hints its type can hold (`hintedRole`). A role the person set is never
+ * proposed over.
+ */
+export function recordTypeProposals(
+    entry: DataEntry,
+    recordType: RecordTypeGuide | null | undefined,
+    types: readonly TypeChoice[],
+): RoleProposal[] {
+    if (!recordType?.roleHints) return [];
+    const m = entry.mapping;
+    const mapped = new Set(
+        [m?.from, m?.to, m?.kind, m?.primaryTime, m?.primaryMeasure, entry.eventDate]
+            .filter((c): c is string => !!c)
+            .map((c) => c.toLowerCase()),
+    );
+    const out: RoleProposal[] = [];
+    for (const c of entry.columns) {
+        if (mapped.has(c.name.toLowerCase()) || (c.role && c.role !== 'detail')) continue;
+        if (roleOf(c, entry, types) === 'entity') continue;
+        const hinted = hintedRole(c.name, c.type, recordType.roleHints);
+        if (hinted && hinted.role !== roleOf(c, entry, types)) out.push({ column: c.name, ...hinted });
+    }
+    return out;
+}
+
 /** A link mapping in words: `from_account → to_account · kind channel · when booked_at`. */
 export function mappingLine(m: LinkMapping | null): string {
     if (!m) return 'No link mapping yet';
@@ -178,6 +214,11 @@ export interface MappingForm {
     kind: string;
     primaryTime: string;
     primaryMeasure: string;
+    /**
+     * The Time, Measure and Category columns kept off this Mapping's links (`carried: false`, LA-COLUMN-ROLES-2): the
+     * Mapping's own marks when editing it, its base's for a new one; any other column is carried.
+     */
+    notCarried: string[];
 }
 
 /** A Mapping name: the Dataset id rule (a lower-case letter, then letters, digits or _), unique among Datasets. */
@@ -204,13 +245,23 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
                   : c.role === 'entity'
                     ? null
                     : c.role;
+        // LA-COLUMN-ROLES-2: whether it rides on this Mapping's links is the Mapping's own mark, not its base's
+        // (an entry written before roles reads its role as the page shows it - a date column is a Time - and states it)
+        const shown = role ?? (chosen === undefined ? roleOf(c, base, types) : null);
+        const keptOff =
+            !!shown &&
+            CARRIED_ROLES.has(shown) &&
+            f.notCarried.includes(c.name) &&
+            c.name !== f.from &&
+            c.name !== f.to;
+        const written = keptOff ? shown : role;
         return {
             name: c.name,
             type: c.type,
             ...(classification ? { classification } : {}),
-            ...(role ? { role } : {}),
-            ...(role === 'measure' && c.unit ? { unit: c.unit } : {}),
-            ...(c.carried === false ? { carried: false } : {}),
+            ...(written ? { role: written } : {}),
+            ...(written === 'measure' && c.unit ? { unit: c.unit } : {}),
+            ...(keptOff ? { carried: false } : {}),
         };
     });
     const mapping: Record<string, string> = { from: f.from, to: f.to };
@@ -245,5 +296,20 @@ export function formOf(entry: DataEntry, types: readonly TypeChoice[], name = ''
         kind: m?.kind ?? '',
         primaryTime: m?.primaryTime ?? '',
         primaryMeasure: m?.primaryMeasure ?? '',
+        notCarried: entry.columns.filter((c) => c.carried === false).map((c) => c.name),
     };
+}
+
+/**
+ * The columns a Mapping of `base` may keep off its links (LA-COLUMN-ROLES-2): the base's Time, Measure and Category
+ * columns, in column order, except the Mapping's From and To (an end is never carried).
+ */
+export function carriedChoices(
+    base: DataEntry,
+    f: Pick<MappingForm, 'from' | 'to'>,
+    types: readonly TypeChoice[],
+): string[] {
+    return base.columns
+        .filter((c) => c.name !== f.from && c.name !== f.to && CARRIED_ROLES.has(roleOf(c, base, types)))
+        .map((c) => c.name);
 }

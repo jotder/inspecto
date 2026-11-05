@@ -483,14 +483,14 @@ Link Analysis is **an optional, ServiceLoader-discovered extension of the one ho
                                                          └──────────────────────────┘
 ```
 
-The surface is **110**<!--count:la-routes--> routes: **103**<!--count:la-api-routes--> in `la-api` and **7**<!--count:geo-link-routes--> in `geo-link`, counted from each module's `module.toon` (`provides.routes`) and kept in step with the code by `LaApiRoutesManifestParityTest`. Every route is in `docs/api/openapi-v1.json`. `la-storage` depends on `la-core`, the SQL module and DuckDB; `geo-link` depends on `la-api`, `la-core`, `entity-list` and `entity-store`; `la-core` depends on `inspecto-graph` and `entity-store` among others. Ports point inward: `la-core` defines the engine, dataset, case and store ports, and storage, the bridge and the Postgres module implement them. The core never knows how the index is stored, and the host engine never names a Link Analysis class.
+The surface is **111**<!--count:la-routes--> routes: **104**<!--count:la-api-routes--> in `la-api` and **7**<!--count:geo-link-routes--> in `geo-link`, counted from each module's `module.toon` (`provides.routes`) and kept in step with the code by `LaApiRoutesManifestParityTest`. Every route is in `docs/api/openapi-v1.json`. `la-storage` depends on `la-core`, the SQL module and DuckDB; `geo-link` depends on `la-api`, `la-core`, `entity-list` and `entity-store`; `la-core` depends on `inspecto-graph` and `entity-store` among others. Ports point inward: `la-core` defines the engine, dataset, case and store ports, and storage, the bridge and the Postgres module implement them. The core never knows how the index is stored, and the host engine never names a Link Analysis class.
 
 | Module | Responsibility | Depends on (Inspecto modules, from its pom) |
 | :--- | :--- | :--- |
 | `platform/inspecto-graph` | The graph algorithms and run control (`RunControl`: cancel, deadline, budget) | nothing (JDK only) |
 | `la/inspecto-la-core` | The domain: op evaluator, `InvestigationStore` port and filesystem store, Drafts, Graph Run service, the algorithm catalogue, ports to the host | `inspecto-graph`, `inspecto-entity-store`, `inspecto-sql`, `inspecto-analytics`, `inspecto-config`, `inspecto-util`, platform SPIs |
 | `la/inspecto-la-storage` | The link index: builder, plan, reader, pins and the index-backed graph engine | `la-core`, `inspecto-sql`, `inspecto-analytics` |
-| `la/inspecto-la-api` | The HTTP surface (**103**<!--count:la-api-routes--> routes), the access gates, masking, Draft rebase and promote orchestration, scheduled builds, standing detection | `la-core`, `la-storage`, `inspecto-entity-store`, `inspecto-access`, `inspecto-analytics`, `inspecto-config`, `inspecto-sql`, `inspecto-util`, platform SPIs |
+| `la/inspecto-la-api` | The HTTP surface (**104**<!--count:la-api-routes--> routes), the access gates, masking, Draft rebase and promote orchestration, scheduled builds, standing detection | `la-core`, `la-storage`, `inspecto-entity-store`, `inspecto-access`, `inspecto-analytics`, `inspecto-config`, `inspecto-sql`, `inspecto-util`, platform SPIs |
 | `la/inspecto-geo-link` | The bridge to the host (**7**<!--count:geo-link-routes--> routes): Datasets, Cases, Collector coverage, the index-build service, Alert measures | `la-api`, `la-core`, `inspecto-entity-list`, `inspecto-entity-store`, `inspecto-etl`, `inspecto-processor` |
 | `la/inspecto-la-store-pg` | Investigations on PostgreSQL (Advanced, opt-in) | `la-core` |
 | `platform/inspecto-entity-store` | Entity Types, the Identity Fact log behind Entity Lists and identities, mask keys, industry packs, Link Analysis settings and limits | platform only (`inspecto-api`, `inspecto-util`, `inspecto-graph`, `inspecto-config` and SPIs) |
@@ -941,7 +941,7 @@ In the browser, each algorithm has its own configurable cap, defaulting to `anal
 
 ### 6.3 Layered configurable limits system (LA-CONFIG-LIMITS-1)
 
-Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (152 items on this tree, from canvas caps to rate limits) holds every limit with its key, layer, default and validated range, and the server enforces whatever value is in force. Deployments size the system to their hardware and their analysts, not to the laptop the defaults were measured on. A value outside its range is refused `422` naming the key and the range; a stored value outside its range reads as the default. Limits fall in three layers, separating platform sizing, organisational policy and client rendering:
+Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (156 items on this tree, from canvas caps to rate limits) holds every limit with its key, layer, default and validated range, and the server enforces whatever value is in force. Deployments size the system to their hardware and their analysts, not to the laptop the defaults were measured on. A value outside its range is refused `422` naming the key and the range; a stored value outside its range reads as the default. Limits fall in three layers, separating platform sizing, organisational policy and client rendering:
 
 ```
                     LAYERED CONFIGURATION ARCHITECTURE
@@ -1001,6 +1001,7 @@ A selection of the shipped items (defaults and ranges are those of the catalogue
 | | `entity_profile.shape_sample_rows` | 1,000,000 | 1 to $10^9$ | above it, value shapes read a sample |
 | | `entity_profile.sentinel_share` | 20 % | 1 to 100 | a single value above this share is reported as dominant |
 | | `entity_profile.timeline_days`, `relationship_threshold` | 400, 6 | 1 to 36,600; 2 to $10^6$ | timeline length; outlier count |
+| | `entity_profile.measure_sample_entities` | 100,000 | 1 to $10^7$ | above it, a Measure's per-Entity totals read a key-hash sample |
 | **Browser** | `projection_node_cap` | 1,000 | 1 to 100,000 | entities admitted to one canvas projection |
 | | `analysis_node_cap`, `suspicion_node_cap` | 2,500, 1,000 | 1 to 100,000 each | above it the browser refuses or hands over to the server |
 | | `display.lod_label_cap`, `layered_max_nodes`, `radial_max_nodes`, `mds_max_nodes`, `force_atlas_max_nodes` | 300, 30, 100, 300, 200 | up to 30,000; 3,000; 200; 400; 400 | labels drawn; layouts offered |
@@ -1120,7 +1121,7 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | Entity profile pages: sections, honesty rules, masking, alias-only URLs | **PROVEN** | `ControlApiEntityProfileTest`; scale behaviour `ControlApiEntityProfileScaleTest` (sandbox scale) |
 | | Published false-positive or precision rates on real data | **NOT YET** | Depend on customer thresholds; unmeasured |
 | **Platform** | In-process execution with no external graph database | **PROVEN** | Architectural invariant; seam enforced by `tools/check-module-deps.mjs` and `tools/check-engine-names-no-la.mjs` |
-| | **110**<!--count:la-routes--> Link Analysis API routes (**103**<!--count:la-api-routes--> in `la-api`, **7**<!--count:geo-link-routes--> in `geo-link`) | **PROVEN** | `LaApiRoutesManifestParityTest`; marker-checked against each `module.toon` |
+| | **111**<!--count:la-routes--> Link Analysis API routes (**104**<!--count:la-api-routes--> in `la-api`, **7**<!--count:geo-link-routes--> in `geo-link`) | **PROVEN** | `LaApiRoutesManifestParityTest`; marker-checked against each `module.toon` |
 | | PostgreSQL Investigation store (Advanced, opt-in) | **PROVEN** | `PgInvestigationStoreContractTest`, `PgInvestigationStoreTwoJvmRaceTest`; `docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md`. Embed links are not supported on this store |
 | | Whole-product test baseline at the editions commit | **PROVEN** | Full reactor `-Pedition-advanced`, 56 modules, 10,566 tests, 0 failures; SPA 5,913 passed, 5 skipped (commit `f1b64ce03`) |
 | | Coverage measured 2026-10-15 | **MEASURED** | Backend instruction 86.08 % / branch 73.59 % (48 modules); UI statements 81.51 % / branch 76.64 % (553 spec files); recorded in `docs/okf/product/layer/platform/tests-guard-coverage.md` and `docs/PROJECT_NOTES.md` (UI also in `docs/okf/product/layer/product/plan-surfaces.md`) |

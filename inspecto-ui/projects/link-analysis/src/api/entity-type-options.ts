@@ -1,5 +1,6 @@
 import type { PickerOption } from '@inspecto/core/components/option-picker.component';
 import { sampleFits, shapeSpecificity } from '@inspecto/core/graph/value-shape';
+import { type RecordRoleHints, recordPhrase } from './column-roles';
 
 /**
  * The "what does this column hold" choices (ENTITY-TYPE-CATALOG-1 P0): the Space's Entity Types grouped by their neutral
@@ -38,12 +39,20 @@ export interface RecordTypeGuide {
     definition?: string | null;
     /** The Entity Type ids such a record usually holds, most telling first. */
     likelyTypes: string[];
+    /** Its usual Time, Measure and Category columns and its parties (ENTITY-TYPE-RECORD-ROLES-1); absent from an older server. */
+    roleHints?: RecordRoleHints;
 }
 
 /** What narrows one column's choices: the Dataset's record type and the column's sampled values. */
 export interface HoldsContext {
     recordType?: RecordTypeGuide | null;
     sample?: readonly (string | null | undefined)[] | null;
+    /**
+     * The types whose shape the column's values fit, read on the server over an unmasked sample when the screen has none
+     * of its own (the Data page: `GET /inv/datasets/{id}/shapes`, ENTITY-TYPE-RECORD-ROLES-1); id → whether every value
+     * fits strongly. Ignored when `sample` is given.
+     */
+    fits?: ReadonlyMap<string, { strong: boolean }> | null;
 }
 
 /** The group of the types whose shape the sample fits, when the Dataset has no record type. */
@@ -51,14 +60,7 @@ export const SHAPE_MATCHES = 'Shape matches';
 
 /** The group heading of a record type's likely types: "Likely in a call record", "Likely in an SMS record". */
 export function likelyGroup(recordType: RecordTypeGuide): string {
-    const label = recordType.label.trim();
-    const first = label.split(/\s+/)[0] ?? '';
-    // an abbreviation keeps its capitals ("SMS record"); a plain word reads in lower case inside the sentence
-    const abbreviation = first.length > 1 && first === first.toUpperCase();
-    const shown = abbreviation ? label : label.charAt(0).toLowerCase() + label.slice(1);
-    // an abbreviation is read letter by letter: "an SMS", "an ID", "a USSD"
-    const an = abbreviation ? /^[AEFHILMNORSX]/.test(shown) : /^[aeiou]/i.test(shown);
-    return `Likely in ${an ? 'an' : 'a'} ${shown}`;
+    return `Likely in ${recordPhrase(recordType.label)}`;
 }
 
 /** The group of a type whose family is unstated or not one the server listed. */
@@ -84,7 +86,13 @@ export function entityTypeOptions(
     const label = new Map(families.map((f) => [f.id, f.label] as const));
     const of = (t: EntityTypeGuide): number => (t.family && rank.has(t.family) ? rank.get(t.family)! : families.length);
     const sample = context.sample ?? [];
-    const fitOf = (t: EntityTypeGuide) => (sample.length > 0 ? sampleFits(t.shape, sample) : null);
+    const served = context.fits;
+    const fitOf = (t: EntityTypeGuide): { all: boolean; strong: boolean } | null =>
+        sample.length > 0
+            ? sampleFits(t.shape, sample)
+            : served
+              ? { all: served.has(t.id), strong: !!served.get(t.id)?.strong }
+              : null;
     const matches = (t: EntityTypeGuide): boolean => !!fitOf(t)?.all;
     // a strong fit (every value fits the narrow reading) ranks before a weak one: 15 digits are a card identity before a phone number
     const rankFit = (t: EntityTypeGuide): number => (fitOf(t)?.strong ? 0 : matches(t) ? 1 : 2);

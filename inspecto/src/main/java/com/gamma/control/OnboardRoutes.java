@@ -207,8 +207,11 @@ final class OnboardRoutes implements RouteModule {
             LinkAnalysisSettings laSettings = LinkAnalysisSettings.forRoot(writeRoot);
             Map<String, Object> entity = OnboardDraft.entityTypes(a, laSettings.effectiveEntityTypes(), kind);
             // ENTITY-TYPE-CATALOG-1 P2: what a row is, when the Space's packs define record types
-            if (!laSettings.effectiveRecordTypes().isEmpty())
+            if (!laSettings.effectiveRecordTypes().isEmpty()) {
                 entity.put("recordType", EntityShapes.recordType(entity, laSettings.effectiveRecordTypes()));
+                // ENTITY-TYPE-RECORD-ROLES-1: and the roles such a record usually gives its columns
+                EntityShapes.recordTypeRoles(entity, a.sampled(), laSettings.effectiveRecordTypes());
+            }
 
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("draftId", draftId);

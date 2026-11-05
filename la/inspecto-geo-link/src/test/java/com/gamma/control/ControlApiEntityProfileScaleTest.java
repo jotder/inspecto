@@ -235,12 +235,127 @@ class ControlApiEntityProfileScaleTest {
         }
     }
 
+    /** A file-backed Dataset {@code m_ds}: column {@code s} holds a CELL, {@code amt} is a Measure; its rows are {@code select}. */
+    private static Path measureDataset(EntityProfileFixture.Ctx c, Path root, String select) throws Exception {
+        String store = "ep_measure_" + System.nanoTime();
+        Path dir = Path.of("database").resolve(store);
+        new ComponentStore(root.resolve("registry")).write("dataset", "m_ds", Map.of("physicalRef", store, "owner", "analyst-1",
+                "shares", List.of(), "columns", List.of(Map.of("name", "s", "classification", "CELL"),
+                        Map.of("name", "amt", "type", "number", "role", "measure", "unit", "USD"))));
+        copy(dir.resolve("p1.parquet"), select, 1_700_000_000_000L);
+        return dir;
+    }
+
+    /**
+     * LA-COLUMN-ROLES-2 D-1 b: on a LARGE synthetic Dataset (200,000 distinct Entities) the per-Entity Measure read groups a
+     * key-hash sample bounded by {@code entity_profile.measure_sample_entities} and says so; the row aggregates stay exact.
+     */
+    @Test
+    void thePerEntityMeasureReadIsSampledByKeyHashAndBoundedByItsCap(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        Path dir = null;
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            dir = measureDataset(c, root, "SELECT 'CELL-' || i AS s, CAST(i % 100 AS VARCHAR) AS amt FROM range(0, 200000) AS t(i)");
+            settings(c, "entity_profile:\n  measure_sample_entities: 1000\n");
+            JsonNode m = data(get(c, "/inv/entity-types/cell/profile?sections=measures", OWNER)).at("/measures/0");
+            assertTrue(m.get("assessed").asBoolean(), m.toString());
+            assertEquals(200_000, m.get("rows").asLong(), "the row aggregates are never sampled");
+            assertEquals(9_900_000.0, m.get("sum").asDouble());
+            JsonNode d = m.get("distribution");
+            assertTrue(d.get("assessed").asBoolean(), d.toString());
+            assertTrue(d.get("sampled").asBoolean(), d.toString());
+            assertTrue(d.get("approximate").asBoolean());
+            assertEquals(1000, d.get("sampleEntities").asLong());
+            assertTrue(d.get("every").asLong() >= 200, "1 Entity in about 200 * 1.1: " + d);
+            long read = d.get("entities").asLong();
+            assertTrue(read > 0 && read < 1000, "the sample stays under the cap without the LIMIT cutting it: " + d);
+            assertFalse(d.get("truncated").asBoolean(), d.toString());
+
+            settings(c, "entity_profile:\n  measure_sample_entities: 1000000\n");
+            JsonNode exact = data(get(c, "/inv/entity-types/cell/profile?sections=measures", OWNER)).at("/measures/0/distribution");
+            assertFalse(exact.get("sampled").asBoolean(), exact.toString());
+            assertEquals(1, exact.get("every").asLong());
+            assertEquals(200_000, exact.get("entities").asLong(), "under the cap every Entity is grouped");
+            assertEquals(99.0, exact.get("max").asDouble());
+        } finally {
+            if (dir != null) rmTree(dir);
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    /** A cached Measures section is read again once a column's role or unit changes: the cache stamp holds the Dataset's columns. */
+    @Test
+    void aRoleOrUnitChangeReReadsTheCachedMeasures(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        Path dir = null;
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            dir = measureDataset(c, root, "SELECT * FROM (VALUES ('CELL-1', '5', '2'), ('CELL-2', '1', '3')) AS v(s, amt, fee)");
+            String path = "/inv/entity-types/cell/profile?sections=measures";
+            assertEquals(1, data(get(c, path, OWNER)).get("measures").size());
+            JsonNode again = data(get(c, path, OWNER));
+            assertTrue(again.get("cached").asBoolean(), "not vacuous: the second read is the cached one: " + again);
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            Map<String, Object> entry = new java.util.HashMap<>(reg.get("dataset", "m_ds").orElseThrow().content());
+            entry.put("columns", List.of(Map.of("name", "s", "classification", "CELL"),
+                    Map.of("name", "amt", "type", "number", "role", "measure", "unit", "EUR"),
+                    Map.of("name", "fee", "type", "number", "role", "measure")));
+            reg.write("dataset", "m_ds", entry);
+            JsonNode after = data(get(c, path, OWNER));
+            assertEquals(2, after.get("measures").size(), "a new Measure shows: " + after);
+            assertEquals("EUR", after.at("/measures/0/unit").asText(), "and a changed unit: " + after);
+        } finally {
+            if (dir != null) rmTree(dir);
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    /** A per-Entity Measure read that runs past the statement timeout is not assessed, keeps the row aggregates, and is never cached. */
+    @Test
+    void aMeasureDistributionThatTimesOutIsNotAssessedAndNeverCached(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        AtomicLong tick = new AtomicLong();
+        InputFingerprintCache.forTest(() -> tick.addAndGet(60_000L), 30_000L);
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        Path dir = null;
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            dir = measureDataset(c, root, "SELECT * FROM (VALUES ('CELL-1', '5'), ('CELL-1', '7'), ('CELL-2', '1')) AS v(s, amt)");
+            Faulty f = install();
+            f.error = "INTERRUPT Error: Interrupted!";
+            f.fail = sql -> sql.contains("quantile_disc(");
+            String path = "/inv/entity-types/cell/profile?sections=measures";
+            JsonNode m = data(get(c, path, OWNER)).at("/measures/0");
+            assertEquals(13.0, m.get("sum").asDouble(), "the row aggregates still answer: " + m);
+            assertEquals("USD", m.get("unit").asText());
+            JsonNode d = m.get("distribution");
+            assertFalse(d.get("assessed").asBoolean(), d.toString());
+            assertTrue(d.get("retryable").asBoolean());
+            assertEquals("the read ran past entity_profile.timeout_s", d.get("reason").asText());
+            assertFalse(d.has("p50"), "never a zero for what was not read");
+
+            f.fail = sql -> false;
+            JsonNode second = data(get(c, path, OWNER));
+            assertFalse(second.get("cached").asBoolean(), "the failed distribution was not cached");
+            assertEquals(12.0, second.at("/measures/0/distribution/max").asDouble(), "CELL-1 totals 5 + 7");
+            assertEquals(2, second.at("/measures/0/distribution/entities").asLong());
+            assertTrue(data(get(c, path, OWNER)).get("cached").asBoolean(), "now it is cached");
+        } finally {
+            if (dir != null) rmTree(dir);
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
     private static void plant(Path file, String values, long mtime) throws Exception {
+        copy(file, "SELECT * FROM (VALUES " + values + ") AS v(s)", mtime);
+    }
+
+    private static void copy(Path file, String select, long mtime) throws Exception {
         Files.createDirectories(file.getParent());
         DuckDbUtil.loadDriver();
         java.io.File db = DuckDbUtil.tempDbFile("ep_scale_");
         try (java.sql.Connection conn = DuckDbUtil.openConnection(db); java.sql.Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM (VALUES " + values + ") AS v(s)) TO '" + file.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+            st.execute("COPY (" + select + ") TO '" + file.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }

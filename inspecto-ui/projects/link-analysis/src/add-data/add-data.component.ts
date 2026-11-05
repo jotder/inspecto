@@ -73,6 +73,7 @@ import {
     lowChoices,
     quoteLabel,
     suggestDatasetName,
+    roleUnder,
 } from './add-data.model';
 import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '../api/column-roles';
 import { ImportDatasetCardComponent } from './import-dataset-card.component';
@@ -351,7 +352,11 @@ export class AddDataComponent implements OnInit {
         this.formTick();
         const done = this.confirmed();
         return lowChoices(d, this.withEntityTypes(), this.dropped()).filter(
-            (p) => !done.has(p.key) && !this.changedFromProposal(d, p.key),
+            (p) =>
+                !done.has(p.key) &&
+                !this.changedFromProposal(d, p.key) &&
+                // a role another record type now proposes surely needs no click
+                !(p.key.startsWith('role.') && this.roleChoice(p.key.slice(5))?.confidence === 'high'),
         );
     });
     protected readonly pendingKeys = computed(() => new Set(this.pending().map((p) => p.key)));
@@ -447,6 +452,7 @@ export class AddDataComponent implements OnInit {
                 },
             });
         this.formSub = this.form.valueChanges.subscribe(() => this.formTick.update((n) => n + 1));
+        this.formSub.add(this.form.controls.recordType.valueChanges.subscribe((rt) => this.reproposeRoles(rt)));
         // A different separator, header line or quote re-reads the file (the draft's columns were read with the old one).
         for (const c of [this.form.controls.delimiter, this.form.controls.header, this.form.controls.quote])
             this.formSub.add(c.valueChanges.subscribe(() => this.reformat()));
@@ -517,6 +523,7 @@ export class AddDataComponent implements OnInit {
         this.form.controls.columns.clear({ emitEvent: false });
         for (const c of initialColumns(d)) this.form.controls.columns.push(this.columnGroup(c), { emitEvent: false });
         const roles = initialRoles(d);
+        this.rolesUnder = roles.recordType ?? NONE;
         this.form.patchValue(
             {
                 name: this.form.controls.name.value || suggestDatasetName(d.file.name),
@@ -584,8 +591,31 @@ export class AddDataComponent implements OnInit {
         return this.draft()?.entityTypes.columns.find((c) => c.column === column)?.entityType;
     }
 
+    /** The role proposed for a column under the record type now chosen (ENTITY-TYPE-RECORD-ROLES-1, `roleUnder`). */
     protected roleChoice(column: string): Choice<ColumnRole> | undefined {
-        return this.draft()?.entityTypes.columns.find((c) => c.column === column)?.role;
+        const d = this.draft();
+        return d ? roleUnder(d, column, this.form.controls.recordType.value, this.recordTypes()) : undefined;
+    }
+
+    /** The record type the role controls were last proposed under. */
+    private rolesUnder = NONE;
+
+    /**
+     * Another record type picked: each column whose role still is the proposal under the old one takes the proposal under
+     * the new one; a role the person picked stays.
+     */
+    private reproposeRoles(recordType: string): void {
+        const d = this.draft();
+        const was = this.rolesUnder;
+        this.rolesUnder = recordType;
+        if (!d || was === recordType) return;
+        for (const g of this.form.controls.columns.controls) {
+            const n = g.controls.name.value;
+            const before = roleUnder(d, n, was, this.recordTypes())?.value;
+            const after = roleUnder(d, n, recordType, this.recordTypes())?.value;
+            if (before && after && after !== before && g.controls.role.value === before)
+                g.controls.role.setValue(after);
+        }
     }
 
     protected typeChoice(column: string): Choice<string> | undefined {
