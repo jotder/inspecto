@@ -4,8 +4,9 @@ import { ComponentsService } from '@inspecto/core/api';
 import { GraphSourceId, GraphSourceQuery } from '@inspecto/core/graph';
 import { DomainProfileId } from '@inspecto/link-analysis/graph/domain-profile';
 import { SavedViewStore } from '@inspecto/link-analysis/investigation/saved-view-store';
-import { GraphDisplayOptions, GraphLayoutId, GraphViewPlugins } from '@inspecto/core/graph/graph-view.component';
+import { GraphLayoutId, GraphViewPlugins } from '@inspecto/core/graph/graph-view.component';
 import type { InvestigationRef } from './investigation-state';
+import type { LaDisplayOptions } from './link-width';
 
 /**
  * A saved investigation — a **Link-Analysis View** (GLOSSARY §11), persisted as the
@@ -29,8 +30,8 @@ export interface LinkAnalysisView {
     description?: string;
     sourceId: GraphSourceId;
     query: GraphSourceQuery;
-    /** Presentation (labels + per-kind colours) captured with the view; absent = defaults. */
-    display?: GraphDisplayOptions;
+    /** Presentation (labels, per-kind colours, the link width) captured with the view; absent = defaults. */
+    display?: LaDisplayOptions;
     /** The chosen graph layout; absent = the default layered layout. */
     layout?: GraphLayoutId;
     /** The domain profile shaping statistics and suggested tools; absent = generic. */
@@ -162,7 +163,7 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
         description?: string;
         sourceId?: GraphSourceId;
         query?: GraphSourceQuery;
-        display?: GraphDisplayOptions;
+        display?: LaDisplayOptions;
         layout?: GraphLayoutId;
         profile?: DomainProfileId;
         view?: LinkAnalysisViewOptions;

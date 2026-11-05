@@ -512,6 +512,36 @@
                                 </button>
                             }
                         </div>
+                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Link width</span>
+                        @if (linkMeasure(); as measure) {
+                            <div class="flex items-center gap-1.5" role="group" aria-label="Link width">
+                                <button
+                                    type="button"
+                                    class="rounded border px-2 py-0.5 text-xs"
+                                    [class.ring-2]="linkWidthDrawn() === 'count'"
+                                    [attr.aria-pressed]="linkWidthDrawn() === 'count'"
+                                    data-link-width="count"
+                                    (click)="setLinkWidth('count')"
+                                >
+                                    Count
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded border px-2 py-0.5 text-xs disabled:opacity-50"
+                                    [class.ring-2]="linkWidthDrawn() === 'measure'"
+                                    [attr.aria-pressed]="linkWidthDrawn() === 'measure'"
+                                    [disabled]="!!linkMeasureOffReason()"
+                                    data-link-width="measure"
+                                    (click)="setLinkWidth('measure')"
+                                >
+                                    {{ measure }}
+                                </button>
+                            </div>
+                            @if (linkMeasureOffReason(); as why) {
+                                <span class="text-secondary text-xs" data-testid="la-link-width-reason">{{ why }}</span>
+                            }
+                        }
+                        <span class="text-secondary text-xs" data-testid="la-link-width-hint">{{ linkWidthHint() }}</span>
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node colours</span>
                         <span class="text-secondary text-xs"
                             >Types without a choice here get an automatic colour and shape. The most common type stays
@@ -1249,7 +1279,7 @@
                         <p class="sr-only" role="status" data-testid="la-selection-announcement">{{ selectionAnnouncement() }}</p>
                         <inspecto-graph-view
                             [fill]="true"
-                            [data]="canvasData()"
+                            [data]="weighedCanvasData()"
                             [emphasis]="emphasis() ?? geoBrushEmphasis()"
                             [display]="displayOptions()"
                             [tooltips]="true"

@@ -255,6 +255,15 @@ import { PivotService } from '@inspecto/link-analysis/investigation/pivot.servic
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { carriedColumns, columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
 import { timeColumnChoices } from './timeline-playback';
+import {
+    LaDisplayOptions,
+    LinkWidthBy,
+    carriesLinkMeasure,
+    linkWidthHint,
+    sharedLinkMeasure,
+    weighLinks,
+    withLinkMeasure,
+} from './link-width';
 import { LinkAnalysisRoleFilterComponent, RoleFilterCategory } from './link-analysis-role-filter.component';
 import { NO_ROLE_FILTERS, RoleFilters, categoryValuesSql, withRoleFilters } from './role-filters';
 import {
@@ -1469,11 +1478,42 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** How far the layout spreads nodes (a multiplier on its distances); wide by default; changed from the Display menu. */
     readonly layoutSpacing = signal(GRAPH_DEFAULT_LAYOUT_SPACING);
 
+    // ── link width (LA-COLUMN-ROLES-2 D-2): by the rows a link folds, or by its link mapping's primary Measure ──
+    /** What the analyst chose for the link width; saved with a view (`display.linkWidth`, absent = count). */
+    readonly linkWidthBy = signal<LinkWidthBy>('count');
+    /** A Dataset's primary Measure, from its link mapping (`defaultLinkMapping`; old entries say `amount`). */
+    private readonly measureOf = (datasetId: string): string | undefined =>
+        this.datasets().find((d) => d.id === datasetId)?.defaultLinkMapping?.primaryMeasure;
+    /** The primary Measure the last read's link mappings name; undefined = the Display menu offers Count only. */
+    readonly linkMeasure = computed(() => {
+        const run = this.lastRun();
+        return run ? sharedLinkMeasure(run.sourceId, run.query, this.measureOf) : undefined;
+    });
+    /** What the width follows on the canvas: the Measure only while it is offered and the query graph is drawn. */
+    readonly linkWidthDrawn = computed<LinkWidthBy>(() =>
+        this.linkWidthBy() === 'measure' && this.linkMeasure() && !this.workingSetCanvas() ? 'measure' : 'count',
+    );
+    /** The Display menu's line saying what the width means. */
+    readonly linkWidthHint = computed(() => linkWidthHint(this.linkWidthDrawn(), this.linkMeasure()));
+    /**
+     * Why Width by the Measure cannot be picked now, or null. Picking it re-reads the last query with the Measure summed
+     * (when its links do not carry the totals yet), which would replace a graph grown beyond what that query drew.
+     */
+    readonly linkMeasureOffReason = computed<string | null>(() => {
+        if (this.workingSetCanvas()) return this.queryGraphOnlyReason;
+        const run = this.lastRun();
+        const measure = this.linkMeasure();
+        if (!run || !measure || carriesLinkMeasure(run.query, measure) || this.graph() === this.plainGraph) return null;
+        return 'Run the query again first: this graph holds more than the query drew.';
+    });
+    /** {@link canvasData} with each link weighed by {@link linkWidthDrawn}: what the graph view draws. */
+    readonly weighedCanvasData = computed(() => weighLinks(this.canvasData(), this.linkWidthDrawn()));
+
     /**
      * What the analyst chose, and only that: this is what a saved view keeps. The automatic look ({@link displayOptions})
      * is derived from the drawn graph every time, so it is never written into a view.
      */
-    readonly chosenDisplay = computed<GraphDisplayOptions>(
+    readonly chosenDisplay = computed<LaDisplayOptions>(
         () => ({
             nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
             edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
@@ -1486,6 +1526,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             ...(this.nodeRules().length ? { nodeRules: this.nodeRules() } : {}),
             ...(this.nodeSize() !== GRAPH_DEFAULT_NODE_SIZE ? { nodeSize: this.nodeSize() } : {}),
             ...(this.layoutSpacing() !== GRAPH_DEFAULT_LAYOUT_SPACING ? { layoutSpacing: this.layoutSpacing() } : {}),
+            ...(this.linkWidthBy() === 'measure' ? { linkWidth: 'measure' as const } : {}),
         }),
         { equal: (a, b) => stableKey(a) === stableKey(b) },
     );
@@ -1536,7 +1577,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             Object.keys(this.nodeShapes()).length > 0 ||
             Object.keys(this.edgePatterns()).length > 0 ||
             Object.keys(this.edgeSizes()).length > 0 ||
-            this.nodeRules().length > 0,
+            this.nodeRules().length > 0 ||
+            this.linkWidthBy() === 'measure',
     );
 
     // ── layout (the Layout toolbox; persisted with a saved view) ──
@@ -2855,7 +2897,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (!source?.expand) return [];
         const wanted = values.slice(0, START_MAX_SEEDS);
         const projection = entityType ? { ...ds.mapping, entityType } : ds.mapping;
-        const q: GraphSourceQuery = { projection };
+        const q = this.withWidthMeasure('entity-projection', { projection }); // a start's Dataset is loaded by now
         const firstDraw = !this.graph();
         const focusBefore = this.focusHolder();
         this.starting.set(true);
@@ -3357,7 +3399,10 @@ Its prior copies stay in its version history.`,
         this.clearResults();
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
-            const hit = await this.cachedQuery(sourceId, source, q, force);
+            // a view opened on a refresh can run before the Datasets (and so their Measures) have arrived
+            if (this.linkWidthBy() === 'measure') await this.datasetsLoaded;
+            const read = this.withWidthMeasure(sourceId, q);
+            const hit = await this.cachedQuery(sourceId, source, read, force);
             const g = hit.value.g;
             this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
@@ -3367,7 +3412,7 @@ Its prior copies stay in its version history.`,
             this.truncated.set(!!(g as ProjectedGraph).truncated);
             this.mappingSummary.set((g as MultiProjectedGraph).mappings ?? []);
             this.kindFilter.set([]);
-            this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
+            this.lastRun.set(this.runOf(sourceId, read, g as ProjectedGraph));
             this.queryPanel?.markPristine(); // what was run is no longer an unsaved change
             this.settingsOpen.set(false); // the drawn graph is the answer: show it
             if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
@@ -3824,6 +3869,27 @@ Its prior copies stay in its version history.`,
         this.nodeSize.set(size);
     }
 
+    /**
+     * Pick what the link width follows (D-2). The Measure re-reads the last query with it summed when its links do not
+     * carry the totals yet; back to Count needs no read. Not on the undo history: an undo back to the Measure over a graph
+     * read without it would draw every link thinnest.
+     */
+    async setLinkWidth(by: LinkWidthBy): Promise<void> {
+        if (by === 'measure' && this.linkMeasureOffReason()) return; // the button is disabled with the reason
+        this.linkWidthBy.set(by);
+        const run = this.lastRun();
+        const measure = this.linkMeasure();
+        if (by === 'measure' && run && measure && !carriesLinkMeasure(run.query, measure))
+            await this.execute(run.sourceId, run.query); // execute adds the Measure while the width follows it
+    }
+
+    /** The read `q` with the shared primary Measure summed on its links while the width follows it; else `q` as it is. */
+    private withWidthMeasure(sourceId: GraphSourceId, q: GraphSourceQuery): GraphSourceQuery {
+        if (this.linkWidthBy() !== 'measure') return q;
+        const measure = sharedLinkMeasure(sourceId, q, this.measureOf);
+        return measure ? withLinkMeasure(q, measure) : q;
+    }
+
     /** Pick how far the layout spreads nodes (undoable); the layout re-runs. */
     setLayoutSpacing(spacing: number): void {
         this.recordHistory();
@@ -3948,7 +4014,8 @@ Its prior copies stay in its version history.`,
         }
     }
 
-    private applyDisplay(display: GraphDisplayOptions | undefined): void {
+    private applyDisplay(display: LaDisplayOptions | undefined): void {
+        this.linkWidthBy.set(display?.linkWidth === 'measure' ? 'measure' : 'count'); // a view saved before D-2: Count
         this.nodeLabels.set(display?.nodeLabels ?? false);
         this.edgeLabels.set(display?.edgeLabels ?? false);
         this.allEdgeLabels.set(display?.allEdgeLabels ?? false);

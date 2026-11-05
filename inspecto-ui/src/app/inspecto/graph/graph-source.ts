@@ -29,6 +29,8 @@ export interface EntityProjection {
     targetCol: string;
     linkKindCol?: string;
     attrCols?: string[];
+    /** A Measure column the read sums per link into `data.total` (LA-COLUMN-ROLES-2 D-2); absent = no total. */
+    measureCol?: string;
     /**
      * Multi-mapping merges (P3, `projections`) are **type-scoped**: an `entityType` distinguishes a
      * `person` entity named "Bob" from an `account` entity named "Bob" so they don't silently merge
@@ -129,4 +131,6 @@ export interface MultiEdgeMapping {
     attributes?: string[];
     /** Narrows ONLY this mapping; the request's top-level `filter` applies to every edge mapping. */
     filter?: ConditionGroup;
+    /** A Measure column summed per link into `total` beside `count` (LA-COLUMN-ROLES-2 D-2); absent = no total. */
+    measureColumn?: string;
 }

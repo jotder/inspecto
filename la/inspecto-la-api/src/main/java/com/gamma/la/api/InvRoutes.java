@@ -849,10 +849,11 @@ public final class InvRoutes implements RouteModule {
             String ds = datasetOf(m, "edges");
             String relationSql = relationFor(api, ex, writeRoot, ds);
             String srcCol = ident(m, "sourceColumn", true), tgtCol = ident(m, "targetColumn", true);
+            String measureCol = ident(m, "measureColumn", false);   // LA-COLUMN-ROLES-2: summed per link as `total`
             List<String> attrs = nameList(m, "attributes", true);
             DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), ds, relationSql)
                     .and(filterSql(m.get("filter"), ds, relationSql));
-            String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filter);
+            String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filter, measureCol);
             Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(srcCol, tgtCol));
             plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs,
                     null, types.get(srcCol), types.get(tgtCol), filter.binds(),
@@ -970,6 +971,7 @@ public final class InvRoutes implements RouteModule {
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
+        String measureCol = ident(body, "measureCol", false);   // LA-COLUMN-ROLES-2: summed per link as `total`
         List<String> attrCols = attrCols(body);
         LaLimitValues lim = SpaceLimits.of(writeRoot);
         int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_MAX));
@@ -1027,7 +1029,7 @@ public final class InvRoutes implements RouteModule {
         IndexedRead.Outcome<IndexedNeighbors.Result> indexed = null;
         if (neighborsOf != null) {
             indexed = IndexedNeighbors.attempt(writeRoot, api.dataRoot(), relationSql, new IndexedNeighbors.Request(datasetId, sourceCol,
-                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit), traversalPolicy(writeRoot));
+                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit, measureCol), traversalPolicy(writeRoot));
             if (indexed.served()) {
                 List<Map<String, Object>> rows = new ArrayList<>(indexed.result().rows().size());
                 for (Map<String, Object> row : indexed.result().rows())
@@ -1061,7 +1063,7 @@ public final class InvRoutes implements RouteModule {
         }
         binds.addAll(filter.binds());
         // Server-built from validated identifiers only; one extra row detects truncation.
-        String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filter);
+        String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filter, measureCol);
 
         try {
             ProjectionCache.READS.increment();
@@ -1133,6 +1135,16 @@ public final class InvRoutes implements RouteModule {
      */
     private static String edgeSql(String datasetId, String sourceCol, String targetCol, String kindCol,
                                   List<String> attrCols, String extraWhere, DatasetProvider.BoundFilter filter) {
+        return edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, extraWhere, filter, null);
+    }
+
+    /**
+     * As above; {@code measureCol}, when not null, is also SUMmed per link as {@code total} (LA-COLUMN-ROLES-2: the primary
+     * Measure that weighs a link on the canvas) - beside the count, never a grouping key, so the links stay folded as they
+     * are. A value that is no number counts nothing ({@code TRY_CAST}); a link with none has total NULL.
+     */
+    private static String edgeSql(String datasetId, String sourceCol, String targetCol, String kindCol,
+                                  List<String> attrCols, String extraWhere, DatasetProvider.BoundFilter filter, String measureCol) {
         String src = q(sourceCol), tgt = q(targetCol);
         String kindSel = kindCol != null ? ", CAST(" + q(kindCol) + " AS VARCHAR) AS kind" : "";
         StringBuilder attrSel = new StringBuilder();
@@ -1144,7 +1156,8 @@ public final class InvRoutes implements RouteModule {
         if (kindCol != null) groupBy.append(", ").append(nextGroupIdx++);
         for (int i = 0; i < attrCols.size(); i++) groupBy.append(", ").append(nextGroupIdx++);
         return "SELECT CAST(" + src + " AS VARCHAR) AS source, CAST(" + tgt + " AS VARCHAR) AS target"
-                + kindSel + attrSel + ", COUNT(*) AS cnt FROM " + q(datasetId)
+                + kindSel + attrSel + (measureCol != null ? ", SUM(TRY_CAST(" + q(measureCol) + " AS DOUBLE)) AS total" : "")
+                + ", COUNT(*) AS cnt FROM " + q(datasetId)
                 + " WHERE " + src + " IS NOT NULL AND " + tgt + " IS NOT NULL" + extraWhere
                 + " AND (" + filter.sql() + ")"
                 + " " + groupBy
@@ -1167,6 +1180,7 @@ public final class InvRoutes implements RouteModule {
         out.put("target", row.get("target"));
         out.put("kind", kind);
         out.put("count", row.get("cnt"));
+        if (row.containsKey("total")) out.put("total", row.get("total"));
         if (!attrCols.isEmpty()) {
             Map<String, Object> attrs = new LinkedHashMap<>();
             for (int i = 0; i < attrCols.size(); i++) attrs.put(attrCols.get(i), row.get("attr_" + i));

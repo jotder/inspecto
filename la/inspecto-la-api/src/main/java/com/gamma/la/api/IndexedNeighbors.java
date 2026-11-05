@@ -30,20 +30,27 @@ import java.util.Set;
  * {@code limit}; more rows than that sets {@code truncated}, as the flat executor does.
  *
  * <p>Servable only when the index carries every column asked for: the {@code linkKindCol}, each attribute column and every
- * field of the {@code filter} (the weight column is not an index column of record for a filter, see {@link IndexedRead}).
+ * field of the {@code filter} (the weight column is not an index column of record for a filter, see {@link IndexedRead}),
+ * and the {@code measureCol} a link's total sums (LA-COLUMN-ROLES-2), which must be one of its attribute columns.
  */
 final class IndexedNeighbors {
 
     record Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> attrCols, Object filter,
-                   String value, int limit) { }
+                   String value, int limit, String measureCol) {
+        Request(String datasetId, String sourceCol, String targetCol, String kindCol, List<String> attrCols, Object filter,
+                String value, int limit) {
+            this(datasetId, sourceCol, targetCol, kindCol, attrCols, filter, value, limit, null);
+        }
+    }
 
-    /** Rows shaped like the flat statement's: {@code source, target, [kind], [attr_i...], cnt}. */
+    /** Rows shaped like the flat statement's: {@code source, target, [kind], [attr_i...], [total], cnt}. */
     record Result(List<Map<String, Object>> rows, boolean truncated) { }
 
     private IndexedNeighbors() { }
 
     static Outcome<Result> attempt(Path writeRoot, Path dataRoot, String relationSql, Request rq, SqlSandboxPolicy policy) {
         List<String> extraCols = new ArrayList<>();
+        String[] totalCol = {null};
         Selection sel = IndexedRead.select(writeRoot, dataRoot, relationSql, rq.datasetId(), rq.sourceCol(), rq.targetCol(), (m, utc) -> {
             extraCols.clear();
             if (rq.kindCol() != null) {
@@ -57,6 +64,12 @@ final class IndexedNeighbors {
                 if (at < 0) return Fitted.no(Reason.column_not_indexed);
                 extraCols.add("a" + at);
             }
+            totalCol[0] = null;
+            if (rq.measureCol() != null) {
+                for (int i = 0; i < m.attributeColumns().size(); i++)
+                    if (rq.measureCol().equalsIgnoreCase(m.attributeColumns().get(i))) totalCol[0] = "a" + i;
+                if (totalCol[0] == null) return Fitted.no(Reason.column_not_indexed);
+            }
             if (rq.filter() == null) return Fitted.ok(null);
             DatasetProvider.BoundFilter f = IndexedRead.renderFilter(rq.filter(), m, utc);
             return f == null ? Fitted.no(Reason.filter_not_indexed) : Fitted.ok(f);
@@ -65,8 +78,8 @@ final class IndexedNeighbors {
 
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
             Set<Folded> distinct = new LinkedHashSet<>();                                    // a self-loop arrives from both copies
-            distinct.addAll(reader.fold(rq.value(), Side.OUT, extraCols, null, sel.filterSql(), sel.filterBinds()));
-            distinct.addAll(reader.fold(rq.value(), Side.IN, extraCols, null, sel.filterSql(), sel.filterBinds()));
+            distinct.addAll(reader.fold(rq.value(), Side.OUT, extraCols, null, sel.filterSql(), sel.filterBinds(), false, totalCol[0]));
+            distinct.addAll(reader.fold(rq.value(), Side.IN, extraCols, null, sel.filterSql(), sel.filterBinds(), false, totalCol[0]));
             List<Folded> sorted = new ArrayList<>(distinct);
             sorted.sort((a, b) -> {
                 int c = Long.compare(b.count(), a.count());
@@ -84,6 +97,7 @@ final class IndexedNeighbors {
                 int at = 0;
                 if (rq.kindCol() != null) row.put("kind", f.extras().get(at++));
                 for (int i = 0; i < rq.attrCols().size(); i++) row.put("attr_" + i, f.extras().get(at++));
+                if (rq.measureCol() != null) row.put("total", f.total());
                 row.put("cnt", f.count());
                 rows.add(row);
             }

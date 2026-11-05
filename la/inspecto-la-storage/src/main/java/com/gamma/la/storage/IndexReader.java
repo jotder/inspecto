@@ -210,7 +210,12 @@ public final class IndexReader implements AutoCloseable {
      * that fold into it, as the flat {@code GROUP BY} reports it. {@code extras} are in the order asked for, null where the row's
      * value is NULL.
      */
-    public record Folded(String source, String target, List<String> extras, long count) { }
+    public record Folded(String source, String target, List<String> extras, long count, Double total) {
+        /** A fold that sums no column. */
+        public Folded(String source, String target, List<String> extras, long count) {
+            this(source, target, extras, count, null);
+        }
+    }
 
     /**
      * The folded links of ONE key on ONE side: one equality statement on the key's bucket, {@code GROUP BY src, dst, extras}.
@@ -234,6 +239,17 @@ public final class IndexReader implements AutoCloseable {
      */
     public List<Folded> fold(String key, Side side, List<String> extraCols, List<String> kinds, String filterSql, List<String> filterBinds,
                              boolean weighted) throws SQLException {
+        return fold(key, side, extraCols, kinds, filterSql, filterBinds, weighted, null);
+    }
+
+    /**
+     * As above; {@code totalCol}, when not null, is one more index column ({@code a0..}) whose numbers each folded link also
+     * SUMs ({@link Folded#total}; a value that is no number counts nothing, a link with none is null) - LA-COLUMN-ROLES-2:
+     * the primary Measure that weighs a link on the canvas.
+     */
+    public List<Folded> fold(String key, Side side, List<String> extraCols, List<String> kinds, String filterSql, List<String> filterBinds,
+                             boolean weighted, String totalCol) throws SQLException {
+        if (totalCol != null && !totalCol.matches("a\\d{1,3}")) throw new IllegalArgumentException("not an index attribute column: " + totalCol);
         for (String c : extraCols)
             if (!c.matches("kind|a\\d{1,3}")) throw new IllegalArgumentException("not an index column: " + c);
         if (kinds != null && kinds.isEmpty()) throw new IllegalArgumentException("kinds must not be empty");
@@ -241,6 +257,7 @@ public final class IndexReader implements AutoCloseable {
         StringBuilder sel = new StringBuilder("src, dst");
         for (String c : extraCols) sel.append(", ").append(c);
         StringBuilder sql = new StringBuilder("SELECT ").append(sel)
+                .append(totalCol != null ? ", SUM(TRY_CAST(" + totalCol + " AS DOUBLE)) AS total" : "")
                 .append(weighted ? ", CAST(SUM(COALESCE(CAST(w AS BIGINT), 1)) AS BIGINT) AS cnt FROM e_" : ", COUNT(*) AS cnt FROM e_")
                 .append(side == Side.OUT ? "out" : "in").append(" WHERE bucket = ").append(BucketFunction.bucketOf(key, buckets))
                 .append(" AND ").append(own).append(" = ?");
@@ -262,7 +279,13 @@ public final class IndexReader implements AutoCloseable {
                 while (rs.next()) {
                     List<String> extras = new ArrayList<>(extraCols.size());
                     for (int i = 0; i < extraCols.size(); i++) extras.add(rs.getString(3 + i));
-                    out.add(new Folded(rs.getString(1), rs.getString(2), extras, rs.getLong(3 + extraCols.size())));
+                    int at = 3 + extraCols.size();
+                    Double total = null;
+                    if (totalCol != null) {
+                        double t = rs.getDouble(at++);
+                        total = rs.wasNull() ? null : t;
+                    }
+                    out.add(new Folded(rs.getString(1), rs.getString(2), extras, rs.getLong(at), total));
                 }
             }
         }

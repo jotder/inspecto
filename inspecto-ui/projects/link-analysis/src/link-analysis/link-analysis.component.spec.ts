@@ -6867,3 +6867,130 @@ describe('mergeWorkingSets (LA-UNSAVED-INVESTIGATION-1)', () => {
         expect(mergeWorkingSets(prev, { ...next, entities: [...next.entities, e('s', 0)] }, ['s']).entities.find((x) => x.id === 's')!.hop).toBe(0);
     });
 });
+
+describe('LinkAnalysisComponent - link width by the primary Measure (LA-COLUMN-ROLES-2 D-2)', () => {
+    /** Links folded from 2, 7 and 1 rows, totalling 5000, 5 and no number. */
+    const TOTALS: G6GraphData = {
+        nodes: ['a', 'b', 'c', 'd'].map((id) => ({ id, data: { label: id, kind: 'entity' } })),
+        edges: [
+            { id: 'a->b', source: 'a', target: 'b', data: { kind: 'paid', count: 2, total: 5000 } },
+            { id: 'a->c', source: 'a', target: 'c', data: { kind: 'paid', count: 7, total: 5 } },
+            { id: 'a->d', source: 'a', target: 'd', data: { kind: 'paid', count: 1, total: null } },
+        ],
+    } as never;
+    const WITH_MEASURE = {
+        ...DS,
+        defaultLinkMapping: { from: 'source', to: 'target', primaryMeasure: 'amount' },
+    } as unknown as Dataset;
+    const weights = (g: G6GraphData | null) =>
+        Object.fromEntries((g?.edges ?? []).map((e) => [e.id, (e.data as { weight?: number }).weight]));
+    const measureColOf = (q: unknown) => (q as { projection?: { measureCol?: string } }).projection?.measureCol;
+
+    async function drawn(datasets: Dataset[] = [WITH_MEASURE]) {
+        const made = create({ graph: TOTALS, datasets });
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        return { ...made, c: made.fixture.componentInstance };
+    }
+
+    it('Count is the default and weighs every drawn link by its row count; the graph view is given those weights', async () => {
+        const { fixture, c, queried } = await drawn();
+        expect(c.linkWidthDrawn()).toBe('count');
+        expect(measureColOf(queried[0])).toBeUndefined(); // nothing changes until the analyst asks
+        expect(weights(c.weighedCanvasData())).toEqual({ 'a->b': 2, 'a->c': 7, 'a->d': 1 });
+        const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+        expect(weights(view.data)).toEqual({ 'a->b': 2, 'a->c': 7, 'a->d': 1 });
+    });
+
+    it('the Measure re-reads the links with it summed and weighs them by their totals; Count again needs no read', async () => {
+        const { c, queried } = await drawn();
+        expect(c.linkMeasure()).toBe('amount');
+        await c.setLinkWidth('measure');
+        expect(queried).toHaveLength(2);
+        expect(measureColOf(queried[1])).toBe('amount');
+        expect(c.linkWidthDrawn()).toBe('measure');
+        const w = weights(c.weighedCanvasData());
+        expect(w['a->b']).toBeGreaterThan(w['a->c']);
+        expect(w['a->d']).toBe(0); // no number: thinnest
+        await c.setLinkWidth('count');
+        expect(queried).toHaveLength(2);
+        expect(weights(c.weighedCanvasData())).toEqual({ 'a->b': 2, 'a->c': 7, 'a->d': 1 });
+        await c.setLinkWidth('measure'); // the links still carry their totals
+        expect(queried).toHaveLength(2);
+        expect(c.linkWidthDrawn()).toBe('measure');
+    });
+
+    it('is not offered when the link mapping names no primary Measure', async () => {
+        const { fixture, c, queried } = await drawn([DS]);
+        expect(c.linkMeasure()).toBeUndefined();
+        await c.setLinkWidth('measure');
+        expect(queried).toHaveLength(1);
+        expect(c.linkWidthDrawn()).toBe('count');
+        (
+            fixture.nativeElement.querySelector('[aria-label="Display options"][aria-haspopup]') as HTMLButtonElement
+        ).click();
+        fixture.detectChanges();
+        const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
+        expect(menu.querySelector('[role="group"][aria-label="Link width"]')).toBeNull();
+        expect(menu.querySelector('[data-testid="la-link-width-hint"]')!.textContent!.trim()).toBe(
+            'Thicker links fold more rows.',
+        );
+        fixture.destroy();
+    });
+
+    it('the Display menu offers Count | the Measure by name, pressed as drawn, and says what the width means', async () => {
+        const { fixture, queried } = await drawn();
+        (
+            fixture.nativeElement.querySelector('[aria-label="Display options"][aria-haspopup]') as HTMLButtonElement
+        ).click();
+        fixture.detectChanges();
+        const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
+        const group = menu.querySelector('[role="group"][aria-label="Link width"]') as HTMLElement;
+        const button = (by: string) => group.querySelector(`[data-link-width="${by}"]`) as HTMLButtonElement;
+        expect(button('count').getAttribute('aria-pressed')).toBe('true');
+        expect(button('measure').textContent!.trim()).toBe('amount');
+        button('measure').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(queried).toHaveLength(2);
+        expect(button('measure').getAttribute('aria-pressed')).toBe('true');
+        expect(menu.querySelector('[data-testid="la-link-width-hint"]')!.textContent).toContain(
+            'larger total of amount',
+        );
+        await expectNoA11yViolations(group);
+        fixture.destroy();
+    });
+
+    it('is kept in a saved view, and opening it reads the links with the Measure; a view saved before it is Count', async () => {
+        const { c, queried } = await drawn();
+        expect(c.chosenDisplay().linkWidth).toBeUndefined();
+        await c.setLinkWidth('measure');
+        expect(c.chosenDisplay().linkWidth).toBe('measure');
+        expect(c.displayCustomized()).toBe(true);
+        const display = c.chosenDisplay();
+        const query = { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } };
+        await c.setLinkWidth('count');
+        await c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query, display });
+        expect(c.linkWidthBy()).toBe('measure');
+        expect(measureColOf(queried.at(-1))).toBe('amount');
+        await c.loadView({
+            id: 'old',
+            name: 'Old',
+            sourceId: 'entity-projection',
+            query,
+            display: { ...display, linkWidth: undefined },
+        });
+        expect(c.linkWidthBy()).toBe('count');
+        expect(measureColOf(c.lastRun()!.query)).toBeUndefined(); // the same read as the first draw (served from the cache)
+    });
+
+    it('a graph grown past the last query is not re-read: the Measure waits for the query to run again', async () => {
+        const { c, queried } = await drawn();
+        c.graph.set({ ...c.graph()!, nodes: [...c.graph()!.nodes] }); // an expand, a Grow or a push drew another graph
+        expect(c.linkMeasureOffReason()).toContain('Run the query again');
+        await c.setLinkWidth('measure');
+        expect(queried).toHaveLength(1);
+        expect(c.linkWidthDrawn()).toBe('count');
+    });
+});

@@ -13,6 +13,7 @@ import {
     projectTriples,
     projectionNodeCapValue,
     resolveRunQuery,
+    sumTotals,
     withColumnTypes,
 } from './entity-projection';
 import { endpointId } from '@inspecto/core/graph';
@@ -460,5 +461,76 @@ describe('invErrorMessage - an empty Dataset store', () => {
 
     it('leaves any other 409 as the server says it', () => {
         expect(invErrorMessage(http(409, 'something else conflicted'), 'x')).toBe('something else conflicted');
+    });
+});
+
+describe('link totals of the primary Measure (LA-COLUMN-ROLES-2 D-2)', () => {
+    const p = { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' };
+    const totalOf = (g: { edges: { id: string; data: object }[] }, id: string) =>
+        (g.edges.find((e) => e.id === id)!.data as { total?: number | null }).total;
+
+    it('adds the numbers and is null only when neither is one', () => {
+        expect(sumTotals(10, null)).toBe(10);
+        expect(sumTotals(null, 10)).toBe(10);
+        expect(sumTotals(3, 4)).toBe(7);
+        expect(sumTotals(null, null)).toBeNull();
+        expect(sumTotals(undefined, null)).toBeNull();
+    });
+
+    it('projectTriples sums the totals of the triples it folds into one link: 10 + null = 10, null + null = null', () => {
+        const g = projectTriples(
+            [
+                { source: 'a', target: 'b', kind: null, count: 1, total: 10 },
+                { source: 'A', target: 'b', kind: null, count: 2, total: null }, // the same pair once normalised (D-S4)
+                { source: 'a', target: 'c', kind: null, count: 1, total: null },
+                { source: 'a', target: 'c', kind: null, count: 1, total: null },
+            ],
+            false,
+            p,
+        );
+        expect(g.edges.find((e) => e.id === 'entity:a->entity:b:link')!.data).toMatchObject({ count: 3, total: 10 });
+        expect(totalOf(g, 'entity:a->entity:c:link')).toBeNull();
+    });
+
+    it('projectTriples adds no total to links read without a Measure', () => {
+        const g = projectTriples([{ source: 'a', target: 'b', kind: null, count: 2 }], false, p);
+        expect('total' in g.edges[0].data).toBe(false);
+    });
+
+    it('the client fold sums the Measure column over the rows of each link, null where none holds a number', () => {
+        const g = projectEntities(
+            [
+                { source: 'a', target: 'b', amount: 17 },
+                { source: 'a', target: 'b', amount: '3' },
+                { source: 'a', target: 'b', amount: 'n/a' },
+                { source: 'a', target: 'c', amount: '' },
+            ],
+            { ...p, measureCol: 'amount' },
+        );
+        if (isProjectionError(g)) throw new Error(g.error);
+        expect(totalOf(g, 'entity:a->entity:b:link')).toBe(20);
+        expect(totalOf(g, 'entity:a->entity:c:link')).toBeNull();
+        const plain = projectEntities([{ source: 'a', target: 'b', amount: 1 }], p);
+        if (isProjectionError(plain)) throw new Error(plain.error);
+        expect('total' in plain.edges[0].data).toBe(false);
+    });
+
+    it("asks the projection and the neighbours read for the mapping's Measure column", async () => {
+        const sent: Record<string, unknown>[] = [];
+        const answer = () =>
+            of({ rows: [{ source: 'a', target: 'b', kind: null, count: 2, total: 5.5 }], truncated: false });
+        const inv = {
+            project: (req: Record<string, unknown>) => (sent.push(req), answer()),
+            neighbors: (req: Record<string, unknown>) => (sent.push(req), answer()),
+        } as never;
+        const src = new EntityProjectionGraphSource({} as never, inv);
+        const q = { projection: { ...p, measureCol: 'amount' } };
+        const g = await src.query(q);
+        const grown = await src.expand('entity:a', 'a', q);
+        expect(sent.map((r) => r['measureCol'])).toEqual(['amount', 'amount']);
+        expect(totalOf(g, 'entity:a->entity:b:link')).toBe(5.5);
+        expect(totalOf(grown, 'entity:a->entity:b:link')).toBe(5.5);
+        await src.query({ projection: p });
+        expect(sent[2]['measureCol']).toBeUndefined();
     });
 });

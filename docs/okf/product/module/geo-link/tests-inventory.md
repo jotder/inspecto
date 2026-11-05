@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-127 test class(es): 18 unit, 109 real-HTTP control-plane, 0 IT.
+128 test class(es): 18 unit, 110 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -114,6 +114,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiLaShowcaseFiguresTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLaShowcaseFiguresTest.java` | DR-T6: the user manual's section 10 worked-example figures, REPRODUCED over the shipped {@code la-showcase} corpus |
 | `ControlApiLaShowcaseGeoSceneTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLaShowcaseGeoSceneTest.java` | The {@code la-showcase} GEO scene (operator 2026-10-12): the saved Geo Views the template ships are read with the |
 | `ControlApiLaSpaceLimitsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLaSpaceLimitsTest.java` | {@code LA-CONFIG-LIMITS-1} P3 over real HTTP: every Space analysis limit is read at its code site from the Space's in-force |
+| `ControlApiLinkTotalTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLinkTotalTest.java` | LA-COLUMN-ROLES-2 (operator decision D-2 a): a link read may name a Measure column ({@code measureCol}, an edge mapping's |
 | `ControlApiMaskingDefaultBySignInTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiMaskingDefaultBySignInTest.java` | The masking default follows SIGN-IN, not the Link Analysis level ({@code LA-ONBOARD-1} OB-6, operator answer A-16): with |
 | `ControlApiOnboardLinkAnalysisTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiOnboardLinkAnalysisTest.java` | The Link Analysis half of Add data ({@code LA-ONBOARD-1} phase 2, OB-2, OB-8, F-9, DT-16) over real HTTP, with the Link |
 | `ControlApiPresetQueriesTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiPresetQueriesTest.java` | LA-PRESET-QUERIES-1 over real HTTP: {@code GET /inv/presets} offers the Industry pack's presets whose roles a Dataset |
