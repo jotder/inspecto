@@ -1,4 +1,5 @@
 import type { Condition, ConditionGroup } from '@inspecto/core/query/query-types';
+import { columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
 
 /**
  * **Filter by role** (LA-COLUMN-ROLES-1 P3): a range per Measure, a value list per Category and a window on any Time
@@ -18,6 +19,19 @@ export const NO_ROLE_FILTERS: RoleFilters = { measures: {}, categories: {}, time
 
 /** The Category bound (plan Q-6): a Category column offers at most this many values. */
 export const CATEGORY_VALUES_MAX = 200;
+
+/** A Dataset's Measure, Category and Time columns, by its stored `columns[].role`, in column order. */
+export function roleColumnsOf(columns: readonly unknown[] | null | undefined): {
+    measures: string[];
+    categories: string[];
+    times: string[];
+} {
+    return {
+        measures: columnsOfRole(columns, 'measure'),
+        categories: columnsOfRole(columns, 'dimension'),
+        times: columnsOfRole(columns, 'temporal'),
+    };
+}
 
 /** A DuckDB identifier, double-quoted. */
 function ident(name: string): string {
@@ -87,4 +101,28 @@ export function withRoleFilters(tree: ConditionGroup, next: RoleFilters, previou
     if (tree.op === 'AND' && !tree.negate) return { ...tree, items: [...kept, ...added] };
     // an OR (or negated) root: the analyst's tree as one group, AND the role conditions
     return { kind: 'group', op: 'AND', items: [...(kept.length ? [{ ...tree, items: kept }] : []), ...added] };
+}
+
+/** **Filter by role over several Datasets** (LA-COLUMN-ROLES-2 D-3 b): what the panel applied, per Dataset id. */
+export type DatasetRoleFilters = Record<string, RoleFilters>;
+
+/**
+ * The edge mappings of a read over several Datasets with the role filters in them: each mapping's OWN `filter` gets its
+ * Dataset's conditions through {@link withRoleFilters} (so only what the panel wrote last time for that Dataset is taken
+ * out, and the analyst's own conditions on that mapping stay). A mapping whose Dataset the panel never touched is
+ * returned as it is; one left with no condition sends no `filter`. The read's top-level `filter` is not this helper's.
+ */
+export function withDatasetRoleFilters<M extends { dataset: string; filter?: ConditionGroup }>(
+    edges: readonly M[],
+    next: DatasetRoleFilters,
+    previous: DatasetRoleFilters,
+): M[] {
+    return edges.map((e) => {
+        const now = next[e.dataset] ?? NO_ROLE_FILTERS;
+        const before = previous[e.dataset] ?? NO_ROLE_FILTERS;
+        if (!roleFilterConditions(now).length && !roleFilterConditions(before).length) return e;
+        const tree = withRoleFilters(e.filter ?? { kind: 'group', op: 'AND', items: [] }, now, before);
+        const { filter: _drop, ...rest } = e;
+        return (tree.items.length ? { ...rest, filter: tree } : rest) as M;
+    });
 }

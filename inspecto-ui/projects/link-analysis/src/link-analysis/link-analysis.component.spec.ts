@@ -1596,6 +1596,129 @@ describe('LinkAnalysisComponent', () => {
         expect(c.roleFilters().measures).toEqual({});
     });
 
+    it('LA-COLUMN-ROLES-2 D-3 b: over several Datasets, one section per Dataset, each applied as its own mapping filter', async () => {
+        const col = (name: string, role: string) => ({ name, type: role === 'measure' ? 'number' : 'string', role });
+        const calls = {
+            ...DS,
+            id: 'calls',
+            name: 'Calls',
+            sourceName: 'calls_t',
+            columns: [col('amount', 'measure'), col('channel', 'dimension')],
+        } as unknown as Dataset;
+        const pays = {
+            ...DS,
+            id: 'pays',
+            name: 'Payments',
+            sourceName: 'pays_t',
+            columns: [col('fee', 'measure'), col('channel', 'dimension')],
+        } as unknown as Dataset;
+        // answered by the test, once it has seen which reads were asked for
+        const answers: (() => void)[] = [];
+        const sql = vi.fn(
+            (source: string) =>
+                new Promise((resolve) =>
+                    answers.push(() =>
+                        resolve({
+                            rows: [{ v: source === 'calls_t' ? 'app' : 'agent' }],
+                            columns: [],
+                            truncated: false,
+                        }),
+                    ),
+                ),
+        );
+        const { fixture, queried } = create({
+            datasets: [calls, pays],
+            rows: { sql } as unknown as Partial<DatasetRowsService>,
+        });
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const own = {
+            kind: 'group' as const,
+            op: 'AND' as const,
+            items: [{ kind: 'condition' as const, field: 'kind', operator: '=' as const, value: 'sms' }],
+        };
+        const paysEdge = { dataset: 'pays', sourceColumn: 'p', targetColumn: 'q', filter: own };
+        await c.loadView({
+            id: 'm',
+            name: 'm',
+            sourceId: 'entity-projection-multi',
+            query: {
+                multi: { nodes: [], edges: [{ dataset: 'calls', sourceColumn: 'a', targetColumn: 'b' }, paysEdge] },
+            },
+        });
+        expect(c.roleColumns()).toEqual({ measures: [], categories: [], times: [] }); // no one loaded Dataset
+        expect(c.roleSections().map((s) => [s.key, s.title, s.measures])).toEqual([
+            ['calls', 'Calls', ['amount']],
+            ['pays', 'Payments', ['fee']],
+        ]);
+        // the Category values are read per Dataset, from that Dataset
+        // detectChanges (inside the zone), not TestBed.tick(): a read started inside a bare tick re-enters it (NG0101)
+        const settle = async () => {
+            for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r));
+        };
+        c.filterOpen.set(true);
+        fixture.detectChanges();
+        expect(sql.mock.calls.map((call) => call[0])).toEqual(['calls_t', 'pays_t']);
+        answers.forEach((answer) => answer());
+        await settle();
+        expect(c.roleSections().map((s) => s.categories)).toEqual([
+            [{ name: 'channel', values: ['app'] }],
+            [{ name: 'channel', values: ['agent'] }],
+        ]);
+        c.filterOpen.set(false);
+        fixture.detectChanges();
+        c.filterOpen.set(true);
+        fixture.detectChanges();
+        expect(sql).toHaveBeenCalledTimes(2); // once per Dataset, not per opening of the filter
+
+        type Pushed = { filter?: { items: unknown[] }; multi: { edges: { dataset: string; filter?: unknown }[] } };
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'a' }); // the analyst's own
+        await c.applyDatasetRoleFilters({
+            calls: {
+                measures: { amount: { min: '10', max: '' } },
+                categories: { channel: ['app'] },
+                time: { column: '', from: '', to: '' },
+            },
+            pays: { measures: {}, categories: {}, time: { column: '', from: '', to: '' } },
+        });
+        let pushed = queried.at(-1) as Pushed;
+        expect(pushed.multi.edges[0].filter).toEqual({
+            kind: 'group',
+            op: 'AND',
+            items: [
+                { kind: 'condition', field: 'amount', operator: '>=', value: '10' },
+                { kind: 'condition', field: 'channel', operator: 'in', value: 'app' },
+            ],
+        });
+        expect(pushed.multi.edges[1]).toEqual(paysEdge); // the other mapping: no role filter, its own kept
+        expect(pushed.filter!.items).toEqual([{ kind: 'condition', field: 'source', operator: '=', value: 'a' }]);
+
+        // applied again: only the panel's last conditions for that Dataset are replaced
+        await c.applyDatasetRoleFilters({
+            calls: { measures: {}, categories: {}, time: { column: '', from: '', to: '' } },
+            pays: { measures: { fee: { min: '', max: '5' } }, categories: {}, time: { column: '', from: '', to: '' } },
+        });
+        pushed = queried.at(-1) as Pushed;
+        expect('filter' in pushed.multi.edges[0]).toBe(false); // an emptied section sends no filter
+        expect(pushed.multi.edges[1].filter).toEqual({
+            ...own,
+            items: [...own.items, { kind: 'condition', field: 'fee', operator: '<=', value: '5' }],
+        });
+        expect(pushed.filter!.items).toEqual([{ kind: 'condition', field: 'source', operator: '=', value: 'a' }]);
+
+        // a Refresh re-runs the same mappings as a new run: the panel's conditions are still its own, never piled up
+        await c.refreshFromServer();
+        await c.applyDatasetRoleFilters({
+            calls: { measures: {}, categories: {}, time: { column: '', from: '', to: '' } },
+            pays: { measures: { fee: { min: '', max: '9' } }, categories: {}, time: { column: '', from: '', to: '' } },
+        });
+        pushed = queried.at(-1) as Pushed;
+        expect(pushed.multi.edges[1].filter).toEqual({
+            ...own,
+            items: [...own.items, { kind: 'condition', field: 'fee', operator: '<=', value: '9' }],
+        });
+    });
+
     it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {
         const FILTERED: G6GraphData = { nodes: GRAPH.nodes.slice(0, 3), edges: GRAPH.edges.slice(0, 2) }; // a–b–c only
         const { fixture, queried } = create({ filtered: FILTERED });
@@ -6865,5 +6988,132 @@ describe('mergeWorkingSets (LA-UNSAVED-INVESTIGATION-1)', () => {
         expect(m.entities.map((x) => [x.id, x.hop, !!x.highConnectivity])).toEqual([['a', 0, false], ['b', 1, true], ['c', 2, false]]);
         expect(m.links).toHaveLength(2);
         expect(mergeWorkingSets(prev, { ...next, entities: [...next.entities, e('s', 0)] }, ['s']).entities.find((x) => x.id === 's')!.hop).toBe(0);
+    });
+});
+
+describe('LinkAnalysisComponent - link width by the primary Measure (LA-COLUMN-ROLES-2 D-2)', () => {
+    /** Links folded from 2, 7 and 1 rows, totalling 5000, 5 and no number. */
+    const TOTALS: G6GraphData = {
+        nodes: ['a', 'b', 'c', 'd'].map((id) => ({ id, data: { label: id, kind: 'entity' } })),
+        edges: [
+            { id: 'a->b', source: 'a', target: 'b', data: { kind: 'paid', count: 2, total: 5000 } },
+            { id: 'a->c', source: 'a', target: 'c', data: { kind: 'paid', count: 7, total: 5 } },
+            { id: 'a->d', source: 'a', target: 'd', data: { kind: 'paid', count: 1, total: null } },
+        ],
+    } as never;
+    const WITH_MEASURE = {
+        ...DS,
+        defaultLinkMapping: { from: 'source', to: 'target', primaryMeasure: 'amount' },
+    } as unknown as Dataset;
+    const weights = (g: G6GraphData | null) =>
+        Object.fromEntries((g?.edges ?? []).map((e) => [e.id, (e.data as { weight?: number }).weight]));
+    const measureColOf = (q: unknown) => (q as { projection?: { measureCol?: string } }).projection?.measureCol;
+
+    async function drawn(datasets: Dataset[] = [WITH_MEASURE]) {
+        const made = create({ graph: TOTALS, datasets });
+        made.fixture.detectChanges();
+        await runQuery(made.fixture);
+        made.fixture.detectChanges();
+        return { ...made, c: made.fixture.componentInstance };
+    }
+
+    it('Count is the default and weighs every drawn link by its row count; the graph view is given those weights', async () => {
+        const { fixture, c, queried } = await drawn();
+        expect(c.linkWidthDrawn()).toBe('count');
+        expect(measureColOf(queried[0])).toBeUndefined(); // nothing changes until the analyst asks
+        expect(weights(c.weighedCanvasData())).toEqual({ 'a->b': 2, 'a->c': 7, 'a->d': 1 });
+        const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+        expect(weights(view.data)).toEqual({ 'a->b': 2, 'a->c': 7, 'a->d': 1 });
+    });
+
+    it('the Measure re-reads the links with it summed and weighs them by their totals; Count again needs no read', async () => {
+        const { c, queried } = await drawn();
+        expect(c.linkMeasure()).toBe('amount');
+        await c.setLinkWidth('measure');
+        expect(queried).toHaveLength(2);
+        expect(measureColOf(queried[1])).toBe('amount');
+        expect(c.linkWidthDrawn()).toBe('measure');
+        const w = weights(c.weighedCanvasData());
+        expect(w['a->b']).toBeGreaterThan(w['a->c']);
+        expect(w['a->d']).toBe(0); // no number: thinnest
+        await c.setLinkWidth('count');
+        expect(queried).toHaveLength(2);
+        expect(weights(c.weighedCanvasData())).toEqual({ 'a->b': 2, 'a->c': 7, 'a->d': 1 });
+        await c.setLinkWidth('measure'); // the links still carry their totals
+        expect(queried).toHaveLength(2);
+        expect(c.linkWidthDrawn()).toBe('measure');
+    });
+
+    it('is not offered when the link mapping names no primary Measure', async () => {
+        const { fixture, c, queried } = await drawn([DS]);
+        expect(c.linkMeasure()).toBeUndefined();
+        await c.setLinkWidth('measure');
+        expect(queried).toHaveLength(1);
+        expect(c.linkWidthDrawn()).toBe('count');
+        (
+            fixture.nativeElement.querySelector('[aria-label="Display options"][aria-haspopup]') as HTMLButtonElement
+        ).click();
+        fixture.detectChanges();
+        const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
+        expect(menu.querySelector('[role="group"][aria-label="Link width"]')).toBeNull();
+        expect(menu.querySelector('[data-testid="la-link-width-hint"]')!.textContent!.trim()).toBe(
+            'Thicker links fold more rows.',
+        );
+        fixture.destroy();
+    });
+
+    it('the Display menu offers Count | the Measure by name, pressed as drawn, and says what the width means', async () => {
+        const { fixture, queried } = await drawn();
+        (
+            fixture.nativeElement.querySelector('[aria-label="Display options"][aria-haspopup]') as HTMLButtonElement
+        ).click();
+        fixture.detectChanges();
+        const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
+        const group = menu.querySelector('[role="group"][aria-label="Link width"]') as HTMLElement;
+        const button = (by: string) => group.querySelector(`[data-link-width="${by}"]`) as HTMLButtonElement;
+        expect(button('count').getAttribute('aria-pressed')).toBe('true');
+        expect(button('measure').textContent!.trim()).toBe('amount');
+        button('measure').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(queried).toHaveLength(2);
+        expect(button('measure').getAttribute('aria-pressed')).toBe('true');
+        expect(menu.querySelector('[data-testid="la-link-width-hint"]')!.textContent).toContain(
+            'larger total of amount',
+        );
+        await expectNoA11yViolations(group);
+        fixture.destroy();
+    });
+
+    it('is kept in a saved view, and opening it reads the links with the Measure; a view saved before it is Count', async () => {
+        const { c, queried } = await drawn();
+        expect(c.chosenDisplay().linkWidth).toBeUndefined();
+        await c.setLinkWidth('measure');
+        expect(c.chosenDisplay().linkWidth).toBe('measure');
+        expect(c.displayCustomized()).toBe(true);
+        const display = c.chosenDisplay();
+        const query = { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } };
+        await c.setLinkWidth('count');
+        await c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query, display });
+        expect(c.linkWidthBy()).toBe('measure');
+        expect(measureColOf(queried.at(-1))).toBe('amount');
+        await c.loadView({
+            id: 'old',
+            name: 'Old',
+            sourceId: 'entity-projection',
+            query,
+            display: { ...display, linkWidth: undefined },
+        });
+        expect(c.linkWidthBy()).toBe('count');
+        expect(measureColOf(c.lastRun()!.query)).toBeUndefined(); // the same read as the first draw (served from the cache)
+    });
+
+    it('a graph grown past the last query is not re-read: the Measure waits for the query to run again', async () => {
+        const { c, queried } = await drawn();
+        c.graph.set({ ...c.graph()!, nodes: [...c.graph()!.nodes] }); // an expand, a Grow or a push drew another graph
+        expect(c.linkMeasureOffReason()).toContain('Run the query again');
+        await c.setLinkWidth('measure');
+        expect(queried).toHaveLength(1);
+        expect(c.linkWidthDrawn()).toBe('count');
     });
 });

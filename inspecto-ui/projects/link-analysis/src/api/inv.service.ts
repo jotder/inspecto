@@ -21,6 +21,11 @@ export interface ProjectionTriple {
     /** The link kind from `linkKindCol`, or null when the projection is untyped. */
     kind: string | null;
     count: number;
+    /**
+     * The SUM of the request's `measureCol` (`measureColumn` on a multi edge mapping) over the rows folded into this link;
+     * null when none of them held a number. Present only when the request named that column (LA-COLUMN-ROLES-2 D-2).
+     */
+    total?: number | null;
     /** Values of `attrCols`, keyed by column name — present only when the request sent `attrCols`. */
     attrs?: Record<string, string | null>;
 }
@@ -66,6 +71,8 @@ export interface ProjectionRequest {
     limit?: number;
     /** Plan S1.4 — a structured predicate applied pre-fold. Ignored by the backend until the field lands. */
     filter?: ConditionGroup;
+    /** A Measure column summed per link into `total` beside `count` (D-2); the links fold exactly as without it. */
+    measureCol?: string;
 }
 
 /** {@code POST /inv/projection/neighbors} request — a mapping plus the entity value to expand. */

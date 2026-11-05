@@ -349,3 +349,58 @@ describe('MultiProjectionGraphSource - node attributes, edge filter and expand (
         ).rejects.toThrow(/is unavailable \(missing or not shared with you\)/);
     });
 });
+
+describe('multi-Dataset link totals (LA-COLUMN-ROLES-2 D-2)', () => {
+    it('sums the totals of the links two Datasets fold into one: 10 + null = 10, null + null = null', () => {
+        const g = projectMultiResult({
+            nodes: [],
+            edges: [
+                { source: 'a', target: 'b', kind: 'paid', count: 1, total: 10, __provenance_dataset: 'ledger' },
+                { source: 'A', target: 'b', kind: 'paid', count: 1, total: null, __provenance_dataset: 'wires' },
+                { source: 'a', target: 'c', kind: 'paid', count: 1, total: null, __provenance_dataset: 'ledger' },
+                { source: 'a', target: 'c', kind: 'paid', count: 1, total: null, __provenance_dataset: 'wires' },
+                { source: 'a', target: 'd', kind: 'paid', count: 1, __provenance_dataset: 'ledger' },
+            ],
+            mappings: [],
+            truncated: false,
+        });
+        const total = (to: string) =>
+            (g.edges.find((e) => e.target === entityId(undefined, to))!.data as { total?: number | null }).total;
+        expect(total('b')).toBe(10);
+        expect(total('c')).toBeNull();
+        expect(total('d')).toBeUndefined(); // read without a Measure: no total at all
+    });
+
+    it("an expand asks each edge mapping's neighbours read for its measureColumn", async () => {
+        const calls: Record<string, unknown>[] = [];
+        const inv = {
+            neighbors: (req: Record<string, unknown>) => {
+                calls.push(req);
+                return of({ rows: [{ source: 'a', target: 'b', kind: null, count: 1, total: 4 }], truncated: false });
+            },
+        } as unknown as InvService;
+        const multi = {
+            nodes: [],
+            edges: [
+                { dataset: 'ledger', sourceColumn: 's', targetColumn: 't', measureColumn: 'amount' },
+                { dataset: 'wires', sourceColumn: 's', targetColumn: 't' },
+            ],
+        };
+        const g = await new MultiProjectionGraphSource(inv).expand('n', 'a', { multi });
+        expect(calls.map((c) => c['measureCol'])).toEqual(['amount', undefined]);
+        expect((g.edges[0].data as { total?: number | null }).total).toBe(8);
+    });
+
+    it("sends each edge mapping's measureColumn on the multi read as it is", async () => {
+        let sent: unknown;
+        const inv = {
+            projectMulti: (req: unknown) => {
+                sent = req;
+                return of({ nodes: [], edges: [], mappings: [], truncated: false });
+            },
+        } as unknown as InvService;
+        const edges = [{ dataset: 'ledger', sourceColumn: 's', targetColumn: 't', measureColumn: 'amount' }];
+        await new MultiProjectionGraphSource(inv).query({ multi: { nodes: [], edges } });
+        expect((sent as { edges: unknown[] }).edges).toEqual(edges);
+    });
+});
