@@ -1966,7 +1966,7 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 
 ### 6.20 Watch this folder: the 30 s inbox poll (BASIC-ONBOARD-1 P2, as built 2026-11-05)
 
-Plan [`basic-onboard-plan.md`](../../../../superpower/basic-onboard-plan.md) §4.6, §5 Q1; narrows DT-5 / DT-17 (a
+Plan [`basic-onboard-plan.md`](../../../../archived-documents/plans-archive/basic-onboard-plan.md) §4.6, §5 Q1; narrows DT-5 / DT-17 (a
 Basic import inbox may poll; still no user-defined schedule). Class `inspecto/.../control/InboxWatch.java`.
 
 | Route | What |
@@ -1996,7 +1996,7 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   `StabilityGate` class: it forgets a file once it releases it, and the run takes the whole inbox, so the poll must
   see all of it settled at once (with the gate, two files settling on alternate ticks would never run). **Known gap:**
   a file created in the instant between the poll's listing and the run's own listing is taken unchecked; closing it
-  needs a per-run stability override in `CollectorService.runPipeline` (not built).
+  needs a per-run stability override in `CollectorService.runPipeline` (not built; BACKLOG `BASIC-ONBOARD-SETTLE-1`).
 - **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
   watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
   the poll target is dropped.

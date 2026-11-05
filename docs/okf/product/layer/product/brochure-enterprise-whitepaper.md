@@ -596,6 +596,12 @@ Professional and Enterprise across the whole product. The placement below follow
   └────────────────────────┘
 ```
 
+**Basic is usable on its own data.** Add data has three ways in on every edition: upload a file; point an inbox
+folder at it, imported on request or watched every 30 seconds; or choose a Postgres table, copied as a read-only
+snapshot and refreshed on request or every 30 seconds. One default Pipeline converts and arranges the data into
+Parquet - no transformation, no schedule to write, no Pipeline editor - and each application adds its own follow-on
+step, such as Inspecto LA's link index. Standard adds scheduled feeds, every Collector and transformation.
+
 *Basic explores the data; Standard owns the problem; Advanced governs and scales it.* The moment a Break or
 an Investigation needs an owner, an audit export or a second team, you are in Standard — because that is
 where those modules live. Advanced adds nothing you must learn twice: the same artifact, with stronger

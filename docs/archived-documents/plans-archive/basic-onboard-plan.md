@@ -1,7 +1,10 @@
 # Basic data onboarding: three ways in, one default Pipeline, every application (`BASIC-ONBOARD-1`)
 
-> **PLAN 2026-11-05 — the operator accepted the recommendations (§4) and answered the open questions (§5) the same
-> day. Nothing built under this name yet.** Operator: *"This is minimum data onboarding (basic version of
+> **SHIPPED 2026-11-05 — archived.** P0 - P4 built the same day in three lanes (onboard-seam: P0 V1/V4 + P1;
+> onboard-postgres: P0 V2 + P3; inbox-poll: P0 V3 + P2 + P4). As built: `okf/product/module/la-core/architecture.md`
+> §6.20, `okf/product/module/processor/api-onboarding-authoring.md`, `EDITIONS.md` § *Basic — data onboarding*. Open
+> remainder: BACKLOG `BASIC-ONBOARD-SETTLE-1`. Accepted earlier the same day: the operator accepted the recommendations
+> (§4) and answered the open questions (§5).** Operator: *"This is minimum data onboarding (basic version of
 > pipelining), reusable functionality that will work across many applications (not only Link Analysis: the Basic
 > versions of MFS, rating, roaming analysis…)."* And the rule behind every placement below: **"Basic is not a demo;
 > it must be usable."**

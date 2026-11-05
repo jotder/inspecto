@@ -24,6 +24,10 @@ explorer* below.
 
 | Area | Feature | Basic | Standard | Advanced | Preview |
 |---|---|---|---|---|---|
+| Data | Add data: upload a file, review its columns, a Dataset (one default Pipeline, no transformation; `BASIC-ONBOARD-1`) | ✅ | ✅ | ✅ | ✅ |
+| | An import's inbox: *Import waiting files*, or *Watch this folder* (a fixed 30 s poll, off by default) | ✅ | ✅ | ✅ | ✅ |
+| | *Choose a table*: a Postgres table snapshot, *Refresh now* or every 30 s | ✅ | ✅ | ✅ | ✅ |
+| | *Keep this up to date* on a chosen schedule (watched folder, SFTP), other databases and remote systems | — | ✅ | ✅ | ✅ |
 | Explore | Graph studio, projections from any Dataset, saved views | ✅ | ✅ | ✅ | ✅ |
 | | Find paths, neighbours, "Investigate a number", connect seeds | ✅ | ✅ | ✅ | ✅ |
 | | Temporal and branching patterns, pattern packs | ✅ | ✅ | ✅ | ✅ |
@@ -326,6 +330,22 @@ reveal on an Investigation) starts in Standard.
 swaps the OIDC trio for `inspecto-demo-auth.jar`). Held by the `Preview carries every module …` test in
 `tools/offering-classpath.test.mjs` (the generator table, the plain and demo classpaths and the `edition-preview`
 profile) and by `tools/check-offerings.mjs` (Offering == bundle == pom profile).
+
+## Basic — data onboarding (BASIC-ONBOARD-1, 2026-11-05)
+
+Operator rule: *"Basic is not a demo; it must be usable."* Add data is a platform feature in every edition with three
+ways in - **upload a file**, **an inbox folder** (imported with *Import waiting files*, or watched every 30 s with *Watch
+this folder*), **a Postgres table** (a read-only snapshot, refreshed with *Refresh now* or every 30 s) - and one default
+Pipeline: read, arrange (the column review), write Parquet, then each application's follow-on (Inspecto LA: its link
+index). No transformation, no user-defined schedule, no Pipeline editor on Basic. The poll is one fixed interval, off by
+default, run by the platform's one poller (`InboxWatch`), not a Pipeline trigger: an import's Pipeline stays
+`trigger: manual`, so DT-17 holds. Postgres is read through DuckDB's `postgres` extension, already in every bundle (no
+added dependency); a write-capable login is refused. Standard keeps *Keep this up to date* on a chosen schedule, every
+Collector, other databases and transformation. Reverses DT-4, narrows DT-5 / DT-17, widens DT-10
+([`data-tier-editions-plan.md`](superpower/data-tier-editions-plan.md)). As built:
+[`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §6.20,
+[`okf/product/module/processor/api-onboarding-authoring.md`](okf/product/module/processor/api-onboarding-authoring.md);
+plan [`archived-documents/plans-archive/basic-onboard-plan.md`](archived-documents/plans-archive/basic-onboard-plan.md).
 
 ## UI flavor — not an edition
 
