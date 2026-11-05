@@ -54,7 +54,7 @@ final class DatasetArrivals {
     static final int MAX_LISTED = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
     /** The inbox name only Add data gives a file it lands ({@code OnboardImport.Job#landFromDraft}): {@code add_<stamp>_<stem>.<ext>}. */
-    static final java.util.regex.Pattern ADD_DATA_NAME = java.util.regex.Pattern.compile("add_[a-z]+_(.+)");
+    static final java.util.regex.Pattern ADD_DATA_NAME = java.util.regex.Pattern.compile("add_[a-z]{10,12}_(.+)");
 
     // ── the sidecar, written by an upload (OnboardImport) ───────────────────────────────────────────────────
 
