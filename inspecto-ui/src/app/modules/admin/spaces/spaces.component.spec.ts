@@ -4,10 +4,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LensService, Space, SpacesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { SampleSpaceDialog } from 'app/inspecto/spaces/sample-space.dialog';
 import { SpacesComponent } from './spaces.component';
 
 const SPACES: Space[] = [
@@ -15,13 +16,13 @@ const SPACES: Space[] = [
     { id: 'beta', displayName: '', description: '', createdAt: '' },
 ];
 
-function create(multi: boolean, list: Space[], canAdminister = true) {
+function create(multi: boolean, list: Space[], canAdminister = true, dialog: object = {}) {
     const stub = {
         multiSpace: signal(multi),
         availableSpaces: signal(list),
         currentSpaceId: signal<string | null>(multi ? 'alpha' : null),
         refresh: () => of(list),
-        selectSpace: () => {},
+        selectSpace: vi.fn(),
         dataSources: () => of([]),
     } as unknown as SpacesService;
     TestBed.configureTestingModule({
@@ -29,7 +30,7 @@ function create(multi: boolean, list: Space[], canAdminister = true) {
         providers: [
             provideNoopAnimations(),
             { provide: SpacesService, useValue: stub },
-            { provide: MatDialog, useValue: {} },
+            { provide: MatDialog, useValue: dialog },
             { provide: ToastrService, useValue: {} },
             { provide: InspectoConfirmService, useValue: {} },
             { provide: LensService, useValue: { canAdminister: signal(canAdminister) } },
@@ -74,6 +75,32 @@ describe('SpacesComponent', () => {
         const text = (create(true, SPACES, true).nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('New space');
         expect(text).toContain('New from template');
+    });
+
+    it('offers "New from sample" only with canAdminister (ONBOARDING-FIRST-RUN-1 C4)', () => {
+        const q = '[data-testid="new-from-sample"]';
+        expect((create(true, SPACES, true).nativeElement as HTMLElement).querySelector(q)).not.toBeNull();
+        TestBed.resetTestingModule();
+        expect((create(true, SPACES, false).nativeElement as HTMLElement).querySelector(q)).toBeNull();
+    });
+
+    it('"New from sample" opens the sample dialog on orders-starter and enters the Space it made', () => {
+        const made: Space = { id: 'sample', displayName: 'Sample', description: '', createdAt: '' };
+        const open = vi.fn(() => ({ afterClosed: () => of(made) }));
+        const fixture = create(true, SPACES, true, { open });
+        const assign = vi.fn();
+        vi.stubGlobal('location', { ...window.location, assign });
+        try {
+            (fixture.nativeElement.querySelector('[data-testid="new-from-sample"]') as HTMLButtonElement).click();
+            expect(open).toHaveBeenCalledWith(
+                SampleSpaceDialog,
+                expect.objectContaining({ data: { preferred: 'orders-starter' } }),
+            );
+            expect(fixture.componentInstance.spaces.selectSpace).toHaveBeenCalledWith('sample');
+            expect(assign).toHaveBeenCalledWith('/');
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it('offers "Compare Spaces" only to canAdminister with at least two Spaces — the server refuses it otherwise', () => {

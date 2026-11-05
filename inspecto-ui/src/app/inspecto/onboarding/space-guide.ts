@@ -4,8 +4,14 @@
  * same rules. `SpaceGuideService` loads the state; `<inspecto-space-guide>` draws it.
  */
 
-/** The guide's steps, in order. `list` is optional: the guide is done without it. */
-export type SpaceGuideStepId = 'space' | 'data' | 'columns' | 'graph' | 'list';
+/** Inspecto LA's steps, in order. `list` is optional: the guide is done without it. */
+export type LaGuideStepId = 'space' | 'data' | 'columns' | 'graph' | 'list';
+/** The console's steps (ONBOARDING-FIRST-RUN-1 B1), in order. `dashboard` is optional. */
+export type ConsoleGuideStepId = 'space' | 'data' | 'query' | 'dashboard';
+/** Any guide step, in either app. */
+export type SpaceGuideStepId = LaGuideStepId | ConsoleGuideStepId;
+/** Which app's step set the guide shows: Inspecto LA's, or the console's. */
+export type SpaceGuideKind = 'la' | 'console';
 
 /** What the server says about the current Space, read defensively (an absent field reads as "not yet"). */
 export interface SpaceGuideState {
@@ -19,6 +25,10 @@ export interface SpaceGuideState {
     views: number;
     /** Entity Lists in the current Space. */
     lists: number;
+    /** Saved queries in the current Space (console guide only; absent reads as none). */
+    queries?: number;
+    /** Dashboards in the current Space (console guide only; absent reads as none). */
+    dashboards?: number;
 }
 
 export interface SpaceGuideStep {
@@ -50,26 +60,34 @@ export function datasetDescribesColumns(content: DatasetContent | null | undefin
     return !!mapping && typeof mapping === 'object' && !!mapping['from'] && !!mapping['to'];
 }
 
-/** The steps with their ticks. */
+function spaceStep(s: SpaceGuideState): SpaceGuideStep {
+    return {
+        id: 'space',
+        label: 'Space',
+        hint: s.hasSpace ? 'You have a place for your data.' : 'Create a place for one kind of data.',
+        done: s.hasSpace,
+        optional: false,
+    };
+}
+
+function dataStep(s: SpaceGuideState): SpaceGuideStep {
+    return {
+        id: 'data',
+        label: 'Data',
+        hint:
+            s.datasets > 0
+                ? `${s.datasets} ${s.datasets === 1 ? 'Dataset' : 'Datasets'} (tables Inspecto keeps).`
+                : 'Add a file: it becomes a Dataset, a table Inspecto keeps.',
+        done: s.hasSpace && s.datasets > 0,
+        optional: false,
+    };
+}
+
+/** Inspecto LA's steps with their ticks. */
 export function spaceGuideSteps(s: SpaceGuideState): SpaceGuideStep[] {
     return [
-        {
-            id: 'space',
-            label: 'Space',
-            hint: s.hasSpace ? 'You have a place for your data.' : 'Create a place for one kind of data.',
-            done: s.hasSpace,
-            optional: false,
-        },
-        {
-            id: 'data',
-            label: 'Data',
-            hint:
-                s.datasets > 0
-                    ? `${s.datasets} ${s.datasets === 1 ? 'Dataset' : 'Datasets'} (tables Inspecto keeps).`
-                    : 'Add a file: it becomes a Dataset, a table Inspecto keeps.',
-            done: s.hasSpace && s.datasets > 0,
-            optional: false,
-        },
+        spaceStep(s),
+        dataStep(s),
         {
             id: 'columns',
             label: 'What the columns hold',
@@ -94,12 +112,58 @@ export function spaceGuideSteps(s: SpaceGuideState): SpaceGuideStep[] {
     ];
 }
 
+/**
+ * The console's steps with their ticks (B1): *Space · Data · First query · (optional) A dashboard*. *First query* is
+ * ticked by a saved query and *A dashboard* by a saved dashboard: server state, like every other tick (H1).
+ */
+export function consoleSpaceGuideSteps(s: SpaceGuideState): SpaceGuideStep[] {
+    const queries = s.queries ?? 0;
+    const dashboards = s.dashboards ?? 0;
+    return [
+        spaceStep(s),
+        dataStep(s),
+        {
+            id: 'query',
+            label: 'First query',
+            hint:
+                queries > 0
+                    ? 'A query is saved in this Space.'
+                    : 'Ask a question of a Dataset in Studio, then save the query.',
+            done: s.hasSpace && queries > 0,
+            optional: false,
+        },
+        {
+            id: 'dashboard',
+            label: 'A dashboard',
+            hint: dashboards > 0 ? 'A dashboard is saved in this Space.' : 'Put your answers side by side on one page.',
+            done: s.hasSpace && dashboards > 0,
+            optional: true,
+        },
+    ];
+}
+
+/** The steps of `kind`'s guide. */
+export function guideSteps(s: SpaceGuideState, kind: SpaceGuideKind = 'la'): SpaceGuideStep[] {
+    return kind === 'console' ? consoleSpaceGuideSteps(s) : spaceGuideSteps(s);
+}
+
+/** The Space Template the console's *Try it with sample data* creates: invented daily orders with a dashboard. */
+export const CONSOLE_SAMPLE_TEMPLATE = 'orders-starter';
+/** Where the console sample lands once its data loaded: the template's dashboard. */
+export const CONSOLE_SAMPLE_LANDING = '/studio/dashboards/orders_overview';
+/** Where each console Space guide line leads (`space` opens the Create Space dialog instead). */
+export const CONSOLE_STEP_ROUTES: Partial<Record<SpaceGuideStepId, string>> = {
+    data: '/add-data',
+    query: '/studio/queries',
+    dashboard: '/studio/dashboards',
+};
+
 /** Setup is incomplete — the Getting started page shows — while there is no Space or no Dataset yet. */
 export function setupIncomplete(s: SpaceGuideState): boolean {
     return !s.hasSpace || s.datasets === 0;
 }
 
 /** The guide is done when every required step is ticked; it then stops showing. */
-export function guideDone(s: SpaceGuideState): boolean {
-    return spaceGuideSteps(s).every((step) => step.done || step.optional);
+export function guideDone(s: SpaceGuideState, kind: SpaceGuideKind = 'la'): boolean {
+    return guideSteps(s, kind).every((step) => step.done || step.optional);
 }

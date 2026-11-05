@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    consoleSpaceGuideSteps,
     datasetDescribesColumns,
     guideDone,
     NO_SPACE,
@@ -9,6 +10,29 @@ import {
 } from './space-guide';
 
 const ticks = (s: SpaceGuideState) => Object.fromEntries(spaceGuideSteps(s).map((x) => [x.id, x.done]));
+
+describe('consoleSpaceGuideSteps (ONBOARDING-FIRST-RUN-1 B1)', () => {
+    const S = (over: Partial<SpaceGuideState> = {}): SpaceGuideState => ({ ...NO_SPACE, hasSpace: true, ...over });
+
+    it('is Space, Data, First query and an optional dashboard', () => {
+        const steps = consoleSpaceGuideSteps(S());
+        expect(steps.map((s) => s.id)).toEqual(['space', 'data', 'query', 'dashboard']);
+        expect(steps.map((s) => s.optional)).toEqual([false, false, false, true]);
+    });
+
+    it('ticks First query by a saved query and the dashboard by a saved dashboard', () => {
+        const done = (s: SpaceGuideState) => consoleSpaceGuideSteps(s).map((x) => x.done);
+        expect(done(S({ datasets: 1 }))).toEqual([true, true, false, false]);
+        expect(done(S({ datasets: 1, queries: 2, dashboards: 1 }))).toEqual([true, true, true, true]);
+        expect(done({ ...NO_SPACE, queries: 1, dashboards: 1 })).toEqual([false, false, false, false]);
+    });
+
+    it('is done without the dashboard, and never by the Link Analysis ticks', () => {
+        expect(guideDone(S({ datasets: 1, queries: 1 }), 'console')).toBe(true);
+        expect(guideDone(S({ datasets: 1, columnsDescribed: true, views: 1 }), 'console')).toBe(false);
+        expect(guideDone(S({ datasets: 1, queries: 1 }))).toBe(false); // the LA guide still wants its own steps
+    });
+});
 
 describe('space guide rules', () => {
     it('lists the five steps in order, A list optional', () => {

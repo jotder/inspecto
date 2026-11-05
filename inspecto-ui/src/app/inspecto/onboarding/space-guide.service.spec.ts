@@ -49,6 +49,24 @@ describe('SpaceGuideService', () => {
         http.verify();
     });
 
+    it('the console guide reads Datasets, saved queries and dashboards, and not the Link Analysis state', () => {
+        const { service, http } = create(true, ALPHA);
+        let got: SpaceGuideState | undefined;
+        service.load('console').subscribe((s) => (got = s));
+        http.expectOne((r) => r.url.endsWith('/components/dataset')).flush([
+            { type: 'dataset', name: 'orders_dataset', ref: 'orders_dataset', content: {} },
+        ]);
+        http.expectOne((r) => r.url.endsWith('/components/query')).flush('boom', {
+            status: 500,
+            statusText: 'Server Error',
+        });
+        http.expectOne((r) => r.url.endsWith('/components/dashboard')).flush([
+            { type: 'dashboard', name: 'orders_overview', ref: 'orders_overview', content: {} },
+        ]);
+        http.verify(); // no /components/link-analysis-view, no /entity-lists
+        expect(got).toEqual({ ...NO_SPACE, hasSpace: true, datasets: 1, queries: 0, dashboards: 1 });
+    });
+
     it('each read degrades on its own: a failed one counts as "not yet"', () => {
         const { service, http } = create(false, null); // single-Space server: the one Space is in force
         let got: SpaceGuideState | undefined;

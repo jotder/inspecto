@@ -36,8 +36,29 @@ timestamp: 2026-07-16T00:00:00Z
 > taken once, because a file cannot travel in a URL. It lives in the console's `add-data` feature, not in
 > `app/inspecto`, because core may not import the Link Analysis library (eslint D-5).
 > *Open in editor* on the review screen (before Create, no Pipeline exists yet) is **moved to `BASIC-ONBOARD-1`
-> (operator 2026-11-05)**: not built and not declined. Not built yet: the Getting started panel and console Space guide
-> (C4), and the console Dataset page (C5) — `docs/BACKLOG.md`.
+> (operator 2026-11-05)**: not built and not declined. Not built yet: the console Dataset page (C5) — `docs/BACKLOG.md`.
+>
+> **Getting started and the console Space guide (C4, 2026-11-05).** While setup is incomplete (no Space, or a Space with
+> no Dataset yet; the run history no longer decides it), Home shows **Getting started** in place of its first-run
+> cards: *Try it with sample data*, *Add data* (*Create a Space* when there is none), *Open my team's data* (the Space
+> switcher, when the server hosts Spaces), and beside them the **Space guide** *Space · Data · First query · (optional)
+> A dashboard*. *Try the sample* is one call, `POST /spaces {template: orders-starter, loadSamples: true}`: it creates
+> the Space, loads the template's sample files and runs its Pipeline, then enters the Space on the `orders_overview`
+> dashboard, so a blank install reaches a populated dashboard with no file-system access (UC-1). A Pipeline that did not
+> load is named in place, and the dashboard is not opened. A choice that cannot run says why on the card: a
+> single-Space server, a sign-in Space where the person cannot administer (the server gates `POST /spaces` the same
+> way), the sample not installed, or not creatable in this edition. Once a Dataset exists the tiles return and the
+> guide stays beside them until its required steps are done. Getting started re-reads the guide's state every 30
+> seconds, so a Dataset that lands brings the tiles back without a reload; beside the tiles the guide is read once per
+> Home load (never polled for ever). A done guide reports *guide completed* to the local counters (OB-13). **The ticks are server state** (H1): *Data* = a `dataset`
+> component, *First query* = a saved `query` component, *A dashboard* = a `dashboard` component (the tick sources for
+> the last two were chosen by this slice, 2026-11-05; the plan named the steps, not their sources). The **Spaces pane**
+> has **New from sample** beside *New from template* (administrators of a multi-Space server): the shared sample
+> dialog, `orders-starter` picked first, and the new Space is entered at once. As built: the console steps are
+> `consoleSpaceGuideSteps` in `app/inspecto/onboarding/space-guide.ts` (one component, `<inspecto-space-guide
+> kind="console">`, `SpaceGuideService.load('console')`); Getting started is
+> `modules/admin/home/getting-started.component.ts`. The step routes and the sample constants live in the shared
+> `space-guide.ts`, so the Spaces pane does not import the Home feature.
 >
 > **Choose a table: a Postgres snapshot (`BASIC-ONBOARD-1` P3, 2026-11-05; every edition, Basic included).** Step 1
 > is now *1. Choose the data*: **A file** (as above) or **A Postgres table**. For a table, give the host, port, database

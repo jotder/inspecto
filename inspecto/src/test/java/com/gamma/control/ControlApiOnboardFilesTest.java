@@ -654,6 +654,15 @@ class ControlApiOnboardFilesTest {
             JsonNode list = out.get("arrivals");
             assertEquals(3, list.size(), out.toString());
             assertEquals("upload", list.get(2).get("sender").asText(), "a legacy line: " + list.get(2));
+            // no sidecar at all (an import made before it existed, or its best-effort write lost): Add data's own
+            // add_<stamp>_ name still says a person added it, under the person's file name; the inbox drop stays a system's
+            Path kept = Files.move(sidecar, sidecar.resolveSibling("kept.jsonl"));
+            JsonNode bare = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals("upload", bare.get(2).get("sender").asText(), "no sidecar line: " + bare.get(2));
+            assertEquals("transfers.csv", bare.get(2).get("file").asText(), bare.get(2).toString());
+            assertEquals("upload", bare.get(1).get("sender").asText(), bare.get(1).toString());
+            assertEquals("system", bare.get(0).get("sender").asText(), bare.get(0).toString());
+            Files.move(kept, sidecar);
             assertNotNull(out.get("eventDateColumn").textValue(), "Add data names the When column: " + out);
 
             JsonNode drop = list.get(0), nov = list.get(1), first = list.get(2);

@@ -11,6 +11,8 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
+import { SampleSpaceDialog } from 'app/inspecto/spaces/sample-space.dialog';
+import { CONSOLE_SAMPLE_TEMPLATE } from 'app/inspecto/onboarding/space-guide';
 import { SpaceTemplateGalleryData, SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
 import { SpaceComparisonData, SpaceComparisonDialog } from './space-comparison.dialog';
@@ -143,6 +145,25 @@ export class SpacesComponent implements OnInit {
         if (!go) return;
         this.spaces.selectSpace(s.id);
         window.location.assign('/'); // UIE-7: `/` lands on the Space landing
+    }
+
+    /**
+     * **New from sample** (ONBOARDING-FIRST-RUN-1 C4): pick a template that ships sample data; one call creates the
+     * Space, loads the samples and runs its Pipelines. The new Space is entered at once: that is why it was made.
+     */
+    newFromSample(): void {
+        this.dialog
+            .open(SampleSpaceDialog, {
+                width: '520px',
+                maxHeight: '90vh',
+                data: { preferred: CONSOLE_SAMPLE_TEMPLATE },
+            })
+            .afterClosed()
+            .subscribe((created?: Space) => {
+                if (!created) return;
+                this.spaces.selectSpace(created.id);
+                window.location.assign('/'); // UIE-7: `/` lands on the Space landing
+            });
     }
 
     /** Compare the storage growth of two or more hosted Spaces (`POST /space-comparisons`). */

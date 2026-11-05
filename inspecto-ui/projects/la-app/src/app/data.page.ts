@@ -46,6 +46,8 @@ import {
     mappingEntry,
     carriedChoices,
     mappingLine,
+    mappingRole,
+    MappingRole,
     recordTypeProposals,
     roleOf,
     typeOf,
@@ -179,6 +181,17 @@ import {
                                             [formControl]="roles().get(d.id)!.get(col.name)!"
                                             [attr.data-testid]="'role-' + col.name"
                                         ></inspecto-option-picker>
+                                        @if (derivedRoles().get(d.id)?.get(col.name); as dr) {
+                                            @if (dr.role === r) {
+                                                <p
+                                                    class="text-secondary m-0 text-xs"
+                                                    [attr.data-testid]="'derived-' + col.name"
+                                                >
+                                                    From {{ dr.mappings.length === 1 ? 'Mapping' : 'Mappings' }}
+                                                    {{ dr.mappings.join(', ') }} - not set on this Dataset.
+                                                </p>
+                                            }
+                                        }
                                         @if (r === 'entity') {
                                             <inspecto-option-picker
                                                 [label]="col.name + ' holds'"
@@ -574,7 +587,7 @@ export class DataPageComponent implements OnInit {
     );
     readonly roles = computed(() =>
         this.controls<ColumnRole>(
-            (d, c) => roleOf(c, d, this.types()),
+            (d, c) => this.derivedRoles().get(d.id)?.get(c.name)?.role ?? roleOf(c, d, this.types()),
             (d, c, v) => this.setRole(d, c, v),
         ),
     );
@@ -613,8 +626,30 @@ export class DataPageComponent implements OnInit {
     private readonly picked = signal<ReadonlyMap<string, ColumnRole>>(new Map());
 
     protected roleShown(d: DataEntry, c: DataColumn): ColumnRole {
-        return this.picked().get(`${d.id}/${c.name}`) ?? roleOf(c, d, this.types());
+        return (
+            this.picked().get(`${d.id}/${c.name}`) ??
+            this.derivedRoles().get(d.id)?.get(c.name)?.role ??
+            roleOf(c, d, this.types())
+        );
     }
+
+    /**
+     * Per base, the roles its unset columns read from the Mappings built on it (`mappingRole`; operator 2026-11-05):
+     * shown with the Mappings that say so, never written - a person's pick saves as any other.
+     */
+    readonly derivedRoles = computed(() => {
+        const out = new Map<string, Map<string, MappingRole>>();
+        for (const d of this.bases()) {
+            const mappings = this.mappingsOf(d.id);
+            const m = new Map<string, MappingRole>();
+            for (const c of d.columns) {
+                const dr = mappingRole(c, d, mappings, this.types());
+                if (dr) m.set(c.name, dr);
+            }
+            out.set(d.id, m);
+        }
+        return out;
+    });
 
     /** The name's error line, shown once the field was left or a save was tried. */
     protected nameError(): string {

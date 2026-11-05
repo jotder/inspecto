@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
-import { guideDone, SpaceGuideState, SpaceGuideStepId, spaceGuideSteps } from './space-guide';
+import { guideDone, guideSteps, SpaceGuideKind, SpaceGuideState, SpaceGuideStepId } from './space-guide';
 
 /** localStorage key remembering a collapsed guide ('1'). */
 export const SPACE_GUIDE_COLLAPSED_KEY = 'inspecto.space-guide.collapsed';
@@ -14,7 +14,8 @@ function readCollapsed(): boolean {
 }
 
 /**
- * The **Space guide** (help H1): *Space · Data · What the columns hold · First graph · (optional) A list*, each ticked
+ * The **Space guide** (help H1): in Inspecto LA *Space · Data · What the columns hold · First graph · (optional) A
+ * list*, in the console (`kind="console"`) *Space · Data · First query · (optional) A dashboard*; each ticked
  * from server state ({@link SpaceGuideState}, loaded by `SpaceGuideService`). Collapsible, never modal, and gone once
  * every required step is done. Presentational and host-agnostic, so the console can reuse it: each line emits
  * {@link stepOpen} and the HOST decides where that step lives.
@@ -83,16 +84,18 @@ function readCollapsed(): boolean {
 export class SpaceGuideComponent {
     /** The server state the ticks come from; null while it loads (nothing renders). */
     readonly state = input<SpaceGuideState | null>(null);
+    /** Which app's steps to show. */
+    readonly kind = input<SpaceGuideKind>('la');
     /** A line was chosen: the host opens that step. */
     readonly stepOpen = output<SpaceGuideStepId>();
 
     protected readonly steps = computed(() => {
         const s = this.state();
-        return s ? spaceGuideSteps(s) : [];
+        return s ? guideSteps(s, this.kind()) : [];
     });
     protected readonly visible = computed(() => {
         const s = this.state();
-        return !!s && !guideDone(s);
+        return !!s && !guideDone(s, this.kind());
     });
     protected readonly required = computed(() => this.steps().filter((s) => !s.optional).length);
     protected readonly doneCount = computed(() => this.steps().filter((s) => !s.optional && s.done).length);

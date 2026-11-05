@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { LensService, SampleSpace, Space, SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
-import { SpaceGuideStepId } from '@inspecto/core/onboarding/space-guide';
+import { LaGuideStepId, SpaceGuideStepId } from '@inspecto/core/onboarding/space-guide';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { failedSampleRuns } from '@inspecto/core/spaces/sample-space.dialog';
 import { SpaceFormDialog } from '@inspecto/core/spaces/space-form.dialog';
@@ -17,7 +17,7 @@ export const LA_SAMPLE_VIEW = 'mule_layering_ring';
 export const ADD_DATA_ROUTE = '/add-data';
 
 /** Where each Space guide line leads in this app (`space` opens the Create Space dialog instead). */
-const STEP_ROUTES: Record<Exclude<SpaceGuideStepId, 'space'>, string> = {
+const STEP_ROUTES: Record<Exclude<LaGuideStepId, 'space'>, string> = {
     data: ADD_DATA_ROUTE,
     columns: '/entities?tab=columns',
     graph: '/link-analysis',
@@ -67,7 +67,7 @@ export class FirstRun {
     /** Open one Space guide step. */
     openStep(id: SpaceGuideStepId): void {
         if (id === 'space') this.createSpace();
-        else void this.router.navigateByUrl(STEP_ROUTES[id]);
+        else if (id in STEP_ROUTES) void this.router.navigateByUrl(STEP_ROUTES[id as keyof typeof STEP_ROUTES]);
     }
 
     /** Make `spaceId` the active Space and land on `url` with a reload. */
