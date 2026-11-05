@@ -391,6 +391,9 @@ describe('lookups in the draft (ONBOARDING-FIRST-RUN-1 C6a)', () => {
         };
         expect(keptFormat(d)).toEqual({ delimiter: ';', quote: '"' });
         expect(keptFormat(null)).toEqual({});
+    });
+});
+
 describe('row filter words and checks (ADD-DATA-ROW-FILTER-1)', () => {
     const col = (name: string, type: string, drop = false): ColumnState => ({
         name,
