@@ -312,7 +312,13 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             type: 'dataset',
             name,
             ref: `dataset/${name}`,
-            content: { origin: 'mapping', basedOn: 'wallet_txn', physicalRef: 'wallet_txn/database', columns: [], defaultLinkMapping: m },
+            content: {
+                origin: 'mapping',
+                basedOn: 'wallet_txn',
+                physicalRef: 'wallet_txn/database',
+                columns: [],
+                defaultLinkMapping: m,
+            },
         });
         const { el, c } = create([
             ...datasets,
