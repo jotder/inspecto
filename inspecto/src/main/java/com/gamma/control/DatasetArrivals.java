@@ -78,7 +78,8 @@ final class DatasetArrivals {
      * never the import.
      */
     static void recordRun(Path dataRoot, String pipeline, List<Map<String, String>> taken, Path landed, String fileName,
-                          String mode, String sha256, Map<String, List<String>> newColumns, Map<String, Long> filteredOut,
+                          String mode, String sha256, Map<String, List<String>> newColumns, List<String> keptColumns,
+                          Map<String, Long> filteredOut,
                           Map<String, Object> summary) {
         String landedName = landed == null ? null : landed.getFileName().toString();
         String at = java.time.Instant.now().toString();
@@ -102,6 +103,8 @@ final class DatasetArrivals {
                 }
                 List<String> fresh = newColumns.get(name);
                 if (fresh != null && !fresh.isEmpty()) m.put("newColumns", fresh);
+                // LA-ARRIVAL-NEW-COLUMNS-1: the run kept these as details (every file it took carries them)
+                if (keptColumns != null && !keptColumns.isEmpty()) m.put("keptColumns", keptColumns);
                 Long left = filteredOut.get(name);   // ADD-DATA-ROW-FILTER-1: present only for an import that filters rows
                 if (left != null) m.put("rowsFilteredOut", left);
                 if (summary.get("index") instanceof Map<?, ?> ix && ix.get("result") != null) {
@@ -330,6 +333,7 @@ final class DatasetArrivals {
         a.put("coversFrom", period[0]);
         a.put("coversTo", period[1]);
         a.put("newColumns", extra == null ? null : extra.get("newColumns"));
+        a.put("keptColumns", extra == null ? null : extra.get("keptColumns"));
         a.put("rowsFilteredOut", extra == null ? null : extra.get("rowsFilteredOut"));
         a.put("reason", null);
         if (extra != null && extra.get("at") != null) a.put(AT, extra.get("at"));   // a sort key only, never answered
@@ -357,6 +361,7 @@ final class DatasetArrivals {
         a.put("coversFrom", null);
         a.put("coversTo", null);
         a.put("newColumns", null);
+        a.put("keptColumns", null);
         a.put("reason", m.get("reason"));
         a.put("setAside", m.get("setAside"));
         if (m.get("at") != null) a.put(AT, m.get("at"));

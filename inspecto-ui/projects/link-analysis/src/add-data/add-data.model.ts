@@ -289,6 +289,8 @@ export interface Arrival {
     coversTo: string | null;
     /** LA-ARRIVAL-MODES-1: columns the file carried that the Dataset does not read (accepted, not kept). */
     newColumns?: string[] | null;
+    /** LA-ARRIVAL-NEW-COLUMNS-1: new columns the run that took this file kept as details. */
+    keptColumns?: string[] | null;
     /** ADD-DATA-ROW-FILTER-1: rows of this file the import's row filter left out; null = no filter, or not counted. */
     rowsFilteredOut?: number | null;
     /** A `REFUSED` arrival: why, and where the file was set aside (relative to the Dataset's folder). */
@@ -335,6 +337,10 @@ export interface ImportSummary {
     period?: { days: number; from: string | null; to: string | null; rowsReplaced: number; filesRewritten: number };
     /** Columns the file carried that the Dataset does not read: accepted, not kept. */
     newColumns?: string[];
+    /** LA-ARRIVAL-NEW-COLUMNS-1: new columns this run kept as details of the Dataset. */
+    keptColumns?: string[];
+    /** Why a new column was left out (the person chose so, another file lacks it, an approval policy …). */
+    newColumnsReason?: string;
     /** Waiting files refused by the columns rule and set aside (`setAside` is relative to the Dataset's folder). */
     refused?: { file: string; reason: string; setAside: string }[];
 }
@@ -867,11 +873,14 @@ export function summaryLines(s: ImportSummary): SummaryLine[] {
         });
     for (const q of s.quarantined ?? []) out.push({ tone: 'warning', text: `${q.file} was set aside: ${q.reason}.` });
     out.push(...refused);
+    for (const c of s.keptColumns ?? []) out.push({ tone: 'info', text: `New column ${c}: kept as a detail.` });
     if (s.newColumns?.length)
         out.push({
             tone: 'info',
-            text: `New ${s.newColumns.length === 1 ? 'column' : 'columns'} not kept: ${s.newColumns.join(', ')}. The Dataset reads the columns it was made with.`,
+            text: `New ${s.newColumns.length === 1 ? 'column' : 'columns'} not kept: ${s.newColumns.join(', ')}${s.newColumnsReason ? ` (${s.newColumnsReason})` : ''}.`,
         });
+    else if (s.newColumnsReason && !s.keptColumns?.length)
+        out.push({ tone: 'info', text: `A new column was not kept: ${s.newColumnsReason}.` });
     if (s.period)
         out.push({
             tone: 'info',
@@ -1058,6 +1067,7 @@ export function arrivalLine(a: Arrival): string {
     if (a.rowsFilteredOut) parts.push(`${plural(a.rowsFilteredOut, 'row', 'rows')} left out by the filter`);
     const covers = coversText(a.coversFrom, a.coversTo);
     if (covers) parts.push(`covers ${covers}`);
+    if (a.keptColumns?.length) parts.push(`kept new: ${a.keptColumns.join(', ')}`);
     if (a.newColumns?.length) parts.push(`not kept: ${a.newColumns.join(', ')}`);
     if (!a.kept) parts.push('set aside by a later replace');
     return parts.join(' · ');

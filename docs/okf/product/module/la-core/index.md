@@ -36,7 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `LA-REFERENCE-DETAILS-MORE-1` | P3 | feature | Link Analysis: colour nodes by a Reference detail, and say how many of a Reference's entities appear in the graph's Dataset ("312 account… | demand |
 | `LA-DATASET-COMPACT-2` | P3 | feature | *keep N arrivals* after a *Replace the period* (deferred from LA-DATASET-COMPACT-1, 2026-11-05; narrowed 2026-11-05). | — |
-| `LA-ARRIVAL-NEW-COLUMNS-1` | P3 | feature | keep a later file's new columns as details of an import Dataset (schema evolution with union-by-name reads), filed 2026-11-05 from D-6. | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

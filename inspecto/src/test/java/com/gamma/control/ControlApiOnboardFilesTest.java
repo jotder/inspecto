@@ -855,7 +855,7 @@ class ControlApiOnboardFilesTest {
     /**
      * LA-ARRIVAL-MODES-1, the schema-drift policy (operator 2026-11-05, D-6): a later file is judged by its column NAMES
      * before anything lands. A reordered header no longer loads into the wrong columns - it is refused naming each moved
-     * column; a missing column is refused by name; a new column is accepted, not kept, and named in the result and the
+     * column; a missing column is refused by name; a new column the person leaves out (LA-ARRIVAL-NEW-COLUMNS-1) is accepted, not kept, and named in the result and the
      * arrival. Run now judges a dropped file the same way and sets a refused one aside with the reason.
      */
     @Test
@@ -879,7 +879,7 @@ class ControlApiOnboardFilesTest {
             assertEquals(50, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsAfter").asLong(),
                     "nothing of a refused file landed");
 
-            JsonNode wider = data(send(c, "POST", "/datasets/" + id + "/files?name=wider.csv&mode=append",
+            JsonNode wider = data(send(c, "POST", "/datasets/" + id + "/files?name=wider.csv&mode=append&newColumns=leave",
                     editColumns(transfers(20), -1, "fee", "1.5").getBytes(StandardCharsets.UTF_8), null), 200);
             assertEquals(70, wider.get("rowsAfter").asLong(), wider.toString());
             assertEquals("[\"fee\"]", wider.get("newColumns").toString(), wider.toString());
@@ -906,7 +906,7 @@ class ControlApiOnboardFilesTest {
             String named = transfers(30).replaceFirst("transfer_id", "Transfer ID");
             JsonNode d2 = draft(c, "spaced.csv", "stream", named, null);
             data(json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", "{\"name\":\"" + spaced + "\"}", null), 200);
-            JsonNode w2 = data(send(c, "POST", "/datasets/" + spaced + "/files?name=wider.csv&mode=append",
+            JsonNode w2 = data(send(c, "POST", "/datasets/" + spaced + "/files?name=wider.csv&mode=append&newColumns=leave",
                     editColumns(transfers(10).replaceFirst("transfer_id", "Transfer ID"), -1, "fee", "1.5")
                             .getBytes(StandardCharsets.UTF_8), null), 200);
             assertEquals(40, w2.get("rowsAfter").asLong(), w2.toString());

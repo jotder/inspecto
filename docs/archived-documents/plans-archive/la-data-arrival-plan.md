@@ -179,6 +179,10 @@ origin, logical_name`. So the arrival list is a **read** over that ledger, not a
   read by position), refuses the file and names each one; Run now moves a refused waiting file to `<id>/refused/` and records
   it as a refused arrival with the reason. A new column is accepted, not kept, and named in the result and the arrival.
   Keeping new columns as details (schema evolution, union-by-name reads) is `LA-ARRIVAL-NEW-COLUMNS-1` on the board.
+  **Operator 2026-11-06 (that row, built the same day):** kept by default, *Keep new columns as details* on Add a file
+  leaves them out; unattended runs keep; left out only where keeping cannot work (an import with no header line, an
+  approval policy over Datasets), and the result says why. Once kept, a later file without the column is refused (not
+  accepted blank), naming the column and the file it was kept from. As built: la-core architecture §6.17.
   *(Replaces §5 P2's first wording "new column kept as detail, missing column: rows rejected".)*
 - **D-7…D-10 (operator 2026-11-05, P4, the recommended options; committed as D-6…D-9 in `4489071bb` before the ledger lane's D-6 landed):** **D-7** compaction runs on its own at the end of an
   import once the Dataset holds more than 20 files, inside the person's run, every edition, plus *Compact now* by
