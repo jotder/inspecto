@@ -43,6 +43,12 @@ import java.util.regex.Pattern;
  *   <li>{@code POST /datasets/{id}/run} (Run now) on a snapshot Dataset re-copies it ({@link #refresh}).</li>
  * </ul>
  *
+ * <p><b>Export, then move</b> (operator 2026-11-05): Run now EXPORTS the table with DuckDB {@code COPY (…) TO
+ * '<file>.parquet'} into a temporary folder under the data root's drafts folder - never inside the inbox - and only once
+ * the file is complete MOVES it atomically into the Dataset's inbox, where the ordinary import path takes it like an
+ * uploaded file: name-checked columns, the row filter, the arrival, compaction. A snapshot always replaces everything.
+ * <b>A snapshot is manual only:</b> nothing polls it (the 30 s refresh was removed the same day).
+ *
  * <p><b>How it reads</b> (plan §6.1 V2): DuckDB's {@code postgres} extension, already staged in every bundle - no JDBC
  * driver on Basic. The password is a {@code ${ENV:NAME}} reference, resolved only here, at the moment of connecting,
  * into a {@code TEMPORARY SECRET} of an in-memory DuckDB; it is never stored, answered, logged or put in a URL or a
@@ -284,12 +290,12 @@ final class PostgresSnapshot {
     // ── refresh: Run now, and the poll ────────────────────────────────────────────────────────────────────────
 
     /**
-     * Copy the table again into a staged Parquet file and hand it to the replace path ({@link OnboardImport#addStaged}).
-     * {@code ex == null} (the poll) runs inline and, when {@code skipUnchanged}, adds no arrival when the copy's bytes
-     * equal the last one's - answers {@code null} then.
+     * Run now on a snapshot: EXPORT the table into a staged Parquet file under the data root's drafts folder (outside the
+     * inbox, so neither a concurrent Run now nor anything reading the inbox sees it half-written), then hand the complete
+     * file to the replace path ({@link OnboardImport#addStaged}), which MOVES it into the inbox and imports it.
      */
     static Object refresh(OnboardImport.Space space, Map<String, Object> content, String id, Map<String, Object> config,
-                          HttpExchange ex, boolean skipUnchanged) throws IOException {
+                          HttpExchange ex) throws IOException {
         Conn c = Conn.of(config.get("connection"));
         Source src = Source.fromMap(config);
         String pipeline = String.valueOf(content.get("importPipeline"));
@@ -302,20 +308,12 @@ final class PostgresSnapshot {
         try {
             Files.createDirectories(stage);
             pull(c, src, stage, file, lim);
-            if (skipUnchanged) {
-                String sha = DatasetArrivals.sha256(file);
-                if (sha != null && DatasetArrivals.alreadyImported(space.dataRoot(), pipeline, sha) != null) {
-                    OnboardImport.IN_FLIGHT.remove(key);
-                    OnboardRoutes.deleteTree(stage);
-                    return null;
-                }
-            }
         } catch (IOException | RuntimeException fault) {
             OnboardImport.IN_FLIGHT.remove(key);
-            OnboardRoutes.deleteTree(stage);
+            OnboardRoutes.deleteTree(stage);   // a failed or half-written export never reaches the inbox
             throw fault;
         }
-        return OnboardImport.addStaged(space, content, id, key, stage, file, name, "replace", ex);
+        return OnboardImport.addStaged(space, content, id, key, stage, file, name, "replace", ex, true);
     }
 
     // ── the copy ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -479,15 +477,5 @@ final class PostgresSnapshot {
     /** Whether {@code id}'s import is a snapshot (its config file exists). */
     static boolean isSnapshot(Path writeRoot, String id) {
         return Files.isRegularFile(configFile(writeRoot, id));
-    }
-
-    /** For the poller ({@code BASIC-ONBOARD-1} P2): refresh {@code id} when the table changed; {@code false} when unchanged. */
-    static boolean poll(Path writeRoot, Path dataRoot, CollectorService service, String id) throws IOException {
-        Map<String, Object> content = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry")).get("dataset", id)
-                .map(com.gamma.pipeline.ComponentRegistry.Component::content)
-                .orElse(null);
-        Map<String, Object> config = read(writeRoot, id);
-        if (content == null || config == null || !OnboardImport.isOurs(writeRoot, id, content, service)) return false;
-        return refresh(new OnboardImport.Space(writeRoot, dataRoot, service, "system:poll"), content, id, config, null, true) != null;
     }
 }

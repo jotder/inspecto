@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-372 test class(es): 137 unit, 235 real-HTTP control-plane, 0 IT.
+375 test class(es): 138 unit, 237 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -144,6 +144,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiImportConcurrentRollbackTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportConcurrentRollbackTest.java` | `IMPORT-RESIDUALS-1` (3) over real HTTP: a refused {@code POST /spaces/{id}/import} rolls back every file it |
 | `ControlApiImportRefusalAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRefusalAuditTest.java` | Round 5: the IMPORT doors write Pipeline configs through {@code ImportJournal}, not the write routes — each import |
 | `ControlApiImportReservedPathsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportReservedPathsTest.java` | `SEC-IMPORT-ROLES-ESCALATION-1`, over real HTTP with an ARMED Authenticator (without a Subject |
+| `ControlApiImportRowFilterTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRowFilterTest.java` | {@code ADD-DATA-ROW-FILTER-1} over real HTTP: a commit's {@code filter: [{column, op, value \| min \| max}]} becomes the |
 | `ControlApiImportUnderPolicyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportUnderPolicyTest.java` | Maker-checker at the import door (`ASSURE-MAKER-CHECKER-1`, over the upstream import judge): under an approval |
 | `ControlApiInboxWatchTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiInboxWatchTest.java` | {@code BASIC-ONBOARD-1} P2 over real HTTP: {@code PUT /datasets/{id}/watch} turns the inbox poll on and off on Basic; |
 | `ControlApiIncrementalJobTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiIncrementalJobTest.java` | INCREMENTAL-1 (operator, 2026-10-10) over real HTTP: a malformed {@code incremental:} block and a sink that |
@@ -233,6 +234,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSignalsStreamTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalsStreamTest.java` | Integration test for the SSE live-push counterpart to {@code GET /signals} |
 | `ControlApiSignalsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalsTest.java` | {@code GET /signals} over real HTTP: a failing Job run emits {@code job.run.started} (INFO) and |
 | `ControlApiSinkDuckLakeSharedTableTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSinkDuckLakeSharedTableTest.java` | Two {@code sinks[]} destinations registering into ONE DuckLake table |
+| `ControlApiSnapshotExportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSnapshotExportTest.java` | A Postgres snapshot's Run now, redesigned 2026-11-05 (operator): EXPORT the table into a temporary folder under the data |
 | `ControlApiSpaceBootReadinessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceBootReadinessTest.java` | HA-RUNLEASE-DB-CREDENTIALS-1 (operator 2026-10-10): a node whose Spaces are CONFIGURED but none could boot must |
 | `ControlApiSpaceComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceComparisonTest.java` | Real-HTTP tests for {@code POST /space-comparisons} (space-comparison design, decided 2026-09-24) over a |
 | `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
@@ -263,6 +265,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ExchangeAttributeScopeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ExchangeAttributeScopeTest.java` | SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): nothing stamped on the exchange by one request may be readable |
 | `FindingJsonShapeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/FindingJsonShapeTest.java` | The {@link Finding} diagnostic contract (authoring-residuals R1) through the REAL serializer the |
 | `ImportCapabilityGuardTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportCapabilityGuardTest.java` | {@link ImportCapabilityGuard} is COMPLETE against {@link CapabilityManifest}: for every writable kind, every declared |
+| `ImportRowFilterHugeExponentTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportRowFilterHugeExponentTest.java` | A decimal filter value with a huge exponent is refused before {@code BigDecimal.toPlainString} expands it into |
 | `IndexBuildOwnerRunAuthorityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/IndexBuildOwnerRunAuthorityTest.java` | T5 residuals (a)+(b): the RUN path refuses an la.index.build Job whose owner is not its last editor, unless that |
 | `JobWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/JobWritersTest.java` | ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 2: <b>every route that can write a {@code job} passes |
 | `KpiCompletenessWidgetTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/KpiCompletenessWidgetTest.java` | The completeness tile (§8-D, operator 2026-10-09: Signals behind a Dataset). The shipped {@code telco-ra} Space |

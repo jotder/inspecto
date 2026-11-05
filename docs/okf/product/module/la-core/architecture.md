@@ -1409,12 +1409,15 @@ limits and the commit's write order are in
   ends), so link roles and the `links` section are assessed with no saved view. Pinned by
   `ControlApiOnboardLinkAnalysisTest`: wallets registered with a default mapping are assessed, agents without one
   are "not assessed"; red with the fallback removed.
-- **The index is built in the user's run on Basic (DT-16).** The commit, Add a file and Run now call the
-  `LinkIndexBuilder` SPI (the geo-link bridge, `ScheduledIndexBuild`) for the default mapping (source = from,
-  target = to, kind, time, weight = amount; no attribute columns; owner = the importer; a first build is FULL),
-  not a signal-driven `la.index.build` Job. Skipped (and said so) where `pipeline.automation` is present; that
-  feature is declared by no module yet, so today every edition builds in-run. The summary reports
-  `index:{result, edges, nodes}`.
+- **The index is built in the user's run, in every edition (DT-16; operator 2026-11-05).** The commit, Add a file and
+  Run now call the `LinkIndexBuilder` SPI (the geo-link bridge, `ScheduledIndexBuild`) for the default mapping (source =
+  from, target = to, kind, time, weight = amount; no attribute columns; owner = the importer; a first build is FULL),
+  not a signal-driven `la.index.build` Job: a person's import always gives a fresh graph. Where Pipelines run on their
+  own (`pipeline.automation`, declared by `inspecto-ops` since 2026-11-05), a feed's scheduled runs are indexed by the
+  Space's Job; the index layer makes a build that meets a running one wait and re-plan (`BUILD_IN_PROGRESS`). Until
+  2026-11-05 the in-run build was skipped where that feature was present (`followOnInRun`, `ImportFollowOn.deferred`,
+  both removed); the Expectations are evaluated in the run in every edition too (DT-15). The in-run build waits for a
+  running build of the same index (wait budget -1: bounded waits within its 300 s timeout). The summary reports `index:{result, edges, nodes}`.
 - **The entry keeps its last import (`LA-ONBOARD-RESIDUALS-1` item 7, as built 2026-10-28).** The commit and *Add a file*
   write `lastImport {at, replaced, rowsBefore, rowsAfter, batch, file}` onto the Dataset's registry entry
   (`OnboardImport.Job.lastImport`; `batch` = the run's ledger `consignment_id`). The commit puts it in the entry it
@@ -1423,6 +1426,22 @@ limits and the commit's write order are in
   *Run now* imports no file and records none. Session decision (assistant-decided under operator delegation, pending
   confirmation): only the LAST import is kept, not a history - the card shows one line per Dataset. Pinned by
   `ControlApiOnboardFilesTest.addAFileReplacesOrAppendsAndRunNowReRuns`.
+- **Keep only some rows (`ADD-DATA-ROW-FILTER-1`, as built 2026-11-05; DT-7: Basic no-code shaping).**
+  - **The screen.** The review step ("2. Check the columns") has a *Keep only some rows* block of property rows. Each
+    row is a column picker (the kept columns, by their new names), a condition picker (`rowOps`: is / is not for
+    every type, contains for text with a *Match case* switch (off = ignore case; the card adds "(exact case)"), is between for numbers, dates and times) and value pen fields (From / To for a
+    range; the box type follows the column type).
+  - **Holding Create back.** An incomplete condition, or one on a column left out, shows its reason on the row
+    (`conditionProblem`) and keeps Create disabled.
+  - **What is sent and shown.** The sentence "Keeps rows where …" (`keepsRowsLine`) sits under the block and on the
+    Dataset card (`importFilter` on the entry; every card host passes it through `rowConditions`). The run summary
+    adds "N rows were left out by the row filter", and each arrival "N rows left out by the filter". The commit
+    sends `filter` only when there is a condition.
+  - **Server side.** The contract, the choice of the Pipeline's `csv_settings.where` over the schema, the
+    no-raw-SQL rendering and the counting are in
+    [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md) ("Keep only some rows").
+  - **Specs.** `add-data.component.spec.ts` (two `ADD-DATA-ROW-FILTER-1` cases), `import-dataset-card.component.spec.ts`
+    and `add-data.model.spec.ts` ("row filter words and checks").
 - **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
   to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
 - **Deleting an Add data Dataset retires its import Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, `LA-ONBOARD-RETIRE-GAPS-1`).
@@ -1453,7 +1472,8 @@ limits and the commit's write order are in
     sole Space's write root), not `-Ddata.dir`, which is per Space. Reserved in `ReservedConfigPaths` (an import must
     not forge it). No home = `recording: false`.
   * **Who records what.** `OnboardingRoutes.register` installs the file at boot and records `launch` (so "first launch"
-    = the first server start of this installation, the drive's clock start). `SpaceRoutes.createSpace` records
+    = the first server start of this installation, the drive's clock start; Settings → Getting started counters
+    labels the two rows *First server start* and *Server starts*, 2026-11-05). `SpaceRoutes.createSpace` records
     `space_created` (template, sample or bare); `OnboardImport.Job.finishCommit` records `first_dataset` after the undo
     stack is cleared (inline and 202 commits alike); `InvRoutes.project` (projection AND the Start box's neighbours read)
     records `first_graph` when the answer holds a link. The browser reports only what it alone sees through
@@ -1575,8 +1595,15 @@ Calls marked * were assistant-decided under operator delegation, pending confirm
 * **Commits stay inline up to `import.inline_max_bytes`*** (default 64 MiB, per Space; 0 sends every commit to a
   followed 202 run). Not benchmarked; the knob is the bound, so there is no code change.
 * **Find paths (server) stays unlocked on Basic*:** `docs/EDITIONS.md` lists it for all four editions.
-* **Still demand-gated\*:** the `pipeline.automation` feature and DT-17 trigger (item 3), no-code row filtering (6), a
-  stored run summary for replace-vs-append (7), and the phase-8 notes; each is a feature, not a small change.
+* **Settled 2026-11-05:** item 3 - an import's Pipeline stays `trigger: manual` (DT-17 as narrowed by `BASIC-ONBOARD-1`)
+  until *Keep this up to date* puts it on a schedule; the `pipeline.automation` feature, which `OnboardImport`,
+  `DatasetFeed` and `DatasetCompaction` read, is declared by `inspecto-ops` on Standard and up (operator 2026-11-05), so
+  Standard offers *Keep this up to date* and a retention policy while Basic's screens stay locked; a person's import still
+  builds the link index inside the run in every edition. A Case saved after *Start from these* keeps no exclusion list written
+  on the graph before it: a new graph starts from the Case's members only, by design. The counters' "first launch" is
+  labelled *First server start*.
+* **Still open:** no-code row filtering (6; in Basic by DT-7, not built) and a real drag-and-drop of a file onto Add
+  data by a person (the acceptance drive handed the files to the file chooser by script).
 
 ### 6.14 Studio UI reorganization (LA-STUDIO-UI-REORG-1, as built 2026-10-28)
 
@@ -1928,6 +1955,23 @@ for THIS id).
   Add data already wrote.
 - **A watched folder IS the Dataset's inbox** (`<dataRoot>/inbox/<id>`): no caller-supplied path, so nothing to jail.
   An SFTP feed reads the Connection's `base_path`.
+- **A person's *Add a file* is imported at once on a fed Dataset** (`ADD-FILE-FEED-1`, defect, fixed 2026-11-05). The
+  upload lands in that same inbox, and the folder feed's stability gate held every file 30 s, so the person's own run
+  took nothing and answered 422 "nothing was imported". `OnboardImport.addStaged` now opens
+  `com.gamma.inspector.RunFiles.complete({landed file})` around its run: `CollectorProcessor.collect` adds the files a
+  `complete` scope names back after `gateStability` (run path only; discovery order kept). The upload is whole by
+  construction (`Job.landFromDraft` moves it into the inbox complete). Every other waiting file is still gated, so a sender's
+  file that has just arrived waits for the feed; on Basic (no stability block) nothing changes - Add a file still takes
+  the files waiting. No double import: the run moves the upload out of the inbox into
+  `<id>/backup/` as it commits it, so the feed never lists it; were it left there, the feed's checksum duplicate check
+  (`duplicate {mode: checksum}`) and, below that, the ingest's own commit record would each still skip it (mutation
+  check 2026-11-05: with the move AND the duplicate check both disabled, the feed lists the upload again and adds no
+  row). An SFTP feed was never affected (a
+  remote collector does not gate the local inbox). Same seam as `BASIC-ONBOARD-SETTLE-1` (§6.20). Not covered: the
+  scope is not tied to one run, so a scheduled run that lists the inbox while it is open (the person's run then waits
+  on the Pipeline's run lock) takes the upload; it is imported once, by the feed, and the person's run reports
+  nothing imported. Tests:
+  `ControlApiDatasetFeedTest` (`addAFileRightAfterKeepThisUpToDate…`, `onBasicAddAFileStillTakes…`), `RunFilesTest`.
 - **Waiting files** = regular files under the inbox (depth 4, links not followed) with the import's extension, never a
   hidden one (`.landing-*` uploads in flight). A file whose name the import took before (`MarkerManager
   .isAlreadyProcessed`) is skipped by Run now and would wait for ever, so it is flagged (`alreadyImported`, per file and
@@ -1988,6 +2032,29 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   `DESCRIBE`) drops whole arrivals received before the cutoff. A policy stored on Basic is ignored
   (`retentionInForce`): Basic never drops a row.
 - **Link index (D-10).** The files are rewritten, so the index's next build is a full one (its own advice, nothing added).
+- **A run outside Add data compacts on its commit (`LA-DATASET-COMPACT-2`, 2026-11-05).** A Standard feed's scheduled run
+  (or any run of the import Pipeline not started by Add data) never reaches `Job.followOn`. `CollectorService` subscribes ONE
+  commit step to its Space's `ConsignmentEventBus` in its constructor - before `JobService.start()` subscribes - and the
+  control plane sets it (`DatasetCompaction.register` → `CollectorService.commitStep`). The bus publishes synchronously on the
+  run's thread, under the Pipeline's run claim, so the compaction finishes before the Space's Jobs (the `la.index.build` Job
+  on `pipeline.commit`) are handed the commit; no other run of the import can write meanwhile. `DatasetCompaction.afterCommit`
+  takes a SUCCESS, non-dry-run commit, finds the Space whose service published it (the attached ControlApis' Spaces), reads
+  its roots under that Space's MDC, and acts only for an import Add data wrote for THIS id (`OnboardImport.isOurs`; the
+  import Pipeline is named as its Dataset). It claims `OnboardImport.IN_FLIGHT` and **skips** when the claim is held: an
+  import (which compacts in its own follow-on), *Compact now* or a delete is at work. Threshold and retention as on import.
+  Never throws; a compaction that ran is logged. *Chosen over a `dataset.compact` Job step on `pipeline.commit`* (the row's
+  suggestion): two Jobs on the same signal run concurrently, so the index build would race the swap, and the Job would
+  have to be authored per Dataset. *Not* the `ImportFollowOn` seam either: a scheduled run never calls it.
+- **The graph after a compaction (`LA-DATASET-COMPACT-2`).** The link index's read gate (`IndexedRead.select`,
+  `IndexStaleness.removedInput`) already refuses an index whose input files are gone, so the graph reads the flat Dataset
+  after a compaction - but it compared the files through `InputFingerprintCache` (30 s, cleared only by an index build), so
+  for up to 30 s a read was served from the index with the rows a retention removed (measured: `/inv/projection/neighbors`
+  answered `source.kind: index, stale: false`). Every compaction that merged (or failed part-way) now calls each installed
+  application's `ImportFollowOn.filesRewritten` (a default no-op method; inside a run, *Compact now* and a scheduled
+  commit, every edition); Link Analysis's `LinkIndexFollowOn` drops the Dataset's cached fingerprints
+  (`InputFingerprintCache.forget`), so the next read answers `index_stale_refused` from the flat Dataset. *The smaller fix
+  was chosen*: no rebuild inside *Compact now* - the graph reads flat until the next index build (Basic: the next import;
+  Standard: the next commit's Job), as after any other removal.
 - **UI:** `add-data/dataset-storage.component.ts` in the card (*Storage* line, *Compact now*, on Standard the *Keep*
   picker for a person who may author); `storageStatusLine` is its *Data status* line.
 - **Arrivals and Data status.** `DatasetArrivals` reads the merge map: an arrival whose own output a compaction merged is
@@ -1998,11 +2065,11 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   included): the map keeps the merged file's `mergedBytes` and `mergedModified` and trusts its row segments only while
   both match. Otherwise its arrivals stay *kept* with no known period, and the next compaction carries the file as ONE
   block (`holds` names the arrivals in it) - never sliced by stale offsets.
-- **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2`):** (a) a Standard feed's SCHEDULED runs do
-  not pass through `OnboardImport`, so they compact only at the next Add a file / Run now or *Compact now* - a
-  `dataset.compact` step on `pipeline.commit` would close it; (b) *Compact now* with a retention policy does not rebuild
-  the index - the graph follows at the next import; (c) the policy is gated on `pipeline.automation` (the Standard marker
-  the data-tier plan already uses); (d) a leftover that can never be deleted (a folder named `*.parquet`) keeps
+- **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2` keeps (e)):** (a) *(built 2026-11-05, above:
+  a scheduled run compacts on its commit)*; (b) *Compact now* with a retention policy does not rebuild the index - the
+  graph reads the flat Dataset until the next build *(since 2026-11-05 it never shows a removed row, above)*; (c) the policy is gated on `pipeline.automation` (the Standard marker
+  the data-tier plan already uses; declared by `inspecto-ops` since 2026-11-05 - before, no module did, so real Standard
+  bundles refused the policy and *Keep this up to date* like Basic, test `ControlApiKeepUpToDateStandardTest`); (d) a leftover that can never be deleted (a folder named `*.parquet`) keeps
   compaction waiting, saying why each time - nothing is lost or doubled; (e) *keep N arrivals* counts a rewritten merged
   file (a `holds` block) as ONE arrival, and its removal names that file; (f) the arrivals answer has no capability (as
   before), so its `feed` tells a viewer of the Dataset the Connection's name, the ready marker and the waiting count -
@@ -2010,7 +2077,9 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 - Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept and listed as kept by the arrivals
   answer, Compact now, a Replace the period that rewrites the merged file, Replace resets the map, retention by arrivals /
   by event date / an unreadable date / a missing When column / never on Basic, the crash heal, a file held open, armed
-  gates), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
+  gates, `aRunOutsideAddDataCompactsOnItsCommit`: a run not started by Add data compacts, and leaves a held Dataset alone),
+  `ControlApiOnboardLinkAnalysisTest#afterARetentionCompactionTheGraphNoLongerShowsTheRemovedRows` (geo-link: right after a
+  *keep 1 arrival* Compact now the neighbours read is `index_stale_refused` and draws no removed row), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
 
 ### 6.20 Watch this folder: the 30 s inbox poll (BASIC-ONBOARD-1 P2, as built 2026-11-05)
 
@@ -2030,11 +2099,16 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 - **One poller.** A single daemon thread (`inbox-watch`), fixed delay 30 s, polls every registered `InboxWatch.PollTarget`
   in turn under its Space's MDC (`tick()` is synchronized). The watched list is in memory: the toggle registers or
   removes a poll target, and each ControlApi's Spaces are read for `watchInbox` entries on the first tick after it starts
-  (`attach`, from `OnboardRoutes.register`; its poll targets go on close). The seam P3's snapshot refresh reuses is described
-  in the plan §4.6.
+  (`attach`, from `OnboardRoutes.register`; its poll targets go on close).
+- **A Postgres snapshot is never polled (operator 2026-11-05).** Its 30 s refresh target (`InboxWatch.Snapshot`) is
+  removed: the toggle refuses a snapshot (422), `watched()` and `watchable` are false for one, and the inbox target
+  skips it. *Refresh now* exports the table to `<data root>/_onboard/a<uuid>/` and moves the complete file into the
+  inbox, where the replace path takes it like an upload
+  ([`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md), *Export, then move*). The Dataset card's
+  feed shows "The table is copied again only when you press Refresh now" in place of the toggle.
 - **The same path as Run now.** `OnboardImport.runNow`'s body is now `importWaiting(Space, id, content)`, called by
   Run now and by the poll alike: columns checked by name, a refused file moved to `<id>/refused/` with its reason and a
-  REFUSED arrival, the run, the follow-on (the link index in the run on Basic), the arrivals. The poll's actor is
+  REFUSED arrival, the run, the follow-on (the link index, in the run in every edition), the arrivals. The poll's actor is
   `inbox-watch`. A 409 because a person's Run now or upload holds the import is skipped silently (the next tick looks
   again); any other failure is kept as `watchError` and logged. The daemon's start lock is not the class monitor
   `tick()` holds, so a toggle never waits for a running import.
@@ -2050,7 +2124,8 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   pending count still sees the whole inbox). A file created between the check and the run stays in the inbox and is
   checked by later polls. Run now passes no set: it takes the whole inbox, as before. Not covered: a file already
   checked that is rewritten in that instant is still taken (the scope matches by path, since the columns check may
-  rewrite a file it accepts).
+  rewrite a file it accepts). Its other half, `RunFiles.complete`, lets a person's *Add a file* skip a feed's
+  stability window (`ADD-FILE-FEED-1`, §6.18).
 - **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
   watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
   the poll target is dropped.

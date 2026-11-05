@@ -78,7 +78,8 @@ final class DatasetArrivals {
      * never the import.
      */
     static void recordRun(Path dataRoot, String pipeline, List<Map<String, String>> taken, Path landed, String fileName,
-                          String mode, String sha256, Map<String, List<String>> newColumns, Map<String, Object> summary) {
+                          String mode, String sha256, Map<String, List<String>> newColumns, Map<String, Long> filteredOut,
+                          Map<String, Object> summary) {
         String landedName = landed == null ? null : landed.getFileName().toString();
         String at = java.time.Instant.now().toString();
         StringBuilder lines = new StringBuilder();
@@ -101,6 +102,8 @@ final class DatasetArrivals {
                 }
                 List<String> fresh = newColumns.get(name);
                 if (fresh != null && !fresh.isEmpty()) m.put("newColumns", fresh);
+                Long left = filteredOut.get(name);   // ADD-DATA-ROW-FILTER-1: present only for an import that filters rows
+                if (left != null) m.put("rowsFilteredOut", left);
                 if (summary.get("index") instanceof Map<?, ?> ix && ix.get("result") != null) {
                     m.put("index", String.valueOf(ix.get("result")));
                     if (ix.get("mode") != null) m.put("indexMode", String.valueOf(ix.get("mode")));
@@ -327,6 +330,7 @@ final class DatasetArrivals {
         a.put("coversFrom", period[0]);
         a.put("coversTo", period[1]);
         a.put("newColumns", extra == null ? null : extra.get("newColumns"));
+        a.put("rowsFilteredOut", extra == null ? null : extra.get("rowsFilteredOut"));
         a.put("reason", null);
         if (extra != null && extra.get("at") != null) a.put(AT, extra.get("at"));   // a sort key only, never answered
         return a;

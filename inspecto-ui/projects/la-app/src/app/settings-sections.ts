@@ -199,8 +199,8 @@ export class OnboardingCountersSettingsComponent implements OnInit {
             this.metrics.set(m);
             if (m) {
                 this.rows.set([
-                    { label: 'First launch', value: milestoneWords(m.firstLaunch, null) },
-                    { label: 'Launches', value: String(m.launches ?? 0) },
+                    { label: 'First server start', value: milestoneWords(m.firstLaunch, null) },
+                    { label: 'Server starts', value: String(m.launches ?? 0) },
                     { label: 'First Space', value: milestoneWords(m.firstSpace, m.firstSpaceSeconds) },
                     { label: 'Spaces created', value: String(m.spacesCreated ?? 0) },
                     { label: 'First Dataset', value: milestoneWords(m.firstDataset, m.firstDatasetSeconds) },

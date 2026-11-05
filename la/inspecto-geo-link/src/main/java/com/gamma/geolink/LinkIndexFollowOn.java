@@ -33,11 +33,6 @@ public final class LinkIndexFollowOn implements ImportFollowOn {
     }
 
     @Override
-    public Map<String, Object> deferred() {
-        return outcome("DEFERRED", "the Space's Jobs build the index");
-    }
-
-    @Override
     @SuppressWarnings("unchecked")
     public Map<String, Object> run(Context c) {
         if (!(c.entry().get(LinkMapping.KEY) instanceof Map<?, ?> raw))
@@ -51,7 +46,9 @@ public final class LinkIndexFollowOn implements ImportFollowOn {
                     LinkMapping.primary(m, LinkMapping.PRIMARY_TIME, "time"), null,
                     // LA-COLUMN-ROLES-1 P2: every Time, Measure and Category column rides in the index
                     LinkMapping.primary(m, LinkMapping.PRIMARY_MEASURE, "amount"), LinkMapping.carriedColumns(c.entry()),
-                    c.actor(), true, 300_000L, 0L));
+                    // wait budget -1: a build already running (a kept-up-to-date feed's index Job on the same commit) is
+                    // waited for and re-planned, a bounded number of times within the timeout - never "not built" for it
+                    c.actor(), true, 300_000L, -1L));
             Map<String, Object> r = outcome(o.result(), o.message());
             r.put("mode", o.mode());   // append / full / compact / none: what the build cost (V4)
             r.put("code", o.code());
@@ -61,6 +58,17 @@ public final class LinkIndexFollowOn implements ImportFollowOn {
         } catch (RuntimeException failed) {
             return outcome("FAILED", "the index could not be built: " + failed.getMessage());
         }
+    }
+
+    /**
+     * LA-DATASET-COMPACT-2: a compaction rewrote the Dataset's files. The index is now stale by its own check (its input
+     * files are gone), but a read within the input-fingerprint cache's lifetime would still compare the OLD files and serve
+     * rows a retention removed; dropping the cached fingerprint makes the very next read see the change. The next build is a
+     * full one (D-10).
+     */
+    @Override
+    public void filesRewritten(Context c) {
+        com.gamma.la.api.InputFingerprintCache.forget(c.dataset());
     }
 
     private static Map<String, Object> outcome(String result, String message) {

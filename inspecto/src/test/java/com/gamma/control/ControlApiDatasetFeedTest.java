@@ -119,7 +119,9 @@ class ControlApiDatasetFeedTest {
 
     @Test
     void onBasicTheInboxAndItsWaitingFilesAreShownAndRunNowImportsThem(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        EditionFeatures.overrideForTest(Set.of());   // Basic: no pipeline.automation
+        // Basic as a real bundle: no override - this module's class path carries no inspecto-ops, so nothing declares
+        // pipeline.automation and the screens stay locked (automatic false, the Keep PUT refused)
+        EditionFeatures.overrideForTest(null);
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, "inboxed", "stream", ControlApiOnboardFilesTest.transfers(40), null);
             JsonNode empty = data(json(c, "GET", "/datasets/" + id + "/feed", null, null), 200);
@@ -225,6 +227,52 @@ class ControlApiDatasetFeedTest {
             assertEquals("path", manual.collector().duplicate().mode(), "the feed's own keys are gone");
             assertEquals(2, manual.collector().recursiveDepth(), "the editor's setting is still kept");
             data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);   // the import still runs by hand
+        }
+    }
+
+    // ── ADD-FILE-FEED-1: a person's Add a file is imported at once, whatever feed is on ─────────────────────────
+
+    private static long rows(String id) {
+        return OnboardImport.countRows(Path.of("database", id, "database"));
+    }
+
+    @Test
+    void addAFileRightAfterKeepThisUpToDateImportsAtOnceAndTheFeedDoesNotTakeItAgain(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "kept", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/feed", "{\"kind\":\"folder\",\"every\":\"5m\"}", null), 200);
+            assertTrue(c.svc().configFor(id).orElseThrow().collector().stability().enabled(), "the feed holds a new file 30 s");
+            // a sender's file that has just arrived: the person's run must still leave it to the stability window
+            Files.writeString(inbox(id).resolve("drop_w.csv"), ControlApiOnboardFilesTest.transfers(3));
+
+            JsonNode added = data(send(c, "POST", "/datasets/" + id + "/files?name=more.csv&mode=append",
+                    ControlApiOnboardFilesTest.transfers(10).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(10, added.get("rowsChanged").asLong(), "the upload is imported at once, the new drop is not: " + added);
+            assertEquals(50, rows(id));
+            assertEquals(1, data(json(c, "GET", "/datasets/" + id + "/feed", null, null), 200).get("waiting").asInt(),
+                    "the run moved the upload out of the inbox; only the sender's file waits");
+
+            // the feed's later runs, once every file in the inbox has sat still past the window
+            long old = System.currentTimeMillis() - 3_600_000L;
+            try (var w = Files.list(inbox(id))) {
+                for (Path p : w.toList()) Files.setLastModifiedTime(p, java.nio.file.attribute.FileTime.fromMillis(old));
+            }
+            for (int i = 0; i < 3; i++) c.svc().runPipeline(id).orElseThrow();
+            assertEquals(53, rows(id), "the feed took the sender's file once and the upload not a second time");
+        }
+    }
+
+    @Test
+    void onBasicAddAFileStillTakesTheFilesWaitingInTheInbox(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(null);   // a real Basic class path: no feed, no stability window
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "basic", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            Files.writeString(inbox(id).resolve("drop_w.csv"), ControlApiOnboardFilesTest.transfers(3));
+            JsonNode added = data(send(c, "POST", "/datasets/" + id + "/files?name=more.csv&mode=append",
+                    ControlApiOnboardFilesTest.transfers(10).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(13, added.get("rowsChanged").asLong(), "the upload and the waiting file, as before: " + added);
+            assertEquals(53, rows(id));
         }
     }
 

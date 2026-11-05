@@ -65,8 +65,8 @@ final class InboxWatch {
     static final String WATCH_KEY = "watchInbox";
 
     /**
-     * Something the one poller looks at every {@link #EVERY_MS}: an import inbox here, a database snapshot later
-     * ({@code BASIC-ONBOARD-1} P3). {@link #poll} runs on the poll thread only, one poll target at a time, with the Space's
+     * Something the one poller looks at every {@link #EVERY_MS}: an import inbox (a Postgres snapshot is not
+     * polled since 2026-11-05: Run now exports it). {@link #poll} runs on the poll thread only, one poll target at a time, with the Space's
      * MDC set to {@link #space}; it answers false to stop being polled. An exception is logged and the poll target kept.
      */
     interface PollTarget {
@@ -186,21 +186,17 @@ final class InboxWatch {
         return "inbox|" + writeRoot.toAbsolutePath().normalize() + "|" + id;
     }
 
-    static String snapshotKey(Path writeRoot, String id) {
-        return "snapshot|" + writeRoot.toAbsolutePath().normalize() + "|" + id;
-    }
-
-    /** The poll target for a watched entry: a table snapshot is refreshed (P3), any other import's inbox is watched. */
+    /** The poll target for a watched entry: its inbox. A Postgres snapshot has none (it is refreshed with Run now only). */
     private static PollTarget target(ApiContext api, String space, Path writeRoot, String id, Map<String, Object> content) {
-        return snapshot(content) ? new Snapshot(api, space, writeRoot, id) : new Inbox(api, space, writeRoot, id);
+        return new Inbox(api, space, writeRoot, id);
     }
 
     /**
-     * Whether the 30 s poll is on now: the toggle is on, no schedule runs the Pipeline, and either it is a table snapshot
-     * (refreshed: replaced, so a Reference too) or not a Reference (a watched inbox only adds rows).
+     * Whether the 30 s poll is on now: the toggle is on, no schedule runs the Pipeline, not a Reference (a watched inbox only
+     * adds rows) and not a Postgres snapshot (manual only since 2026-11-05: Run now exports the table and moves it in).
      */
     static boolean watched(Map<String, Object> content, PipelineConfig cfg) {
-        return Boolean.TRUE.equals(content.get(WATCH_KEY)) && (snapshot(content) || !"reference".equals(content.get("kind")))
+        return Boolean.TRUE.equals(content.get(WATCH_KEY)) && !snapshot(content) && !"reference".equals(content.get("kind"))
                 && PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL;
     }
 
@@ -270,7 +266,7 @@ final class InboxWatch {
                     .map(ComponentRegistry.Component::content).orElse(null);
             if (content == null || !Boolean.TRUE.equals(content.get(WATCH_KEY))) return false;
             if ("reference".equals(content.get("kind"))) return false;   // set by another door: a watched inbox only adds rows
-            if (snapshot(content) || PostgresSnapshot.isSnapshot(writeRoot, id)) return false;   // refreshed by its own target (P3)
+            if (snapshot(content) || PostgresSnapshot.isSnapshot(writeRoot, id)) return false;   // a snapshot is never polled
             try {
                 OnboardImport.requireOwnImport(writeRoot, id, content, service);
             } catch (ApiException notOurs) {
@@ -322,55 +318,6 @@ final class InboxWatch {
         }
     }
 
-    /**
-     * A Postgres table snapshot refreshed every 30 s ({@code BASIC-ONBOARD-1} P3 with P2's toggle): each poll runs
-     * {@link PostgresSnapshot#poll}, which copies the table again and replaces everything only when the copy's bytes differ
-     * from the last arrival. No settle check: there is no inbox, the copy is made by the server itself.
-     */
-    static final class Snapshot implements PollTarget {
-        private final ApiContext api;
-        private final String space, id, key;
-        private final Path writeRoot;
-
-        Snapshot(ApiContext api, String space, Path writeRoot, String id) {
-            this.api = api;
-            this.space = space;
-            this.writeRoot = writeRoot.toAbsolutePath().normalize();
-            this.id = id;
-            this.key = snapshotKey(writeRoot, id);
-        }
-
-        @Override public String key() { return key; }
-        @Override public String space() { return space; }
-        @Override public ApiContext owner() { return api; }
-
-        @Override
-        public boolean poll() {
-            if (HostContext.of(api).spaces().space(SpaceId.of(space)).isEmpty()) return false;   // the Space is gone
-            if (!writeRoot.equals(api.writeRoot() == null ? null : api.writeRoot().toAbsolutePath().normalize())) return false;
-            Path dataRoot = api.dataRoot();
-            if (dataRoot == null || !DataSettings.forRoot(writeRoot).selfImportInForce()) return true;   // Add data off: wait
-            Path data = dataRoot.toAbsolutePath().normalize();
-            CollectorService service = HostContext.of(api).service();
-            Map<String, Object> content = new ComponentStore(writeRoot.resolve("registry")).get("dataset", id)
-                    .map(ComponentRegistry.Component::content).orElse(null);
-            if (content == null || !Boolean.TRUE.equals(content.get(WATCH_KEY))) return false;
-            if (!snapshot(content) || !PostgresSnapshot.isSnapshot(writeRoot, id)) return false;
-            if (!OnboardImport.isOurs(writeRoot, id, content, service)) return false;
-            PipelineConfig cfg = service.configFor(id).orElse(null);
-            if (cfg == null) return false;
-            if (!watched(content, cfg)) return true;   // a schedule runs it: not ours to poll
-            record(writeRoot, data, id, content.get("importPipeline"), () -> {
-                try {
-                    PostgresSnapshot.poll(writeRoot, data, service, id);   // false = the table is unchanged: nothing added
-                } catch (IOException e) {
-                    throw new java.io.UncheckedIOException(e);
-                }
-            });
-            return true;
-        }
-    }
-
     // ── PUT /datasets/{id}/watch ────────────────────────────────────────────────────────────────────────────
 
     static void registerRoutes(ApiContext api) {
@@ -383,8 +330,10 @@ final class InboxWatch {
         DatasetFeed.Import imp = DatasetFeed.gate(api, ex, id, "Watch this folder");
         if (body == null || !(body.get("watch") instanceof Boolean on))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "watch must be true or false");
-        boolean snapshot = snapshot(imp.content());
-        if (on && !snapshot && "reference".equals(imp.content().get("kind")))
+        if (on && (snapshot(imp.content()) || PostgresSnapshot.isSnapshot(imp.writeRoot(), id)))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "a Postgres snapshot is not polled; Refresh now copies the table again");
+        if (on && "reference".equals(imp.content().get("kind")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "a Reference is replaced with Add a file; a watched inbox only adds rows, so it keeps Events up to date");
         PipelineConfig cfg = imp.service().configFor(id)
@@ -409,7 +358,6 @@ final class InboxWatch {
         if (on) register(target(api, EventLog.currentSpaceId(), imp.writeRoot(), id, imp.content()));
         else {
             unregister(key);
-            unregister(snapshotKey(imp.writeRoot(), id));
             LAST_ERROR.remove(errorKey(imp.dataRoot(), id));
         }
         return DatasetFeed.read(api, ex, id);

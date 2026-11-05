@@ -17,6 +17,13 @@ import {
     roleUnder,
     suggestDatasetName,
     summaryLines,
+    ColumnState,
+    RowConditionState,
+    buildFilter,
+    conditionProblem,
+    keepsRowsLine,
+    rowConditions,
+    rowOps,
 } from './add-data.model';
 import { accountsDraft, lowDraft, summary, transfersDraft } from './add-data.testing';
 
@@ -384,5 +391,88 @@ describe('lookups in the draft (ONBOARDING-FIRST-RUN-1 C6a)', () => {
         };
         expect(keptFormat(d)).toEqual({ delimiter: ';', quote: '"' });
         expect(keptFormat(null)).toEqual({});
+describe('row filter words and checks (ADD-DATA-ROW-FILTER-1)', () => {
+    const col = (name: string, type: string, drop = false): ColumnState => ({
+        name,
+        rename: name,
+        type,
+        drop,
+        entityType: '',
+        role: 'detail',
+    });
+    const cols = [col('channel', 'VARCHAR'), col('amount', 'DOUBLE'), col('on', 'DATE'), col('ok', 'BOOLEAN')];
+    const cond = (over: Partial<RowConditionState>): RowConditionState => ({
+        column: 'channel',
+        op: 'eq',
+        value: '',
+        min: '',
+        max: '',
+        matchCase: false,
+        ...over,
+    });
+
+    it('a column offers contains only for text and a range only for numbers, dates and times', () => {
+        expect(rowOps('VARCHAR')).toEqual(['eq', 'ne', 'contains']);
+        expect(rowOps('DOUBLE')).toEqual(['eq', 'ne', 'range']);
+        expect(rowOps('TIMESTAMP')).toEqual(['eq', 'ne', 'range']);
+        expect(rowOps('BOOLEAN')).toEqual(['eq', 'ne']);
+    });
+
+    it('an incomplete condition says what it lacks; a complete one is sent trimmed, a range with only its bounds', () => {
+        expect(conditionProblem(cond({ column: '' }), cols)).toBe('Choose a column.');
+        expect(conditionProblem(cond({ value: '  ' }), cols)).toBe('Enter a value.');
+        expect(conditionProblem(cond({ column: 'amount', op: 'contains', value: '1' }), cols)).toBe(
+            'Choose a condition this column offers.',
+        );
+        expect(conditionProblem(cond({ column: 'amount', op: 'range' }), cols)).toBe(
+            'Enter a from value, a to value or both.',
+        );
+        expect(conditionProblem(cond({ value: 'x' }), [col('channel', 'VARCHAR', true)])).toContain('left out');
+        expect(conditionProblem(cond({ column: 'on', op: 'range', max: '2026-01-31' }), cols)).toBe('');
+        expect(
+            buildFilter([
+                cond({ value: ' mobile ' }),
+                cond({ column: 'on', op: 'range', value: 'stale', max: '2026-01-31' }),
+            ]),
+        ).toEqual([
+            { column: 'channel', op: 'eq', value: 'mobile' },
+            { column: 'on', op: 'range', max: '2026-01-31' },
+        ]);
+        // Match case travels only on contains (operator 2026-11-05)
+        expect(
+            buildFilter([
+                cond({ op: 'contains', value: 'Agent', matchCase: true }),
+                cond({ op: 'eq', value: 'x', matchCase: true }),
+                cond({ op: 'contains', value: 'y' }),
+            ]),
+        ).toEqual([
+            { column: 'channel', op: 'contains', value: 'Agent', matchCase: true },
+            { column: 'channel', op: 'eq', value: 'x' },
+            { column: 'channel', op: 'contains', value: 'y' },
+        ]);
+    });
+
+    it('the card sentence, and a stored entry read back (anything not a condition skipped)', () => {
+        expect(keepsRowsLine([])).toBe('');
+        expect(
+            keepsRowsLine([
+                { column: 'channel', op: 'ne', value: 'branch' },
+                { column: 'note', op: 'contains', value: 'refund' },
+                { column: 'on', op: 'range', max: '2026-01-31' },
+            ]),
+        ).toBe("Keeps rows where channel is not branch and note contains 'refund' and on is 2026-01-31 or less");
+        expect(keepsRowsLine([{ column: 'note', op: 'contains', value: 'REFUND', matchCase: true }])).toBe(
+            "Keeps rows where note contains 'REFUND' (exact case)",
+        );
+        expect(rowConditions([{ column: 'a', op: 'eq', value: '1' }, { column: 'b', op: 'like' }, 'x', null])).toEqual([
+            { column: 'a', op: 'eq', value: '1' },
+        ]);
+        expect(rowConditions({})).toEqual([]);
+    });
+
+    it('a run summary counts the rows left out apart from the rows kept', () => {
+        const lines = summaryLines(summary({ rowsIn: 100, rowsFilteredOut: 40, rowsAfter: 60 })).map((l) => l.text);
+        expect(lines[0]).toBe('100 rows were read from transfers.csv; 60 rows were kept.');
+        expect(lines).toContain('40 rows were left out by the row filter.');
     });
 });

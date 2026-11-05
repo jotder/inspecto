@@ -36,6 +36,14 @@ class OpsEditionFeaturesTest {
     }
 
     @Test
+    void opsDeclaresPipelinesThatRunOnTheirOwn() {
+        EditionFeatures.overrideForTest(null);
+        assertTrue(EditionFeatures.present(EditionFeatures.PIPELINE_AUTOMATION),
+                "Standard and up keep an import up to date and keep a retention policy (operator 2026-11-05)");
+        assertFalse(EditionFeatures.gatesRoutes(EditionFeatures.PIPELINE_AUTOMATION), "the feed and storage routes check it themselves");
+    }
+
+    @Test
     void opsDeclaresTheDashboardWidgetFlagButItIsNotARouteFeature() {
         EditionFeatures.overrideForTest(null);
         assertTrue(EditionFeatures.present(EditionFeatures.LA_WIDGETS), "Standard and up bring the LA dashboard widgets (D-LAE2)");

@@ -62,9 +62,8 @@ class ImportCapabilityGuardTest {
                     + "and collector (DatasetFeed.rewrite), not the Dataset entry"),
             Map.entry("PUT /datasets/([^/]+)/watch", "turns the 30 s poll on or off (the entry's watchInbox key, nothing "
                     + "else). For an inbox the generic door writing the same key is no wider: a builder can already put the "
-                    + "import Pipeline on a schedule. For a Postgres snapshot it IS wider - a builder may turn on the 30 s "
-                    + "refresh, Run now's act - an accepted, bounded widening (operator 2026-11-05): the same stored "
-                    + "connection and table, and _snapshot.toon can no longer be planted (ImportPaths.REFUSED_SUFFIXES)"),
+                    + "import Pipeline on a schedule. A Postgres snapshot is refused (422): it is never polled since the "
+                    + "export-then-move redesign (operator 2026-11-05), so the widening this door once allowed is gone"),
             Map.entry("POST /datasets/([^/]+)/compact", "Compact now: merges the Dataset's stored data files; the "
                     + "Dataset's config is untouched"));
 

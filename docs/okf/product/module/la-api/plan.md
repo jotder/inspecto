@@ -44,7 +44,6 @@ design: [architecture](architecture.md); layer: [layer/la architecture](../../la
 
 Open rows in [`docs/BACKLOG.md`](../../../../BACKLOG.md):
 
-- `LA-EDITIONS-RESIDUALS-1` (P3): what LA-EDITIONS-1 left.
 - `LA-ENTITY-PROFILE-RESIDUALS-1` (P3), `LA-I2-GAPS-RESIDUALS-1` (P3): residuals of the profile and i2-gap lanes.
 - `LA-CONFIG-LIMITS-RESIDUALS-1` (P3): re-measure the doubled defaults on a server-class host.
 - `LA-A11Y-AUDIT-1` (P3): person-only accessibility checks.

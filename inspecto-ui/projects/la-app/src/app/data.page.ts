@@ -120,6 +120,7 @@ import {
                                     description: d.description,
                                     importPipeline: d.importPipeline ?? d.id,
                                     importSource: d.importSource ?? undefined,
+                                    importFilter: d.importFilter,
                                 }"
                             ></inspecto-import-dataset-card>
                         } @else {

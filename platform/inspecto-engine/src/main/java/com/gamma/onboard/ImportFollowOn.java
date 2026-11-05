@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * One application's follow-on step of an import's default Pipeline ({@code BASIC-ONBOARD-1} P1): read → arrange →
  * write Parquet → <b>follow-on</b>. The platform's Add data runs every registered follow-on inside the user's run
- * (DT-16), after the Parquet is written and compacted and before the Expectations, and reports each outcome in the run
+ * (DT-16), in every edition (operator 2026-11-05), after the Parquet is written and compacted and before the Expectations, and reports each outcome in the run
  * summary under {@link #key()}. An application without one ends at the Parquet.
  *
  * <p>A {@code ServiceLoader} SPI (a {@code META-INF/services} entry, found through {@code OptionalSpi.all}) because the
@@ -24,14 +24,19 @@ public interface ImportFollowOn {
     /** The Dataset entry keys it needs; without them it reports itself skipped (Link Analysis: {@code defaultLinkMapping}). */
     Set<String> needs();
 
-    /** Its outcome when the Space's Jobs do this work instead of the user's run ({@code pipeline.automation} present). */
-    Map<String, Object> deferred();
-
     /**
      * Do the work for one import. A refusal or failure is an outcome ({@code result}, {@code message}, plus its own
      * fields), never an exception.
      */
     Map<String, Object> run(Context context);
+
+    /**
+     * The Dataset's files were rewritten by a compaction ({@code LA-DATASET-COMPACT-2}): rows may be gone (retention) and
+     * every file has a new name. Forget anything remembered about the old files, so the next read judges the new ones. Runs
+     * after every compaction that changed the files - inside a run, <i>Compact now</i>, or a scheduled run's commit - in
+     * every edition. Never throws. Default: nothing remembered.
+     */
+    default void filesRewritten(Context context) {}
 
     /**
      * What a follow-on gets: the Space's roots, the Dataset id, its registry entry as it stands after the run, and who

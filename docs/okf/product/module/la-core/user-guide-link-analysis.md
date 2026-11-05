@@ -215,8 +215,8 @@ up to date. For each one:
 - its card: for a Dataset you added, the **Data status** line (when data last arrived, the period it covers, whether the
   graph has it), the **Arrivals** (every file it took, uploaded or put in its inbox by another system), *Add a file* and
   *Run now*; under **Inbox**, *Watch this folder* imports what another system writes there on its own, checked every
-  30 seconds, once the files have stopped changing (every edition); a Postgres table snapshot shows *Refresh now* and
-  *Refresh every 30 seconds* instead; for one a Pipeline or a Job keeps up to date, *Kept up to date by a Pipeline or a Job* - its data is
+  30 seconds, once the files have stopped changing (every edition); a Postgres table snapshot shows *Refresh now*
+  instead, and is copied again only when you press it; for one a Pipeline or a Job keeps up to date, *Kept up to date by a Pipeline or a Job* - its data is
   written there, so there is nothing to add here;
 - **Entities**: what each column holds, one Entity Type or *Nothing: a detail* per column - changed here, saved at once;
 - **Mappings**: how its rows are read as links. The Dataset has its own; **New mapping** saves another, under its own

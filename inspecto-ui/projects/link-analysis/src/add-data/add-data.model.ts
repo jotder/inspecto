@@ -221,6 +221,23 @@ export interface CommitLink {
     primaryMeasure?: string;
 }
 
+/** A row condition's operator (ADD-DATA-ROW-FILTER-1): the closed set the server takes. */
+export type RowOp = 'eq' | 'ne' | 'contains' | 'range';
+
+/**
+ * One row condition: in a commit body `column` is the DRAFT column's name; on the Dataset entry (`importFilter`) and in a
+ * run summary (`filter`) it is the Dataset's (renamed) name. A range has `min`, `max` or both (inclusive), the others `value`.
+ */
+export interface RowCondition {
+    column: string;
+    op: RowOp;
+    value?: string;
+    min?: string;
+    max?: string;
+    /** `contains` only: match the value's case exactly (operator 2026-11-05); absent = ignore case. */
+    matchCase?: boolean;
+}
+
 /** The body of `POST /onboard/files/{draftId}/commit`; every key optional (absent = the draft's proposal). */
 export interface CommitBody {
     name: string;
@@ -230,11 +247,13 @@ export interface CommitBody {
     link?: CommitLink | null;
     identifyingColumn?: string | null;
     recordType?: string | null;
+    /** ADD-DATA-ROW-FILTER-1: keep only the rows that meet every condition; absent = every row. */
+    filter?: RowCondition[];
 }
 
 /** `index` of a run summary: the link index built inside the user's run (DT-16). */
 export interface ImportIndexOutcome {
-    result: 'BUILT' | 'UP_TO_DATE' | 'REFUSED' | 'FAILED' | 'SKIPPED' | 'NOT_AVAILABLE' | 'DEFERRED' | string;
+    result: 'BUILT' | 'UP_TO_DATE' | 'REFUSED' | 'FAILED' | 'SKIPPED' | 'NOT_AVAILABLE' | string;
     message?: string | null;
     edges?: number | null;
     nodes?: number | null;
@@ -260,7 +279,7 @@ export interface Arrival {
     rowsRejected: number | null;
     mode: 'replace' | 'append' | 'period' | null;
     sha256: string | null;
-    /** The link index outcome of the run that took this file (BUILT, UP_TO_DATE, DEFERRED, FAILED, …); null = not recorded. */
+    /** The link index outcome of the run that took this file (BUILT, UP_TO_DATE, FAILED, …); null = not recorded. */
     index: string | null;
     /** How that build ran: `append` (the new file only), `full`, `compact`, `none`; null = not recorded. */
     indexMode?: string | null;
@@ -270,6 +289,8 @@ export interface Arrival {
     coversTo: string | null;
     /** LA-ARRIVAL-MODES-1: columns the file carried that the Dataset does not read (accepted, not kept). */
     newColumns?: string[] | null;
+    /** ADD-DATA-ROW-FILTER-1: rows of this file the import's row filter left out; null = no filter, or not counted. */
+    rowsFilteredOut?: number | null;
     /** A `REFUSED` arrival: why, and where the file was set aside (relative to the Dataset's folder). */
     reason?: string | null;
     setAside?: string | null;
@@ -298,6 +319,10 @@ export interface ImportSummary {
     file?: string;
     rowsIn: number;
     rowsRejected: number;
+    /** ADD-DATA-ROW-FILTER-1: rows the import's row filter left out (absent = no filter; null = not counted for this format). */
+    rowsFilteredOut?: number | null;
+    /** The import's row conditions, by the Dataset's column names (absent = no filter). */
+    filter?: RowCondition[];
     rejectedDetail?: string;
     quarantined: { file: string; reason: string }[];
     rowsBefore: number;
@@ -340,6 +365,87 @@ export interface ImportDataset {
     importPipeline?: string;
     /** `postgres` when Add data copies it from a Postgres table (BASIC-ONBOARD-1 P3); absent for files. */
     importSource?: string;
+    /** ADD-DATA-ROW-FILTER-1: the rows the import keeps (`importFilter` on the entry); absent or empty = every row. */
+    importFilter?: RowCondition[];
+}
+
+// ── Row filter (ADD-DATA-ROW-FILTER-1) ───────────────────────────────────────────────────────────────────────────────
+
+const RANGE_TYPES: ReadonlySet<string> = new Set(['BIGINT', 'DOUBLE', 'DATE', 'TIMESTAMP']);
+const ROW_OPS: readonly RowOp[] = ['eq', 'ne', 'contains', 'range'];
+
+export const ROW_OP_LABELS: Record<RowOp, string> = {
+    eq: 'is',
+    ne: 'is not',
+    contains: 'contains',
+    range: 'is between',
+};
+
+/** The operators a column of `type` offers: is / is not always, contains for text, a range for numbers, dates and times. */
+export function rowOps(type: string): RowOp[] {
+    return ROW_OPS.filter((op) =>
+        op === 'contains' ? type === 'VARCHAR' : op === 'range' ? RANGE_TYPES.has(type) : true,
+    );
+}
+
+/** What the screen holds for one condition; '' = not filled in. `column` is the draft column's name. */
+export interface RowConditionState {
+    column: string;
+    op: RowOp;
+    value: string;
+    min: string;
+    max: string;
+    /** `contains` only: match case exactly. */
+    matchCase: boolean;
+}
+
+/** Why a condition cannot be sent yet ('' = it can), against the columns as the screen holds them. */
+export function conditionProblem(c: RowConditionState, columns: readonly ColumnState[]): string {
+    const col = columns.find((x) => x.name === c.column);
+    if (!col) return 'Choose a column.';
+    if (col.drop) return 'This column is left out, so it cannot keep rows.';
+    if (!rowOps(col.type).includes(c.op)) return 'Choose a condition this column offers.';
+    if (c.op === 'range') return text(c.min) || text(c.max) ? '' : 'Enter a from value, a to value or both.';
+    return text(c.value) ? '' : 'Enter a value.';
+}
+
+/** The commit's `filter` from the screen's conditions (each one complete; see {@link conditionProblem}). */
+export function buildFilter(conditions: readonly RowConditionState[]): RowCondition[] {
+    return conditions.map((c) => {
+        if (c.op === 'contains' && c.matchCase)
+            return { column: c.column, op: c.op, value: text(c.value), matchCase: true };
+        if (c.op !== 'range') return { column: c.column, op: c.op, value: text(c.value) };
+        const r: RowCondition = { column: c.column, op: 'range' };
+        if (text(c.min)) r.min = text(c.min);
+        if (text(c.max)) r.max = text(c.max);
+        return r;
+    });
+}
+
+/** The conditions a Dataset entry's `importFilter` holds; anything not shaped like one is skipped. */
+export function rowConditions(raw: unknown): RowCondition[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(
+        (c): c is RowCondition =>
+            !!c && typeof c === 'object' && typeof c.column === 'string' && ROW_OPS.includes(c.op as RowOp),
+    );
+}
+
+/** "Keeps rows where channel is mobile and amount is 100 or more"; '' when every row is kept. */
+export function keepsRowsLine(conditions: readonly RowCondition[] | null | undefined): string {
+    if (!conditions?.length) return '';
+    const words = conditions.map((c) => {
+        if (c.op === 'eq') return `${c.column} is ${c.value}`;
+        if (c.op === 'ne') return `${c.column} is not ${c.value}`;
+        if (c.op === 'contains') return `${c.column} contains '${c.value}'${c.matchCase ? ' (exact case)' : ''}`;
+        if (c.min != null && c.max != null) return `${c.column} is between ${c.min} and ${c.max}`;
+        return c.min != null ? `${c.column} is ${c.min} or more` : `${c.column} is ${c.max} or less`;
+    });
+    return `Keeps rows where ${words.join(' and ')}`;
+}
+
+function text(v: unknown): string {
+    return v == null ? '' : String(v).trim();
 }
 
 // ── Words ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -729,7 +835,7 @@ export interface SummaryLine {
 /** A run summary as a few sentences a person reads: rows in, rows set aside and why, the index, the Expectations. */
 export function summaryLines(s: ImportSummary): SummaryLine[] {
     const out: SummaryLine[] = [];
-    const kept = Math.max(0, s.rowsIn - s.rowsRejected);
+    const kept = Math.max(0, s.rowsIn - s.rowsRejected - (s.rowsFilteredOut ?? 0));
     const from = s.file ? ` from ${s.file}` : '';
     // LA-ARRIVAL-MODES-1: waiting files refused by the columns rule were set aside before the run
     const refused: SummaryLine[] = (s.refused ?? []).map((r) => ({
@@ -753,6 +859,11 @@ export function summaryLines(s: ImportSummary): SummaryLine[] {
         out.push({
             tone: 'warning',
             text: `${plural(s.rowsRejected, 'row was', 'rows were')} set aside because ${s.rowsRejected === 1 ? 'it' : 'they'} did not match the column types.`,
+        });
+    if (s.rowsFilteredOut)
+        out.push({
+            tone: 'info',
+            text: `${plural(s.rowsFilteredOut, 'row was', 'rows were')} left out by the row filter.`,
         });
     for (const q of s.quarantined ?? []) out.push({ tone: 'warning', text: `${q.file} was set aside: ${q.reason}.` });
     out.push(...refused);
@@ -802,7 +913,6 @@ function indexAndExpectations(s: ImportSummary): SummaryLine[] {
                 break;
             case 'SKIPPED':
             case 'NOT_AVAILABLE':
-            case 'DEFERRED':
                 out.push({ tone: 'info', text: `No link index was built: ${ix.message ?? 'nothing to build'}.` });
                 break;
             default:
@@ -891,7 +1001,6 @@ const INDEXED = new Set(['BUILT', 'UP_TO_DATE']);
 /** What the graph holds, from the arrivals' recorded index outcomes, newest first; '' when nothing was recorded. */
 function graphClock(list: readonly Arrival[]): string {
     const newest = list[0];
-    if (newest?.index === 'DEFERRED') return "the graph is updated by the Space's Jobs";
     const k = list.findIndex((a) => !!a.index && INDEXED.has(a.index));
     if (k === 0) return 'graph up to date';
     // the arrivals after the newest one the graph took, counted only when their own outcome was recorded
@@ -946,6 +1055,7 @@ export function arrivalLine(a: Arrival): string {
                 ? `${plural(a.rowsRead, 'row', 'rows')} (${a.rowsRejected} rejected)`
                 : plural(a.rowsRead, 'row', 'rows'),
         );
+    if (a.rowsFilteredOut) parts.push(`${plural(a.rowsFilteredOut, 'row', 'rows')} left out by the filter`);
     const covers = coversText(a.coversFrom, a.coversTo);
     if (covers) parts.push(`covers ${covers}`);
     if (a.newColumns?.length) parts.push(`not kept: ${a.newColumns.join(', ')}`);

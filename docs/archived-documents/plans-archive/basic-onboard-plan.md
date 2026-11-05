@@ -207,6 +207,21 @@ Pipeline (`addStaged`), which calls `followOn` and `recordArrival` like every ot
 
 `BASIC-ONBOARD-1` (P2) in `docs/BACKLOG.md`.
 
+## As-built note: the snapshot redesign (2026-11-05, operator)
+
+After P3 shipped, the operator changed how a Postgres snapshot refreshes:
+
+- **Export, then move.** *Refresh now* EXPORTS the table with DuckDB `COPY (...) TO` into a temporary folder under the
+  data root (`<data root>/_onboard/a<uuid>/`, never the inbox). Only once the file is complete is it MOVED atomically
+  into the Dataset's inbox, where the replace path takes it like an uploaded file: name-checked columns, the row
+  filter, the arrival and compaction all apply unchanged. A snapshot still replaces everything.
+- **No poll.** The snapshot's 30 s refresh (`InboxWatch.Snapshot`, `PostgresSnapshot.poll`, the card's *Refresh every
+  30 seconds* toggle) is removed, so a snapshot is manual only, like an upload. This supersedes the §4.6 seam for P3.
+  DT-5 / DT-17 now narrow to the import inbox alone.
+
+As built: `okf/product/module/processor/api-onboarding-authoring.md` (*Choose a table*, *Export, then move*) and
+`okf/product/module/la-core/architecture.md` §6.20.
+
 ## References
 
 - `docs/superpower/data-tier-editions-plan.md` (DT-2, DT-3, DT-4, DT-5, DT-8, DT-10, DT-15, DT-16, DT-17)

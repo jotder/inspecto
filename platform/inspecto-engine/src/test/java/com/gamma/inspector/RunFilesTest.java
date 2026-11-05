@@ -29,4 +29,20 @@ class RunFilesTest {
         }
         assertEquals(all, RunFiles.narrow(all), "closed: unchanged");
     }
+
+    /** ADD-FILE-FEED-1: a file the caller knows is whole passes the stability gate; the gate's own verdict is kept. */
+    @Test
+    void aCompleteScopeReleasesOnlyItsFilesAndEndsWhenClosed(@TempDir Path dir) throws Exception {
+        Path upload = Files.writeString(dir.resolve("add_upload.csv"), "a");
+        Path fresh = Files.writeString(dir.resolve("drop_fresh.csv"), "b");
+        Path settled = Files.writeString(dir.resolve("drop_settled.csv"), "c");
+        List<Path> discovered = List.of(upload, fresh, settled), gated = List.of(settled);
+
+        assertEquals(gated, RunFiles.release(discovered, gated, p -> p), "no scope: the gate decides");
+        try (RunFiles.Scope s = RunFiles.complete(Set.of(upload))) {
+            assertEquals(List.of(upload, settled), RunFiles.release(discovered, gated, p -> p),
+                    "the upload joins, in discovery order; the fresh drop still waits");
+        }
+        assertEquals(gated, RunFiles.release(discovered, gated, p -> p), "closed: the gate decides again");
+    }
 }

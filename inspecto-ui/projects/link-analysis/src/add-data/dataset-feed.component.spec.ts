@@ -145,20 +145,14 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         await expectNoA11yViolations(el);
     });
 
-    it('a table snapshot: only Refresh every 30 seconds, no inbox (BASIC-ONBOARD-1 P3, no violations)', async () => {
+    it('a table snapshot: no inbox and no refresh toggle - it is copied again only by Refresh now (no violations)', async () => {
         const { fixture, el } = create({ snapshot: true });
-        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...STATE, watchable: true, snapshot: true });
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...STATE, watchable: false, snapshot: true });
         fixture.detectChanges();
         expect(q(el, 'dataset-inbox')).toBeNull();
         expect(q(el, 'watch-folder')).toBeNull();
-        const toggle = () => el.querySelector<HTMLButtonElement>('[data-testid="refresh-every"] button')!;
-        toggle().click();
-        const req = http.expectOne(apiUrl('/datasets/calls/watch'));
-        expect(req.request.body).toEqual({ watch: true });
-        req.flush({ ...STATE, watchable: true, snapshot: true, watch: true, watchError: 'Postgres refused the login' });
-        fixture.detectChanges();
-        expect(toggle().getAttribute('aria-checked')).toBe('true');
-        expect(q(el, 'watch-error')!.textContent).toContain('The last refresh failed: Postgres refused the login');
+        expect(el.querySelector('mat-slide-toggle')).toBeNull();
+        expect(q(el, 'snapshot-manual')!.textContent).toContain('only when you press Refresh now');
         await expectNoA11yViolations(el);
     });
 
@@ -345,9 +339,6 @@ describe('dataset-feed wording', () => {
         expect(feedStatusLine(null)).toBeNull();
         expect(feedStatusLine(STATE)).toBeNull();
         expect(feedStatusLine({ ...STATE, watch: true })).toBe('Inbox watched, checked every 30 seconds');
-        expect(feedStatusLine({ ...STATE, watch: true, snapshot: true })).toBe(
-            'Refreshed from its table every 30 seconds',
-        );
         expect(feedStatusLine({ ...STATE, watch: true, waiting: 2, watchError: 'disk full' })).toBe(
             'Inbox watched, checked every 30 seconds · 2 files waiting · the last import failed: disk full',
         );

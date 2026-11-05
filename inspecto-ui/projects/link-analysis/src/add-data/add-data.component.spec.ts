@@ -497,7 +497,100 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         expect(body.columns.find((c) => c.name === 'txn_id')!.rename).toBe('transfer_id');
         expect(body.columns.find((c) => c.name === 'channel')).toEqual({ name: 'channel', drop: true });
         expect(body.link!.kind).toBeUndefined(); // the kind column was left out
+        expect(body.filter).toBeUndefined(); // no row condition: every row (ADD-DATA-ROW-FILTER-1)
         req.flush(summary());
+    });
+
+    it('ADD-DATA-ROW-FILTER-1: row conditions on the review step are said in words and sent as the commit filter (no violations)', async () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        expect(q(el, 'keeps-line')).toBeNull();
+
+        (q(el, 'add-condition') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        // an empty condition holds Create back, with its reason on the row
+        expect(el.querySelector('[data-condition="0"] [role="alert"]')!.textContent).toContain('Choose a column.');
+        expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(true);
+        pickerSet(fixture, '[data-condition="0"] [data-testid="condition-column"]', 'channel');
+        expect(el.querySelector('[data-condition="0"] [role="alert"]')!.textContent).toContain('Enter a value.');
+        penEdit(
+            fixture,
+            el.querySelector<HTMLElement>('[data-condition="0"] [data-testid="condition-value"]')!,
+            ' mobile ',
+        );
+
+        (q(el, 'add-condition') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        pickerSet(fixture, '[data-condition="1"] [data-testid="condition-column"]', 'amount');
+        // a number column offers a range, and no "contains"
+        const ops = fixture.debugElement.queryAll(By.css('[data-condition="1"] [data-testid="condition-op"]'))[0]
+            .componentInstance as { options: () => { value: string }[] };
+        expect(ops.options().map((o) => o.value)).toEqual(['eq', 'ne', 'range']);
+        pickerSet(fixture, '[data-condition="1"] [data-testid="condition-op"]', 'range');
+        penEdit(fixture, el.querySelector<HTMLElement>('[data-condition="1"] [data-testid="condition-min"]')!, '100');
+
+        // the sentence names the column by its new name
+        penEdit(fixture, penByLabel(el, 'Column 5')!, 'via');
+        expect(q(el, 'keeps-line')!.textContent!.trim()).toBe(
+            'Keeps rows where via is mobile and amount is 100 or more.',
+        );
+        expect(el.querySelector('[data-testid="row-filter"] [role="alert"]')).toBeNull();
+        await expectNoA11yViolations(el);
+
+        const req = commit(fixture, el);
+        expect(bodyOf(req).filter).toEqual([
+            { column: 'channel', op: 'eq', value: 'mobile' },
+            { column: 'amount', op: 'range', min: '100' },
+        ]);
+        req.flush(summary({ rowsFilteredOut: 15, filter: [{ column: 'via', op: 'eq', value: 'mobile' }] }));
+        fixture.detectChanges();
+        expect(el.textContent).toContain('15 rows were left out by the row filter.');
+        expect(q(el, 'keeps-rows')!.textContent).toContain('Keeps rows where via is mobile');
+    });
+
+    it('ADD-DATA-ROW-FILTER-1: contains offers Match case, sent and said only when ticked (operator 2026-11-05)', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        (q(el, 'add-condition') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        pickerSet(fixture, '[data-condition="0"] [data-testid="condition-column"]', 'channel');
+        expect(q(el, 'condition-match-case')).toBeNull(); // "is" has no case switch
+        pickerSet(fixture, '[data-condition="0"] [data-testid="condition-op"]', 'contains');
+        penEdit(
+            fixture,
+            el.querySelector<HTMLElement>('[data-condition="0"] [data-testid="condition-value"]')!,
+            'Agent',
+        );
+        expect(q(el, 'keeps-line')!.textContent!.trim()).toBe("Keeps rows where channel contains 'Agent'.");
+        (el.querySelector('[data-testid="condition-match-case"] input') as HTMLInputElement).click();
+        fixture.detectChanges();
+        expect(q(el, 'keeps-line')!.textContent!.trim()).toBe(
+            "Keeps rows where channel contains 'Agent' (exact case).",
+        );
+        const req = commit(fixture, el);
+        expect(bodyOf(req).filter).toEqual([{ column: 'channel', op: 'contains', value: 'Agent', matchCase: true }]);
+        req.flush(summary());
+    });
+
+    it('ADD-DATA-ROW-FILTER-1: leaving out a column a condition names holds Create back; removing the condition frees it', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        (q(el, 'add-condition') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        pickerSet(fixture, '[data-condition="0"] [data-testid="condition-column"]', 'channel');
+        penEdit(
+            fixture,
+            el.querySelector<HTMLElement>('[data-condition="0"] [data-testid="condition-value"]')!,
+            'agent',
+        );
+        (el.querySelector('[data-column="channel"] [data-testid="drop-column"] input') as HTMLInputElement).click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-condition="0"] [role="alert"]')!.textContent).toContain('left out');
+        expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(true);
+        (q(el, 'remove-condition') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-condition="0"]')).toBeNull();
+        expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(false);
     });
 
     it('an invalid rename holds Create back with the reason on the row', () => {
