@@ -177,7 +177,11 @@ to date** is locked on Basic. On Standard and up it asks where the files come fr
 *files on an SFTP server* through a Connection), how often to check, and an optional ready marker (read `name.csv` only
 once `name.csv.done` is there); new files are then imported on their own, a file sent again is skipped, and the Job that
 adds them to the graph is saved for you when you may author Jobs (else the card names the Job to ask an administrator
-for). **Stop** goes back to importing only when asked. If adding data is off in this Space the screen says why (*its data comes from Pipelines*);
+for). **Stop** goes back to importing only when asked. **Storage** says how many files the Dataset holds; past 20 an import
+merges them into one so reading stays quick, and **Compact now** does it at once; the merge keeps each arrival's
+period on record (the *Arrivals* list shows it once it reads that record, `LA-ARRIVAL-LEDGER-1`). On
+Standard and up, **Keep** sets what the Dataset keeps (*every arrival*, *the last N days* by each row's date, or *the
+last N arrivals*); older rows are removed at the next compaction. If adding data is off in this Space the screen says why (*its data comes from Pipelines*);
 with sign-in an administrator turns it on per Space (**Settings → Add data**, *People may add data in this Space*), and
 you need the right to upload data.
 

@@ -84,6 +84,7 @@ final class OnboardRoutes implements RouteModule {
         api.put("/datasets/([^/]+)/record-type", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> OnboardImport.setRecordType(api, e, ApiContext.name(m), api.body(e))));
         DatasetFeed.register(api);   // LA-ARRIVAL-FEEDS-1
+        DatasetCompaction.register(api);   // LA-DATASET-COMPACT-1
     }
 
     /** The standard rate-limit bucket covers these (each reads, or runs, a whole file). */

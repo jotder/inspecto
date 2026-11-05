@@ -1830,6 +1830,55 @@ for THIS id).
 - Tests: `ControlApiDatasetFeedTest` (real HTTP: Basic inbox + Run now, Standard PUT/DELETE and the reloaded config,
   every refusal, armed 401/403/200), `dataset-feed.component.spec.ts`, `import-dataset-card.component.spec.ts`.
 
+### 6.18 Dataset storage: compaction, the merge map and retention (LA-DATASET-COMPACT-1, as built 2026-11-05)
+
+Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P4, decisions D-5…D-9 (operator
+2026-11-05). Class `inspecto/.../control/DatasetCompaction.java`, registered from `OnboardRoutes`.
+
+| Route | Gate | What |
+|---|---|---|
+| `GET /datasets/{id}/storage` | `canUploadData` | `files`, `bytes`, `threshold` (20), `compactedAt`, `compactedArrivals`, `removedArrivals`, `retention`, `retentionAvailable` |
+| `POST /datasets/{id}/compact` | `canUploadData` | *Compact now*, at any count; claims `OnboardImport.IN_FLIGHT` (409 while an import or a delete runs); the answer carries `compaction {result, filesBefore, filesAfter, rowsRemoved, message}` |
+| `PUT /datasets/{id}/storage` | `canAuthorWorkbench` | `{retention: {days: N} \| {arrivals: N} \| null}` on the Dataset entry; 503 without `pipeline.automation` (Basic); an approval policy over Datasets refuses (409) |
+
+All three after Add a file's gates (503 no write root, 403 `data.self_import`, 404 / 409 `importDataset`).
+
+- **On its own (D-6).** `OnboardImport.Job.followOn` calls `DatasetCompaction.afterImport` first, so every import path
+  (commit, Add a file, Run now) compacts past 20 files inside the person's run, before the index build; the summary
+  carries `compaction`. Never throws: a failed compaction leaves the files and says so. Every edition.
+- **How.** Every Parquet file under `<dataRoot>/<id>/database` (no hidden file, no link) is read in a DuckDB sealed to
+  `<dataRoot>/<id>`, each row tagged with its arrival (`__seq`) and its row number, and written ONE file
+  `compacted_<stamp>.parquet` ordered by arrival (`UNION ALL BY NAME`, so drifted columns line up). Arrival order: the
+  segments the previous merged file holds (its map's order), then the loose files by modification time.
+- **The merge map (D-7)** `<dataRoot>/<id>/compaction.json`: `merged`, `at`, `arrivals[{file, received, firstRow, rows,
+  coversFrom, coversTo}]` (the arrival's own output name, its row segment, the period of its kept rows),
+  `removed[{file, at, reason}]` (at most 500), `retention`. `DatasetCompaction.merged(dataRoot, id)` answers it ONLY
+  while the merged file exists, so a *Replace everything* (which sets the whole `database` folder aside) silences it.
+- **The swap.** Write the merged file in `<id>/temp`, write `compaction.json.pending` (merged name, inputs, next map),
+  move the merged file in, delete the inputs (only inside `database`, never the merged file), commit the map. `heal`
+  (run before every compaction) finishes a pending swap whose merged file moved in, or drops one whose file did not.
+  Between the move and the deletes a reader may count rows twice; an input that cannot be deleted (held open) stays
+  named in the pending file and is counted twice until the next compaction removes it - the outcome says so. While a
+  pending file still names one, compaction waits (`NOT_NEEDED`): its rows are in the merged file already, and merging
+  it again would keep them twice for good.
+- **Retention (D-8), Standard and up**, applied at compaction: *keep N arrivals* drops the oldest arrivals whole; *keep N
+  days* keeps rows whose event date (`eventDate`, the When column) is within N days - a row whose date is missing or
+  cannot be read as a timestamp always stays - and without a When column (or one the files do not have, checked with
+  `DESCRIBE`) drops whole arrivals received before the cutoff. A policy stored on Basic is ignored
+  (`retentionInForce`): Basic never drops a row.
+- **Link index (D-9).** The files are rewritten, so the index's next build is a full one (its own advice, nothing added).
+- **UI:** `add-data/dataset-storage.component.ts` in the card (*Storage* line, *Compact now*, on Standard the *Keep*
+  picker for a person who may author); `storageStatusLine` is the *Data status* line, joined through the ledger lane's
+  `<inspecto-la-data-status>` once that is on master.
+- **Deliberately not done (review on return):** (a) a Standard feed's SCHEDULED runs do not pass through
+  `OnboardImport`, so they compact only at the next Add a file / Run now or *Compact now* - a `dataset.compact` step on
+  `pipeline.commit` is a follow-up; (b) `DatasetArrivals` reads the merge map (D-7) once the ledger lane's version of
+  that class is on master - until then a merged arrival reads as *set aside* in that list, so this lane is pushed
+  only with that read; (c) *Compact now* with a retention policy does not rebuild the index - the graph follows at
+  the next import; (d) the policy is gated on `pipeline.automation` (the Standard marker the data-tier plan already uses).
+- Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept, Compact now, Replace resets the
+  map, retention by arrivals / by event date / never on Basic, the crash heal, armed gates), `dataset-storage.component.spec.ts`.
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (28); geo-link → `RouteModule` (4), `InvestigationMeasureProbe`,

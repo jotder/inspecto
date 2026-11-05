@@ -28,6 +28,7 @@ import { AddDataAccess } from './add-data-access';
 import { Arrival, ImportDataset, ImportSummary, arrivalLine, dataStatusLine, fileProblem } from './add-data.model';
 import { ImportSummaryComponent } from './import-summary.component';
 import { DatasetFeedComponent } from './dataset-feed.component';
+import { DatasetStorageComponent } from './dataset-storage.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
 /**
@@ -54,6 +55,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         LockedActionComponent,
         ImportSummaryComponent,
         DatasetFeedComponent,
+        DatasetStorageComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -179,6 +181,11 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                     [locked]="locked()"
                     (importWaiting)="runNow()"
                 ></inspecto-dataset-feed>
+                <inspecto-dataset-storage
+                    [datasetId]="dataset().id"
+                    [busy]="busy()"
+                    [locked]="locked()"
+                ></inspecto-dataset-storage>
                 @if (access.automationLock(); as why) {
                     <inspecto-locked-action label="Keep this up to date" [reason]="why"></inspecto-locked-action>
                 } @else if (editorRoute() && access.canAuthor()) {
@@ -230,6 +237,8 @@ export class ImportDatasetCardComponent {
     private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
     /** LA-ARRIVAL-FEEDS-1: the inbox and the feed, re-read after every import. */
     private readonly feedPanel = viewChild(DatasetFeedComponent);
+    /** LA-DATASET-COMPACT-1: the files and the last compaction, re-read after every import (it may have compacted). */
+    private readonly storagePanel = viewChild(DatasetStorageComponent);
 
     /** LA-ARRIVAL-LEDGER-1: every file the import took, newest first; [] while unread or when the read fails. */
     protected readonly arrivals = signal<Arrival[]>([]);
@@ -296,6 +305,7 @@ export class ImportDatasetCardComponent {
                 this.imported.emit(s);
                 this.loadArrivals(this.dataset().id);
                 this.feedPanel()?.load();
+                this.storagePanel()?.load();
             },
             error: (err: unknown) => {
                 this.busy.set(false);

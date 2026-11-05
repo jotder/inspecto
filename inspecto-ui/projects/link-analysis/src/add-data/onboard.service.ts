@@ -14,6 +14,7 @@ import type {
     OnboardDraft,
 } from './add-data.model';
 import type { DatasetFeedState, IndexJob, KeepUpToDate } from './dataset-feed.model';
+import type { DatasetStorageState, Retention } from './dataset-storage.model';
 
 /** A followed run that ended in `failed`: the server's reason, said as it said it. */
 export class ImportRunFailed extends Error {
@@ -148,6 +149,23 @@ export class OnboardService {
     /** Save the index Job *Keep this up to date* proposed, through the Jobs route and its own gates. */
     saveIndexJob(job: IndexJob): Observable<unknown> {
         return this.http.post(apiUrl('/jobs'), job);
+    }
+
+    /** LA-DATASET-COMPACT-1: the Dataset's Parquet files, the last compaction and its retention policy. */
+    storage(datasetId: string): Observable<DatasetStorageState> {
+        return this.http.get<DatasetStorageState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/storage`));
+    }
+
+    /** *Compact now*: merge the Dataset's files into one, whatever their count. */
+    compactNow(datasetId: string): Observable<DatasetStorageState> {
+        return this.http.post<DatasetStorageState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/compact`), null);
+    }
+
+    /** The retention policy (Standard and up, `canAuthorWorkbench`); null keeps every arrival. */
+    setRetention(datasetId: string, retention: Retention | null): Observable<DatasetStorageState> {
+        return this.http.put<DatasetStorageState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/storage`), {
+            retention,
+        });
     }
 
     /** 200 = the summary; 202 = a run to follow (the caller is told, so it can say the run continues on the server). */

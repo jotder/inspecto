@@ -777,6 +777,8 @@ final class OnboardImport {
         void followOn(Map<String, Object> summary) {
             Map<String, Object> current = new ComponentStore(space.writeRoot().resolve("registry")).get("dataset", id)
                     .map(ComponentRegistry.Component::content).orElse(dataset);
+            // LA-DATASET-COMPACT-1 (D-6): merge the files once there are many, before the index reads them
+            summary.put("compaction", DatasetCompaction.afterImport(space.dataRoot(), id, current));
             boolean inRun = !EditionFeatures.present(AUTOMATION_FEATURE);
             summary.put("followOnInRun", inRun);
             summary.put("index", inRun ? buildIndex(current) : outcome("DEFERRED", "the Space's Jobs build the index"));

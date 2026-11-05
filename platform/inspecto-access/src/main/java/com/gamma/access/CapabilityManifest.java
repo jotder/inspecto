@@ -223,6 +223,11 @@ public final class CapabilityManifest {
             new Entry("GET", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
             new Entry("PUT", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
             new Entry("DELETE", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
+            // LA-DATASET-COMPACT-1: the storage read and Compact now are the upload verb; a retention policy (which drops
+            // rows at the next compaction) is a Dataset authoring write.
+            new Entry("GET", "/datasets/([^/]+)/storage", Roles.CAN_UPLOAD_DATA),
+            new Entry("PUT", "/datasets/([^/]+)/storage", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/datasets/([^/]+)/compact", Roles.CAN_UPLOAD_DATA),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

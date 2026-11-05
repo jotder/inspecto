@@ -138,6 +138,14 @@ origin, logical_name`. So the arrival list is a **read** over that ledger, not a
 - **D-3 Duplicates: file-level (sha256) now.** Row keys (upsert) only together with SCD2 (D-ING4, still deferred).
 - **D-4 Arrival history: keep every ledger row** (small); the data files follow D-5.
 - **D-5 Compaction in every edition** (it is read correctness); a **retention policy Standard+**.
+- **D-6…D-9 (operator 2026-11-05, P4, the recommended options):** **D-6** compaction runs on its own at the end of an
+  import once the Dataset holds more than 20 files, inside the person's run, every edition, plus *Compact now* by
+  *Data status*; **D-7** a merge map (the merged file and the arrival files it replaced) keeps every arrival's period
+  and its *kept* state, read by `DatasetArrivals`; **D-8** retention *keep N days* by event date (the *When* column),
+  falling back to the received date; *keep N arrivals* drops the oldest arrivals' rows; applied at compaction time,
+  Standard and up; **D-9** the link-index build after a compaction is a full one (the index's own advice). Guiding rule:
+  "Basic is not a demo, it must be usable" - a Basic inbox poll (every 30 s) comes in its own plan (`BASIC-ONBOARD-1`),
+  so the inbox listing stays callable from a poller (`DatasetFeed.waiting`).
 
 ## 7. Done means
 

@@ -107,6 +107,10 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
             ?.match((r) => r.url.endsWith('/feed'))
             .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
         http?.match((r) => r.url.endsWith('/connections')).forEach((r) => !r.cancelled && r.flush([]));
+        // LA-DATASET-COMPACT-1: and its storage
+        http
+            ?.match((r) => r.url.endsWith('/storage'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
         http?.verify();
     });
 
