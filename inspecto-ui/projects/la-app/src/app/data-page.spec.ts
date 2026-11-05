@@ -241,6 +241,10 @@ describe('a Mapping\'s own "On each link" marks (LA-COLUMN-ROLES-2)', () => {
         expect(own.find((c) => c.name === 'fee')?.carried).toBe(false);
         // a Detail is never marked: it rides along anyway
         expect(cols({ ...f, notCarried: ['note'] }).find((c) => c.name === 'note')?.carried).toBeUndefined();
+        // a mark left on a column then picked as an end is not written: an end is never carried anyway
+        expect(
+            cols({ ...f, notCarried: ['fee'], to: 'fee', toType: '' }).find((c) => c.name === 'fee')?.carried,
+        ).toBeUndefined();
     });
 
     it("editing a Mapping starts from the Mapping's own marks", () => {

@@ -911,6 +911,8 @@ final class EntityProfiles {
                     () -> DatasetProviders.require().inputFingerprint(content, f.api.dataRoot(), f.writeRoot));
             if (fp == null || fp.value() == null || !fp.value().startsWith(InputFingerprint.FILES)) return null;
             sb.append('|').append(ds).append('=').append(fp.value());
+            // LA-COLUMN-ROLES-2: the Measures section reads each Dataset's column roles and units, so a role edit re-reads it
+            sb.append('|').append(content == null ? null : content.get("columns"));
         }
         return sha256(sb.toString());
     }

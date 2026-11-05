@@ -284,6 +284,33 @@ class ControlApiEntityProfileScaleTest {
         }
     }
 
+    /** A cached Measures section is read again once a column's role or unit changes: the cache stamp holds the Dataset's columns. */
+    @Test
+    void aRoleOrUnitChangeReReadsTheCachedMeasures(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        Path dir = null;
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            dir = measureDataset(c, root, "SELECT * FROM (VALUES ('CELL-1', '5', '2'), ('CELL-2', '1', '3')) AS v(s, amt, fee)");
+            String path = "/inv/entity-types/cell/profile?sections=measures";
+            assertEquals(1, data(get(c, path, OWNER)).get("measures").size());
+            JsonNode again = data(get(c, path, OWNER));
+            assertTrue(again.get("cached").asBoolean(), "not vacuous: the second read is the cached one: " + again);
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            Map<String, Object> entry = new java.util.HashMap<>(reg.get("dataset", "m_ds").orElseThrow().content());
+            entry.put("columns", List.of(Map.of("name", "s", "classification", "CELL"),
+                    Map.of("name", "amt", "type", "number", "role", "measure", "unit", "EUR"),
+                    Map.of("name", "fee", "type", "number", "role", "measure")));
+            reg.write("dataset", "m_ds", entry);
+            JsonNode after = data(get(c, path, OWNER));
+            assertEquals(2, after.get("measures").size(), "a new Measure shows: " + after);
+            assertEquals("EUR", after.at("/measures/0/unit").asText(), "and a changed unit: " + after);
+        } finally {
+            if (dir != null) rmTree(dir);
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
     /** A per-Entity Measure read that runs past the statement timeout is not assessed, keeps the row aggregates, and is never cached. */
     @Test
     void aMeasureDistributionThatTimesOutIsNotAssessedAndNeverCached(@TempDir Path cfg, @TempDir Path root) throws Exception {

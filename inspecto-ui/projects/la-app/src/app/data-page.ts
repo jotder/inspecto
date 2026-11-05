@@ -248,7 +248,12 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
         // LA-COLUMN-ROLES-2: whether it rides on this Mapping's links is the Mapping's own mark, not its base's
         // (an entry written before roles reads its role as the page shows it - a date column is a Time - and states it)
         const shown = role ?? (chosen === undefined ? roleOf(c, base, types) : null);
-        const keptOff = !!shown && CARRIED_ROLES.has(shown) && f.notCarried.includes(c.name);
+        const keptOff =
+            !!shown &&
+            CARRIED_ROLES.has(shown) &&
+            f.notCarried.includes(c.name) &&
+            c.name !== f.from &&
+            c.name !== f.to;
         const written = keptOff ? shown : role;
         return {
             name: c.name,
