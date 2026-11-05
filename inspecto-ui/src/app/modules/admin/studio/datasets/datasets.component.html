@@ -1,4 +1,9 @@
-<div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+<!-- While there is no Dataset, a file dropped here opens Add data with it (ONBOARDING-FIRST-RUN-1 B1). -->
+<inspecto-add-data-drop
+    #drop
+    class="flex min-w-0 flex-auto flex-col p-6 md:p-8"
+    [enabled]="!loading() && datasets().length === 0"
+>
     <!-- Header -->
     <inspecto-page-header
         title="Datasets"
@@ -59,7 +64,14 @@
             class="mt-8 block"
             icon="heroicons_outline:table-cells"
             title="No datasets yet"
-            message="Use “New dataset” to shape a source with the Query Core, then visualize it."
+            [message]="
+                drop.armed()
+                    ? 'Drop a file here to add it as data, or use “New dataset” to shape a source with the Query Core.'
+                    : 'Use “New dataset” to shape a source with the Query Core, then visualize it.'
+            "
+            [actionLabel]="drop.armed() ? 'Add data' : ''"
+            (action)="addData()"
+            data-testid="datasets-empty"
         />
     }
 
@@ -137,4 +149,4 @@
     @if (datasets().length && visibleDatasets().length === 0) {
         <div class="text-secondary mt-8">No datasets match “{{ filterText() }}”.</div>
     }
-</div>
+</inspecto-add-data-drop>
