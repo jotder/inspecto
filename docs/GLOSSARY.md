@@ -222,7 +222,7 @@ seams: `docs/okf/product/module/processor/api-onboarding-authoring.md`.)*
 OB-14): the button says *Add data*, the screen title says *Onboard a file*, so "Onboard" stays the one verb. One
 server route family, every edition (`POST /onboard/files` → a draft whose every choice carries evidence and a
 confidence; `…/{draftId}/commit` → an ordinary Pipeline marked `origin: import`, run once, and the Dataset). On a
-Dataset made this way: **Add a file** and **Run now** (manual-only on Basic, DATA-TIERS-1 DT-5). Who may use it is
+Dataset made this way: **Add a file** and **Run now**. Who may use it is
 the Space setting `data.self_import` (on with no sign-in, off with sign-in until an administrator turns it on).
 ⛔ never "upload wizard" or "import wizard"; ⛔ not the Investigation tab's analyst upload (`/inv/uploads`, which
 only drops a file in an existing Collector's inbox).
