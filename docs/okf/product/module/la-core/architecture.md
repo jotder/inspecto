@@ -1849,7 +1849,10 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   Gates as `/freshness` (no capability); an entry whose import fields do not name ITS OWN Add data Pipeline reads nothing.
 - **The sidecar** gets one line per file a run took (`DatasetArrivals.recordRun`): the upload's name, mode, sha256; every
   file's index outcome and its mode (`append` / `full` / `compact`). *Run now* records the drops it took (`sender: system`).
-  A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A refused
+  A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A file
+  with NO line (imported before the sidecar existed, 2026-11-03, or its best-effort write lost) is an upload when its
+  inbox name is Add data's own `add_<stamp>_<name>` (`DatasetArrivals.ADD_DATA_NAME`), shown as `<name>`; else a
+  system's. A refused
   waiting file has only its sidecar line (`status: REFUSED`, `reason`, `setAside`) and is merged in by time.
 - **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`),
   on the Dataset card, under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up

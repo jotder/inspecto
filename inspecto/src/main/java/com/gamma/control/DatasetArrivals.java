@@ -40,7 +40,9 @@ import java.util.Map;
  * rows read / rejected, output Parquet), plus the covered period from the arrival's own Parquet output (min / max of the
  * Dataset's {@code eventDate} column), plus one small sidecar line per upload ({@code <dataRoot>/<id>/arrivals.jsonl}:
  * the file's own name, replace or append, its sha256, the import-time index outcome) that the ledger cannot know. A file
- * with no sidecar line came from a system (a drop in the inbox). Every edition: it is the explorer's own data.
+ * with no sidecar line came from a system (a drop in the inbox) - unless Add data landed it ({@code add_<stamp>_<name>},
+ * {@link #ADD_DATA_NAME}): an import made before the sidecar existed, or whose best-effort line was lost, was still added
+ * by a person. Every edition: it is the explorer's own data.
  */
 final class DatasetArrivals {
 
@@ -51,6 +53,8 @@ final class DatasetArrivals {
     /** Newest arrivals listed; older ones stay in the ledger. */
     static final int MAX_LISTED = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
+    /** The inbox name only Add data gives a file it lands ({@code OnboardImport.Job#landFromDraft}): {@code add_<stamp>_<stem>.<ext>}. */
+    static final java.util.regex.Pattern ADD_DATA_NAME = java.util.regex.Pattern.compile("add_[a-z]+_(.+)");
 
     // ── the sidecar, written by an upload (OnboardImport) ───────────────────────────────────────────────────
 
@@ -282,9 +286,12 @@ final class DatasetArrivals {
         Map<String, Object> extra = extras.get(landed + "|" + batch);
         Map<String, Object> byName = extras.get(landed);
         if (extra == null && byName != null && !isSystem(byName)) extra = byName;
-        boolean upload = extra != null && !isSystem(extra);
+        java.util.regex.Matcher added = ADD_DATA_NAME.matcher(landed);
+        // no line at all: Add data's own name still says a person added it (a system line, when there is one, wins)
+        boolean upload = extra != null ? !isSystem(extra) : added.matches();
         Map<String, Object> a = new LinkedHashMap<>();
-        a.put("file", upload && extra.get("file") != null ? extra.get("file")
+        a.put("file", upload && extra != null && extra.get("file") != null ? extra.get("file")
+                : upload && extra == null ? added.group(1)
                 : nonBlank(r.get("origin")) ? r.get("origin") : landed);
         a.put("sender", upload ? "upload" : "system");
         a.put("received", nonBlank(r.get("end_time")) ? r.get("end_time") : r.get("start_time"));
