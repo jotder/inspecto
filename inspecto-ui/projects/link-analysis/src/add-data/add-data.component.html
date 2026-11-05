@@ -147,6 +147,67 @@
             }
         </section>
 
+        <!-- ONBOARDING-FIRST-RUN-1 C6a: columns this file shares with Datasets already here (counts only) -->
+        @if (draft()?.matches?.length) {
+            <section class="flex flex-col gap-2" aria-labelledby="add-data-matches-title" data-testid="matches">
+                <h2 id="add-data-matches-title" class="m-0 text-lg font-semibold">Shared with your data</h2>
+                <ul class="m-0 flex list-none flex-col gap-2 p-0">
+                    @for (m of draft()!.matches!; track m.dataset + '.' + m.datasetColumn + '.' + m.column) {
+                        <li
+                            class="flex flex-wrap items-center gap-2 text-sm"
+                            [attr.data-testid]="'match-' + m.dataset + '-' + m.datasetColumn"
+                        >
+                            <span>{{ matchLine(m) }}</span>
+                            @if (draft()!.kind === 'stream') {
+                                @if (!draft()!.snapshot) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        data-testid="use-as-lookup"
+                                        [attr.aria-label]="'Use as a lookup: ' + matchLine(m)"
+                                        [disabled]="reading()"
+                                        (click)="useAsLookup(m)"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:identification"></mat-icon>
+                                        Use as a lookup
+                                    </button>
+                                }
+                            } @else if (identifiedBy(m)) {
+                                <inspecto-chip variant="soft" data-testid="used-as-lookup"
+                                    >Used as a lookup</inspecto-chip
+                                >
+                            } @else {
+                                <button
+                                    mat-button
+                                    type="button"
+                                    data-testid="identify-by"
+                                    [attr.aria-label]="
+                                        'Identify each entity by ' +
+                                        m.column +
+                                        ', as in ' +
+                                        m.dataset +
+                                        '.' +
+                                        m.datasetColumn
+                                    "
+                                    (click)="identifyBy(m)"
+                                >
+                                    Identify each entity by {{ m.column }}
+                                </button>
+                            }
+                        </li>
+                    }
+                </ul>
+                <p class="text-secondary m-0 text-xs">
+                    @if (draft()!.kind === 'stream') {
+                        A lookup is a file of details about entities: Add data reads it again that way, identified by
+                        the shared column.
+                    } @else {
+                        Its details are shown on the entities that column identifies, and you can filter by them.
+                    }
+                </p>
+            </section>
+        }
+
         @if (draft(); as d) {
             <form class="flex flex-col gap-6" [formGroup]="form" (ngSubmit)="create()">
                 <!-- 2. Check the columns -->

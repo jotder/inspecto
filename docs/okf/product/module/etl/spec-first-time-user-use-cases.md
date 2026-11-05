@@ -146,6 +146,12 @@ smart help involved (catalogue in §4), and what the edition plan must account f
 - **Edition plan impact.** D-PE5 puts enrichment in Standard. Then Basic should still let the user onboard a
   Reference and **query** both (a join in Studio), while the in-pipeline enrich shows a **locked** affordance with a
   plain reason (H4), never a dead end. Decide whether Basic onboards References at all.
+- **As built (`ONBOARDING-FIRST-RUN-1` C6a, 2026-11-05).** Basic onboards References (A-5). The Add data draft names
+  shared columns with their match ("`store_id` matches 98% of `sales.store_id`", counts only, never over a column masked
+  for the person) and *Use as a lookup* re-reads the file as details identified by that column; the Reference's console
+  card shows its rows and filters them; the Dataset it describes offers enrichment, locked on Basic with the Studio
+  join as the way, opening the guided editor on Standard (no pre-filled Enrich stage, no match-rate preview there).
+  Detail: `okf/product/layer/product/user-guide-onboarding.md` (*Lookups*).
 
 ### UC-5 The next file arrives (P1 Basic, P2 Standard)
 

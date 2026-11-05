@@ -45,6 +45,7 @@ import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/imp
 import { importDatasetOf } from './dataset-page';
 import { DatasetOffersComponent } from './dataset-offers.component';
 import { DatasetSummaryComponent } from './dataset-summary.component';
+import { ReferenceDetailsComponent } from './reference-details.component';
 
 /**
  * Studio **Datasets** — the data-source abstractions (physical / virtual / materialized) widgets build on.
@@ -60,6 +61,7 @@ import { DatasetSummaryComponent } from './dataset-summary.component';
         ImportDatasetCardComponent,
         DatasetSummaryComponent,
         DatasetOffersComponent,
+        ReferenceDetailsComponent,
         InspectoPageHeaderComponent,
         AiExplainComponent,
         MatButtonModule,

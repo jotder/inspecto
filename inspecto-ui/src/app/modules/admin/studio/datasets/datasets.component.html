@@ -99,7 +99,10 @@
                         [arrivals]="arrivalsOf(d.id)"
                         [version]="versionOf(d.id)"
                     ></app-dataset-summary>
-                    <app-dataset-offers [dataset]="d"></app-dataset-offers>
+                    @if (imp.kind === 'reference') {
+                        <app-reference-details [dataset]="d"></app-reference-details>
+                    }
+                    <app-dataset-offers [dataset]="d" [others]="datasets()"></app-dataset-offers>
                 </inspecto-import-dataset-card>
             } @else {
                 <div class="bg-card flex flex-col rounded-2xl p-5 shadow">

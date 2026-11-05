@@ -241,6 +241,14 @@ final class BiResultMasking {
         return applies() && !reveal;
     }
 
+    /**
+     * This caller may not see {@code column} raw (ONBOARDING-FIRST-RUN-1 C6a: Add data's shared-column counts skip it, since
+     * a count of matching keys over a masked column would tell which keys exist).
+     */
+    boolean hidesFromCaller(String column) {
+        return engaged() && isMasked(column, false);
+    }
+
     /** A Dataset column (any type) the caller may not see raw: masked, or not provably clean while the lineage is unknown. */
     private boolean isMasked(String column, boolean viaText) {
         String c = column == null ? "" : column.trim().toLowerCase(Locale.ROOT);

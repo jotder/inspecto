@@ -358,8 +358,26 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
                         role:{value, evidence, confidence}, distinct? (text columns)}],
               primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)},
  limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel},
- findings:[{entry, column?, cause, fix:{label, redraft? | columns? | newDataset?}}]}   // C2, the fix catalogue (below)
+ findings:[{entry, column?, cause, fix:{label, redraft? | columns? | newDataset?}}],   // C2, the fix catalogue (below)
+ matches:[{column, dataset, datasetColumn, share, keys, found, by: name|entityType, entityType?, entityTypeLabel?, datasetKind?}]}  // C6a
 ```
+
+* **Shared columns (`matches`, `OnboardMatches`; `ONBOARDING-FIRST-RUN-1` C6a, 2026-11-05).** Which Datasets already in
+  the Space share a column with the file: the same name (any case), or a file column proposed as the Entity Type a
+  Dataset column holds - its `classification` resolved to the Space's Entity Type (one that claims it, else one whose id
+  it is; `OnboardMatches.typeOf`), and answered as that type's **id** (`entityType`, what the commit accepts) and name
+  (`entityTypeLabel`). `share` = `found / keys`: of that Dataset column's distinct non-blank keys over its first
+  1,000,000 rows (read over its trusted relation, `DatasetRelation`), the part among the file column's sampled values
+  (the first 1,000 rows). Best first, at most 10; at most 20 column pairs are counted per draft, over at most 50 Datasets.
+  A Dataset read outside the data root (a shared snapshot, a lakehouse table) is left out. Keys are compared as trimmed text, not through
+  the Entity Type's normaliser: `+15550000001` in the file does not match `15550000001` stored as a number (seen live,
+  2026-11-05; a later refinement, not built). **Counts only, no value leaves;**
+  only Datasets the caller may read (`ComponentAccess.canView`), and never a column masked for the caller
+  (`BiResultMasking.hidesFromCaller`: a count of matching keys would tell which keys exist). Best effort: a Dataset that
+  cannot be read is left out, never an error. Not written to `draft.json` (the commit does not read it). Add data uses
+  it for *Use as a lookup* (`layer/product/user-guide-onboarding.md`). Tests: `ControlApiOnboardMatchesTest` (by name with
+  the share, partial, none; by Entity Type under another name; none for a viewer over a masked column, the count for a
+  revealer; a lookup committed with the match's Entity Type id).
 
 * **Every proposed choice is `{value, evidence, confidence}`**. OF-2 (operator 2026-10-25): `high` when every sampled
   value agrees and the sample has at least **200** non-blank values (`OnboardDraft.MIN_SAMPLE`; it was 50 until

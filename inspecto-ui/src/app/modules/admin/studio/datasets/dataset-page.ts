@@ -1,4 +1,10 @@
-import { Arrivals, ImportDataset, ImportKind, count } from '@inspecto/link-analysis/add-data/add-data.model';
+import {
+    Arrivals,
+    ImportDataset,
+    ImportKind,
+    count,
+    editionLock,
+} from '@inspecto/link-analysis/add-data/add-data.model';
 import { Dataset } from './dataset-types';
 
 /**
@@ -59,7 +65,9 @@ export const starterBoard = (datasetId: string): string => `${datasetId}_trend_b
 
 /** One offer of *What this Dataset can feed*. */
 export interface FeedOffer {
-    id: 'network' | 'network-widget' | 'starter-dashboard';
+    id: 'network' | 'network-widget' | 'starter-dashboard' | 'enrich';
+    /** The other Dataset the offer is about (the Reference of `enrich`). */
+    target?: string;
     /** The action, as its button says it. */
     action: string;
     /** Why it is offered, from the Dataset's columns. */
@@ -75,6 +83,8 @@ export interface FeedContext {
     /** People sign in here, so rights are checked. */
     signIn: boolean;
     canAuthor: boolean;
+    /** `/bootstrap` edition: a feature it does not name is locked on Basic (`editionLock`). */
+    edition?: string;
 }
 
 export const NO_LINK_ANALYSIS = 'Link Analysis is not part of this installation.';
@@ -86,7 +96,7 @@ export const NO_AUTHOR_RIGHT = 'Making a dashboard needs the right to author in 
  * What a Dataset can feed, from its columns (UC-8). An offer the edition or the person cannot fulfil stays in the list,
  * locked with its reason (H4), so the way up stays visible. Empty when nothing fits.
  */
-export function feedOffers(d: Dataset, ctx: FeedContext): FeedOffer[] {
+export function feedOffers(d: Dataset, ctx: FeedContext, others: readonly Dataset[] = []): FeedOffer[] {
     const out: FeedOffer[] = [];
     const link = d.defaultLinkMapping;
     if (link) {
@@ -117,8 +127,73 @@ export function feedOffers(d: Dataset, ctx: FeedContext): FeedOffer[] {
                       : null,
         });
     }
+    for (const l of lookupsOf(d, others)) {
+        const name = l.reference.id;
+        out.push({
+            id: 'enrich',
+            target: name,
+            action: `Add the details from ${name} to each row`,
+            because: `${name} describes the entities in ${l.column}: its details can be looked up for every row.`,
+            lock:
+                editionLock(
+                    'pipelineTransform',
+                    ctx.flags as Readonly<Record<string, boolean>>,
+                    ctx.reasons,
+                    ctx.edition ?? '',
+                    ENRICH_FALLBACK,
+                ) ?? (ctx.signIn && !ctx.canAuthor ? NO_ENRICH_RIGHT : null),
+        });
+    }
     return out;
 }
+
+/** Why enrichment is locked when `/bootstrap` does not say (DT-6), with the way Basic does it instead. */
+export const ENRICH_FALLBACK =
+    "Adding a lookup's columns to each row (enrichment) is available in Standard and above. Here, join the two in a Studio query.";
+
+export const NO_ENRICH_RIGHT =
+    "Adding a lookup's columns to each row needs the right to author in this Space - ask an administrator.";
+
+/** A Reference (details about entities): the column that identifies each one, and the Entity Type it holds. */
+export function referenceOf(d: Dataset): { identifying: string; entityType: string | null } | null {
+    if ((d.kind as string) !== 'reference') return null;
+    const id = d.extra?.['identifyingColumn'];
+    return typeof id === 'string' && id ? { identifying: id, entityType: d.primaryEntityType ?? null } : null;
+}
+
+/**
+ * The References that describe a Dataset's entities (B5): a column of `d` holding the Entity Type a Reference's
+ * identifying column holds, or else named as that column. One per Reference, the first column that fits.
+ */
+export function lookupsOf(d: Dataset, others: readonly Dataset[]): { reference: Dataset; column: string }[] {
+    if (referenceOf(d)) return [];
+    const out: { reference: Dataset; column: string }[] = [];
+    for (const r of others) {
+        const ref = referenceOf(r);
+        if (!ref || r.id === d.id) continue;
+        // columns hold an Entity Type through their classification (`MSISDN`), not its id (`msisdn`): compare those
+        const cls = r.columns.find((c) => c.name === ref.identifying)?.classification?.toUpperCase();
+        const col =
+            (cls && d.columns.find((c) => c.classification?.toUpperCase() === cls)) ||
+            d.columns.find((c) => c.name.toLowerCase() === ref.identifying.toLowerCase());
+        if (col) out.push({ reference: r, column: col.name });
+    }
+    return out;
+}
+
+/** The `POST /bi/query` body that reads a Reference's rows (masked like every BI read), filtered by one detail. */
+export function detailsQuery(
+    d: Dataset,
+    filter: { column: string; value: string } | null,
+    limit = DETAILS_LIMIT,
+): { dataset: string; groupBy: string[]; limit: number; filters?: { field: string; op: string; value: string }[] } {
+    const body = { dataset: d.id, groupBy: d.columns.map((c) => c.name), limit };
+    const v = filter?.value.trim();
+    return filter && v ? { ...body, filters: [{ field: filter.column, op: 'like', value: `%${v}%` }] } : body;
+}
+
+/** How many of a Reference's rows the details read shows. */
+export const DETAILS_LIMIT = 200;
 
 /** The `/bi/query` answer of {@link factsQuery}: row count and, with a time column, its first and last value. */
 export interface DatasetFacts {

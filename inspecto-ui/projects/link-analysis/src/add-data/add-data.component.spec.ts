@@ -535,6 +535,42 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         req.flush(summary({ dataset: 'accounts', kind: 'reference' }));
     });
 
+    it('a shared column is named with its match, and Use as a lookup reads the file as details identified by it (C6a)', async () => {
+        const { fixture, el } = create({ mode: 'optional' });
+        const match = {
+            column: 'holder',
+            dataset: 'transfers',
+            datasetColumn: 'payer',
+            share: 0.984,
+            keys: 250,
+            found: 246,
+            by: 'entityType' as const,
+            entityType: 'account',
+        };
+        upload(fixture, el, { ...accountsDraft(), kind: 'stream', matches: [match] });
+        const line = q(el, 'match-transfers-payer')!;
+        expect(line.textContent).toContain('holder matches 98% of transfers.payer (both hold account)');
+        (line.querySelector('[data-testid="use-as-lookup"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        // the same file again, as details about entities
+        const again = http.expectOne((r) => r.url === apiUrl('/onboard/files'));
+        expect(again.request.params.get('kind')).toBe('reference');
+        // the sure format choices travel with it (a low guess would not)
+        expect(again.request.params.get('delimiter')).toBe(',');
+        again.flush({ ...accountsDraft(), matches: [match] });
+        fixture.detectChanges();
+        expect(q(el, 'used-as-lookup')).not.toBeNull();
+        expect(q(el, 'use-as-lookup')).toBeNull();
+        await expectNoA11yViolations(el);
+        // the console's closed step 3 opened, and the lookup's choices are confirmed (nothing left pending for them)
+        const req = commit(fixture, el);
+        const body = bodyOf(req);
+        expect(body.identifyingColumn).toBe('holder');
+        expect(body.primaryEntityType).toBe('account');
+        expect(body.columns.find((c) => c.name === 'holder')?.entityType).toBe('account');
+        req.flush(summary({ dataset: 'accounts', kind: 'reference' }));
+    });
+
     it('the console: step 3 starts closed and a guess left there is not applied', () => {
         const { fixture, el } = create({ mode: 'optional' });
         upload(fixture, el, lowDraft());

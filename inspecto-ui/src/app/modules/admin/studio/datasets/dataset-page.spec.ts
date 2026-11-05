@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { Arrival, Arrivals } from '@inspecto/link-analysis/add-data/add-data.model';
 import { Dataset } from './dataset-types';
 import {
+    ENRICH_FALLBACK,
     FeedContext,
+    NO_ENRICH_RIGHT,
+    detailsQuery,
+    lookupsOf,
     LA_WIDGETS_FALLBACK,
     NO_AUTHOR_RIGHT,
     NO_LINK_ANALYSIS,
@@ -181,5 +185,76 @@ describe('dataset-page (ONBOARDING-FIRST-RUN-1 C5)', () => {
         ]);
         expect(setAsideLines({ ...a, arrivals: [arrival({})] })).toEqual([]);
         expect(setAsideLines(null)).toEqual([]);
+    });
+});
+
+describe('dataset-page lookups (ONBOARDING-FIRST-RUN-1 C6a)', () => {
+    /** stores: details about stores, identified by store_id holding the Entity Type `store`. */
+    const stores = calls({
+        id: 'stores',
+        name: 'stores',
+        kind: 'reference' as never,
+        defaultLinkMapping: undefined,
+        primaryEntityType: 'store',
+        columns: [
+            { name: 'store_id', type: 'string', role: 'entity', classification: 'STORE' },
+            { name: 'region', type: 'string', role: 'dimension' },
+        ],
+        extra: { origin: 'import', importPipeline: 'stores', identifyingColumn: 'store_id' },
+    });
+    const sales = calls({
+        id: 'sales',
+        name: 'sales',
+        defaultLinkMapping: undefined,
+        columns: [
+            { name: 'shop', type: 'string', role: 'entity', classification: 'STORE' },
+            { name: 'total', type: 'number', role: 'dimension' },
+        ],
+    });
+
+    it('a Reference describes the Datasets holding its Entity Type, else a column of its identifying name', () => {
+        expect(lookupsOf(sales, [stores, sales]).map((l) => [l.reference.id, l.column])).toEqual([['stores', 'shop']]);
+        const byName = {
+            ...sales,
+            columns: [{ name: 'STORE_ID', type: 'string' as const, role: 'dimension' as const }],
+        };
+        expect(lookupsOf(byName, [stores]).map((l) => l.column)).toEqual(['STORE_ID']);
+        expect(lookupsOf({ ...sales, columns: [{ name: 'x', type: 'string', role: 'dimension' }] }, [stores])).toEqual(
+            [],
+        );
+        // a Reference is described by nothing; a Reference without its identifying column describes nothing
+        expect(lookupsOf(stores, [stores, sales])).toEqual([]);
+        expect(lookupsOf(sales, [{ ...stores, extra: { origin: 'import' } }])).toEqual([]);
+    });
+
+    it('enrichment is offered, locked on Basic with the Studio join as the way, open on Standard (DT-6)', () => {
+        const basic = feedOffers(sales, { ...BASIC, edition: 'basic' }, [stores]).find((o) => o.id === 'enrich');
+        expect(basic).toMatchObject({
+            target: 'stores',
+            action: 'Add the details from stores to each row',
+            lock: ENRICH_FALLBACK,
+        });
+        expect(basic?.because).toContain('stores describes the entities in shop');
+        const said = {
+            ...BASIC,
+            edition: 'basic',
+            flags: { pipelineTransform: false },
+            reasons: { pipelineTransform: 'Std only.' },
+        };
+        expect(feedOffers(sales, said, [stores]).find((o) => o.id === 'enrich')?.lock).toBe('Std only.');
+        const std = { ...STANDARD, edition: 'standard' };
+        expect(feedOffers(sales, std, [stores]).find((o) => o.id === 'enrich')?.lock).toBeNull();
+        expect(
+            feedOffers(sales, { ...std, signIn: true, canAuthor: false }, [stores]).find((o) => o.id === 'enrich')
+                ?.lock,
+        ).toBe(NO_ENRICH_RIGHT);
+    });
+
+    it('the details read is a masked /bi/query over every column, filtered by one detail', () => {
+        expect(detailsQuery(stores, null)).toEqual({ dataset: 'stores', groupBy: ['store_id', 'region'], limit: 200 });
+        expect(detailsQuery(stores, { column: 'region', value: ' North ' }).filters).toEqual([
+            { field: 'region', op: 'like', value: '%North%' },
+        ]);
+        expect(detailsQuery(stores, { column: 'region', value: '  ' }).filters).toBeUndefined();
     });
 });

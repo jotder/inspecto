@@ -91,6 +91,26 @@ timestamp: 2026-07-16T00:00:00Z
 > existing last-import summary; the network offers use the stored link mapping only (a Dataset without one is offered
 > nothing for Link Analysis); a Standard install was driven by the specs (the flags), not live.
 >
+> **Lookups (C6a, 2026-11-05; console UC-4, every edition).** *Details about entities* on the Add data screen is the
+> Reference kind (the console's "It describes entities"). Once a file is read, **Shared with your data** names each
+> column it shares with a Dataset already here, from the draft's `matches` - "`store_id` matches 98% of
+> `sales.store_id`" (a share under 100% never rounds up to it; "(both hold Phone number)", the Entity Type's name, when matched by Entity Type). On a file
+> read as events, **Use as a lookup** reads the same file again as details about entities, identified by that column,
+> holding the Entity Type the matched Dataset column holds (the identifying column, its Entity Type and the primary
+> Entity Type are set and count as confirmed; the console's closed step 3 opens); the re-read keeps the separator, header and quote
+> the person stated or that were sure (never a low guess); a failed re-read keeps the earlier draft and kind. On a file read as details, the line offers *Identify each entity by …*, or says *Used as a lookup*.
+> A Postgres table is not re-read this way (no *Use as a lookup* on a snapshot draft). On the console Dataset page, a
+> Reference's card shows **Details**: its rows (`POST /bi/query` grouped on its columns, so masked like every BI read,
+> at most 200, with a note when cut) in the shared data table, filtered by one detail (*Filter by* a column, *Contains*
+> a text, server-side `LIKE`). A Dataset with a column of the same classification as the Reference's identifying column (else
+> named as that column) offers **Add the details from <reference> to each row**: enrichment, `pipelineTransform` (Standard and
+> up); on Basic it is locked with "…available in Standard and above. Here, join the two in a Studio query." (or the
+> server's `featureReasons.pipelineTransform`), and for a signed-in person without `canAuthorWorkbench` with that reason;
+> on Standard it opens the Dataset's import Pipeline in the guided editor (`/pipelines?guided=1&open=<pipeline>`) - no
+> Enrich stage is pre-filled. As built: `add-data.model.ts` (`DraftMatch`, `matchLine`), `add-data.component`
+> (`useAsLookup`, `identifyBy`), console `dataset-page.ts` (`referenceOf`, `lookupsOf`, `detailsQuery`), and
+> `reference-details.component.ts`.
+>
 > **Choose a table: a Postgres snapshot (`BASIC-ONBOARD-1` P3, 2026-11-05; every edition, Basic included).** Step 1
 > is now *1. Choose the data*: **A file** (as above) or **A Postgres table**. For a table, give the host, port, database
 > and user, and the password as `${ENV:INSPECTO_PG_…}` - the name of an environment variable on the server holding it,

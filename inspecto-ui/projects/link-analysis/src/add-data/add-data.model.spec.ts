@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    keptFormat,
+    matchLine,
     followOnClause,
     AUTOMATION_FALLBACK,
     buildCommit,
@@ -351,5 +353,36 @@ describe('followOnClause (BASIC-ONBOARD-1 P1)', () => {
 
     it('names a follow-on that needs nothing whatever the link', () => {
         expect(followOnClause([{ key: 'score', does: 'scores it', needs: [] }], false)).toBe(', and scores it');
+    });
+});
+
+describe('lookups in the draft (ONBOARDING-FIRST-RUN-1 C6a)', () => {
+    it('a match reads as a share of the Dataset column, never rounded up to 100%, with the Entity Type by name', () => {
+        const m = {
+            column: 'phone',
+            dataset: 'calls',
+            datasetColumn: 'caller',
+            keys: 400,
+            found: 399,
+            by: 'name' as const,
+        };
+        expect(matchLine({ ...m, share: 0.9975 })).toBe('phone matches 99% of calls.caller');
+        expect(matchLine({ ...m, share: 1 })).toBe('phone matches 100% of calls.caller');
+        expect(
+            matchLine({ ...m, share: 0.5, by: 'entityType', entityType: 'msisdn', entityTypeLabel: 'Phone number' }),
+        ).toBe('phone matches 50% of calls.caller (both hold Phone number)');
+        expect(matchLine({ ...m, share: 0.5, by: 'entityType', entityType: 'msisdn' })).toContain('(both hold msisdn)');
+    });
+
+    it('a re-read keeps the sure format choices, never a low guess', () => {
+        const d = transfersDraft();
+        d.format = {
+            ...d.format,
+            delimiter: { value: ';', evidence: 'stated', confidence: 'high' },
+            header: { value: true, evidence: 'guess', confidence: 'low' },
+            quote: { value: '"', evidence: 'stated', confidence: 'high' },
+        };
+        expect(keptFormat(d)).toEqual({ delimiter: ';', quote: '"' });
+        expect(keptFormat(null)).toEqual({});
     });
 });

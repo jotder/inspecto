@@ -13,6 +13,8 @@ import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { DatasetsComponent } from './datasets.component';
+import { penEdit } from 'app/inspecto/testing/pen-field';
+import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 
 /** An Add data Dataset of sales (a date and an amount, no link) and a call-records one (a link). */
 const SALES: Dataset = {
@@ -100,6 +102,7 @@ function create(
             },
             { provide: EventsService, useValue: { signals: () => of([]) } },
             { provide: AlertsService, useValue: { rules: () => of([]) } },
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
         ],
     });
     const fixture = TestBed.createComponent(DatasetsComponent);
@@ -204,6 +207,69 @@ describe('DatasetsComponent - the console Dataset page (ONBOARDING-FIRST-RUN-1 C
         const exists = q(fixture.nativeElement, 'starter-exists');
         expect(exists.textContent).toContain('open sales_trend_board');
         expect(exists.querySelector('a')?.getAttribute('href')).toBe('/studio/dashboards/sales_trend_board');
+    });
+
+    it('a Reference shows its details and filters them; the Dataset it describes offers enrichment, locked on Basic (C6a)', async () => {
+        const stores: Dataset = {
+            ...SALES,
+            id: 'stores',
+            name: 'stores',
+            kind: 'reference' as never,
+            columns: [
+                { name: 'store_id', type: 'string', role: 'entity', classification: 'STORE' },
+                { name: 'region', type: 'string', role: 'dimension' },
+            ],
+            primaryEntityType: 'store',
+            extra: { origin: 'import', importPipeline: 'stores', identifyingColumn: 'store_id' },
+        };
+        const sales: Dataset = {
+            ...SALES,
+            columns: [
+                { name: 'store_id', type: 'string', role: 'entity', classification: 'STORE' },
+                ...SALES.columns.slice(1),
+            ],
+        };
+        const { fixture, http } = create([sales, stores]);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const card = Array.from(el.querySelectorAll<HTMLElement>('[data-testid="import-dataset-card"]')).find((c) =>
+            c.textContent?.includes('Details about entities'),
+        )!;
+        const details = q(card, 'reference-details');
+        expect(details.textContent).toContain('identified by store_id');
+        const first = http.expectOne((r) => r.url.endsWith('/bi/query'));
+        expect(first.request.body).toEqual({ dataset: 'stores', groupBy: ['store_id', 'region'], limit: 200 });
+        first.flush({
+            resultSet: { columns: [], rowCount: 2 },
+            rows: [
+                { store_id: 'S01', region: 'North' },
+                { store_id: 'S04', region: 'South' },
+            ],
+            statistics: { rowCount: 2, elapsedMs: 1, truncated: false },
+            sql: '',
+        });
+        fixture.detectChanges();
+        expect(details.textContent).toContain('S04');
+        // filter by a detail: the server filters (masked like every BI read)
+        const value = details.querySelector<HTMLElement>('[data-testid="details-filter-value"]')!;
+        penEdit(fixture, value, 'Nor');
+        (details.querySelector('[data-testid="details-filter-apply"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        const filtered = http.expectOne((r) => r.url.endsWith('/bi/query'));
+        expect(filtered.request.body.filters).toEqual([{ field: 'store_id', op: 'like', value: '%Nor%' }]);
+        filtered.flush({
+            resultSet: { columns: [], rowCount: 0 },
+            rows: [],
+            statistics: { rowCount: 0, elapsedMs: 1, truncated: false },
+            sql: '',
+        });
+        fixture.detectChanges();
+        expect(q(details, 'details-filter-clear')).not.toBeNull();
+        // the Stream it describes: enrichment shown, locked on Basic with the Studio join as the way
+        expect(q(el, 'offer-enrich-stores').textContent).toContain('stores describes the entities in store_id');
+        expect(q(el, 'offer-enrich-stores').textContent).toContain('join the two in a Studio query');
+        expect(q(el, 'offer-enrich-stores-go')).toBeNull();
+        await expectNoA11yViolations(el);
     });
 
     it('a 409 with no such board (an approval hold, a left-over widget) shows the server reason, not a dead link', () => {

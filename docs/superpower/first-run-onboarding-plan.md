@@ -2,7 +2,7 @@
 
 **Status: PLAN 2026-10-22, every decision answered (OF-1…OF-3 on 2026-10-25); C3 built 2026-11-01 and 2026-11-05** (console `/add-data` on the shared screen, Home's first-run Add data, drop zones on Home / Catalog / the empty Datasets pane - as built in `okf/product/layer/product/user-guide-onboarding.md`; *Open in editor* on the review screen moved to `BASIC-ONBOARD-1`, operator 2026-11-05); **C1 built 2026-11-05** (as built in
 `okf/product/module/processor/api-onboarding-authoring.md`, "The draft"); **C2 built 2026-11-05** (same file, "The fix
-catalogue"); **C4 built 2026-11-05** (Getting started, the console Space guide, *New from sample*); **C5 built 2026-11-05** (the console Dataset page, as built in `okf/product/layer/product/user-guide-onboarding.md`). C6a open (C6b is `ONBOARDING-REMOTE-SYSTEMS-1`). The direction is decided (§2, operator
+catalogue"); **C4 built 2026-11-05** (Getting started, the console Space guide, *New from sample*); **C5 built 2026-11-05** (the console Dataset page, as built in `okf/product/layer/product/user-guide-onboarding.md`). **C6a steps 1-3 built 2026-11-05** (matches, *Use as a lookup*, a Reference's details on the console, enrichment locked on Basic); C6a step 4 open (Link Analysis shows a Reference's columns on nodes and filters by them, operator 2026-11-05); C6b is `ONBOARDING-REMOTE-SYSTEMS-1`. The direction is decided (§2, operator
 2026-10-22); the decisions OF-1…OF-3 (§7) were answered 2026-10-25. When a slice ships, distil
 the as-built facts into the product hubs (`layer/product`, `module/etl`, `module/processor`), close its board rows,
 and archive this file when the last slice ships.

@@ -289,6 +289,9 @@ final class OnboardRoutes implements RouteModule {
         AtomicFiles.write(dir.resolve("draft.json"), JSON.writeValueAsBytes(record), ".draft-");
         // BASIC-ONBOARD-1 P1: what the default Pipeline's follow-on step will do, for the review sentence (every way in)
         out.put("followOns", OnboardImport.describeFollowOns());
+        // ONBOARDING-FIRST-RUN-1 C6a: columns the file shares with Datasets already here (counts only), for *Use as a lookup*
+        out.put("matches", OnboardMatches.find(ex, writeRoot, dir.getParent().getParent(), a.sampled(), entity,
+                laSettings.effectiveEntityTypes()));
         return out;
     }
 

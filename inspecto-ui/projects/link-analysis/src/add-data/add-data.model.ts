@@ -101,6 +101,48 @@ export interface OnboardDraft {
     followOns?: ImportFollowOnInfo[];
     /** A draft copied from Postgres (BASIC-ONBOARD-1 P3): where from. The password is its `${ENV:…}` reference, never the value. */
     snapshot?: PostgresSnapshotSource;
+    /** ONBOARDING-FIRST-RUN-1 C6a: the columns this file shares with Datasets already in the Space, best first. */
+    matches?: DraftMatch[];
+}
+
+/**
+ * A column the new file shares with a Dataset already here (`matches` of the draft): the same name, or a column proposed as
+ * the Entity Type the Dataset column holds. `share` = the part of that Dataset column's distinct keys found in the file's
+ * first rows. Counts only; never over a column masked for the person.
+ */
+export interface DraftMatch {
+    column: string;
+    dataset: string;
+    datasetColumn: string;
+    share: number;
+    keys: number;
+    found: number;
+    by: 'name' | 'entityType';
+    /** The Entity Type (its id) the Dataset column holds, when it holds one; `entityTypeLabel` is its name. */
+    entityType?: string | null;
+    entityTypeLabel?: string | null;
+    datasetKind?: string;
+}
+
+/** "`store_id` matches 98% of `sales.store_id`" - a share under 100% never rounds up to it. */
+export function matchLine(m: DraftMatch): string {
+    const pct = m.share >= 1 ? 100 : Math.min(99, Math.round(m.share * 100));
+    const type = m.entityTypeLabel || m.entityType;
+    const held = m.by === 'entityType' && type ? ` (both hold ${type})` : '';
+    return `${m.column} matches ${pct}% of ${m.dataset}.${m.datasetColumn}${held}`;
+}
+
+/**
+ * The separator, header and quote a re-read of the same file keeps: the draft's sure choices (stated by the person, or
+ * high), never a low guess - a re-read must not confirm what the person has not.
+ */
+export function keptFormat(d: OnboardDraft | null): FormatOverrides {
+    const f = d?.format;
+    const out: FormatOverrides = {};
+    if (f?.delimiter?.confidence === 'high') out.delimiter = f.delimiter.value;
+    if (f?.header?.confidence === 'high') out.header = f.header.value;
+    if (f?.quote?.confidence === 'high') out.quote = f.quote.value;
+    return out;
 }
 
 /** One application's follow-on step, as the draft lists it: its summary key, what it does, the entry keys it needs. */

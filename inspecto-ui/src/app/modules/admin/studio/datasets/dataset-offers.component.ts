@@ -15,6 +15,7 @@ import { DatasetsService } from './datasets.service';
 export const LA_ROUTE = '/studio/link-analysis';
 export const NEW_WIDGET_ROUTE = '/studio/widgets/new';
 export const DASHBOARDS_ROUTE = '/studio/dashboards';
+export const EDITOR_ROUTE = '/pipelines';
 
 /**
  * **What this Dataset can feed** (ONBOARDING-FIRST-RUN-1 B4, C5; console UC-8, H9): offers read from the Dataset's
@@ -36,9 +37,14 @@ export const DASHBOARDS_ROUTE = '/studio/dashboards';
             [attr.aria-labelledby]="titleId"
             data-testid="dataset-offers"
         >
-            <h4 class="m-0 text-sm font-semibold" [id]="titleId">What this Dataset can feed</h4>
-            @for (o of offers(); track o.id) {
-                <div class="flex flex-col gap-1" [attr.data-testid]="'offer-' + o.id">
+            <h4 class="m-0 text-sm font-semibold" [id]="titleId">
+                What this Dataset can feed<span class="sr-only"> - {{ dataset().id }}</span>
+            </h4>
+            @for (o of offers(); track o.id + (o.target ?? '')) {
+                <div
+                    class="flex flex-col gap-1"
+                    [attr.data-testid]="'offer-' + o.id + (o.target ? '-' + o.target : '')"
+                >
                     <p class="text-secondary m-0 text-sm">{{ o.because }}</p>
                     @if (o.lock) {
                         <inspecto-locked-action [label]="o.action" [reason]="o.lock"></inspecto-locked-action>
@@ -47,7 +53,7 @@ export const DASHBOARDS_ROUTE = '/studio/dashboards';
                             mat-stroked-button
                             type="button"
                             class="self-start"
-                            [attr.data-testid]="'offer-' + o.id + '-go'"
+                            [attr.data-testid]="'offer-' + o.id + (o.target ? '-' + o.target : '') + '-go'"
                             [disabled]="busy()"
                             (click)="go(o)"
                         >
@@ -84,6 +90,8 @@ export class DatasetOffersComponent {
     private readonly destroyRef = inject(DestroyRef);
 
     readonly dataset = input.required<Dataset>();
+    /** The Space's other Datasets: a Reference among them that describes this one's entities offers enrichment (C6a). */
+    readonly others = input<readonly Dataset[]>([]);
 
     protected readonly titleId = `app-dataset-offers-${DatasetOffersComponent.nextId++}`;
     protected readonly dashboards = DASHBOARDS_ROUTE;
@@ -93,22 +101,33 @@ export class DatasetOffersComponent {
     protected readonly made = signal<string | null>(null);
 
     protected readonly offers = computed(() =>
-        feedOffers(this.dataset(), {
-            flags: this.session.features(),
-            reasons: this.session.featureReasons(),
-            signIn: this.session.authMode() === 'oidc',
-            canAuthor: this.lens.canAuthorWorkbench(),
-        }),
+        feedOffers(
+            this.dataset(),
+            {
+                flags: this.session.features(),
+                reasons: this.session.featureReasons(),
+                signIn: this.session.authMode() === 'oidc',
+                canAuthor: this.lens.canAuthorWorkbench(),
+                edition: this.session.edition(),
+            },
+            this.others(),
+        ),
     );
 
     protected icon(o: FeedOffer): string {
-        return o.id === 'starter-dashboard' ? 'heroicons_outline:chart-bar' : 'heroicons_outline:share';
+        if (o.id === 'starter-dashboard') return 'heroicons_outline:chart-bar';
+        return o.id === 'enrich' ? 'heroicons_outline:identification' : 'heroicons_outline:share';
     }
 
     protected go(o: FeedOffer): void {
         const id = this.dataset().id;
         if (o.id === 'network') void this.router.navigate([LA_ROUTE], { queryParams: { dataset: id } });
         else if (o.id === 'network-widget') void this.router.navigateByUrl(NEW_WIDGET_ROUTE);
+        // Standard: the enrichment is an Enrich stage of this import's Pipeline, in the guided editor
+        else if (o.id === 'enrich')
+            void this.router.navigate([EDITOR_ROUTE], {
+                queryParams: { guided: 1, open: (this.dataset().extra?.['importPipeline'] as string) ?? id },
+            });
         else this.makeStarter();
     }
 

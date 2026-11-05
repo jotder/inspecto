@@ -58,6 +58,9 @@ import {
     TYPE_LABELS,
     buildCommit,
     choiceKey,
+    DraftMatch,
+    matchLine,
+    keptFormat,
     count,
     followOnClause,
     delimiterLabel,
@@ -510,6 +513,8 @@ export class AddDataComponent implements OnInit {
                     if (/save .* as CSV/i.test(this.error())) this.excel.set(false);
                     // A failed re-read keeps the draft it had: its format choices go back to what that draft was read with.
                     const kept = this.draft();
+                    this.pendingLookup = null; // and a failed *Use as a lookup* leaves the kind it was read as
+                    if (kept) this.kind.setValue(kept.kind);
                     if (kept)
                         this.form.patchValue(
                             {
@@ -555,6 +560,9 @@ export class AddDataComponent implements OnInit {
             { emitEvent: false },
         );
         this.formTick.update((n) => n + 1);
+        const lookup = this.pendingLookup;
+        this.pendingLookup = null;
+        if (lookup && d.kind === 'reference') this.identifyBy(lookup);
     }
 
     private columnGroup(c: ColumnState): ColumnGroup {
@@ -581,6 +589,7 @@ export class AddDataComponent implements OnInit {
         this.formTick.update((n) => n + 1);
         this.kind.setValue(kind);
         this.whatOpen.set(this.whatColumnsHold() === 'ask');
+        this.pendingLookup = null;
     }
 
     // ── 2. the columns ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -703,6 +712,46 @@ export class AddDataComponent implements OnInit {
     protected explore(): void {
         const s = this.summary();
         if (s) void this.router.navigate([this.exploreRoute()], { queryParams: { dataset: s.dataset } });
+    }
+
+    // ── C6a: lookups ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+    protected readonly matchLine = matchLine;
+    /** The match *Use as a lookup* was chosen for, applied when the same file comes back as details about entities. */
+    private pendingLookup: DraftMatch | null = null;
+
+    /** *Use as a lookup*: read the same file again as details about entities, identified by the matched column. */
+    protected useAsLookup(m: DraftMatch): void {
+        const f = this.file();
+        if (!f) return;
+        this.pendingLookup = m;
+        this.kind.setValue('reference');
+        this.read(f, keptFormat(this.draft()));
+    }
+
+    /** The matched column identifies each entity, holding the Entity Type its Dataset column holds; a choice, so confirmed. */
+    protected identifyBy(m: DraftMatch): void {
+        const v: { identifying: string; primary?: string } = { identifying: m.column };
+        const confirm = [choiceKey.identifying];
+        const i = this.form.controls.columns.controls.findIndex((g) => g.controls.name.value === m.column);
+        if (m.entityType) {
+            v.primary = m.entityType;
+            confirm.push(choiceKey.primary);
+            if (i >= 0) {
+                this.form.controls.columns.at(i).controls.entityType.setValue(m.entityType, { emitEvent: false });
+                confirm.push(`entity.${m.column}`);
+            }
+        }
+        this.form.patchValue(v);
+        this.confirmed.update((s) => new Set([...s, ...confirm]));
+        this.whatOpen.set(true);
+        this.formTick.update((n) => n + 1);
+    }
+
+    /** Whether the draft's identifying column is the match's column (it is used as that lookup). */
+    protected identifiedBy(m: DraftMatch): boolean {
+        this.formTick();
+        return this.form.controls.identifying.value === m.column;
     }
 
     /** *Add details about these entities*: the same screen, for a file that describes them (UC-04). */
