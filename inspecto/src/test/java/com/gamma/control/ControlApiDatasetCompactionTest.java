@@ -201,32 +201,69 @@ class ControlApiDatasetCompactionTest {
             assertEquals(105, last.firstRow(), last.toString());
             assertTrue(last.coversFrom().startsWith(day(22)), last.toString());
 
-            // Replace the period rewrites the merged file (day 5 goes): its segments no longer hold, so its arrivals stay kept with
-            // no known period - and the next compaction carries it as ONE block, never slicing it by stale offsets
+            // Replace the period rewrites the merged file (day 5 goes): LA-DATASET-COMPACT-2 - it re-counts each arrival's segment
+            // as it rewrites, so every other arrival stays at a known place with its own day; day 5's arrival has no row left
             JsonNode period = data(send(c, "POST", "/datasets/" + id + "/files?name=day5again.csv&mode=period",
                     transfersOn(day(5), 3).getBytes(StandardCharsets.UTF_8), null), 200);
             assertEquals(5, period.at("/period/rowsReplaced").asLong(), period.toString());
             long afterPeriod = OnboardImport.countRows(Path.of("database", id, "database"));
             assertEquals(108, afterPeriod);
-            Map<String, DatasetCompaction.Segment> stale = DatasetCompaction.merged(Path.of("database"), id);
-            assertEquals(22, stale.size());
-            assertTrue(stale.values().stream().allMatch(seg -> seg.rows() < 0 && seg.coversFrom() == null), stale.toString());
+            List<DatasetCompaction.Segment> exact = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values());
+            assertEquals(21, exact.size(), "day 5's arrival left the merged file: " + exact);
+            long at = 0;
+            for (DatasetCompaction.Segment seg : exact) {
+                assertEquals(at, seg.firstRow(), seg.toString());
+                assertEquals(5, seg.rows(), seg.toString());
+                assertFalse(seg.coversFrom().startsWith(day(5)), seg.toString());
+                at += seg.rows();
+            }
             JsonNode recompacted = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
             assertEquals("COMPACTED", recompacted.at("/compaction/result").asText(), recompacted.toString());
             assertEquals(afterPeriod, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
             Map<String, DatasetCompaction.Segment> carried = DatasetCompaction.merged(Path.of("database"), id);
-            assertEquals(24, carried.size(), "the 22 held arrivals, the block itself and the new upload: " + carried.keySet());
-            assertEquals(23, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt(),
-                    "the block's own old file is not an arrival");
+            assertEquals(22, carried.size(), "the 21 arrivals left and the new upload: " + carried.keySet());
+            assertTrue(carried.values().stream().allMatch(seg -> seg.rows() > 0 && seg.coversFrom() != null), carried.toString());
+            assertEquals(22, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
             assertTrue(carried.keySet().stream().anyMatch(f -> f.contains("_day5again_")), carried.keySet().toString());
-            assertTrue(data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").findValues("kept")
-                    .stream().allMatch(JsonNode::asBoolean), "every arrival still kept");
+            JsonNode afterList = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            long notKept = 0;
+            for (JsonNode a : afterList) if (!a.get("kept").asBoolean()) notKept++;
+            assertEquals(1, notKept, "only day 5's first arrival was replaced: " + afterList);
 
             // a Replace everything sets the folder aside: the map falls silent with it
             data(send(c, "POST", "/datasets/" + id + "/files?name=fresh.csv&mode=replace",
                     transfersOn(day(28), 4).getBytes(StandardCharsets.UTF_8), null), 200);
             assertTrue(DatasetCompaction.merged(Path.of("database"), id).isEmpty(), "the old merged file is gone");
             assertEquals(0, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
+        }
+    }
+
+    /**
+     * LA-DATASET-COMPACT-2: <i>keep N arrivals</i> after a <i>Replace the period</i> that rewrote the merged file counts each
+     * arrival in it, not the rewritten file as one: keep 2 leaves the newest two arrivals' rows.
+     */
+    @Test
+    void keepNArrivalsAfterAReplaceThePeriodCountsEachArrival(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));
+            String id = imported(c, "keepn", transfersOn(day(1), 5), null);
+            for (int d = 2; d <= 5; d++) append(c, id, "day" + d + ".csv", transfersOn(day(d), 5), null);
+            data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
+            assertEquals(1, parquetFiles(id));
+            data(send(c, "POST", "/datasets/" + id + "/files?name=day3again.csv&mode=period",
+                    transfersOn(day(3), 3).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(23, OnboardImport.countRows(Path.of("database", id, "database")));
+
+            data(json(c, "PUT", "/datasets/" + id + "/storage", "{\"retention\":{\"arrivals\":2}}", null), 200);
+            JsonNode kept = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
+            assertEquals(15, kept.at("/compaction/rowsRemoved").asLong(), "days 1, 2 and 4 go, each its own arrival: " + kept);
+            assertEquals(8, OnboardImport.countRows(Path.of("database", id, "database")), "day 5 and the corrected day 3 stay");
+            List<DatasetCompaction.Segment> segs = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values());
+            assertEquals(2, segs.size(), segs.toString());
+            assertTrue(segs.get(0).coversFrom().startsWith(day(5)) && segs.get(1).coversFrom().startsWith(day(3)), segs.toString());
+            assertEquals(3, kept.get("removedArrivals").asInt(), kept.toString());
+        } finally {
+            EditionFeatures.overrideForTest(null);
         }
     }
 

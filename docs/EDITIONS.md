@@ -360,7 +360,8 @@ Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspe
 | Row filter on the review step, and *Edit filter* on the Dataset card (applies to the next files) | ✅ | ✅ | ✅ |
 | Expectations, quarantine and dedupe, evaluated in the import's own run (DT-15) | ✅ | ✅ | ✅ |
 | Arrivals list, name-checked columns, duplicate refusal, *Replace the period*, compaction (automatic, and *Compact now*) | ✅ | ✅ | ✅ |
-| Retention policy on an import Dataset (`PUT /datasets/{id}/storage`) | — every file stays, compacted | ✅ | ✅ |
+| A later file's new columns kept as details (*Keep new columns as details* on *Add a file*; unattended runs keep them; `LA-ARRIVAL-NEW-COLUMNS-1`) | ✅ | ✅ | ✅ |
+| Retention policy on an import Dataset (`PUT /datasets/{id}/storage`; *keep N arrivals* counts each arrival, also after *Replace the period*, `LA-DATASET-COMPACT-2`) | — every file stays, compacted | ✅ | ✅ |
 | *Keep this up to date*: a watched folder or SFTP feed on a chosen schedule (`PUT /datasets/{id}/feed`) | — locked | ✅ | ✅ |
 | Discover, entity summary, query builder, preset questions (Inspecto LA, feature `geoLink`) | ✅ | ✅ | ✅ |
 | Add data's *another database or a remote system* | — locked | not locked: the screen says a Pipeline reads them | as Standard |
@@ -382,7 +383,7 @@ carries. The product states nothing either way about scheduled or signal-driven 
 
 - **New in every edition:** Add data's three ways in (upload, an import inbox with *Watch this folder*, a Postgres
   table snapshot by *Refresh now*), column roles, row filtering and *Edit filter*, the arrivals list with compaction,
-  and Discover, the entity summary and the query builder in Inspecto LA.
+  a later file's new columns kept as details, and Discover, the entity summary and the query builder in Inspecto LA.
 - **Standard and up:** *Keep this up to date* and a retention policy now work on a real Standard bundle (before
   2026-11-05 no module declared `pipeline.automation`, so both were refused everywhere outside tests). An import's link
   index is still built in the person's own run.

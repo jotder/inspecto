@@ -229,6 +229,42 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         await expectNoA11yViolations(el);
     });
 
+    it('LA-ARRIVAL-NEW-COLUMNS-1: new columns are kept by default; unticked, they are left out and the reason is said', async () => {
+        const { fixture, el } = create();
+        http.expectOne(apiUrl('/datasets/transfers/arrivals')).flush({
+            dataset: 'transfers',
+            eventDateColumn: null,
+            arrivals: [],
+            truncated: false,
+            reason: null,
+        });
+        fixture.detectChanges();
+        const keep = q(el, 'keep-new-columns')!.querySelector('input[type=checkbox]') as HTMLInputElement;
+        expect(keep.checked).toBe(true);
+        const input = el.querySelector('input[type=file]') as HTMLInputElement;
+        const choose = (name: string) => {
+            Object.defineProperty(input, 'files', { value: [new File(['a'], name)], configurable: true });
+            input.dispatchEvent(new Event('change'));
+            fixture.detectChanges();
+        };
+        choose('wider.csv');
+        const kept = http.expectOne((r) => r.url === apiUrl('/datasets/transfers/files'));
+        expect(kept.request.params.get('newColumns')).toBe('keep');
+        kept.flush(summary({ file: 'wider.csv', keptColumns: ['fee'] }));
+        fixture.detectChanges();
+        expect(el.textContent).toContain('New column fee: kept as a detail.');
+
+        keep.click();
+        fixture.detectChanges();
+        choose('taxed.csv');
+        const left = http.expectOne((r) => r.url === apiUrl('/datasets/transfers/files'));
+        expect(left.request.params.get('newColumns')).toBe('leave');
+        left.flush(summary({ file: 'taxed.csv', newColumns: ['tax'], newColumnsReason: 'you chose to leave new columns out' }));
+        fixture.detectChanges();
+        expect(el.textContent).toContain('New column not kept: tax (you chose to leave new columns out).');
+        await expectNoA11yViolations(el);
+    });
+
     it('BASIC-ONBOARD-1 P3: a Postgres snapshot is refreshed from its table - no Add a file, no inbox (no violations)', async () => {
         const { fixture, el } = create();
         fixture.componentInstance.dataset.set({
@@ -475,6 +511,8 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         // a Dataset with no link mapping has no graph to speak of
         expect(dataStatusLine([{ ...base, index: 'SKIPPED' }])).toBe('Received 2026-11-02 08:00');
         // LA-ARRIVAL-MODES-1: a period arrival, a file's new columns, and a refused drop (never in the Data status)
+        // LA-ARRIVAL-NEW-COLUMNS-1: a column the run kept
+        expect(arrivalLine({ ...base, keptColumns: ['fee'] })).toContain('kept new: fee');
         expect(arrivalLine({ ...base, mode: 'period', newColumns: ['fee'] })).toBe(
             'uploaded · replaced the days it covers · 1 row · not kept: fee',
         );

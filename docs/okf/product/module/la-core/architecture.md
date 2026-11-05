@@ -1929,12 +1929,35 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   under the same name is skipped by the import Pipeline's duplicate policy and stays in the inbox.
 - **Schema drift** (D-6, operator 2026-11-05): `OnboardImport.checkColumns` judges a later file by column NAME before
   anything lands. A missing column, or a delimited column at another position, refuses it naming each (422 for an upload;
-  Run now, and Add a file for the drops its run takes, move a refused waiting file to `<id>/refused/`). A new column is
-  accepted, not kept (delimited files are rewritten with the read columns only, because the engine sets aside rows with
-  more fields than it reads) and named in the result and the arrival. An import with no header line is judged by its
-  column count only.
+  Run now, and Add a file for the drops its run takes, move a refused waiting file to `<id>/refused/`). An import with no
+  header line is judged by its column count only.
+- **New columns are kept as details** (`LA-ARRIVAL-NEW-COLUMNS-1`, operator 2026-11-06, as built 2026-11-06;
+  `inspecto/.../control/DatasetNewColumns.java`). A run keeps the new columns EVERY file it takes carries (delimited
+  text: the same leading new columns in the same order, since the engine reads by position; JSON / Parquet: by field
+  name). Each kept column is appended to the import's schema (`raw.fields`, type `VARCHAR`, the next position for
+  delimited text; a `keep` mapping), the Pipeline is re-read (`CollectorService.refreshConfigs`, the registry's content
+  hash sees the schema change), and the Dataset entry gains `{name, type: string, role: detail, keptFrom {file, at}}`
+  (a versioned write). All of it is undone if the run fails. The answer and the arrival carry `keptColumns`.
+  **Left out**, as before (delimited files are rewritten with the columns kept, because the engine sets aside rows with
+  more fields than it reads), named in `newColumns` with `newColumnsReason`, when: the person unticked *Keep new
+  columns as details* (`POST /datasets/{id}/files?newColumns=leave`; Run now, the inbox poll, feeds and a snapshot
+  refresh always keep); another file of the same run lacks it; its name is taken (a Dataset column or a schema field,
+  case-insensitive) or cannot name a column; or the Space's approval policy holds `dataset` or `schema` changes (a
+  column is then added only on its own). **Once kept, a later file without it is refused** like any missing column
+  (operator 2026-11-06, not accepted blank), the reason saying `'fee' is missing (kept from 'wider.csv' on <date>)`.
+  **Reads:** every read of the Dataset's Parquet already lines files up by name - the engine Dataset read
+  (`DatasetRelation` via `SqlViews.readerOverLiteral`, `union_by_name=true`; Link Analysis, Discover, BI and the index
+  build read through it), `/db/table` and `/db/query`, `countRows`, the arrivals' periods and *Replace the period*
+  (`SqlViews.parquet(…, true, …)`), compaction (`UNION ALL BY NAME`); an older file reads the column as empty. The row
+  filter (`where`) runs on the import, over each file before it lands, and every file it sees carries every column the
+  Dataset reads, so a kept column never makes it fail. Values are kept as text: a kept column made a Measure is still
+  text (deliberate - a later file's value that does not parse would otherwise set its row aside). Tests:
+  `ControlApiArrivalNewColumnsTest` (older and newer files read together, the refusal, leave, the every-file rule, Run
+  now keeping on its own, JSON, an approval policy, a row filter, compaction over mixed columns),
+  `ControlApiOnboardLinkAnalysisTest#aKeptNewColumnRidesTheIndexBuiltOverOlderAndNewerFiles` (made a Category, the column
+  rides a full index build over the mixed files).
 
-**Deliberately not done.** Keeping new columns as details (`LA-ARRIVAL-NEW-COLUMNS-1`); row-key upserts (with SCD2,
+**Deliberately not done.** Row-key upserts (with SCD2,
 D-ING4); the inbox and *Keep this up to date* (`LA-ARRIVAL-FEEDS-1`); Dataset Parquet compaction (`LA-DATASET-COMPACT-1`);
 a refresh of the Start box / dock status after a run (each reads once per Dataset); a live drive on Basic and Preview.
 Plan: `docs/archived-documents/plans-archive/la-data-arrival-plan.md` §5a-§5d, §6.
@@ -2072,21 +2095,29 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   one line for each (`feedSummaryLine`, `storageStatusLine`), so the card, the Start box and the Rows dock say them.
 - **A merged file rewritten since** (*Replace the period*, §6.17, removes days from every older file, the merged one
   included): the map keeps the merged file's `mergedBytes` and `mergedModified` and trusts its row segments only while
-  both match. Otherwise its arrivals stay *kept* with no known period, and the next compaction carries the file as ONE
-  block (`holds` names the arrivals in it) - never sliced by stale offsets.
+  both match. **Replace the period keeps the map true** (`LA-DATASET-COMPACT-2`, as built 2026-11-06): when the file it
+  rewrites IS the map's merged file and the map still holds (`DatasetCompaction.trustedSegments`), it writes the kept
+  rows in their row order (`file_row_number`), re-counts each arrival's segment and period from the same read
+  (`DatasetPeriod.recount`), and commits the map with the new size and time (`segmentsRewritten`; undone with the
+  import, `restoreMap`). An arrival left with no row drops out of the map, so the arrivals answer reads it as replaced
+  (not as a retention removal). So *keep N arrivals* after a *Replace the period* counts every arrival. Only when the
+  map cannot be trusted (an older map, a row outside every segment, a rewrite by anything else) do its arrivals stay
+  *kept* with no known period and the next compaction carries the file as ONE block (`holds` names the arrivals in it),
+  counted as one arrival by *keep N arrivals* - never sliced by stale offsets.
 - **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2` keeps (e)):** (a) *(built 2026-11-05, above:
   a scheduled run compacts on its commit)*; (b) *Compact now* with a retention policy does not rebuild the index - the
   graph reads the flat Dataset until the next build *(since 2026-11-05 it never shows a removed row, above)*; (c) the policy is gated on `pipeline.automation` (the Standard marker
   the data-tier plan already uses; declared by `inspecto-ops` since 2026-11-05 - before, no module did, so real Standard
   bundles refused the policy and *Keep this up to date* like Basic, test `ControlApiKeepUpToDateStandardTest`); (d) a leftover that can never be deleted (a folder named `*.parquet`) keeps
-  compaction waiting, saying why each time - nothing is lost or doubled; (e) *keep N arrivals* counts a rewritten merged
-  file (a `holds` block) as ONE arrival, and its removal names that file; (f) the arrivals answer has no capability (as
+  compaction waiting, saying why each time - nothing is lost or doubled; (e) *(built 2026-11-06, above: Replace the
+  period keeps the map true; only a `holds` block from an untrusted map still counts as ONE arrival)*; (f) the arrivals answer has no capability (as
   before), so its `feed` tells a viewer of the Dataset the Connection's name, the ready marker and the waiting count -
   never the inbox path.
 - Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept and listed as kept by the arrivals
   answer, Compact now, a Replace the period that rewrites the merged file, Replace resets the map, retention by arrivals /
   by event date / an unreadable date / a missing When column / never on Basic, the crash heal, a file held open, armed
-  gates, `aRunOutsideAddDataCompactsOnItsCommit`: a run not started by Add data compacts, and leaves a held Dataset alone),
+  gates, `keepNArrivalsAfterAReplaceThePeriodCountsEachArrival`, compaction over files whose columns differ
+  (`ControlApiArrivalNewColumnsTest`), `aRunOutsideAddDataCompactsOnItsCommit`: a run not started by Add data compacts, and leaves a held Dataset alone),
   `ControlApiOnboardLinkAnalysisTest#afterARetentionCompactionTheGraphNoLongerShowsTheRemovedRows` (geo-link: right after a
   *keep 1 arrival* Compact now the neighbours read is `index_stale_refused` and draws no removed row), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
 

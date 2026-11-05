@@ -36,6 +36,8 @@ final class DatasetPeriod {
 
     private final Path base, database, aside;
     private final List<Path[]> moved = new ArrayList<>();   // {original path, its copy in the aside dir}
+    /** The merge map before this replacement re-counted the merged file's segments; null when it did not. */
+    private byte[] mapBefore;
 
     DatasetPeriod(Path dataRoot, String id, String stamp) {
         this.base = dataRoot.resolve(id).toAbsolutePath().normalize();
@@ -76,12 +78,19 @@ final class DatasetPeriod {
                     removed += hit;
                     touched++;
                     boolean empties = hit == rs.getLong(2);
+                    // LA-DATASET-COMPACT-2: the merged file of a compaction is rewritten in its row order and each arrival's
+                    // segment re-counted, so the merge map keeps every arrival at a known place (keep N arrivals counts them)
+                    List<DatasetCompaction.Segment> segs = empties ? null : DatasetCompaction.trustedSegments(base, f);
+                    String keep = col + " IS NULL OR NOT (" + in + ")";
+                    List<DatasetCompaction.Segment> next = new ArrayList<>();
+                    if (segs != null && !recount(st, f, segs, keep, col, next)) segs = null;
                     // the rewrite is named so no Parquet glob reads it, and never left behind
                     Path tmp = f.resolveSibling(".period-" + f.getFileName() + ".tmp");
                     try {
                         if (!empties)
-                            st.execute("COPY (SELECT * FROM " + source(List.of(f)) + " WHERE " + col + " IS NULL OR NOT (" + in + ")) TO "
-                                    + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
+                            st.execute("COPY (" + (segs == null ? "SELECT * FROM " + source(List.of(f)) + " WHERE " + keep
+                                    : "SELECT * EXCLUDE (file_row_number) FROM " + numbered(f) + " WHERE " + keep + " ORDER BY file_row_number")
+                                    + ") TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
                         Path kept = aside.resolve(database.relativize(f));
                         Files.createDirectories(kept.getParent());
                         Files.move(f, kept, StandardCopyOption.ATOMIC_MOVE);
@@ -90,6 +99,7 @@ final class DatasetPeriod {
                     } finally {
                         Files.deleteIfExists(tmp);
                     }
+                    if (segs != null) mapBefore = DatasetCompaction.segmentsRewritten(base, f, next);
                 }
             }
             return new Result(days, removed, touched);
@@ -98,7 +108,7 @@ final class DatasetPeriod {
         }
     }
 
-    /** Put every original back (the import failed after {@link #replace}). */
+    /** Put every original back (the import failed after {@link #replace}), and the merge map with them. */
     void restore() throws IOException {
         for (int i = moved.size() - 1; i >= 0; i--) {
             Path[] m = moved.get(i);
@@ -106,7 +116,45 @@ final class DatasetPeriod {
             Files.move(m[1], m[0], StandardCopyOption.ATOMIC_MOVE);
         }
         moved.clear();
+        if (mapBefore != null) DatasetCompaction.restoreMap(base, mapBefore);
+        mapBefore = null;
         OnboardRoutes.deleteTree(aside);
+    }
+
+    /**
+     * Each arrival's rows of the merged file {@code f} that {@code keep} keeps, by its segment ({@code file_row_number}
+     * ranges), into {@code next} (new first rows, in order; the period over {@code col}; an arrival left with no row drops
+     * out). False when a kept row falls in no segment: the map is then left to its stale check.
+     */
+    private boolean recount(Statement st, Path f, List<DatasetCompaction.Segment> segs, String keep, String col,
+                            List<DatasetCompaction.Segment> next) throws SQLException {
+        StringBuilder seg = new StringBuilder("CASE");
+        for (int i = 0; i < segs.size(); i++)
+            seg.append(" WHEN file_row_number >= ").append(segs.get(i).firstRow()).append(" AND file_row_number < ")
+                    .append(segs.get(i).firstRow() + segs.get(i).rows()).append(" THEN ").append(i);
+        seg.append(" ELSE -1 END");
+        Map<Integer, Object[]> by = new java.util.HashMap<>();
+        try (ResultSet rs = st.executeQuery("SELECT " + seg + " AS s, count(*), CAST(min(" + col + ") AS VARCHAR), CAST(max(" + col
+                + ") AS VARCHAR) FROM " + numbered(f) + " WHERE " + keep + " GROUP BY 1")) {
+            while (rs.next()) by.put(rs.getInt(1), new Object[] {rs.getLong(2), rs.getString(3), rs.getString(4)});
+        }
+        if (by.containsKey(-1)) return false;
+        long first = 0;
+        for (int i = 0; i < segs.size(); i++) {
+            DatasetCompaction.Segment s = segs.get(i);
+            Object[] r = by.get(i);
+            if (r == null) continue;
+            long n = (Long) r[0];
+            next.add(new DatasetCompaction.Segment(s.file(), s.received(), first, n, (String) r[1], (String) r[2], s.holds()));
+            first += n;
+        }
+        return true;
+    }
+
+    /** {@code f} read with each row's place in it ({@code file_row_number}); jailed like {@link #source}. */
+    private String numbered(Path f) {
+        source(List.of(f));
+        return "read_parquet(" + SqlIdent.pathStr(f) + ", file_row_number = true)";
     }
 
     /** The import succeeded: the originals are no longer needed. */
