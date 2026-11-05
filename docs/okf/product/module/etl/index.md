@@ -40,6 +40,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
-| `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | — |
+| `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `LA-DATASET-COMPACT-2` | P3 | feature | compaction for a feed's scheduled runs, and the graph after a retention compaction (deferred from LA-DATASET-COMPACT-1, 2026-11-05). | — |
 | `LA-ARRIVAL-NEW-COLUMNS-1` | P3 | feature | keep a later file's new columns as details of an import Dataset (schema evolution with union-by-name reads), filed 2026-11-05 from D-6. | — |

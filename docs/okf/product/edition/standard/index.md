@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `edition.standard` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |

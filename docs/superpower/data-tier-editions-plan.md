@@ -1,6 +1,6 @@
 # Data layer by edition — what Basic, Standard and Advanced get from ingestion, Pipelines and data quality (`DATA-TIERS-1`)
 
-**Status: PLAN — every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25); nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
+**Re-planned 2026-11-05 (§5.3): P3 dropped, DT-9 narrowed to "gate in screens", P1 / P10 done, P9 superseded; P2, P4 (narrowed), P5, P6 (shrunk), P7, P8 remain.** **Status: PLAN — every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25); nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
 2026-10-22** with the parallel draft `PIPELINE-EDITIONS-1` (never pushed; operator: "merge into a single plan"),
 which added the grounding in §3 and §7, the operator decisions DT-11…DT-14, and the open decisions DT-15…DT-19.
 **Operator answers of 2026-10-22** recorded in the Inspecto LA first-time user use cases (§8, A-1…A-16; confirmed
@@ -136,6 +136,27 @@ Answered in the operator decision interview of 2026-10-25. The recommendation wa
 **Operator answers A-1…A-16** (LA use cases §8) not listed above concern Inspecto LA and onboarding (Spaces per
 data domain, the primary entity per Dataset, the sample Space, beginner measures, analyst uploads per Space,
 masking defaults); `ONBOARDING-FIRST-RUN-1` carries the ones it needs.
+
+### 5.3 Re-plan by the operator (2026-11-05)
+
+After `BASIC-ONBOARD-1` shipped (Postgres snapshot and a 30 s inbox poll on Basic) and DT-16's Jobs gate was dropped
+("no promise, keep silent"), the operator re-decided what this plan still builds. Rule behind it: **"Basic is not a
+demo; it must be usable."** Where this section and an earlier row disagree, this section wins.
+
+| Decision | Now |
+|---|---|
+| **DT-9 narrowed: gate in screens, not on load** | Basic runs any configuration it is given; the edition line is what Basic's **screens offer**: no Pipeline editor, no schedule authoring, no remote system except the Postgres snapshot. No refuse-on-load of Standard steps, kinds or triggers. The existing Alert Rule hold (logged, not armed) stays. §9 "What breaks" no longer applies to loading. |
+| **P1** "Add data" | **Done** (`ONBOARDING-FIRST-RUN-1`, `BASIC-ONBOARD-1`). |
+| **P2** groundwork | **Kept, shrunk** to what P4, P5 and P7 need. |
+| **P3** automation gate | **Dropped.** Basic offers no schedule authoring in its screens (already true); configurations with schedules still run. |
+| **P4** reach | **Kept, narrowed:** `telecom-asn1` and the telecom decoders to Advanced (DT-12); remote kinds other than the Postgres snapshot are Standard **in Basic's screens** (locked with a reason). The Postgres snapshot reads through DuckDB's `postgres` extension, so it does not need `connectors` on Basic. |
+| **P5** egress gate | **Kept:** outbound delivery is Standard, locked with a reason on Basic's screens. |
+| **P6** transform gate | **Shrunk** to palette / step-catalog locks in the screens (Basic has no Pipeline editor); no refuse walk on load. |
+| **P7** upgrade test | **Kept.** |
+| **P8** docs | **Kept.** |
+| **P9** per-application Basic forms | **Superseded** by `BASIC-ONBOARD-1` §5 Q3 ("decided later, as we go"). |
+| **P10** large files in place | **Done** (DT-3). |
+| `ONBOARDING-FIRST-RUN-1` C5 / C6 | **No longer wait on this plan:** C5 (console Dataset page) reuses the shared import Dataset card; C6a (lookups) builds now; C6b (remote systems on Standard, grown from the Postgres flow) is its own row. |
 
 ## 6. Gates (capabilities)
 

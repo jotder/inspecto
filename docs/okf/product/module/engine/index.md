@@ -38,7 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Consignment addressing | demand |
 | `MAPPING-EPOCH-TIMESTAMP-1` | P3 | feature | a field mapping cannot type an epoch-seconds string as a TIMESTAMP. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
-| `DATA-TIERS-1` | P2 | feature | the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / N… | — |
+| `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | external |
