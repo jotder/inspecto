@@ -1976,6 +1976,29 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   `DESCRIBE`) drops whole arrivals received before the cutoff. A policy stored on Basic is ignored
   (`retentionInForce`): Basic never drops a row.
 - **Link index (D-10).** The files are rewritten, so the index's next build is a full one (its own advice, nothing added).
+- **A run outside Add data compacts on its commit (`LA-DATASET-COMPACT-2`, 2026-11-05).** A Standard feed's scheduled run
+  (or any run of the import Pipeline not started by Add data) never reaches `Job.followOn`. `CollectorService` subscribes ONE
+  commit step to its Space's `ConsignmentEventBus` in its constructor - before `JobService.start()` subscribes - and the
+  control plane sets it (`DatasetCompaction.register` → `CollectorService.commitStep`). The bus publishes synchronously on the
+  run's thread, under the Pipeline's run claim, so the compaction finishes before the Space's Jobs (the `la.index.build` Job
+  on `pipeline.commit`) are handed the commit; no other run of the import can write meanwhile. `DatasetCompaction.afterCommit`
+  takes a SUCCESS, non-dry-run commit, finds the Space whose service published it (the attached ControlApis' Spaces), reads
+  its roots under that Space's MDC, and acts only for an import Add data wrote for THIS id (`OnboardImport.isOurs`; the
+  import Pipeline is named as its Dataset). It claims `OnboardImport.IN_FLIGHT` and **skips** when the claim is held: an
+  import (which compacts in its own follow-on), *Compact now* or a delete is at work. Threshold and retention as on import.
+  Never throws; a compaction that ran is logged. *Chosen over a `dataset.compact` Job step on `pipeline.commit`* (the row's
+  suggestion): two Jobs on the same signal run concurrently, so the index build would race the swap, and the Job would
+  have to be authored per Dataset. *Not* the `ImportFollowOn` seam either: a scheduled run never calls it.
+- **The graph after a compaction (`LA-DATASET-COMPACT-2`).** The link index's read gate (`IndexedRead.select`,
+  `IndexStaleness.removedInput`) already refuses an index whose input files are gone, so the graph reads the flat Dataset
+  after a compaction - but it compared the files through `InputFingerprintCache` (30 s, cleared only by an index build), so
+  for up to 30 s a read was served from the index with the rows a retention removed (measured: `/inv/projection/neighbors`
+  answered `source.kind: index, stale: false`). Every compaction that merged (or failed part-way) now calls each installed
+  application's `ImportFollowOn.filesRewritten` (a default no-op method; inside a run, *Compact now* and a scheduled
+  commit, every edition); Link Analysis's `LinkIndexFollowOn` drops the Dataset's cached fingerprints
+  (`InputFingerprintCache.forget`), so the next read answers `index_stale_refused` from the flat Dataset. *The smaller fix
+  was chosen*: no rebuild inside *Compact now* - the graph reads flat until the next index build (Basic: the next import;
+  Standard: the next commit's Job), as after any other removal.
 - **UI:** `add-data/dataset-storage.component.ts` in the card (*Storage* line, *Compact now*, on Standard the *Keep*
   picker for a person who may author); `storageStatusLine` is its *Data status* line.
 - **Arrivals and Data status.** `DatasetArrivals` reads the merge map: an arrival whose own output a compaction merged is
@@ -1986,10 +2009,9 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   included): the map keeps the merged file's `mergedBytes` and `mergedModified` and trusts its row segments only while
   both match. Otherwise its arrivals stay *kept* with no known period, and the next compaction carries the file as ONE
   block (`holds` names the arrivals in it) - never sliced by stale offsets.
-- **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2`):** (a) a Standard feed's SCHEDULED runs do
-  not pass through `OnboardImport`, so they compact only at the next Add a file / Run now or *Compact now* - a
-  `dataset.compact` step on `pipeline.commit` would close it; (b) *Compact now* with a retention policy does not rebuild
-  the index - the graph follows at the next import; (c) the policy is gated on `pipeline.automation` (the Standard marker
+- **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2` keeps (e)):** (a) *(built 2026-11-05, above:
+  a scheduled run compacts on its commit)*; (b) *Compact now* with a retention policy does not rebuild the index - the
+  graph reads the flat Dataset until the next build *(since 2026-11-05 it never shows a removed row, above)*; (c) the policy is gated on `pipeline.automation` (the Standard marker
   the data-tier plan already uses); (d) a leftover that can never be deleted (a folder named `*.parquet`) keeps
   compaction waiting, saying why each time - nothing is lost or doubled; (e) *keep N arrivals* counts a rewritten merged
   file (a `holds` block) as ONE arrival, and its removal names that file; (f) the arrivals answer has no capability (as
@@ -1998,7 +2020,9 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 - Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept and listed as kept by the arrivals
   answer, Compact now, a Replace the period that rewrites the merged file, Replace resets the map, retention by arrivals /
   by event date / an unreadable date / a missing When column / never on Basic, the crash heal, a file held open, armed
-  gates), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
+  gates, `aRunOutsideAddDataCompactsOnItsCommit`: a run not started by Add data compacts, and leaves a held Dataset alone),
+  `ControlApiOnboardLinkAnalysisTest#afterARetentionCompactionTheGraphNoLongerShowsTheRemovedRows` (geo-link: right after a
+  *keep 1 arrival* Compact now the neighbours read is `index_stale_refused` and draws no removed row), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
 
 ### 6.20 Watch this folder: the 30 s inbox poll (BASIC-ONBOARD-1 P2, as built 2026-11-05)
 

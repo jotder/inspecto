@@ -34,6 +34,14 @@ public interface ImportFollowOn {
     Map<String, Object> run(Context context);
 
     /**
+     * The Dataset's files were rewritten by a compaction ({@code LA-DATASET-COMPACT-2}): rows may be gone (retention) and
+     * every file has a new name. Forget anything remembered about the old files, so the next read judges the new ones. Runs
+     * after every compaction that changed the files - inside a run, <i>Compact now</i>, or a scheduled run's commit - in
+     * every edition. Never throws. Default: nothing remembered.
+     */
+    default void filesRewritten(Context context) {}
+
+    /**
      * What a follow-on gets: the Space's roots, the Dataset id, its registry entry as it stands after the run, and who
      * started the run.
      */

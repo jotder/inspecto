@@ -914,7 +914,7 @@ final class OnboardImport {
             Map<String, Object> current = new ComponentStore(space.writeRoot().resolve("registry")).get("dataset", id)
                     .map(ComponentRegistry.Component::content).orElse(dataset);
             // LA-DATASET-COMPACT-1 (D-7): merge the files once there are many, before a follow-on reads them
-            summary.put("compaction", DatasetCompaction.afterImport(space.dataRoot(), id, current));
+            summary.put("compaction", DatasetCompaction.afterImport(space.writeRoot(), space.dataRoot(), id, current, space.actor()));
             boolean inRun = !EditionFeatures.present(AUTOMATION_FEATURE);
             summary.put("followOnInRun", inRun);
             for (ImportFollowOn f : followOns())

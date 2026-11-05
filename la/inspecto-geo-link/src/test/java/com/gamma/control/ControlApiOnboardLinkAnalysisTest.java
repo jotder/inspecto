@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
@@ -22,6 +23,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -233,6 +235,47 @@ class ControlApiOnboardLinkAnalysisTest {
             assertEquals("UP_TO_DATE", now.get("result").asText(), now.toString());
             assertEquals(400, now.get("edges").asLong(), now.toString());
             assertEquals(entities, now.get("nodes").asLong(), "an index that is already current counts each entity once too: " + now);
+        }
+    }
+
+    /**
+     * LA-DATASET-COMPACT-2 (b): <i>Compact now</i> with a retention policy removes rows the link index still holds. The very
+     * next graph read must not show them - not one fingerprint-cache lifetime later, and not until the next import.
+     */
+    @Test
+    void afterARetentionCompactionTheGraphNoLongerShowsTheRemovedRows(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            // Basic: the commit and the append are each indexed inside the run
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("BUILT", data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200).at("/index/result").asText());
+            String wire = transfers(50).replaceAll(",(mobile|branch|online),", ",wire,").replace("T0", "W0");
+            assertEquals("BUILT", data(send(c, "POST", "/datasets/" + id + "/files?name=wire.csv&mode=append",
+                    wire.getBytes(StandardCharsets.UTF_8)), 200).at("/index/result").asText());
+            // Standard: keep the newest arrival only (the Dataset entry changes now, not between the two reads)
+            EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));
+            try {
+                data(send(c, "PUT", "/datasets/" + id + "/storage", "{\"retention\":{\"arrivals\":1}}".getBytes(StandardCharsets.UTF_8)), 200);
+
+                // the hub's links, from the index: both files' rows
+                byte[] read = ("{\"dataset\":\"" + id + "\",\"sourceCol\":\"from_account\",\"targetCol\":\"to_account\",\"linkKindCol\":\"channel\","
+                        + "\"value\":\"ACC-0001\"}").getBytes(StandardCharsets.UTF_8);
+                JsonNode before = data(send(c, "POST", "/inv/projection/neighbors", read), 200);
+                assertEquals("index", before.at("/source/kind").asText(), before.get("source").toString());
+                assertTrue(before.toString().contains("mobile"), before.toString());
+
+                // Compact now: the first file's 200 rows go
+                JsonNode now = data(send(c, "POST", "/datasets/" + id + "/compact", new byte[0]), 200);
+                assertEquals(200, now.at("/compaction/rowsRemoved").asLong(), now.toString());
+
+                // within the input-fingerprint cache's lifetime: the index's own stale check must refuse it already
+                JsonNode after = data(send(c, "POST", "/inv/projection/neighbors", read), 200);
+                assertEquals("index_stale_refused", after.at("/source/reason").asText(), after.get("source").toString());
+                assertTrue(after.toString().contains("wire"), after.toString());
+                assertFalse(after.toString().contains("mobile"), "a removed row is drawn: " + after);
+            } finally {
+                EditionFeatures.overrideForTest(null);
+            }
         }
     }
 
