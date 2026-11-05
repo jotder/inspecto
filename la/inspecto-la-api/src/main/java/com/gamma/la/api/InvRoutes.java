@@ -850,6 +850,7 @@ public final class InvRoutes implements RouteModule {
             String relationSql = relationFor(api, ex, writeRoot, ds);
             String srcCol = ident(m, "sourceColumn", true), tgtCol = ident(m, "targetColumn", true);
             String measureCol = ident(m, "measureColumn", false);   // LA-COLUMN-ROLES-2: summed per link as `total`
+            refuseEndAsMeasure(measureCol, srcCol, tgtCol);
             List<String> attrs = nameList(m, "attributes", true);
             DatasetProvider.BoundFilter filter = filterSql(body.get("filter"), ds, relationSql)
                     .and(filterSql(m.get("filter"), ds, relationSql));
@@ -972,6 +973,7 @@ public final class InvRoutes implements RouteModule {
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
         String measureCol = ident(body, "measureCol", false);   // LA-COLUMN-ROLES-2: summed per link as `total`
+        refuseEndAsMeasure(measureCol, sourceCol, targetCol);
         List<String> attrCols = attrCols(body);
         LaLimitValues lim = SpaceLimits.of(writeRoot);
         int limit = clamp(body.get("limit"), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_DEFAULT), SpaceLimits.get(lim, LaLimit.TRAVERSAL_ROWS_MAX));
@@ -1171,6 +1173,16 @@ public final class InvRoutes implements RouteModule {
             row.put("target", mask.out(row.get("target")));
         }
         return row;
+    }
+
+    /**
+     * A link's {@code total} sums its Measure; naming a link END as the Measure would sum its ids, and a one-row link's total
+     * would carry a raw id past the read's masking. Refused (422) on every read that takes a Measure column.
+     */
+    private static void refuseEndAsMeasure(String measureCol, String sourceCol, String targetCol) {
+        if (measureCol != null && (measureCol.equalsIgnoreCase(sourceCol) || measureCol.equalsIgnoreCase(targetCol)))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "the Measure column '" + measureCol + "' is an end of the link, not a Measure");
     }
 
     /** One {@link #edgeSql} result row in the response shape {@code {source,target,kind,count,attrs?}}. */

@@ -120,6 +120,10 @@ class ControlApiLinkTotalTest {
 
             // a column the Dataset has not got is refused, never summed as nothing
             post(c, "/inv/projection", "{" + COLS + ",\"measureCol\":\"nope\"}", 422);
+            // a link end is no Measure: its sum would carry raw ids past masking
+            post(c, "/inv/projection", "{" + COLS + ",\"measureCol\":\"S\"}", 422);
+            post(c, "/inv/projection/multi", "{\"edges\":[{\"dataset\":\"t_ds\",\"sourceColumn\":\"s\",\"targetColumn\":\"t\","
+                    + "\"measureColumn\":\"t\"}]}", 422);
         }
     }
 
@@ -148,7 +152,7 @@ class ControlApiLinkTotalTest {
 
             // a measure the index does not carry is read flat, saying why
             Files.writeString(root.resolve("link-analysis.toon"), "index:\n  enabled: true\n");
-            JsonNode notCarried = post(c, "/inv/projection/neighbors", "{" + COLS + ",\"value\":\"A\",\"measureCol\":\"s\"}", 200);
+            JsonNode notCarried = post(c, "/inv/projection/neighbors", "{" + COLS + ",\"value\":\"A\",\"measureCol\":\"kind\"}", 200);
             assertEquals("column_not_indexed", notCarried.at("/source/reason").asText());
         }
     }
