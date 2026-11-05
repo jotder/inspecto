@@ -85,11 +85,13 @@ final class OnboardRoutes implements RouteModule {
                 (e, m) -> OnboardImport.setRecordType(api, e, ApiContext.name(m), api.body(e))));
         DatasetFeed.register(api);   // LA-ARRIVAL-FEEDS-1
         DatasetCompaction.register(api);   // LA-DATASET-COMPACT-1
+        PostgresSnapshot.register(api);   // BASIC-ONBOARD-1 P3
     }
 
     /** The standard rate-limit bucket covers these (each reads, or runs, a whole file). */
     static boolean isRateLimited(String method, String path) {
         return "POST".equals(method) && (path.equals("/onboard/files") || path.startsWith("/onboard/files/")
+                || path.startsWith("/onboard/postgres")   // BASIC-ONBOARD-1 P3: each connects to a database and may copy a table
                 || (path.startsWith("/datasets/") && (path.endsWith("/files") || path.endsWith("/run"))));
     }
 
@@ -197,57 +199,72 @@ final class OnboardRoutes implements RouteModule {
         Path file = dir.resolve(storedName(name));
         boolean kept = false;
         try {
-            long bytes = receive(api, ex, file, lim.get(LaLimit.IMPORT_MAX_BYTES));
+            receive(api, ex, file, lim.get(LaLimit.IMPORT_MAX_BYTES));
             String type = OnboardDraft.fileType(file, name);
-            OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, overrides(ex, type));
-            long maxRows = lim.get(LaLimit.IMPORT_MAX_ROWS);
-            if (a.rows() > maxRows)
-                throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "'" + name + "' holds " + a.rows()
-                        + " rows; this Space's import.max_rows is " + maxRows);
-            LinkAnalysisSettings laSettings = LinkAnalysisSettings.forRoot(writeRoot);
-            Map<String, Object> entity = OnboardDraft.entityTypes(a, laSettings.effectiveEntityTypes(), kind);
-            // ENTITY-TYPE-CATALOG-1 P2: what a row is, when the Space's packs define record types
-            if (!laSettings.effectiveRecordTypes().isEmpty()) {
-                entity.put("recordType", EntityShapes.recordType(entity, laSettings.effectiveRecordTypes()));
-                // ENTITY-TYPE-RECORD-ROLES-1: and the roles such a record usually gives its columns
-                EntityShapes.recordTypeRoles(entity, a.sampled(), laSettings.effectiveRecordTypes());
-            }
-
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("draftId", draftId);
-            out.put("kind", kind);
-            Map<String, Object> f = new LinkedHashMap<>();
-            f.put("name", name);
-            f.put("bytes", bytes);
-            f.put("rows", a.rows());
-            out.put("file", f);
-            out.put("format", a.format());
-            out.put("columns", a.columns());
-            out.put("rows", a.preview());
-            out.put("entityTypes", entity);
-            out.put("limits", limitsShape(writeRoot, lim));
-
-            Map<String, Object> record = new LinkedHashMap<>(out);
-            record.remove("rows");
-            record.put("type", type);
-            record.put("stored", file.getFileName().toString());
-            record.put("uploader", ApiContext.actor(ex));
-            record.put("createdAt", Instant.now().toString());
-            record.put("plan", a.cols().stream().map(c -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("name", c.name());
-                m.put("header", c.header());
-                m.put("selector", c.selector());
-                m.put("type", c.type());
-                m.put("format", c.format());
-                return m;
-            }).toList());
-            AtomicFiles.write(dir.resolve("draft.json"), JSON.writeValueAsBytes(record), ".draft-");
+            Map<String, Object> out = answerDraft(writeRoot, ex, draftId, dir, file, name, kind, lim, overrides(ex, type), null);
             kept = true;
             return out;
         } finally {
             if (!kept) deleteTree(dir);
         }
+    }
+
+    /**
+     * Analyse the draft's {@code file} (already in {@code dir}), write {@code draft.json} and answer the DRAFT. Shared by an
+     * uploaded file and a Postgres snapshot ({@link PostgresSnapshot}), whose {@code snapshot} settings ride in the record
+     * so the commit can write them; {@code null} for a file.
+     */
+    static Map<String, Object> answerDraft(Path writeRoot, HttpExchange ex, String draftId, Path dir, Path file, String name,
+                                           String kind, LaLimitValues lim, Map<String, String> overrides,
+                                           Map<String, Object> snapshot) throws IOException {
+        long bytes = Files.size(file);
+        String type = OnboardDraft.fileType(file, name);
+        OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, overrides);
+        long maxRows = lim.get(LaLimit.IMPORT_MAX_ROWS);
+        if (a.rows() > maxRows)
+            throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "'" + name + "' holds " + a.rows()
+                    + " rows; this Space's import.max_rows is " + maxRows);
+        LinkAnalysisSettings laSettings = LinkAnalysisSettings.forRoot(writeRoot);
+        Map<String, Object> entity = OnboardDraft.entityTypes(a, laSettings.effectiveEntityTypes(), kind);
+        // ENTITY-TYPE-CATALOG-1 P2: what a row is, when the Space's packs define record types
+        if (!laSettings.effectiveRecordTypes().isEmpty()) {
+            entity.put("recordType", EntityShapes.recordType(entity, laSettings.effectiveRecordTypes()));
+            // ENTITY-TYPE-RECORD-ROLES-1: and the roles such a record usually gives its columns
+            EntityShapes.recordTypeRoles(entity, a.sampled(), laSettings.effectiveRecordTypes());
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("draftId", draftId);
+        out.put("kind", kind);
+        Map<String, Object> f = new LinkedHashMap<>();
+        f.put("name", name);
+        f.put("bytes", bytes);
+        f.put("rows", a.rows());
+        out.put("file", f);
+        out.put("format", a.format());
+        out.put("columns", a.columns());
+        out.put("rows", a.preview());
+        out.put("entityTypes", entity);
+        out.put("limits", limitsShape(writeRoot, lim));
+        if (snapshot != null) out.put("snapshot", snapshot);
+
+        Map<String, Object> record = new LinkedHashMap<>(out);
+        record.remove("rows");
+        record.put("type", type);
+        record.put("stored", file.getFileName().toString());
+        record.put("uploader", ApiContext.actor(ex));
+        record.put("createdAt", Instant.now().toString());
+        record.put("plan", a.cols().stream().map(c -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", c.name());
+            m.put("header", c.header());
+            m.put("selector", c.selector());
+            m.put("type", c.type());
+            m.put("format", c.format());
+            return m;
+        }).toList());
+        AtomicFiles.write(dir.resolve("draft.json"), JSON.writeValueAsBytes(record), ".draft-");
+        return out;
     }
 
     static String kind(String raw) {

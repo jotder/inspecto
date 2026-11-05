@@ -31,6 +31,7 @@ import {
     Arrivals,
     ImportDataset,
     ImportSummary,
+    isSnapshot,
     arrivalLine,
     fileProblem,
 } from './add-data.model';
@@ -77,7 +78,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             <header class="flex flex-wrap items-center gap-2">
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:table-cells" aria-hidden="true"></mat-icon>
                 <h3 class="m-0 text-base font-semibold" [id]="titleId">{{ dataset().id }}</h3>
-                <inspecto-chip variant="soft">one-time import</inspecto-chip>
+                <inspecto-chip variant="soft">{{ snapshot() ? 'Postgres snapshot' : 'one-time import' }}</inspecto-chip>
                 <span class="text-secondary text-sm">{{ kindWords() }}</span>
             </header>
             @if (dataset().description) {
@@ -121,7 +122,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 </section>
             }
 
-            @if (dataset().kind === 'stream') {
+            @if (dataset().kind === 'stream' && !snapshot()) {
                 <mat-radio-group
                     class="flex flex-wrap gap-x-4 text-sm"
                     [formControl]="mode"
@@ -146,17 +147,19 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                     aria-hidden="true"
                     (change)="onFile($event)"
                 />
-                <button
-                    mat-flat-button
-                    color="primary"
-                    type="button"
-                    data-testid="add-a-file"
-                    [disabled]="busy() || !!locked()"
-                    (click)="fileInput.click()"
-                >
-                    <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                    Add a file
-                </button>
+                @if (!snapshot()) {
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        data-testid="add-a-file"
+                        [disabled]="busy() || !!locked()"
+                        (click)="fileInput.click()"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                        Add a file
+                    </button>
+                }
                 <button
                     mat-stroked-button
                     type="button"
@@ -164,10 +167,17 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                     [disabled]="busy() || !!locked()"
                     (click)="runNow()"
                 >
-                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
-                    Run now
+                    <mat-icon
+                        [svgIcon]="snapshot() ? 'heroicons_outline:arrow-path' : 'heroicons_outline:play'"
+                    ></mat-icon>
+                    {{ snapshot() ? 'Refresh now' : 'Run now' }}
                 </button>
             </div>
+            @if (snapshot()) {
+                <p class="text-secondary m-0 text-xs" data-testid="snapshot-note">
+                    Refresh now copies the table again and replaces everything in {{ dataset().id }}.
+                </p>
+            }
             @if (locked(); as why) {
                 <p class="text-secondary m-0 text-sm" data-testid="card-locked">{{ why }}</p>
             }
@@ -185,13 +195,15 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             }
 
             <div class="flex flex-col gap-3 border-t pt-3" data-testid="keep-up-to-date">
-                <inspecto-dataset-feed
-                    [datasetId]="dataset().id"
-                    [offerKeep]="!access.automationLock()"
-                    [busy]="busy()"
-                    [locked]="locked()"
-                    (importWaiting)="runNow()"
-                ></inspecto-dataset-feed>
+                @if (!snapshot()) {
+                    <inspecto-dataset-feed
+                        [datasetId]="dataset().id"
+                        [offerKeep]="!access.automationLock()"
+                        [busy]="busy()"
+                        [locked]="locked()"
+                        (importWaiting)="runNow()"
+                    ></inspecto-dataset-feed>
+                }
                 <inspecto-dataset-storage
                     [datasetId]="dataset().id"
                     [busy]="busy()"
@@ -234,6 +246,8 @@ export class ImportDatasetCardComponent {
     readonly imported = output<ImportSummary>();
 
     protected readonly titleId = `inspecto-import-card-${ImportDatasetCardComponent.nextId++}`;
+    /** A Postgres snapshot (BASIC-ONBOARD-1 P3): refreshed from its table, never added to by a file. */
+    protected readonly snapshot = computed(() => isSnapshot(this.dataset()));
     protected readonly mode = new FormControl<AddFileMode>('replace', { nonNullable: true });
     protected readonly last = signal<ImportSummary | null>(null);
     protected readonly busy = signal(false);

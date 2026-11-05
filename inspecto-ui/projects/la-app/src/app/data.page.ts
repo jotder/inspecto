@@ -117,6 +117,7 @@ import {
                                     kind: d.kind,
                                     description: d.description,
                                     importPipeline: d.importPipeline ?? d.id,
+                                    importSource: d.importSource ?? undefined,
                                 }"
                             ></inspecto-import-dataset-card>
                         } @else {

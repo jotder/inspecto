@@ -13,6 +13,9 @@ import type {
     ImportRun,
     ImportSummary,
     OnboardDraft,
+    PostgresConnection,
+    PostgresPick,
+    PostgresTest,
 } from './add-data.model';
 import type { DatasetFeedState, IndexJob, KeepUpToDate } from './dataset-feed.model';
 import type { DatasetStorageState, Retention } from './dataset-storage.model';
@@ -52,6 +55,16 @@ export class OnboardService {
         });
     }
 
+    /** **Choose a table** (BASIC-ONBOARD-1 P3): connect read-only and list the tables; a login that could write is refused. */
+    testPostgres(connection: PostgresConnection): Observable<PostgresTest> {
+        return this.http.post<PostgresTest>(apiUrl('/onboard/postgres/test'), { connection });
+    }
+
+    /** Copy a table (or one read-only query) and read it back as a draft - the same draft a file gives. */
+    draftPostgres(connection: PostgresConnection, pick: PostgresPick, kind: ImportKind): Observable<OnboardDraft> {
+        return this.http.post<OnboardDraft>(apiUrl('/onboard/postgres'), { connection, ...pick, kind });
+    }
+
     /** The one confirm: writes, registers, lands, runs once. A large file answers 202 and is followed to its end. */
     commit(draftId: string, body: CommitBody, onFollow?: (runId: string) => void): Observable<ImportSummary> {
         // The commit registers a Dataset: the Dataset list the landing reads must be asked again.
@@ -88,7 +101,7 @@ export class OnboardService {
         );
     }
 
-    /** **Run now**: the import's Pipeline over whatever waits in its inbox. */
+    /** **Run now**: the import's Pipeline over whatever waits in its inbox; a Postgres snapshot copies its table again. */
     runNow(datasetId: string, onFollow?: (runId: string) => void): Observable<ImportSummary> {
         return this.settle(
             this.http.post<ImportSummary | ImportRun>(
