@@ -38,6 +38,12 @@ export interface DatasetFeedState {
     /** This installation runs feeds on their own (Standard and above); Basic imports waiting files with Run now. */
     automatic: boolean;
     feed: Feed;
+    /** BASIC-ONBOARD-1 P2: *Watch this folder* is on - the inbox is looked at every 30 seconds. */
+    watch?: boolean;
+    /** *Watch this folder* is offered: not a Reference, and no schedule keeps the Dataset up to date. */
+    watchable?: boolean;
+    /** Why the poll's last import of this inbox failed; absent once one succeeds. */
+    watchError?: string;
     /** Only in the answer to *Keep this up to date*: the Job that keeps the graph up to date, or null without a link. */
     indexJob?: IndexJob | null;
 }
@@ -101,7 +107,15 @@ export function feedWords(f: Feed): string {
 }
 
 /** The feed as the arrivals answer carries it (one read for every *Data status*): no inbox path. */
-export type FeedSummary = Feed & { waiting: number | null; alreadyImported?: number };
+export type FeedSummary = Feed & {
+    waiting: number | null;
+    alreadyImported?: number;
+    watch?: boolean;
+    watchError?: string;
+};
+
+/** *Watch this folder* in words: one interval, fixed (BASIC-ONBOARD-1 P2). */
+export const WATCH_WORDS = 'Inbox watched, checked every 30 seconds';
 
 /**
  * The ONE *Data status* line about the feed (D-1): on a kept-up-to-date Dataset how and how often, else only the files
@@ -110,6 +124,12 @@ export type FeedSummary = Feed & { waiting: number | null; alreadyImported?: num
 export function feedSummaryLine(f: FeedSummary | null): string | null {
     if (!f) return null;
     const waiting = f.waiting ? waitingWords(f.waiting, f.alreadyImported) : '';
+    if (f.kind === 'uploads' && f.watch) {
+        const parts = [WATCH_WORDS];
+        if (waiting) parts.push(waiting);
+        if (f.watchError) parts.push(`the last import failed: ${f.watchError}`);
+        return parts.join(' · ');
+    }
     if (f.kind === 'uploads') return waiting ? `Inbox: ${waiting}` : null;
     const how = `Kept up to date: ${feedWords(f)}${f.every ? `, ${everyWords(f.every)}` : ''}`;
     return waiting ? `${how} · ${waiting}` : how;
@@ -117,5 +137,13 @@ export function feedSummaryLine(f: FeedSummary | null): string | null {
 
 /** {@link feedSummaryLine} over the feed route's own answer. */
 export function feedStatusLine(s: DatasetFeedState | null): string | null {
-    return s ? feedSummaryLine({ ...s.feed, waiting: s.waiting, alreadyImported: s.alreadyImported }) : null;
+    return s
+        ? feedSummaryLine({
+              ...s.feed,
+              waiting: s.waiting,
+              alreadyImported: s.alreadyImported,
+              watch: s.watch,
+              watchError: s.watchError,
+          })
+        : null;
 }

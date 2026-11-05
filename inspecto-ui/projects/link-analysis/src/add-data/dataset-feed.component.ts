@@ -15,6 +15,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Subscription } from 'rxjs';
 import { ConnectionsService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -35,7 +36,8 @@ import { OnboardService } from './onboard.service';
 /**
  * How files reach an import Dataset (`LA-ARRIVAL-FEEDS-1`, plan P3, D-1), inside the Dataset card:
  * - **Inbox** (every edition): the folder on the server another system writes files into, *N files waiting* and
- *   **Import waiting files** - the card's Run now (`importWaiting`); nothing polls on Basic (DT-5).
+ *   **Import waiting files** - the card's Run now (`importWaiting`); and **Watch this folder** (`BASIC-ONBOARD-1` P2,
+ *   Basic and up): the inbox is looked at every 30 seconds and imported the same way once its files have settled.
  * - **Keep this up to date** (`offerKeep`, Standard and above): the inbox watched, or an SFTP Connection read, on a
  *   schedule; then the proposed index Job is saved through `POST /jobs` when the person may author, so the graph follows.
  *   *Stop* goes back to uploads.
@@ -50,6 +52,7 @@ import { OnboardService } from './onboard.service';
         ReactiveFormsModule,
         MatButtonModule,
         MatIconModule,
+        MatSlideToggleModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         PenFieldComponent,
@@ -62,6 +65,9 @@ import { OnboardService } from './onboard.service';
                 <p class="text-secondary m-0 text-xs">
                     @if (s.automatic && s.feed.kind !== 'uploads') {
                         Files another system writes into this folder on the server are imported on their own.
+                    } @else if (s.watch) {
+                        Files another system writes into this folder on the server are imported on their own once they
+                        have stopped changing; the folder is checked every 30 seconds.
                     } @else {
                         Files another system writes into this folder on the server wait there until you import them.
                     }
@@ -82,6 +88,21 @@ import { OnboardService } from './onboard.service';
                         </button>
                     }
                 </div>
+                @if (s.watchable) {
+                    <mat-slide-toggle
+                        class="self-start"
+                        data-testid="watch-folder"
+                        [checked]="!!s.watch"
+                        [disabled]="saving() || !!locked()"
+                        (change)="setWatch($event)"
+                        >Watch this folder</mat-slide-toggle
+                    >
+                    @if (s.watch && s.watchError) {
+                        <inspecto-alert variant="warning" data-testid="watch-error"
+                            >The last import of this folder failed: {{ s.watchError }}</inspecto-alert
+                        >
+                    }
+                }
                 @if (s.files.length) {
                     <ul class="text-secondary m-0 flex list-none flex-col p-0 text-xs" data-testid="waiting-files">
                         @for (f of shownFiles(); track f.name) {
@@ -323,6 +344,33 @@ export class DatasetFeedComponent {
                                   text: `New files are imported on their own, but the graph Job ${job.name} was not saved: ${apiErrorMessage(err, 'the Jobs route refused it')}.`,
                               },
                     ),
+            });
+    }
+
+    /** *Watch this folder* on or off; a refusal puts the toggle back and says why. */
+    protected setWatch(change: MatSlideToggleChange): void {
+        const on = change.checked;
+        this.note.set(null);
+        this.saving.set(true);
+        this.onboard
+            .watch(this.datasetId(), on)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (s) => {
+                    this.saving.set(false);
+                    this.adopt(s);
+                },
+                error: (err: unknown) => {
+                    this.saving.set(false);
+                    change.source.checked = !on; // the toggle shows the stored value again
+                    this.note.set({
+                        variant: 'error',
+                        text: apiErrorMessage(
+                            err,
+                            on ? 'This folder could not be watched.' : 'The folder could not stop being watched.',
+                        ),
+                    });
+                },
             });
     }
 

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-367 test class(es): 136 unit, 231 real-HTTP control-plane, 0 IT.
+368 test class(es): 136 unit, 232 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -145,6 +145,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiImportRefusalAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRefusalAuditTest.java` | Round 5: the IMPORT doors write Pipeline configs through {@code ImportJournal}, not the write routes — each import |
 | `ControlApiImportReservedPathsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportReservedPathsTest.java` | `SEC-IMPORT-ROLES-ESCALATION-1`, over real HTTP with an ARMED Authenticator (without a Subject |
 | `ControlApiImportUnderPolicyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportUnderPolicyTest.java` | Maker-checker at the import door (`ASSURE-MAKER-CHECKER-1`, over the upstream import judge): under an approval |
+| `ControlApiInboxWatchTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiInboxWatchTest.java` | {@code BASIC-ONBOARD-1} P2 over real HTTP: {@code PUT /datasets/{id}/watch} turns the inbox poll on and off on Basic; |
 | `ControlApiIncrementalJobTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiIncrementalJobTest.java` | INCREMENTAL-1 (operator, 2026-10-10) over real HTTP: a malformed {@code incremental:} block and a sink that |
 | `ControlApiJobActionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobActionsTest.java` | The Scheduler's per-job actions over real HTTP (the UI's live path): single-job detail |
 | `ControlApiJobArtifactDownloadTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobArtifactDownloadTest.java` | {@code GET /jobs/{name}/runs/{runId}/artifacts/{artifact}/content} over real HTTP: a report Job delivers |

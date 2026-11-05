@@ -142,6 +142,11 @@ export class OnboardService {
         return this.http.put<DatasetFeedState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/feed`), body);
     }
 
+    /** BASIC-ONBOARD-1 P2: *Watch this folder* on or off - the inbox is looked at every 30 seconds (Basic and up). */
+    watch(datasetId: string, watch: boolean): Observable<DatasetFeedState> {
+        return this.http.put<DatasetFeedState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/watch`), { watch });
+    }
+
     /** Back to uploads: the import runs only when someone asks. */
     stopFeed(datasetId: string): Observable<DatasetFeedState> {
         return this.http.delete<DatasetFeedState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/feed`));

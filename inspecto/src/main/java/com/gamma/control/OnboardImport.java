@@ -1047,6 +1047,12 @@ final class OnboardImport {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset component '" + id + "'"));
         OnboardRoutes.requireEdit(ex, id, content);
+        requireOwnImport(writeRoot, id, content, service);
+        return content;
+    }
+
+    /** {@link #importDataset}'s 409s without a request: {@code content} is an import Add data wrote for THIS id. */
+    static void requireOwnImport(Path writeRoot, String id, Map<String, Object> content, CollectorService service) {
         Path expected = writeRoot.resolve(CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
         boolean ours = "import".equals(String.valueOf(content.get("origin"))) && id.equals(content.get("importPipeline"))
                 && service.pathFor(id).map(p -> p.toAbsolutePath().normalize().equals(expected)).orElse(false)
@@ -1056,7 +1062,6 @@ final class OnboardImport {
                     + "': it reads that Dataset's data, so add files to '" + content.get(DatasetEntryRules.BASED_ON) + "'");
         if (!ours)
             throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is kept up to date by a Pipeline, not by Add data; add files to that Pipeline's Collector");
-        return content;
     }
 
     static Object addFile(ApiContext api, HttpExchange ex, String id) throws IOException {
@@ -1283,13 +1288,24 @@ final class OnboardImport {
     static Object runNow(ApiContext api, HttpExchange ex, String id) {
         Path writeRoot = OnboardRoutes.requireSelfImport(api, "Run now");
         Path dataRoot = OnboardRoutes.requireDataRoot(api);
-        Map<String, Object> content = importDataset(writeRoot, ex, id, HostContext.of(api).service());
+        CollectorService service = HostContext.of(api).service();
+        Map<String, Object> content = importDataset(writeRoot, ex, id, service);
+        return importWaiting(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), id, content);
+    }
+
+    /**
+     * <b>Import waiting files</b>: the files in the import's inbox, each judged by the columns policy first (a refused one
+     * set aside with its reason), then the run, the follow-on and the arrivals. The ONE path for Run now and the inbox
+     * poll ({@link InboxWatch}, {@code BASIC-ONBOARD-1} P2); the caller has passed the family's gates. 409 while the same
+     * import is running.
+     */
+    static Map<String, Object> importWaiting(Space space, String id, Map<String, Object> content) {
+        Path writeRoot = space.writeRoot(), dataRoot = space.dataRoot();
         String pipeline = String.valueOf(content.get("importPipeline"));
         String key = writeRoot + "|" + pipeline;
         if (!IN_FLIGHT.add(key)) throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is being imported right now");
         try {
-            Job job = new Job(new Space(writeRoot, dataRoot, HostContext.of(api).service(), ApiContext.actor(ex)), pipeline,
-                    String.valueOf(content.get("kind")), null, null, content, false);
+            Job job = new Job(space, pipeline, String.valueOf(content.get("kind")), null, null, content, false);
             // LA-ARRIVAL-MODES-1: a waiting file is judged by the columns policy first; a refused one is set aside, named
             Map<String, List<String>> fresh = new LinkedHashMap<>();
             List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, String.valueOf(content.get("importFormat")),

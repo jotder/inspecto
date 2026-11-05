@@ -56,6 +56,25 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
    the arrivals list, compaction and retention apply to an inbox file, an upload and a snapshot alike.
 5. **Placement.** This plan owns the Basic column of `DATA-TIERS-1`; `DATA-TIERS-1` keeps the Standard / Advanced
    gates and the breaking-change refusals (DT-9).
+6. **One poller, a small "poll this source" seam (P2, built 2026-11-05).** `InboxWatch` (`inspecto/.../control/`)
+   runs ONE daemon thread for the whole JVM, every 30 s at a fixed delay (a slow tick delays the next, never overlaps
+   it). It polls each registered `InboxWatch.PollTarget`, one at a time, with the Space's MDC set:
+   ```java
+   interface PollTarget {
+       String key();          // unique in the JVM; registering the same key again replaces the poll target
+       String space();        // the Space id the poll runs under (MDC)
+       ApiContext owner();    // the ControlApi that registered it: its poll targets go when it closes
+       boolean poll() throws Exception;   // one look; false = stop polling me; an exception is logged, the poll target kept
+   }
+   InboxWatch.register(source);  InboxWatch.unregister(key);
+   ```
+   The inbox poll target (`InboxWatch.Inbox`) re-checks on every poll that the Space exists, Add data is on, the Dataset
+   entry still says `watchInbox: true`, it is still an import Add data wrote (`OnboardImport.requireOwnImport`) and no
+   schedule runs its Pipeline; then it starts `OnboardImport.importWaiting` - the same code as *Run now* - only when
+   every waiting file has settled. **P3's snapshot refresh registers its own poll target** (key e.g.
+   `snapshot|<writeRoot>|<id>`); its `poll()` decides whether a refresh is due and runs it the way *Run now* does. A
+   poll target that must survive a restart persists its own on/off flag and re-registers it: the inbox does this from the
+   Dataset entries on the first tick after start-up (`InboxWatch.attach`); a snapshot poll target needs the same step.
 
 ## 5. Operator answers (2026-11-05)
 

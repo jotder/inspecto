@@ -1964,6 +1964,51 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   by event date / an unreadable date / a missing When column / never on Basic, the crash heal, a file held open, armed
   gates), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
 
+### 6.20 Watch this folder: the 30 s inbox poll (BASIC-ONBOARD-1 P2, as built 2026-11-05)
+
+Plan [`basic-onboard-plan.md`](../../../../superpower/basic-onboard-plan.md) §4.6, §5 Q1; narrows DT-5 / DT-17 (a
+Basic import inbox may poll; still no user-defined schedule). Class `inspecto/.../control/InboxWatch.java`.
+
+| Route | What |
+|---|---|
+| `PUT /datasets/{id}/watch` | `{watch: true \| false}`; `canUploadData`; gates as the feed (`DatasetFeed.gate`); 422 not a boolean, 422 a Reference (a watched inbox adds rows), 409 a Pipeline already on a schedule (*Keep this up to date*), 409 an approval policy over Datasets; answers the feed read |
+
+- **Every edition, off by default, one interval.** The toggle writes `watchInbox: true` on the Dataset entry (removed
+  when off); the import Pipeline stays `trigger: manual`, so the scheduler never runs it. The feed read and the arrivals
+  answer's `feed` carry `watch` (true only while the entry says so AND the trigger is manual) and, after a failed poll
+  import, `watchError`: a refusal's own words with the server's paths taken out (`ServerFaults.withoutServerPaths`),
+  or for anything else a fixed phrase - exception text never reaches the wire (ERR-5XX-ROUTE-BODIES); the detail is
+  logged. The feed read also carries `watchable` (not a Reference, trigger manual): the UI offers the toggle on it.
+- **One poller.** A single daemon thread (`inbox-watch`), fixed delay 30 s, polls every registered `InboxWatch.PollTarget`
+  in turn under its Space's MDC (`tick()` is synchronized). The watched list is in memory: the toggle registers or
+  removes a poll target, and each ControlApi's Spaces are read for `watchInbox` entries on the first tick after it starts
+  (`attach`, from `OnboardRoutes.register`; its poll targets go on close). The seam P3's snapshot refresh reuses is described
+  in the plan §4.6.
+- **The same path as Run now.** `OnboardImport.runNow`'s body is now `importWaiting(Space, id, content)`, called by
+  Run now and by the poll alike: columns checked by name, a refused file moved to `<id>/refused/` with its reason and a
+  REFUSED arrival, the run, the follow-on (the link index in the run on Basic), the arrivals. The poll's actor is
+  `inbox-watch`. A 409 because a person's Run now or upload holds the import is skipped silently (the next tick looks
+  again); any other failure is kept as `watchError` and logged. The daemon's start lock is not the class monitor
+  `tick()` holds, so a toggle never waits for a running import.
+- **No half-written file.** A run starts only when at least one file the run would take is waiting (files already
+  imported under the same name are ignored) and EVERY such file is unmodified for 30 s and was seen at the same size on
+  two polls - the numbers a folder feed writes into its Pipeline (`stability {window: 30s, size_checks: 2}`). Not the
+  `StabilityGate` class: it forgets a file once it releases it, and the run takes the whole inbox, so the poll must
+  see all of it settled at once (with the gate, two files settling on alternate ticks would never run). **Known gap:**
+  a file created in the instant between the poll's listing and the run's own listing is taken unchecked; closing it
+  needs a per-run stability override in `CollectorService.runPipeline` (not built).
+- **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
+  watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
+  the poll target is dropped.
+- **Cost (P0 V3, measured):** under 1 % of one core at 1,000 empty watched inboxes; files left waiting are the driver.
+- **UI:** `dataset-feed.component.ts` - a *Watch this folder* slide toggle in the Inbox block when the feed is
+  `watchable`; the inbox text says it is checked every 30 seconds; a refusal flips the toggle back and says why; a
+  failed poll import shows as a warning. Data status (`feedSummaryLine`): *Inbox watched, checked every 30 seconds ·
+  N files waiting · the last import failed: …*.
+- Tests: `ControlApiInboxWatchTest` (real HTTP; ticks driven directly with the daemon paused (`pausedForTest`): settled import with a refused file set aside, a
+  growing file holding the inbox, off, the restart read-back, refusals, a Reference watched through another door, armed 401/403/200), `dataset-feed.component
+  .spec.ts` (toggle, refusal, schedule hides it, the Data status words).
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (28); geo-link → `RouteModule` (4), `InvestigationMeasureProbe`,

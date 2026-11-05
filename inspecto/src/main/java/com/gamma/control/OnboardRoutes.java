@@ -85,6 +85,8 @@ final class OnboardRoutes implements RouteModule {
                 (e, m) -> OnboardImport.setRecordType(api, e, ApiContext.name(m), api.body(e))));
         DatasetFeed.register(api);   // LA-ARRIVAL-FEEDS-1
         DatasetCompaction.register(api);   // LA-DATASET-COMPACT-1
+        InboxWatch.registerRoutes(api);   // BASIC-ONBOARD-1 P2
+        InboxWatch.attach(api);
     }
 
     /** The standard rate-limit bucket covers these (each reads, or runs, a whole file). */

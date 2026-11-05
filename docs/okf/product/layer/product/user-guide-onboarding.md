@@ -17,7 +17,9 @@ timestamp: 2026-07-16T00:00:00Z
 > *Run now*; on Standard and up the card's *Open in editor* opens the import's Pipeline in the guided editor
 > (`/pipelines?guided=1&open=<pipeline>`) for more settings; every card shows the import's inbox and *Import waiting
 > files*, and *Keep this up to date* turns the import into a watched-folder or SFTP feed (`LA-ARRIVAL-FEEDS-1`, Standard
-> and up); on Basic *Keep this up to date* shows locked with its reason,
+> and up); on Basic *Keep this up to date* shows locked with its reason, and *Watch this folder* (every edition,
+> `BASIC-ONBOARD-1` P2) looks at the inbox every 30 seconds and imports its files the way *Import waiting files* does,
+> once they have stopped changing,
 > and *Read from a database or a remote system* is locked on Basic (DT-4). Home's first-run panel leads with
 > **Add data** (offered to everyone; the screen itself says why when the person may not upload, A-15); the create
 > dialog below (*Onboard a Stream*) stays the **advanced start** (OF-3), linked under it and from Add data for those

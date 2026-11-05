@@ -35,7 +35,8 @@ import java.util.stream.Stream;
  *       and which of them the import already took under the same name, so Run now skips them)
  *       and its feed: {@code uploads} (a person adds files; the Pipeline runs only when asked), {@code folder} (the inbox
  *       is watched) or {@code sftp} (a Connection is read). Every edition: on Basic the files waiting are imported with
- *       <i>Run now</i>, never by polling (D-1, DT-5).</li>
+ *       <i>Run now</i>, or by <i>Watch this folder</i> ({@link InboxWatch}, {@code BASIC-ONBOARD-1} P2: {@code watch},
+ *       {@code watchError}).</li>
  *   <li>{@code PUT /datasets/{id}/feed} {@code {kind: folder|sftp, connection?, every?, readyMarker?}} - <b>Keep this up to
  *       date</b> (Standard and above, {@code pipeline.automation}): rewrites the import's own Pipeline to a scheduled poll
  *       with the safe defaults - a stability gate, an optional ready marker, a checksum duplicate policy that skips a
@@ -69,10 +70,10 @@ final class DatasetFeed {
     }
 
     /** The import behind {@code id}, after the family's gates. */
-    private record Import(Path writeRoot, Path dataRoot, CollectorService service, String id, Map<String, Object> content,
+    record Import(Path writeRoot, Path dataRoot, CollectorService service, String id, Map<String, Object> content,
                           Path pipelineFile) {}
 
-    private static Import gate(ApiContext api, HttpExchange ex, String id, String what) {
+    static Import gate(ApiContext api, HttpExchange ex, String id, String what) {
         Path writeRoot = OnboardRoutes.requireSelfImport(api, what);
         Path dataRoot = OnboardRoutes.requireDataRoot(api);
         CollectorService service = HostContext.of(api).service();
@@ -118,6 +119,10 @@ final class DatasetFeed {
         out.put("truncated", waiting.size() > LISTED);
         out.put("automatic", EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE));
         out.put("feed", feedOf(cfg));
+        watch(out, cfg, imp.dataRoot(), imp.id(), imp.content());   // BASIC-ONBOARD-1 P2
+        // the toggle is offered: not a Reference (it is replaced, a watched inbox adds rows), no schedule runs the Pipeline
+        out.put("watchable", !"reference".equals(imp.content().get("kind"))
+                && PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL);
         return out;
     }
 
@@ -127,6 +132,7 @@ final class DatasetFeed {
      */
     static Map<String, Object> summary(PipelineConfig cfg, Path dataRoot, String id, Map<String, Object> content) {
         Map<String, Object> f = new LinkedHashMap<>(feedOf(cfg));
+        watch(f, cfg, dataRoot, id, content);
         try {
             Path inbox = OnboardImport.inbox(dataRoot, id).toAbsolutePath().normalize();
             List<Path> waiting = waiting(inbox, "." + OnboardImport.extension(String.valueOf(content.get("importFormat"))));
@@ -138,6 +144,14 @@ final class DatasetFeed {
             f.put("waiting", null);
         }
         return f;
+    }
+
+    /** {@code watch} (the inbox is polled every 30 s) and, after a failed import by the poll, {@code watchError}. */
+    private static void watch(Map<String, Object> out, PipelineConfig cfg, Path dataRoot, String id, Map<String, Object> content) {
+        boolean on = InboxWatch.watched(content, cfg);
+        out.put("watch", on);
+        String error = on ? InboxWatch.lastError(dataRoot, id) : null;
+        if (error != null) out.put("watchError", error);
     }
 
     /** The import's own files in its inbox, oldest first: never a hidden file (a landing upload, a marker). */

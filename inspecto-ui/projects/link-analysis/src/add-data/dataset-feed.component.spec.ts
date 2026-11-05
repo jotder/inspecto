@@ -117,6 +117,53 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         expect(items[1]).toBe('nov.csv');
     });
 
+    it('Watch this folder (BASIC-ONBOARD-1 P2): on, said in the inbox, and a failed import shown (no violations)', async () => {
+        const { fixture, el } = create();
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...STATE, automatic: false, watchable: true });
+        fixture.detectChanges();
+        const toggle = () => el.querySelector<HTMLButtonElement>('[data-testid="watch-folder"] button')!;
+        expect(toggle().getAttribute('aria-checked')).toBe('false');
+        toggle().click();
+        const req = http.expectOne(apiUrl('/datasets/calls/watch'));
+        expect(req.request.method).toBe('PUT');
+        expect(req.request.body).toEqual({ watch: true });
+        req.flush({
+            ...STATE,
+            automatic: false,
+            watchable: true,
+            watch: true,
+            watchError: 'the import could not run: disk full',
+        });
+        fixture.detectChanges();
+        expect(toggle().getAttribute('aria-checked')).toBe('true');
+        expect(q(el, 'dataset-inbox')!.textContent).toContain('checked every 30 seconds');
+        expect(q(el, 'watch-error')!.textContent).toContain('disk full');
+        expect(fixture.componentInstance.last!.watch).toBe(true);
+        await expectNoA11yViolations(el);
+    });
+
+    it('Watch this folder refused: the toggle goes back and the reason is said', () => {
+        const { fixture, el } = create();
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...STATE, watchable: true });
+        fixture.detectChanges();
+        const toggle = () => el.querySelector<HTMLButtonElement>('[data-testid="watch-folder"] button')!;
+        toggle().click();
+        http.expectOne(apiUrl('/datasets/calls/watch')).flush(
+            { error: { message: 'a Reference is replaced with Add a file' } },
+            { status: 422, statusText: 'Unprocessable' },
+        );
+        fixture.detectChanges();
+        expect(toggle().getAttribute('aria-checked')).toBe('false');
+        expect(q(el, 'feed-note')!.textContent).toContain('Reference');
+    });
+
+    it('a Dataset the server says cannot be watched (a Reference, a schedule) offers no Watch this folder', () => {
+        const { fixture, el } = create();
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...STATE, watchable: false });
+        fixture.detectChanges();
+        expect(q(el, 'watch-folder')).toBeNull();
+    });
+
     it('no file waiting: no Import waiting files button', () => {
         const { fixture, el } = create();
         http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
@@ -277,6 +324,10 @@ describe('dataset-feed wording', () => {
         );
         expect(feedStatusLine(null)).toBeNull();
         expect(feedStatusLine(STATE)).toBeNull();
+        expect(feedStatusLine({ ...STATE, watch: true })).toBe('Inbox watched, checked every 30 seconds');
+        expect(feedStatusLine({ ...STATE, watch: true, waiting: 2, watchError: 'disk full' })).toBe(
+            'Inbox watched, checked every 30 seconds · 2 files waiting · the last import failed: disk full',
+        );
         expect(feedStatusLine({ ...STATE, waiting: 3 })).toBe('Inbox: 3 files waiting');
         expect(feedStatusLine({ ...STATE, feed: { kind: 'folder', every: '5m' } })).toBe(
             'Kept up to date: the inbox is watched, every 5 minutes',
