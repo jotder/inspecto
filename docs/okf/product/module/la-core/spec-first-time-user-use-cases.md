@@ -243,7 +243,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   Type. The values are read through the masked `POST /inv/reference-rows`, batched over the drawn nodes. A masked value is
   never coloured by, and a node without a row stays uncoloured. A Reference's Dataset card (Add data, the console
   Dataset page, the Link Analysis Data page) says "40 Account entities described." and "20 appear in transfers; 20 do
-  not." These counts come from `GET /datasets/{id}/coverage`, which is bounded and returns counts only. Verified by
+  not." These counts come from `GET /datasets/{id}/coverage`, which is bounded, returns counts only and never counts over a column masked for the viewer. Verified by
   `ControlApiDatasetCoverageTest` over a synthetic pair and by specs (masking, a node without a row, the counts), each
   mutation-checked.
   Detail: `la-core/architecture.md` (*Colour by a Reference detail, and the coverage line*).

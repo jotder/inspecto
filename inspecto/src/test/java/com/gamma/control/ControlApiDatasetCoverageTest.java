@@ -3,6 +3,11 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.service.CollectorService;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewDefinition;
+import com.gamma.pipeline.ViewStore;
+import com.gamma.spi.auth.Authenticators;
+import com.gamma.spi.auth.Subject;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +25,9 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -37,7 +45,7 @@ class ControlApiDatasetCoverageTest {
     private final HttpClient client = HttpClient.newHttpClient();
     private final List<String> ids = new ArrayList<>();
 
-    private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
+    private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
         public void close() {
             api.close();
             svc.close();
@@ -46,6 +54,7 @@ class ControlApiDatasetCoverageTest {
 
     @AfterEach
     void cleanUp() {
+        Authenticators.forTest(null);
         Path data = Path.of("database").toAbsolutePath();
         for (String id : ids) {
             OnboardRoutes.deleteTree(data.resolve(id));
@@ -67,14 +76,19 @@ class ControlApiDatasetCoverageTest {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
             ControlApi api = new ControlApi(svc, 0);
             api.start();
-            return new Ctx(svc, api, api.port());
+            return new Ctx(svc, api, api.port(), writeRoot);
         } finally {
             System.clearProperty("assist.write.root");
         }
     }
 
     private HttpResponse<String> send(Ctx c, String method, String path, String body) throws Exception {
+        return send(c, method, path, body, null);
+    }
+
+    private HttpResponse<String> send(Ctx c, String method, String path, String body, String user) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path));
+        if (user != null) b.header("Authorization", "Bearer " + user);
         b = body == null ? b.GET() : b.method(method, BodyPublishers.ofString(body, StandardCharsets.UTF_8));
         return client.send(b.build(), BodyHandlers.ofString());
     }
@@ -129,6 +143,90 @@ class ControlApiDatasetCoverageTest {
             assertTrue(notRef.get("reason").asText().contains("not a Reference"), notRef.toString());
             // unknown: 404
             assertEquals(404, send(c, "GET", "/datasets/no_such_dataset/coverage", null).statusCode());
+        }
+    }
+
+    /** A Dataset over a view of VALUES: {@code column} (classified) holding {@code keys}; {@code extra} = more entry keys. */
+    private static void dataset(Ctx c, String id, String column, String classification, List<String> keys,
+                                Map<String, Object> extra) throws Exception {
+        StringBuilder values = new StringBuilder();
+        for (String k : keys) values.append(values.isEmpty() ? "" : ",").append("('").append(k).append("', 1)");
+        new ViewStore(c.root.resolve("views")).write(new ViewDefinition(id + "_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES " + values + ") AS t(" + column + ", qty)", "2026-11-06T00:00:00Z"));
+        Map<String, Object> entry = new java.util.LinkedHashMap<>(extra);
+        entry.put("view", id + "_view");
+        entry.put("columns", List.of(classification == null ? Map.of("name", column, "type", "string")
+                : Map.of("name", column, "type", "string", "classification", classification), Map.of("name", "qty", "type", "number")));
+        new ComponentStore(c.root.resolve("registry")).write("dataset", id, entry);
+    }
+
+    /**
+     * The verifier's probe (2026-11-06): under masking, a caller who may not reveal ids makes Datasets of chosen numbers
+     * classified as the Entity Type; their {@code appear} would say which numbers the Reference holds. No count is given
+     * over a column masked for the caller, so the probe learns nothing; one who may reveal gets the counts. Falsified: with
+     * the {@code hidesFromCaller} checks removed from {@code DatasetCoverage}, the viewer's answer carries
+     * {@code probe_hit appear 1}.
+     */
+    @Test
+    void noCountIsGivenOverAColumnMaskedForTheCaller(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case "Bearer viewer" -> Optional.of(new Subject("viewer-1", Set.of("canUploadData")));
+            case "Bearer revealer" -> Optional.of(new Subject("revealer-1", Set.of("canUploadData", BiResultMasking.REVEAL)));
+            default -> Optional.empty();
+        });
+        try (Ctx c = open(cfg, root)) {
+            java.nio.file.Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+            dataset(c, "subs", "msisdn", "MSISDN", List.of("44170001", "44170002"),
+                    Map.of("kind", "reference", "identifyingColumn", "msisdn", "primaryEntityType", "msisdn"));
+            dataset(c, "probe_hit", "msisdn", "MSISDN", List.of("44170001"), Map.of());
+            dataset(c, "probe_miss", "msisdn", "MSISDN", List.of("99999999"), Map.of());
+
+            HttpResponse<String> masked = send(c, "GET", "/datasets/subs/coverage", null, "viewer");
+            JsonNode m = data(masked, 200);
+            assertTrue(m.get("described").isNull(), m.toString());
+            assertEquals(0, m.get("datasets").size(), m.toString());
+            assertTrue(m.get("reason").asText().contains("masked for you"), m.toString());
+            assertFalse(masked.body().contains("probe_"), masked.body());
+
+            // a Dataset the caller may not view: 404 as the Reference, never counted as a holder
+            Map<String, Object> privateEntry = Map.of("owner", "someone-else", "shares", List.of());
+            dataset(c, "probe_private", "msisdn", "MSISDN", List.of("44170002"), privateEntry);
+            Map<String, Object> privateRef = new java.util.LinkedHashMap<>(privateEntry);
+            privateRef.putAll(Map.of("kind", "reference", "identifyingColumn", "msisdn", "primaryEntityType", "msisdn"));
+            dataset(c, "subs_private", "msisdn", "MSISDN", List.of("44170001"), privateRef);
+            assertEquals(404, send(c, "GET", "/datasets/subs_private/coverage", null, "revealer").statusCode());
+
+            JsonNode r = data(send(c, "GET", "/datasets/subs/coverage", null, "revealer"), 200);
+            assertEquals(2, r.get("described").asLong(), r.toString());
+            assertEquals(2, r.get("datasets").size(), r.toString());   // probe_private is not listed
+            assertEquals(1, r.get("datasets").get(0).get("appear").asLong(), r.toString());   // probe_hit
+            assertEquals(0, r.get("datasets").get(1).get("appear").asLong(), r.toString());   // probe_miss
+        }
+    }
+
+    /**
+     * A holder's column masked for the caller is never compared, even when the Reference's own key is visible: under
+     * {@code all} the unclassified key {@code phone} is shown raw while {@code calls.caller} (MSISDN) is masked. Falsified:
+     * without the holder-side {@code hidesFromCaller}, the viewer's answer lists {@code calls}.
+     */
+    @Test
+    void aHoldersMaskedColumnIsNeverCompared(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case "Bearer viewer" -> Optional.of(new Subject("viewer-1", Set.of("canUploadData")));
+            case "Bearer revealer" -> Optional.of(new Subject("revealer-1", Set.of("canUploadData", BiResultMasking.REVEAL)));
+            default -> Optional.empty();
+        });
+        try (Ctx c = open(cfg, root)) {
+            java.nio.file.Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+            dataset(c, "plans", "phone", null, List.of("44170001", "44170002"),
+                    Map.of("kind", "reference", "identifyingColumn", "phone", "primaryEntityType", "msisdn"));
+            dataset(c, "calls", "caller", "MSISDN", List.of("44170001"), Map.of());
+            JsonNode out = data(send(c, "GET", "/datasets/plans/coverage", null, "viewer"), 200);
+            assertEquals(2, out.get("described").asLong(), out.toString());
+            assertEquals(0, out.get("datasets").size(), out.toString());
+            JsonNode r = data(send(c, "GET", "/datasets/plans/coverage", null, "revealer"), 200);
+            assertEquals(1, r.get("datasets").size(), r.toString());
+            assertEquals(1, r.get("datasets").get(0).get("appear").asLong(), r.toString());
         }
     }
 

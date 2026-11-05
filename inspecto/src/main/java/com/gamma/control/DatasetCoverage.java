@@ -36,9 +36,11 @@ import java.util.Map;
  * ({@link OnboardMatches#typeOf}), {@code appear} = how many of those keys are found in ANY such column, {@code absent}
  * the rest. Keys compare as trimmed text, as Add data's shared-column {@code matches} do.
  *
- * <p><b>Counts only</b>: no key or value leaves. The counts are taken over two whole registered Datasets the caller may
- * already view - no caller-chosen value enters the query - so they are no membership oracle and are answered under every
- * masking mode (unlike {@code matches}, whose file values the caller chooses). <b>Bounded</b>: each Dataset is read over at
+ * <p><b>Counts only</b>: no key or value leaves, and never a count over a column masked for the caller
+ * ({@link BiResultMasking#hidesFromCaller}, as Add data's {@code matches}): a caller who may create a Dataset of chosen
+ * values classified as the Entity Type would otherwise learn from {@code appear} which masked keys the Reference holds. So
+ * a Reference whose identifying column is masked for the caller answers no counts (with the {@code reason}), and a
+ * Dataset's masked columns are never compared (a Dataset left with none is not listed). <b>Bounded</b>: each Dataset is read over at
  * most {@link #MAX_SCAN_ROWS} rows and at most {@link #MAX_DATASETS} Datasets are compared; {@code truncated} says a cap
  * bit. A Dataset that cannot be read is left out, never an error.
  *
@@ -90,6 +92,16 @@ final class DatasetCoverage {
         }
 
         ViewStore views = new ViewStore(writeRoot.resolve("views"));
+        boolean reveal = BiResultMasking.mayReveal(ex);
+        try {
+            if (BiResultMasking.of(writeRoot, store, views, id, ref, reveal).hidesFromCaller(keyCol)) {
+                out.put("reason", "'" + keyCol + "' is masked for you, so how many of its entities appear elsewhere is not counted");
+                return out;
+            }
+        } catch (RuntimeException unreadable) {
+            out.put("reason", "'" + id + "' could not be read");
+            return out;
+        }
         // the other viewable Datasets holding the Entity Type, by name; a Reference describes, it does not "appear"
         List<String[]> holders = new ArrayList<>();             // {name, relation, column...}
         boolean truncated = false;
@@ -111,6 +123,9 @@ final class DatasetCoverage {
             }
             String relation;
             try {
+                BiResultMasking masking = BiResultMasking.of(writeRoot, store, views, d.name(), c, reveal);
+                cols.removeIf(masking::hidesFromCaller);   // a count over a masked column would tell which keys exist
+                if (cols.isEmpty()) continue;
                 relation = DatasetRelation.relationSql(c, dataRoot, views);
             } catch (RuntimeException unreadable) {
                 continue;

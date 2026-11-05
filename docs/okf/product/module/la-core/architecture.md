@@ -468,14 +468,18 @@ truncated, reason?}`. `described` counts the distinct trimmed keys of the identi
 non-Reference Dataset contributes the columns whose `classification` resolves to the Entity Type
 (`OnboardMatches.typeOf`), and `appear` counts the described keys found in any of them. The read is bounded at
 `MAX_SCAN_ROWS` = 1,000,000 rows per Dataset and `MAX_DATASETS` = 20 Datasets; `truncated` says when a cap was hit. The
-answer holds counts only. **Decision (2026-11-06):** the counts are answered under every masking mode. Both sides are
-whole registered Datasets the caller can already view, and no caller-chosen value enters the query, so the counts are no
-membership oracle. Add data's `matches`, whose file values the caller chooses, still skip masked columns. Keys compare
+answer holds counts only, and never a count over a column masked for the caller (`BiResultMasking.hidesFromCaller`, the
+`matches` rule). Someone who may create a Dataset can fill it with chosen values classified as the Entity Type, so
+`appear` would otherwise tell them which masked keys the Reference holds (the verification probe, 2026-11-06). So a
+Reference whose identifying column is masked for the caller answers no counts, only a `reason`, and a holder's masked
+columns are never compared; a holder left with no column is not listed. Under masking, then, the line shows only to
+someone who may reveal ids, or when the keys are not masked. Keys compare
 as trimmed text, without the Entity Type normaliser, the same as `matches`. The UI is
 `<inspecto-la-reference-coverage>` on the shared import card for a `kind: reference` Dataset, so it shows on Add data's
 result, the console Dataset page and the Link Analysis Data page. It re-reads whenever the card's arrivals change and
 shows nothing when the read fails. Tests: `ControlApiDatasetCoverageTest` (a synthetic pair: 40 described, 20 appear, 20
-absent, no key in the body; the bounded scan), `node-rules.spec`, `reference-details.spec`,
+absent, no key in the body; no count over a column masked for the caller, either side; a Dataset the caller
+cannot view is 404 as the Reference and never counted; the bounded scan), `node-rules.spec`, `reference-details.spec`,
 `link-analysis-display-rules.component.spec`, `link-analysis.component.spec` (the batched masked read),
 `reference-coverage.component.spec`, `import-dataset-card.component.spec`. All are mutation-checked.
 
