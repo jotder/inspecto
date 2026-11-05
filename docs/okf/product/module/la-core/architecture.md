@@ -1704,9 +1704,15 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   (`recordTypeProposals`; a role the column already reads as is not repeated), saved together by *Use these roles*;
   a role the person set is never proposed over. The Holds picker marks *Shape matches* per column from
   `GET /inv/datasets/{id}/shapes` (read once per page per Dataset).
-- **Deliberately not built** (board row `LA-COLUMN-ROLES-2`): the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the
-  primary Measure (the canvas still weighs links by their count); a Mapping-level override of `carried` (a Mapping keeps
-  its base's mark); Category values for a multi-Dataset read (the panel offers a single read's Dataset only).
+- **A Mapping's own carriage (`LA-COLUMN-ROLES-2`, 2026-11-05).** The Mapping form has an *On each link* row per Time,
+  Measure and Category column of its base (as the page reads the base's roles; never the Mapping's From or To),
+  seeded from the base for a new Mapping and from the Mapping when editing it (`MappingForm.notCarried`,
+  `carriedChoices`). The Mapping's entry writes its OWN `carried: false` marks, so its link index carries what it says,
+  whatever its base says; a kept-off column whose base states no role gets the role the page shows (a date is a Time).
+- **Still being built** (board row `LA-COLUMN-ROLES-2`, decisions in [`plan-column-roles-2.md`](plan-column-roles-2.md)):
+  the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the primary Measure (the canvas
+  still weighs links by their count); Category values for a multi-Dataset read (the panel offers a single read's
+  Dataset only).
 
 ### 6.16 Discovery in Basic: presets, Discover, entity summary, query builder (LA-BASIC-DISCOVERY-1, as built 2026-11-03/05)
 

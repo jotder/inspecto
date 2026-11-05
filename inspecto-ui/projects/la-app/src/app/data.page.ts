@@ -1,5 +1,12 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { AbstractControl, FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormBuilder,
+    FormControl,
+    FormsModule,
+    ReactiveFormsModule,
+    Validators,
+} from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -37,6 +44,7 @@ import {
     driftedColumns,
     formOf,
     mappingEntry,
+    carriedChoices,
     mappingLine,
     recordTypeProposals,
     roleOf,
@@ -55,6 +63,7 @@ import {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        FormsModule,
         ReactiveFormsModule,
         RouterLink,
         MatButtonModule,
@@ -350,6 +359,17 @@ import {
                                             formControlName="toType"
                                             [options]="typeOptions()"
                                         ></inspecto-option-picker>
+                                        <!-- LA-COLUMN-ROLES-2: this Mapping's own "On each link" marks -->
+                                        @for (col of mappingCarried(); track col) {
+                                            <inspecto-option-picker
+                                                [label]="col + ' on each link'"
+                                                [options]="carriedOptions"
+                                                [ngModel]="isCarried(col) ? 'yes' : 'no'"
+                                                [ngModelOptions]="{ standalone: true }"
+                                                (ngModelChange)="setCarried(col, $event)"
+                                                [attr.data-testid]="'mapping-carried-' + col"
+                                            ></inspecto-option-picker>
+                                        }
                                         @for (opt of optional; track opt.key) {
                                             <inspecto-option-picker
                                                 [label]="opt.label"
@@ -653,9 +673,28 @@ export class DataPageComponent implements OnInit {
         kind: [''],
         primaryTime: [''],
         primaryMeasure: [''],
+        notCarried: [[] as string[]],
     });
 
+    /** The open Mapping form's columns that may be kept off its links (re-read as From and To change). */
+    protected readonly mappingCarried = computed(() => {
+        this.formTick();
+        const e = this.editing();
+        return e ? carriedChoices(e.base, this.form.getRawValue(), this.types()) : [];
+    });
+    private readonly formTick = signal(0);
+
+    protected isCarried(column: string): boolean {
+        return !this.form.controls.notCarried.value.includes(column);
+    }
+
+    protected setCarried(column: string, v: string): void {
+        const rest = this.form.controls.notCarried.value.filter((c) => c !== column);
+        this.form.controls.notCarried.setValue(v === 'no' ? [...rest, column] : rest);
+    }
+
     constructor() {
+        this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.formTick.update((n) => n + 1));
         this.form.controls.from.valueChanges.pipe(takeUntilDestroyed()).subscribe((from) => {
             this.form.controls.to.updateValueAndValidity({ emitEvent: false });
             this.holdsOf(from, this.form.controls.fromType);

@@ -1,5 +1,5 @@
 import type { ComponentDef } from '@inspecto/core/api';
-import { ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/link-analysis/api/column-roles';
+import { CARRIED_ROLES, ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/link-analysis/api/column-roles';
 import type { EntityTypeGuide, RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
 export { ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
@@ -214,6 +214,11 @@ export interface MappingForm {
     kind: string;
     primaryTime: string;
     primaryMeasure: string;
+    /**
+     * The Time, Measure and Category columns kept off this Mapping's links (`carried: false`, LA-COLUMN-ROLES-2): the
+     * Mapping's own marks when editing it, its base's for a new one; any other column is carried.
+     */
+    notCarried: string[];
 }
 
 /** A Mapping name: the Dataset id rule (a lower-case letter, then letters, digits or _), unique among Datasets. */
@@ -240,13 +245,18 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
                   : c.role === 'entity'
                     ? null
                     : c.role;
+        // LA-COLUMN-ROLES-2: whether it rides on this Mapping's links is the Mapping's own mark, not its base's
+        // (an entry written before roles reads its role as the page shows it - a date column is a Time - and states it)
+        const shown = role ?? (chosen === undefined ? roleOf(c, base, types) : null);
+        const keptOff = !!shown && CARRIED_ROLES.has(shown) && f.notCarried.includes(c.name);
+        const written = keptOff ? shown : role;
         return {
             name: c.name,
             type: c.type,
             ...(classification ? { classification } : {}),
-            ...(role ? { role } : {}),
-            ...(role === 'measure' && c.unit ? { unit: c.unit } : {}),
-            ...(c.carried === false ? { carried: false } : {}),
+            ...(written ? { role: written } : {}),
+            ...(written === 'measure' && c.unit ? { unit: c.unit } : {}),
+            ...(keptOff ? { carried: false } : {}),
         };
     });
     const mapping: Record<string, string> = { from: f.from, to: f.to };
@@ -281,5 +291,20 @@ export function formOf(entry: DataEntry, types: readonly TypeChoice[], name = ''
         kind: m?.kind ?? '',
         primaryTime: m?.primaryTime ?? '',
         primaryMeasure: m?.primaryMeasure ?? '',
+        notCarried: entry.columns.filter((c) => c.carried === false).map((c) => c.name),
     };
+}
+
+/**
+ * The columns a Mapping of `base` may keep off its links (LA-COLUMN-ROLES-2): the base's Time, Measure and Category
+ * columns, in column order, except the Mapping's From and To (an end is never carried).
+ */
+export function carriedChoices(
+    base: DataEntry,
+    f: Pick<MappingForm, 'from' | 'to'>,
+    types: readonly TypeChoice[],
+): string[] {
+    return base.columns
+        .filter((c) => c.name !== f.from && c.name !== f.to && CARRIED_ROLES.has(roleOf(c, base, types)))
+        .map((c) => c.name);
 }

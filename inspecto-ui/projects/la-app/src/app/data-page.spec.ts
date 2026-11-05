@@ -5,6 +5,7 @@ import {
     driftedColumns,
     formOf,
     mappingEntry,
+    carriedChoices,
     mappingLine,
     recordTypeProposals,
     roleOf,
@@ -207,5 +208,62 @@ describe('recordTypeProposals (ENTITY-TYPE-RECORD-ROLES-1)', () => {
     it('proposes nothing without a record type or its hints', () => {
         expect(recordTypeProposals(entry, null, TYPES)).toEqual([]);
         expect(recordTypeProposals(entry, { ...transfer, roleHints: undefined }, TYPES)).toEqual([]);
+    });
+});
+
+describe('a Mapping\'s own "On each link" marks (LA-COLUMN-ROLES-2)', () => {
+    const base = dataEntry({
+        type: 'dataset',
+        name: 't',
+        ref: 'dataset/t',
+        content: {
+            origin: 'import',
+            physicalRef: 't/database',
+            columns: [
+                { name: 'a', classification: 'ACCOUNT_ID', role: 'entity' },
+                { name: 'b', classification: 'ACCOUNT_ID', role: 'entity' },
+                { name: 'c', role: 'dimension', carried: false },
+                { name: 'fee', role: 'measure' },
+                { name: 'note', role: 'detail' },
+            ],
+            defaultLinkMapping: { from: 'a', to: 'b' },
+        },
+    } as ComponentDef);
+
+    it("a new Mapping starts from its base's marks; the Mapping's own marks are written, not the base's", () => {
+        const f = { ...formOf(base, TYPES), name: 'm' };
+        expect(f.notCarried).toEqual(['c']);
+        const cols = (fc: typeof f) =>
+            mappingEntry(base, fc, TYPES)['columns'] as { name: string; carried?: boolean }[];
+        expect(cols(f).find((c) => c.name === 'c')?.carried).toBe(false);
+        const own = cols({ ...f, notCarried: ['fee'] });
+        expect(own.find((c) => c.name === 'c')?.carried).toBeUndefined(); // carried on this Mapping, not on its base
+        expect(own.find((c) => c.name === 'fee')?.carried).toBe(false);
+        // a Detail is never marked: it rides along anyway
+        expect(cols({ ...f, notCarried: ['note'] }).find((c) => c.name === 'note')?.carried).toBeUndefined();
+    });
+
+    it("editing a Mapping starts from the Mapping's own marks", () => {
+        const m = dataEntry({
+            type: 'dataset',
+            name: 'm',
+            ref: 'dataset/m',
+            content: {
+                origin: 'mapping',
+                basedOn: 't',
+                physicalRef: 't/database',
+                columns: [
+                    { name: 'fee', role: 'measure', carried: false },
+                    { name: 'c', role: 'dimension' },
+                ],
+                defaultLinkMapping: { from: 'a', to: 'b' },
+            },
+        } as ComponentDef);
+        expect(formOf(m, TYPES, 'm').notCarried).toEqual(['fee']);
+    });
+
+    it("offers the base's Time, Measure and Category columns, never the Mapping's ends", () => {
+        expect(carriedChoices(base, { from: 'a', to: 'b' }, TYPES)).toEqual(['c', 'fee']);
+        expect(carriedChoices(base, { from: 'a', to: 'c' }, TYPES)).toEqual(['fee']);
     });
 });

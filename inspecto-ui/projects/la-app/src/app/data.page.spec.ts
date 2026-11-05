@@ -524,4 +524,30 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         puts.forEach((r) => r.flush({}));
         http.expectOne(apiUrl('/components/dataset')).flush(typed);
     });
+
+    it('LA-COLUMN-ROLES-2: a Mapping keeps a column off its own links, whatever its base says', async () => {
+        const { fixture, el, c } = create();
+        const page = c as unknown as { setCarried(col: string, v: string): void; bases(): { id: string }[] };
+        c.newMapping(c.bases().find((d) => d.id === 'wallet_txn')!);
+        fixture.detectChanges();
+        await fixture.whenStable(); // ngModel writes its value a tick later
+        fixture.detectChanges();
+        // txn_date is a Time on the base (a date column), so this Mapping may keep it off its links; an end may not
+        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('Carried');
+        expect(q(el, 'mapping-carried-src_id')).toBeNull();
+        page.setCarried('txn_date', 'no');
+        c.form.patchValue({ name: 'by_dst', from: 'src_id', to: 'dst_id' });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('Not carried');
+        c.saveMapping();
+        const req = http.expectOne((r) => r.method === 'POST' && r.url.includes('/components/dataset'));
+        const cols = req.request.body as { content?: unknown; columns?: unknown } as Record<string, unknown>;
+        const written = JSON.stringify(cols);
+        expect(written).toContain('"name":"txn_date"');
+        expect(written).toMatch(/"name":"txn_date"[^}]*"carried":false/);
+        req.flush({});
+        http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
 });
