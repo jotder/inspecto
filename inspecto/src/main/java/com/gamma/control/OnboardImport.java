@@ -628,6 +628,8 @@ final class OnboardImport {
         String runBatch;
         /** sha256 of the uploaded file (LA-ARRIVAL-LEDGER-1), read as it lands; null for Run now. */
         String sha256;
+        /** The per-file ledger rows {@link #runChecked} saw this run add: the files it took (LA-ARRIVAL-LEDGER-1). */
+        List<Map<String, String>> taken = List.of();
 
         Job(Space space, String id, String kind, Path source, String fileName, Map<String, Object> dataset, boolean replace) {
             this.space = space;
@@ -696,11 +698,17 @@ final class OnboardImport {
             for (Map<String, String> b : space.service().statusStore().batches(cfg)) batchesBefore.add(String.valueOf(b.get("consignment_id")));
             Set<String> quarantineBefore = new HashSet<>();
             for (Map<String, String> q : space.service().statusStore().quarantine(cfg)) quarantineBefore.add(String.valueOf(q.get("path")));
+            Set<String> filesBefore = new HashSet<>();
+            for (Map<String, String> f : space.service().statusStore().files(cfg)) filesBefore.add(f.get("filename") + "|" + f.get("consignment_id"));
             try {
                 space.service().runPipeline(id).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + id + "' is not registered"));
             } catch (IllegalStateException notRunnable) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import could not run: " + notRunnable.getMessage());
             }
+            List<Map<String, String>> took = new ArrayList<>();
+            for (Map<String, String> f : space.service().statusStore().files(cfg))
+                if (!filesBefore.contains(f.get("filename") + "|" + f.get("consignment_id"))) took.add(f);
+            taken = took;
             long after = countRows(database());
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("dataset", id);
@@ -756,9 +764,12 @@ final class OnboardImport {
             return m;
         }
 
-        /** LA-ARRIVAL-LEDGER-1: what the run ledger cannot know about this upload, for {@code GET /datasets/{id}/arrivals}. */
+        /**
+         * LA-ARRIVAL-LEDGER-1: what the run ledger cannot know about the files this run took (the upload's name, mode and
+         * sha256; every file's index outcome), for {@code GET /datasets/{id}/arrivals}. Run now records its files too.
+         */
         void recordArrival(Map<String, Object> summary) {
-            DatasetArrivals.recordUpload(space.dataRoot(), id, runBatch, landed, fileName, replace, sha256, summary);
+            DatasetArrivals.recordRun(space.dataRoot(), id, taken, landed, fileName, replace ? "replace" : "append", sha256, summary);
         }
 
         /**
@@ -798,6 +809,7 @@ final class OnboardImport {
                         DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount"), DatasetEntryRules.carriedColumns(content),
                         space.actor(), true, 300_000L, 0L));
                 Map<String, Object> r = outcome(o.result(), o.message());
+                r.put("mode", o.mode());   // append / full / compact / none: what the build cost (V4)
                 r.put("code", o.code());
                 r.put("edges", o.edges());
                 r.put("nodes", o.nodes());
@@ -1108,6 +1120,7 @@ final class OnboardImport {
             Map<String, Object> s = job.runChecked(before);
             s.put("dataset", id);
             job.followOn(s);
+            job.recordArrival(s);   // LA-ARRIVAL-LEDGER-1: each file Run now took, with the index outcome
             return s;
         } finally {
             IN_FLIGHT.remove(key);

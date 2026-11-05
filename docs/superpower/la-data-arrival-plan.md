@@ -130,6 +130,38 @@ origin, logical_name`. So the arrival list is a **read** over that ledger, not a
 - Tests: `ControlApiOnboardFilesTest#theArrivalsOfAnImportDatasetAreListedNewestFirstWithTheirPeriod` (real HTTP),
   `import-dataset-card.component.spec.ts` (rendering, five-then-all, a11y; the wording helpers).
 
+## 5c. P1 finished (2026-11-05): V4, Run now's index outcome, Data status on the Start box and dock
+
+- **V4 measured** (`la/inspecto-geo-link` `ControlApiOnboardLinkAnalysisTest#onBasicEachAppendIsIndexedAsAnAppendAndTheArrivalsSayIt`,
+  and `#v4MeasuredAtScale` by hand with `-Dla.v4.rows=N`): on Basic every *Add a file* in append mode and every *Run now*
+  that takes a dropped file builds the link index in mode **append** (the new file only); only the first build is `full`.
+  Wall time of the whole Add a file (run + row count + index + Expectations; 10,000 appended rows, this laptop):
+
+  | Dataset rows | first commit | each append (3) | Run now, one dropped file |
+  |---|---|---|---|
+  | 2,000 (200-row appends) | 2.1 s | 3.5 - 3.8 s | 2.5 s |
+  | 100,000 | 5.9 s | 6.6 - 7.5 s | 4.9 s |
+  | 1,000,000 | 11.7 s | 7.4 - 10.7 s | 3.9 s |
+
+  The append cost grows far slower than the Dataset (10× the rows: about +3 s), so the index is no reason to stop
+  appending on Basic. 10 M rows was not measured: the base file passes the 64 MiB inline limit and runs as a followed
+  (202) run; expect tens of seconds per append, not a rebuild. A *Replace the period* rewrites existing Parquet files, so
+  its next build is `full` (the plan advice for a rewritten input) - said in P2.
+- **Run now records each file it took** in the sidecar (`sender: system`, `mode: append`, the run's index outcome), so
+  decision (a) of §5b is reversed: a *system* arrival now says what the graph did. One run that takes an upload and a
+  waiting drop records both. A system line is keyed by file name **and** batch (a foreign process may reuse a name). Every
+  line now carries `at` and, beside `index`, `indexMode` (append / full / compact / none). The run summary's `index`
+  carries `mode` too.
+- **A re-sent drop under the same name is skipped** by the import Pipeline's duplicate policy (Run now answers
+  `rowsIn: 0`, no arrival) - pinned in `ControlApiOnboardFilesTest#theArrivalsOfAnImportDatasetAreListedNewestFirstWithTheirPeriod`.
+  The file stays in the inbox (P3's *N files waiting* must say why such a file is not taken).
+- **Data status is one component**, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`):
+  `[dataset]` (it reads `GET /datasets/{id}/arrivals` itself) or `[arrivals]` (the host's read). On the Dataset card, under
+  the Start box's Dataset picker (decision (b) of §5b reversed), and above the Rows dock's table for the drawn Dataset. The
+  graph clock: *graph up to date* when the newest arrival was indexed, *graph N files behind* when newer arrivals recorded
+  a failed or refused build, nothing when nothing was recorded. **Extension point** for P3 / P4: `dataStatusLines()` in
+  `add-data.model.ts` - one more line per field of the arrivals answer.
+
 ## 6. Decisions (operator 2026-11-03: the recommended options, accepted)
 
 - **D-1 Basic and foreign drops: manual.** Basic shows the Dataset's inbox path and *N files waiting · Import waiting

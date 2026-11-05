@@ -25,7 +25,8 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { AddDataAccess } from './add-data-access';
-import { Arrival, ImportDataset, ImportSummary, arrivalLine, dataStatusLine, fileProblem } from './add-data.model';
+import { Arrival, Arrivals, ImportDataset, ImportSummary, arrivalLine, fileProblem } from './add-data.model';
+import { DataStatusComponent } from './data-status.component';
 import { ImportSummaryComponent } from './import-summary.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
@@ -52,6 +53,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         ChipComponent,
         LockedActionComponent,
         ImportSummaryComponent,
+        DataStatusComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -69,11 +71,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             @if (dataset().description) {
                 <p class="text-secondary m-0 text-sm">{{ dataset().description }}</p>
             }
-            @if (statusLine(); as line) {
-                <p class="m-0 text-sm" data-testid="data-status">
-                    <span class="font-semibold">Data status:</span> {{ line }}
-                </p>
-            }
+            <inspecto-la-data-status [arrivals]="arrivalsAnswer()"></inspecto-la-data-status>
             @if (last(); as s) {
                 <div class="flex flex-col gap-1">
                     <h4 class="m-0 text-sm font-semibold">Last import</h4>
@@ -226,14 +224,15 @@ export class ImportDatasetCardComponent {
     protected readonly locked = computed(() => this.access.lockReason());
     private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
-    /** LA-ARRIVAL-LEDGER-1: every file the import took, newest first; [] while unread or when the read fails. */
-    protected readonly arrivals = signal<Arrival[]>([]);
+    /** LA-ARRIVAL-LEDGER-1: the last `GET /datasets/{id}/arrivals` answer; null while unread or when the read fails. */
+    protected readonly arrivalsAnswer = signal<Arrivals | null>(null);
+    /** Every file the import took, newest first. */
+    protected readonly arrivals = computed<Arrival[]>(() => this.arrivalsAnswer()?.arrivals ?? []);
     protected readonly arrivalsShown = 5;
     protected readonly allArrivals = signal(false);
     protected readonly shownArrivals = computed(() =>
         this.allArrivals() ? this.arrivals() : this.arrivals().slice(0, this.arrivalsShown),
     );
-    protected readonly statusLine = computed(() => dataStatusLine(this.arrivals()));
     protected readonly line = arrivalLine;
     protected readonly received = (a: Arrival): string => (a.received ?? '').replace('T', ' ').slice(0, 16);
 
@@ -257,8 +256,8 @@ export class ImportDatasetCardComponent {
             .arrivals(id)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: (r) => this.arrivals.set(r.arrivals ?? []),
-                error: () => this.arrivals.set([]), // the card stays usable; only the history is missing
+                next: (r) => this.arrivalsAnswer.set(r),
+                error: () => this.arrivalsAnswer.set(null), // the card stays usable; only the history is missing
             });
     }
 

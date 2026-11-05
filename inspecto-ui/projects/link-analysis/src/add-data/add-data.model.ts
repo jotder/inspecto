@@ -154,7 +154,10 @@ export interface Arrival {
     rowsRejected: number | null;
     mode: 'replace' | 'append' | null;
     sha256: string | null;
+    /** The link index outcome of the run that took this file (BUILT, UP_TO_DATE, DEFERRED, FAILED, …); null = not recorded. */
     index: string | null;
+    /** How that build ran: `append` (the new file only), `full`, `compact`, `none`; null = not recorded. */
+    indexMode?: string | null;
     consignment: string;
     kept: boolean;
     coversFrom: string | null;
@@ -692,8 +695,35 @@ export function coversText(from: string | null, to: string | null): string {
 }
 
 /**
- * The Dataset's **Data status** in one line, from its newest arrival: when data last arrived, the period the data still kept
- * covers, and whether the graph has it - said only when the import recorded it (a file from a system has no such record).
+ * Every line of a Dataset's **Data status** (`<inspecto-la-data-status>`), the three clocks first. ⚠ Extension point: a
+ * later line (files waiting in the inbox, storage) is one more entry here from a field of `GET /datasets/{id}/arrivals`.
+ */
+export function dataStatusLines(read: Arrivals | null): string[] {
+    const clocks = dataStatusLine(read?.arrivals ?? []);
+    return clocks ? [clocks] : [];
+}
+
+const INDEXED = new Set(['BUILT', 'UP_TO_DATE']);
+
+/** What the graph holds, from the arrivals' recorded index outcomes, newest first; '' when nothing was recorded. */
+function graphClock(list: readonly Arrival[]): string {
+    const newest = list[0];
+    if (newest?.index === 'DEFERRED') return "the graph is updated by the Space's Jobs";
+    const k = list.findIndex((a) => !!a.index && INDEXED.has(a.index));
+    if (k === 0) return 'graph up to date';
+    // the arrivals after the newest one the graph took, counted only when their own outcome was recorded
+    const behind = (k < 0 ? list : list.slice(0, k)).filter(
+        (a) => !!a.index && a.index !== 'SKIPPED' && a.index !== 'NOT_AVAILABLE',
+    ).length;
+    if (k > 0 && behind) return `graph ${plural(behind, 'file', 'files')} behind`;
+    if (newest?.index === 'FAILED' || newest?.index === 'REFUSED') return 'the graph was not updated';
+    return '';
+}
+
+/**
+ * The Dataset's **Data status** in one line, from its arrivals (newest first): **Received** (when data last arrived) ·
+ * **covers** (the period the data still kept covers) · the **graph** (up to date, or how many files behind) - the graph
+ * part only when the runs recorded an index outcome.
  */
 export function dataStatusLine(list: readonly Arrival[]): string | null {
     const newest = list[0];
@@ -710,9 +740,8 @@ export function dataStatusLine(list: readonly Arrival[]): string | null {
               )
             : '';
     if (covers) parts.push(`covers ${covers}`);
-    if (newest.index === 'BUILT' || newest.index === 'UP_TO_DATE') parts.push('graph up to date');
-    else if (newest.index === 'DEFERRED') parts.push("the graph is updated by the Space's Jobs");
-    else if (newest.index === 'FAILED' || newest.index === 'REFUSED') parts.push('the graph was not updated');
+    const graph = graphClock(list);
+    if (graph) parts.push(graph);
     return parts.join(' · ');
 }
 

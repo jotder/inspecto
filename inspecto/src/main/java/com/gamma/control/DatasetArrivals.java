@@ -67,31 +67,52 @@ final class DatasetArrivals {
     }
 
     /**
-     * Record one upload's arrival: the ledger batch and landed name it matches, the user's file name, the mode and the
-     * import-time index outcome. Best effort - a failed write loses only these extras, never the import.
+     * Record what one run took, one sidecar line per file (the ledger rows {@code taken} the run added): the upload's own
+     * line (the user's file name, the mode, its sha256) for {@code landed}, and a {@code sender: system} line for every
+     * other file - a drop Run now (or the upload's run) took from the inbox. Every line carries the run's index outcome
+     * ({@code result} and {@code mode}: append / full / compact). Best effort - a failed write loses only these extras,
+     * never the import.
      */
-    static void recordUpload(Path dataRoot, String pipeline, String batch, Path landed, String fileName, boolean replace,
-                             String sha256, Map<String, Object> summary) {
-        if (batch == null || landed == null) return;
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("batch", batch);
-        m.put("landed", landed.getFileName().toString());
-        m.put("file", fileName);
-        m.put("mode", replace ? "replace" : "append");
-        if (sha256 != null) m.put("sha256", sha256);
-        if (summary.get("index") instanceof Map<?, ?> ix && ix.get("result") != null) m.put("index", String.valueOf(ix.get("result")));
+    static void recordRun(Path dataRoot, String pipeline, List<Map<String, String>> taken, Path landed, String fileName,
+                          String mode, String sha256, Map<String, Object> summary) {
+        String landedName = landed == null ? null : landed.getFileName().toString();
+        String at = java.time.Instant.now().toString();
+        StringBuilder lines = new StringBuilder();
         try {
+            for (Map<String, String> r : taken) {
+                String name = java.util.Objects.toString(r.get("filename"), "");
+                if (name.isBlank()) continue;
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("batch", r.get("consignment_id"));
+                m.put("landed", name);
+                m.put("at", at);
+                if (name.equals(landedName)) {
+                    m.put("sender", "upload");
+                    m.put("file", fileName);
+                    m.put("mode", mode);
+                    if (sha256 != null) m.put("sha256", sha256);
+                } else {
+                    m.put("sender", "system");
+                    m.put("mode", "append");   // Run now adds what it takes
+                }
+                if (summary.get("index") instanceof Map<?, ?> ix && ix.get("result") != null) {
+                    m.put("index", String.valueOf(ix.get("result")));
+                    if (ix.get("mode") != null) m.put("indexMode", String.valueOf(ix.get("mode")));
+                }
+                lines.append(JSON.writeValueAsString(m)).append('\n');
+            }
+            if (lines.isEmpty()) return;
             Path f = dataRoot.resolve(pipeline).resolve(SIDECAR);
             Files.createDirectories(f.getParent());
-            Files.writeString(f, JSON.writeValueAsString(m) + "\n", StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            Files.writeString(f, lines.toString(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException ignored) {
-            // best effort: the ledger still lists the arrival, as one from a system
+            // best effort: the ledger still lists the arrivals, as ones from a system with no index outcome
         }
     }
 
-    private static Map<String, Map<String, Object>> sidecar(Path dataRoot, String pipeline) {
-        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+    /** The sidecar's lines, oldest first; torn lines skipped. */
+    static List<Map<String, Object>> sidecarLines(Path dataRoot, String pipeline) {
+        List<Map<String, Object>> out = new ArrayList<>();
         Path f = dataRoot.resolve(pipeline).resolve(SIDECAR);
         if (!Files.isRegularFile(f)) return out;
         try {
@@ -100,7 +121,7 @@ final class DatasetArrivals {
                 try {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> m = JSON.readValue(line, Map.class);
-                    out.put(String.valueOf(m.get("landed")), m);   // the landed name is unique per upload (add_<stamp>_…)
+                    out.add(m);
                 } catch (IOException torn) {
                     // a torn line (a crash mid-write) is skipped, not fatal
                 }
@@ -109,6 +130,21 @@ final class DatasetArrivals {
             // no extras: every arrival reads as one from a system
         }
         return out;
+    }
+
+    /**
+     * The extras by ledger row: an upload's line under its landed name (unique per upload, {@code add_<stamp>_…}); a
+     * system line under {@code landed|batch}, since a foreign process may send the same name twice.
+     */
+    private static Map<String, Map<String, Object>> sidecar(Path dataRoot, String pipeline) {
+        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+        for (Map<String, Object> m : sidecarLines(dataRoot, pipeline))
+            out.put(isSystem(m) ? m.get("landed") + "|" + m.get("batch") : String.valueOf(m.get("landed")), m);
+        return out;
+    }
+
+    private static boolean isSystem(Map<String, Object> line) {
+        return "system".equals(line.get("sender"));
     }
 
     // ── GET /datasets/{id}/arrivals ────────────────────────────────────────────────────────────────────────
@@ -178,11 +214,14 @@ final class DatasetArrivals {
                                                String pipeline, String eventDate, Connection duck) {
         String landed = r.getOrDefault("filename", "");
         String batch = r.getOrDefault("consignment_id", "");
-        Map<String, Object> extra = extras.get(landed);
+        Map<String, Object> extra = extras.get(landed + "|" + batch);
+        Map<String, Object> byName = extras.get(landed);
+        if (extra == null && byName != null && !isSystem(byName)) extra = byName;
+        boolean upload = extra != null && !isSystem(extra);
         Map<String, Object> a = new LinkedHashMap<>();
-        a.put("file", extra != null && extra.get("file") != null ? extra.get("file")
+        a.put("file", upload && extra.get("file") != null ? extra.get("file")
                 : nonBlank(r.get("origin")) ? r.get("origin") : landed);
-        a.put("sender", extra != null ? "upload" : "system");
+        a.put("sender", upload ? "upload" : "system");
         a.put("received", nonBlank(r.get("end_time")) ? r.get("end_time") : r.get("start_time"));
         a.put("status", r.get("status"));
         a.put("rowsRead", number(r.get("parsed_rows")));
@@ -190,6 +229,7 @@ final class DatasetArrivals {
         a.put("mode", extra == null ? null : extra.get("mode"));
         a.put("sha256", extra == null ? null : extra.get("sha256"));
         a.put("index", extra == null ? null : extra.get("index"));
+        a.put("indexMode", extra == null ? null : extra.get("indexMode"));
         a.put("consignment", batch);
         List<Path> outputs = new ArrayList<>();
         Path base = dataRoot.resolve(pipeline);

@@ -262,6 +262,23 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(dataStatusLine([{ ...base, index: 'BUILT' }])).toBe('Received 2026-11-02 08:00 · graph up to date');
         expect(dataStatusLine([{ ...base, index: 'DEFERRED' }])).toContain("updated by the Space's Jobs");
         expect(dataStatusLine([])).toBeNull();
+        // the graph clock: how many files arrived after the newest one the graph took (Run now records its own outcome)
+        const drop: Arrival = { ...base, sender: 'system', index: 'FAILED' };
+        expect(dataStatusLine([drop, { ...base, index: 'BUILT' }])).toBe(
+            'Received 2026-11-02 08:00 · graph 1 file behind',
+        );
+        expect(dataStatusLine([drop, drop, { ...base, index: 'UP_TO_DATE' }])).toContain('graph 2 files behind');
+        expect(
+            dataStatusLine([
+                { ...drop, index: 'BUILT' },
+                { ...base, index: 'FAILED' },
+            ]),
+        ).toContain('graph up to date');
+        // an arrival with no recorded outcome is not counted as behind: nothing is said rather than guessed
+        expect(dataStatusLine([base, { ...base, index: 'BUILT' }])).toBe('Received 2026-11-02 08:00');
+        expect(dataStatusLine([drop])).toContain('the graph was not updated');
+        // a Dataset with no link mapping has no graph to speak of
+        expect(dataStatusLine([{ ...base, index: 'SKIPPED' }])).toBe('Received 2026-11-02 08:00');
         expect(arrivalLine({ ...base, rowsRead: 5, rowsRejected: 2 })).toBe(
             'uploaded · added its rows · 5 rows (2 rejected)',
         );

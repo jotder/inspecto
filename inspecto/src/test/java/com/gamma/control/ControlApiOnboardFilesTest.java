@@ -596,6 +596,9 @@ class ControlApiOnboardFilesTest {
             String id = uniqueId("arrivals");
             JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
             data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            // a sidecar line written before senders were recorded (no "sender") still reads as an upload
+            Path sidecar = Path.of("database", id, DatasetArrivals.SIDECAR);
+            Files.writeString(sidecar, Files.readString(sidecar).replace("\"sender\":\"upload\",", ""));
             byte[] november = transfers(30).getBytes(StandardCharsets.UTF_8);
             data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv&mode=append", november, null), 200);
             Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(20));
@@ -604,13 +607,18 @@ class ControlApiOnboardFilesTest {
             JsonNode out = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200);
             JsonNode list = out.get("arrivals");
             assertEquals(3, list.size(), out.toString());
+            assertEquals("upload", list.get(2).get("sender").asText(), "a legacy line: " + list.get(2));
             assertNotNull(out.get("eventDateColumn").textValue(), "Add data names the When column: " + out);
 
             JsonNode drop = list.get(0), nov = list.get(1), first = list.get(2);
             assertEquals("system", drop.get("sender").asText(), drop.toString());
             assertTrue(drop.get("file").asText().contains("foreign_drop"), drop.toString());
             assertEquals(20, drop.get("rowsRead").asLong());
-            assertTrue(drop.get("mode").isNull());
+            assertEquals("append", drop.get("mode").asText(), "Run now adds what it takes: " + drop);
+            // Run now records its own index outcome per file (no Link Analysis here: nothing to build)
+            assertEquals("NOT_AVAILABLE", drop.get("index").asText(), drop.toString());
+            assertTrue(drop.get("sha256").isNull(), "only an upload's bytes are hashed: " + drop);
+            assertEquals("NOT_AVAILABLE", nov.get("index").asText(), nov.toString());
 
             assertEquals("upload", nov.get("sender").asText(), nov.toString());
             assertEquals("november.csv", nov.get("file").asText());
@@ -631,6 +639,26 @@ class ControlApiOnboardFilesTest {
             assertEquals("replace", after.get(0).get("mode").asText());
             assertTrue(after.get(0).get("kept").asBoolean());
             for (int i = 1; i < 4; i++) assertFalse(after.get(i).get("kept").asBoolean(), after.get(i).toString());
+
+            // a foreign process sending the SAME name again: the import Pipeline's duplicate policy skips it (no arrival)
+            Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(5));
+            JsonNode resent = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(0, resent.get("rowsIn").asLong(), resent.toString());
+            assertEquals(4, data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").size());
+            // ... while a new name is an arrival of its own - here taken by an upload's run, which records both files
+            Files.writeString(Path.of("database", "inbox", id).resolve("second_drop.csv"), transfers(5));
+            data(send(c, "POST", "/datasets/" + id + "/files?name=extra.csv&mode=append", transfers(7).getBytes(StandardCharsets.UTF_8), null), 200);
+            JsonNode again = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals(6, again.size(), again.toString());
+            JsonNode drop2 = null, extra = null;
+            for (int i = 0; i < 2; i++)
+                if ("system".equals(again.get(i).get("sender").asText())) drop2 = again.get(i); else extra = again.get(i);
+            assertNotNull(drop2, again.toString());
+            assertNotNull(extra, again.toString());
+            assertEquals(5, drop2.get("rowsRead").asLong(), drop2.toString());
+            assertEquals("NOT_AVAILABLE", drop2.get("index").asText(), drop2.toString());
+            assertEquals("extra.csv", extra.get("file").asText(), extra.toString());
+            assertEquals(7, extra.get("rowsRead").asLong(), extra.toString());
 
             // gates: unknown 404; a Dataset no import made answers 200 with no arrivals and why
             assertEquals(404, json(c, "GET", "/datasets/nope/arrivals", null, null).statusCode());
