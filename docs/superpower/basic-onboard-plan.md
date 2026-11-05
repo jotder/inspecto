@@ -71,10 +71,11 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
    The inbox poll target (`InboxWatch.Inbox`) re-checks on every poll that the Space exists, Add data is on, the Dataset
    entry still says `watchInbox: true`, it is still an import Add data wrote (`OnboardImport.requireOwnImport`) and no
    schedule runs its Pipeline; then it starts `OnboardImport.importWaiting` - the same code as *Run now* - only when
-   every waiting file has settled. **P3's snapshot refresh registers its own poll target** (key e.g.
-   `snapshot|<writeRoot>|<id>`); its `poll()` decides whether a refresh is due and runs it the way *Run now* does. A
-   poll target that must survive a restart persists its own on/off flag and re-registers it: the inbox does this from the
-   Dataset entries on the first tick after start-up (`InboxWatch.attach`); a snapshot poll target needs the same step.
+   every waiting file has settled. **A table snapshot has its own poll target** (`InboxWatch.Snapshot`, key
+   `snapshot|<writeRoot>|<id>`, built after P3 landed): the same toggle and `watchInbox` key; each poll runs
+   `PostgresSnapshot.poll`, which copies the table again and replaces everything only when the copy's bytes changed. A
+   restart re-registers either kind from the Dataset entries on the first tick (`InboxWatch.attach`; a snapshot is
+   told by `importSource: postgres`). Another poll target that must survive a restart adds its branch there.
 
 ### 4.1 The follow-on seam (P1 - read this if you call it from P2 or P3)
 

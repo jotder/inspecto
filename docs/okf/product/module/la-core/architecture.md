@@ -2000,6 +2000,13 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 - **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
   watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
   the poll target is dropped.
+- **A Postgres table snapshot (P3) refreshes on the same toggle.** For an entry with `importSource: postgres` the toggle
+  registers `InboxWatch.Snapshot` instead: each poll runs `PostgresSnapshot.poll` (copy the table again; replace
+  everything only when the bytes differ from the last arrival; no settle check - the server makes the copy itself). A
+  snapshot is never inbox-polled; a Reference snapshot may refresh (it replaces). The feed read says `snapshot`; the
+  card mounts the feed component in snapshot mode (*Refresh every 30 seconds*, no inbox); Data status says *Refreshed
+  from its table every 30 seconds*. Test: `ControlApiPostgresSnapshotTest#theThirtySecondRefreshCopiesTheTableOnlyWhenItChanged`
+  (real Postgres).
 - **Cost (P0 V3, measured):** under 1 % of one core at 1,000 empty watched inboxes; files left waiting are the driver.
 - **UI:** `dataset-feed.component.ts` - a *Watch this folder* slide toggle in the Inbox block when the feed is
   `watchable`; the inbox text says it is checked every 30 seconds; a refusal flips the toggle back and says why; a
