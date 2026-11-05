@@ -162,9 +162,10 @@ class ControlApiOnboardFilesTest {
     @Test
     void theDraftProposesEveryChoiceWithEvidenceAndConfidence(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            JsonNode d = draft(c, "transfers.csv", "stream", transfers(120), null);
+            // OF-2 (operator 2026-10-25): high needs at least 200 non-blank sampled values
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(240), null);
             assertTrue(d.get("draftId").asText().matches("d[0-9a-f]{32}"), d.toString());
-            assertEquals(120, d.get("file").get("rows").asLong());
+            assertEquals(240, d.get("file").get("rows").asLong());
             assertEquals(20, d.get("rows").size(), "a preview of the first rows");
 
             JsonNode f = d.get("format");
@@ -172,7 +173,7 @@ class ControlApiOnboardFilesTest {
             assertEquals("csv", f.get("type").get("value").asText());
             assertEquals(",", f.get("delimiter").get("value").asText());
             assertEquals("high", f.get("delimiter").get("confidence").asText(), f.toString());
-            assertTrue(f.get("delimiter").get("evidence").asText().contains("120 sampled lines splits into 7 fields"), f.toString());
+            assertTrue(f.get("delimiter").get("evidence").asText().contains("240 sampled lines splits into 7 fields"), f.toString());
             assertTrue(f.get("header").get("value").asBoolean());
             assertEquals("high", f.get("header").get("confidence").asText());
 
@@ -180,7 +181,7 @@ class ControlApiOnboardFilesTest {
             assertChoice(amount);
             assertEquals("DOUBLE", amount.get("value").asText());
             assertEquals("high", amount.get("confidence").asText());
-            assertTrue(amount.get("evidence").asText().contains("all 120 sampled values parse as double"), amount.toString());
+            assertTrue(amount.get("evidence").asText().contains("all 240 sampled values parse as double"), amount.toString());
             JsonNode booked = column(d, "booked_at").get("type");
             assertEquals("TIMESTAMP", booked.get("value").asText());
             assertEquals("%Y-%m-%d %H:%M:%S", booked.get("format").asText(), "the proven strptime format rides the choice");
@@ -220,7 +221,7 @@ class ControlApiOnboardFilesTest {
     @Test
     void aSmallSampleIsLowConfidenceAndValueShapesAreRecognised(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            // 12 rows: below OF-2's 50 non-blank values, so nothing is high
+            // 12 rows: below OF-2's 200 non-blank values, so nothing is high
             JsonNode d = draft(c, "few.csv", "stream", transfers(12), null);
             assertEquals("low", d.get("format").get("delimiter").get("confidence").asText());
             assertEquals("low", column(d, "amount").get("type").get("confidence").asText());
@@ -228,7 +229,7 @@ class ControlApiOnboardFilesTest {
 
             // value shapes: valid IMEIs (Luhn) and + phone numbers, under names that say nothing
             StringBuilder sb = new StringBuilder("a,b,c\n");
-            for (int i = 0; i < 60; i++) {
+            for (int i = 0; i < 240; i++) {
                 String body = String.format("35%012d", 100000 + i);
                 sb.append(body).append(luhnDigit(body)).append(",+3361234").append(String.format("%04d", i)).append(",x").append(i).append('\n');
             }
@@ -475,14 +476,14 @@ class ControlApiOnboardFilesTest {
     void aReferenceFileNamesItsIdentifyingColumnAndRegistersNoLinks(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             String id = uniqueId("accounts");
-            JsonNode d = draft(c, "accounts.csv", "reference", accounts(60), null);
+            JsonNode d = draft(c, "accounts.csv", "reference", accounts(240), null);
             JsonNode et = d.get("entityTypes");
             assertFalse(et.has("link"), et.toString());
             assertEquals("account_id", et.get("identifying").get("value").asText());
             assertEquals("high", et.get("identifying").get("confidence").asText(), et.toString());
-            assertTrue(et.get("identifying").get("evidence").asText().contains("every one of its 60 sampled values is different"));
+            assertTrue(et.get("identifying").get("evidence").asText().contains("every one of its 240 sampled values is different"));
             JsonNode s = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
-            assertEquals(60, s.get("rowsAfter").asLong());
+            assertEquals(240, s.get("rowsAfter").asLong());
             assertFalse(s.has("index"), "no follow-on registered here (Link Analysis reports SKIPPED for a Reference): " + s);
             JsonNode ds = data(json(c, "GET", "/components/dataset/" + id, null, null), 200).get("content");
             assertEquals("reference", ds.get("kind").asText());
@@ -1276,7 +1277,7 @@ class ControlApiOnboardFilesTest {
 
             // the draft proposes the record type whose likely types the columns hold: numbers, handsets and the serving cell -> a call
             StringBuilder sb = new StringBuilder("caller,callee,device_serial,cell_id,duration\n");
-            for (int i = 0; i < 60; i++) {
+            for (int i = 0; i < 240; i++) {
                 String body = String.format("35%012d", 200000 + i);
                 sb.append("+3361234").append(String.format("%04d", i)).append(",+3361299").append(String.format("%04d", i)).append(',')
                         .append(body).append(luhnDigit(body)).append(",SITE-").append(i % 7).append(',').append(i).append('\n');
@@ -1414,6 +1415,133 @@ class ControlApiOnboardFilesTest {
             assertEquals("DOUBLE", column(p, "amount").get("type").get("value").asText());
             assertTrue(column(p, "amount").get("type").get("evidence").asText().startsWith("the file declares"), p.toString());
         }
+    }
+
+    // ── ONBOARDING-FIRST-RUN-1 C1: what the draft detects is what the commit runs ───────────────────────────
+
+    /** One number per row of the import's Parquet, by {@code sql} over {@code t}. */
+    private static double parquetValue(String id, String sql) throws Exception {
+        com.gamma.util.DuckDbUtil.loadDriver();
+        try (java.sql.Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null, List.of(Path.of("database", id).toAbsolutePath()), null);
+             java.sql.Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("WITH t AS (SELECT * FROM read_parquet('"
+                     + Path.of("database", id, "database").toAbsolutePath().toString().replace('\\', '/') + "/**/*.parquet')) " + sql)) {
+            assertTrue(rs.next());
+            return rs.getDouble(1);
+        }
+    }
+
+    @Test
+    void aCommaDecimalFileCommitsItsNumbersAsNumbersUnderTheNameWithoutItsDate(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            StringBuilder csv = new StringBuilder("booking;amount;fee\n");
+            double sum = 0;
+            for (int i = 1; i <= 240; i++) {
+                csv.append("B").append(i).append(';').append(i).append('.').append(String.format("%03d", i)).append(",50;").append(i % 7).append(",25\n");
+                sum += i * 1000 + i + 0.5;
+            }
+            JsonNode d = draft(c, "kasse_2026-10.csv", "stream", csv.toString(), null);
+            JsonNode mark = d.get("format").get("decimalMark");
+            assertChoice(mark);
+            assertEquals(",", mark.get("value").asText(), mark.toString());
+            assertEquals("high", mark.get("confidence").asText(), mark.toString());
+            JsonNode amount = column(d, "amount").get("type");
+            assertEquals("DOUBLE", amount.get("value").asText(), amount.toString());
+            assertTrue(amount.get("evidence").asText().contains("',' as the decimal mark"), amount.toString());
+            JsonNode date = d.get("format").get("fileDate");
+            assertChoice(date);
+            assertEquals("2026-10", date.get("value").asText());
+            assertEquals("%Y-%m", date.get("format").asText());
+            assertEquals("kasse", date.get("name").asText());
+
+            // no name in the commit: the file name without its date
+            ids.add("kasse");
+            JsonNode s = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{}", null), 200);
+            assertEquals("kasse", s.get("dataset").asText(), s.toString());
+            assertEquals(240, s.get("rowsAfter").asLong());
+            assertEquals(sum, parquetValue("kasse", "SELECT sum(amount) FROM t"), 0.001, "every '1.234,50' read as 1234.5");
+            assertEquals(0, parquetValue("kasse", "SELECT count(*) FROM t WHERE amount IS NULL OR fee IS NULL"));
+            JsonNode ds = data(json(c, "GET", "/components/dataset/kasse", null, null), 200).get("content");
+            assertEquals("number", stored(ds, "amount").get("type").asText());
+
+            // the user's own mark re-reads the file; a mark on Parquet or a record path on CSV is refused
+            JsonNode point = data(send(c, "POST", "/onboard/files?name=k.csv&decimal=.", csv.toString().getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals("you chose '.'", point.get("format").get("decimalMark").get("evidence").asText());
+            assertEquals("VARCHAR", column(point, "amount").get("type").get("value").asText(), "'1.001,50' is no '.' number");
+            assertEquals(422, send(c, "POST", "/onboard/files?name=k.csv&decimal=x", csv.toString().getBytes(StandardCharsets.UTF_8), null).statusCode());
+            assertEquals(422, send(c, "POST", "/onboard/files?name=k.csv&recordPath=a", csv.toString().getBytes(StandardCharsets.UTF_8), null).statusCode());
+            Path parquet;
+            try (Stream<Path> w = Files.walk(Path.of("database", "kasse", "database"))) {
+                parquet = w.filter(p -> p.toString().endsWith(".parquet")).findFirst().orElseThrow();
+            }
+            HttpResponse<String> pq = send(c, "POST", "/onboard/files?name=out.parquet&decimal=,", Files.readAllBytes(parquet), null);
+            assertEquals(422, pq.statusCode(), pq.body());
+            JsonNode plain = data(send(c, "POST", "/onboard/files?name=out.parquet", Files.readAllBytes(parquet), null), 200);
+            assertFalse(plain.get("format").has("decimalMark"), "a Parquet file declares its numbers: " + plain.get("format"));
+            assertChoice(plain.get("format").get("fileDate"));
+        }
+    }
+
+    @Test
+    void aNestedJsonDocumentCommitsItsRecordsWithFlattenedColumnsAndTakesALaterFile(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String doc = nestedDoc(0, 220);
+            JsonNode d = draft(c, "export.json", "stream", doc, null);
+            assertEquals("json", d.get("format").get("type").get("value").asText());
+            JsonNode path = d.get("format").get("recordPath");
+            assertChoice(path);
+            assertEquals("response.transfers", path.get("value").asText(), path.toString());
+            assertEquals("high", path.get("confidence").asText(), path.toString());
+            JsonNode flat = d.get("format").get("flatten");
+            assertChoice(flat);
+            assertEquals("[\"payer\",\"payee\"]", flat.get("value").toString());
+            assertEquals(220, d.get("file").get("rows").asLong());
+            assertEquals("payer_account", d.get("entityTypes").get("link").get("from").get("value").asText(), d.get("entityTypes").toString());
+            assertEquals("DOUBLE", column(d, "amount").get("type").get("value").asText());
+
+            String id = uniqueId("nested");
+            JsonNode s = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            assertEquals(220, s.get("rowsAfter").asLong(), s.toString());
+            String pipe = Files.readString(root.resolve("imports").resolve(id + "_pipeline.toon"));
+            assertTrue(pipe.contains("records_path: response.transfers"), pipe);
+            assertEquals(220, parquetValue(id, "SELECT count(*) FROM t WHERE payer_account LIKE 'ACC-%'"));
+            assertEquals(0, parquetValue(id, "SELECT count(*) FROM t WHERE payee_account IS NULL OR payer_bank IS NULL"));
+
+            // Add a file: a later export with the same shape is judged by its dotted fields and appended
+            JsonNode more = data(send(c, "POST", "/datasets/" + id + "/files?name=export2.json&mode=append",
+                    nestedDoc(1000, 30).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(250, more.get("rowsAfter").asLong(), more.toString());
+        }
+    }
+
+    @Test
+    void aChosenRecordPathIsWhereALaterFileIsReadToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            StringBuilder doc = new StringBuilder("{\"links\":[{\"href\":\"x\"}],\"data\":[");
+            for (int i = 0; i < 240; i++) doc.append(i == 0 ? "" : ",").append("{\"id\":\"R").append(i).append("\",\"v\":").append(i).append('}');
+            String json = doc.append("]}").toString();
+            JsonNode first = draft(c, "page.json", "stream", json, null);
+            assertEquals("links", first.get("format").get("recordPath").get("value").asText(), "the first list, low: another exists");
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=page.json&recordPath=data", json.getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals("data", d.get("format").get("recordPath").get("value").asText());
+            String id = uniqueId("page");
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            String later = json.replace("\"R", "\"P");   // the same shape, other rows (the same bytes would be refused as a duplicate)
+            JsonNode more = data(send(c, "POST", "/datasets/" + id + "/files?name=page2.json&mode=append", later.getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(480, more.get("rowsAfter").asLong(), more.toString());
+        }
+    }
+
+    /** {@code n} transfers under {@code response.transfers}, payer and payee nested objects, tags a list. */
+    private static String nestedDoc(int from, int n) {
+        StringBuilder sb = new StringBuilder("{\n  \"meta\": {\"source\": \"bank api\", \"page\": 1},\n  \"response\": {\"status\": \"ok\", \"transfers\": [\n");
+        for (int i = from; i < from + n; i++) {
+            if (i > from) sb.append(",\n");
+            sb.append("    {\"id\": \"T").append(i).append("\", \"payer\": {\"account\": \"ACC-").append(i % 40).append("\", \"bank\": \"B").append(i % 3)
+                    .append("\"}, \"payee\": {\"account\": \"ACC-").append((i * 7 + 3) % 40).append("\"}, \"amount\": ").append(i).append(".25")
+                    .append(", \"tags\": [\"x\", \"y").append(i % 2).append("\"]}");
+        }
+        return sb.append("\n  ]}\n}\n").toString();
     }
 
     // ── data.self_import and the capability gates (armed: 401 / 403 / 200) ─────────────────────────────────

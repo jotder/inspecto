@@ -330,7 +330,7 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 
 | Route | Capability | What it does |
 |---|---|---|
-| `POST /onboard/files?name=&kind=stream\|reference[&delimiter=&header=&quote=]` | `canUploadData` | raw body, streamed to `<data root>/_onboard/<draftId>/`; answers the draft |
+| `POST /onboard/files?name=&kind=stream\|reference[&delimiter=&header=&quote=&encoding=&decimal=&recordPath=]` | `canUploadData` | raw body, streamed to `<data root>/_onboard/<draftId>/`; answers the draft |
 | `POST /onboard/files/{draftId}/commit` | `canUploadData` | one confirm: writes, registers, lands, runs once, registers the Dataset; 200 run summary, or 202 above `import.inline_max_bytes` |
 | `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
 | `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
@@ -348,23 +348,53 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
 
 ```
 {draftId, kind, file:{name, bytes, rows},
- format:{type, delimiter?, header?, quote?},                    // delimiter/header/quote for CSV / TSV only
+ format:{type, delimiter?, header?, quote?,                     // delimiter/header/quote for CSV / TSV only
+         decimalMark?,                                          // every text format (not Parquet)
+         recordPath?, flatten?,                                 // JSON / NDJSON
+         fileDate:{value, format, name, evidence, confidence}},
  columns:[{name, header, type:{value, format, evidence, confidence}, sample:[up to 3]}],
  rows:[up to 20 preview rows],
  entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence},
                         role:{value, evidence, confidence}, distinct? (text columns)}],
               primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)},
- limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}}
+ limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel},
+ findings:[{entry, column?, cause, fix:{label, redraft? | columns? | newDataset?}}]}   // C2, the fix catalogue (below)
 ```
 
-* **Every proposed choice is `{value, evidence, confidence}`**. OF-2: `high` when every sampled value agrees and
-  the sample has at least 50 non-blank values (`OnboardDraft.MIN_SAMPLE`), `low` otherwise. ⚠ **Operator 2026-10-25 changed OF-2
-  to 200 non-blank values; the constant is still 50 (not yet built)**: raise `MIN_SAMPLE`, and the fixtures that rely on
-  50-199 row samples in `ControlApiOnboardFilesTest` and `ControlApiOnboardLinkAnalysisTest`. A choice the user
-  stated (`?delimiter=` on a re-draft) is `high` by definition. The sample is the first 1,000 rows.
-* `format` is the extension point of slice C1 (file-name dates, decimal mark, nested-JSON record path): add a key
-  and keep the choice shape. A column's date or time format rides its `type` choice (`format`, the strptime
-  pattern every sampled value parsed with: DATE through `SchemaSuggest`, TIMESTAMP from a fixed candidate list).
+* **Every proposed choice is `{value, evidence, confidence}`**. OF-2 (operator 2026-10-25): `high` when every sampled
+  value agrees and the sample has at least **200** non-blank values (`OnboardDraft.MIN_SAMPLE`; it was 50 until
+  `ONBOARDING-FIRST-RUN-1` C1, 2026-11-05), `low` otherwise. A choice the user stated (`?delimiter=`, `?decimal=`,
+  `?recordPath=` on a re-draft) is `high` by definition. The sample is the first 1,000 rows. A column's date or time
+  format rides its `type` choice (`format`, the strptime pattern every sampled value parsed with: DATE through
+  `SchemaSuggest`, TIMESTAMP from a fixed candidate list).
+* **The decimal mark (`format.decimalMark`, C1; `DecimalMark`).** `.` (`1,234.50`) or `,` (`1.234,50`); digit groups
+  may be split by the other mark or a space. A column decides when every sampled value reads with one mark and not the
+  other (`12.5` → `.`; `12,5`, `1.234,50` → `,`); a whole part with a leading zero (`000 345 678`, `012.000.789`) is
+  an identifier, never a number (known limit: a space-grouped identifier with no leading zero, such as a SIREN `512 100 554`, is still proposed as a number - drop it or set its type at commit); `1.234` reads either way and decides nothing (then `.` is assumed,
+  `low`). Columns that disagree keep `.`, `low`, both named. No number with a mark: `high`, "changes nothing". A column
+  whose numbers need the mark (a `,` mark, or grouping) is typed DOUBLE (never BIGINT: a later `7.500,25` keeps its
+  fraction) and carries it in
+  the draft's `plan` (`decimal`); the commit writes that raw field as VARCHAR and maps it with `fn: custom`,
+  `TRY_CAST(REPLACE(…) AS DOUBLE)` (the engine's cast has no decimal-mark option; ⚠ a `custom` field is outside the
+  cast-failure audit, so an unreadable value becomes empty without being counted). Not on Parquet (`?decimal=` 422).
+* **JSON records (`format.recordPath`, `format.flatten`, C1; `OnboardJson`).** A `.json` file starting with `{` that
+  holds ONE document is walked with Jackson's streaming parser; its records are the first list of objects in document
+  order (a list inside a record is a field). `recordPath` is that list's dotted path (`response.transfers`; `$` for a
+  top-level array or NDJSON), `high` when it is the document's only list of records and holds ≥ 200 records; the
+  commit writes it as the Pipeline's `json.records_path` (`format: auto`). One object with no list: one line is NDJSON,
+  more is 422. Nested objects are spread into columns by dotted selectors (`payer.account` → column `payer_account`;
+  `flatten` lists the spread paths); a list stays one column of JSON text; a path that is an object in some records and
+  a value in others stays whole (JSON text), so no value is lost. A key holding a `.` is escaped (`r\.s`), the
+  engine's one notation. A nested document over 16 MB is 422 "save it as NDJSON" (DuckDB's `maximum_object_size`
+  default; raising it is a deliberate deferral - its buffer cost was not measured). Add a file judges a later JSON file
+  by these dotted selectors, read at the import's own `json.records_path` (a chosen `?recordPath=` included); an import
+  written before C1 that reads a nested object whole by its root key still takes a file holding that object. Only `.` is
+  escaped and a `"` is not, exactly as the engine's `selectorSegments` / `jsonPath` read them, so a key holding `"`
+  fails the draft (422) rather than the commit.
+* **A date in the file name (`format.fileDate`, C1).** `%Y-%m-%d` / `%Y_%m_%d` / `%Y.%m.%d` and `%Y-%m` / `%Y_%m` are
+  `high`; a bare `%Y%m%d` or `%Y%m` digit run and day-first `%d-%m-%Y` are `low`; the date must be real, the year
+  1990-2099. `value` is ISO (`2026-10-31` or `2026-10`), `name` the file name without it (`sales_2026-10.csv` →
+  `sales`; UC-2); a commit with no `name` takes it (`OnboardImport.proposedStem`). No date: `value: null`, `high`.
 * Reading uses a sealed in-memory DuckDB allowed only the draft directory. Delimited text: `sniff_csv` (it spells
   "no quote found" as `(empty)`, and fails on mixed line endings; then the delimiter is guessed from field counts
   and every format choice is `low`), field-count evidence from a quote-aware split of the first lines, and types by
@@ -395,6 +425,46 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   took 3.2 s and 20 s. A 500 MB file would hold a request for about 40 s plus the index build, hence the 202
   threshold.
 * Drafts expire after 24 hours (pruned on the next upload); a signed-in caller sees only their own (404 otherwise).
+
+### The fix catalogue (`OnboardFixes`; `ONBOARDING-FIRST-RUN-1` C2, 2026-11-05)
+
+"Problems in plain words" for both apps, server side, every edition. Seven entries (`OnboardFixes.ENTRIES`); a matching
+draft finding, commit refusal or set-aside/rejected run carries `{entry, column?, cause, fix}`. A fix only edits what the
+user is about to confirm - `redraft:{param: value}` (add the same file again to `POST /onboard/files` with these
+parameters), `columns:[{name, type, format}]` (send them in the commit body) or `newDataset: true` (add the file as its
+own Dataset) - and the user re-runs it; nothing is applied silently.
+
+| Entry | Where it is found | Cause (example) | Fix |
+|---|---|---|---|
+| `decimal_mark` | draft: a text column whose values (≥ 4 in 5) are numbers that need the OTHER mark | "'amount' has numbers like '1.001,50' in 240 of 240 sampled rows: this file uses ',' as the decimal mark" | `redraft {decimal}` |
+| `date_format` | draft: a text column whose values (≥ 4 in 5) are dates in one of seven formats; when another format reads exactly as many (`03/04/2026`: day or month first) the cause names it and the fix carries it under `alternatives` - the user chooses | "239 of 240 sampled values of 'ordered' are dates written %d/%m/%Y; 1 is not a real date (e.g. '31/02/2026') and would stay empty" | `columns [{name, type: DATE, format}]` (+ `alternatives`) |
+| `delimiter` | draft: lines split into one column, or unevenly, and another of `, ; tab \|` splits every sampled line alike | "every sampled line is one column on ','; every line splits into 3 columns on ';'" | `redraft {delimiter}` |
+| `header_row` | draft: no header line, yet the first line is distinct non-number names over a number column; or a header whose names over number columns are numbers | "the first line (meter, reading, zone) holds names, not values like the rows below" | `redraft {header}` |
+| `encoding` | draft refusal (422) of a file that is not UTF-8; a commit whose run rejected rows or set the file aside, the whole draft file decoded | "'customers.csv' is not UTF-8 text; it reads as Latin-1 (Windows Western)", or, for a file starting with a UTF-16 byte-order mark (Excel's "Unicode Text"), "… is UTF-16 text" | `redraft {encoding: latin-1 \| utf-16}` |
+| `quote` | draft: lines split unevenly under the quote, and no quote (else `"` or `'`) makes them split alike | "only 120 of 240 sampled lines split alike when '\"' quotes a field; with no character every line splits into 3 columns" | `redraft {quote}` |
+| `missing_column` | Add a file refusal (422) and Run now's refused arrivals: a column the Dataset reads is not in the file | "'later.csv' has no column 'amount', which 'sales' reads" | `newDataset` |
+
+* **Answers.** Draft: `findings` (stored in `draft.json` too). A refusal that matches is the usual error with
+  `error.details.findings` (`OnboardRoutes.fixable` answers `OnboardFixes.Refusal`): the non-UTF-8 draft, Add a file's
+  missing column. A commit whose run rejected rows or set the file aside explains it from the draft's file
+  (`Job.explain` → `OnboardDraft.diagnose`): `findings` in the 200 summary (and on each `quarantined[]` entry), or in
+  `error.details.findings` of the 422 "nothing was imported"; a followed (202) commit refused so keeps them on its run
+  (`GET /onboard/runs/{id}` → `findings`). Run now's refused arrivals carry `findings` per file.
+* **Encoding.** `?encoding=utf-8|latin-1|utf-16` (delimited text only; DuckDB's `read_csv` names; Java reads UTF-16 by
+  its byte-order mark). The draft reads the lines and
+  `sniff_csv` / `read_csv` with it and proposes `format.encoding`; the commit writes `csv_settings.encoding`,
+  which the engine passes to `read_csv`; Add a file reads a later file with the import's encoding. A redraft fix does not
+  apply to a later file, so Add a file answers a non-UTF-8 file as before (plain 422).
+* **Measured (2026-11-05):** a stray `"` inside values does not set the file aside - the engine imports every row - so
+  the quote entry is a draft finding only; bytes that stop being UTF-8 after the sampled lines make the run reject those
+  rows (200, `rowsRejected`), which is where the run-time encoding finding comes from.
+* Tests: `ControlApiOnboardFixesTest` - one test per entry (named after it; a reflection check fails when an entry has
+  none) that produces the problem, applies the fix exactly as the finding states it, and re-runs to an imported Dataset;
+  seven mutants (no decimal finding, no run diagnosis, no missing-column finding, no quote search, no date tie, no UTF-16
+  mark, no findings on a followed run) each killed.
+* **Not covered (seen 2026-11-05):** a ragged CSV that sniffs as one column split on `|`, and a pivot header
+  (`country,2022,2023`) sniffed as no header, get no finding; a quoted multi-line field is a 422 from DuckDB's parallel
+  reader with `null_padding` (outside the catalogue).
 
 ### The commit
 
@@ -471,12 +541,16 @@ data on a config delete is irreversible; to reuse the id, import under another n
 `POST /spaces` does not refuse a Demo Auth template (only the gallery marks it) - a server with no sign-in creates the sample
 Spaces legitimately and the roster is simply unused.
 
-Tests: `inspecto/.../ControlApiOnboardFilesTest` (draft evidence and confidence, value shapes, commit, overrides,
+Tests: `inspecto/.../OnboardDraftFormatPropertyTest` (C1 property tests over seeded generated files: the decimal mark
+each file was written with, every value read back by the commit's expression, the record path and flattened selectors
+of random nested documents, file-name dates in six styles; OF-2 at 200) and `inspecto/.../ControlApiOnboardFilesTest`
+(draft evidence and confidence, value shapes, commit, overrides,
 Reference, failed commit, 202 and a failed 202, Add a file and Run now, the column route, limits, the Excel
 refusal, NDJSON and Parquet, `data.self_import` without and with sign-in, armed 401/403/200; since 2026-10-23 also
 the delete retirement, the commit refused under an approval policy over Datasets or schemas with nothing written,
 the 202 run read only by its starter or an administrator, and a 202 commit plus a 202 Add a file in a second Space
-landing in that Space only) and
+landing in that Space only; since 2026-11-05 a `,`-decimal file committed under its date-less name with its sums
+exact, and a nested JSON export committed with `records_path` and taking a later file by Add a file) and
 `la/inspecto-geo-link/.../ControlApiOnboardLinkAnalysisTest` (index BUILT in the run, `/inv/projection` with no
 saved view, Entity profile links assessed from `defaultLinkMapping` and not without it, falsified by removing the
 fallback in `EntityTypeBindings`).

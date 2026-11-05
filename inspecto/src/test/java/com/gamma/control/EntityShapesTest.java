@@ -30,7 +30,7 @@ class EntityShapesTest {
 
     private static List<String> values(IntFunction<String> f) {
         List<String> out = new ArrayList<>();
-        for (int i = 0; i < 60; i++) out.add(f.apply(i));
+        for (int i = 0; i < 240; i++) out.add(f.apply(i));   // OF-2: high needs 200 non-blank values
         return out;
     }
 

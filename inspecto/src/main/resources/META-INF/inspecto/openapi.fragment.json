@@ -8526,7 +8526,7 @@
         ],
         "summary" : "Add data: upload a file and get a draft of how to import it",
         "operationId" : "postOnboardFiles",
-        "description" : "LA-ONBOARD-1 OB-2. Raw file body; stored in the Space's draft area (data root, _onboard/), never in config. Answers the DRAFT: {draftId, kind, file:{name, bytes, rows}, format:{type, delimiter?, header?, quote?}, columns:[{name, header, type:{value, format, evidence, confidence}, sample}], rows (first 20), entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence}, role:{value (entity|temporal|measure|dimension|detail), evidence, confidence}, distinct? (text columns)}], primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)}, limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}, followOns:[{key, does, needs}] (BASIC-ONBOARD-1: each installed application's follow-on step; empty when none, and the import ends at its Parquet)}. Every proposed choice is {value, evidence, confidence: high|low}; OF-2: high when every sampled value agrees and the sample has at least 50 non-blank values. Formats (DT-8): CSV, TSV, Parquet, JSON (array), NDJSON; Excel (.xlsx) only when the bundle carries the DuckDB excel extension, else 422 'save as CSV'. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 422 name missing/unusable; 403 a path-shaped name; 413 over import.max_bytes (streamed, never buffered) or more rows than import.max_rows; 422 empty, unreadable or unsupported file. Drafts expire after 24 hours.",
+        "description" : "LA-ONBOARD-1 OB-2. Raw file body; stored in the Space's draft area (data root, _onboard/), never in config. Answers the DRAFT: {draftId, kind, file:{name, bytes, rows}, format:{type, delimiter?, header?, quote? (CSV / TSV), decimalMark? (every text format), recordPath?, flatten? (JSON / NDJSON), fileDate:{value, format, name, evidence, confidence}}, columns:[{name, header, type:{value, format, evidence, confidence}, sample}], rows (first 20), entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence}, role:{value (entity|temporal|measure|dimension|detail), evidence, confidence}, distinct? (text columns)}], primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)}, limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel}, followOns:[{key, does, needs}] (BASIC-ONBOARD-1: each installed application's follow-on step; empty when none, and the import ends at its Parquet)}. Every proposed choice is {value, evidence, confidence: high|low}; OF-2: high when every sampled value agrees and the sample has at least 200 non-blank values. ONBOARDING-FIRST-RUN-1 C1: decimalMark '.' or ',' (a column whose numbers need it is typed as a number and read through it at commit); a JSON document's records are found in its first list of objects (recordPath, the engine's json.records_path) and nested objects are spread into dotted columns (flatten; a list stays JSON text); fileDate is the date the file name holds, and a commit with no name takes fileDate.name (sales_2026-10.csv -> sales). ONBOARDING-FIRST-RUN-1 C2: findings:[{entry (decimal_mark|date_format|delimiter|header_row|encoding|quote|missing_column), column?, cause, fix:{label, redraft?:{param: value} | columns?:[{name, type, format}] | newDataset?}}], the fix catalogue; a file that is not UTF-8 is 422 with error.details.findings (fix: ?encoding=latin-1). Formats (DT-8): CSV, TSV, Parquet, JSON (array), NDJSON; Excel (.xlsx) only when the bundle carries the DuckDB excel extension, else 422 'save as CSV'. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 when the Space's data.self_import is off (GET /settings/data); 422 name missing/unusable; 403 a path-shaped name; 413 over import.max_bytes (streamed, never buffered) or more rows than import.max_rows; 422 empty, unreadable or unsupported file. Drafts expire after 24 hours.",
         "parameters" : [
           {
             "name" : "name",
@@ -8569,6 +8569,33 @@
             "in" : "query",
             "required" : false,
             "description" : "Delimited text only: one character, or empty for none",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "decimal",
+            "in" : "query",
+            "required" : false,
+            "description" : "Text formats only (not Parquet): the decimal mark, '.' or ','",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "encoding",
+            "in" : "query",
+            "required" : false,
+            "description" : "Delimited text only: utf-8 (default), latin-1 or utf-16 (the encoding fix)",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "recordPath",
+            "in" : "query",
+            "required" : false,
+            "description" : "JSON only: the dotted path of the list holding the records (one the draft found)",
             "schema" : {
               "type" : "string"
             }
