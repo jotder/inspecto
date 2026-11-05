@@ -1,7 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, map } from 'rxjs';
-import { ComponentsService, apiUrl } from 'app/inspecto/api';
+import { Observable, catchError, map, of } from 'rxjs';
+import { BiQueryService, ComponentsService, apiUrl } from 'app/inspecto/api';
+import { DatasetFacts, STARTER_TEMPLATE, factsOf, factsQuery, starterBoard } from './dataset-page';
 import { CalculatedColumn, Dataset, DatasetColumn, DatasetConfig, DatasetKind, NamedMeasure } from './dataset-types';
 import { isSharedRef } from 'app/inspecto/api/shared-ref';
 
@@ -15,6 +16,7 @@ import { isSharedRef } from 'app/inspecto/api/shared-ref';
 export class DatasetsService {
     private components = inject(ComponentsService);
     private http = inject(HttpClient);
+    private bi = inject(BiQueryService);
 
     list(): Observable<Dataset[]> {
         return this.components.list('dataset').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
@@ -47,6 +49,36 @@ export class DatasetsService {
 
     remove(id: string): Observable<unknown> {
         return this.components.remove('dataset', id);
+    }
+
+    /** Rows and time span of a Dataset (the Dataset page's summary, ONBOARDING-FIRST-RUN-1 C5), over `POST /bi/query`. */
+    facts(ds: Dataset): Observable<DatasetFacts> {
+        return this.bi.run(factsQuery(ds)).pipe(
+            map((r) =>
+                factsOf(
+                    r.rows[0],
+                    r.resultSet.columns.map((c) => c.name),
+                ),
+            ),
+        );
+    }
+
+    /**
+     * *Make a starter dashboard* (C5): `POST /bi/templates/trend-monitor/apply` over the Dataset's own date and amount
+     * columns, prefixed with its id. Answers the dashboard id it made.
+     */
+    /** Whether a dashboard of this id exists (a 409 from apply may also be an approval hold, not a made board). */
+    dashboardExists(id: string): Observable<boolean> {
+        return this.components.get('dashboard', id).pipe(
+            map(() => true),
+            catchError(() => of(false)),
+        );
+    }
+
+    applyStarter(datasetId: string, columns: Record<string, string>): Observable<string> {
+        return this.http
+            .post(apiUrl(`/bi/templates/${STARTER_TEMPLATE}/apply`), { dataset: datasetId, prefix: datasetId, columns })
+            .pipe(map(() => starterBoard(datasetId)));
     }
 
     /**

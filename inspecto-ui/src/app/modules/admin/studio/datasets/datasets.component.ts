@@ -38,6 +38,13 @@ import {
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { ADD_DATA_ROUTE, AddDataDropComponent } from 'app/modules/admin/add-data/add-data-drop.component';
+import { NgTemplateOutlet } from '@angular/common';
+import { Arrivals, ImportDataset } from '@inspecto/link-analysis/add-data/add-data.model';
+import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
+import { importDatasetOf } from './dataset-page';
+import { DatasetOffersComponent } from './dataset-offers.component';
+import { DatasetSummaryComponent } from './dataset-summary.component';
 
 /**
  * Studio **Datasets** — the data-source abstractions (physical / virtual / materialized) widgets build on.
@@ -49,6 +56,10 @@ import { ADD_DATA_ROUTE, AddDataDropComponent } from 'app/modules/admin/add-data
     standalone: true,
     imports: [
         AddDataDropComponent,
+        NgTemplateOutlet,
+        ImportDatasetCardComponent,
+        DatasetSummaryComponent,
+        DatasetOffersComponent,
         InspectoPageHeaderComponent,
         AiExplainComponent,
         MatButtonModule,
@@ -109,6 +120,41 @@ export class DatasetsComponent implements OnInit {
         this.visibleDatasets().map((d) => ({ kind: 'dataset' as const, id: d.id })),
     );
 
+    /**
+     * ONBOARDING-FIRST-RUN-1 C5: each Add data Dataset as the shared import card reads it, made once per list read. ⚠ Never
+     * build it in the template: a new object per change detection is a new card input, whose effect re-reads the arrivals,
+     * whose answer updates this pane - a request loop (found in the preview, 2026-11-05).
+     */
+    private readonly imports = computed(() => {
+        const m = new Map<string, ImportDataset>();
+        for (const d of this.datasets()) {
+            const imp = importDatasetOf(d);
+            if (imp) m.set(d.id, imp);
+        }
+        return m;
+    });
+    /** The import card's view of a Dataset; null for any other Dataset. */
+    protected importOf(d: Dataset): ImportDataset | null {
+        return this.imports().get(d.id) ?? null;
+    }
+    private readonly addDataAccess = inject(AddDataAccess);
+    /** Each import card's last arrivals read, for its summary's *Set aside*. */
+    private readonly arrivals = signal<Record<string, Arrivals | null>>({});
+    /** Bumped after an import on a card, so its summary counts again. */
+    private readonly versions = signal<Record<string, number>>({});
+    protected arrivalsOf(id: string): Arrivals | null {
+        return this.arrivals()[id] ?? null;
+    }
+    protected setArrivals(id: string, a: Arrivals | null): void {
+        this.arrivals.update((m) => ({ ...m, [id]: a }));
+    }
+    protected versionOf(id: string): number {
+        return this.versions()[id] ?? 0;
+    }
+    protected bump(id: string): void {
+        this.versions.update((m) => ({ ...m, [id]: (m[id] ?? 0) + 1 }));
+    }
+
     /** *Add data* from the empty pane (the keyboard path beside the drop, ONBOARDING-FIRST-RUN-1 B1). */
     protected addData(): void {
         void this.router.navigateByUrl(ADD_DATA_ROUTE);
@@ -116,6 +162,7 @@ export class DatasetsComponent implements OnInit {
 
     ngOnInit(): void {
         this.load();
+        this.addDataAccess.load(); // the import cards' Add a file / Run now lock (A-15) reads the Space's switch
     }
 
     load(): void {

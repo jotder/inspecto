@@ -75,76 +75,95 @@
         />
     }
 
-    <!-- Datasets -->
+    <!-- Datasets (the hidden heading keeps the import cards' h3 in order under the page h1) -->
+    @if (visibleDatasets().length) {
+        <h2 class="sr-only">Datasets in this Space</h2>
+    }
     <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         @for (d of visibleDatasets(); track d.id) {
-            <div class="bg-card flex flex-col rounded-2xl p-5 shadow">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                        <div class="break-all font-mono text-lg font-semibold">{{ d.id }}</div>
-                        <div class="text-secondary mt-0.5 flex flex-wrap items-center gap-2 text-sm">
-                            <inspecto-status-badge [value]="d.kind" [label]="d.kind" />
-                            @if (sharedOwner(d); as owner) {
-                                <inspecto-status-badge
-                                    value="shared"
-                                    [label]="'Shared · ' + owner"
-                                    matTooltip="Bound to a dataset shared by another space"
-                                />
-                            }
-                            @if (freshnessBadge(d); as fb) {
-                                <inspecto-status-badge
-                                    [value]="fb.value"
-                                    [label]="fb.label"
-                                    [matTooltip]="fb.tooltip"
-                                />
-                            }
-                            <span
-                                >source: <span class="font-mono">{{ d.sourceName }}</span></span
-                            >
-                            @if (columnCount(d)) {
-                                <span>· {{ columnCount(d) }} columns</span>
-                            } @else {
+            @if (importOf(d); as imp) {
+                <!-- An Add data Dataset: the shared import card, plus the B4 summary and offers (ONBOARDING-FIRST-RUN-1 C5) -->
+                <inspecto-import-dataset-card
+                    class="lg:col-span-2"
+                    [dataset]="imp"
+                    editorRoute="/pipelines"
+                    (arrivalsLoaded)="setArrivals(d.id, $event)"
+                    (imported)="bump(d.id)"
+                >
+                    <ng-container cardActions>
+                        <ng-container *ngTemplateOutlet="actions; context: { $implicit: d }"></ng-container>
+                    </ng-container>
+                    <app-dataset-summary
+                        cardSummary
+                        [dataset]="d"
+                        [arrivals]="arrivalsOf(d.id)"
+                        [version]="versionOf(d.id)"
+                    ></app-dataset-summary>
+                    <app-dataset-offers [dataset]="d"></app-dataset-offers>
+                </inspecto-import-dataset-card>
+            } @else {
+                <div class="bg-card flex flex-col rounded-2xl p-5 shadow">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="break-all font-mono text-lg font-semibold">{{ d.id }}</div>
+                            <div class="text-secondary mt-0.5 flex flex-wrap items-center gap-2 text-sm">
+                                <inspecto-status-badge [value]="d.kind" [label]="d.kind" />
+                                @if (sharedOwner(d); as owner) {
+                                    <inspecto-status-badge
+                                        value="shared"
+                                        [label]="'Shared · ' + owner"
+                                        matTooltip="Bound to a dataset shared by another space"
+                                    />
+                                }
+                                @if (freshnessBadge(d); as fb) {
+                                    <inspecto-status-badge
+                                        [value]="fb.value"
+                                        [label]="fb.label"
+                                        [matTooltip]="fb.tooltip"
+                                    />
+                                }
                                 <span
-                                    matTooltip="This Dataset declares no columns; screens read its shape from the store it points at."
-                                    >· columns derived from the store</span
+                                    >source: <span class="font-mono">{{ d.sourceName }}</span></span
                                 >
-                            }
+                                @if (columnCount(d)) {
+                                    <span>· {{ columnCount(d) }} columns</span>
+                                } @else {
+                                    <span
+                                        matTooltip="This Dataset declares no columns; screens read its shape from the store it points at."
+                                        >· columns derived from the store</span
+                                    >
+                                }
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1">
+                            <ng-container *ngTemplateOutlet="actions; context: { $implicit: d }"></ng-container>
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-1">
-                        <button mat-icon-button [routerLink]="[d.id]" matTooltip="Edit" aria-label="Edit">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
-                        </button>
-                        @if (canShare()) {
-                            <button
-                                mat-icon-button
-                                (click)="offer(d)"
-                                matTooltip="Offer for sharing"
-                                aria-label="Offer for sharing"
-                            >
-                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:share"></mat-icon>
-                            </button>
-                        }
-                        @if (!writesDisabled()) {
-                            @if (opsEnabled()) {
-                                <button
-                                    mat-icon-button
-                                    (click)="openTags(d)"
-                                    [attr.aria-label]="'Tags for ' + d.id"
-                                    matTooltip="Tags"
-                                >
-                                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
-                                </button>
-                            }
-                            <button mat-icon-button (click)="remove(d)" matTooltip="Delete" aria-label="Delete">
-                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
-                            </button>
-                        }
-                    </div>
                 </div>
-            </div>
+            }
         }
     </div>
+
+    <ng-template #actions let-d>
+        <button mat-icon-button [routerLink]="[d.id]" matTooltip="Edit" aria-label="Edit">
+            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+        </button>
+        @if (canShare()) {
+            <button mat-icon-button (click)="offer(d)" matTooltip="Offer for sharing" aria-label="Offer for sharing">
+                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:share"></mat-icon>
+            </button>
+        }
+        @if (!writesDisabled()) {
+            @if (opsEnabled()) {
+                <button mat-icon-button (click)="openTags(d)" [attr.aria-label]="'Tags for ' + d.id" matTooltip="Tags">
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
+                </button>
+            }
+            <button mat-icon-button (click)="remove(d)" matTooltip="Delete" aria-label="Delete">
+                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
+            </button>
+        }
+    </ng-template>
 
     @if (datasets().length && visibleDatasets().length === 0) {
         <div class="text-secondary mt-8">No datasets match “{{ filterText() }}”.</div>

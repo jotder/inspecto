@@ -55,6 +55,36 @@ class ControlApiBiTemplatesTest {
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
+    /**
+     * ONBOARDING-FIRST-RUN-1 C5: {@code columns} points a starter board at the Dataset's own columns, so *Make a starter
+     * dashboard* reads {@code sold_on} / {@code total} instead of the template's {@code event_date} / {@code amount}. A
+     * column the template does not read, a non-identifier, or a column the Dataset does not declare is 422, nothing written.
+     */
+    @Test
+    void columnsPointTheBoardAtTheDatasetsOwnColumns(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            reg.write("dataset", "sales", Map.of("physicalRef", "sales/database", "columns", List.of(
+                    Map.of("name", "sold_on", "type", "date"), Map.of("name", "total", "type", "number"))));
+
+            for (String bad : List.of("{\"region\":\"total\"}", "{\"amount\":\"total; drop\"}",
+                    "{\"amount\":\"price\"}", "[\"total\"]")) {
+                HttpResponse<String> r = post(c.port, "/bi/templates/trend-monitor/apply",
+                        "{\"dataset\":\"sales\",\"prefix\":\"sales\",\"columns\":" + bad + "}");
+                assertEquals(422, r.statusCode(), bad + " -> " + r.body());
+                assertTrue(reg.get("dashboard", "sales_trend_board").isEmpty(), "nothing written for " + bad);
+            }
+
+            HttpResponse<String> ok = post(c.port, "/bi/templates/trend-monitor/apply",
+                    "{\"dataset\":\"sales\",\"prefix\":\"sales\",\"columns\":{\"event_date\":\"sold_on\",\"amount\":\"total\"}}");
+            assertEquals(200, ok.statusCode(), ok.body());
+            String line = JSON.writeValueAsString(reg.get("widget", "sales_amount_over_time").orElseThrow().content());
+            assertTrue(line.contains("\"sold_on\"") && line.contains("\"total\""), line);
+            assertFalse(line.contains("event_date") || line.contains("\"amount\""), line);
+            assertTrue(reg.get("dashboard", "sales_trend_board").isPresent());
+        }
+    }
+
     @Test
     void galleryListsAndAppliesParameterized(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -36,7 +36,7 @@ timestamp: 2026-07-16T00:00:00Z
 > taken once, because a file cannot travel in a URL. It lives in the console's `add-data` feature, not in
 > `app/inspecto`, because core may not import the Link Analysis library (eslint D-5).
 > *Open in editor* on the review screen (before Create, no Pipeline exists yet) is **moved to `BASIC-ONBOARD-1`
-> (operator 2026-11-05)**: not built and not declined. Not built yet: the console Dataset page (C5) — `docs/BACKLOG.md`.
+> (operator 2026-11-05)**: not built and not declined. The console Dataset page is C5, below.
 >
 > **Getting started and the console Space guide (C4, 2026-11-05).** While setup is incomplete (no Space, or a Space with
 > no Dataset yet; the run history no longer decides it), Home shows **Getting started** in place of its first-run
@@ -59,6 +59,37 @@ timestamp: 2026-07-16T00:00:00Z
 > kind="console">`, `SpaceGuideService.load('console')`); Getting started is
 > `modules/admin/home/getting-started.component.ts`. The step routes and the sample constants live in the shared
 > `space-guide.ts`, so the Spaces pane does not import the Home feature.
+>
+> **The console Dataset page (C5, 2026-11-05; console UC-5, UC-8).** In the Studio **Datasets** pane
+> (`/catalog/datasets`) a Dataset Add data made (`origin: import`) is drawn as the **shared import Dataset card** (the
+> one Add data and Inspecto LA's Data page use: Data status, last import, arrivals, *Add a file* / *Run now*, the inbox
+> and *Watch this folder*, Storage, *Keep this up to date* and its locks), full width, with the pane's own Edit / Share /
+> Tags / Delete in its header. Any other Dataset keeps its plain card. Inside the card the console adds:
+> - **Summary** — *Rows* and *Time span* (one `POST /bi/query`: `count`, and `min` / `max` of the time column, which is
+>   the link's time, else the import's `eventDate`, else the first Time or date column), *Primary entity* (or *Not
+>   set*), and *Set aside*: the rows the kept files' runs rejected ("did not match the column types") and each refused
+>   file with its reason, read from the arrivals the card already reads (no second read). Counted again after every
+>   import on the card.
+> - **What this Dataset can feed** (H9), from the registry entry's columns and roles: a link (`defaultLinkMapping`
+>   from → to) offers *Explore as a network in Link Analysis* (`/studio/link-analysis?dataset=<id>`) and *Show the
+>   network on a dashboard* (the Widget builder); a date and an amount (the link's measure, else a Measure column, else
+>   the first number that is not an id) offer *Make a starter dashboard*, which applies the `trend-monitor` template
+>   over the Dataset's **own** columns and opens `/studio/dashboards/<id>_trend_board`; a second apply links to the board
+>   it made (only when that board exists: a 409 from an approval hold or a left-over widget shows the server's reason). The
+>   dashboard network offer opens an empty Widget builder (no view is pre-chosen). Locks, never hidden: Link Analysis absent (`features.geoLink` false) locks both network offers; the
+>   dashboard network view follows `features.laWidgets` (Standard and up, `featureReasons.laWidgets`); the starter is
+>   locked with no write root, or for a signed-in person without `canAuthorWorkbench`. Nothing suggested = one line
+>   saying what would be.
+> - The template route gained an optional body field for this: `POST /bi/templates/{id}/apply {dataset, prefix?,
+>   columns?}` - `columns` maps a template column (`event_date`, `amount`, `region`, `id`) to the Dataset's; a key the
+>   template does not read, a value that is not a plain identifier, or (when the Dataset declares its columns) a column it
+>   does not declare is 422 with nothing written (`ControlApiBiTemplatesTest.columnsPointTheBoardAtTheDatasetsOwnColumns`).
+> As built: `modules/admin/studio/datasets/dataset-page.ts` (the rules and words), `dataset-summary.component.ts`,
+> `dataset-offers.component.ts`; the shared card gained only additive slots (`[cardActions]`, `[cardSummary]`, the end)
+> and an `(arrivalsLoaded)` output. Deliberately not built (lane decisions, 2026-11-05): the primary entity is shown,
+> not changed here (Link Analysis' Entities page changes it); *Re-import* says how many rows changed through the card's
+> existing last-import summary; the network offers use the stored link mapping only (a Dataset without one is offered
+> nothing for Link Analysis); a Standard install was driven by the specs (the flags), not live.
 >
 > **Choose a table: a Postgres snapshot (`BASIC-ONBOARD-1` P3, 2026-11-05; every edition, Basic included).** Step 1
 > is now *1. Choose the data*: **A file** (as above) or **A Postgres table**. For a table, give the host, port, database

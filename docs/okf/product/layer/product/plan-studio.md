@@ -642,7 +642,9 @@ are the values four-eyes approved (below).
 `GET /bi/templates` serves a corpus that is a **Java constant** (`BiTemplates.TEMPLATES`) with exactly
 three ids: `kpi-overview`, `quality-monitor`, and `trend-monitor` (the temporal one, added 2026-09-02 —
 two `line` Widgets over `event_date` at `month` grain plus a KPI). `POST /bi/templates/{id}/apply`
-takes a Dataset and an optional id `prefix`, **conflict-checks every target id first and 409s if any
+takes a Dataset, an optional id `prefix` and (since 2026-11-05, `ONBOARDING-FIRST-RUN-1` C5) an optional
+`columns` map from the template's own columns (`event_date`, `amount`, `region`, `id`) to the Dataset's, refused 422
+for a column the template does not read or, when the Dataset declares its columns, one it does not declare, **conflict-checks every target id first and 409s if any
 exists**, then writes them all — all-or-nothing, so a half-written board is not reachable. What it
 writes is **UI-native**: `{vizType, datasetId, controls, options}` Widgets and `{name, tiles}`
 Dashboards, so an applied board renders immediately instead of needing a translation step.

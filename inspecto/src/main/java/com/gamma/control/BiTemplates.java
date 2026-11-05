@@ -93,7 +93,7 @@ final class BiTemplates {
             m.put("id", t.id());
             m.put("title", t.title());
             m.put("description", t.description());
-            m.put("params", List.of("dataset", "prefix?"));
+            m.put("params", List.of("dataset", "prefix?", "columns?"));
             m.put("components", t.components().stream().map(c ->
                     Map.of("kind", c.get("kind"), "id", c.get("id"))).toList());
             out.add(m);
@@ -101,7 +101,13 @@ final class BiTemplates {
         return out;
     }
 
-    /** {@code POST /bi/templates/{id}/apply} — body {@code {dataset, prefix?}}; writes the components. */
+    /**
+     * {@code POST /bi/templates/{id}/apply} — body {@code {dataset, prefix?, columns?}}; writes the components.
+     * {@code columns} maps a template's own column ({@code event_date}, {@code amount}, ...) to the Dataset's, so a
+     * starter board reads the real columns (ONBOARDING-FIRST-RUN-1 C5, *Make a starter dashboard*). A key the template
+     * does not read, a value that is not a plain identifier, or (when the Dataset declares its columns) one it does not
+     * declare is 422.
+     */
     static Object apply(ApiContext api, String templateId, Map<String, Object> body) throws IOException {
         Template t = TEMPLATES.stream().filter(x -> x.id().equals(templateId)).findFirst()
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no template '" + templateId + "'"));
@@ -112,7 +118,9 @@ final class BiTemplates {
 
         Path writeRoot = WriteGates.requireWriteRoot(api, "template apply");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        store.get("dataset", dataset).orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'"));
+        Map<String, Object> entry = store.get("dataset", dataset)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'")).content();
+        Map<String, String> columns = columnMap(t, body.get("columns"), entry);
         // Maker-checker (ASSURE-MAKER-CHECKER-1): an all-or-nothing board is not ONE Pending Change.
         PendingChanges.holdRefusing(api, java.util.List.of("dataset", "widget", "dashboard"),
                 "applying a BI template writes a whole board in one act");
@@ -140,7 +148,7 @@ final class BiTemplates {
         for (Map<String, Object> c : t.components()) {
             String kind = (String) c.get("kind");
             String id = substitute((String) c.get("id"), dataset, prefix);
-            Map<String, Object> content = substituteTree(asMap(c.get("content")), dataset, prefix);
+            Map<String, Object> content = renameFields(substituteTree(asMap(c.get("content")), dataset, prefix), columns);
             try {
                 ComponentRoutes.validateKind(api, kind, id, content);
             } catch (IllegalArgumentException e) {
@@ -205,6 +213,53 @@ final class BiTemplates {
     /** A temporal dimension channel: the field plus the time bucket ({@code day|week|month}) it groups into. */
     private static Map<String, Object> temporal(String field, String grain) {
         return Map.of("field", field, "grain", grain);
+    }
+
+    private static final java.util.regex.Pattern IDENT = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    /** The body's {@code columns}, checked against the template's fields and the Dataset's declared columns. */
+    private static Map<String, String> columnMap(Template t, Object raw, Map<String, Object> entry) {
+        if (raw == null) return Map.of();
+        if (!(raw instanceof Map<?, ?> m))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "columns must be an object {templateColumn: datasetColumn}");
+        java.util.Set<String> fields = new java.util.TreeSet<>();
+        for (Map<String, Object> c : t.components()) collectFields(c.get("content"), fields);
+        java.util.Set<String> declared = new java.util.HashSet<>();
+        if (entry.get("columns") instanceof List<?> cols)
+            for (Object c : cols) if (c instanceof Map<?, ?> cm && cm.get("name") instanceof String n) declared.add(n);
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : m.entrySet()) {
+            String k = String.valueOf(e.getKey());
+            if (!fields.contains(k))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template '" + t.id() + "' reads no column '" + k
+                        + "'; it reads " + String.join(", ", fields));
+            if (!(e.getValue() instanceof String v) || !IDENT.matcher(v).matches())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "columns." + k + " must be a column name");
+            if (!declared.isEmpty() && !declared.contains(v))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the dataset has no column '" + v + "'");
+            out.put(k, v);
+        }
+        return out;
+    }
+
+    private static void collectFields(Object v, java.util.Set<String> out) {
+        if (v instanceof Map<?, ?> m) {
+            if (m.get("field") instanceof String f) out.add(f);
+            m.values().forEach(x -> collectFields(x, out));
+        } else if (v instanceof List<?> l) l.forEach(x -> collectFields(x, out));
+    }
+
+    /** Every channel's {@code field} renamed by {@code columns}; everything else as written. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> renameFields(Map<String, Object> m, Map<String, String> columns) {
+        if (columns.isEmpty()) return m;
+        Map<String, Object> out = new LinkedHashMap<>();
+        m.forEach((k, v) -> out.put(k, "field".equals(k) && v instanceof String f ? columns.getOrDefault(f, f)
+                : v instanceof Map<?, ?> sub ? renameFields((Map<String, Object>) sub, columns)
+                : v instanceof List<?> l ? l.stream().map(x -> x instanceof Map<?, ?> xm
+                        ? (Object) renameFields((Map<String, Object>) xm, columns) : x).toList()
+                : v));
+        return out;
     }
 
     private static String substitute(String s, String dataset, String prefix) {

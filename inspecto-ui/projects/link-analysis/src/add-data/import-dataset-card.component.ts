@@ -49,6 +49,9 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
  * administrator. Inspecto LA never edits a Pipeline itself (A-6).
  *
  * @example <inspecto-import-dataset-card [dataset]="d" [summary]="last" (imported)="last = $event" />
+ *
+ * A host may add to the card (all optional): `[cardActions]` at the header's end, `[cardSummary]` under the description,
+ * and anything else at the card's end (the console Datasets pane adds the B4 summary and *What this Dataset can feed*).
  */
 @Component({
     selector: 'inspecto-import-dataset-card',
@@ -80,10 +83,12 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 <h3 class="m-0 text-base font-semibold" [id]="titleId">{{ dataset().id }}</h3>
                 <inspecto-chip variant="soft">{{ snapshot() ? 'Postgres snapshot' : 'one-time import' }}</inspecto-chip>
                 <span class="text-secondary text-sm">{{ kindWords() }}</span>
+                <span class="ml-auto flex items-center gap-1"><ng-content select="[cardActions]"></ng-content></span>
             </header>
             @if (dataset().description) {
                 <p class="text-secondary m-0 text-sm">{{ dataset().description }}</p>
             }
+            <ng-content select="[cardSummary]"></ng-content>
             <inspecto-la-data-status [arrivals]="arrivalsAnswer()"></inspecto-la-data-status>
             @if (last(); as s) {
                 <div class="flex flex-col gap-1">
@@ -223,6 +228,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                     <p class="text-secondary m-0 text-xs">More settings for the import in the guided editor.</p>
                 }
             </div>
+            <ng-content></ng-content>
         </article>
     `,
 })
@@ -243,6 +249,11 @@ export class ImportDatasetCardComponent {
     readonly editorRoute = input<string | null>(null);
     /** A file was added, or Run now ran: the new summary. */
     readonly imported = output<ImportSummary>();
+    /**
+     * Every `GET /datasets/{id}/arrivals` answer the card reads (null when the read fails), so a host can show more about
+     * the same arrivals without reading them twice (the console Dataset page's *Set aside*, ONBOARDING-FIRST-RUN-1 C5).
+     */
+    readonly arrivalsLoaded = output<Arrivals | null>();
 
     protected readonly titleId = `inspecto-import-card-${ImportDatasetCardComponent.nextId++}`;
     /** A Postgres snapshot (BASIC-ONBOARD-1 P3): refreshed from its table, never added to by a file. */
@@ -296,8 +307,14 @@ export class ImportDatasetCardComponent {
             .arrivals(id)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: (r) => this.arrivalsAnswer.set(r),
-                error: () => this.arrivalsAnswer.set(null), // the card stays usable; only the history is missing
+                next: (r) => {
+                    this.arrivalsAnswer.set(r);
+                    this.arrivalsLoaded.emit(r);
+                },
+                error: () => {
+                    this.arrivalsAnswer.set(null); // the card stays usable; only the history is missing
+                    this.arrivalsLoaded.emit(null);
+                },
             });
     }
 
