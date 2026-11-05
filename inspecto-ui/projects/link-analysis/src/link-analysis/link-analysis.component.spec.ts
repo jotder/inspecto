@@ -24,7 +24,7 @@ import { EntityProfileService, EntityTypeSummary } from '@inspecto/link-analysis
 import { PipelinesService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ElementDetailData } from '@inspecto/link-analysis/investigation/element-detail.dialog';
-import { G6GraphData, GraphSource } from '@inspecto/core/graph';
+import { G6GraphData, G6Node, GraphSource, nodeRuleColor } from '@inspecto/core/graph';
 import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { GeoLinkBrushService } from '@inspecto/link-analysis/graph/geo-link-brush';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
@@ -4584,6 +4584,69 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(c.hiddenNodeIds()).toEqual(['e', 'd']);
     });
 
+    it('Display rules on a Reference detail (LA-REFERENCE-DETAILS-MORE-1): one batched masked read; masked values and nodes without a row stay uncoloured', async () => {
+        const typed: G6GraphData = {
+            ...GRAPH,
+            nodes: GRAPH.nodes.map((n) => ({ ...n, data: { ...n.data, entityType: n.id < 'd' ? 'store' : 'cell' } })),
+        };
+        const stores: Dataset = {
+            ...DS,
+            id: 'stores',
+            name: 'stores',
+            kind: 'reference' as never,
+            primaryEntityType: 'store',
+            columns: [
+                { name: 'store_id', type: 'string', role: 'entity', classification: 'STORE' },
+                { name: 'region', type: 'string', role: 'dimension' },
+                { name: 'owner', type: 'string', role: 'dimension' },
+            ],
+            extra: { origin: 'import', identifyingColumn: 'store_id' },
+        };
+        const { fixture, c } = await drawn({ features: BASIC_EDITION_FEATURES, graph: typed, datasets: [DS, stores] });
+        // the server masked B's region (an alias) and the whole owner column; C has no row
+        const lookup = vi.spyOn(TestBed.inject(NodeRiskService), 'lookup').mockResolvedValue({
+            byKey: new Map([
+                ['A', { store_id: 'A', region: 'North', owner: 'masked:o1' }],
+                ['B', { store_id: 'B', region: 'masked:r2', owner: 'masked:o2' }],
+            ]),
+            columns: ['store_id', 'region', 'owner'],
+            truncated: false,
+            unresolved: 0,
+            maskedColumns: ['owner'],
+            masked: true,
+        });
+        c.setNodeRules([{ attr: 'risk', op: 'eq', value: '1', color: 'swatch-333333' }]);
+        fixture.detectChanges();
+        await settle(fixture);
+        expect(lookup).not.toHaveBeenCalled(); // no rule names a Reference: nothing is read
+
+        c.setNodeRules([
+            { reference: 'stores', attr: 'region', op: 'contains', value: 'r', color: 'swatch-111111' },
+            { reference: 'stores', attr: 'owner', op: 'contains', value: 'o', color: 'swatch-222222' },
+        ]);
+        fixture.detectChanges();
+        await settle(fixture);
+        // the drawn store nodes, in one batched lookup by their keys; the cells are not asked
+        expect(lookup).toHaveBeenCalledTimes(1);
+        expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'stores', keyCol: 'store_id' }), ['A', 'B', 'C'], null);
+        const details = c.displayOptions().referenceDetails!;
+        expect(details).toEqual({ stores: { a: { region: 'North' }, b: {} } });
+        const colour = (id: string) =>
+            nodeRuleColor(c.displayOptions().nodeRules, { label: id, kind: 'store' } as G6Node['data'], (ref) => details[ref]?.[id]);
+        expect(colour('a')).toBe('swatch-111111');
+        expect(colour('b')).toBeUndefined(); // its region is masked: never coloured by the alias, which contains "r"
+        expect(colour('c')).toBeUndefined(); // no row in the Reference
+        expect(c.referenceDetailsNote()).toContain('owner in stores is masked');
+        // read data, never the analyst's choice: a saved view does not carry it
+        expect('referenceDetails' in c.chosenDisplay()).toBe(false);
+
+        // a hide does not re-read (the whole drawn graph is looked up, hidden nodes included)
+        c.hiddenNodeIds.set(['b']);
+        fixture.detectChanges();
+        await settle(fixture);
+        expect(lookup).toHaveBeenCalledTimes(1);
+    });
+
     it('Filter by details (C6a): keeps the nodes whose Reference detail contains the text; Show all brings the rest back', async () => {
         const typed: G6GraphData = {
             ...GRAPH,
@@ -4613,6 +4676,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             columns: ['store_id', 'region'],
             truncated: false,
             unresolved: 0,
+            maskedColumns: [],
             masked: false,
         });
         c.openDock('rows');
@@ -4669,6 +4733,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             columns: ['store_id', 'region'],
             truncated: false,
             unresolved: 0,
+            maskedColumns: [],
             masked: false,
             ...over,
         });

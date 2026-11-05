@@ -17,6 +17,7 @@ import type {
     PostgresPick,
     PostgresTest,
 } from './add-data.model';
+import type { ReferenceCoverage } from './reference-coverage.component';
 import type { DatasetFeedState, IndexJob, KeepUpToDate } from './dataset-feed.model';
 import type { DatasetStorageState, Retention } from './dataset-storage.model';
 import type { ImportFilterState, RowCondition } from './add-data.model';
@@ -138,6 +139,11 @@ export class OnboardService {
     /** Every file the import Dataset took, newest first, with the period each covers (a read: no capability). */
     arrivals(datasetId: string): Observable<Arrivals> {
         return this.http.get<Arrivals>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/arrivals`));
+    }
+
+    /** How many of a Reference's entities the other Datasets hold (LA-REFERENCE-DETAILS-MORE-1; counts only, a read). */
+    coverage(datasetId: string): Observable<ReferenceCoverage> {
+        return this.http.get<ReferenceCoverage>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/coverage`));
     }
 
     /** The Space's `data.self_import` (OB-7): whether people may Add data here. */

@@ -449,6 +449,40 @@ node of its type keeps its *Show all*. No
 join builds data (DT-6). Tests: `reference-details.spec`, `link-analysis-reference-filter.component.spec`,
 `node-insight.component.spec` (Details), `link-analysis.component.spec` (*Filter by details*).
 
+**Colour by a Reference detail, and the coverage line (`LA-REFERENCE-DETAILS-MORE-1`, 2026-11-06; every edition).**
+*Colour:* `NodeRule` gained `reference?` (the Reference's Dataset id). A rule with it reads `attr` from
+`GraphDisplayOptions.referenceDetails` (Reference → node id → column → value), never from the node's `attrs`.
+`nodeRuleMatches` never matches a value starting `masked:` (`MaskTokens.TOKEN_PREFIX`). The host's
+`referenceDetailsWanted` (the References a rule names among `drawnReferences`, with every drawn node of their Entity Type,
+hidden nodes included, so a hide does not re-read) drives one effect. `loadReferenceDetails` runs `NodeRiskService.lookup`
+(chunked `POST /inv/reference-rows`; a newer read wins), and `detailValuesByNode` keeps only unmasked values: it drops the
+key column, every `masking.maskedColumns` entry (any case; `ReferenceTable` gained `maskedColumns`) and every `masked:`
+value. A node without a row gets no entry and stays uncoloured. `referenceDetails` sits in `displayOptions` only, never
+`chosenDisplay`, so a saved view keeps the rule but not the values. `referenceDetailsNote` lists unreadable or truncated
+reads and masked details. The rule works in the explorer only, like *Filter by details* (an Investigation has no
+`drawnReferences`).
+*Coverage:* `GET /datasets/{id}/coverage` (`DatasetCoverage`, core `DatasetRoutes`; read gate = the Dataset's view
+permission, as `/arrivals`; 503 without a write root, 400 for a bad id, 404 for an unknown or unviewable id) answers
+`{dataset, entityType, entityTypeLabel?, identifyingColumn, described, datasets:[{dataset, columns, appear, absent}],
+truncated, reason?}`. `described` counts the distinct trimmed keys of the identifying column. Each other viewable,
+non-Reference Dataset contributes the columns whose `classification` resolves to the Entity Type
+(`OnboardMatches.typeOf`), and `appear` counts the described keys found in any of them. The read is bounded at
+`MAX_SCAN_ROWS` = 1,000,000 rows per Dataset and `MAX_DATASETS` = 20 Datasets; `truncated` says when a cap was hit. The
+answer holds counts only, and never a count over a column masked for the caller (`BiResultMasking.hidesFromCaller`, the
+`matches` rule). Someone who may create a Dataset can fill it with chosen values classified as the Entity Type, so
+`appear` would otherwise tell them which masked keys the Reference holds (the verification probe, 2026-11-06). So a
+Reference whose identifying column is masked for the caller answers no counts, only a `reason`, and a holder's masked
+columns are never compared; a holder left with no column is not listed. Under masking, then, the line shows only to
+someone who may reveal ids, or when the keys are not masked. Keys compare
+as trimmed text, without the Entity Type normaliser, the same as `matches`. The UI is
+`<inspecto-la-reference-coverage>` on the shared import card for a `kind: reference` Dataset, so it shows on Add data's
+result, the console Dataset page and the Link Analysis Data page. It re-reads whenever the card's arrivals change and
+shows nothing when the read fails. Tests: `ControlApiDatasetCoverageTest` (a synthetic pair: 40 described, 20 appear, 20
+absent, no key in the body; no count over a column masked for the caller, either side; a Dataset the caller
+cannot view is 404 as the Reference and never counted; the bounded scan), `node-rules.spec`, `reference-details.spec`,
+`link-analysis-display-rules.component.spec`, `link-analysis.component.spec` (the batched masked read),
+`reference-coverage.component.spec`, `import-dataset-card.component.spec`. All are mutation-checked.
+
 **Case history (`POST /inv/case-history`, 2026-10-11).** Body `{key, investigationId?, status?, limit?}` →
 `{entityType, resolved, reason?, objects, total, truncated, masking{mode, masked}}`. The node dialog's Case history for a
 key it holds only as an alias (`GET /objects/by-entity` needs the raw id). The key resolves with the reference-rows rules:
@@ -2184,7 +2218,10 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   operator accepted this as a bounded widening (2026-11-05): the same stored connection and table, and an import can
   no longer plant `_snapshot.toon` (`ImportPaths.REFUSED_SUFFIXES`). Recorded as the `PUT /watch` ACTS reason in
   `ImportCapabilityGuardTest`.
-- **A Postgres table snapshot (P3) refreshes on the same toggle.** For an entry with `importSource: postgres` the toggle
+- ⚠ **Superseded the same day (operator, 2026-11-05): a snapshot is never polled.** *Refresh now* exports the table and
+  moves the finished file into the inbox; `InboxWatch.Snapshot`, `PostgresSnapshot.poll` and the card's 30 s toggle
+  were removed (`InboxWatch.watched` excludes `importSource: postgres`). The bullet below records the first design, which no longer exists.
+- ~~**A Postgres table snapshot (P3) refreshes on the same toggle.**~~ For an entry with `importSource: postgres` the toggle
   registers `InboxWatch.Snapshot` instead: each poll runs `PostgresSnapshot.poll` (copy the table again; replace
   everything only when the bytes differ from the last arrival; no settle check - the server makes the copy itself). A
   snapshot is never inbox-polled; a Reference snapshot may refresh (it replaces). The feed read says `snapshot`; the

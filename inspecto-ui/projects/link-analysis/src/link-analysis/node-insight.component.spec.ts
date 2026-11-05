@@ -48,6 +48,7 @@ const INDICATORS: ReferenceTable = {
     columns: ['msisdn', 'indicator_score', 'on_blocklist', 'alarms_recent'],
     truncated: false,
     unresolved: 0,
+    maskedColumns: [],
     masked: false,
 };
 const CRM: ReferenceTable = {
@@ -55,6 +56,7 @@ const CRM: ReferenceTable = {
     columns: [],
     truncated: false,
     unresolved: 0,
+    maskedColumns: [],
     masked: false,
 };
 

@@ -2077,6 +2077,8 @@
             <inspecto-link-analysis-display-rules
                 [rules]="nodeRules()"
                 [attributes]="nodeAttributeKeys()"
+                [references]="drawnReferences()"
+                [note]="referenceDetailsNote()"
                 [kinds]="nodeKinds()"
                 [swatches]="swatches"
                 (rulesChange)="setNodeRules($event)"

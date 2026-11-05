@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-378 test class(es): 138 unit, 240 real-HTTP control-plane, 0 IT.
+379 test class(es): 138 unit, 241 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -104,6 +104,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConnectionsTest.java` | Data Acquisition: the {@code /connections} routes over real HTTP — masked list/by-id + a live |
 | `ControlApiCrossSpaceJailTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCrossSpaceJailTest.java` | {@code CROSS-SPACE-JAIL-1} — <b>a Space's config may not name another Space's directory.</b> |
 | `ControlApiDatasetCompactionTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetCompactionTest.java` | {@code LA-DATASET-COMPACT-1} over real HTTP: an import compacts its files on its own past the threshold (every edition, |
+| `ControlApiDatasetCoverageTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetCoverageTest.java` | {@code GET /datasets/{id}/coverage} (LA-REFERENCE-DETAILS-MORE-1, UC-04 H9): over a synthetic pair - accounts ACC-0021..0060 |
 | `ControlApiDatasetFeedTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetFeedTest.java` | {@code LA-ARRIVAL-FEEDS-1} over real HTTP: {@code GET /datasets/{id}/feed} names the import's inbox and the files waiting |
 | `ControlApiDatasetFreshnessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetFreshnessTest.java` | LA-DAILY-INGEST-1 T8 - {@code GET /datasets/{id}/freshness}, real HTTP + real DuckDB: "data as of" is the newest value of |
 | `ControlApiDatasetMaterializeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetMaterializeTest.java` | Real-HTTP tests for {@code POST /datasets/{id}/materialize} (STUDIO-HALVES-1) — one per fail-closed |

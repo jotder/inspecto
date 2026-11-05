@@ -237,9 +237,16 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   no row for (a local hide: undoable; *Show all* brings back only what the filter hid; nothing recorded; the explorer only - an Investigation hides by its
   own recorded ops). Verified by specs (`reference-details.spec`, the node dialog, the filter, the Link Analysis
   component over a drawn graph), each mutation-checked; not driven live (the lane's backend had no Link Analysis
-  module). Still not built: colouring by a detail, and the "N of them appear in your transfers" count (Add data's
-  `matches` gives the share, `ONBOARDING-FIRST-RUN-1` C6a) - BACKLOG `LA-REFERENCE-DETAILS-MORE-1`. Detail: `la-core/architecture.md` (*Reference details on
-  nodes*).
+  module). Detail: `la-core/architecture.md` (*Reference details on nodes*).
+- **As built: colour and coverage (`LA-REFERENCE-DETAILS-MORE-1`, 2026-11-06; every edition) - UC-04 verified.**
+  **⚙ Settings ▸ Display rules** offers a Reference's detail columns (*Details in accounts*) for the nodes of its Entity
+  Type. The values are read through the masked `POST /inv/reference-rows`, batched over the drawn nodes. A masked value is
+  never coloured by, and a node without a row stays uncoloured. A Reference's Dataset card (Add data, the console
+  Dataset page, the Link Analysis Data page) says "40 Account entities described." and "20 appear in transfers; 20 do
+  not." These counts come from `GET /datasets/{id}/coverage`, which is bounded, returns counts only and never counts over a column masked for the viewer. Verified by
+  `ControlApiDatasetCoverageTest` over a synthetic pair and by specs (masking, a node without a row, the counts), each
+  mutation-checked.
+  Detail: `la-core/architecture.md` (*Colour by a Reference detail, and the coverage line*).
 
 ### UC-05 Use a Dataset that a Pipeline already builds
 

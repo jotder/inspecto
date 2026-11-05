@@ -64,6 +64,7 @@ final class DatasetRoutes implements RouteModule {
         api.get("/datasets/([^/]+)/rows", (e, m) -> rows(api, e, ApiContext.name(m)));
         api.get("/datasets/([^/]+)/freshness", (e, m) -> freshness(api, e, ApiContext.name(m)));
         api.get("/datasets/([^/]+)/arrivals", (e, m) -> DatasetArrivals.list(api, e, ApiContext.name(m)));
+        api.get("/datasets/([^/]+)/coverage", (e, m) -> DatasetCoverage.of(api, e, ApiContext.name(m)));
         api.post("/datasets/([^/]+)/materialize",
                 ApiContext.withCapability("canOperateRuns",
                         (e, m) -> materialize(api, e, ApiContext.name(m))));

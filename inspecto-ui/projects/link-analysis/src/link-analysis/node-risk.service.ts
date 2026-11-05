@@ -35,6 +35,8 @@ export interface ReferenceTable {
     unresolved: number;
     /** Some value was masked (the Space masks entity ids or a column is classified sensitive). */
     masked: boolean;
+    /** The columns the server masked in any chunk (LA-REFERENCE-DETAILS-MORE-1: never coloured by). */
+    maskedColumns: string[];
     error?: string;
 }
 
@@ -72,7 +74,14 @@ export class NodeRiskService {
 
     /** The rows of `keys` in a reference Dataset, chunk by chunk; any failed chunk makes the whole lookup an error. */
     async lookup(ref: KeyedDataset, keys: string[], investigationId?: string | null): Promise<ReferenceTable> {
-        const out: ReferenceTable = { byKey: new Map(), columns: [], truncated: false, unresolved: 0, masked: false };
+        const out: ReferenceTable = {
+            byKey: new Map(),
+            columns: [],
+            truncated: false,
+            unresolved: 0,
+            masked: false,
+            maskedColumns: [],
+        };
         try {
             for (const chunk of keyChunks(keys)) {
                 const r = await firstValueFrom(this.referenceRows(ref, chunk, investigationId));
@@ -81,6 +90,7 @@ export class NodeRiskService {
                 out.truncated ||= r.truncated;
                 out.unresolved += r.unresolved.length + r.rawKeysRefused;
                 out.masked ||= r.masking.masked;
+                for (const c of r.masking.maskedColumns ?? []) if (!out.maskedColumns.includes(c)) out.maskedColumns.push(c);
             }
         } catch (e) {
             out.error = apiErrorMessage(e, 'the reference rows could not be read');

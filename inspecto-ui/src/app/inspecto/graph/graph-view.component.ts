@@ -31,7 +31,7 @@ import { G6GraphData, entityTypeIcon, nodeColor, nodeKindLabel, nodeShape } from
 import { toSvg } from './graph-export';
 import type { G6Node } from './graph-types';
 import { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS, type GraphLayoutId } from './graph-layouts';
-import { NodeRule, nodeRuleColor } from './node-rules';
+import { NodeRule, NodeRuleDetails, nodeRuleColor } from './node-rules';
 import { NodeKind } from 'app/inspecto/api';
 import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
 
@@ -353,6 +353,11 @@ export interface GraphDisplayOptions {
     edgeSizes: Record<string, number>;
     /** Conditional formatting: ordered rules colouring the nodes that satisfy an attribute predicate (first match wins). */
     nodeRules?: NodeRule[];
+    /**
+     * LA-REFERENCE-DETAILS-MORE-1: the drawn nodes' Reference detail values a Reference rule colours by (masked values
+     * left out by the host). Read data, never the analyst's choice: a host keeps it out of a saved view.
+     */
+    referenceDetails?: NodeRuleDetails;
     /**
      * Node diameter in px (an icon tile scales with it). It never follows degree or any attribute: the analyst sets it.
      * Absent = {@link HOST_NODE_SIZE}, what the catalog and pipeline graphs have always drawn.
@@ -1085,7 +1090,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         const group = this.emGroups?.get(d.id as string);
         if (group) return this.groupSwatch.get(group)!; // analysis overlay wins over styling
         const kind = (d.data as { kind: NodeKind }).kind;
-        const ruled = nodeRuleColor(this.display?.nodeRules, d.data as G6Node['data']);
+        const details = this.display?.referenceDetails;
+        const ruled = nodeRuleColor(this.display?.nodeRules, d.data as G6Node['data'], (ref) => details?.[ref]?.[d.id as string]);
         if (ruled) return ruled; // conditional formatting outranks the per-kind colour
         return this.display?.nodeColors[kind] ?? (d.data as { color?: string }).color ?? nodeColor(kind);
     }

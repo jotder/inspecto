@@ -18,6 +18,7 @@ Revenue-assurance, fraud, AML and data-quality teams that need several analysts 
 ## What is included
 
 - Everything in Basic.
+- Data that keeps flowing: *Keep this up to date* turns an imported Dataset into a watched-folder or SFTP feed on a chosen schedule; a retention policy; enrichment from a Reference.
 - Sign-in through your identity provider (OIDC), roles, secrets management, enforced masking with audited reveal.
 - Add-ons: [Incidents](../../addon/incidents/index.md), [Workflow & SLA](../../addon/workflowSla/index.md), [Case Management](../../addon/caseManagement/index.md), [Reconciliation](../../addon/reconciliation/index.md), [Scoring & Lists](../../addon/scoringLists/index.md), [Screening](../../addon/screening/index.md), [Anomaly Detection](../../addon/anomalyDetection/index.md), [Action Requests](../../addon/actionRequests/index.md), [Regulatory Reporting](../../addon/regulatoryReporting/index.md), [Integration & Delivery](../../addon/integrationDelivery/index.md), [Multi-entity / Group](../../addon/multiEntity/index.md), [Premium Connectors](../../addon/premiumConnectors/index.md) (Kafka), [Telecom industry pack](../../addon/telecomIndustryPack/index.md) (ASN.1 CDR decoding) and [AI Assist](../../addon/aiAssist/index.md) (the assistant agent).
 - Full Link Analysis: Investigations with a sealed operation log, verifiable Dossiers, Drafts, four-eyes, embed links, Case linking, server graph runs, the link index and standing detection.

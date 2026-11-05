@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { NodeRule } from '@inspecto/core/graph';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
+import type { NodeReference } from './reference-details';
 
 @Component({
     standalone: true,
@@ -13,6 +14,8 @@ import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules
     template: `<inspecto-link-analysis-display-rules
         [rules]="rules()"
         [attributes]="attributes()"
+        [references]="references()"
+        [note]="note()"
         [kinds]="['msisdn', 'imei']"
         [swatches]="['swatch-EF4444', 'swatch-22C55E']"
         (rulesChange)="emitted = $event; rules.set($event)"
@@ -21,6 +24,8 @@ import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules
 class HostComponent {
     rules = signal<NodeRule[]>([]);
     attributes = signal<string[]>(['risk']);
+    references = signal<NodeReference[]>([]);
+    note = signal<string | null>(null);
     emitted: NodeRule[] | null = null;
 }
 
@@ -57,6 +62,39 @@ describe('LinkAnalysisDisplayRulesComponent', () => {
         el.querySelector<HTMLButtonElement>('button[aria-label^="Remove the display rule"]')!.click();
         fixture.detectChanges();
         expect(host.emitted).toEqual([]);
+    });
+
+    it('offers a Reference detail and adds a rule naming that Reference (LA-REFERENCE-DETAILS-MORE-1)', () => {
+        TestBed.configureTestingModule({ imports: [HostComponent] });
+        const fixture = TestBed.createComponent(HostComponent);
+        const host = fixture.componentInstance;
+        host.attributes.set([]); // the nodes carry nothing: the Reference's details alone make the form
+        host.references.set([
+            { dataset: 'accounts', keyCol: 'account_id', name: 'Accounts', entityType: 'account', columns: ['segment', 'kyc'] },
+        ]);
+        host.note.set('kyc in Accounts is masked, so no node is coloured by it');
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        const group = el.querySelector('optgroup')!;
+        expect(group.label).toBe('Details in Accounts');
+        expect(Array.from(group.querySelectorAll('option')).map((o) => o.textContent?.trim())).toEqual(['segment', 'kyc']);
+        expect(el.querySelector('[data-testid="la-rule-reference-note"]')!.textContent).toContain('is masked');
+
+        const set = (id: string, value: string) => {
+            const c = el.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)!;
+            c.value = value;
+            c.dispatchEvent(new Event(c.tagName === 'SELECT' ? 'change' : 'input'));
+        };
+        set('la-rule-attr', group.querySelector('option')!.value);
+        set('la-rule-value', 'retail');
+        el.querySelector<HTMLButtonElement>('button[aria-pressed]')!.click();
+        fixture.detectChanges();
+        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Add rule'))!.click();
+        fixture.detectChanges();
+        expect(host.emitted).toEqual([
+            { reference: 'accounts', attr: 'segment', op: 'eq', value: 'retail', color: 'swatch-EF4444' },
+        ]);
+        expect(el.textContent).toContain('segment (in accounts) equals retail');
     });
 
     it('says so when the loaded nodes carry no attributes', () => {

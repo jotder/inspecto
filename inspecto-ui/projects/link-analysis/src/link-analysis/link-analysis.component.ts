@@ -142,7 +142,16 @@ import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.comp
 import { ExcludeDialogData, ExcludeDialogResult, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
-import { G6GraphData, EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery, NodeRule, toGraphml } from '@inspecto/core/graph';
+import {
+    G6GraphData,
+    EntityProjection,
+    GraphSource,
+    GraphSourceId,
+    GraphSourceQuery,
+    NodeRule,
+    NodeRuleDetails,
+    toGraphml,
+} from '@inspecto/core/graph';
 import { LinkAnalysisGlossaryComponent } from './link-analysis-glossary.component';
 import { LinkAnalysisDisplayRulesComponent } from './link-analysis-display-rules.component';
 import { LaSettingsSection, LinkAnalysisSettingsComponent } from './link-analysis-settings.component';
@@ -272,7 +281,14 @@ import {
 } from './link-analysis-role-filter.component';
 import { LinkAnalysisReferenceFilterComponent, ReferenceFilter } from './link-analysis-reference-filter.component';
 import { NodeRiskService } from './node-risk.service';
-import { DrawnNode, nodeReferences, nodesNotMatching, referencesFor } from './reference-details';
+import {
+    DrawnNode,
+    NodeReference,
+    detailValuesByNode,
+    nodeReferences,
+    nodesNotMatching,
+    referencesFor,
+} from './reference-details';
 import {
     DatasetRoleFilters,
     NO_ROLE_FILTERS,
@@ -1033,6 +1049,67 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.hiddenNodeIds.update((h) => h.filter((id) => !mine.has(id)));
         this.detailsHidden.set([]);
     }
+
+    /**
+     * LA-REFERENCE-DETAILS-MORE-1: what the display rules on a Reference detail need read - each Reference a rule colours
+     * by, with the drawn nodes of its Entity Type (the whole drawn graph, hidden nodes included, so a hide never re-reads).
+     */
+    private readonly referenceDetailsWanted = computed(
+        () => {
+            const used = new Set(this.nodeRules().map((r) => r.reference).filter((r): r is string => !!r));
+            const nodes = this.baseGraph()?.nodes ?? [];
+            return this.drawnReferences()
+                .filter((r) => used.has(r.dataset))
+                .map((reference) => ({
+                    reference,
+                    nodes: nodes
+                        .filter((n) => this.typeOfNode(n) === reference.entityType)
+                        .map((n): DrawnNode => ({ id: n.id, key: rawIdsOf(n)[0] ?? n.data.label })),
+                }));
+        },
+        { equal: (a, b) => stableKey(a) === stableKey(b) },
+    );
+    /** The drawn nodes' detail values the Reference rules colour by (masked ones left out). Read data: never in a view. */
+    readonly referenceDetails = signal<NodeRuleDetails>({});
+    /** Why some node a Reference rule names stays uncoloured (unreadable, cut, or a masked detail); null when none. */
+    readonly referenceDetailsNote = signal<string | null>(null);
+    private referenceDetailsRead = 0;
+    private readonly readReferenceDetails = effect(() => {
+        const wanted = this.referenceDetailsWanted();
+        untracked(() => void this.loadReferenceDetails(wanted));
+    });
+
+    /**
+     * Read each wanted Reference's rows for its drawn nodes, batched (`POST /inv/reference-rows` in chunks, masked by the
+     * server as every Link Analysis read); a newer read wins. A node without a row, or with a masked value, is not coloured.
+     */
+    async loadReferenceDetails(wanted: readonly { reference: NodeReference; nodes: DrawnNode[] }[]): Promise<void> {
+        const run = ++this.referenceDetailsRead;
+        const details: NodeRuleDetails = {};
+        const notes: string[] = [];
+        for (const w of wanted) {
+            if (!w.nodes.length) continue;
+            const table = await this.nodeRisk.lookup(
+                w.reference,
+                w.nodes.map((n) => n.key),
+                this.graphRunInvestigationId(),
+            );
+            if (run !== this.referenceDetailsRead) return;
+            if (table.error) {
+                notes.push(`${w.reference.name} could not be read: ${table.error}`);
+                continue;
+            }
+            if (table.truncated) notes.push(`${w.reference.name} returned only part of its rows: nodes without one stay uncoloured`);
+            const masked = new Set(table.maskedColumns.map((c) => c.toLowerCase()));
+            for (const r of this.nodeRules())
+                if (r.reference === w.reference.dataset && masked.has(r.attr.toLowerCase()))
+                    notes.push(`${r.attr} in ${w.reference.name} is masked, so no node is coloured by it`);
+            details[w.reference.dataset] = detailValuesByNode(w.nodes, table.byKey, w.reference.keyCol, table.maskedColumns);
+        }
+        if (run !== this.referenceDetailsRead) return;
+        this.referenceDetails.set(details);
+        this.referenceDetailsNote.set(notes.length ? [...new Set(notes)].join('; ') : null);
+    }
     readonly pipelines = signal<PipelineSummary[]>([]);
 
     // ── result state ──
@@ -1640,6 +1717,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 nodeSize: this.nodeSize(),
                 layoutSpacing: this.layoutSpacing(),
                 layoutCaps: laLayoutCaps(),
+                // read data for the Reference rules, never the analyst's choice: kept out of chosenDisplay (a saved view)
+                ...(Object.keys(this.referenceDetails()).length ? { referenceDetails: this.referenceDetails() } : {}),
             };
         },
         { equal: (a, b) => stableKey(a) === stableKey(b) },
