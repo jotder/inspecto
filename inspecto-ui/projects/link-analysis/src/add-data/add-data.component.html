@@ -34,9 +34,9 @@
     </section>
 } @else {
     <div class="flex flex-col gap-6">
-        <!-- 1. Drop or choose a file -->
+        <!-- 1. Choose the data: a file or a Postgres table -->
         <section class="flex flex-col gap-3" aria-labelledby="add-data-file-title" data-testid="step-file">
-            <h2 id="add-data-file-title" class="m-0 text-lg font-semibold">1. Drop or choose a file</h2>
+            <h2 id="add-data-file-title" class="m-0 text-lg font-semibold">1. Choose the data</h2>
             <mat-radio-group
                 class="flex flex-col gap-1 sm:flex-row sm:gap-6"
                 [formControl]="kind"
@@ -51,19 +51,35 @@
                 </mat-radio-button>
             </mat-radio-group>
 
+            @if (!draft()) {
+                <mat-radio-group
+                    class="flex flex-col gap-1 sm:flex-row sm:gap-6"
+                    [formControl]="origin"
+                    aria-label="Where is the data?"
+                    data-testid="data-origin"
+                >
+                    <mat-radio-button value="file" [disabled]="reading()">A file</mat-radio-button>
+                    <mat-radio-button value="postgres" [disabled]="reading()">A Postgres table</mat-radio-button>
+                </mat-radio-group>
+            }
             @if (draft(); as d) {
                 <div class="flex flex-wrap items-center gap-2 text-sm" data-testid="chosen-file">
                     <mat-icon
                         class="icon-size-5"
-                        svgIcon="heroicons_outline:document-text"
+                        [svgIcon]="d.snapshot ? 'heroicons_outline:circle-stack' : 'heroicons_outline:document-text'"
                         aria-hidden="true"
                     ></mat-icon>
-                    <span class="font-semibold">{{ d.file.name }}</span>
+                    <span class="font-semibold">{{ d.snapshot ? snapshotName(d.snapshot) : d.file.name }}</span>
                     <span class="text-secondary">{{ count(d.file.rows) }} rows, {{ formatSize(d.file.bytes) }}</span>
                     <button mat-button type="button" data-testid="choose-another" (click)="startOver()">
-                        Choose another file
+                        {{ d.snapshot ? 'Choose another table' : 'Choose another file' }}
                     </button>
                 </div>
+            } @else if (origin.value === 'postgres') {
+                <inspecto-postgres-table
+                    [kind]="kind.value"
+                    (drafted)="adoptSnapshot($event)"
+                ></inspecto-postgres-table>
             } @else {
                 <div
                     class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center"
@@ -112,12 +128,12 @@
             </ul>
             @if (access.remoteLock(); as why) {
                 <inspecto-locked-action
-                    label="Read from a database or a remote system"
+                    label="Read from another database or a remote system"
                     [reason]="why"
                 ></inspecto-locked-action>
             } @else {
                 <p class="text-secondary m-0 text-sm" data-testid="remote-hand-off">
-                    A database or a remote system is read by a Pipeline that keeps the data up to date.
+                    Another database or a remote system is read by a Pipeline that keeps the data up to date.
                 </p>
             }
             @if (reading()) {

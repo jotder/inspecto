@@ -334,7 +334,7 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 | `POST /onboard/files/{draftId}/commit` | `canUploadData` | one confirm: writes, registers, lands, runs once, registers the Dataset; 200 run summary, or 202 above `import.inline_max_bytes` |
 | `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
 | `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
-| `POST /datasets/{id}/run` | `canUploadData` | **Run now**: runs the import Pipeline over what waits in its inbox |
+| `POST /datasets/{id}/run` | `canUploadData` | **Run now**: runs the import Pipeline over what waits in its inbox; on a Postgres snapshot, copies the table again (below) |
 | `PUT /datasets/{id}/columns/{column}` | `canAuthorWorkbench` | one column's Entity Type: `{entityType: id\|null}` or `{classification: X\|null}`; and/or its `role`, a measure's `unit`, and `carried` (`false` keeps a Time, Measure or Category column off the links and the index; LA-COLUMN-ROLES-1) |
 | `GET` / `PUT /settings/data` | open / `canAdminister` | the Space's `data.self_import`: `{selfImport, selfImportDefault, selfImportInForce}` |
 
@@ -480,6 +480,62 @@ landing in that Space only) and
 `la/inspecto-geo-link/.../ControlApiOnboardLinkAnalysisTest` (index BUILT in the run, `/inv/projection` with no
 saved view, Entity profile links assessed from `defaultLinkMapping` and not without it, falsified by removing the
 fallback in `EntityTypeBindings`).
+
+### Choose a table: a Postgres snapshot (`PostgresSnapshot`; `BASIC-ONBOARD-1` P3, 2026-11-05)
+
+The third way into Add data, on **every edition, Basic included** (reverses DT-4 for Postgres only; other databases
+and remote systems stay Standard). A table, or one read-only `SELECT`, is copied into Parquet and becomes an
+ordinary import Dataset whose every refresh is a *replace everything* arrival.
+
+| Route | Capability | What it does |
+|---|---|---|
+| `POST /onboard/postgres/test` `{connection}` | `canUploadData` | connect read-only, refuse a login that could write, list the tables (`{connected, user, readOnly, tables:[{schema, table, view}], truncated}`, at most 500) |
+| `POST /onboard/postgres` `{connection, schema+table \| query, kind}` | `canUploadData` | copy the rows into `<data root>/_onboard/<draftId>/<table>.parquet` and answer the SAME draft as `/onboard/files`, plus `snapshot` |
+
+`connection` is `{host, port (5432), database, user, password}`, and `password` MUST be `${ENV:INSPECTO_PG_…}` -
+the name of an environment variable on the server, and **only one starting `INSPECTO_PG_`** (`ENV_PREFIX`): the
+caller picks both the host and the variable, so any other name would let anyone with `canUploadData` send any server
+secret (a cloud key, the keystore password) to a Postgres server they run. Naming the variable `INSPECTO_PG_…` is the
+administrator's statement that it may go to a database. Gates: as Add data (401/403 → 503 → `data.self_import` 403),
+then 422 for a malformed connection, a raw password (never echoed), a reference outside the prefix (refused by its
+name, nothing resolved), an unset variable (named), a query that is not one
+`SELECT` / `WITH` (`;` inside, or another verb), a write-capable login, an empty result; 413 above
+`import.max_rows`. Rate class: the standard bucket. The commit is the ordinary `/onboard/files/{draftId}/commit`;
+for a snapshot draft it also writes `imports/<id>_snapshot.toon` (connection with the password as its reference,
+schema+table or query; refused 409 if it already exists) and stamps the Dataset entry `importSource: postgres`.
+**Run now** (`POST /datasets/{id}/run`) on such a Dataset copies the table again and runs the Add-a-file replace path.
+
+**How it reads (P0 V2, plan §6.1).** DuckDB's `postgres` extension (`postgres_scanner`), already staged in every
+bundle - no JDBC driver on Basic, no dependency added. `Session.open`: resolve the reference → in-memory DuckDB →
+`DuckDbExtension.ensureLoaded("postgres_scanner")` → `CREATE TEMPORARY SECRET` → `ATTACH '' AS pg (TYPE postgres,
+SECRET …, READ_ONLY)`, all before the seal; then `allowed_directories` = the stage only, external access off.
+⚠ Never the inline libpq string: DuckDB's connect error ECHOES it, password included (measured); the secret form
+says `at ""`. Every error is scrubbed of the resolved value anyway.
+
+**Read-only, three ways (each mutation-tested):** `READ_ONLY` makes DuckDB refuse a write AND the Postgres session
+run `transaction_read_only = on` (so `postgres_execute('INSERT …')` is refused by Postgres); a pasted query must
+be one `SELECT`/`WITH`; and the role check (superuser, or INSERT/UPDATE/DELETE/TRUNCATE on any non-system table,
+via `has_table_privilege`, so inherited and PUBLIC grants count) runs on the test AND on every copy, Run now
+included. Not checked: CREATE on a schema (Postgres < 15 grants it to PUBLIC on `public`; refusing it would refuse
+nearly every login).
+
+**Types.** The copy casts to what the import reads: `timestamptz` → its UTC wall time (`timezone('UTC', …)`, never
+the host zone); integers, floating, `numeric`, `date`, `timestamp`, `boolean`, text kept; anything else (uuid,
+json, arrays, intervals, bytea…) → text. The draft then reads the Parquet like an uploaded one (`numeric` →
+DOUBLE).
+
+**The seam for the poll (P2).** `OnboardImport.addStaged(space, content, id, key, stage, file, name, mode, ex)` is
+the Add-a-file tail with no HTTP exchange (`ex == null` always runs inline); `PostgresSnapshot.poll(writeRoot,
+dataRoot, service, id)` refreshes a snapshot and answers `false` without an arrival when the copy's sha256 equals
+the last arrival's (an unchanged table adds nothing; DuckDB writes the same bytes for the same rows - tested).
+
+Tests: `inspecto/.../ControlApiPostgresSnapshotTest` - the refusals before connecting (raw password never echoed,
+unset reference named, malformed host/port, write verbs, `;`, table AND query, a quoted identifier), 503/401/403/
+self-import 403, and against a REAL Postgres when `INSPECTO_TEST_PG_URL` (superuser JDBC URL) and
+`INSPECTO_PG_TEST_PASSWORD` are set (skipped otherwise - read "Skipped"): a write-capable login refused at
+the test and at the copy, the table list, the draft's types, the password in no answer / draft / config, commit,
+Run now replacing (35 rows after 5 added and 10 deleted), the poll skipping an unchanged table, the session itself
+read-only for a write-capable login, a data-modifying `WITH` changing nothing. Five mutants, each killed by its test.
 
 ### Onboarding counters (`OnboardingRoutes`; `LA-ONBOARD-1` OB-13, 2026-10-22)
 

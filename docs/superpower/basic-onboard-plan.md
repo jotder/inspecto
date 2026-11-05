@@ -109,6 +109,39 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
 | **P3 Postgres snapshot** | Connect (host, database, user, `${ENV:…}` password), pick a schema / table or paste a read-only `SELECT`, preview, review columns, Create; *Run now* / poll refreshes as *replace everything*; connection test refuses write-capable statements | L |
 | **P4 Docs and sale** | EDITIONS rows, the whitepapers, the user guide; DT-4 / DT-5 / DT-10 / DT-17 amended in `data-tier-editions-plan.md` | S |
 
+### 6.1 P0 V2 result - how Basic reads Postgres (measured 2026-11-05, DuckDB 2.0.0.0, Postgres 18.6 in Docker)
+
+| | DuckDB `postgres` extension (`postgres_scanner`) | The `db` Collector (`DbExportConnector`) |
+|---|---|---|
+| In the Basic bundle today | **Yes.** `package.ps1` step 6d stages `postgres_scanner.duckdb_extension` for both platforms in every edition (it rides with `ducklake`, AIRGAP-EXTENSIONS-1); loaded through `DuckDbExtension.ensureLoaded`. Windows file 52 MB, already shipped | **No.** The connector class is in `inspecto-connectors` (every edition), but `postgresql.jar` (42.7.12, 1.1 MB) is never bundled on Basic (`package.ps1` skips it for Basic; it is REQUIRED with a Postgres module, `needsPostgresDriver`: Advanced, Preview, and rides along on Standard when the local Maven repo has it) |
+| New dependency / bundle growth | **None / 0 bytes** | +1.1 MB driver on Basic, plus the Collector's config surface |
+| Offline build | extension already in the local cache (`~/.duckdb/extensions/v2.0.0/…`) | driver in the local Maven repo |
+| Types | typed straight into Parquet (BIGINT, DECIMAL, TIMESTAMPTZ, BOOLEAN, UUID…) - no re-inference | JDBC → **CSV text**, every type re-guessed |
+| Refusing writes | `ATTACH … (READ_ONLY)`: DuckDB refuses `INSERT` on the attached database **and** the Postgres session runs `transaction_read_only = on`, so even `postgres_query` / `postgres_execute` with `INSERT` is refused by Postgres. Multi-statement text cannot be prepared | `Connection.setReadOnly(true)` would have to be added |
+| Secret handling | a `TEMPORARY SECRET` (in memory, `duckdb_secrets()` shows `password=redacted`); a failed connect says `Unable to connect to Postgres at ""` - no password. ⚠ The inline libpq string form ECHOES the password in the error: never use it | JDBC URL built from the profile |
+| Engine seal | attach before the seal, then `enable_external_access=false` + `allowed_directories`: the attached tables stay readable, a second `ATTACH` and any file outside the stage are refused | n/a (no DuckDB) |
+
+**Decision: the DuckDB `postgres` extension.** No dependency added and the Basic bundle does not grow, so P3 goes ahead
+without a further operator question (the rule in the lane brief). The `db` Collector stays the Standard way to keep a
+database table up to date incrementally (watermarks), unchanged.
+
+**Decision recorded for "refuse a write-capable session"** (the plan says read-only credentials; the operator was
+away): the connection test **refuses** a role that is a superuser or holds INSERT / UPDATE / DELETE / TRUNCATE on any
+table outside the system schemas (`has_table_privilege`, so inherited and PUBLIC grants count), naming what to grant
+instead. The session is read-only regardless (above); the role check is so the user gives Basic a read-only login.
+
+**Decision recorded for the password reference** (found by the verification review, operator away): only
+`${ENV:INSPECTO_PG_…}` is resolved. The person choosing the host also chooses the variable, so an unrestricted
+`${ENV:NAME}` would let anyone with `canUploadData` send any server secret to a Postgres server they run (a
+cleartext-password server receives it as is). Naming the variable `INSPECTO_PG_…` is the administrator's decision that
+it may go to a database.
+
+**P3 built 2026-11-05 (lane onboard-pg)** - as built in `module/processor/api-onboarding-authoring.md` (*Choose a
+table*) and `layer/product/user-guide-onboarding.md`. Seams left for the sibling lanes: `OnboardImport.addStaged` (the
+Add-a-file tail with no HTTP exchange) and `PostgresSnapshot.poll(writeRoot, dataRoot, service, id)` for P2's poller,
+which still owns the 30 s toggle. Nothing registers a way in: a refresh lands its Parquet through the import's
+Pipeline (`addStaged`), which calls `followOn` and `recordArrival` like every other way, so P1's follow-ons run after it.
+
 ## 7. Not in scope
 
 - Transformation on Basic (joins, derived columns, filters beyond the review step) - Standard.

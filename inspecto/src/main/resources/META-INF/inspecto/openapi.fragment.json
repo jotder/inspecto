@@ -8620,6 +8620,36 @@
         }
       }
     },
+    "/onboard/postgres/test" : {
+      "post" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Add data, Choose a table: test a Postgres connection and list its tables",
+        "operationId" : "postOnboardPostgresTest",
+        "description" : "BASIC-ONBOARD-1 P3, every edition. Body {connection:{host, port? (5432), database, user, password}}; password MUST be a secret reference ${ENV:NAME} (the server's environment variable), never the value - it is resolved only to connect and is never answered, stored or logged. Reads through DuckDB's postgres extension, attached READ_ONLY. Answers {connected, user, readOnly:true, tables:[{schema, table, view}] (at most 500), truncated}. Gates in order: capability (canUploadData) 401/403; 503 no write root; 403 data.self_import off; 422 a malformed connection or a raw password; 422 the reference is not set on the server, the database refused the connection (its reason, password scrubbed), or the role could write (superuser, or INSERT/UPDATE/DELETE/TRUNCATE on any non-system table).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped connection test."
+          }
+        }
+      }
+    },
+    "/onboard/postgres" : {
+      "post" : {
+        "tags" : [
+          "datasets"
+        ],
+        "summary" : "Add data, Choose a table: copy a Postgres table or query into a draft",
+        "operationId" : "postOnboardPostgres",
+        "description" : "BASIC-ONBOARD-1 P3, every edition. Body {connection (as /onboard/postgres/test), schema + table | query, kind? (stream|reference)}. query must be one read-only SELECT or WITH statement. Copies the rows into Parquet in the draft area (a time-zoned timestamp as its UTC time; types without an import column type as text) and answers the same DRAFT as POST /onboard/files, plus snapshot:{source:postgres, connection (password as its reference), schema, table | query}. Commit with POST /onboard/files/{draftId}/commit: it also writes imports/<id>_snapshot.toon, and Run now (POST /datasets/{id}/run) copies the table again as a replace-everything arrival. Gates as /onboard/postgres/test (the role check runs on every copy, Run now included), then 422 a malformed table/query, an empty result; 413 more rows than import.max_rows.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped draft."
+          }
+        }
+      }
+    },
     "/onboarding/metrics" : {
       "get" : {
         "summary" : "What the onboarding counters say (LA-ONBOARD-1 OB-13)",

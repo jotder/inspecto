@@ -99,6 +99,8 @@ export interface OnboardDraft {
     limits: DraftLimits;
     /** The follow-on steps the installed applications registered (BASIC-ONBOARD-1 P1); empty: the import ends at Parquet. */
     followOns?: ImportFollowOnInfo[];
+    /** A draft copied from Postgres (BASIC-ONBOARD-1 P3): where from. The password is its `${ENV:…}` reference, never the value. */
+    snapshot?: PostgresSnapshotSource;
 }
 
 /** One application's follow-on step, as the draft lists it: its summary key, what it does, the entry keys it needs. */
@@ -116,6 +118,41 @@ export function followOnClause(followOns: ImportFollowOnInfo[] | undefined, hasL
     const met = (followOns ?? []).filter((f) => f.needs.every((n) => n === 'defaultLinkMapping' && hasLink));
     return met.map((f) => `, and ${f.does}`).join('');
 }
+
+/** Where to connect: the password is a `${ENV:NAME}` reference to the server's environment, never the password itself. */
+export interface PostgresConnection {
+    host: string;
+    port: number;
+    database: string;
+    user: string;
+    password: string;
+}
+
+/** What the connection test answers: the login, and the tables it may read (at most 500). */
+export interface PostgresTest {
+    connected: boolean;
+    user: string;
+    readOnly: boolean;
+    tables: { schema: string; table: string; view: boolean }[];
+    truncated: boolean;
+}
+
+/** A table, or one read-only `SELECT`. */
+export type PostgresPick = { schema: string; table: string } | { query: string };
+
+export type PostgresSnapshotSource = { source: 'postgres'; connection: PostgresConnection } & Partial<{
+    schema: string;
+    table: string;
+    query: string;
+}>;
+
+/** The import Dataset is a Postgres snapshot (its `importSource`). */
+export function isSnapshot(d: { importSource?: string }): boolean {
+    return d.importSource === 'postgres';
+}
+
+/** The `${ENV:INSPECTO_PG_…}` form the server accepts for the password: only a variable an administrator named for it. */
+export const PASSWORD_REFERENCE = /^\$\{ENV:INSPECTO_PG_[A-Z0-9_]{1,100}\}$/;
 
 /** The format choices a re-draft states (`?delimiter=&header=&quote=`). */
 export interface FormatOverrides {
@@ -259,6 +296,8 @@ export interface ImportDataset {
     description?: string;
     primaryEntityType?: string | null;
     importPipeline?: string;
+    /** `postgres` when Add data copies it from a Postgres table (BASIC-ONBOARD-1 P3); absent for files. */
+    importSource?: string;
 }
 
 // ── Words ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -754,7 +793,7 @@ export const SELF_IMPORT_OFF =
 export const NO_UPLOAD_RIGHT = 'Adding data needs the right to upload data in this Space - ask an administrator';
 /** Fallbacks until `DATA-TIERS-1` phase 2 serves `featureReasons.remoteSystems` / `pipelineAutomation`. */
 export const REMOTE_FALLBACK =
-    'Reading from a database or a remote system is available in Standard and above - this build (Basic) adds files';
+    'Reading from another database or a remote system is available in Standard and above - this build (Basic) adds files and copies Postgres tables';
 export const AUTOMATION_FALLBACK =
     'Keeping a Dataset up to date by itself is available in Standard and above - this build (Basic) runs an import when you add a file or press Run now';
 

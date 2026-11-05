@@ -320,6 +320,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/objects/([^/]+)/transition` | gated | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:85` |
 | POST | `/onboard/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:73` |
 | POST | `/onboard/files/([^/]+)/commit` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:74` |
+| POST | `/onboard/postgres` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:84` |
+| POST | `/onboard/postgres/test` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:83` |
 | POST | `/onboarding/events` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java:40` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:43` |
 | POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:74` |

@@ -52,6 +52,7 @@ import {
     ImportSummary,
     OnboardDraft,
     PendingChoice,
+    PostgresSnapshotSource,
     READ_FORMATS,
     RolesState,
     TYPE_LABELS,
@@ -78,6 +79,7 @@ import {
 } from './add-data.model';
 import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '../api/column-roles';
 import { ImportDatasetCardComponent } from './import-dataset-card.component';
+import { PostgresTableComponent } from './postgres-table.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
 type ColumnGroup = FormGroup<{
@@ -95,7 +97,8 @@ const NONE = '';
  * **Add data** - the ONE screen both apps use to **Onboard a file** (LA-ONBOARD-1 phase 4, OF-1; console
  * `ONBOARDING-FIRST-RUN-1` B1/C3). File first, on one screen:
  *
- * 1. **Drop or choose a file** - the formats and this Space's limits are shown before anything is sent; a database or a
+ * 1. **Choose the data** - drop or choose a file (the formats and this Space's limits are shown before anything is sent),
+ *    or choose a Postgres table ({@link PostgresTableComponent}, BASIC-ONBOARD-1 P3: every edition); another database or a
  *    remote system is shown locked on Basic (DT-4).
  * 2. **Check the columns** - every detected choice is pre-applied with its evidence; a low-confidence one is highlighted
  *    and needs a click (OF-2). Rename or leave out a column; a different separator, header line or quote re-reads the file.
@@ -128,6 +131,7 @@ const NONE = '';
         PenFieldComponent,
         DataTableComponent,
         ImportDatasetCardComponent,
+        PostgresTableComponent,
     ],
     host: { class: 'block' },
     templateUrl: './add-data.component.html',
@@ -155,6 +159,8 @@ export class AddDataComponent implements OnInit {
 
     // ── state ────────────────────────────────────────────────────────────────────────────────────────────────────────
     protected readonly kind = new FormControl<ImportKind>('stream', { nonNullable: true });
+    /** Where the data is: a file, or a Postgres table (BASIC-ONBOARD-1 P3). */
+    protected readonly origin = new FormControl<'file' | 'postgres'>('file', { nonNullable: true });
     protected readonly file = signal<File | null>(null);
     protected readonly draft = signal<OnboardDraft | null>(null);
     protected readonly reading = signal(false);
@@ -423,6 +429,7 @@ export class AddDataComponent implements OnInit {
             id: s.dataset,
             kind: s.kind,
             importPipeline: s.pipeline,
+            importSource: this.draft()?.snapshot?.source,
             description: this.form.controls.description.value || undefined,
             primaryEntityType: this.form.controls.primary.value || null,
         };
@@ -514,6 +521,18 @@ export class AddDataComponent implements OnInit {
                         );
                 },
             });
+    }
+
+    /** The rows of a Postgres table were copied: review them as a file's. */
+    protected adoptSnapshot(d: OnboardDraft): void {
+        this.error.set('');
+        this.unavailable.set('');
+        this.adopt(d);
+    }
+
+    /** `database.schema.table`, or `database (query)`. */
+    protected snapshotName(s: PostgresSnapshotSource): string {
+        return s.table ? `${s.connection.database}.${s.schema}.${s.table}` : `${s.connection.database} (query)`;
     }
 
     private adopt(d: OnboardDraft): void {

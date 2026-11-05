@@ -47,6 +47,8 @@ export interface DataEntry {
     basedOn: string | null;
     physicalRef: string;
     importPipeline: string | null;
+    /** `postgres` for a Postgres snapshot (BASIC-ONBOARD-1 P3); null for files. */
+    importSource: string | null;
     columns: DataColumn[];
     mapping: LinkMapping | null;
     eventDate: string | null;
@@ -126,6 +128,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
         basedOn: str(c['basedOn']),
         physicalRef: str(c['physicalRef']) ?? '',
         importPipeline: str(c['importPipeline']),
+        importSource: str(c['importSource']),
         columns,
         mapping,
         eventDate: str(c['eventDate']),
