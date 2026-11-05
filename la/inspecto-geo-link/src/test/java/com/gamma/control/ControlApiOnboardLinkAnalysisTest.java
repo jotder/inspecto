@@ -220,8 +220,9 @@ class ControlApiOnboardLinkAnalysisTest {
             long entities = first.get("nodes").asLong();
             assertTrue(entities > 0 && entities <= 42, "at most the 42 accounts the fixture names: " + first);
 
+            // the same rows in other bytes (CRLF): the same bytes again would be refused as already imported (D-3)
             JsonNode app = data(send(c, "POST", "/datasets/" + id + "/files?name=again.csv&mode=append",
-                    transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+                    transfers(200).replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8)), 200);
             assertEquals(400, app.get("rowsAfter").asLong(), app.toString());
             JsonNode ix = app.get("index");
             assertEquals("BUILT", ix.get("result").asText(), ix.toString());
@@ -283,8 +284,9 @@ class ControlApiOnboardLinkAnalysisTest {
         long edges = first.get("edges").asLong();
         for (int i = 1; i <= appends; i++) {
             t = System.nanoTime();
+            // each part its own ids, so no part is the same bytes as another (refused as already imported, D-3)
             JsonNode ix = data(send(c, "POST", "/datasets/" + id + "/files?name=part" + i + ".csv&mode=append",
-                    transfers(appendRows).getBytes(StandardCharsets.UTF_8)), 200).get("index");
+                    transfers(appendRows).replace("\nT", "\nP" + i + "T").getBytes(StandardCharsets.UTF_8)), 200).get("index");
             ms[i] = (System.nanoTime() - t) / 1_000_000;
             assertEquals("BUILT", ix.get("result").asText(), ix.toString());
             assertEquals("append", ix.get("mode").asText(), "an append is indexed as an append, not rebuilt: " + ix);

@@ -25,7 +25,15 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { LockedActionComponent } from '@inspecto/core/components/locked-action.component';
 import { AddDataAccess } from './add-data-access';
-import { Arrival, Arrivals, ImportDataset, ImportSummary, arrivalLine, fileProblem } from './add-data.model';
+import {
+    AddFileMode,
+    Arrival,
+    Arrivals,
+    ImportDataset,
+    ImportSummary,
+    arrivalLine,
+    fileProblem,
+} from './add-data.model';
 import { DataStatusComponent } from './data-status.component';
 import { ImportSummaryComponent } from './import-summary.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
@@ -118,6 +126,11 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 >
                     <mat-radio-button value="replace">A new file replaces the data</mat-radio-button>
                     <mat-radio-button value="append">A new file adds its rows</mat-radio-button>
+                    @if (arrivalsAnswer()?.eventDateColumn) {
+                        <mat-radio-button value="period" data-testid="add-file-period"
+                            >A new file replaces the days it covers</mat-radio-button
+                        >
+                    }
                 </mat-radio-group>
             }
             <div class="flex flex-wrap items-center gap-2">
@@ -211,7 +224,7 @@ export class ImportDatasetCardComponent {
     readonly imported = output<ImportSummary>();
 
     protected readonly titleId = `inspecto-import-card-${ImportDatasetCardComponent.nextId++}`;
-    protected readonly mode = new FormControl<'replace' | 'append'>('replace', { nonNullable: true });
+    protected readonly mode = new FormControl<AddFileMode>('replace', { nonNullable: true });
     protected readonly last = signal<ImportSummary | null>(null);
     protected readonly busy = signal(false);
     protected readonly following = signal(false);

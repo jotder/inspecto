@@ -75,7 +75,7 @@ foreign process** (a folder or SFTP the Space watches or is told to check).
 |---|---|---|---|
 | **P0 verify** | V1 Run now takes foreign files from the inbox; V2 same upload twice = double rows; V3 Dataset Parquet compaction; V4 index build per append on Basic (cost at 10 M rows) | 1 day, tests only | - |
 | **P1 Arrival ledger + Data status** | ledger rows written by `OnboardImport` and by Collector-fed runs (one writer: the run summary); event min/max computed from the kept Parquet; `GET /datasets/{id}/arrivals`; UI: arrival history on the Dataset card, the three-clock *Data status* line; GLOSSARY entries | backend M, UI M | **all editions** (it is the Explorer's own data, not Investigation data) |
-| **P2 Incremental semantics** | *Replace the period*; duplicate-file refusal on upload (sha256); schema-drift policy (new column: kept as detail, missing column: rows rejected with a named reason) and its message | backend M, UI S | all |
+| **P2 Incremental semantics** | *Replace the period*; duplicate-file refusal on upload (sha256); schema-drift policy (D-6, operator 2026-11-05: checked by column name before anything lands - a missing or moved column refuses the file naming it, a new column is accepted, not kept, and named; keeping new columns as details is a later row) and its message | backend M, UI S | all |
 | **P3 System-fed files** | Standard: *Keep this up to date* creates the watched folder / SFTP feed on the existing import Pipeline with safe defaults (stability gate, ready marker optional, checksum duplicate policy, quarantine), index Job in append mode. Basic: per D-1 | M | Standard+ automatic; Basic per D-1 |
 | **P4 Storage hygiene** | Dataset Parquet compaction and retention (keep N days / N arrivals), surfaced as one line in Data status | M | per D-5 |
 
@@ -170,6 +170,48 @@ origin, logical_name`. So the arrival list is a **read** over that ledger, not a
 - **D-3 Duplicates: file-level (sha256) now.** Row keys (upsert) only together with SCD2 (D-ING4, still deferred).
 - **D-4 Arrival history: keep every ledger row** (small); the data files follow D-5.
 - **D-5 Compaction in every edition** (it is read correctness); a **retention policy Standard+**.
+- **D-6 Schema drift (operator 2026-11-05, option A):** a later file is judged by its column NAMES before anything lands
+  (Add a file, and every file Run now finds waiting). A missing column, or a column at another position (delimited text is
+  read by position), refuses the file and names each one; Run now moves a refused waiting file to `<id>/refused/` and records
+  it as a refused arrival with the reason. A new column is accepted, not kept, and named in the result and the arrival.
+  Keeping new columns as details (schema evolution, union-by-name reads) is `LA-ARRIVAL-NEW-COLUMNS-1` on the board.
+  *(Replaces §5 P2's first wording "new column kept as detail, missing column: rows rejected".)*
+
+## 5d. P2 as built (2026-11-05, `LA-ARRIVAL-MODES-1`)
+
+- **Replace the period it covers** - `POST /datasets/{id}/files?mode=period` (`OnboardImport.addFile`,
+  `DatasetPeriod`): the file's rows are ADDED as in append, then every older Parquet file of the Dataset loses its rows on
+  the calendar days (`CAST(<eventDate> AS DATE)`, the stored value, no zone shift) the upload's own output holds; a row
+  with no event date is never removed; a file left empty is removed. Each touched file is rewritten beside itself and its
+  original kept in `<id>/database.period-<stamp>/` until the import succeeded (undo puts them back). Refused (422) with no
+  When column (`eventDate`) and on a Reference. The answer carries `period {days, from, to, rowsReplaced,
+  filesRewritten}`; `lastImport.mode` and the arrival say `period`. Rewritten inputs make the next index build `full`.
+  The card offers *A new file replaces the days it covers* only when the arrivals answer names a When column.
+- **The same file again (D-3)** - Add a file in append or period mode whose bytes' sha256 match an earlier upload whose rows
+  the Dataset still holds (no later *Replace everything* in between, `DatasetArrivals.alreadyImported`) answers **409**
+  "already imported on <date> as '<name>' … replace everything". Replace everything may always reload a file. The hash is
+  of the bytes as uploaded. Folder drops follow the import Pipeline's duplicate policy (same name skipped, §5c).
+- **Schema drift (D-6)** - `OnboardImport.checkColumns`: delimited text with a header is compared by the column name at
+  each position the import reads (an import with no header line is judged by its column count only); JSON, NDJSON and
+  Parquet by field name. New columns of delimited text always come after the read ones (a read column elsewhere is
+  refused), and the engine sets aside rows with more fields than it reads, so the file is rewritten in place with the
+  read columns only (`keepReadColumns`, DuckDB read/write, values as text) before it lands. Run now judges every waiting
+  file the same way first (`judgeInbox`), and so does Add a file for the drops its run will take; the answer's `refused
+  [{file, reason, setAside}]` names each, and `GET /datasets/{id}/arrivals` lists it with `status: REFUSED`, `reason`,
+  `setAside` (from its sidecar line - it never reached the ledger). A refused arrival is left out of *Data status*.
+- **Review 2026-11-05, fixed:** the read columns are selected by the file's own header text (a header that needs cleaning
+  up, `Transfer ID`, answered 500); a failed period step now also removes the UPLOAD's own rows (no day left doubled;
+a drop the same run took keeps its rows, and once the import succeeded the undo does nothing - pinned in
+`#aFileReplacesExactlyTheDaysItCovers`);
+  the period rewrite's temp file is never left behind and is not named `*.parquet`; Run now judges files in inbox
+  sub-folders too (the import's pattern is `**/*.<ext>`). **Accepted, recorded:** (a) the delimiter and quote of a later
+  file are detected again rather than read from the import Pipeline (the first import was detected the same way); (b) no
+  stability gate before judging a waiting file - Run now is a person's gesture and the run itself takes the file as it
+  is; a file still being written may be judged (or refused) half-written.
+- Tests: `ControlApiOnboardFilesTest#aFileReplacesExactlyTheDaysItCovers`, `#theSameFileAddedAgainIsRefusedUntilEverythingIsReplaced`,
+  `#aLaterFileIsJudgedByItsColumnNames` (mutation-checked: accepting a moved column loads the swapped file, 20 rows, into
+  the wrong columns and fails it); the card spec (period offered with a When column, sent as `mode=period`, the result
+  words) and the arrival / status wording.
 
 ## 7. Done means
 
