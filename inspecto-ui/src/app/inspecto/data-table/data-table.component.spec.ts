@@ -548,6 +548,22 @@ describe('DataTableComponent', () => {
         expect(f.componentInstance.suppressHScroll()).toBe(true);
     });
 
+    it('registers every module the shared table binds (no ag-Grid error #200, e.g. Locale for localeText)', async () => {
+        const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        try {
+            await create('standard');
+            const missing = [...err.mock.calls, ...warn.mock.calls]
+                .flat()
+                .map(String)
+                .filter((m) => /#200|moduleName=/.test(m));
+            expect(missing).toEqual([]);
+        } finally {
+            err.mockRestore();
+            warn.mockRestore();
+        }
+    });
+
     describe('sizing + pagination', () => {
         const grid = (f: { debugElement: import('@angular/core').DebugElement }) =>
             f.debugElement.query(By.directive(AgGridAngular));

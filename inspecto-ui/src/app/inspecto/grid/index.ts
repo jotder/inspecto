@@ -15,6 +15,7 @@ import {
     createPart,
     GridApi,
     ICellRendererParams,
+    LocaleModule,
     ModuleRegistry,
     PaginationModule,
     QuickFilterModule,
@@ -63,6 +64,9 @@ ModuleRegistry.registerModules([
     CellStyleModule,
     // getRowClass on <inspecto-data-table> (every shared table binds it) needs RowStyleModule (ag-Grid error 200 without it).
     RowStyleModule,
+    // `[localeText]` on <inspecto-data-table> (every shared table binds it) needs LocaleModule (ag-Grid error 200
+    // `moduleName=Locale&reasonOrId=localeText` without it - LA Data's Discover and the canvas dock grids, 2026-11-05).
+    LocaleModule,
     ...(isDevMode() ? [ValidationModule] : []),
 ]);
 
