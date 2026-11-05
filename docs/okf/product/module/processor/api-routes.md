@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-367 route(s) registered; 367 in the OpenAPI contract, 0 not.
+368 route(s) registered; 368 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -146,6 +146,7 @@ tags: [api, routes, generated]
 | GET | `/datasets/{datasetId}/arrivals` | GET /datasets/{datasetId}/arrivals (generated skeleton) | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | PUT | `/datasets/{datasetId}/columns/{columnId}` | Change which Entity Type one Dataset column holds | datasets | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | POST | `/datasets/{datasetId}/compact` | POST /datasets/{datasetId}/compact (generated skeleton) | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java` |
+| GET | `/datasets/{datasetId}/coverage` | GET /datasets/{datasetId}/coverage | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | DELETE | `/datasets/{datasetId}/feed` | DELETE /datasets/{datasetId}/feed (generated skeleton) | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java` |
 | GET | `/datasets/{datasetId}/feed` | GET /datasets/{datasetId}/feed (generated skeleton) | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java` |
 | PUT | `/datasets/{datasetId}/feed` | PUT /datasets/{datasetId}/feed (generated skeleton) | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java` |

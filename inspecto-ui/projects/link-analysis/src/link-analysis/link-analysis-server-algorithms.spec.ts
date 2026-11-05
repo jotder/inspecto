@@ -163,6 +163,7 @@ function makeWith(run: ReturnType<typeof vi.fn>) {
                 columns: [],
                 truncated: false,
                 unresolved: 0,
+                maskedColumns: [],
                 masked: true,
             }),
         ),

@@ -305,9 +305,27 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
     });
 
     it('a Reference is always replaced (no mode choice)', () => {
-        const { el } = create({ kind: 'reference' });
+        const { fixture, el } = create({ kind: 'reference' });
         expect(q(el, 'add-file-mode')).toBeNull();
         expect(el.textContent).toContain('Details about entities');
+        // LA-REFERENCE-DETAILS-MORE-1: a Reference's card says how many of its entities the other data holds
+        http.expectOne(apiUrl('/datasets/accounts/coverage')).flush({
+            dataset: 'accounts',
+            entityType: 'account',
+            entityTypeLabel: 'Account',
+            identifyingColumn: 'account_id',
+            described: 312,
+            datasets: [{ dataset: 'transfers', columns: ['to_account'], appear: 295, absent: 17 }],
+            truncated: false,
+        });
+        fixture.detectChanges();
+        expect(q(el, 'reference-coverage')!.textContent).toContain('295 appear in transfers; 17 do not.');
+    });
+
+    it('an events Dataset reads no coverage', () => {
+        const { el } = create();
+        http.expectNone(apiUrl('/datasets/transfers/coverage'));
+        expect(q(el, 'reference-coverage')).toBeNull();
     });
 
     it('Run now: a 202 is followed; a refusal is said in plain words', () => {

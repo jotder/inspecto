@@ -5,11 +5,17 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { NODE_RULE_OPS, NodeRule, NodeRuleOp, describeNodeRule } from '@inspecto/core/graph';
+import type { NodeReference } from './reference-details';
+
+/** The attribute picker's value for a Reference detail: `ref:<index in references>:<column>` (a node attribute is its key). */
+const REF_PREFIX = 'ref:';
 
 /**
  * **Conditional formatting** editor for the canvas Display menu: an ordered list of rules (an attribute predicate →
  * a node colour, first match wins) plus the form that adds one. Presentational — the host owns the rules signal,
  * the undo history and the saved view; this only emits the next list. The colours are the shared chart-token swatches.
+ * LA-REFERENCE-DETAILS-MORE-1: the attribute picker also lists the detail columns of each Reference describing a drawn
+ * Entity Type (*Details in …*); such a rule carries `reference` and the host reads the values (masked) for it.
  */
 @Component({
     selector: 'inspecto-link-analysis-display-rules',
@@ -37,7 +43,10 @@ import { NODE_RULE_OPS, NodeRule, NodeRuleOp, describeNodeRule } from '@inspecto
                 No display rules yet. Add one to colour nodes by an attribute.
             </span>
         }
-        @if (attributes().length === 0) {
+        @if (note(); as n) {
+            <span class="text-secondary text-xs" data-testid="la-rule-reference-note">{{ n }}</span>
+        }
+        @if (attributes().length === 0 && referenceColumns().length === 0) {
             <span class="text-secondary text-xs">The loaded nodes carry no attributes to build a rule on.</span>
         } @else {
             <form [formGroup]="form" (ngSubmit)="add()" class="flex flex-col gap-1">
@@ -54,6 +63,15 @@ import { NODE_RULE_OPS, NodeRule, NodeRuleOp, describeNodeRule } from '@inspecto
                         <option value="" disabled>attribute</option>
                         @for (a of attributes(); track a) {
                             <option [value]="a">{{ a }}</option>
+                        }
+                        @for (r of references(); track r.dataset; let i = $index) {
+                            @if (r.columns.length) {
+                                <optgroup [label]="'Details in ' + r.name">
+                                    @for (c of r.columns; track c) {
+                                        <option [value]="refValue(i, c)">{{ c }}</option>
+                                    }
+                                </optgroup>
+                            }
                         }
                     </select>
                     <label class="sr-only" for="la-rule-op">Comparison</label>
@@ -94,6 +112,10 @@ export class LinkAnalysisDisplayRulesComponent {
     readonly rules = input<readonly NodeRule[]>([]);
     /** The node `attrs` keys present in the loaded graph. */
     readonly attributes = input<readonly string[]>([]);
+    /** The References describing a drawn Entity Type: their detail columns are offered too. */
+    readonly references = input<readonly NodeReference[]>([]);
+    /** Why some node a Reference rule names stays uncoloured (the host's read), or null. */
+    readonly note = input<string | null>(null);
     readonly kinds = input<readonly string[]>([]);
     readonly swatches = input<readonly string[]>([]);
     readonly rulesChange = output<NodeRule[]>();
@@ -111,10 +133,32 @@ export class LinkAnalysisDisplayRulesComponent {
         return describeNodeRule(r);
     }
 
+    /** Every Reference detail column offered (none when no drawn Entity Type has a Reference). */
+    referenceColumns(): string[] {
+        return this.references().flatMap((r) => r.columns);
+    }
+
+    refValue(index: number, column: string): string {
+        return `${REF_PREFIX}${index}:${column}`;
+    }
+
     add(): void {
         if (this.form.invalid) return;
-        const { kind, attr, op, value, color } = this.form.getRawValue();
-        this.rulesChange.emit([...this.rules(), { ...(kind ? { kind } : {}), attr, op, value, color }]);
+        const { kind, attr: picked, op, value, color } = this.form.getRawValue();
+        let attr = picked;
+        let reference: string | undefined;
+        if (picked.startsWith(REF_PREFIX)) {
+            const rest = picked.slice(REF_PREFIX.length);
+            const at = rest.indexOf(':');
+            const ref = this.references()[Number(rest.slice(0, at))];
+            if (!ref) return;
+            reference = ref.dataset;
+            attr = rest.slice(at + 1);
+        }
+        this.rulesChange.emit([
+            ...this.rules(),
+            { ...(kind ? { kind } : {}), ...(reference ? { reference } : {}), attr, op, value, color },
+        ]);
         this.form.patchValue({ value: '' });
     }
 

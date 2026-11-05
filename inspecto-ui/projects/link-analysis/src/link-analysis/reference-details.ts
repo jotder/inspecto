@@ -82,3 +82,33 @@ export function nodesNotMatching(
         })
         .map((n) => n.id);
 }
+
+/** The prefix of a masked value (an exploration alias, `MaskTokens.TOKEN_PREFIX`). */
+const MASKED_PREFIX = 'masked:';
+
+/**
+ * LA-REFERENCE-DETAILS-MORE-1: the drawn nodes' detail values in a Reference, for colouring them: node id → column → value.
+ * A node the Reference has no row for gets no entry (it stays uncoloured). The key column, a column the server masked
+ * (`maskedColumns`, any case) and any masked value are left out, so no node is ever coloured by a masked value. Pure.
+ */
+export function detailValuesByNode(
+    nodes: readonly DrawnNode[],
+    byKey: ReadonlyMap<string, Record<string, unknown>>,
+    keyCol: string,
+    maskedColumns: readonly string[],
+): Record<string, Record<string, string>> {
+    const masked = new Set([keyCol, ...maskedColumns].map((c) => c.toLowerCase()));
+    const out: Record<string, Record<string, string>> = {};
+    for (const n of nodes) {
+        const row = byKey.get(n.key);
+        if (!row) continue;
+        const values: Record<string, string> = {};
+        for (const [col, v] of Object.entries(row)) {
+            if (masked.has(col.toLowerCase()) || v === null || v === undefined) continue;
+            const text = String(v);
+            if (!text.startsWith(MASKED_PREFIX)) values[col] = text;
+        }
+        out[n.id] = values;
+    }
+    return out;
+}

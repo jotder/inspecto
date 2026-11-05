@@ -449,6 +449,36 @@ node of its type keeps its *Show all*. No
 join builds data (DT-6). Tests: `reference-details.spec`, `link-analysis-reference-filter.component.spec`,
 `node-insight.component.spec` (Details), `link-analysis.component.spec` (*Filter by details*).
 
+**Colour by a Reference detail, and the coverage line (`LA-REFERENCE-DETAILS-MORE-1`, 2026-11-06; every edition).**
+*Colour:* `NodeRule` gained `reference?` (the Reference's Dataset id). A rule with it reads `attr` from
+`GraphDisplayOptions.referenceDetails` (Reference → node id → column → value), never from the node's `attrs`.
+`nodeRuleMatches` never matches a value starting `masked:` (`MaskTokens.TOKEN_PREFIX`). The host's
+`referenceDetailsWanted` (the References a rule names among `drawnReferences`, with every drawn node of their Entity Type,
+hidden nodes included, so a hide does not re-read) drives one effect. `loadReferenceDetails` runs `NodeRiskService.lookup`
+(chunked `POST /inv/reference-rows`; a newer read wins), and `detailValuesByNode` keeps only unmasked values: it drops the
+key column, every `masking.maskedColumns` entry (any case; `ReferenceTable` gained `maskedColumns`) and every `masked:`
+value. A node without a row gets no entry and stays uncoloured. `referenceDetails` sits in `displayOptions` only, never
+`chosenDisplay`, so a saved view keeps the rule but not the values. `referenceDetailsNote` lists unreadable or truncated
+reads and masked details. The rule works in the explorer only, like *Filter by details* (an Investigation has no
+`drawnReferences`).
+*Coverage:* `GET /datasets/{id}/coverage` (`DatasetCoverage`, core `DatasetRoutes`; read gate = the Dataset's view
+permission, as `/arrivals`; 503 without a write root, 400 for a bad id, 404 for an unknown or unviewable id) answers
+`{dataset, entityType, entityTypeLabel?, identifyingColumn, described, datasets:[{dataset, columns, appear, absent}],
+truncated, reason?}`. `described` counts the distinct trimmed keys of the identifying column. Each other viewable,
+non-Reference Dataset contributes the columns whose `classification` resolves to the Entity Type
+(`OnboardMatches.typeOf`), and `appear` counts the described keys found in any of them. The read is bounded at
+`MAX_SCAN_ROWS` = 1,000,000 rows per Dataset and `MAX_DATASETS` = 20 Datasets; `truncated` says when a cap was hit. The
+answer holds counts only. **Decision (2026-11-06):** the counts are answered under every masking mode. Both sides are
+whole registered Datasets the caller can already view, and no caller-chosen value enters the query, so the counts are no
+membership oracle. Add data's `matches`, whose file values the caller chooses, still skip masked columns. Keys compare
+as trimmed text, without the Entity Type normaliser, the same as `matches`. The UI is
+`<inspecto-la-reference-coverage>` on the shared import card for a `kind: reference` Dataset, so it shows on Add data's
+result, the console Dataset page and the Link Analysis Data page. It re-reads whenever the card's arrivals change and
+shows nothing when the read fails. Tests: `ControlApiDatasetCoverageTest` (a synthetic pair: 40 described, 20 appear, 20
+absent, no key in the body; the bounded scan), `node-rules.spec`, `reference-details.spec`,
+`link-analysis-display-rules.component.spec`, `link-analysis.component.spec` (the batched masked read),
+`reference-coverage.component.spec`, `import-dataset-card.component.spec`. All are mutation-checked.
+
 **Case history (`POST /inv/case-history`, 2026-10-11).** Body `{key, investigationId?, status?, limit?}` →
 `{entityType, resolved, reason?, objects, total, truncated, masking{mode, masked}}`. The node dialog's Case history for a
 key it holds only as an alias (`GET /objects/by-entity` needs the raw id). The key resolves with the reference-rows rules:

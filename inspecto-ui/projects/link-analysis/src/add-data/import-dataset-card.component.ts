@@ -40,6 +40,7 @@ import { DataStatusComponent } from './data-status.component';
 import { ImportSummaryComponent } from './import-summary.component';
 import { DatasetFeedComponent } from './dataset-feed.component';
 import { DatasetStorageComponent } from './dataset-storage.component';
+import { ReferenceCoverageComponent } from './reference-coverage.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
 /**
@@ -71,6 +72,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         DataStatusComponent,
         DatasetFeedComponent,
         DatasetStorageComponent,
+        ReferenceCoverageComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -94,6 +96,9 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             }
             <ng-content select="[cardSummary]"></ng-content>
             <inspecto-la-data-status [arrivals]="arrivalsAnswer()"></inspecto-la-data-status>
+            @if (dataset().kind === 'reference') {
+                <inspecto-la-reference-coverage [dataset]="dataset().id" [refresh]="arrivalsAnswer()" />
+            }
             @if (last(); as s) {
                 <div class="flex flex-col gap-1">
                     <h4 class="m-0 text-sm font-semibold">Last import</h4>

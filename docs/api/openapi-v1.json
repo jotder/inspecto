@@ -12511,6 +12511,27 @@
         "x-generated" : true
       }
     },
+    "/datasets/{datasetId}/coverage" : {
+      "get" : {
+        "tags" : [ "datasets" ],
+        "summary" : "GET /datasets/{datasetId}/coverage",
+        "operationId" : "getDatasetsByDatasetIdCoverage",
+        "description" : "LA-REFERENCE-DETAILS-MORE-1: how many of a Reference's entities appear in the Datasets that hold its Entity Type - counts only, no value. {dataset, entityType, entityTypeLabel?, identifyingColumn, described, datasets:[{dataset, columns, appear, absent}], truncated, reason?}. Read gate only (the Dataset's view permission); unknown or shared-away 404; a Dataset that is not a Reference answers 200 with a reason.",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
     "/datasets/{datasetId}/feed" : {
       "get" : {
         "tags" : [ "datasets" ],

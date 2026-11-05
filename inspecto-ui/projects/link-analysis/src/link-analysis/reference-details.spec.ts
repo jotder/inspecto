@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
-import { detailContains, detailLines, nodeReferences, nodesNotMatching, referencesFor } from './reference-details';
+import {
+    detailContains,
+    detailLines,
+    detailValuesByNode,
+    nodeReferences,
+    nodesNotMatching,
+    referencesFor,
+} from './reference-details';
 
 /** stores: an Add data Reference of stores; sales: an ordinary Dataset; half: a Reference with no identifying column. */
 const stores: LaDataset = {
@@ -53,5 +60,31 @@ describe('reference-details (ONBOARDING-FIRST-RUN-1 C6a step 4)', () => {
         expect(nodesNotMatching(nodes, rows, 'region', 'north')).toEqual(['n2', 'n3']);
         // a cut read: a node with no row may lie beyond the cut, so it stays
         expect(nodesNotMatching(nodes, rows, 'region', 'north', false)).toEqual(['n2']);
+    });
+
+    describe('detailValuesByNode (LA-REFERENCE-DETAILS-MORE-1)', () => {
+        const nodes = [
+            { id: 'n-1', key: 'S1' },
+            { id: 'n-2', key: 'S2' },
+            { id: 'n-3', key: 'S3' },
+        ];
+        const byKey = new Map<string, Record<string, unknown>>([
+            ['S1', { store_id: 'S1', region: 'north', owner: 'masked:9f', size: 3, note: null }],
+            ['S2', { store_id: 'masked:k2', region: 'masked:r2', owner: 'Owner 2', size: 7 }],
+        ]);
+
+        it('gives each node with a row its values, the key column left out; a node without a row gets none', () => {
+            const out = detailValuesByNode(nodes, byKey, 'store_id', []);
+            expect(out['n-1']).toEqual({ region: 'north', size: '3' });
+            expect('n-3' in out).toBe(false);
+        });
+
+        it('leaves out every masked value and every column the server masked (any case)', () => {
+            const out = detailValuesByNode(nodes, byKey, 'store_id', ['OWNER']);
+            expect(out['n-1']).toEqual({ region: 'north', size: '3' });
+            expect(out['n-2']).toEqual({ size: '7' }); // region was masked:, owner is a masked column
+            expect(JSON.stringify(out)).not.toContain('masked:');
+            expect(JSON.stringify(out)).not.toContain('Owner 2');
+        });
     });
 });
