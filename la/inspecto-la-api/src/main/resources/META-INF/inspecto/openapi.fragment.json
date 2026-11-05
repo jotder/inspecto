@@ -1781,6 +1781,35 @@
         "x-optional-module" : true
       }
     },
+    "/inv/datasets/{datasetId}/shapes" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "Which Entity Types' value shapes each column of one Dataset fits",
+        "operationId" : "getInvDatasetShapes",
+        "description" : "ENTITY-TYPE-RECORD-ROLES-1 (Basic and up). {dataset, sampled, columns {<column>: [{type, strong}]}}: the Entity Types whose value shape every non-empty value of the column fits, over the first 200 rows read unmasked on the server; strong when every value fits the narrow reading. Marks only, never a value. Feeds the Data page's Shape matches marks. Gated by the geoLink feature, a write root and R3 view access to the Dataset.",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The marks."
+          },
+          "404" : {
+            "description" : "No such Dataset, or not viewable by the caller (the same answer)."
+          },
+          "422" : {
+            "description" : "A Dataset that cannot be read."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/inv/entities/{entityType}/{entityKey}/summary" : {
       "get" : {
         "tags" : [ "inv" ],

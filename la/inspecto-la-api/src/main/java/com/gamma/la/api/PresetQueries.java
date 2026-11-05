@@ -390,7 +390,8 @@ final class PresetQueries {
 
     /**
      * The Dataset's columns by role. From, To, Kind and When come from its {@code defaultLinkMapping} when it states one
-     * (Add data and Mappings do); else From and To are its first two columns classified as an Entity Type and Kind a
+     * (Add data and Mappings do); else From and To are chosen by {@link #ends} among its columns classified as an Entity
+     * Type (its record type's parties, else two of one Entity Type, else the first two) and Kind a
      * column named {@code kind} or {@code *_kind}. When (if not mapped) is the {@code eventDate}, else the first date
      * or timestamp column; Amount is the mapping's {@code amount}, else the first number column whose name the Industry
      * pack hints ({@code measure_hints}).
@@ -400,6 +401,12 @@ final class PresetQueries {
      */
     static Roles roles(Map<String, Object> dataset, List<DatasetProvider.Column> columns, List<EntityTypes.EntityType> types,
                        IndustryPack pack) {
+        return roles(dataset, columns, types, pack, pack == null ? List.of() : pack.recordTypes());
+    }
+
+    /** As {@link #roles(Map, List, List, IndustryPack)}, reading the Dataset's record type among {@code recordTypes}. */
+    static Roles roles(Map<String, Object> dataset, List<DatasetProvider.Column> columns, List<EntityTypes.EntityType> types,
+                       IndustryPack pack, List<IndustryPack.RecordType> recordTypes) {
         Map<String, String> real = new LinkedHashMap<>();   // lower-case name -> the relation's own spelling
         Map<String, String> type = new LinkedHashMap<>();   // the relation's spelling -> coarse type
         for (DatasetProvider.Column c : columns)
@@ -429,13 +436,14 @@ final class PresetQueries {
             amount = col(real, m.get("primaryMeasure") != null ? m.get("primaryMeasure") : m.get("amount"));   // P0: before any pack hint
         }
         if (from == null || to == null) {
-            List<String> classified = new ArrayList<>();
+            Map<String, String> classified = new LinkedHashMap<>();   // the relation's spelling -> the Entity Type id it holds
             if (dataset.get("columns") instanceof List<?> cols)
                 for (Object o : cols)
                     if (o instanceof Map<?, ?> c && col(real, c.get("name")) != null && c.get("classification") instanceof String k
-                            && claimed(k, types)) classified.add(col(real, c.get("name")));
-            from = classified.size() >= 2 ? classified.get(0) : null;
-            to = classified.size() >= 2 ? classified.get(1) : null;
+                            && typeClaiming(k, types) != null) classified.put(col(real, c.get("name")), typeClaiming(k, types));
+            String[] ends = ends(classified, recordType(dataset, recordTypes));
+            from = ends[0];
+            to = ends[1];
         }
         if (kind == null)
             for (String n : type.keySet()) {
@@ -457,13 +465,50 @@ final class PresetQueries {
         return new Roles(from, to, kind, time, amount);
     }
 
+    /**
+     * From and To when no link mapping names them (LA-PRESET-ROLES-1), among the columns that hold an Entity Type:
+     * <ol>
+     *   <li>the Dataset's record type's parties - the first column its {@code from} hints name, then another its {@code to}
+     *       hints name (ENTITY-TYPE-RECORD-ROLES-1);</li>
+     *   <li>else the first two columns holding the SAME Entity Type, in column order (two numbers, not a number and its
+     *       SIM: a link joins two of one kind, as Add data proposes it);</li>
+     *   <li>else the first two.</li>
+     * </ol>
+     * {null, null} with fewer than two.
+     */
+    static String[] ends(Map<String, String> classified, IndustryPack.RecordType recordType) {
+        List<String> names = new ArrayList<>(classified.keySet());
+        if (names.size() < 2) return new String[] {null, null};
+        if (recordType != null) {
+            IndustryPack.RoleHints h = recordType.roleHints();
+            for (String f : names) {
+                if (IndustryPack.RoleHints.matching(h.from(), f) == null) continue;
+                for (String t : names)
+                    if (!t.equals(f) && IndustryPack.RoleHints.matching(h.to(), t) != null
+                            && IndustryPack.RoleHints.matching(h.from(), t) == null) return new String[] {f, t};
+            }
+        }
+        for (int i = 0; i < names.size(); i++)
+            for (int j = i + 1; j < names.size(); j++)
+                if (classified.get(names.get(i)).equals(classified.get(names.get(j)))) return new String[] {names.get(i), names.get(j)};
+        return new String[] {names.get(0), names.get(1)};
+    }
+
+    /** The record type the Dataset names ({@code recordType}) among those in force, or null. */
+    private static IndustryPack.RecordType recordType(Map<String, Object> dataset, List<IndustryPack.RecordType> recordTypes) {
+        if (!(dataset.get("recordType") instanceof String id)) return null;
+        for (IndustryPack.RecordType r : recordTypes) if (r.id().equals(id.trim())) return r;
+        return null;
+    }
+
     private static String col(Map<String, String> real, Object name) {
         return name instanceof String s ? real.get(s.trim().toLowerCase(Locale.ROOT)) : null;
     }
 
-    private static boolean claimed(String classification, List<EntityTypes.EntityType> types) {
+    /** The id of the Entity Type claiming {@code classification}, or null. */
+    private static String typeClaiming(String classification, List<EntityTypes.EntityType> types) {
         for (EntityTypes.EntityType t : types)
-            for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(classification.trim())) return true;
-        return false;
+            for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(classification.trim())) return t.id();
+        return null;
     }
 }

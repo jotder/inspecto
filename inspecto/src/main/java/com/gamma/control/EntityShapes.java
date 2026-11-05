@@ -5,6 +5,7 @@ import com.gamma.entitystore.IndustryPack;
 import com.gamma.entitystore.ValueShapes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -131,6 +132,60 @@ final class EntityShapes {
     }
 
     private static final Map<String, String> ROLE_WORDS = Map.of("dimension", "kind", "temporal", "time", "measure", "measure");
+
+    /**
+     * ENTITY-TYPE-RECORD-ROLES-1: the role the record type's hints give a column of {@code type} - its first Time, Measure or
+     * Category hint naming the column, in that order, whose role the type can hold (a Time is a DATE or TIMESTAMP, a Measure
+     * a DOUBLE or BIGINT, a Category neither a DOUBLE nor a date); null when none does. {@code [role, hint]}.
+     */
+    static String[] hintedRole(String column, String type, IndustryPack.RoleHints hints) {
+        String t = type == null ? "VARCHAR" : type.toUpperCase(Locale.ROOT);
+        boolean date = t.equals("DATE") || t.equals("TIMESTAMP");
+        String h;
+        if (date && (h = IndustryPack.RoleHints.matching(hints.time(), column)) != null) return new String[] {"temporal", h};
+        if ((t.equals("DOUBLE") || t.equals("BIGINT")) && (h = IndustryPack.RoleHints.matching(hints.measure(), column)) != null)
+            return new String[] {"measure", h};
+        if (!date && !t.equals("DOUBLE") && (h = IndustryPack.RoleHints.matching(hints.category(), column)) != null)
+            return new String[] {"dimension", h};
+        return null;
+    }
+
+    private static final Map<String, String> HINT_WORDS = Map.of("temporal", "Time", "measure", "Measure", "dimension", "Category");
+
+    /**
+     * ENTITY-TYPE-RECORD-ROLES-1: the draft's role proposals, with the proposed record type's usual roles applied. A column
+     * that holds an Entity Type, or is the link's kind, time or measure, keeps its role; any other column a hint names
+     * (with a type that can hold that role, {@link #hintedRole}) takes the hinted role, sure when the record type is,
+     * and remembers the role proposed without it ({@code base}) so the screen can undo it when another record type is
+     * picked. {@code entityTypes} is the block {@link #propose} answered, with its {@code recordType} set.
+     */
+    @SuppressWarnings("unchecked")
+    static void recordTypeRoles(Map<String, Object> entityTypes, List<Column> columns, List<IndustryPack.RecordType> recordTypes) {
+        if (!(entityTypes.get("recordType") instanceof Map<?, ?> rtChoice) || rtChoice.get("value") == null) return;
+        IndustryPack.RecordType rt = recordTypes.stream().filter(r -> r.id().equals(rtChoice.get("value"))).findFirst().orElse(null);
+        if (rt == null) return;
+        boolean sure = "high".equals(rtChoice.get("confidence"));
+        Set<Object> linkCols = new HashSet<>();
+        if (entityTypes.get("link") instanceof Map<?, ?> link)
+            for (String k : List.of("kind", "primaryTime", "primaryMeasure"))
+                if (link.get(k) instanceof Map<?, ?> ch && ch.get("value") != null) linkCols.add(ch.get("value"));
+        Map<String, Column> byName = new LinkedHashMap<>();
+        for (Column c : columns) byName.put(c.name(), c);
+        for (Object o : (List<Object>) entityTypes.getOrDefault("columns", List.of())) {
+            if (!(o instanceof Map<?, ?> raw)) continue;
+            Map<String, Object> row = (Map<String, Object>) raw;
+            Column c = byName.get(String.valueOf(row.get("column")));
+            Object current = row.get("role") instanceof Map<?, ?> r ? r.get("value") : null;
+            if (c == null || "entity".equals(current) || linkCols.contains(c.name())) continue;
+            String[] hinted = hintedRole(c.name(), c.type(), rt.roleHints());
+            if (hinted == null || hinted[0].equals(current)) continue;
+            String label = rt.label().toLowerCase(Locale.ROOT);
+            Map<String, Object> ch = OnboardDraft.choice(hinted[0], (label.matches("^[aeiou].*") ? "an " : "a ") + label + " usually has a "
+                    + HINT_WORDS.get(hinted[0]) + " named like '" + hinted[1] + "'", sure);
+            ch.put("base", current);
+            row.put("role", ch);
+        }
+    }
 
     // ── per column ───────────────────────────────────────────────────────────────────────────────────────────
 

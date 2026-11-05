@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { ComponentDef } from '@inspecto/core/api';
-import { dataEntry, driftedColumns, formOf, mappingEntry, mappingLine, roleOf, typeOf } from './data-page';
+import {
+    dataEntry,
+    driftedColumns,
+    formOf,
+    mappingEntry,
+    mappingLine,
+    recordTypeProposals,
+    roleOf,
+    typeOf,
+} from './data-page';
 
 const TYPES = [
     { id: 'account', label: 'Account', classifications: ['ACCOUNT_ID'] },
@@ -158,5 +167,45 @@ describe('the Data page model (LA-DATA-PAGE-1)', () => {
             { name: 'c', type: 'string', classification: 'CHANNEL', role: 'entity' },
             { name: 'fee', type: 'string', role: 'measure', unit: 'USD' },
         ]);
+    });
+});
+
+describe('recordTypeProposals (ENTITY-TYPE-RECORD-ROLES-1)', () => {
+    const transfer = {
+        id: 'transfer',
+        label: 'Transfer',
+        likelyTypes: [],
+        roleHints: { time: ['booked'], measure: ['amount', 'fee'], category: ['channel', 'status', 'from'] },
+    };
+    const entry = dataEntry({
+        type: 'dataset',
+        name: 'transfers',
+        ref: 'dataset/transfers',
+        content: {
+            recordType: 'transfer',
+            columns: [
+                { name: 'from_account', type: 'string', classification: 'ACCOUNT_ID' },
+                { name: 'to_account', type: 'string' },
+                { name: 'channel', type: 'string' },
+                { name: 'status', type: 'string', role: 'detail' },
+                { name: 'amount', type: 'number', role: 'detail' },
+                { name: 'fee', type: 'number', role: 'dimension' },
+                { name: 'booked', type: 'string' },
+            ],
+            defaultLinkMapping: { from: 'from_account', to: 'to_account' },
+        },
+    } as ComponentDef);
+
+    it("proposes the record type's roles for the columns that say none or Detail, never over a set role or the mapping", () => {
+        expect(recordTypeProposals(entry, transfer, TYPES)).toEqual([
+            { column: 'channel', role: 'dimension', hint: 'channel' },
+            { column: 'status', role: 'dimension', hint: 'status' },
+            { column: 'amount', role: 'measure', hint: 'amount' },
+        ]);
+    });
+
+    it('proposes nothing without a record type or its hints', () => {
+        expect(recordTypeProposals(entry, null, TYPES)).toEqual([]);
+        expect(recordTypeProposals(entry, { ...transfer, roleHints: undefined }, TYPES)).toEqual([]);
     });
 });

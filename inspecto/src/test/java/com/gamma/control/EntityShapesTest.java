@@ -77,6 +77,78 @@ class EntityShapesTest {
         return Map.of("columns", cols);
     }
 
+    // ── ENTITY-TYPE-RECORD-ROLES-1: the record type's usual column roles ───────────────────────────────────────
+
+    private static final IndustryPack.RecordType CALL_WITH_ROLES = new IndustryPack.RecordType("call", "Voice call record", "",
+            List.of("msisdn"), new IndustryPack.RoleHints(List.of("start"), List.of("duration", "charge"), List.of("cause", "service", "call"),
+            List.of("calling"), List.of("called")));
+
+    private static EntityShapes.Column col(String name, String type, String... values) {
+        return new EntityShapes.Column(name, type, List.of(values));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> roleOf(Map<String, Object> entityTypes, String column) {
+        for (Object o : (List<Object>) entityTypes.get("columns"))
+            if (o instanceof Map<?, ?> row && column.equals(row.get("column"))) return (Map<String, Object>) row.get("role");
+        throw new AssertionError("no column " + column);
+    }
+
+    @Test
+    void theProposedRecordTypeGivesItsUsualRolesToTheColumnsItsHintsName() {
+        List<EntityShapes.Column> cols = List.of(
+                col("calling", "VARCHAR", "+447700900001", "+447700900002", "+447700900003"),
+                col("called", "VARCHAR", "+447700900004", "+447700900005", "+447700900006"),
+                col("start_at", "TIMESTAMP", "2026-01-01 10:00:00", "2026-01-01 11:00:00", "2026-01-01 12:00:00"),
+                col("ended_at", "TIMESTAMP", "2026-01-01 10:01:00", "2026-01-01 11:01:00", "2026-01-01 12:01:00"),
+                col("call_seconds", "BIGINT", "60", "61", "62"),
+                col("charge_band", "VARCHAR", "a1", "b2", "c3"),
+                col("release_cause", "VARCHAR", "x1", "x2", "x3"),
+                col("served_cell", "VARCHAR", "c1", "c2", "c3"));
+        List<EntityType> types = List.of(EntityTypes.coreDefault("msisdn"));
+        Map<String, Object> et = new java.util.LinkedHashMap<>(EntityShapes.propose(cols, types, "stream"));
+        et.put("recordType", OnboardDraft.choice("call", "", true));
+        Map<String, Object> before = roleOf(et, "release_cause");
+        assertEquals("detail", before.get("value"), "every sampled value differs: a Detail without the record type");
+        EntityShapes.recordTypeRoles(et, cols, List.of(CALL_WITH_ROLES));
+
+        Map<String, Object> cause = roleOf(et, "release_cause");
+        assertEquals("dimension", cause.get("value"), cause.toString());
+        assertEquals("high", cause.get("confidence"));
+        assertEquals("detail", cause.get("base"), "the role without the record type, to undo it");
+        assertTrue(String.valueOf(cause.get("evidence")).contains("a voice call record usually has a Category"), cause.toString());
+        // a Measure hint on a text column does not make it a Measure; it may still be a Category
+        assertEquals("detail", roleOf(et, "charge_band").get("value"), "'charge' is a Measure hint, and the column holds text");
+        // "call" is a Category hint naming calling (an Entity) and call_seconds (the link's measure, a whole number): both keep their role
+        assertEquals("entity", roleOf(et, "calling").get("value"), "a column holding an Entity Type keeps its role");
+        assertEquals("measure", roleOf(et, "call_seconds").get("value"), "the link's measure keeps its role");
+        // the link's primaries keep theirs: start_at is a Time either way, ended_at stays what its type says
+        assertEquals("temporal", roleOf(et, "ended_at").get("value"));
+        assertEquals("detail", roleOf(et, "served_cell").get("value"), "a hint is a whole pattern: 'service' does not name served_cell");
+
+        // a guessed record type gives guessed roles
+        Map<String, Object> low = new java.util.LinkedHashMap<>(EntityShapes.propose(cols, types, "stream"));
+        low.put("recordType", OnboardDraft.choice("call", "", false));
+        EntityShapes.recordTypeRoles(low, cols, List.of(CALL_WITH_ROLES));
+        assertEquals("low", roleOf(low, "release_cause").get("confidence"));
+        // no record type, no change
+        Map<String, Object> none = new java.util.LinkedHashMap<>(EntityShapes.propose(cols, types, "stream"));
+        none.put("recordType", OnboardDraft.choice(null, "", false));
+        EntityShapes.recordTypeRoles(none, cols, List.of(CALL_WITH_ROLES));
+        assertEquals("detail", roleOf(none, "release_cause").get("value"));
+    }
+
+    @Test
+    void aHintedRoleNeedsAColumnTypeThatCanHoldIt() {
+        IndustryPack.RoleHints h = CALL_WITH_ROLES.roleHints();
+        assertEquals("temporal", EntityShapes.hintedRole("start_at", "TIMESTAMP", h)[0]);
+        assertNull(EntityShapes.hintedRole("start_at", "VARCHAR", h), "a Time is a date or timestamp; 'start' names no Category");
+        assertEquals("measure", EntityShapes.hintedRole("call_duration", "DOUBLE", h)[0]);
+        assertNull(EntityShapes.hintedRole("duration", "VARCHAR", h));
+        assertEquals("dimension", EntityShapes.hintedRole("cause", "BIGINT", h)[0], "a coded category may be a whole number");
+        assertNull(EntityShapes.hintedRole("cause", "DOUBLE", h));
+    }
+
     @Test
     void theRecordTypeWhoseLikelyTypesTheColumnsHoldIsProposed() {
         Map<String, Object> call = EntityShapes.recordType(held("msisdn", "imei"), RECORDS);

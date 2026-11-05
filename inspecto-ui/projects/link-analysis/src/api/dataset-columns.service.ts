@@ -23,6 +23,16 @@ export interface ColumnChange {
 }
 
 /**
+ * `GET /inv/datasets/{id}/shapes` (ENTITY-TYPE-RECORD-ROLES-1): per column, the Entity Types whose value shape every sampled
+ * value fits - read unmasked on the server, answered as marks only.
+ */
+export interface DatasetShapes {
+    dataset: string;
+    sampled: number;
+    columns: Record<string, { type: string; strong: boolean }[]>;
+}
+
+/**
  * What a Dataset column holds (LA-ONBOARD-1 OB-8, UC-07): one column's Entity Type, written as the column's
  * classification on the Dataset registry entry. Needs `canAuthorWorkbench` and edit access to the Dataset; the
  * Entity Types are re-assessed on the next read of `GET /inv/entity-types`.
@@ -64,5 +74,10 @@ export class DatasetColumnsService {
                 recordType: string | null;
             }>(apiUrl(`/datasets/${encodeURIComponent(dataset)}/record-type`), { recordType })
             .pipe(tap(() => this.reads.clear()));
+    }
+
+    /** Which Entity Types' shapes each column of `dataset` fits (the Data page's "Shape matches" marks). */
+    shapes(dataset: string): Observable<DatasetShapes> {
+        return this.http.get<DatasetShapes>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/shapes`));
     }
 }

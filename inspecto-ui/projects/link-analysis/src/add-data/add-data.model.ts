@@ -1,5 +1,6 @@
 import { formatNumber } from '@inspecto/core/viz/number-format';
-import type { ColumnRole } from '../api/column-roles';
+import { type ColumnRole, ROLE_LABELS, hintedRole, recordPhrase } from '@inspecto/link-analysis/api/column-roles';
+import type { RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
 /**
  * **Add data** - the contract of `POST /onboard/files` and its commit (LA-ONBOARD-1 OB-2, phase 2), and the pure rules the
@@ -80,7 +81,13 @@ export interface OnboardDraft {
     rows: Record<string, unknown>[];
     entityTypes: {
         /** Per column: what it holds, its proposed role, and for a text column its distinct sampled values. */
-        columns: { column: string; entityType: DraftEntityTypeChoice; role?: Choice<ColumnRole>; distinct?: number }[];
+        columns: {
+            column: string;
+            entityType: DraftEntityTypeChoice;
+            /** `base`: the role proposed without the draft's record type, when that record type changed it (ENTITY-TYPE-RECORD-ROLES-1). */
+            role?: Choice<ColumnRole> & { base?: ColumnRole | null };
+            distinct?: number;
+        }[];
         primary: Choice<string | null>;
         link?: DraftLink;
         identifying?: Choice<string | null> & { entityType?: string | null };
@@ -541,6 +548,39 @@ export function initialColumns(d: OnboardDraft): ColumnState[] {
         entityType: entity.get(c.name) ?? '',
         role: role.get(c.name) ?? 'detail',
     }));
+}
+
+/**
+ * ENTITY-TYPE-RECORD-ROLES-1: a column's role proposal under `recordType` (an id; '' = none). Under the record type the
+ * draft proposed, its own proposal stands (the server applied that record type's usual roles). Under another, the role
+ * proposed without a record type (`base`) - changed to the new record type's usual role where its hints name the column
+ * and the column's type can hold it. A column holding an Entity Type, or the link's kind, time or measure, keeps its role.
+ */
+export function roleUnder(
+    d: OnboardDraft,
+    column: string,
+    recordType: string,
+    recordTypes: readonly RecordTypeGuide[],
+): Choice<ColumnRole> | undefined {
+    const drafted = d.entityTypes.columns.find((c) => c.column === column)?.role;
+    if (!drafted || recordType === (d.entityTypes.recordType?.value ?? '')) return drafted;
+    const l = d.entityTypes.link;
+    if (drafted.value === 'entity' || (l && LINK_PRIMARIES.some((p) => l[p].value === column))) return drafted;
+    const base: Choice<ColumnRole> = drafted.base
+        ? {
+              value: drafted.base,
+              evidence: `${column} reads as a ${ROLE_LABELS[drafted.base]} by its values`,
+              confidence: 'high',
+          }
+        : drafted;
+    const rt = recordTypes.find((r) => r.id === recordType);
+    const hinted = hintedRole(column, d.columns.find((c) => c.name === column)?.type.value, rt?.roleHints);
+    if (!rt || !hinted || hinted.role === base.value) return base;
+    return {
+        value: hinted.role,
+        evidence: `${recordPhrase(rt.label)} usually has a ${ROLE_LABELS[hinted.role]} named like '${hinted.hint}'`,
+        confidence: 'high',
+    };
 }
 
 export function initialRoles(d: OnboardDraft): RolesState {

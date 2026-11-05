@@ -1,17 +1,47 @@
 record_types[8]:
   - id: voice_call
     likely_types[4]: msisdn,imsi,imei,cell
+    time_hints[5]: start,answer,end_time,event_time,call_time
+    measure_hints[3]: duration,seconds,charge
+    category_hints[5]: call_type,direction,service,cause,status
+    from_hints[5]: calling,caller,a_number,anumber,orig
+    to_hints[5]: called,callee,b_number,bnumber,dest
   - id: sms
     likely_types[3]: msisdn,imsi,cell
+    time_hints[4]: sent,submit,deliver,event_time
+    measure_hints[2]: parts,length
+    category_hints[4]: direction,status,message_type,sms_type
+    from_hints[4]: sender,orig,calling,a_number
+    to_hints[5]: recipient,receiver,dest,called,b_number
   - id: data_session
     likely_types[6]: msisdn,imsi,imei,apn,ip_address,cell
+    time_hints[3]: start,end_time,event_time
+    measure_hints[5]: bytes,volume,uplink,downlink,duration
+    category_hints[3]: radio,access_type,status
   - id: sim_registration
     likely_types[6]: msisdn,iccid,imsi,subscriber,id_document,retailer
+    time_hints[3]: registered,activat,event_time
+    category_hints[4]: channel,status,id_type,document_type
   - id: top_up
     likely_types[3]: msisdn,retailer,account
+    time_hints[3]: event_time,top_up_time,created
+    measure_hints[3]: amount,value,bonus
+    category_hints[3]: channel,payment_method,status
+    from_hints[3]: retailer,seller,agent
+    to_hints[3]: beneficiary,msisdn,subscriber
   - id: roaming
     likely_types[3]: msisdn,imsi,roaming_partner
+    time_hints[2]: start,event_time
+    measure_hints[4]: duration,bytes,volume,charge
+    category_hints[3]: service,direction,country
   - id: device_change
     likely_types[4]: msisdn,imsi,imei,handset
+    time_hints[3]: changed,first_seen,event_time
+    category_hints[2]: brand,change_type
+    from_hints[3]: old,previous,from
+    to_hints[2]: new,current
   - id: invoice
     likely_types[4]: account,subscriber,msisdn,email
+    time_hints[4]: period,issued,due,bill_date
+    measure_hints[5]: amount,total,tax,balance,charge
+    category_hints[4]: status,plan,tariff,payment_method

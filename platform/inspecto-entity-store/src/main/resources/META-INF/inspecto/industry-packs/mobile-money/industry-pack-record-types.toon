@@ -1,17 +1,52 @@
 record_types[8]:
   - id: transfer
     likely_types[2]: wallet,msisdn
+    time_hints[4]: booked,created,event_time,transaction_time
+    measure_hints[3]: amount,fee,balance
+    category_hints[4]: channel,status,currency,transaction_type
+    from_hints[6]: sender,payer,^from,_from$,source,debit
+    to_hints[7]: receiver,recipient,payee,^to_,_to$,beneficiary,credit
   - id: cash_out
     likely_types[3]: agent,wallet,msisdn
+    time_hints[3]: booked,created,event_time
+    measure_hints[3]: amount,fee,commission
+    category_hints[3]: channel,status,currency
+    from_hints[3]: wallet,customer,payer
+    to_hints[2]: agent,payee
   - id: cash_in
     likely_types[3]: agent,wallet,msisdn
+    time_hints[3]: booked,created,event_time
+    measure_hints[3]: amount,fee,commission
+    category_hints[3]: channel,status,currency
+    from_hints[2]: agent,payer
+    to_hints[3]: wallet,customer,beneficiary
   - id: merchant_payment
     likely_types[3]: wallet,merchant,msisdn
+    time_hints[3]: booked,created,event_time
+    measure_hints[3]: amount,fee,tip
+    category_hints[4]: channel,status,currency,category
+    from_hints[3]: payer,customer,wallet
+    to_hints[3]: merchant,payee,till
   - id: bill_payment
     likely_types[3]: wallet,biller,account
+    time_hints[3]: booked,created,event_time
+    measure_hints[2]: amount,fee
+    category_hints[3]: channel,status,bill_type
+    from_hints[3]: payer,customer,wallet
+    to_hints[2]: biller,payee
   - id: bank_transfer
     likely_types[3]: wallet,bank_account,card
+    time_hints[3]: booked,created,event_time
+    measure_hints[2]: amount,fee
+    category_hints[4]: channel,status,currency,direction
+    from_hints[4]: sender,payer,^from,debit
+    to_hints[4]: receiver,payee,^to_,credit
   - id: kyc_registration
     likely_types[4]: subscriber,id_document,msisdn,wallet
+    time_hints[3]: registered,verified,event_time
+    category_hints[4]: kyc_level,id_type,status,channel
   - id: login_event
     likely_types[4]: wallet,msisdn,imei,ip_address
+    time_hints[3]: login,event_time,created
+    measure_hints[1]: attempts
+    category_hints[4]: result,status,channel,device_type

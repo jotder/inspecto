@@ -385,6 +385,27 @@ class ControlApiDatasetDiscoverTest {
         }
     }
 
+    /**
+     * ENTITY-TYPE-RECORD-ROLES-1: {@code GET /inv/datasets/{id}/shapes} reads a sample unmasked on the server and answers
+     * only which Entity Types' shapes each column fits - under the Space's default masking no raw id leaves.
+     */
+    @Test
+    void shapesAnswerMarksPerColumnNeverAValue(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "")) {
+            HttpResponse<String> r = get(c, "/inv/datasets/pays_ds/shapes");
+            assertEquals(200, r.statusCode(), r.body());
+            for (String raw : RAW) assertFalse(r.body().contains(raw), "leaked the raw id " + raw + ": " + r.body());
+            JsonNode d = JSON.readTree(r.body()).get("data");
+            assertEquals(6, d.get("sampled").asInt());
+            assertTrue(list(d.at("/columns/caller"), "type").contains("msisdn"), d.toString());
+            for (JsonNode fit : d.at("/columns/caller"))
+                if (fit.get("type").asText().equals("msisdn"))
+                    assertFalse(fit.get("strong").asBoolean(), "bare digits are the weak reading of a phone number");
+            assertEquals(0, d.at("/columns/link_kind").size(), "p2p fits no shape: " + d);
+            assertEquals(404, get(c, "/inv/datasets/nope/shapes").statusCode());
+        }
+    }
+
     private static void plant(Path file, String values, long mtime) throws Exception {
         Files.createDirectories(file.getParent());
         DuckDbUtil.loadDriver();

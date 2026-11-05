@@ -104,6 +104,10 @@ const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-
 describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)', () => {
     afterEach(() => {
         http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        // ENTITY-TYPE-RECORD-ROLES-1: each base's shape marks are read once per page
+        http
+            ?.match((r) => r.url.endsWith('/shapes'))
+            .forEach((r) => !r.cancelled && r.flush({ sampled: 0, columns: {} }));
         http?.verify();
     });
 
@@ -418,7 +422,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(
             c
                 .holdsOptions()
-                .get('transfers')!
+                .get('transfers/from_account')!
                 .map((o) => [o.group, o.value]),
         ).toEqual([
             [undefined, ''],
@@ -426,7 +430,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             ['Account', 'account'],
         ]);
         // a base with no record type keeps the family order
-        expect(c.holdsOptions().get('wallet_txn')![1].group).toBe('Account');
+        expect(c.holdsOptions().get('wallet_txn/src_id')![1].group).toBe('Account');
         await expectNoA11yViolations(el);
 
         c.recordTypeControls().get('transfers')!.setValue('');
@@ -434,5 +438,90 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(req.request.body).toEqual({ recordType: null });
         req.flush({ dataset: 'transfers', recordType: null });
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it("marks the types whose shape a column fits, read on the server, and proposes the record type's usual roles (ENTITY-TYPE-RECORD-ROLES-1)", async () => {
+        TestBed.configureTestingModule({
+            imports: [DataPageComponent],
+            providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()],
+        });
+        http = TestBed.inject(HttpTestingController);
+        const fixture = TestBed.createComponent(DataPageComponent);
+        fixture.detectChanges();
+        const typed = DATASETS.map((d) =>
+            d.name === 'transfers'
+                ? {
+                      ...d,
+                      content: {
+                          ...d.content,
+                          recordType: 'transfer',
+                          columns: [
+                              ...d.content.columns,
+                              { name: 'amount', type: 'number', role: 'detail' },
+                              { name: 'booked_at', type: 'timestamp' },
+                              { name: 'status', type: 'string', role: 'dimension' },
+                          ],
+                      },
+                  }
+                : d,
+        );
+        http.expectOne(apiUrl('/components/dataset')).flush(typed);
+        http.match((r) => r.url.includes('/entity-types')).forEach((r) =>
+            r.flush({
+                items: [
+                    { id: 'account', label: 'Account', classifications: ['ACCOUNT_ID'], family: 'account' },
+                    { id: 'phone', label: 'Phone number', classifications: ['PHONE'], family: 'identifier' },
+                ],
+                families: [
+                    { id: 'account', label: 'Account', definition: '' },
+                    { id: 'identifier', label: 'Identifier', definition: '' },
+                ],
+                recordTypes: [
+                    {
+                        id: 'transfer',
+                        label: 'Transfer',
+                        likelyTypes: [],
+                        roleHints: { time: ['booked'], measure: ['amount'], category: ['channel', 'status'] },
+                    },
+                ],
+            }),
+        );
+        http.expectOne(apiUrl('/inv/datasets/transfers/shapes')).flush({
+            dataset: 'transfers',
+            sampled: 3,
+            columns: { from_account: [{ type: 'phone', strong: true }] },
+        });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const c = fixture.componentInstance as unknown as {
+            holdsOptions: () => ReadonlyMap<string, { value: string; hint?: string }[]>;
+        };
+        const from = c.holdsOptions().get('transfers/from_account')!;
+        expect(from.find((o) => o.value === 'phone')?.hint).toContain('Shape matches.');
+        expect(from.find((o) => o.value === 'account')?.hint ?? '').not.toContain('Shape matches.');
+        expect(
+            c
+                .holdsOptions()
+                .get('transfers/to_account')!
+                .some((o) => (o.hint ?? '').includes('Shape matches.')),
+        ).toBe(false);
+
+        // a Detail and an unstated role are proposed; a role the person set (status), the mapping's ends and a role the column already reads as are not
+        const line = q(el, 'record-roles')!;
+        expect(line.textContent).toContain('A transfer usually has');
+        expect(line.textContent).toContain('channel');
+        expect(line.textContent).toContain('amount');
+        expect(line.textContent).not.toContain('booked_at'); // a timestamp already reads as a Time
+        expect(line.textContent).not.toContain('status');
+        await expectNoA11yViolations(el);
+
+        (q(el, 'record-roles-apply') as HTMLButtonElement).click();
+        const puts = http.match((r) => r.method === 'PUT' && r.url.startsWith(apiUrl('/datasets/transfers/columns/')));
+        expect(puts.map((r) => [r.request.url.split('/').pop(), r.request.body.role])).toEqual([
+            ['channel', 'dimension'],
+            ['amount', 'measure'],
+        ]);
+        puts.forEach((r) => r.flush({}));
+        http.expectOne(apiUrl('/components/dataset')).flush(typed);
     });
 });

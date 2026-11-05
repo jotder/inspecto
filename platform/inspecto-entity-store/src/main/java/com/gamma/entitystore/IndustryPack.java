@@ -1,6 +1,7 @@
 package com.gamma.entitystore;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,19 +53,63 @@ public record IndustryPack(String id, String name, String description, List<Stri
      * "what does this column hold" picker then offers the likely types first. It only orders and groups: identity is the
      * Entity Type id, the same in every Dataset.
      */
-    public record RecordType(String id, String label, String definition, List<String> likelyTypes) {
+    public record RecordType(String id, String label, String definition, List<String> likelyTypes, RoleHints roleHints) {
         public RecordType {
             likelyTypes = List.copyOf(likelyTypes);
+            roleHints = roleHints == null ? RoleHints.NONE : roleHints;
         }
 
-        /** The wire shape: {@code {id, label, definition, likelyTypes}}. */
+        /** A record type that names no usual column roles. */
+        public RecordType(String id, String label, String definition, List<String> likelyTypes) {
+            this(id, label, definition, likelyTypes, RoleHints.NONE);
+        }
+
+        /** The wire shape: {@code {id, label, definition, likelyTypes, roleHints}}. */
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", id);
             m.put("label", label);
             m.put("definition", definition);
             m.put("likelyTypes", likelyTypes);
+            m.put("roleHints", roleHints.toMap());
             return m;
+        }
+    }
+
+    /**
+     * ENTITY-TYPE-RECORD-ROLES-1: the column names such a record usually gives its times, measures and categories, and its
+     * two parties (who calls, who is called), as the profile's hints are written: case-insensitive patterns of letters,
+     * digits, {@code _}, {@code ^} and {@code $}, matched anywhere in the column name unless anchored. Add data and the Data
+     * page propose a column's role from them; preset questions read From / To from the parties when no link mapping says.
+     */
+    public record RoleHints(List<String> time, List<String> measure, List<String> category, List<String> from, List<String> to) {
+        public static final RoleHints NONE = new RoleHints(List.of(), List.of(), List.of(), List.of(), List.of());
+
+        public RoleHints {
+            time = List.copyOf(time);
+            measure = List.copyOf(measure);
+            category = List.copyOf(category);
+            from = List.copyOf(from);
+            to = List.copyOf(to);
+        }
+
+        /** The wire shape: {@code {time, measure, category, from, to}}, each a list of hints. */
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("time", time);
+            m.put("measure", measure);
+            m.put("category", category);
+            m.put("from", from);
+            m.put("to", to);
+            return m;
+        }
+
+        /** The first of {@code hints} that names {@code column}, or null. */
+        public static String matching(List<String> hints, String column) {
+            if (column == null) return null;
+            for (String h : hints)
+                if (Pattern.compile(h, Pattern.CASE_INSENSITIVE).matcher(column).find()) return h;
+            return null;
         }
     }
 
@@ -204,6 +249,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
 
         // record types: ids and likely types now; label and definition from their terms below
         Map<String, List<String>> records = new LinkedHashMap<>();
+        Map<String, RoleHints> recordHints = new HashMap<>();
         if (recordTypesDoc != null) {
             List<?> rawRecords = list(recordTypesDoc.get("record_types"), "record_types");
             if (rawRecords.size() > MAX_RECORD_TYPES)
@@ -222,6 +268,11 @@ public record IndustryPack(String id, String name, String description, List<Stri
                 if (new HashSet<>(likely).size() != likely.size())
                     throw new IllegalArgumentException("record type '" + rid + "' lists a likely type twice");
                 records.put(rid, likely);
+                recordHints.put(rid, new RoleHints(optHints(m.get("time_hints"), "record type '" + rid + "' time_hints"),
+                        optHints(m.get("measure_hints"), "record type '" + rid + "' measure_hints"),
+                        optHints(m.get("category_hints"), "record type '" + rid + "' category_hints"),
+                        optHints(m.get("from_hints"), "record type '" + rid + "' from_hints"),
+                        optHints(m.get("to_hints"), "record type '" + rid + "' to_hints")));
             }
         }
 
@@ -252,7 +303,7 @@ public record IndustryPack(String id, String name, String description, List<Stri
             Term term = terms.stream().filter(t -> t.key().equals("record_type." + r.getKey())).findFirst().orElseThrow(
                     () -> new IllegalArgumentException("record type '" + r.getKey() + "' needs a term 'record_type." + r.getKey()
                             + "' for its label and definition"));
-            recordTypes.add(new RecordType(r.getKey(), term.label(), term.definition(), r.getValue()));
+            recordTypes.add(new RecordType(r.getKey(), term.label(), term.definition(), r.getValue(), recordHints.get(r.getKey())));
         }
         IndustryPack pack = new IndustryPack(id, name, description, templates, patterns, profile, terms, types, kinds, recordTypes);
         EntityTypes.validate(pack.overlay(EntityTypes.DEFAULTS), Integer.MAX_VALUE);
@@ -482,6 +533,11 @@ public record IndustryPack(String id, String name, String description, List<Stri
         for (String h : out)
             if (!HINT.matcher(h).matches()) throw new IllegalArgumentException(what + ": '" + h + "' must match " + HINT.pattern());
         return out;
+    }
+
+    /** {@link #hints} of an optional key: absent = none. */
+    private static List<String> optHints(Object raw, String what) {
+        return raw == null ? List.of() : hints(raw, what);
     }
 
     private static List<String> refs(Object raw, String what) {

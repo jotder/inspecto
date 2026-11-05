@@ -56,3 +56,64 @@ export const ROLE_HINTS: Record<ColumnRole, string> = {
     dimension: 'A few named values: to filter by (a type, a channel)',
     detail: 'Carried along, not filtered on',
 };
+
+/**
+ * What a record type says of its usual columns (ENTITY-TYPE-RECORD-ROLES-1; `GET /inv/entity-types` → `recordTypes[].roleHints`):
+ * the column-name patterns of its Times, Measures and Categories and of its two parties. Patterns as the pack's profile
+ * hints: case-insensitive, matched anywhere in the name unless anchored with `^` / `$`.
+ */
+export interface RecordRoleHints {
+    time?: string[];
+    measure?: string[];
+    category?: string[];
+    from?: string[];
+    to?: string[];
+}
+
+/** The first of `hints` naming `column`, or null (a pattern this engine refuses is skipped). */
+export function matchingHint(hints: readonly string[] | null | undefined, column: string): string | null {
+    for (const h of hints ?? []) {
+        try {
+            if (new RegExp(h, 'i').test(column)) return h;
+        } catch {
+            // the server validates the shape; a pattern this engine refuses names nothing
+        }
+    }
+    return null;
+}
+
+const DATE_TYPE = /^(date|timestamp)/i;
+const DECIMAL_TYPE = /^(double|float|real|decimal|numeric)/i;
+const NUMBER_TYPE =
+    /^(double|float|real|decimal|numeric|number|bigint|hugeint|integer|int|smallint|tinyint|ubigint|uinteger)/i;
+
+/**
+ * The role a record type's hints give a column of `type` (the server's `EntityShapes.hintedRole`): its first Time,
+ * Measure or Category hint naming the column, in that order, whose role the type can hold - a Time is a date or
+ * timestamp, a Measure a number, a Category neither a decimal number nor a date. Null when none does.
+ */
+export function hintedRole(
+    column: string,
+    type: string | null | undefined,
+    hints: RecordRoleHints | null | undefined,
+): { role: ColumnRole; hint: string } | null {
+    if (!hints) return null;
+    const t = type ?? 'VARCHAR';
+    const date = DATE_TYPE.test(t);
+    let h: string | null;
+    if (date && (h = matchingHint(hints.time, column))) return { role: 'temporal', hint: h };
+    if (NUMBER_TYPE.test(t) && (h = matchingHint(hints.measure, column))) return { role: 'measure', hint: h };
+    if (!date && !DECIMAL_TYPE.test(t) && (h = matchingHint(hints.category, column)))
+        return { role: 'dimension', hint: h };
+    return null;
+}
+
+/** "a voice call record", "an invoice", "an SMS record": a record type's label inside a sentence. */
+export function recordPhrase(label: string): string {
+    const l = label.trim();
+    const first = l.split(/\s+/)[0] ?? '';
+    const abbreviation = first.length > 1 && first === first.toUpperCase();
+    const shown = abbreviation ? l : l.charAt(0).toLowerCase() + l.slice(1);
+    const an = abbreviation ? /^[AEFHILMNORSX]/.test(shown) : /^[aeiou]/i.test(shown);
+    return `${an ? 'an' : 'a'} ${shown}`;
+}

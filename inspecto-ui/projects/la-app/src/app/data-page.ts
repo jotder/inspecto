@@ -1,6 +1,6 @@
 import type { ComponentDef } from '@inspecto/core/api';
-import type { EntityTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
-import { ColumnRole, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
+import { ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/link-analysis/api/column-roles';
+import type { EntityTypeGuide, RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
 export { ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
 export type { ColumnRole } from '@inspecto/link-analysis/api/column-roles';
@@ -155,6 +155,42 @@ export function roleOf(col: DataColumn, entry: DataEntry, types: readonly TypeCh
     if (is(entry.mapping?.kind)) return 'dimension';
     if (/^(date|timestamp)/i.test(col.type)) return 'temporal';
     return 'detail';
+}
+
+/** One role a Dataset's record type proposes for a column (ENTITY-TYPE-RECORD-ROLES-1). */
+export interface RoleProposal {
+    column: string;
+    role: ColumnRole;
+    /** The record type's hint that names the column. */
+    hint: string;
+}
+
+/**
+ * The roles a Dataset's record type usually gives its columns that the entry does not say yet: a column whose role is
+ * unstated or Detail (Add data's "nothing said") and that holds no Entity Type, is none of the link mapping's columns,
+ * and is named by one of the record type's hints its type can hold (`hintedRole`). A role the person set is never
+ * proposed over.
+ */
+export function recordTypeProposals(
+    entry: DataEntry,
+    recordType: RecordTypeGuide | null | undefined,
+    types: readonly TypeChoice[],
+): RoleProposal[] {
+    if (!recordType?.roleHints) return [];
+    const m = entry.mapping;
+    const mapped = new Set(
+        [m?.from, m?.to, m?.kind, m?.primaryTime, m?.primaryMeasure, entry.eventDate]
+            .filter((c): c is string => !!c)
+            .map((c) => c.toLowerCase()),
+    );
+    const out: RoleProposal[] = [];
+    for (const c of entry.columns) {
+        if (mapped.has(c.name.toLowerCase()) || (c.role && c.role !== 'detail')) continue;
+        if (roleOf(c, entry, types) === 'entity') continue;
+        const hinted = hintedRole(c.name, c.type, recordType.roleHints);
+        if (hinted && hinted.role !== roleOf(c, entry, types)) out.push({ column: c.name, ...hinted });
+    }
+    return out;
 }
 
 /** A link mapping in words: `from_account → to_account · kind channel · when booked_at`. */
