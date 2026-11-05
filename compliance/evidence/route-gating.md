@@ -174,6 +174,7 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:69` |
 | PUT | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:67` |
 | POST | `/datasets/([^/]+)/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:78` |
+| PUT | `/datasets/([^/]+)/filter` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/ImportFilterEdit.java:48` |
 | POST | `/datasets/([^/]+)/materialize` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java:67` |
 | PUT | `/datasets/([^/]+)/record-type` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:84` |
 | POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |

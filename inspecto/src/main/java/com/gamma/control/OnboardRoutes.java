@@ -84,6 +84,7 @@ final class OnboardRoutes implements RouteModule {
         api.put("/datasets/([^/]+)/record-type", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> OnboardImport.setRecordType(api, e, ApiContext.name(m), api.body(e))));
         DatasetFeed.register(api);   // LA-ARRIVAL-FEEDS-1
+        ImportFilterEdit.register(api);   // ADD-DATA-FILTER-EDIT-1
         DatasetCompaction.register(api);   // LA-DATASET-COMPACT-1
         InboxWatch.registerRoutes(api);   // BASIC-ONBOARD-1 P2
         InboxWatch.attach(api);

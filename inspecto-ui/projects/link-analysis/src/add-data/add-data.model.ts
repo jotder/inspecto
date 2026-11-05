@@ -406,13 +406,46 @@ export interface RowConditionState {
 }
 
 /** Why a condition cannot be sent yet ('' = it can), against the columns as the screen holds them. */
-export function conditionProblem(c: RowConditionState, columns: readonly ColumnState[]): string {
+export function conditionProblem(
+    c: RowConditionState,
+    columns: readonly Pick<ColumnState, 'name' | 'type' | 'drop'>[],
+): string {
     const col = columns.find((x) => x.name === c.column);
     if (!col) return 'Choose a column.';
     if (col.drop) return 'This column is left out, so it cannot keep rows.';
     if (!rowOps(col.type).includes(c.op)) return 'Choose a condition this column offers.';
     if (c.op === 'range') return text(c.min) || text(c.max) ? '' : 'Enter a from value, a to value or both.';
     return text(c.value) ? '' : 'Enter a value.';
+}
+
+/** The value box a condition on a column of `type` calls for. */
+export function conditionValueType(type: string): 'text' | 'number' | 'date' | 'datetime-local' {
+    return type === 'BIGINT' || type === 'DOUBLE'
+        ? 'number'
+        : type === 'DATE'
+          ? 'date'
+          : type === 'TIMESTAMP'
+            ? 'datetime-local'
+            : 'text';
+}
+
+/** `GET|PUT /datasets/{id}/filter` (ADD-DATA-FILTER-EDIT-1): the conditions, and the columns with the import's types. */
+export interface ImportFilterState {
+    dataset: string;
+    filter: RowCondition[];
+    columns: { name: string; type: string }[];
+}
+
+/** ADD-DATA-FILTER-EDIT-1: a stored condition as the screen holds it, to edit it again. */
+export function conditionState(c: RowCondition): RowConditionState {
+    return {
+        column: c.column,
+        op: c.op,
+        value: c.value ?? '',
+        min: c.min ?? '',
+        max: c.max ?? '',
+        matchCase: !!c.matchCase,
+    };
 }
 
 /** The commit's `filter` from the screen's conditions (each one complete; see {@link conditionProblem}). */
