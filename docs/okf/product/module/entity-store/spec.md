@@ -92,7 +92,11 @@ Term keys are `concept.`, `entity_type.`, `record_type.`, `link_kind.`, `measure
   Data page from `GET /inv/datasets/{id}/shapes` (its own row sample is masked for masked types, so the server reads
   the first 200 rows unmasked and answers marks only, `{columns: {<col>: [{type, strong}]}}`, never a value). Add data
   proposes the record type from its sure (high-confidence) column proposals: the most likely types held, then the
-  larger share of the record type's list; a remaining tie is low.
+  larger share of the record type's list; a remaining tie is low. So a file whose columns have under 50 non-blank sampled
+  values (OF-2: every proposal low) gets **no** record type (`recordType: null`, "no column holds an Entity Type a record
+  type of this Space usually holds"), even when its names say `from_wallet` / `to_wallet`: by design, the person picks
+  it (checked 2026-11-05 on a 3-row wallet-transfer CSV in la-mobile-money; the `transfer` record type would match once
+  the wallet columns are sure).
 - **A record type's usual roles (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05):** optional `time_hints`, `measure_hints`,
   `category_hints`, `from_hints`, `to_hints` per record type (`IndustryPack.RoleHints`; written and matched as the
   profile's hints: case-insensitive, anywhere unless anchored with `^` / `$`; a bad pattern refuses the pack); wire

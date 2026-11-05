@@ -71,7 +71,7 @@ const DATASETS = [
     },
 ];
 
-function create() {
+function create(datasets: unknown[] = DATASETS) {
     TestBed.configureTestingModule({
         imports: [DataPageComponent],
         providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()],
@@ -79,7 +79,7 @@ function create() {
     http = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(DataPageComponent);
     fixture.detectChanges();
-    http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    http.expectOne(apiUrl('/components/dataset')).flush(datasets);
     http.match((r) => r.url.includes('/entity-types')).forEach((r) =>
         r.flush({
             items: [
@@ -289,6 +289,52 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(card.querySelector('[data-testid="entity-channel"]')).toBeNull();
         // three role rows, and a Holds row for each of the two Entity columns
         expect(card.querySelectorAll('inspecto-option-picker').length).toBe(5);
+    });
+
+    it('a column the base states no role for shows the role its Mappings give it, naming them, and writes nothing', () => {
+        // wallet_txn gains an amount and a kind; one Mapping names both, a second names kind as its Measure
+        const datasets = (DATASETS as { name: string; content: Record<string, unknown> }[]).map((d) =>
+            d.name !== 'wallet_txn'
+                ? d
+                : {
+                      ...d,
+                      content: {
+                          ...d.content,
+                          columns: [
+                              ...(d.content['columns'] as unknown[]),
+                              { name: 'amt', type: 'number' },
+                              { name: 'kind', type: 'string' },
+                          ],
+                      },
+                  },
+        );
+        const mapping = (name: string, m: Record<string, string>) => ({
+            type: 'dataset',
+            name,
+            ref: `dataset/${name}`,
+            content: {
+                origin: 'mapping',
+                basedOn: 'wallet_txn',
+                physicalRef: 'wallet_txn/database',
+                columns: [],
+                defaultLinkMapping: m,
+            },
+        });
+        const { el, c } = create([
+            ...datasets,
+            mapping('wallet_links', { from: 'src_id', to: 'dst_id', amount: 'amt', kind: 'kind' }),
+            mapping('kind_sums', { from: 'src_id', to: 'dst_id', amount: 'kind' }),
+        ]);
+        const card = q(el, 'data-wallet_txn')!.querySelector('[data-testid="columns"]')!;
+        // one Mapping: Measure, and says where it came from
+        expect(card.querySelector('[data-testid="role-amt"]')!.textContent).toContain('Measure');
+        expect(card.querySelector('[data-testid="derived-amt"]')!.textContent).toContain('From Mapping wallet_links');
+        // two that disagree: a Detail, with no note
+        expect(card.querySelector('[data-testid="role-kind"]')!.textContent).toContain('Detail');
+        expect(card.querySelector('[data-testid="derived-kind"]')).toBeNull();
+        // shown only: nothing is written while the page reads it
+        expect(http.match((r) => r.method === 'PUT' || r.method === 'POST')).toEqual([]);
+        expect(c.roles().get('wallet_txn')!.get('amt')!.value).toBe('measure');
     });
 
     it('a role other than Entity saves at once, and an Entity column that becomes one stops holding its type', () => {

@@ -795,7 +795,7 @@ export const NO_UPLOAD_RIGHT = 'Adding data needs the right to upload data in th
 export const REMOTE_FALLBACK =
     'Reading from another database or a remote system is available in Standard and above - this build (Basic) adds files and copies Postgres tables';
 export const AUTOMATION_FALLBACK =
-    'Keeping a Dataset up to date by itself is available in Standard and above - this build (Basic) runs an import when you add a file or press Run now';
+    'Keeping a Dataset up to date on a schedule you set, or from a remote system, is available in Standard and above';
 
 /**
  * Whether an edition feature is withheld here, and why: locked when `/bootstrap` says the feature is false, or when the

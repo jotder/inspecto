@@ -160,6 +160,43 @@ export function roleOf(col: DataColumn, entry: DataEntry, types: readonly TypeCh
     return 'detail';
 }
 
+/** A role a base's column reads from the Mappings built on it, and which Mappings say so. */
+export interface MappingRole {
+    role: ColumnRole;
+    mappings: string[];
+}
+
+/**
+ * A role read, for display only and never written, from the Mappings built on `base` (operator 2026-11-05): a column
+ * that states no role and that the base itself reads as a Detail takes the role a Mapping's primaries give it - its
+ * primary Time → Time, its primary Measure → Measure, its kind → Category. Mappings that disagree leave it a Detail (null).
+ */
+export function mappingRole(
+    col: DataColumn,
+    base: DataEntry,
+    mappings: readonly DataEntry[],
+    types: readonly TypeChoice[],
+): MappingRole | null {
+    if (col.role || roleOf(col, base, types) !== 'detail') return null;
+    const is = (n: string | null | undefined) => !!n && n.toLowerCase() === col.name.toLowerCase();
+    const roles = new Set<ColumnRole>();
+    const names: string[] = [];
+    for (const m of mappings) {
+        if (m.origin !== 'mapping' || m.basedOn !== base.id || !m.mapping) continue;
+        const r: ColumnRole | null = is(m.mapping.primaryTime)
+            ? 'temporal'
+            : is(m.mapping.primaryMeasure)
+              ? 'measure'
+              : is(m.mapping.kind)
+                ? 'dimension'
+                : null;
+        if (!r) continue;
+        roles.add(r);
+        names.push(m.id);
+    }
+    return roles.size === 1 ? { role: [...roles][0], mappings: names } : null;
+}
+
 /** One role a Dataset's record type proposes for a column (ENTITY-TYPE-RECORD-ROLES-1). */
 export interface RoleProposal {
     column: string;
