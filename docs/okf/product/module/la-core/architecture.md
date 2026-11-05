@@ -1405,6 +1405,22 @@ limits and the commit's write order are in
   *Run now* imports no file and records none. Session decision (assistant-decided under operator delegation, pending
   confirmation): only the LAST import is kept, not a history - the card shows one line per Dataset. Pinned by
   `ControlApiOnboardFilesTest.addAFileReplacesOrAppendsAndRunNowReRuns`.
+- **Keep only some rows (`ADD-DATA-ROW-FILTER-1`, as built 2026-11-05; DT-7: Basic no-code shaping).**
+  - **The screen.** The review step ("2. Check the columns") has a *Keep only some rows* block of property rows. Each
+    row is a column picker (the kept columns, by their new names), a condition picker (`rowOps`: is / is not for
+    every type, contains for text with a *Match case* switch (off = ignore case; the card adds "(exact case)"), is between for numbers, dates and times) and value pen fields (From / To for a
+    range; the box type follows the column type).
+  - **Holding Create back.** An incomplete condition, or one on a column left out, shows its reason on the row
+    (`conditionProblem`) and keeps Create disabled.
+  - **What is sent and shown.** The sentence "Keeps rows where …" (`keepsRowsLine`) sits under the block and on the
+    Dataset card (`importFilter` on the entry; every card host passes it through `rowConditions`). The run summary
+    adds "N rows were left out by the row filter", and each arrival "N rows left out by the filter". The commit
+    sends `filter` only when there is a condition.
+  - **Server side.** The contract, the choice of the Pipeline's `csv_settings.where` over the schema, the
+    no-raw-SQL rendering and the counting are in
+    [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md) ("Keep only some rows").
+  - **Specs.** `add-data.component.spec.ts` (two `ADD-DATA-ROW-FILTER-1` cases), `import-dataset-card.component.spec.ts`
+    and `add-data.model.spec.ts` ("row filter words and checks").
 - **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
   to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
 - **Deleting an Add data Dataset retires its import Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, `LA-ONBOARD-RETIRE-GAPS-1`).
@@ -2036,8 +2052,13 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 - **One poller.** A single daemon thread (`inbox-watch`), fixed delay 30 s, polls every registered `InboxWatch.PollTarget`
   in turn under its Space's MDC (`tick()` is synchronized). The watched list is in memory: the toggle registers or
   removes a poll target, and each ControlApi's Spaces are read for `watchInbox` entries on the first tick after it starts
-  (`attach`, from `OnboardRoutes.register`; its poll targets go on close). The seam P3's snapshot refresh reuses is described
-  in the plan §4.6.
+  (`attach`, from `OnboardRoutes.register`; its poll targets go on close).
+- **A Postgres snapshot is never polled (operator 2026-11-05).** Its 30 s refresh target (`InboxWatch.Snapshot`) is
+  removed: the toggle refuses a snapshot (422), `watched()` and `watchable` are false for one, and the inbox target
+  skips it. *Refresh now* exports the table to `<data root>/_onboard/a<uuid>/` and moves the complete file into the
+  inbox, where the replace path takes it like an upload
+  ([`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md), *Export, then move*). The Dataset card's
+  feed shows "The table is copied again only when you press Refresh now" in place of the toggle.
 - **The same path as Run now.** `OnboardImport.runNow`'s body is now `importWaiting(Space, id, content)`, called by
   Run now and by the poll alike: columns checked by name, a refused file moved to `<id>/refused/` with its reason and a
   REFUSED arrival, the run, the follow-on (the link index in the run on Basic), the arrivals. The poll's actor is

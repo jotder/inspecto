@@ -72,7 +72,9 @@ timestamp: 2026-07-16T00:00:00Z
 > rows**: the rows are copied and the columns reviewed exactly as a file's, and *Create and run* makes the Dataset. Its
 > card says *Postgres snapshot* and offers **Refresh now** in place of *Add a file* / *Run now*: the table is copied
 > again and replaces everything (the arrival rules apply: name-checked columns, the arrivals list, compaction). No inbox
-> and no *Add a file* on a snapshot. Turning on the 30-second refresh is the shared poll's toggle (P2). *Another database
+> and no *Add a file* on a snapshot. A snapshot is refreshed only when you press **Refresh now** (2026-11-05): the
+> table is exported to a temporary file first, and only the complete file is put in the Dataset's inbox and imported,
+> so a refresh that fails changes nothing. It is not refreshed on its own. *Another database
 > or a remote system* stays locked on Basic. As built: `add-data/postgres-table.component.ts` on
 > `/onboard/postgres/test` and `/onboard/postgres` (`module/processor/api-onboarding-authoring.md`, *Choose a table*).
 

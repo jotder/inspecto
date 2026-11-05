@@ -1,4 +1,5 @@
 import type { ComponentDef } from '@inspecto/core/api';
+import { RowCondition, rowConditions } from '@inspecto/link-analysis/add-data/add-data.model';
 import { CARRIED_ROLES, ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/link-analysis/api/column-roles';
 import type { EntityTypeGuide, RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
@@ -49,6 +50,8 @@ export interface DataEntry {
     importPipeline: string | null;
     /** `postgres` for a Postgres snapshot (BASIC-ONBOARD-1 P3); null for files. */
     importSource: string | null;
+    /** ADD-DATA-ROW-FILTER-1: the rows the import keeps; empty = every row. */
+    importFilter: RowCondition[];
     columns: DataColumn[];
     mapping: LinkMapping | null;
     eventDate: string | null;
@@ -129,6 +132,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
         physicalRef: str(c['physicalRef']) ?? '',
         importPipeline: str(c['importPipeline']),
         importSource: str(c['importSource']),
+        importFilter: rowConditions(c['importFilter']),
         columns,
         mapping,
         eventDate: str(c['eventDate']),

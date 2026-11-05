@@ -470,7 +470,8 @@ own Dataset) - and the user re-runs it; nothing is applied silently.
 
 Body (every key optional; absent = the draft's proposal): `{name, description, columns:[{name, type?, format?,
 entityType? (id|null), role?, rename?, drop?}], primaryEntityType?, link?: {from, to, kind?, primaryTime?,
-primaryMeasure?, details?} | null, identifyingColumn?}`. Columns are named by their **draft** name. A column's role
+primaryMeasure?, details?} | null, identifyingColumn?, filter?: [{column, op, value | min | max}]}` (the row filter:
+below). Columns are named by their **draft** name. A column's role
 is the stated `role`, else Entity when it holds an Entity Type, else the draft's proposal while it fits the column's
 type (else Detail); the link's kind / primaryTime / primaryMeasure columns take Category / Time / Measure unless a
 role is stated. A stated role that contradicts the Entity Type, the link's primaries, or a Measure on a non-number
@@ -515,6 +516,68 @@ directories, registration, Pipeline file, schema file), and the draft keeps its 
 the cause is fixed (`ControlApiOnboardFilesTest.aFailedCommitLeavesNothingBehind`, falsified by removing the
 rollback). A 202 run is undone the same way in the background and records `failed` with the reason. The background
 run uses the Space roots and service captured on the request thread, never "the current Space".
+
+#### Keep only some rows: the commit's `filter` (`ADD-DATA-ROW-FILTER-1`, as built 2026-11-05)
+
+DT-7 puts "filter rows" in Basic's no-code shaping. The commit body takes an additive
+`filter: [{column, op, value | min | max, matchCase?}]` (absent or `[]` = every row); a row is kept when it meets **every**
+condition. `column` is the **draft** column's name (like `columns[]`), and must be a kept column. `op` is one of
+`eq`, `ne`, `contains` (text columns only; ignoring case unless the condition carries `matchCase: true`, operator
+2026-11-05: then `contains(col, 'v')` instead of `contains(lower(col), lower('v'))`; `matchCase` on any other op is
+422) and `range` (numbers, dates and times; `min` and `max`
+inclusive, either optional, not both absent, `min` ≤ `max`). At most 20 conditions; a text value is at most 200
+characters, with no control characters. `ImportRowFilter` checks it all in `Plan.of`, before anything is written.
+A refused condition is 422 naming it, for example `filter[1] (qty eq): '1 OR 1=1' is not a whole number` or
+`filter[0] (nope): the draft has no column 'nope'`. A left-out column, an unknown key and a bad op are refused the
+same way.
+
+- **Design choice: the Pipeline's post-parse predicate, not the schema.** The schema has no row filter (its
+  `mapping` names and types columns only). The engine's one post-parse row filter is `processing.csv_settings.where`,
+  a predicate over the **mapped, typed** columns that `DataTransformer.materialize` applies on every ingest lane and
+  every frontend. The commit renders the conditions into that key. In graph form the legacy key lifts as a
+  `transform.filter` node (`PipelineConfig.resolveSteps`). That is not a Basic gate: DT-9 now gates Standard in the
+  screens, not on load, and no `EditionFeatures` id covers `filter`. The planned `pipeline.transform` gate
+  (DATA-TIERS-1 P6) must keep it Basic, as no-code shaping.
+- **No raw value reaches SQL.** Each value is parsed to its column's type first: `long`, `BigDecimal`, `LocalDate`,
+  `LocalDateTime` or boolean. The literal is rendered from that parsed value (`DATE '2026-01-31'`,
+  `TIMESTAMP '… hh:mm:ss'`, a plain number, `TRUE`). Text is the only kind kept as given; it goes in as a quoted
+  literal (`SqlIdent.sqlStr`), and the column is a quoted identifier. The predicate then passes the Pipeline save
+  gate, which binds the legacy `where` with `SqlGuard` and `TypeFlow` against the import's columns
+  (`ConfigRoutes.stepConfigFindings`).
+  - ⚠ **`SqlGuard` does not catch an injection here.** `"channel" = 'x' OR '1'='1'` is valid read-only SQL, so the
+    quoting is the defence that matters. A mutant that splices text raw keeps every row, and
+    `ControlApiImportRowFilterTest` goes red.
+  - ⚠ **`ne` is `(col IS NULL OR col <> v)`, not `IS DISTINCT FROM`.** `SqlGuard`'s lexical scan reads
+    `FROM '<text>'` as a file read and refuses it. `ne` keeps a row whose value is empty; every other condition
+    drops it.
+- **Where it is kept.** The Pipeline holds `csv_settings.where`, which is what runs. The Dataset entry holds
+  `importFilter: [{column, op, value | min | max}]`, display only: it uses the Dataset's (renamed) column names and
+  canonical values, and the card reads it. A later file through the same Pipeline is filtered the same way: *Add a
+  file*, *Run now*, the inbox and its 30 s poll, and a Postgres snapshot refresh (`addStaged`).
+- **Counted.** A filtered run's summary adds `rowsFilteredOut` and `filter` (the entry's conditions). `rowsIn` is
+  then rows written + rejected + left out. Each arrival line (`arrivals.jsonl`, `GET /datasets/{id}/arrivals`)
+  carries the file's `rowsFilteredOut`.
+  - ⚠ The ledger cannot give this figure. The native CSV lane and the Parquet lane count `parsed_rows` /
+    `total_input_rows` **after** the filter (`NativeCsvStreamingEngine.streamUnit` counts `transformed`). So before
+    the run, `OnboardImport.Job.rowsRead` counts each inbox file: delimited text through the engine's own reader
+    view (`DuckDbCsvIngester.createRawInputView`, rejected rows excluded), Parquet by row count. This is one extra
+    read per file, and only an import with a filter pays it. Left out = that count less the rows the file wrote: the
+    batch output for a single file, else the lineage ledger.
+  - JSON, NDJSON and Excel are not counted apart: `rowsFilteredOut` is `null`, never a wrong 0.
+- **A file the filter keeps nothing of.**
+  - The native CSV lane quarantines it as `empty`, which is engine behaviour. The summary rewrites that reason to
+    "the row filter kept none of its N rows".
+  - An upload (commit, Add a file, snapshot refresh) of such a file is refused: 422 "nothing was imported … the row
+    filter kept none of its N rows". Nothing changes.
+  - Run now and the poll report it as set aside.
+- **Tests.** `ControlApiImportRowFilterTest` (synthetic rows):
+  - the written filter keeps exactly the rows that random conditions describe, over 10 seeds;
+  - refusals naming the condition, and an injection-shaped text value that stays a literal;
+  - later files: Add a file (replace and append), an inbox drop taken by Run now, and the arrivals' counts;
+  - a Parquet replace handed to `addStaged`, as a snapshot's Refresh now does.
+
+  `ControlApiPostgresSnapshotTest.aSnapshotKeepsOnlyTheFilteredRowsOnEveryRefresh` covers the real-Postgres path. It
+  is skipped without `INSPECTO_TEST_PG_URL`.
 
 **Add a file** acts only on the Pipeline Add data wrote for that Dataset (`importPipeline` equal to the id and registered
 from `imports/<id>_pipeline.toon`; the registry fields alone are editable, so a forged entry is 409), checks the file
@@ -582,6 +645,26 @@ Only this commit writes it: an import into an existing Space carrying a `*_snaps
 created from a bundle (`canAdminister`) keeps the file, as it keeps every file it seeds.
 **Run now** (`POST /datasets/{id}/run`) on such a Dataset copies the table again and runs the Add-a-file replace path.
 
+**Export, then move (redesigned 2026-11-05, operator).**
+- **The export.** Run now EXPORTS the table with DuckDB `COPY (...) TO '<file>.parquet'`, through the same
+  `postgres_scanner` session, into a temporary folder `<data root>/_onboard/a<uuid>/`. That folder is under the data
+  root and never inside the inbox, so nothing reading the inbox (a concurrent Run now, the engine's discovery) can
+  see a half-written file.
+- **The move.** Only once the file is complete is it MOVED atomically into the Dataset's inbox
+  (`OnboardImport.addStaged(..., moveIntoInbox: true)`, `Job.moveSource`). The ordinary replace path then takes it like
+  an uploaded file: name-checked columns, the row filter (`ADD-DATA-ROW-FILTER-1`), the arrival (mode `replace`, the
+  rows left out) and compaction.
+- **A failed export** (refused login, unset reference, a copy error) removes the temporary folder and leaves the
+  inbox and the data as they were.
+- **The commit.** The draft's export is already complete and outside the inbox. The commit copies it to a temporary
+  file in the same drafts folder (the draft keeps its own copy for a retry) and moves that in; every Add data landing
+  now copies outside the inbox the same way. It used to copy to a `.landing-` file inside the inbox.
+- **A snapshot is manual only.** The 30 s refresh is removed: `InboxWatch.Snapshot`, its poll target and
+  `PostgresSnapshot.poll` are gone. `PUT /datasets/{id}/watch {watch: true}` on a snapshot is 422 ("a Postgres
+  snapshot is not polled"). The feed answers `watchable: false`, and an entry switched on before (`watchInbox: true`)
+  never reads as watched. There is no longer an "unchanged table adds no arrival" check: every Refresh now is a
+  replace, as an upload's *Replace everything* is.
+
 **How it reads (P0 V2, plan §6.1).** DuckDB's `postgres` extension (`postgres_scanner`), already staged in every
 bundle - no JDBC driver on Basic, no dependency added. `Session.open`: resolve the reference → in-memory DuckDB →
 `DuckDbExtension.ensureLoaded("postgres_scanner")` → `CREATE TEMPORARY SECRET` → `ATTACH '' AS pg (TYPE postgres,
@@ -601,18 +684,29 @@ the host zone); integers, floating, `numeric`, `date`, `timestamp`, `boolean`, t
 json, arrays, intervals, bytea…) → text. The draft then reads the Parquet like an uploaded one (`numeric` →
 DOUBLE).
 
-**The seam for the poll (P2).** `OnboardImport.addStaged(space, content, id, key, stage, file, name, mode, ex)` is
-the Add-a-file tail with no HTTP exchange (`ex == null` always runs inline); `PostgresSnapshot.poll(writeRoot,
-dataRoot, service, id)` refreshes a snapshot and answers `false` without an arrival when the copy's sha256 equals
-the last arrival's (an unchanged table adds nothing; DuckDB writes the same bytes for the same rows - tested).
+**The seam.** `OnboardImport.addStaged(space, content, id, key, stage, file, name, mode, ex[, moveIntoInbox])` is
+the Add-a-file tail with no HTTP exchange (`ex == null` always runs inline). `PostgresSnapshot.refresh` exports, then
+calls it with `moveIntoInbox: true`. (Until 2026-11-05 `PostgresSnapshot.poll` refreshed a snapshot every 30 s and
+skipped an unchanged copy by its sha256; removed with the poll.)
 
 Tests: `inspecto/.../ControlApiPostgresSnapshotTest` - the refusals before connecting (raw password never echoed,
 unset reference named, malformed host/port, write verbs, `;`, table AND query, a quoted identifier), 503/401/403/
 self-import 403, and against a REAL Postgres when `INSPECTO_TEST_PG_URL` (superuser JDBC URL) and
 `INSPECTO_PG_TEST_PASSWORD` are set (skipped otherwise - read "Skipped"): a write-capable login refused at
 the test and at the copy, the table list, the draft's types, the password in no answer / draft / config, commit,
-Run now replacing (35 rows after 5 added and 10 deleted), the poll skipping an unchanged table, the session itself
-read-only for a write-capable login, a data-modifying `WITH` changing nothing. Five mutants, each killed by its test.
+Run now replacing (35 rows after 5 added and 10 deleted) through the inbox (the inbox empty after the run, the
+arrival a `replace`), a snapshot never polled (Watch refused, a tick copies nothing, Refresh now does), the row filter
+applied on every refresh, the session itself read-only for a write-capable login, a data-modifying `WITH` changing
+nothing. Five mutants, each killed by its test. All 11 ran against a throwaway `postgres:18` container on 2026-11-05.
+`ControlApiSnapshotExportTest` needs no database:
+- the export handed over as `refresh` does is moved in and imported like an upload; the row filter applies, the
+  arrival is recorded and the temporary folder is gone. A watcher thread saw only the complete file in the inbox; it
+  samples, so it is not a proof for a tiny file;
+- a failed export leaves no temporary folder, an empty inbox and unchanged data;
+- a half-written export in the drafts folder is never taken by the 30 s poll or by Run now;
+- a snapshot cannot be watched, and an old `watchInbox: true` never reads as watched.
+
+Two mutants were killed by these tests: allowing Watch on a snapshot, and leaving the failed export's folder behind.
 
 ### Onboarding counters (`OnboardingRoutes`; `LA-ONBOARD-1` OB-13, 2026-10-22)
 

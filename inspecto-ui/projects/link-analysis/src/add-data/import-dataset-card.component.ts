@@ -32,6 +32,7 @@ import {
     ImportDataset,
     ImportSummary,
     isSnapshot,
+    keepsRowsLine,
     arrivalLine,
     fileProblem,
 } from './add-data.model';
@@ -83,6 +84,9 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
             </header>
             @if (dataset().description) {
                 <p class="text-secondary m-0 text-sm">{{ dataset().description }}</p>
+            }
+            @if (keepsRows(); as keeps) {
+                <p class="m-0 text-sm" data-testid="keeps-rows">{{ keeps }}.</p>
             }
             <inspecto-la-data-status [arrivals]="arrivalsAnswer()"></inspecto-la-data-status>
             @if (last(); as s) {
@@ -247,6 +251,8 @@ export class ImportDatasetCardComponent {
     protected readonly titleId = `inspecto-import-card-${ImportDatasetCardComponent.nextId++}`;
     /** A Postgres snapshot (BASIC-ONBOARD-1 P3): refreshed from its table, never added to by a file. */
     protected readonly snapshot = computed(() => isSnapshot(this.dataset()));
+    /** ADD-DATA-ROW-FILTER-1: "Keeps rows where …" when the import keeps only some rows; '' otherwise. */
+    protected readonly keepsRows = computed(() => keepsRowsLine(this.dataset().importFilter));
     protected readonly mode = new FormControl<AddFileMode>('replace', { nonNullable: true });
     protected readonly last = signal<ImportSummary | null>(null);
     protected readonly busy = signal(false);

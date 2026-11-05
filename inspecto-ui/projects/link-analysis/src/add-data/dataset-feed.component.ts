@@ -61,32 +61,10 @@ import { OnboardService } from './onboard.service';
     template: `
         @if (state(); as s) {
             @if (snapshot()) {
-                <section
-                    class="flex flex-col gap-1"
-                    [attr.aria-labelledby]="ids + '-refresh'"
-                    data-testid="snapshot-refresh"
-                >
-                    <h4 class="m-0 text-sm font-semibold" [id]="ids + '-refresh'">Refresh on its own</h4>
-                    <p class="text-secondary m-0 text-xs">
-                        Copies the table again every 30 seconds and replaces everything; nothing is added while the
-                        table has not changed.
-                    </p>
-                    @if (s.watchable) {
-                        <mat-slide-toggle
-                            class="self-start"
-                            data-testid="refresh-every"
-                            [checked]="!!s.watch"
-                            [disabled]="saving() || !!locked()"
-                            (change)="setWatch($event)"
-                            >Refresh every 30 seconds</mat-slide-toggle
-                        >
-                    }
-                    @if (s.watch && s.watchError) {
-                        <inspecto-alert variant="warning" data-testid="watch-error"
-                            >The last refresh failed: {{ s.watchError }}</inspecto-alert
-                        >
-                    }
-                </section>
+                <!-- a Postgres snapshot is manual only (operator 2026-11-05): no 30 s refresh, no inbox to show -->
+                <p class="text-secondary m-0 text-xs" data-testid="snapshot-manual">
+                    The table is copied again only when you press Refresh now; nothing refreshes it on its own.
+                </p>
             } @else {
                 <section
                     class="flex flex-col gap-1"
@@ -235,7 +213,7 @@ export class DatasetFeedComponent {
     readonly datasetId = input.required<string>();
     /** *Keep this up to date* is on offer (the host shows the edition lock otherwise). */
     readonly offerKeep = input(false);
-    /** A Postgres table snapshot (P3): only its 30 s refresh toggle is shown - it has no inbox to fill. */
+    /** A Postgres table snapshot (P3): manual only, so neither an inbox nor a refresh toggle is shown. */
     readonly snapshot = input(false);
     /** The card is running an import. */
     readonly busy = input(false);

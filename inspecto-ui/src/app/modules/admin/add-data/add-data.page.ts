@@ -14,7 +14,12 @@ import { ComponentsService } from '@inspecto/core/api/components.service';
 import { AddDataHandoff } from './add-data-drop.component';
 import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
 import { AddDataComponent } from '@inspecto/link-analysis/add-data/add-data.component';
-import { ImportDataset, ImportKind, ImportSummary } from '@inspecto/link-analysis/add-data/add-data.model';
+import {
+    ImportDataset,
+    ImportKind,
+    ImportSummary,
+    rowConditions,
+} from '@inspecto/link-analysis/add-data/add-data.model';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
 
 /**
@@ -111,6 +116,7 @@ export class ConsoleAddDataPageComponent implements OnInit {
                             primaryEntityType: (c.content['primaryEntityType'] as string | undefined) ?? null,
                             importPipeline: (c.content['importPipeline'] as string | undefined) ?? c.name,
                             importSource: c.content['importSource'] as string | undefined,
+                            importFilter: rowConditions(c.content['importFilter']),
                         })),
                 ),
             error: () => this.imports.set([]),

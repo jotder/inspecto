@@ -55,8 +55,15 @@ import {
     PostgresSnapshotSource,
     READ_FORMATS,
     RolesState,
+    ROW_OP_LABELS,
+    RowConditionState,
+    RowOp,
     TYPE_LABELS,
     buildCommit,
+    buildFilter,
+    conditionProblem,
+    keepsRowsLine,
+    rowOps,
     choiceKey,
     count,
     followOnClause,
@@ -89,6 +96,15 @@ type ColumnGroup = FormGroup<{
     drop: FormControl<boolean>;
     entityType: FormControl<string>;
     role: FormControl<ColumnRole>;
+}>;
+
+type ConditionGroup = FormGroup<{
+    column: FormControl<string>;
+    op: FormControl<RowOp>;
+    value: FormControl<string>;
+    min: FormControl<string>;
+    max: FormControl<string>;
+    matchCase: FormControl<boolean>;
 }>;
 
 const NONE = '';
@@ -188,6 +204,8 @@ export class AddDataComponent implements OnInit {
         header: ['true'],
         quote: [''],
         columns: this.fb.array<ColumnGroup>([]),
+        /** ADD-DATA-ROW-FILTER-1: the rows to keep; empty = every row. */
+        filter: this.fb.array<ConditionGroup>([]),
         primary: [NONE],
         from: [NONE],
         to: [NONE],
@@ -402,6 +420,34 @@ export class AddDataComponent implements OnInit {
         }
         return out;
     });
+    // ── the row filter (ADD-DATA-ROW-FILTER-1) ──────────────────────────────────────────────────────────────────────
+    protected readonly conditionGroups = computed(() => {
+        this.formTick();
+        return this.form.controls.filter.controls;
+    });
+    private readonly conditionStates = computed<RowConditionState[]>(() => {
+        this.formTick();
+        return this.form.controls.filter.getRawValue();
+    });
+    /** Why each condition cannot be sent yet, by index ('' = it can). */
+    protected readonly conditionProblems = computed(() =>
+        this.conditionStates().map((c) => conditionProblem(c, this.columnStates())),
+    );
+    /** A condition may name any kept column, shown by the name it will have. */
+    protected readonly filterColumnOptions = computed<PickerOption[]>(() =>
+        this.keptColumns().map((c) => ({
+            value: c.name,
+            label: c.rename.trim() || c.name,
+            hint: TYPE_LABELS[c.type as ColumnType],
+        })),
+    );
+    /** The sentence the Dataset card will show, by the names the columns will have. */
+    protected readonly keepsLine = computed(() => {
+        const names = new Map(this.columnStates().map((c) => [c.name, c.rename.trim() || c.name]));
+        const ok = this.conditionStates().filter((_, i) => !this.conditionProblems()[i]);
+        return keepsRowsLine(buildFilter(ok).map((c) => ({ ...c, column: names.get(c.column) ?? c.column })));
+    });
+
     protected readonly everyColumnDropped = computed(() => !!this.draft() && this.keptColumns().length === 0);
     protected readonly canCreate = computed(
         () =>
@@ -410,6 +456,7 @@ export class AddDataComponent implements OnInit {
             !this.reading() &&
             this.pending().length === 0 &&
             this.renameErrors().size === 0 &&
+            this.conditionProblems().every((p) => !p) &&
             !this.everyColumnDropped(),
     );
     /** The one sentence above Create: what will happen. */
@@ -430,6 +477,7 @@ export class AddDataComponent implements OnInit {
             kind: s.kind,
             importPipeline: s.pipeline,
             importSource: this.draft()?.snapshot?.source,
+            importFilter: s.filter,
             description: this.form.controls.description.value || undefined,
             primaryEntityType: this.form.controls.primary.value || null,
         };
@@ -541,6 +589,7 @@ export class AddDataComponent implements OnInit {
         this.confirmed.set(new Set());
         const fmt = d.format;
         this.form.controls.columns.clear({ emitEvent: false });
+        this.form.controls.filter.clear({ emitEvent: false });
         for (const c of initialColumns(d)) this.form.controls.columns.push(this.columnGroup(c), { emitEvent: false });
         const roles = initialRoles(d);
         this.rolesUnder = roles.recordType ?? NONE;
@@ -577,6 +626,7 @@ export class AddDataComponent implements OnInit {
         this.unavailable.set('');
         this.confirmed.set(new Set());
         this.form.controls.columns.clear({ emitEvent: false });
+        this.form.controls.filter.clear({ emitEvent: false });
         this.form.reset(undefined, { emitEvent: false });
         this.formTick.update((n) => n + 1);
         this.kind.setValue(kind);
@@ -592,6 +642,49 @@ export class AddDataComponent implements OnInit {
         if (!f || !d || this.reading()) return;
         const v = this.form.getRawValue();
         this.read(f, { delimiter: v.delimiter, header: v.header === 'true', quote: v.quote });
+    }
+
+    /** The type a draft column will have, as the screen holds it ('' = none chosen). */
+    protected columnType(column: string): string {
+        return this.columnStates().find((c) => c.name === column)?.type ?? '';
+    }
+
+    protected opOptions(column: string): PickerOption[] {
+        return rowOps(this.columnType(column)).map((op) => ({ value: op, label: ROW_OP_LABELS[op] }));
+    }
+
+    /** The value box a condition's column calls for. */
+    protected valueType(column: string): 'text' | 'number' | 'date' | 'datetime-local' {
+        const t = this.columnType(column);
+        return t === 'BIGINT' || t === 'DOUBLE'
+            ? 'number'
+            : t === 'DATE'
+              ? 'date'
+              : t === 'TIMESTAMP'
+                ? 'datetime-local'
+                : 'text';
+    }
+
+    protected addCondition(): void {
+        const g: ConditionGroup = this.fb.nonNullable.group({
+            column: [NONE],
+            op: ['eq' as RowOp],
+            value: [''],
+            min: [''],
+            max: [''],
+            matchCase: [false],
+        });
+        // another column may not offer the chosen condition (contains is for text): back to "is"
+        this.formSub?.add(
+            g.controls.column.valueChanges.subscribe((c) => {
+                if (!rowOps(this.columnType(c)).includes(g.controls.op.value)) g.controls.op.setValue('eq');
+            }),
+        );
+        this.form.controls.filter.push(g);
+    }
+
+    protected removeCondition(i: number): void {
+        this.form.controls.filter.removeAt(i);
     }
 
     protected confirm(key: string): void {
@@ -679,6 +772,7 @@ export class AddDataComponent implements OnInit {
         const body = buildCommit(d, v.name, v.description, v.columns, roles, {
             withEntityTypes: this.withEntityTypes(),
         });
+        if (v.filter.length) body.filter = buildFilter(v.filter);
         this.running.set(true);
         this.following.set(false);
         this.error.set('');

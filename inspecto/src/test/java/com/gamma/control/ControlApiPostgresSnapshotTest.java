@@ -318,11 +318,12 @@ class ControlApiPostgresSnapshotTest {
             assertEquals(35, run.get("rowsAfter").asLong(), "replace everything: the table as it is now, not added to: " + run);
 
             Path dataRoot = Path.of("database").toAbsolutePath().normalize();
-            int arrivals = DatasetArrivals.sidecarLines(dataRoot, id).size();
-            assertFalse(PostgresSnapshot.poll(root, dataRoot, c.svc, id), "an unchanged table adds no arrival");
-            assertEquals(arrivals, DatasetArrivals.sidecarLines(dataRoot, id).size());
+            // export, then move (operator 2026-11-05): the run took the export from the inbox like an uploaded file
+            assertEquals("[]", inboxListing(dataRoot, id), "the inbox is empty again: the export was moved in and taken");
+            List<Map<String, Object>> lines = DatasetArrivals.sidecarLines(dataRoot, id);
+            assertEquals("replace", lines.get(lines.size() - 1).get("mode"), "a snapshot replaces everything: " + lines);
             pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id = 45");
-            assertTrue(PostgresSnapshot.poll(root, dataRoot, c.svc, id), "a changed table is copied again");
+            data(post(c, "/datasets/" + id + "/run", null, null), 200);
             assertEquals(34, OnboardImport.countRows(dataRoot.resolve(id).resolve("database")));
 
             // deleting the Dataset retires its import: the snapshot's settings (and their reference) go with it
@@ -335,36 +336,69 @@ class ControlApiPostgresSnapshotTest {
         }
     }
 
+    /** ADD-DATA-ROW-FILTER-1: the row filter a snapshot was committed with keeps applying on every Refresh now. */
     @Test
-    void theThirtySecondRefreshCopiesTheTableOnlyWhenItChanged(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aSnapshotKeepsOnlyTheFilteredRowsOnEveryRefresh(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Pg pg = seeded();
-        InboxWatch.pausedForTest = true;   // the test drives InboxWatch.tick() itself (BASIC-ONBOARD-1 P2 + P3)
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(post(c, "/onboard/postgres", "{\"connection\":" + pg.connection(RO)
+                    + ",\"schema\":\"" + pg.schema + "\",\"table\":\"transfers\"}", null), 200);
+            String id = "snap_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            ids.add(id);
+            // ok = id even; amount = id * 1.5, so amount >= 15 means id >= 10: ids 10, 12 … 40 (16 rows)
+            String filter = ",\"filter\":[{\"column\":\"ok\",\"op\":\"eq\",\"value\":true},{\"column\":\"amount\",\"op\":\"range\",\"min\":15}]";
+            JsonNode made = data(post(c, "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"" + filter + "}", null), 200);
+            assertEquals(16, made.get("rowsAfter").asLong(), made.toString());
+            assertEquals(24, made.get("rowsFilteredOut").asLong(), made.toString());
+
+            // rows 41-45 (amount 1) arrive, rows 1-10 go: 12, 14 … 40 are kept (15 rows)
+            pg.exec("INSERT INTO " + pg.schema + ".transfers SELECT g, 'acct1', 'acct2', 1, now(), true, md5(g::text)::uuid, NULL "
+                    + "FROM generate_series(41, 45) g", "DELETE FROM " + pg.schema + ".transfers WHERE id <= 10");
+            JsonNode run = data(post(c, "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(15, run.get("rowsAfter").asLong(), run.toString());
+            assertEquals(20, run.get("rowsFilteredOut").asLong(), run.toString());
+
+            Path dataRoot = Path.of("database").toAbsolutePath().normalize();
+            pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id = 40");
+            data(post(c, "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(14, OnboardImport.countRows(dataRoot.resolve(id).resolve("database")), "every refresh filters");
+        } finally {
+            drop(pg);
+        }
+    }
+
+    /** Operator 2026-11-05: a snapshot is manual only - Watch is refused and the 30 s tick never copies the table. */
+    @Test
+    void aSnapshotIsNeverPolled(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Pg pg = seeded();
+        InboxWatch.pausedForTest = true;   // the test drives InboxWatch.tick() itself
         try (Ctx c = open(cfg, root)) {
             JsonNode d = data(post(c, "/onboard/postgres", "{\"connection\":" + pg.connection(RO)
                     + ",\"schema\":\"" + pg.schema + "\",\"table\":\"transfers\"}", null), 200);
             String id = "snap_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
             ids.add(id);
             data(post(c, "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
-            Path dataRoot = Path.of("database").toAbsolutePath().normalize();
-            Path db = dataRoot.resolve(id).resolve("database");
+            Path db = Path.of("database").toAbsolutePath().normalize().resolve(id).resolve("database");
 
-            JsonNode on = data(put(c, "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
-            assertTrue(on.get("watchable").asBoolean() && on.get("watch").asBoolean() && on.get("snapshot").asBoolean(), on.toString());
-            int arrivals = DatasetArrivals.sidecarLines(dataRoot, id).size();
-            InboxWatch.tick();
-            assertEquals(arrivals, DatasetArrivals.sidecarLines(dataRoot, id).size(), "an unchanged table adds no arrival");
-
+            HttpResponse<String> on = put(c, "/datasets/" + id + "/watch", "{\"watch\":true}", null);
+            assertEquals(422, on.statusCode(), on.body());
+            assertTrue(error(on).contains("not polled"), on.body());
             pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id <= 5");
             InboxWatch.tick();
-            assertEquals(35, OnboardImport.countRows(db), "the poll copied the changed table, replacing everything");
-
-            data(put(c, "/datasets/" + id + "/watch", "{\"watch\":false}", null), 200);
-            pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id <= 10");
-            InboxWatch.tick();
-            assertEquals(35, OnboardImport.countRows(db), "off: the table is no longer copied");
+            assertEquals(40, OnboardImport.countRows(db), "no poll copied the changed table");
+            data(post(c, "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(35, OnboardImport.countRows(db), "Refresh now does");
         } finally {
             InboxWatch.pausedForTest = false;
             drop(pg);
+        }
+    }
+
+    private static String inboxListing(Path dataRoot, String id) throws Exception {
+        Path in = dataRoot.resolve("inbox").resolve(id);
+        if (!Files.isDirectory(in)) return "[]";
+        try (java.util.stream.Stream<Path> w = Files.list(in)) {
+            return w.map(p -> p.getFileName().toString()).sorted().toList().toString();
         }
     }
 

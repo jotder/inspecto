@@ -241,7 +241,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(el.textContent).toContain('Postgres snapshot');
         expect(q(el, 'add-a-file')).toBeNull();
         expect(q(el, 'add-file-mode')).toBeNull();
-        // P2 + P3: the feed is mounted in snapshot mode - the 30 s refresh toggle, never an inbox
+        // the feed is mounted in snapshot mode: never an inbox, and no refresh toggle (manual only, operator 2026-11-05)
         expect(el.querySelector('inspecto-dataset-feed')).not.toBeNull();
         expect(q(el, 'dataset-inbox')).toBeNull();
         expect(q(el, 'run-now')!.textContent).toContain('Refresh now');
@@ -250,6 +250,57 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         http.expectOne(apiUrl('/datasets/transfers/run')).flush(summary());
         fixture.detectChanges();
         expect(fixture.componentInstance.got.length).toBe(1);
+        await expectNoA11yViolations(el);
+    });
+
+    it('ADD-DATA-ROW-FILTER-1: an import that keeps only some rows says which, and the arrivals how many were left out (no violations)', async () => {
+        const { fixture, el } = create();
+        expect(q(el, 'keeps-rows')).toBeNull(); // no filter: no line
+        fixture.componentInstance.dataset.set({
+            id: 'transfers',
+            kind: 'stream',
+            importPipeline: 'transfers',
+            importFilter: [
+                { column: 'channel', op: 'eq', value: 'mobile' },
+                { column: 'amount', op: 'range', min: '100' },
+                { column: 'booked_on', op: 'range', min: '2026-01-01', max: '2026-03-31' },
+                { column: 'note', op: 'contains', value: 'REFUND', matchCase: true },
+            ],
+        });
+        fixture.detectChanges();
+        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe(
+            "Keeps rows where channel is mobile and amount is 100 or more and booked_on is between 2026-01-01 and 2026-03-31 and note contains 'REFUND' (exact case).",
+        );
+        const reads = http.match((r) => r.url.endsWith('/arrivals')).filter((r) => !r.cancelled);
+        expect(reads.length).toBeGreaterThan(0);
+        reads.forEach((r) =>
+            r.flush({
+                dataset: 'transfers',
+                eventDateColumn: null,
+                truncated: false,
+                reason: null,
+                arrivals: [
+                    {
+                        file: 'october.csv',
+                        sender: 'upload',
+                        received: '2026-11-05 10:00:00',
+                        status: 'SUCCESS',
+                        rowsRead: 40,
+                        rowsRejected: 0,
+                        rowsFilteredOut: 60,
+                        mode: 'replace',
+                        sha256: null,
+                        index: null,
+                        consignment: 'c1',
+                        kept: true,
+                        coversFrom: null,
+                        coversTo: null,
+                    },
+                ],
+            }),
+        );
+        fixture.detectChanges();
+        expect(q(el, 'arrivals')!.textContent).toContain('60 rows left out by the filter');
         await expectNoA11yViolations(el);
     });
 

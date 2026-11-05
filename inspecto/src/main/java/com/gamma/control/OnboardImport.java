@@ -286,7 +286,7 @@ final class OnboardImport {
                    boolean keep, String role, String decimal) {}
 
     record Plan(List<PlanCol> cols, Map<String, Object> format, String primaryEntityType, Map<String, Object> link,
-                String identifying, String description, String frontendType) {
+                String identifying, String description, String frontendType, ImportRowFilter.Result filter) {
 
         @SuppressWarnings("unchecked")
         static Plan of(Map<String, Object> draft, Map<String, Object> body, List<EntityTypes.EntityType> types, String kind) {
@@ -414,7 +414,14 @@ final class OnboardImport {
             }
             if (link != null) cols = linkRoles(cols, overrides, link);
             String description = body.get("description") instanceof String s && !s.isBlank() ? s.trim() : null;
-            return new Plan(cols, draftFormat, primary, link, identifying, description, String.valueOf(draft.get("type")));
+            // ADD-DATA-ROW-FILTER-1: the rows to keep, over the kept columns as they will be typed and named
+            List<ImportRowFilter.Column> filterable = new ArrayList<>();
+            Set<String> left = new HashSet<>();
+            for (PlanCol c : cols)
+                if (c.keep()) filterable.add(new ImportRowFilter.Column(c.source(), c.name(), c.type()));
+                else left.add(c.source());
+            ImportRowFilter.Result filter = ImportRowFilter.of(body.get("filter"), filterable, left);
+            return new Plan(cols, draftFormat, primary, link, identifying, description, String.valueOf(draft.get("type")), filter);
         }
 
         /**
@@ -567,6 +574,9 @@ final class OnboardImport {
             }
             csv.put("date_formats", List.of("%Y-%m-%d"));
             csv.put("timestamp_formats", List.of("%Y-%m-%d %H:%M:%S"));
+            // ADD-DATA-ROW-FILTER-1: the post-parse row predicate over the Dataset's typed columns (every frontend); every
+            // later run of this Pipeline applies it - Add a file, Run now, the inbox poll, a snapshot refresh
+            if (filter.where() != null) csv.put("where", filter.where());
             proc.put("csv_settings", csv);
             p.put("processing", proc);
             Map<String, Object> parsing = new LinkedHashMap<>();
@@ -622,6 +632,8 @@ final class OnboardImport {
             if (primaryEntityType != null) d.put(DatasetEntryRules.PRIMARY_ENTITY_TYPE, primaryEntityType);
             if (link != null) d.put(DatasetEntryRules.DEFAULT_LINK_MAPPING, link);
             if (identifying != null) d.put("identifyingColumn", identifying);
+            // the conditions in words for the card ("Keeps rows where …"); the Pipeline's where is what runs
+            if (!filter.stored().isEmpty()) d.put(IMPORT_FILTER, filter.stored());
             return d;
         }
     }
@@ -655,6 +667,10 @@ final class OnboardImport {
         void run() throws Exception;
     }
 
+    /** The Dataset entry's key for the row conditions an import keeps rows by ({@code ADD-DATA-ROW-FILTER-1}; display only). */
+    static final String IMPORT_FILTER = "importFilter";
+    /** The import formats whose rows a filtered run counts apart, so it can say how many the filter left out. */
+    static final Set<String> COUNTED_FORMATS = Set.of("csv", "tsv", "parquet");
     /** The registry entry's key for {@link Job#lastImport}. */
     static final String LAST_IMPORT = "lastImport";
     /** Add a file's third mode (LA-ARRIVAL-MODES-1): the file replaces the days it covers. */
@@ -672,12 +688,16 @@ final class OnboardImport {
         Path aside;
         /** C2: this run is a commit of a draft, so a set-aside file is explained with fixes that edit that draft. */
         boolean fromDraft;
+        /** The source is a complete export outside the inbox (a Postgres snapshot's Run now): moved in, not copied. */
+        boolean moveSource;
         /** The ledger's {@code consignment_id} of the last batch {@link #runChecked} saw this run add; null if none. */
         String runBatch;
         /** sha256 of the uploaded file (LA-ARRIVAL-LEDGER-1), read as it lands; null for Run now. */
         String sha256;
         /** The per-file ledger rows {@link #runChecked} saw this run add: the files it took (LA-ARRIVAL-LEDGER-1). */
         List<Map<String, String>> taken = List.of();
+        /** ADD-DATA-ROW-FILTER-1: rows the import's row filter left out, by the ledger's file name; empty when it has none. */
+        Map<String, Long> filteredOut = Map.of();
         /** LA-ARRIVAL-MODES-1: the upload replaces the days it covers (its rows are added, then those days' older rows go). */
         boolean period;
         /** Columns the upload carries that the Dataset does not read: accepted, not kept, named in the result. */
@@ -749,13 +769,25 @@ final class OnboardImport {
         void landFromDraft(String type) throws IOException {
             Path in = inbox(space.dataRoot(), id);
             Files.createDirectories(in);
-            // a COPY: the draft keeps its file until the commit succeeds, so a failed commit can be retried as it stands
             String stem = source.getFileName().toString().replaceFirst("\\.[^.]*$", "");
             Path dest = in.resolve("add_" + stamp() + "_" + stem + "." + extension(type));
-            Path tmp = in.resolve(".landing-" + dest.getFileName());
             if (sha256 == null) sha256 = DatasetArrivals.sha256(source);   // Add a file hashed the bytes as uploaded
-            Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
-            Files.move(tmp, dest, StandardCopyOption.ATOMIC_MOVE);   // the poll never sees a half-written file
+            if (moveSource) {
+                // a Postgres snapshot's export (BASIC-ONBOARD-1 redesign, operator 2026-11-05): the complete file is MOVED in
+                Files.move(source, dest, StandardCopyOption.ATOMIC_MOVE);
+            } else {
+                // a COPY: the draft keeps its file until the commit succeeds, so a failed commit can be retried as it stands.
+                // The copy is made outside the inbox (under the drafts folder of the data root) and moved in whole, so
+                // neither the 30 s poll nor a Run now can see a half-written file.
+                Path tmp = space.dataRoot().resolve(OnboardRoutes.DRAFTS).resolve(".landing-" + UUID.randomUUID() + "-" + dest.getFileName());
+                Files.createDirectories(tmp.getParent());
+                try {
+                    Files.copy(source, tmp, StandardCopyOption.REPLACE_EXISTING);
+                    Files.move(tmp, dest, StandardCopyOption.ATOMIC_MOVE);
+                } finally {
+                    Files.deleteIfExists(tmp);
+                }
+            }
             landed = dest;
             undo.push(() -> Files.deleteIfExists(dest));
         }
@@ -796,6 +828,11 @@ final class OnboardImport {
             for (Map<String, String> q : space.service().statusStore().quarantine(cfg)) quarantineBefore.add(String.valueOf(q.get("path")));
             Set<String> filesBefore = new HashSet<>();
             for (Map<String, String> f : space.service().statusStore().files(cfg)) filesBefore.add(f.get("filename") + "|" + f.get("consignment_id"));
+            // ADD-DATA-ROW-FILTER-1: the native CSV lane counts a file's rows AFTER the row filter (parsed = rows written), so
+            // the rows its reader yields are counted here, before the run, with the engine's own reader view
+            boolean filters = cfg.csv().hasRowPredicate();
+            String format = String.valueOf(dataset.get("importFormat"));
+            Map<String, Long> read = filters && COUNTED_FORMATS.contains(format) ? rowsRead(cfg, format) : null;
             try {
                 space.service().runPipeline(id).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + id + "' is not registered"));
             } catch (IllegalStateException notRunnable) {
@@ -811,27 +848,44 @@ final class OnboardImport {
             s.put("pipeline", id);
             s.put("kind", kind);
             if (fileName != null) s.put("file", fileName);
-            long parsed = 0, rejected = 0;
+            long parsed = 0, rejected = 0, written = 0;
+            Map<String, Long> byFile = new LinkedHashMap<>();
+            Map<String, Long> keptByFile = new LinkedHashMap<>();
             List<Map<String, Object>> quarantined = new ArrayList<>();
             for (Map<String, String> b : space.service().statusStore().batches(cfg)) {
                 if (batchesBefore.contains(String.valueOf(b.get("consignment_id")))) continue;
                 runBatch = String.valueOf(b.get("consignment_id"));
                 parsed += parseLong(b.get("total_input_rows"));
                 rejected += parseLong(b.get("rejected_rows"));
+                written += parseLong(b.get("total_output_rows"));
+                if (read != null) filteredPerFile(cfg, runBatch, parseLong(b.get("total_output_rows")), took, read, byFile, keptByFile);
             }
+            filteredOut = byFile;
+            long filtered = byFile.values().stream().mapToLong(Long::longValue).sum();
+            String landedName = landed == null ? null : landed.getFileName().toString();
+            // the native lane sets a file the filter kept nothing of aside as `empty`: say what really happened
+            boolean filteredAway = landedName != null && byFile.getOrDefault(landedName, 0L) > 0 && keptByFile.getOrDefault(landedName, -1L) == 0;
             for (Map<String, String> q : space.service().statusStore().quarantine(cfg)) {
                 if (quarantineBefore.contains(String.valueOf(q.get("path")))) continue;
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("file", landed != null && String.valueOf(q.get("file")).equals(landed.getFileName().toString()) ? fileName : q.get("file"));
-                m.put("reason", q.get("reason"));
+                String qf = String.valueOf(q.get("file"));
+                m.put("file", landedName != null && qf.equals(landedName) ? fileName : q.get("file"));
+                boolean all = "empty".equals(q.get("reason")) && byFile.getOrDefault(qf, 0L) > 0;
+                m.put("reason", all ? "the row filter kept none of its " + byFile.get(qf) + " rows" : q.get("reason"));
                 quarantined.add(m);
             }
+            // rows read = written + rejected + left out, whichever lane counted them (see `read` above)
+            if (read != null) parsed = written + rejected + filtered;
             // C2: a commit whose run set the file aside or rejected rows says why with the catalogue, from the draft's file
             List<Map<String, Object>> findings = fromDraft && (rejected > 0 || !quarantined.isEmpty()) ? explain(cfg) : List.of();
             if (!findings.isEmpty())
                 for (Map<String, Object> m : quarantined) m.put("findings", findings);
             s.put("rowsIn", parsed);
             s.put("rowsRejected", rejected);
+            if (filters) {
+                s.put("rowsFilteredOut", read == null ? null : filtered);   // null: this format's rows are not counted apart
+                if (dataset.get(IMPORT_FILTER) instanceof List<?> conditions) s.put("filter", conditions);
+            }
             if (rejected > 0)
                 s.put("rejectedDetail", "GET /runs/" + id + "/errors?file=" + landed.getFileName());
             s.put("quarantined", quarantined);
@@ -841,13 +895,85 @@ final class OnboardImport {
             s.put("rowsChanged", after - before);
             s.put("replaced", replace);
             if (landed != null && (!quarantined.isEmpty() || after <= (replace ? 0 : before))) {
-                String why = !quarantined.isEmpty() ? "the file was set aside (" + quarantined.get(0).get("reason") + ")"
+                String why = filteredAway ? "the row filter kept none of its " + byFile.get(landedName) + " rows"
+                        : !quarantined.isEmpty() ? "the file was set aside (" + quarantined.get(0).get("reason") + ")"
+                        : filtered > 0 && filtered + rejected >= parsed ? "the row filter kept none of its " + parsed + " rows"
                         : rejected > 0 ? "all " + rejected + " rows were rejected" : "no row could be read";
                 String msg = "nothing was imported from '" + fileName + "': " + why + "; nothing was kept - check the column types and formats and try again";
                 if (!findings.isEmpty()) throw new OnboardFixes.Refusal(422, msg, findings);
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, msg);
             }
             return s;
+        }
+
+        /**
+         * The rows the filter left out of each file of one batch: the rows the file yields ({@code read}, counted before the
+         * run) less the rows it wrote (the batch's output when it took one file, else the lineage ledger's rows for that
+         * file). The ledger's {@code parsed_rows} cannot serve: the native CSV and the Parquet lanes count it after the filter.
+         */
+        private void filteredPerFile(PipelineConfig cfg, String batch, long batchWritten, List<Map<String, String>> took,
+                                     Map<String, Long> read, Map<String, Long> byFile, Map<String, Long> keptByFile) {
+            List<Map<String, String>> files = new ArrayList<>();
+            for (Map<String, String> f : took) if (batch.equals(f.get("consignment_id"))) files.add(f);
+            Map<String, Long> wrote = new LinkedHashMap<>();
+            if (files.size() == 1) wrote.put(String.valueOf(files.get(0).get("filename")), batchWritten);
+            else
+                for (Map<String, String> l : space.service().statusStore().lineage(cfg, batch)) {
+                    String in = l.get("input_file");
+                    if (in == null || in.isBlank()) continue;
+                    wrote.merge(Path.of(in).getFileName().toString(), parseLong(l.get("row_count")), Long::sum);
+                }
+            for (Map<String, String> f : files) {
+                String name = String.valueOf(f.get("filename"));
+                long w = wrote.getOrDefault(Path.of(name).getFileName().toString(), 0L);
+                Long yielded = read.get(name);
+                keptByFile.put(name, w);
+                if (yielded != null) byFile.put(name, Math.max(0, yielded - w));   // not counted (unreadable): left unsaid
+            }
+        }
+
+        /**
+         * Rows each file waiting in the import's inbox yields, by the name the run ledger gives it: delimited text through the
+         * engine's own reader view ({@code DuckDbCsvIngester.createRawInputView}: the same {@code read_csv}, rejected rows
+         * excluded), Parquet by its row count. A file it cannot read is left out (the run judges it). An extra read of each
+         * file, paid only by an import that filters rows.
+         */
+        private Map<String, Long> rowsRead(PipelineConfig cfg, String format) {
+            Map<String, Long> out = new LinkedHashMap<>();
+            Path in = inbox(space.dataRoot(), id);
+            Map<String, Object> schema = cfg.schemas().single();
+            if (schema == null || !Files.isDirectory(in)) return out;
+            List<Path> files;
+            try (java.util.stream.Stream<Path> w = Files.list(in)) {
+                files = w.filter(Files::isRegularFile).filter(p -> !p.getFileName().toString().startsWith(".")).toList();
+            } catch (IOException unreadable) {
+                return out;
+            }
+            if (files.isEmpty()) return out;
+            try {
+                DuckDbUtil.loadDriver();
+                try (Connection conn = DuckDbUtil.openInMemory(null, List.of(in.toAbsolutePath().normalize()), null)) {
+                    for (Path f : files)
+                        try (Statement st = conn.createStatement()) {
+                            String relation;
+                            if ("parquet".equals(format)) {
+                                relation = com.gamma.sql.SqlViews.parquetFile(f);
+                            } else {
+                                com.gamma.etl.DuckDbCsvIngester.createRawInputView(f.toFile(), conn, schema, cfg, "row_filter_read", 0);
+                                relation = "row_filter_read";
+                            }
+                            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + relation)) {
+                                if (rs.next()) out.put(com.gamma.etl.FileNames.safe(cfg, f.getFileName().toString()), rs.getLong(1));
+                            }
+                            st.execute("DROP VIEW IF EXISTS row_filter_read");
+                        } catch (Exception unreadable) {
+                            // left out: the run quarantines or rejects it and the ledger says so
+                        }
+                }
+            } catch (Exception noDuckDb) {
+                // no count: the ledger's own figures are used
+            }
+            return out;
         }
 
         /**
@@ -890,7 +1016,7 @@ final class OnboardImport {
         void recordArrival(Map<String, Object> summary) {
             Map<String, List<String>> fresh = new LinkedHashMap<>(inboxNewColumns);
             if (landed != null && !newColumns.isEmpty()) fresh.put(landed.getFileName().toString(), newColumns);
-            DatasetArrivals.recordRun(space.dataRoot(), id, taken, landed, fileName, mode(), sha256, fresh, summary);
+            DatasetArrivals.recordRun(space.dataRoot(), id, taken, landed, fileName, mode(), sha256, fresh, filteredOut, summary);
         }
 
         /**
@@ -1193,10 +1319,19 @@ final class OnboardImport {
      * Add the file staged at {@code file} (in its own {@code stage} directory) to the import {@code id} and run it - the part
      * of Add a file after the body is received, shared with a Postgres snapshot's refresh ({@link PostgresSnapshot#refresh}).
      * The caller has claimed {@code key} in {@link #IN_FLIGHT}; this releases it and removes {@code stage}, success or not
-     * (a followed run, when it ends). {@code ex == null} (the poll) always runs inline.
+     * (a followed run, when it ends). {@code ex == null} always runs inline.
      */
     static Object addStaged(Space space, Map<String, Object> content, String id, String key, Path stage, Path file, String name,
                             String mode, HttpExchange ex) throws IOException {
+        return addStaged(space, content, id, key, stage, file, name, mode, ex, false);
+    }
+
+    /**
+     * {@link #addStaged(Space, Map, String, String, Path, Path, String, String, HttpExchange)}; {@code moveIntoInbox}: the
+     * staged file is a complete export (a Postgres snapshot's Run now) and is MOVED into the inbox whole instead of copied.
+     */
+    static Object addStaged(Space space, Map<String, Object> content, String id, String key, Path stage, Path file, String name,
+                            String mode, HttpExchange ex, boolean moveIntoInbox) throws IOException {
         Path writeRoot = space.writeRoot(), dataRoot = space.dataRoot();
         String pipeline = String.valueOf(content.get("importPipeline"));
         boolean replace = "replace".equals(mode), period = PERIOD.equals(mode);
@@ -1231,6 +1366,7 @@ final class OnboardImport {
             job.newColumns = newColumns;
             job.inboxNewColumns = waitingNew;
             job.sha256 = sha;
+            job.moveSource = moveIntoInbox;
             long before = countRows(job.database());
             final Job j = job;
             if (replace) job.setAside();
@@ -1456,7 +1592,7 @@ final class OnboardImport {
         Map<String, Object> snapshot = PostgresSnapshot.read(writeRoot, id);
         if (snapshot != null)
             return PostgresSnapshot.refresh(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)),
-                    content, id, snapshot, ex, false);
+                    content, id, snapshot, ex);
         return importWaiting(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), id, content, null);
     }
 

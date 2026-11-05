@@ -36,3 +36,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `e
 |---|---|---|---|---|
 | `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
+| `ADD-DATA-FILTER-EDIT-1` | P3 | feature | *Edit filter* on an import Dataset's card (operator 2026-11-05; follows ADD-DATA-ROW-FILTER-1). | — |
