@@ -370,7 +370,7 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
 * **The decimal mark (`format.decimalMark`, C1; `DecimalMark`).** `.` (`1,234.50`) or `,` (`1.234,50`); digit groups
   may be split by the other mark or a space. A column decides when every sampled value reads with one mark and not the
   other (`12.5` → `.`; `12,5`, `1.234,50` → `,`); a whole part with a leading zero (`000 345 678`, `012.000.789`) is
-  an identifier, never a number; `1.234` reads either way and decides nothing (then `.` is assumed,
+  an identifier, never a number (known limit: a space-grouped identifier with no leading zero, such as a SIREN `512 100 554`, is still proposed as a number - drop it or set its type at commit); `1.234` reads either way and decides nothing (then `.` is assumed,
   `low`). Columns that disagree keep `.`, `low`, both named. No number with a mark: `high`, "changes nothing". A column
   whose numbers need the mark (a `,` mark, or grouping) is typed DOUBLE (never BIGINT: a later `7.500,25` keeps its
   fraction) and carries it in
