@@ -223,6 +223,10 @@ public final class CapabilityManifest {
             new Entry("GET", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
             new Entry("PUT", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
             new Entry("DELETE", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
+            // ADD-DATA-FILTER-EDIT-1: Edit filter rewrites the import Pipeline's row predicate, as the commit wrote it - the
+            // upload verb, like Keep this up to date's rewrite of the same Pipeline.
+            new Entry("GET", "/datasets/([^/]+)/filter", Roles.CAN_UPLOAD_DATA),
+            new Entry("PUT", "/datasets/([^/]+)/filter", Roles.CAN_UPLOAD_DATA),
             // BASIC-ONBOARD-1 P2: Watch this folder (the 30 s inbox poll) is the upload verb too, on Basic and up.
             new Entry("PUT", "/datasets/([^/]+)/watch", Roles.CAN_UPLOAD_DATA),
             // LA-DATASET-COMPACT-1: the storage read and Compact now are the upload verb; a retention policy (which drops

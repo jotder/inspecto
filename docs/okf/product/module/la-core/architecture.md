@@ -1476,6 +1476,15 @@ limits and the commit's write order are in
     [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md) ("Keep only some rows").
   - **Specs.** `add-data.component.spec.ts` (two `ADD-DATA-ROW-FILTER-1` cases), `import-dataset-card.component.spec.ts`
     and `add-data.model.spec.ts` ("row filter words and checks").
+  - **Edit filter on the card (`ADD-DATA-FILTER-EDIT-1`, as built 2026-11-06).** `ImportFilterEditComponent`
+    (`inspecto-import-filter-edit`) sits on the Dataset card, under the Add a file row. It holds the same condition rows,
+    over the Dataset's columns from `GET /datasets/{id}/filter`. It says "Applies to files added from now on; rows
+    already imported stay." (on a Postgres snapshot: "Applies at the next Refresh now, which copies the table again and
+    replaces every row."). Save waits while the card runs an import. Removing every row shows "Every row is kept." and saves `[]`. *Edit filter* follows the
+    card's Add data lock. After a save the card's "Keeps rows where …" line follows the saved conditions until the host
+    passes a fresh entry. Shared helpers in `add-data.model.ts`: `conditionState`, `conditionValueType`;
+    `conditionProblem` takes `{name, type, drop}`. Server side: `api-onboarding-authoring.md` ("Edit filter").
+    Specs: `import-filter-edit.component.spec.ts` and one card case.
 - **Change a column's Entity Type later:** `PUT /datasets/{id}/columns/{column}` (`canAuthorWorkbench`, edit access
   to the Dataset). The profile cache keys on the binding signature, so the next read re-assesses.
 - **Deleting an Add data Dataset retires its import Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, `LA-ONBOARD-RETIRE-GAPS-1`).

@@ -597,6 +597,37 @@ same way.
   `ControlApiPostgresSnapshotTest.aSnapshotKeepsOnlyTheFilteredRowsOnEveryRefresh` covers the real-Postgres path. It
   is skipped without `INSPECTO_TEST_PG_URL`.
 
+#### Edit filter: `GET` / `PUT /datasets/{id}/filter` (`ADD-DATA-FILTER-EDIT-1`, as built 2026-11-06)
+
+The conditions can be changed after the commit (`ImportFilterEdit`).
+- **`GET`** answers `{dataset, filter, columns: [{name, type}]}`: the entry's `importFilter`, and the columns a condition
+  may name, with the engine type the import gives each. They are read from the import's own schema
+  (`imports/<id>_schema.toon`): the mapped columns by their Dataset names, typed by the raw field, or by the cast of a
+  decimal-mark column (`TRY_CAST(… AS DOUBLE)`).
+- **`PUT`** takes `{filter: [...]}`, the commit's shape, but `column` is the **Dataset's** name (no draft any more).
+  `ImportRowFilter.of(…, dataset)` checks and renders it, so every refusal, the literal rendering and the huge-exponent
+  guard are the commit's. A refusal names the Dataset: `filter[0]: 'x' has no column 'channel'`. A missing
+  `filter` key is 422; `[]` or `null` keeps every row, and the `where` key and `importFilter` are removed.
+- **One write, two places.** The Pipeline is rewritten through `DatasetFeed.rewritePipeline`, the same path as *Keep
+  this up to date*: approval policy 409, the import claimed against a run or delete 409, the save gate (only the
+  findings the edit introduces), the reload check, the Pipeline history. The entry is re-read and written inside the
+  same claim, after the new Pipeline loads, so a column change made meanwhile is kept; when the write fails, the old
+  Pipeline is put back (its audit record stays; that path has no test). A refused edit changes neither.
+- **Next files only.** Nothing is re-read: the rows already imported and the earlier arrivals stay as they were. A
+  Postgres snapshot is the exception in effect: Refresh now copies the whole table again, so the new filter then
+  applies to every row (the card says so).
+  Decided for this row: *Replace everything* does not re-read the last file with the new filter. The next run's
+  summary carries the new `filter`.
+- **Gates.** `canUploadData`, the capability every write of an import's Pipeline needs (the commit and the feed). A
+  builder with `canAuthorWorkbench` alone gets 403. Then write root 503, `data.self_import` 403, unknown 404, view-only
+  403, not an import Add data wrote for this id 409, and an approval policy over Datasets 409. Listed in
+  `ImportCapabilityGuardTest`, `JobWritersTest` and `DecisionRuleWritersTest`.
+- **Tests.** `ControlApiImportFilterEditTest` (synthetic rows):
+  - an edit and then Add a file: the new filter applies, while the rows and the first arrival stay;
+  - clearing it;
+  - refusals that change nothing, and an injection-shaped value saved as a literal;
+  - 401 and 403 (a builder), then 200 with `canUploadData`.
+
 **Add a file** acts only on the Pipeline Add data wrote for that Dataset (`importPipeline` equal to the id and registered
 from `imports/<id>_pipeline.toon`; the registry fields alone are editable, so a forged entry is 409), checks the file
 has the import's format and carries the columns the schema reads (column count for delimited text, names otherwise;

@@ -62,6 +62,7 @@ import {
     buildCommit,
     buildFilter,
     conditionProblem,
+    conditionValueType,
     keepsRowsLine,
     rowOps,
     choiceKey,
@@ -664,14 +665,7 @@ export class AddDataComponent implements OnInit {
 
     /** The value box a condition's column calls for. */
     protected valueType(column: string): 'text' | 'number' | 'date' | 'datetime-local' {
-        const t = this.columnType(column);
-        return t === 'BIGINT' || t === 'DOUBLE'
-            ? 'number'
-            : t === 'DATE'
-              ? 'date'
-              : t === 'TIMESTAMP'
-                ? 'datetime-local'
-                : 'text';
+        return conditionValueType(this.columnType(column));
     }
 
     protected addCondition(): void {

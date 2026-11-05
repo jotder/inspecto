@@ -291,6 +291,27 @@ final class DatasetFeed {
     @SuppressWarnings("unchecked")
     private static void rewrite(ApiContext api, Import imp, String why,
                                 java.util.function.Function<Map<String, Object>, Map<String, Object>> edit) throws IOException {
+        rewritePipeline(api, imp, why, p -> {
+            Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> c
+                    ? new LinkedHashMap<>((Map<String, Object>) c) : new LinkedHashMap<>();
+            p.put("trigger", edit.apply(collector));
+            p.put("collector", collector);
+        }, null);
+    }
+
+    /** A step run inside {@link #rewritePipeline}'s claim once the new Pipeline loads; a failure puts the old one back. */
+    @FunctionalInterface
+    interface AfterWrite {
+        void run() throws IOException;
+    }
+
+    /**
+     * {@link #rewrite}'s gates and write for any edit of the import's Pipeline ({@code edit} changes a copy of it in place;
+     * {@code ADD-DATA-FILTER-EDIT-1} rewrites {@code processing.csv_settings.where} through it). {@code after} (may be
+     * null) runs while the import is still claimed; when it fails the Pipeline is put back and nothing is kept in history.
+     */
+    static void rewritePipeline(ApiContext api, Import imp, String why,
+                                java.util.function.Consumer<Map<String, Object>> edit, AfterWrite after) throws IOException {
         PendingChanges.holdRefusing(api, List.of("pipeline"), why);
         String key = imp.writeRoot() + "|" + imp.id();
         if (!OnboardImport.IN_FLIGHT.add(key))
@@ -301,10 +322,7 @@ final class DatasetFeed {
             byte[] before = Files.readAllBytes(imp.pipelineFile());
             Map<String, Object> src = ToonHelper.load(imp.pipelineFile().toString());
             Map<String, Object> p = new LinkedHashMap<>(src);
-            Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> c
-                    ? new LinkedHashMap<>((Map<String, Object>) c) : new LinkedHashMap<>();
-            p.put("trigger", edit.apply(collector));
-            p.put("collector", collector);
+            edit.accept(p);
             Path dir = imp.pipelineFile().getParent();
             List<Finding> introduced = SaveGate.introduced(
                     SaveGate.check(api, "pipeline", p, imp.writeRoot(), dir, SaveGate.Referents.MUST_EXIST),
@@ -322,6 +340,15 @@ final class DatasetFeed {
                 AtomicFiles.write(imp.pipelineFile(), before, ".cfg-");
                 imp.service().refreshConfigs();
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's Pipeline did not load: " + refused.getMessage());
+            }
+            if (after != null) {
+                try {
+                    after.run();
+                } catch (IOException | RuntimeException failed) {
+                    AtomicFiles.write(imp.pipelineFile(), before, ".cfg-");
+                    imp.service().refreshConfigs();
+                    throw failed;
+                }
             }
             PipelineHistory.record(imp.writeRoot(), imp.pipelineFile());   // PIPELINE-CONFIG-HISTORY-1
             imp.service().refreshConfigs();
