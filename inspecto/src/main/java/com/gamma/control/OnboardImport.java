@@ -12,8 +12,7 @@ import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.expectation.ExpectationRunner;
-import com.gamma.linkindex.LinkIndexAccess;
-import com.gamma.linkindex.LinkIndexBuilder;
+import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
@@ -94,6 +93,11 @@ final class OnboardImport {
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS").withZone(ZoneOffset.UTC);
     /** The feature whose presence means a Space's Jobs build indexes and evaluate Expectations (DATA-TIERS-1 §6). */
     static final String AUTOMATION_FEATURE = "pipeline.automation";
+    /**
+     * BASIC-ONBOARD-1 P1: the default Pipeline's four steps, named in every import's Pipeline config. Read by no engine
+     * code (like {@code origin}); an import written before carries none and means the same.
+     */
+    static final List<String> IMPORT_STEPS = List.of("read", "arrange", "write_parquet", "follow_on");
 
     /** Ids being imported right now in this JVM (a second commit of the same id is 409, not a race). */
     static final Set<String> IN_FLIGHT = ConcurrentHashMap.newKeySet();
@@ -435,7 +439,7 @@ final class OnboardImport {
         private static String givenLink(Map<String, Object> given, String key) {
             String old = DatasetEntryRules.PRIMARY_TIME.equals(key) ? "time" : DatasetEntryRules.PRIMARY_MEASURE.equals(key) ? "amount" : null;
             try {
-                return old == null ? (given.get(key) == null ? null : String.valueOf(given.get(key))) : DatasetEntryRules.primary(given, key, old);
+                return old == null ? (given.get(key) == null ? null : String.valueOf(given.get(key))) : com.gamma.linkindex.LinkMapping.primary(given, key, old);
             } catch (IllegalArgumentException twoNames) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "link: " + twoNames.getMessage());
             }
@@ -498,6 +502,7 @@ final class OnboardImport {
             p.put("name", id);
             p.put("active", true);
             p.put("origin", "import");
+            p.put("import_steps", IMPORT_STEPS);
             p.put("description", description != null ? description : "Imported from " + fileName + " with Add data");
             if ("reference".equals(kind)) p.put("produces", "reference");
             p.put("trigger", Map.of("type", "manual"));
@@ -838,40 +843,28 @@ final class OnboardImport {
             registry.write("dataset", id, current, false);
         }
 
-        /** DT-16: the import's own follow-on work, inside the user's run (unless the Space's Jobs do it). */
+        /**
+         * The default Pipeline's fourth step (BASIC-ONBOARD-1 P1, DT-16): the import's follow-on work, inside the user's
+         * run (unless the Space's Jobs do it) - compaction, each application's registered {@link ImportFollowOn} under its
+         * key, then the Expectations. No follow-on registered: the import ends at its Parquet.
+         */
         void followOn(Map<String, Object> summary) {
             Map<String, Object> current = new ComponentStore(space.writeRoot().resolve("registry")).get("dataset", id)
                     .map(ComponentRegistry.Component::content).orElse(dataset);
-            // LA-DATASET-COMPACT-1 (D-7): merge the files once there are many, before the index reads them
+            // LA-DATASET-COMPACT-1 (D-7): merge the files once there are many, before a follow-on reads them
             summary.put("compaction", DatasetCompaction.afterImport(space.dataRoot(), id, current));
             boolean inRun = !EditionFeatures.present(AUTOMATION_FEATURE);
             summary.put("followOnInRun", inRun);
-            summary.put("index", inRun ? buildIndex(current) : outcome("DEFERRED", "the Space's Jobs build the index"));
+            for (ImportFollowOn f : followOns())
+                summary.put(f.key(), inRun ? runFollowOn(f, current) : f.deferred());
             summary.put("expectations", inRun ? evaluateExpectations() : List.of());
         }
 
-        @SuppressWarnings("unchecked")
-        private Map<String, Object> buildIndex(Map<String, Object> content) {
-            if (!(content.get(DatasetEntryRules.DEFAULT_LINK_MAPPING) instanceof Map<?, ?> raw))
-                return outcome("SKIPPED", "the Dataset has no link mapping");
-            Map<String, Object> m = (Map<String, Object>) raw;
-            LinkIndexBuilder builder = com.gamma.spi.OptionalSpi.first(LinkIndexBuilder.class).orElse(null);
-            if (builder == null) return outcome("NOT_AVAILABLE", "Link Analysis is not installed, so there is no index to build");
+        private Map<String, Object> runFollowOn(ImportFollowOn f, Map<String, Object> content) {
             try {
-                LinkIndexAccess.Outcome o = builder.build(space.writeRoot(), space.dataRoot(), new LinkIndexAccess.Request(
-                        "onboard:" + id, id, (String) m.get("from"), (String) m.get("to"), (String) m.get("kind"),
-                        DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_TIME, "time"), null,
-                        // LA-COLUMN-ROLES-1 P2: every Time, Measure and Category column rides in the index
-                        DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount"), DatasetEntryRules.carriedColumns(content),
-                        space.actor(), true, 300_000L, 0L));
-                Map<String, Object> r = outcome(o.result(), o.message());
-                r.put("mode", o.mode());   // append / full / compact / none: what the build cost (V4)
-                r.put("code", o.code());
-                r.put("edges", o.edges());
-                r.put("nodes", o.nodes());
-                return r;
+                return f.run(new ImportFollowOn.Context(space.writeRoot(), space.dataRoot(), id, content, space.actor()));
             } catch (RuntimeException failed) {
-                return outcome("FAILED", "the index could not be built: " + failed.getMessage());
+                return outcome("FAILED", "'" + f.key() + "' could not run: " + failed.getMessage());
             }
         }
 
@@ -936,6 +929,32 @@ final class OnboardImport {
             v /= 26;
         }
         return sb.reverse().toString();
+    }
+
+    private static volatile List<ImportFollowOn> followOnsForTest;
+
+    /** Test seam: a stand-in follow-on list for a class path that carries no application; {@code null} restores the real one. */
+    static void followOnsForTest(List<ImportFollowOn> list) {
+        followOnsForTest = list;
+    }
+
+    /** The follow-ons the installed applications registered (BASIC-ONBOARD-1 P1), in class-path order. */
+    static List<ImportFollowOn> followOns() {
+        List<ImportFollowOn> t = followOnsForTest;
+        return t != null ? t : com.gamma.spi.OptionalSpi.all(ImportFollowOn.class);
+    }
+
+    /** The registered follow-ons as the draft lists them for the review sentence: {@code [{key, does, needs}]}. */
+    static List<Map<String, Object>> describeFollowOns() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ImportFollowOn f : followOns()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("key", f.key());
+            m.put("does", f.does());
+            m.put("needs", List.copyOf(new java.util.TreeSet<>(f.needs())));
+            out.add(m);
+        }
+        return out;
     }
 
     private static Map<String, Object> outcome(String result, String message) {

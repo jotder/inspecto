@@ -336,6 +336,14 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         await expectNoA11yViolations(el);
     });
 
+    it('BASIC-ONBOARD-1 P1: with no follow-on registered the review sentence promises no link index', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft({ followOns: [] }));
+        const line = q(el, 'create-line')!.textContent!;
+        expect(line).toContain('runs it once.');
+        expect(line).not.toContain('link index');
+    });
+
     it('a sure draft: every choice pre-applied with its evidence, nothing to confirm, one click commits it (no violations)', async () => {
         const { fixture, el } = create();
         upload(fixture, el, transfersDraft());
@@ -348,6 +356,7 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         expect(q(el, 'pending')).toBeNull();
         expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(false);
         expect(q(el, 'create-line')!.textContent).toContain('Creates the Dataset transfers (events between entities)');
+        expect(q(el, 'create-line')!.textContent).toContain('runs it once, and builds its link index.');
         await expectNoA11yViolations(el);
         const req = commit(fixture, el);
         const body = bodyOf(req);

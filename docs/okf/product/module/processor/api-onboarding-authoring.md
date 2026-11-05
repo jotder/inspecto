@@ -431,10 +431,13 @@ re-draft with `?delimiter=…`), because the columns were read with it. Order:
    no `shares` key, so the Dataset is shared with its Space like every other Dataset in it (`LA-ONBOARD-DEFECTS-1`,
    2026-10-23; it was `shares: []`, private to the importer, and no screen could share it).
 5. Follow-on work **inside the same run** (DT-16) unless `pipeline.automation` is present (a Space whose Jobs do it;
-   that feature does not exist yet, so every edition does it in-run today): the link index through the
-   `LinkIndexBuilder` SPI (`index:{result: BUILT|UP_TO_DATE|REFUSED|FAILED|SKIPPED|NOT_AVAILABLE, edges, nodes, …}`,
-   `edges` and `nodes` = what the index holds after the run, every entity once - after an append too; the owner
-   is the importer, a full build is allowed) and every enabled Expectation whose target is the Pipeline
+   that feature does not exist yet, so every edition does it in-run today): each installed application's follow-on
+   step, registered through the `ImportFollowOn` SPI and reported under its own key (`BASIC-ONBOARD-1` P1; the
+   draft lists them as `followOns:[{key, does, needs}]`). Link Analysis registers its link index
+   (`LinkIndexFollowOn`, `la/inspecto-geo-link`): `index:{result: BUILT|UP_TO_DATE|REFUSED|FAILED|SKIPPED, edges,
+   nodes, …}`, `edges` and `nodes` = what the index holds after the run, every entity once - after an append too;
+   the owner is the importer, a full build is allowed. Without a registered follow-on (no Link Analysis) the summary
+   has no `index` key and the import ends at its Parquet. Then every enabled Expectation whose target is the Pipeline
    (`expectations:[{name, status, violations}]`). Neither failing undoes the import; both are reported.
 
 **A failed commit leaves nothing behind**: every write is undone in reverse (Dataset entry, data and inbox

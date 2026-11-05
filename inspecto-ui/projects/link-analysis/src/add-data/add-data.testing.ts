@@ -105,6 +105,8 @@ export function transfersDraft(over: Partial<OnboardDraft> = {}): OnboardDraft {
             inlineMaxBytes: 67108864,
             excel: true,
         },
+        // Link Analysis is installed: its link index is the one follow-on (BASIC-ONBOARD-1 P1)
+        followOns: [{ key: 'index', does: 'builds its link index', needs: ['defaultLinkMapping'] }],
         ...over,
     };
 }

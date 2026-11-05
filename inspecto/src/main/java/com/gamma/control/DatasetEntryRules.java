@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.linkindex.LinkMapping;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -21,7 +23,7 @@ import java.util.Set;
 final class DatasetEntryRules {
 
     static final String PRIMARY_ENTITY_TYPE = "primaryEntityType";
-    static final String DEFAULT_LINK_MAPPING = "defaultLinkMapping";
+    static final String DEFAULT_LINK_MAPPING = LinkMapping.KEY;
     /** What one row is (ENTITY-TYPE-CATALOG-1 P2): a record type id of the Space's packs. */
     static final String RECORD_TYPE = "recordType";
 
@@ -30,7 +32,7 @@ final class DatasetEntryRules {
      * that weighs it; {@code time} / {@code amount} are their old names, still read for entries written before (one or the
      * other, never two different columns).
      */
-    static final String PRIMARY_TIME = "primaryTime", PRIMARY_MEASURE = "primaryMeasure";
+    static final String PRIMARY_TIME = LinkMapping.PRIMARY_TIME, PRIMARY_MEASURE = LinkMapping.PRIMARY_MEASURE;
     private static final Set<String> MAPPING_KEYS = Set.of("from", "to", "kind", "time", "amount", PRIMARY_TIME, PRIMARY_MEASURE,
             "details");
 
@@ -61,7 +63,7 @@ final class DatasetEntryRules {
         if (from.equalsIgnoreCase(to))
             throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + ".from and .to must be two different columns");
         for (String k : List.of("kind", "time", "amount", PRIMARY_TIME, PRIMARY_MEASURE)) column(m, k, false, columns);
-        String time = primary(m, PRIMARY_TIME, "time"), measure = primary(m, PRIMARY_MEASURE, "amount");
+        String time = LinkMapping.primary(m, PRIMARY_TIME, "time"), measure = LinkMapping.primary(m, PRIMARY_MEASURE, "amount");
         Map<String, Map<?, ?>> byName = columnsByName(content);
         if (time != null) requireRole(byName, time, "temporal", PRIMARY_TIME, "a Time");
         if (measure != null) {
@@ -117,19 +119,6 @@ final class DatasetEntryRules {
         }
     }
 
-    /**
-     * The primary a link mapping names under {@code key}, else under its old name; {@code null} when neither. Two
-     * different columns under the two names are refused: an entry says which column dates (or weighs) its links once.
-     */
-    static String primary(Map<?, ?> m, String key, String oldKey) {
-        String now = m.get(key) instanceof String s && !s.isBlank() ? s.trim() : null;
-        String old = m.get(oldKey) instanceof String s && !s.isBlank() ? s.trim() : null;
-        if (now != null && old != null && !now.equalsIgnoreCase(old))
-            throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + " names " + key + " '" + now + "' and " + oldKey + " '" + old
-                    + "' (its old name): state " + key + " only");
-        return now != null ? now : old;
-    }
-
     /** A primary's column, when it states a role, has the role the primary needs (an entry without roles is read as before). */
     private static void requireRole(Map<String, Map<?, ?>> byName, String column, String role, String key, String what) {
         Map<?, ?> c = byName.get(column.toLowerCase(Locale.ROOT));
@@ -140,33 +129,7 @@ final class DatasetEntryRules {
     }
 
     /** LA-COLUMN-ROLES-1 P2: {@code columns[].carried: false} keeps a Time, Measure or Category column off the links. */
-    static final String CARRIED = "carried";
-    /** The roles whose columns ride on every link and in its index (plan Q-5: opt-out, not opt-in). */
-    static final Set<String> CARRIED_ROLES = Set.of("temporal", "measure", "dimension");
-    /** At most this many carried columns: a link index build's own bound ({@code IndexRoutes.MAX_ATTR_COLS}). */
-    static final int MAX_CARRIED = 50;
-
-    /**
-     * The columns that ride on every link of the entry (LA-COLUMN-ROLES-1 P2): each Time, Measure and Category column,
-     * in column order, unless it says {@code carried: false}, and never a link end; the first {@link #MAX_CARRIED} only, so
-     * the index it builds can be rebuilt through {@code POST /inv/index/builds}. Empty for an entry without roles.
-     * These become a link index's {@code attributeColumns} and a link read's {@code attrCols}.
-     */
-    static List<String> carriedColumns(Map<String, Object> content) {
-        List<String> out = new java.util.ArrayList<>();
-        if (!(content.get("columns") instanceof List<?> cols)) return out;
-        Set<String> ends = new HashSet<>();
-        if (content.get(DEFAULT_LINK_MAPPING) instanceof Map<?, ?> m)
-            for (String k : List.of("from", "to"))
-                if (m.get(k) instanceof String s) ends.add(s.trim().toLowerCase(Locale.ROOT));
-        for (Object o : cols)
-            if (o instanceof Map<?, ?> c && c.get("name") instanceof String n && !n.isBlank()
-                    && c.get("role") instanceof String r && CARRIED_ROLES.contains(r.trim().toLowerCase(Locale.ROOT))
-                    && !Boolean.FALSE.equals(c.get(CARRIED)) && !ends.contains(n.trim().toLowerCase(Locale.ROOT))
-                    && out.size() < MAX_CARRIED)
-                out.add(n.trim());
-        return out;
-    }
+    static final String CARRIED = LinkMapping.CARRIED;
 
     /** Column types that hold numbers: the registry's {@code number} and the engine's own spellings. */
     private static final Set<String> NUMERIC = Set.of("number", "numeric", "integer", "int", "bigint", "smallint", "tinyint",

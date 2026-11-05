@@ -89,6 +89,10 @@ public final class ConfigSpecs {
                 FieldSpec.enumField("origin", "Origin", List.of("import"), null,
                         "Who made this pipeline: `import` = written by Add data (`POST /onboard/files/{draftId}/commit`, "
                                 + "LA-ONBOARD-1 OB-3). An ordinary Pipeline otherwise; read by no engine code."),
+                FieldSpec.of("import_steps", "Import steps", FieldType.LIST,
+                        "The default Pipeline's steps an Add data import runs (BASIC-ONBOARD-1): `read`, `arrange`, "
+                                + "`write_parquet`, `follow_on` (each installed application's registered follow-on, "
+                                + "e.g. Link Analysis's link index). Written by Add data; read by no engine code."),
                 FieldSpec.enumField("reference.load", "Reference load mode",
                         List.of("replace", "upsert", "scd2"), "replace",
                         "How a produces:reference dataset is loaded: replace (full-replace, today's default), "

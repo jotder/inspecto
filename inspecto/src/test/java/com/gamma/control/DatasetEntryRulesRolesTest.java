@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.linkindex.LinkMapping;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -130,16 +131,16 @@ class DatasetEntryRulesRolesTest {
                 col("name", "fee", "role", "measure", "carried", false), col("name", "amount", "role", "Measure"),
                 col("name", "note", "role", "detail"), col("name", "plain"));
         assertDoesNotThrow(() -> DatasetEntryRules.validate(e));
-        assertEquals(List.of("channel", "booked_at", "amount"), DatasetEntryRules.carriedColumns(e));
+        assertEquals(List.of("channel", "booked_at", "amount"), LinkMapping.carriedColumns(e));
         // a link end is never an attribute, even when it states a carried role
-        assertEquals(List.of(), DatasetEntryRules.carriedColumns(linked(Map.of("from", "a", "to", "b"),
+        assertEquals(List.of(), LinkMapping.carriedColumns(linked(Map.of("from", "a", "to", "b"),
                 col("name", "a", "role", "dimension"), col("name", "b", "role", "temporal"))));
-        assertEquals(List.of(), DatasetEntryRules.carriedColumns(Map.of("physicalRef", "t")));
+        assertEquals(List.of(), LinkMapping.carriedColumns(Map.of("physicalRef", "t")));
         // at most the index build's bound, in column order
         List<Map<String, Object>> wide = new java.util.ArrayList<>();
         for (int i = 0; i < 60; i++) wide.add(col("name", "m" + i, "role", "measure"));
-        List<String> capped = DatasetEntryRules.carriedColumns(Map.of("columns", wide));
-        assertEquals(DatasetEntryRules.MAX_CARRIED, capped.size());
+        List<String> capped = LinkMapping.carriedColumns(Map.of("columns", wide));
+        assertEquals(LinkMapping.MAX_CARRIED, capped.size());
         assertEquals("m49", capped.get(capped.size() - 1));
         assertTrue(refusal(entry(col("name", "fee", "role", "measure", "carried", "no"))).contains("true or false"));
     }

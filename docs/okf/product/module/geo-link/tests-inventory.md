@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-127 test class(es): 18 unit, 109 real-HTTP control-plane, 0 IT.
+128 test class(es): 19 unit, 109 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -144,6 +144,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `IntegrationWebhooksTest` | `com.gamma.geolink` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/geolink/IntegrationWebhooksTest.java` | Which ledger events become which webhook, and the signature's exact shape (LA-EDITIONS-1 phase 6). |
 | `InvestigationMeasureRoutesContractTest` | `com.gamma.geolink` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/geolink/InvestigationMeasureRoutesContractTest.java` | {@link InvestigationMeasureRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |
 | `InvestigationTimeLastWeekdaySqlTest` | `com.gamma.geolink` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/geolink/InvestigationTimeLastWeekdaySqlTest.java` | The {@code lastWeekday} recurring rule's SQL ({@link InvestigationTime#predicates}) must remove EXACTLY the days the Java |
+| `LinkIndexFollowOnTest` | `com.gamma.geolink` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/geolink/LinkIndexFollowOnTest.java` | BASIC-ONBOARD-1 P1: Link Analysis registers its link index as the import's follow-on. |
 | `ReferenceChangeIndexStalenessTest` | `com.gamma.geolink` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/geolink/ReferenceChangeIndexStalenessTest.java` | {@code LA-DAILY-INGEST-1} T6 / roadmap gap 6: does a changed Reference file make a Link Analysis Index stale? Runs the REAL |
 | `WorkingSetMeasuresTest` | `com.gamma.geolink` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/geolink/WorkingSetMeasuresTest.java` | LA-23 — a Measure over one Working Set relation, in the BI Measure shorthand, evaluated in-JVM with SQL's null |
 | `EntityMaskingTest` | `com.gamma.la.api` | unit | `la/inspecto-geo-link/src/test/java/com/gamma/la/api/EntityMaskingTest.java` | LA-17 step 5 — {@code typed} masking reads an Entity List op's SEALED {@code masked} flag (design §4.4.2): a list |

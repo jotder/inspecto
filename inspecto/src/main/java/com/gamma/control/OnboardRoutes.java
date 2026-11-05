@@ -244,6 +244,8 @@ final class OnboardRoutes implements RouteModule {
             }).toList());
             AtomicFiles.write(dir.resolve("draft.json"), JSON.writeValueAsBytes(record), ".draft-");
             kept = true;
+            // BASIC-ONBOARD-1 P1: what the default Pipeline's follow-on step will do, for the review sentence
+            out.put("followOns", OnboardImport.describeFollowOns());
             return out;
         } finally {
             if (!kept) deleteTree(dir);

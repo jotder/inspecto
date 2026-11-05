@@ -58,6 +58,7 @@ class ControlApiOnboardFilesTest {
     @AfterEach
     void cleanUp() {
         Authenticators.forTest(null);
+        OnboardImport.followOnsForTest(null);
         System.clearProperty("duckdb.extension.dir");
         Path data = Path.of("database").toAbsolutePath();
         for (String id : ids) {
@@ -253,6 +254,48 @@ class ControlApiOnboardFilesTest {
         throw new AssertionError();
     }
 
+    /**
+     * BASIC-ONBOARD-1 P1: an application's registered follow-on is listed on the draft and runs inside the user's run,
+     * after the Parquet is written, with the Dataset's entry; its outcome lands under its own key and in the arrival.
+     */
+    @Test
+    void aRegisteredFollowOnIsListedAndRunsInsideTheRun(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        List<com.gamma.onboard.ImportFollowOn.Context> seen = new ArrayList<>();
+        OnboardImport.followOnsForTest(List.of(new com.gamma.onboard.ImportFollowOn() {
+            public String key() { return "probe"; }
+            public String does() { return "probes it"; }
+            public Set<String> needs() { return Set.of("defaultLinkMapping"); }
+            public Map<String, Object> deferred() { return Map.of("result", "DEFERRED"); }
+            public Map<String, Object> run(Context ctx) {
+                seen.add(ctx);
+                // the Parquet is already written when a follow-on runs
+                return Map.of("result", "DONE", "rows", OnboardImport.countRows(ctx.dataRoot().resolve(ctx.dataset()).resolve("database")));
+            }
+        }));
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("probed");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(40), null);
+            JsonNode listed = d.get("followOns");
+            assertEquals(1, listed.size(), listed.toString());
+            assertEquals("probe", listed.get(0).get("key").asText());
+            assertEquals("probes it", listed.get(0).get("does").asText());
+            assertEquals("defaultLinkMapping", listed.get(0).get("needs").get(0).asText());
+            JsonNode s = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            assertEquals("DONE", s.get("probe").get("result").asText(), s.toString());
+            assertEquals(40, s.get("probe").get("rows").asLong(), "the follow-on ran after write Parquet: " + s);
+            assertFalse(s.has("index"), s.toString());
+            assertEquals(1, seen.size());
+            assertEquals(id, seen.get(0).dataset());
+            assertEquals("import", seen.get(0).entry().get("origin"), "the follow-on gets the registered entry");
+            assertTrue(seen.get(0).entry().get("defaultLinkMapping") instanceof Map<?, ?>, seen.get(0).entry().toString());
+
+            // Run now runs it again, inside that run too
+            JsonNode again = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertEquals("DONE", again.get("probe").get("result").asText(), again.toString());
+            assertEquals(2, seen.size());
+        }
+    }
+
     // ── commit ──────────────────────────────────────────────────────────────────────────────────────────────
 
     @Test
@@ -260,6 +303,7 @@ class ControlApiOnboardFilesTest {
         try (Ctx c = open(cfg, root)) {
             String id = uniqueId("transfers");
             JsonNode d = draft(c, "transfers.csv", "stream", transfers(120), null);
+            assertEquals(0, d.get("followOns").size(), "no application registered a follow-on here: " + d.get("followOns"));
             JsonNode s = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
             assertEquals(id, s.get("dataset").asText());
             assertEquals(120, s.get("rowsIn").asLong(), s.toString());
@@ -267,12 +311,13 @@ class ControlApiOnboardFilesTest {
             assertEquals(0, s.get("rowsRejected").asLong());
             assertEquals(0, s.get("quarantined").size());
             assertTrue(s.get("followOnInRun").asBoolean(), "DT-16: the follow-on work ran inside this run");
-            assertEquals("NOT_AVAILABLE", s.get("index").get("result").asText(), "no Link Analysis module in this module's classpath");
+            assertFalse(s.has("index"), "BASIC-ONBOARD-1 P1: no application registered a follow-on here, so the import ends at its Parquet: " + s);
             assertEquals(0, s.get("expectations").size());
 
             // an ordinary Pipeline marked origin: import, never polled, index selectors (OB-4)
             String toon = Files.readString(root.resolve("imports").resolve(id + "_pipeline.toon"));
             assertTrue(toon.contains("origin: import"), toon);
+            assertTrue(toon.contains("import_steps"), "BASIC-ONBOARD-1 P1: the default Pipeline's four steps are named: " + toon);
             assertTrue(toon.contains("type: manual"), toon);
             assertTrue(toon.contains("accepts_upload: true"), toon);
             String schema = Files.readString(root.resolve("imports").resolve(id + "_schema.toon"));
@@ -438,7 +483,7 @@ class ControlApiOnboardFilesTest {
             assertTrue(et.get("identifying").get("evidence").asText().contains("every one of its 60 sampled values is different"));
             JsonNode s = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
             assertEquals(60, s.get("rowsAfter").asLong());
-            assertEquals("SKIPPED", s.get("index").get("result").asText(), "a Reference has no link to index");
+            assertFalse(s.has("index"), "no follow-on registered here (Link Analysis reports SKIPPED for a Reference): " + s);
             JsonNode ds = data(json(c, "GET", "/components/dataset/" + id, null, null), 200).get("content");
             assertEquals("reference", ds.get("kind").asText());
             assertEquals("account_id", ds.get("identifyingColumn").asText());
@@ -615,10 +660,10 @@ class ControlApiOnboardFilesTest {
             assertTrue(drop.get("file").asText().contains("foreign_drop"), drop.toString());
             assertEquals(20, drop.get("rowsRead").asLong());
             assertEquals("append", drop.get("mode").asText(), "Run now adds what it takes: " + drop);
-            // Run now records its own index outcome per file (no Link Analysis here: nothing to build)
-            assertEquals("NOT_AVAILABLE", drop.get("index").asText(), drop.toString());
+            // Run now records its own index outcome per file (no Link Analysis here: no follow-on, nothing recorded)
+            assertTrue(drop.get("index").isNull(), drop.toString());
             assertTrue(drop.get("sha256").isNull(), "only an upload's bytes are hashed: " + drop);
-            assertEquals("NOT_AVAILABLE", nov.get("index").asText(), nov.toString());
+            assertTrue(nov.get("index").isNull(), nov.toString());
 
             assertEquals("upload", nov.get("sender").asText(), nov.toString());
             assertEquals("november.csv", nov.get("file").asText());
@@ -656,7 +701,7 @@ class ControlApiOnboardFilesTest {
             assertNotNull(drop2, again.toString());
             assertNotNull(extra, again.toString());
             assertEquals(5, drop2.get("rowsRead").asLong(), drop2.toString());
-            assertEquals("NOT_AVAILABLE", drop2.get("index").asText(), drop2.toString());
+            assertTrue(drop2.get("index").isNull(), drop2.toString());
             assertEquals("extra.csv", extra.get("file").asText(), extra.toString());
             assertEquals(7, extra.get("rowsRead").asLong(), extra.toString());
 

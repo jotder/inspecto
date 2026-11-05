@@ -97,6 +97,24 @@ export interface OnboardDraft {
         recordType?: Choice<string | null>;
     };
     limits: DraftLimits;
+    /** The follow-on steps the installed applications registered (BASIC-ONBOARD-1 P1); empty: the import ends at Parquet. */
+    followOns?: ImportFollowOnInfo[];
+}
+
+/** One application's follow-on step, as the draft lists it: its summary key, what it does, the entry keys it needs. */
+export interface ImportFollowOnInfo {
+    key: string;
+    does: string;
+    needs: string[];
+}
+
+/**
+ * The follow-on clause of the review sentence (", and builds its link index"): each registered follow-on whose needs the
+ * review meets. `hasLink` = the Dataset will carry a `defaultLinkMapping` (events with both link ends chosen).
+ */
+export function followOnClause(followOns: ImportFollowOnInfo[] | undefined, hasLink: boolean): string {
+    const met = (followOns ?? []).filter((f) => f.needs.every((n) => n === 'defaultLinkMapping' && hasLink));
+    return met.map((f) => `, and ${f.does}`).join('');
 }
 
 /** The format choices a re-draft states (`?delimiter=&header=&quote=`). */
