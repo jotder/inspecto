@@ -78,6 +78,14 @@ public final class EditionFeatures {
      * the SPA as {@code /bootstrap} {@code features.laWidgets}; declared by {@code inspecto-ops} beside the route features.
      */
     public static final String LA_WIDGETS = "laWidgets";
+    /**
+     * Pipelines that run on their own - Standard and up (DT-5, D-1): an import's <i>Keep this up to date</i> (a watched
+     * folder or SFTP feed on a schedule, {@code PUT /datasets/{id}/feed}) and a Dataset's retention policy
+     * ({@code PUT /datasets/{id}/storage}). Checked by those routes themselves, not a route feature; reported in the feed and
+     * storage reads ({@code automatic}, {@code retentionAvailable}) so Basic's screens stay locked. Declared by
+     * {@code inspecto-ops} (operator 2026-11-05: no module declared it, so real Standard bundles refused both).
+     */
+    public static final String PIPELINE_AUTOMATION = "pipeline.automation";
 
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";

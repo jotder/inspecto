@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * One application's follow-on step of an import's default Pipeline ({@code BASIC-ONBOARD-1} P1): read → arrange →
  * write Parquet → <b>follow-on</b>. The platform's Add data runs every registered follow-on inside the user's run
- * (DT-16), after the Parquet is written and compacted and before the Expectations, and reports each outcome in the run
+ * (DT-16), in every edition (operator 2026-11-05), after the Parquet is written and compacted and before the Expectations, and reports each outcome in the run
  * summary under {@link #key()}. An application without one ends at the Parquet.
  *
  * <p>A {@code ServiceLoader} SPI (a {@code META-INF/services} entry, found through {@code OptionalSpi.all}) because the
@@ -23,9 +23,6 @@ public interface ImportFollowOn {
 
     /** The Dataset entry keys it needs; without them it reports itself skipped (Link Analysis: {@code defaultLinkMapping}). */
     Set<String> needs();
-
-    /** Its outcome when the Space's Jobs do this work instead of the user's run ({@code pipeline.automation} present). */
-    Map<String, Object> deferred();
 
     /**
      * Do the work for one import. A refusal or failure is an outcome ({@code result}, {@code message}, plus its own

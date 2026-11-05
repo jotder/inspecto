@@ -149,6 +149,7 @@ demo; it must be usable."** Where this section and an earlier row disagree, this
 | **P1** "Add data" | **Done** (`ONBOARDING-FIRST-RUN-1`, `BASIC-ONBOARD-1`). |
 | **P2** groundwork | **Kept, shrunk** to what P4, P5 and P7 need. |
 | **P3** automation gate | **Dropped.** Basic offers no schedule authoring in its screens (already true); configurations with schedules still run. |
+| **`pipeline.automation` declared** (operator, 2026-11-05) | `inspecto-ops` (Standard and up) declares it, so *Keep this up to date* and a retention policy work on real Standard bundles (no module declared it before; only tests switched it on). It no longer moves the import's link-index build out of the user's run: a person's import always builds the index in-run (a fresh graph), a scheduled feed's files are the Space's Job's; Expectations stay with the Jobs where it is present. Basic's screens stay locked. |
 | **P4** reach | **Kept, narrowed:** `telecom-asn1` and the telecom decoders to Advanced (DT-12); remote kinds other than the Postgres snapshot are Standard **in Basic's screens** (locked with a reason). The Postgres snapshot reads through DuckDB's `postgres` extension, so it does not need `connectors` on Basic. |
 | **P5** egress gate | **Kept:** outbound delivery is Standard, locked with a reason on Basic's screens. |
 | **P6** transform gate | **Shrunk** to palette / step-catalog locks in the screens (Basic has no Pipeline editor); no refuse walk on load. |

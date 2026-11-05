@@ -33,11 +33,6 @@ public final class LinkIndexFollowOn implements ImportFollowOn {
     }
 
     @Override
-    public Map<String, Object> deferred() {
-        return outcome("DEFERRED", "the Space's Jobs build the index");
-    }
-
-    @Override
     @SuppressWarnings("unchecked")
     public Map<String, Object> run(Context c) {
         if (!(c.entry().get(LinkMapping.KEY) instanceof Map<?, ?> raw))

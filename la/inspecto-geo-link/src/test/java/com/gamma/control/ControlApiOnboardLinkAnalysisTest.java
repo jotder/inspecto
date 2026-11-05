@@ -110,8 +110,7 @@ class ControlApiOnboardLinkAnalysisTest {
                     ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
             assertEquals(200, s.get("rowsAfter").asLong(), s.toString());
 
-            // DT-16: on Basic the link index is built inside the user's own run, not dispatched as a signal-driven Job
-            assertTrue(s.get("followOnInRun").asBoolean());
+            // DT-16: the link index is built inside the user's own run, not dispatched as a signal-driven Job
             assertEquals("BUILT", s.get("index").get("result").asText(), s.get("index").toString());
             assertTrue(s.get("index").get("edges").asLong() > 0, s.get("index").toString());
             boolean indexed = false;
@@ -235,6 +234,27 @@ class ControlApiOnboardLinkAnalysisTest {
             assertEquals("UP_TO_DATE", now.get("result").asText(), now.toString());
             assertEquals(400, now.get("edges").asLong(), now.toString());
             assertEquals(entities, now.get("nodes").asLong(), "an index that is already current counts each entity once too: " + now);
+        }
+    }
+
+    /**
+     * Operator 2026-11-05: where Pipelines run on their own (Standard and up, {@code pipeline.automation}), a person's import
+     * still builds the link index inside the run - the graph is fresh at once; a scheduled feed's files are the Job's.
+     */
+    @Test
+    void onStandardAnImportStillBuildsTheIndexInsideTheRun(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode s = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("BUILT", s.at("/index/result").asText(), s.toString());
+            assertEquals(200, s.at("/index/edges").asLong(), s.toString());
+            JsonNode app = data(send(c, "POST", "/datasets/" + id + "/files?name=more.csv&mode=append",
+                    transfers(50).replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("BUILT", app.at("/index/result").asText(), "Add a file too: " + app);
+        } finally {
+            EditionFeatures.overrideForTest(null);
         }
     }
 

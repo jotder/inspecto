@@ -254,10 +254,10 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   2. A person without the right to configure sees **Ask an administrator to keep this up to date** instead.
   3. Anything beyond that (joins, SQL steps, remote Collectors) is **Open in editor** in the console, pre-filled.
      Inspecto LA never edits Pipelines itself (§8 A-6).
-- **As built: hand-off only.** The Dataset card shows **Keep this up to date** locked on Basic, *Ask an administrator
-  to keep this up to date* with sign-in, and an *Open in editor* hand-off. The automation itself is not built: the
-  import Pipeline uses a manual trigger until DT-17, and no module declares the `pipeline.automation` feature yet
-  (`LA-ONBOARD-RESIDUALS-1` item 3, demand-gated).
+- **As built.** The Dataset card shows **Keep this up to date** locked on Basic, *Ask an administrator
+  to keep this up to date* with sign-in, and an *Open in editor* hand-off. On Standard and up it keeps the import up to
+  date (a watched folder or SFTP feed on a schedule, `LA-ARRIVAL-FEEDS-1`): `inspecto-ops` declares the
+  `pipeline.automation` feature since 2026-11-05 (before, no module did, so Standard refused it like Basic).
 
 ### UC-07 Say what the columns hold (Entity Types)
 

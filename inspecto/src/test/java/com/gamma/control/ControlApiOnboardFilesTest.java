@@ -266,7 +266,6 @@ class ControlApiOnboardFilesTest {
             public String key() { return "probe"; }
             public String does() { return "probes it"; }
             public Set<String> needs() { return Set.of("defaultLinkMapping"); }
-            public Map<String, Object> deferred() { return Map.of("result", "DEFERRED"); }
             public Map<String, Object> run(Context ctx) {
                 seen.add(ctx);
                 // the Parquet is already written when a follow-on runs
@@ -311,7 +310,6 @@ class ControlApiOnboardFilesTest {
             assertEquals(120, s.get("rowsAfter").asLong());
             assertEquals(0, s.get("rowsRejected").asLong());
             assertEquals(0, s.get("quarantined").size());
-            assertTrue(s.get("followOnInRun").asBoolean(), "DT-16: the follow-on work ran inside this run");
             assertFalse(s.has("index"), "BASIC-ONBOARD-1 P1: no application registered a follow-on here, so the import ends at its Parquet: " + s);
             assertEquals(0, s.get("expectations").size());
 
@@ -595,7 +593,6 @@ class ControlApiOnboardFilesTest {
             assertEquals(appended, String.valueOf(((Map<?, ?>) registry.get("dataset", id).orElseThrow().content().get("lastImport")).get("batch")));
             assertEquals(90, now.get("rowsAfter").asLong(), now.toString());
             assertEquals(0, now.get("rowsChanged").asLong());
-            assertTrue(now.get("followOnInRun").asBoolean());
 
             // a file of another shape is refused before it lands; the data is untouched
             HttpResponse<String> wrong = send(c, "POST", "/datasets/" + id + "/files?name=narrow.csv", "a,b\n1,2\n".getBytes(StandardCharsets.UTF_8), null);

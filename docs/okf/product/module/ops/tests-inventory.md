@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.ops`](../../../../../product-map/module/ops.toon).
 
-70 test class(es): 47 unit, 23 real-HTTP control-plane, 0 IT.
+71 test class(es): 47 unit, 24 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -39,6 +39,7 @@ mvn -o test -pl features/inspecto-ops -Dtest=AlertMigrationOpsTest,AlertServiceP
 | `ControlApiImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiImpactTest.java` | WS-10 ({@code ASSURE-IMPACT-LEDGER-1}): {@code PUT /objects/{id}/impact} records an Incident's or Case's typed |
 | `ControlApiIncidentFinishGateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiIncidentFinishGateTest.java` | INCIDENT-FINISH-GATE-1 (operator, 2026-09-26: "narrow route"): an analyst holding {@code canWorkIncidents} can |
 | `ControlApiInertObjectsTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiInertObjectsTest.java` | An object of a type this build does not know (a legacy {@code ALERT} row, or a module that is not installed) is |
+| `ControlApiKeepUpToDateStandardTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiKeepUpToDateStandardTest.java` | Operator 2026-11-05: on a real Standard bundle - this module on the class path, NO test override - an import can be kept up |
 | `ControlApiNoteRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiNoteRoutesTest.java` | BACKLOG D10 over real HTTP: the kind-addressed {@code /notes/{targetKind}/{targetId}/…} surface. |
 | `ControlApiObjectReadMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiObjectReadMaskingTest.java` | Read-time masking of the {@code key.<column>} attributes on {@code GET /objects} and {@code GET /objects/{id}} |
 | `ControlApiObjectsByEntityTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiObjectsByEntityTest.java` | {@code GET /objects/by-entity} over real HTTP — an Entity's case history. One test per gate: 401 with no |
