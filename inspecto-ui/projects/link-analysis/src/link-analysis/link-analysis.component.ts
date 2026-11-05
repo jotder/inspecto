@@ -3528,8 +3528,12 @@ Its prior copies stay in its version history.`,
     );
     /** What the panel last applied per Dataset over a read of several Datasets (each written as its mappings' `filter`). */
     readonly datasetRoleFilters = signal<DatasetRoleFilters>({});
-    /** The run whose edge mappings hold the panel's conditions, and which: only those are taken out by the next push. */
-    private datasetRoleFiltersWritten: { run: unknown; filters: DatasetRoleFilters } | null = null;
+    /**
+     * What the last push wrote per Dataset, and the mapping `filter` objects it sent: a Dataset's conditions are taken
+     * out by the next push only while a mapping of the run on screen still holds one of those objects. A Refresh or a
+     * Measure re-read copies the mappings but keeps their `filter` objects; a new run or a loaded view does not.
+     */
+    private datasetRoleFiltersWritten: { trees: ReadonlySet<unknown>; filters: DatasetRoleFilters } | null = null;
     /**
      * The Datasets whose Category values are read (or being read): one read per Dataset, not per opening of the filter.
      * A Dataset no longer drawn leaves it, so its late answer is dropped.
@@ -3607,7 +3611,11 @@ Its prior copies stay in its version history.`,
         // only those this run's mappings hold from the panel are taken out
         const perDataset = this.datasetRoleFilters();
         if (run.sourceId === 'entity-projection-multi' && q.multi) {
-            const written = this.datasetRoleFiltersWritten?.run === run ? this.datasetRoleFiltersWritten.filters : {};
+            const was = this.datasetRoleFiltersWritten;
+            const held = new Set(
+                q.multi.edges.filter((e) => e.filter && was?.trees.has(e.filter)).map((e) => e.dataset),
+            );
+            const written = Object.fromEntries(Object.entries(was?.filters ?? {}).filter(([ds]) => held.has(ds)));
             q.multi = { ...q.multi, edges: withDatasetRoleFilters(q.multi.edges, perDataset, written) };
         }
         this.pushing.set(true);
@@ -3620,8 +3628,11 @@ Its prior copies stay in its version history.`,
             this.truncated.set(truncated);
             const nextRun = this.runOf(run.sourceId, q, next as ProjectedGraph);
             this.lastRun.set(nextRun);
-            if (run.sourceId === 'entity-projection-multi')
-                this.datasetRoleFiltersWritten = { run: nextRun, filters: perDataset };
+            if (run.sourceId === 'entity-projection-multi' && q.multi)
+                this.datasetRoleFiltersWritten = {
+                    trees: new Set(q.multi.edges.map((e) => e.filter).filter((f) => !!f)),
+                    filters: perDataset,
+                };
             this.localFilter.set(null); // the server applied it; the local stage starts clean
             const n = next.edges.length.toLocaleString();
             this.pushState.set(truncated ? `${n} links · truncated — refine and push again` : `${n} links · complete`);

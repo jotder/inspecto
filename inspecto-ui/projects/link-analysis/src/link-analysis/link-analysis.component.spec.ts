@@ -1705,6 +1705,18 @@ describe('LinkAnalysisComponent', () => {
             items: [...own.items, { kind: 'condition', field: 'fee', operator: '<=', value: '5' }],
         });
         expect(pushed.filter!.items).toEqual([{ kind: 'condition', field: 'source', operator: '=', value: 'a' }]);
+
+        // a Refresh re-runs the same mappings as a new run: the panel's conditions are still its own, never piled up
+        await c.refreshFromServer();
+        await c.applyDatasetRoleFilters({
+            calls: { measures: {}, categories: {}, time: { column: '', from: '', to: '' } },
+            pays: { measures: { fee: { min: '', max: '9' } }, categories: {}, time: { column: '', from: '', to: '' } },
+        });
+        pushed = queried.at(-1) as Pushed;
+        expect(pushed.multi.edges[1].filter).toEqual({
+            ...own,
+            items: [...own.items, { kind: 'condition', field: 'fee', operator: '<=', value: '9' }],
+        });
     });
 
     it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {

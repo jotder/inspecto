@@ -1744,8 +1744,9 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   Dataset no longer drawn is dropped. Applying writes each section's conditions as the own `filter` of every edge
   mapping over that Dataset on `POST /inv/projection/multi` (which narrows only that mapping,
   `ControlApiMultiDatasetFilterTest`) and re-runs the read as a push does (merged, stranded nodes marked). Only the
-  conditions the panel wrote into the run on screen are taken out (JSON-equal, per Dataset; tracked per run, so from a
-  new run's or a loaded view's mappings nothing is taken out; loading a view or Clear in the filter also empties the
+  conditions the panel wrote into the run on screen are taken out (JSON-equal, per Dataset; recognised by the mapping
+  `filter` objects the push sent, which a Refresh or a Measure re-read keeps, so they never pile up - while from a new
+  run's or a loaded view's mappings nothing is taken out; loading a view or Clear in the filter also empties the
   panel); the analyst's own mapping filter and the top-level `filter` stay. A section left empty sends no filter for its Dataset. Node mappings are not narrowed. A single-Dataset read is
   unchanged.
 
