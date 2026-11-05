@@ -1977,9 +1977,13 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
 - **New columns are kept as details** (`LA-ARRIVAL-NEW-COLUMNS-1`, operator 2026-11-06, as built 2026-11-06;
   `inspecto/.../control/DatasetNewColumns.java`). A run keeps the new columns EVERY file it takes carries (delimited
   text: the same leading new columns in the same order, since the engine reads by position; JSON / Parquet: by field
-  name). Each kept column is appended to the import's schema (`raw.fields`, type `VARCHAR`, the next position for
-  delimited text; a `keep` mapping), the Pipeline is re-read (`CollectorService.refreshConfigs`, the registry's content
-  hash sees the schema change), and the Dataset entry gains `{name, type: string, role: detail, keptFrom {file, at}}`
+  name). Each kept column is appended to the import's schema (`raw.fields`, the next position for delimited text; a
+  `keep` mapping) with the type its values imply (`DatasetNewColumns.typed`, operator 2026-11-06, as built in
+  `DECIMAL-TEXT-NOT-BIGINT-1`): the draft's inference in every file the run takes (`0.50` and `47.00` are DOUBLE, plain
+  digits BIGINT, a date with its format); whole and decimal numbers across files widen to DOUBLE; any other
+  disagreement, or a number read through a `,` decimal mark, stays VARCHAR. The Pipeline is re-read
+  (`CollectorService.refreshConfigs`, the registry's content hash sees the schema change), and the Dataset entry gains
+  `{name, type (number / date / timestamp / boolean / string), role: detail, keptFrom {file, at}}`
   (a versioned write). All of it is undone if the run fails. The answer and the arrival carry `keptColumns`.
   **Left out**, as before (delimited files are rewritten with the columns kept, because the engine sets aside rows with
   more fields than it reads), named in `newColumns` with `newColumnsReason`, when: the person unticked *Keep new
@@ -1993,8 +1997,9 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   build read through it), `/db/table` and `/db/query`, `countRows`, the arrivals' periods and *Replace the period*
   (`SqlViews.parquet(…, true, …)`), compaction (`UNION ALL BY NAME`); an older file reads the column as empty. The row
   filter (`where`) runs on the import, over each file before it lands, and every file it sees carries every column the
-  Dataset reads, so a kept column never makes it fail. Values are kept as text: a kept column made a Measure is still
-  text (deliberate - a later file's value that does not parse would otherwise set its row aside). Tests:
+  Dataset reads, so a kept column never makes it fail. A typed kept column takes a range filter and can be a Measure;
+  a later value that does not parse is stored empty and counted as a cast failure, as for any typed column, and a
+  fraction into a kept BIGINT column is refused (above). Tests (typing: `ControlApiDecimalColumnTest`):
   `ControlApiArrivalNewColumnsTest` (older and newer files read together, the refusal, leave, the every-file rule, Run
   now keeping on its own, JSON, an approval policy, a row filter, compaction over mixed columns),
   `ControlApiOnboardLinkAnalysisTest#aKeptNewColumnRidesTheIndexBuiltOverOlderAndNewerFiles` (made a Category, the column

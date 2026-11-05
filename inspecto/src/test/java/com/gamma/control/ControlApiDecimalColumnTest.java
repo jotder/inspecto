@@ -207,6 +207,78 @@ class ControlApiDecimalColumnTest {
         }
     }
 
+    /** {@code csv} with one more column {@code name}, row i (from 1) holding {@code value.apply(i)}. */
+    private static String withColumn(String csv, String name, IntFunction<String> value) {
+        return ControlApiArrivalNewColumnsTest.withColumn(csv, name, value);
+    }
+
+    /** The import schema's raw field {@code name}: its type as written. */
+    private static String schemaType(Path root, String id, String name) throws Exception {
+        java.util.Map<String, Object> s = com.gamma.util.ToonHelper.load(root.resolve("imports").resolve(id + "_schema.toon").toString());
+        for (Object f : (List<?>) ((java.util.Map<?, ?>) s.get("raw")).get("fields"))
+            if (f instanceof java.util.Map<?, ?> m && name.equals(m.get("name"))) return String.valueOf(m.get("type"));
+        throw new AssertionError("no field " + name);
+    }
+
+    /**
+     * A kept new column (LA-ARRIVAL-NEW-COLUMNS-1) gets the type its values imply, by the same rules (operator 2026-11-06):
+     * {@code 0.50} is DOUBLE, so it can take a range filter; whole numbers are BIGINT and a later fraction into it is
+     * refused; text stays text.
+     */
+    @Test
+    void aKeptNewColumnIsTypedByItsValues(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("kept");
+            commit(c, id, payments("P", 20, i -> String.valueOf(1000 + i)), "BIGINT");
+
+            String wider = withColumn(withColumn(withColumn(payments("F", 10, i -> "7"), "fee", i -> "0.50"), "qty", i -> String.valueOf(i)),
+                    "note", i -> "n" + i);
+            JsonNode s = data(send(c, "POST", "/datasets/" + id + "/files?name=wider.csv&mode=append", wider), 200);
+            assertEquals("[\"fee\",\"qty\",\"note\"]", s.get("keptColumns").toString(), s.toString());
+            assertEquals("DOUBLE", schemaType(root, id, "fee"));
+            assertEquals("BIGINT", schemaType(root, id, "qty"));
+            assertEquals("VARCHAR", schemaType(root, id, "note"));
+
+            // the decimal kept column takes a range filter (a text column could not)
+            data(send(c, "PUT", "/datasets/" + id + "/filter",
+                    "{\"filter\":[{\"column\":\"fee\",\"op\":\"range\",\"min\":\"0.25\"}]}"), 200);
+
+            // the whole-number kept column refuses a fraction, like any BIGINT column
+            HttpResponse<String> cut = send(c, "POST", "/datasets/" + id + "/files?name=cut.csv&mode=append",
+                    withColumn(withColumn(withColumn(payments("G", 3, i -> "7"), "fee", i -> "1.75"), "qty", i -> i == 2 ? "2.5" : "2"),
+                            "note", i -> "x"));
+            assertEquals(422, cut.statusCode(), cut.body());
+            assertTrue(cut.body().contains("'qty' holds whole numbers and this file has '2.5'"), cut.body());
+
+            // a later value that is not a number is taken with the column empty, as for any typed column
+            JsonNode na = data(send(c, "POST", "/datasets/" + id + "/files?name=na.csv&mode=append",
+                    withColumn(withColumn(withColumn(payments("H", 2, i -> "7"), "fee", i -> i == 1 ? "n/a" : "0.75"), "qty", i -> "3"),
+                            "note", i -> "y")), 200);
+            assertEquals(0, na.get("rowsRejected").asLong(), na.toString());
+            // ... and the range filter above leaves out that row, whose fee is empty; the 0.75 one lands
+            assertEquals(1, na.get("rowsFilteredOut").asLong(), na.toString());
+            assertEquals(31, na.get("rowsAfter").asLong(), na.toString());
+        }
+    }
+
+    /** Two files of one run disagree: whole numbers and decimals widen to DOUBLE; numbers and text stay text. */
+    @Test
+    void aKeptColumnWhoseFilesDisagreeIsWidened(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("mixed");
+            commit(c, id, payments("P", 20, i -> String.valueOf(1000 + i)), "BIGINT");
+            Path inbox = Path.of("database", "inbox", id);
+            Files.createDirectories(inbox);
+            Files.writeString(inbox.resolve("a.csv"), withColumn(withColumn(payments("A", 5, i -> "7"), "fee", i -> "1"), "ref", i -> "9"));
+            Files.writeString(inbox.resolve("b.csv"), withColumn(withColumn(payments("B", 5, i -> "7"), "fee", i -> "1.5"), "ref", i -> "r" + i));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals("[\"fee\",\"ref\"]", run.get("keptColumns").toString(), run.toString());
+            assertEquals("DOUBLE", schemaType(root, id, "fee"));
+            assertEquals("VARCHAR", schemaType(root, id, "ref"));
+            assertEquals(30, run.get("rowsAfter").asLong(), run.toString());
+        }
+    }
+
     /** NDJSON reads by field name: a fraction into a whole-number field is refused the same way. */
     @Test
     void anNdjsonFractionIntoAWholeNumberFieldIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
