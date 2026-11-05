@@ -1372,7 +1372,12 @@ final class OnboardImport {
             job.landFromDraft(type);
             Work rest = () -> {
                 try {
-                    Map<String, Object> s = j.runChecked(replace ? 0 : before);
+                    Map<String, Object> s;
+                    // ADD-FILE-FEED-1: the upload is whole (landFromDraft moves it in complete), so a feed's stability window does
+                    // not hold it back from the person's own run; every other waiting file is gated as before
+                    try (com.gamma.inspector.RunFiles.Scope whole = com.gamma.inspector.RunFiles.complete(Set.of(j.landed))) {
+                        s = j.runChecked(replace ? 0 : before);
+                    }
                     if (period) {
                         s.put("period", j.replacePeriod(eventDate));
                         s.put("rowsAfter", countRows(j.database()));

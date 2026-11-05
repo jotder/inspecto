@@ -514,6 +514,8 @@ public class CollectorProcessor {
                 ready = discovered;   // landed files are complete; acquire() already gated/gapped/watermarked
             } else {
                 ready = gateStability(cfg, src, st, inbox, discovered, emitSignals);
+                // ADD-FILE-FEED-1: a file the caller knows is whole (a person's Add a file) does not wait out the window
+                if (emitSignals) ready = RunFiles.release(discovered, ready, RemoteFile::localPath);
                 if (emitSignals && cfg.collector().gapDetection().active() && !discovered.isEmpty())
                     detectGaps(cfg, discovered);
                 if (emitSignals) DeliveryCheck.detectFileGaps(cfg, discovered, System.currentTimeMillis());

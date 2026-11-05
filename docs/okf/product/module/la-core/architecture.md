@@ -1937,6 +1937,23 @@ for THIS id).
   Add data already wrote.
 - **A watched folder IS the Dataset's inbox** (`<dataRoot>/inbox/<id>`): no caller-supplied path, so nothing to jail.
   An SFTP feed reads the Connection's `base_path`.
+- **A person's *Add a file* is imported at once on a fed Dataset** (`ADD-FILE-FEED-1`, defect, fixed 2026-11-05). The
+  upload lands in that same inbox, and the folder feed's stability gate held every file 30 s, so the person's own run
+  took nothing and answered 422 "nothing was imported". `OnboardImport.addStaged` now opens
+  `com.gamma.inspector.RunFiles.complete({landed file})` around its run: `CollectorProcessor.collect` adds the files a
+  `complete` scope names back after `gateStability` (run path only; discovery order kept). The upload is whole by
+  construction (`Job.landFromDraft` moves it into the inbox complete). Every other waiting file is still gated, so a sender's
+  file that has just arrived waits for the feed; on Basic (no stability block) nothing changes - Add a file still takes
+  the files waiting. No double import: the run moves the upload out of the inbox into
+  `<id>/backup/` as it commits it, so the feed never lists it; were it left there, the feed's checksum duplicate check
+  (`duplicate {mode: checksum}`) and, below that, the ingest's own commit record would each still skip it (mutation
+  check 2026-11-05: with the move AND the duplicate check both disabled, the feed lists the upload again and adds no
+  row). An SFTP feed was never affected (a
+  remote collector does not gate the local inbox). Same seam as `BASIC-ONBOARD-SETTLE-1` (§6.20). Not covered: the
+  scope is not tied to one run, so a scheduled run that lists the inbox while it is open (the person's run then waits
+  on the Pipeline's run lock) takes the upload; it is imported once, by the feed, and the person's run reports
+  nothing imported. Tests:
+  `ControlApiDatasetFeedTest` (`addAFileRightAfterKeepThisUpToDate…`, `onBasicAddAFileStillTakes…`), `RunFilesTest`.
 - **Waiting files** = regular files under the inbox (depth 4, links not followed) with the import's extension, never a
   hidden one (`.landing-*` uploads in flight). A file whose name the import took before (`MarkerManager
   .isAlreadyProcessed`) is skipped by Run now and would wait for ever, so it is flagged (`alreadyImported`, per file and
@@ -2089,7 +2106,8 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   pending count still sees the whole inbox). A file created between the check and the run stays in the inbox and is
   checked by later polls. Run now passes no set: it takes the whole inbox, as before. Not covered: a file already
   checked that is rewritten in that instant is still taken (the scope matches by path, since the columns check may
-  rewrite a file it accepts).
+  rewrite a file it accepts). Its other half, `RunFiles.complete`, lets a person's *Add a file* skip a feed's
+  stability window (`ADD-FILE-FEED-1`, §6.18).
 - **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
   watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
   the poll target is dropped.
