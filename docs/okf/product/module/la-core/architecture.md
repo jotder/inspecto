@@ -1981,7 +1981,8 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   `keep` mapping) with the type its values imply (`DatasetNewColumns.typed`, operator 2026-11-06, as built in
   `DECIMAL-TEXT-NOT-BIGINT-1`): the draft's inference in every file the run takes (`0.50` and `47.00` are DOUBLE, plain
   digits BIGINT, a date with its format); whole and decimal numbers across files widen to DOUBLE; any other
-  disagreement, or a number read through a `,` decimal mark, stays VARCHAR. The Pipeline is re-read
+  disagreement, or a number read through a decimal mark (`12,22`, `1,234.50`: a plain cast reads it as nothing), stays
+  VARCHAR. The Pipeline is re-read
   (`CollectorService.refreshConfigs`, the registry's content hash sees the schema change), and the Dataset entry gains
   `{name, type (number / date / timestamp / boolean / string), role: detail, keptFrom {file, at}}`
   (a versioned write). All of it is undone if the run fails. The answer and the arrival carry `keptColumns`.

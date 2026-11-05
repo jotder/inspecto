@@ -279,6 +279,41 @@ class ControlApiDecimalColumnTest {
         }
     }
 
+    /**
+     * A kept number written with a ',' decimal mark stays text (its values would otherwise all be lost: a plain cast reads
+     * '12,22' as nothing), and a kept date in a day-first format is a DATE written with that format, so every value lands.
+     */
+    @Test
+    void aKeptDecimalMarkColumnStaysTextAndAKeptDateKeepsItsFormat(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("marks");
+            commit(c, id, payments("P", 20, i -> String.valueOf(1000 + i)), "BIGINT");
+            String wider = withColumn(withColumn(payments("E", 12, i -> "7"), "eu_amt", i -> "\"" + i + ",22\""),
+                    "paid_on", i -> String.format("%02d/09/2026", 12 + i));
+            JsonNode s = data(send(c, "POST", "/datasets/" + id + "/files?name=eu.csv&mode=append", wider), 200);
+            assertEquals("[\"eu_amt\",\"paid_on\"]", s.get("keptColumns").toString(), s.toString());
+            assertEquals("VARCHAR", schemaType(root, id, "eu_amt"));
+            assertEquals("DATE", schemaType(root, id, "paid_on"));
+            assertTrue(Files.readString(root.resolve("imports").resolve(id + "_schema.toon")).contains("%d/%m/%Y"), "the format is written");
+
+            JsonNode r = data(send(c, "GET", "/datasets/" + id + "/rows?limit=10000", null), 200);
+            int amt = -1, paid = -1, k = 0;
+            for (JsonNode col : r.get("columns")) {
+                if ("eu_amt".equals(col.get("name").asText())) amt = k;
+                if ("paid_on".equals(col.get("name").asText())) paid = k;
+                k++;
+            }
+            long amts = 0, dates = 0;
+            for (JsonNode row : r.get("rows")) {
+                JsonNode a = row.isArray() ? row.get(amt) : row.get("eu_amt"), d = row.isArray() ? row.get(paid) : row.get("paid_on");
+                if (a != null && !a.isNull()) amts++;
+                if (d != null && !d.isNull()) dates++;
+            }
+            assertEquals(12, amts, "every '12,22' value lands as text");
+            assertEquals(12, dates, "every day-first date is read with its format");
+        }
+    }
+
     /** NDJSON reads by field name: a fraction into a whole-number field is refused the same way. */
     @Test
     void anNdjsonFractionIntoAWholeNumberFieldIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {

@@ -168,7 +168,7 @@ final class DatasetNewColumns {
     }
 
     /**
-     * The schema reads each kept column (text) and maps it through; the Pipeline is re-read; the Dataset lists it as a
+     * The schema reads each kept column at its type ({@link #typed}) and maps it through; the Pipeline is re-read; the Dataset lists it as a
      * detail. Answers null, or why nothing was kept (the schema did not load: every write here is put back).
      */
     @SuppressWarnings("unchecked")
