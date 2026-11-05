@@ -37,7 +37,7 @@ Before that, the module was EDG-01 cell 3b (CP-09), the geo map adapters
 
 ## Left
 
-Open Link Analysis rows live in `docs/BACKLOG.md` under the `LA-*` ids (for example `LA-EDITIONS-RESIDUALS-1`,
+Open Link Analysis rows live in `docs/BACKLOG.md` under the `LA-*` ids (for example
 `LA-INVESTIGATION-OPS-DEFERRED-1` and P2 `LA-DAILY-INGEST-1`); none is specific to this bridge beyond the ports they call.
 
 ## References

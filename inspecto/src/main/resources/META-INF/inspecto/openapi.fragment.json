@@ -448,7 +448,7 @@
   },
   "servers" : [ {
     "url" : "/api/v1",
-    "description" : "Versioned surface (v1 envelope + structured errors). Personal edition: plain HTTP, localhost. Professional edition: HTTPS behind the WSO2 gateway with OIDC (Keycloak/IAM) — same contract."
+    "description" : "Versioned surface (v1 envelope + structured errors). Basic: plain HTTP, localhost. Standard and Advanced: HTTPS behind the WSO2 gateway with OIDC (Keycloak/IAM) — same contract."
   } ],
   "tags" : [ {
     "name" : "Session & Identity",
@@ -494,7 +494,7 @@
     "description" : "Metadata Bundle v2 export / fit-check / import."
   }, {
     "name" : "Audit & Compliance",
-    "description" : "Actor-attributed audit trail (actor from JWT under Professional)."
+    "description" : "Actor-attributed audit trail (actor from JWT under Standard and Advanced)."
   } ],
   "paths" : {
     "/health" : {
@@ -1609,7 +1609,7 @@
       "post" : {
         "tags" : [ "Session & Identity" ],
         "summary" : "Redeem an OIDC authorization code (backend-mediated session)",
-        "description" : "W6d: the SPA completes Authorization Code + PKCE in the browser, then posts the one-time code here. The backend redeems it against the IAM's token endpoint server-to-server and keeps the refresh token in an httpOnly + SameSite=Strict cookie (inspecto_rt) the page's JavaScript can never read — only the short-lived access token is returned. Public route (a caller redeeming a code has no Bearer token yet); cross-site calls are rejected when -Dauth.origin (or -Dcontrol.cors) is configured. 503 on Personal (no session broker).",
+        "description" : "W6d: the SPA completes Authorization Code + PKCE in the browser, then posts the one-time code here. The backend redeems it against the IAM's token endpoint server-to-server and keeps the refresh token in an httpOnly + SameSite=Strict cookie (inspecto_rt) the page's JavaScript can never read — only the short-lived access token is returned. Public route (a caller redeeming a code has no Bearer token yet); cross-site calls are rejected when -Dauth.origin (or -Dcontrol.cors) is configured. 503 on Basic (no session broker).",
         "operationId" : "exchangeAuthorizationCode",
         "requestBody" : {
           "required" : true,
@@ -1656,7 +1656,7 @@
       "post" : {
         "tags" : [ "Session & Identity" ],
         "summary" : "Mint a fresh access token from the session cookie",
-        "description" : "Reads the httpOnly refresh cookie, redeems it at the IAM, rotates the cookie, and returns the new access token. A rejected (expired/revoked) session is a 401 with the cookie cleared. 503 on Personal.",
+        "description" : "Reads the httpOnly refresh cookie, redeems it at the IAM, rotates the cookie, and returns the new access token. A rejected (expired/revoked) session is a 401 with the cookie cleared. 503 on Basic.",
         "operationId" : "refreshSession",
         "responses" : {
           "200" : {
@@ -1690,7 +1690,7 @@
       "post" : {
         "tags" : [ "Session & Identity" ],
         "summary" : "End the session",
-        "description" : "Best-effort revocation of the refresh token at the IAM, then clears the session cookies. The optional body {postLogoutRedirectUri} is placed on the end-session URL returned as endSessionUrl. Idempotent — succeeds with or without a live session. 503 on Personal.",
+        "description" : "Best-effort revocation of the refresh token at the IAM, then clears the session cookies. The optional body {postLogoutRedirectUri} is placed on the end-session URL returned as endSessionUrl. Idempotent — succeeds with or without a live session. 503 on Basic.",
         "operationId" : "logout",
         "responses" : {
           "200" : {
@@ -5435,7 +5435,7 @@
         "tags" : [ "notifications" ],
         "summary" : "The caller’s effective notification preference grid",
         "operationId" : "getNotificationsPreferences",
-        "description" : "Each cell is the calling Subject’s override when it has one, else the deployment default; source marks which (inherited | overridden). Critical categories are always on. email is off and not editable for a Subject with no verified email claim; webhook is never personal. Personal edition (no Subject): the single grid.",
+        "description" : "Each cell is the calling Subject’s override when it has one, else the deployment default; source marks which (inherited | overridden). Critical categories are always on. email is off and not editable for a Subject with no verified email claim; webhook is never personal. Basic (no Subject): the single grid.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): data is the grid, one row per category — {category, label, critical, available, channels:{inApp, email, webhook}, source:{channel: inherited | overridden}, editable:{channel: boolean}}."
@@ -5446,7 +5446,7 @@
         "tags" : [ "notifications" ],
         "summary" : "Save the caller’s own preference override (self-service)",
         "operationId" : "putNotificationsPreferences",
-        "description" : "Body {\"preferences\":[{category, channels:{inApp?, email?}}]}. Writes ONLY the calling Subject’s override, keyed by its stable id; a null cell resets it to the default. Critical categories, webhook, and email-on without a verified email claim are ignored, as is any address in the body — email goes to the Subject’s verified claim only. Personal edition (no Subject): writes the single grid. 503 when the deployment overrides file exists but is unreadable. Returns the caller’s effective grid.",
+        "description" : "Body {\"preferences\":[{category, channels:{inApp?, email?}}]}. Writes ONLY the calling Subject’s override, keyed by its stable id; a null cell resets it to the default. Critical categories, webhook, and email-on without a verified email claim are ignored, as is any address in the body — email goes to the Subject’s verified claim only. Basic (no Subject): writes the single grid. 503 when the deployment overrides file exists but is unreadable. Returns the caller’s effective grid.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): data is the grid, one row per category — {category, label, critical, available, channels:{inApp, email, webhook}, source:{channel: inherited | overridden}, editable:{channel: boolean}}."
@@ -5890,7 +5890,7 @@
         "tags" : [ "access" ],
         "summary" : "Impact matrix for an unsaved Access Policy draft",
         "operationId" : "postAccessPoliciesPreview",
-        "description" : "Gated canConfigureAccess. Body {policies, route?} is validated exactly like PUT /access/policies (422 on the same checks). Returns {enabled, route, roles, actions, kinds, cells: [{role, action, resourceKind, before, beforePolicy, after, afterPolicy, changed}], warnings: [{policy, code, message}]} — every effective role as a synthetic subject (capabilities + role name, no id or claims) x read/write/operate, plus x each known resource kind a current or draft policy targets. Writes nothing. {enabled:false} without a policy engine (Personal/Professional). A POST, so the route PEP evaluates it as a write against the saved doc.",
+        "description" : "Gated canConfigureAccess. Body {policies, route?} is validated exactly like PUT /access/policies (422 on the same checks). Returns {enabled, route, roles, actions, kinds, cells: [{role, action, resourceKind, before, beforePolicy, after, afterPolicy, changed}], warnings: [{policy, code, message}]} — every effective role as a synthetic subject (capabilities + role name, no id or claims) x read/write/operate, plus x each known resource kind a current or draft policy targets. Writes nothing. {enabled:false} without a policy engine (Basic and Standard). A POST, so the route PEP evaluates it as a write against the saved doc.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -7287,7 +7287,7 @@
         "tags" : [ "settings" ],
         "summary" : "Replace the Space's approval policy",
         "operationId" : "putSettingsApproval",
-        "description" : "Replaces `approval.toon` wholesale and returns the policy as GET reads it. Requires canAdminister (not canAuthorWorkbench: turning maker-checker off is the one change an author must not be able to make), and is itself never held for approval. Validated fail-closed: an unknown key, a kind outside `governable`, an `approverCapability` no route demands, `expiresAfterHours` outside 1..8784, a non-boolean flag, or a policy requiring approval on a build with no Authenticator is refused. Lenient scalars: `expiresAfterHours` also accepts its string form (`\"168\"`), the boolean flags accept `\"true\"`/`\"false\"`, and a missing or blank `approverCapability` falls back to `canApproveChanges`. An empty or absent body is refused (422): turning four-eyes off must be explicit, `{\"approval\": {}}`. With no Authenticator configured the route is refused outright (403), so the policy can never be switched off unauthenticated — Personal edition cannot change it through the API (operator, 2026-09-28). Emits one `approval-policy.changed` audit event carrying the policy before and after.",
+        "description" : "Replaces `approval.toon` wholesale and returns the policy as GET reads it. Requires canAdminister (not canAuthorWorkbench: turning maker-checker off is the one change an author must not be able to make), and is itself never held for approval. Validated fail-closed: an unknown key, a kind outside `governable`, an `approverCapability` no route demands, `expiresAfterHours` outside 1..8784, a non-boolean flag, or a policy requiring approval on a build with no Authenticator is refused. Lenient scalars: `expiresAfterHours` also accepts its string form (`\"168\"`), the boolean flags accept `\"true\"`/`\"false\"`, and a missing or blank `approverCapability` falls back to `canApproveChanges`. An empty or absent body is refused (422): turning four-eyes off must be explicit, `{\"approval\": {}}`. With no Authenticator configured the route is refused outright (403), so the policy can never be switched off unauthenticated — a Basic install cannot change it through the API (operator, 2026-09-28). Emits one `approval-policy.changed` audit event carrying the policy before and after.",
         "requestBody" : {
           "description" : "Required: an empty or absent body is 422. Send `{\"approval\": {}}` to turn every hold off.",
           "content" : {
@@ -7601,7 +7601,7 @@
             }
           },
           "403" : {
-            "description" : "canApproveChanges or the kind's approverCapability missing; no authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here); the author deciding their own four-eyes change; or the author no longer holds what the change needs (PERMISSION_DENIED).",
+            "description" : "canApproveChanges or the kind's approverCapability missing; no authenticated Subject (an author and a decider cannot be told apart — Basic, which has no Authenticator, is always refused here); the author deciding their own four-eyes change; or the author no longer holds what the change needs (PERMISSION_DENIED).",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -7692,7 +7692,7 @@
             }
           },
           "403" : {
-            "description" : "canApproveChanges or the kind's approverCapability missing; no authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here); or the author deciding their own four-eyes change (PERMISSION_DENIED).",
+            "description" : "canApproveChanges or the kind's approverCapability missing; no authenticated Subject (an author and a decider cannot be told apart — Basic, which has no Authenticator, is always refused here); or the author deciding their own four-eyes change (PERMISSION_DENIED).",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -7742,7 +7742,7 @@
         "tags" : [ "pending-changes" ],
         "summary" : "Withdraw your own Pending Change",
         "operationId" : "postPendingChangesByPendingchangeIdWithdraw",
-        "description" : "The AUTHOR takes back a change they proposed: it closes `withdrawn`, unapplied, signed and audited (`pending-change.withdrawn`) as a decline is. No capability is needed — only the Subject who proposed it may withdraw it. Gates in order: no authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here) 403 → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 → integrity 409 → not pending (decided, withdrawn or expired) 409 → the caller is not the author 403. Same cross-process compare-and-set as approve: a withdraw racing an approve leaves exactly one outcome.",
+        "description" : "The AUTHOR takes back a change they proposed: it closes `withdrawn`, unapplied, signed and audited (`pending-change.withdrawn`) as a decline is. No capability is needed — only the Subject who proposed it may withdraw it. Gates in order: no authenticated Subject (an author and a decider cannot be told apart — Basic, which has no Authenticator, is always refused here) 403 → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 → integrity 409 → not pending (decided, withdrawn or expired) 409 → the caller is not the author 403. Same cross-process compare-and-set as approve: a withdraw racing an approve leaves exactly one outcome.",
         "parameters" : [ {
           "name" : "pendingchangeId",
           "in" : "path",
@@ -7783,7 +7783,7 @@
             }
           },
           "403" : {
-            "description" : "No authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here), or the caller is not the change's author (PERMISSION_DENIED).",
+            "description" : "No authenticated Subject (an author and a decider cannot be told apart — Basic, which has no Authenticator, is always refused here), or the caller is not the change's author (PERMISSION_DENIED).",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -8081,7 +8081,7 @@
             }
           },
           "403" : {
-            "description" : "The caller lacks canAuthorWorkbench (PERMISSION_DENIED) — Professional edition only.",
+            "description" : "The caller lacks canAuthorWorkbench (PERMISSION_DENIED) — Standard and Advanced only.",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -9065,7 +9065,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "The authenticated subject's resolved capability grants (W6, guideline 13 — verbs, never roles). Present only when the security module attached a Subject (Professional edition, authenticated request); absent on Personal / anonymous requests."
+            "description" : "The authenticated subject's resolved capability grants (W6, guideline 13 — verbs, never roles). Present only when the security module attached a Subject (Standard and Advanced, authenticated request); absent on Basic / anonymous requests."
           },
           "diagnostics" : {
             "$ref" : "#/components/schemas/Diagnostics"
@@ -10589,7 +10589,7 @@
         }
       },
       "PathJail" : {
-        "description" : "A resolved path escapes the write root (PATH_JAIL_VIOLATION). Under Professional, 403 also carries PERMISSION_DENIED for authorization denials.",
+        "description" : "A resolved path escapes the write root (PATH_JAIL_VIOLATION). Under Standard and Advanced, 403 also carries PERMISSION_DENIED for authorization denials.",
         "content" : {
           "application/json" : {
             "schema" : {
@@ -10642,7 +10642,7 @@
         }
       },
       "Unauthenticated" : {
-        "description" : "Missing or invalid credentials (UNAUTHENTICATED) — Professional edition only; Personal never emits it.",
+        "description" : "Missing or invalid credentials (UNAUTHENTICATED) — Standard and Advanced only; Basic never emits it.",
         "content" : {
           "application/json" : {
             "schema" : {
@@ -10652,7 +10652,7 @@
         }
       },
       "SessionUnavailable" : {
-        "description" : "No session broker on this edition (CAPABILITY_UNAVAILABLE) — the /auth/* routes are live only when the Professional security module is bundled.",
+        "description" : "No session broker on this edition (CAPABILITY_UNAVAILABLE) — the /auth/* routes are live only when the Standard security module is bundled.",
         "content" : {
           "application/json" : {
             "schema" : {
@@ -10667,7 +10667,7 @@
         "type" : "http",
         "scheme" : "bearer",
         "bearerFormat" : "JWT",
-        "description" : "Professional/Enterprise editions only (W6): IAM-issued JWT validated by the resource server (issuer/audience/expiry via JWKS); authorization derived from claims → Roles → Capabilities. The Personal edition serves the same contract auth-free on localhost. No operation declares a security requirement until W6 lands."
+        "description" : "Standard and Advanced only (W6): IAM-issued JWT validated by the resource server (issuer/audience/expiry via JWKS); authorization derived from claims → Roles → Capabilities. The Basic edition serves the same contract auth-free on localhost. No operation declares a security requirement until W6 lands."
       }
     }
   }

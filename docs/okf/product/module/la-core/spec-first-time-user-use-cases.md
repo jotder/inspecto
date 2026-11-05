@@ -255,9 +255,11 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   3. Anything beyond that (joins, SQL steps, remote Collectors) is **Open in editor** in the console, pre-filled.
      Inspecto LA never edits Pipelines itself (§8 A-6).
 - **As built.** The Dataset card shows **Keep this up to date** locked on Basic, *Ask an administrator
-  to keep this up to date* with sign-in, and an *Open in editor* hand-off. On Standard and up it keeps the import up to
-  date (a watched folder or SFTP feed on a schedule, `LA-ARRIVAL-FEEDS-1`): `inspecto-ops` declares the
-  `pipeline.automation` feature since 2026-11-05 (before, no module did, so Standard refused it like Basic).
+  to keep this up to date* with sign-in, and an *Open in editor* hand-off. The import Pipeline stays `trigger: manual`
+  (DT-17) until a person keeps it up to date. On Standard and up it keeps the import up to date (a watched folder or SFTP
+  feed on a schedule, `LA-ARRIVAL-FEEDS-1`): `inspecto-ops` declares the `pipeline.automation` feature (operator
+  2026-11-05; before, no module did, so Standard refused it like Basic). A person's import still builds the link index
+  inside the run.
 
 ### UC-07 Say what the columns hold (Entity Types)
 
@@ -412,7 +414,8 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **As built: done.** **What can I do next?** (the light bulb in the left menu) on every la-app screen; a **?** beside
   a product term explains it; locked controls via `inspecto-locked-action` with the reason; onboarding counters in
   `onboarding-counters.tsv` (`GET /onboarding/metrics`, `POST /onboarding/events`), shown in **Settings → Getting
-  started counters**. "First launch" is the first server start, not the first time a person opened the app.
+  started counters**. The first row is labelled *First server start*: the clock starts when the server first starts, not when a person
+  first opens the app.
 
 ---
 
