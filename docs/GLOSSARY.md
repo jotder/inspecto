@@ -233,7 +233,12 @@ and whether its rows are still kept (`LA-ARRIVAL-LEDGER-1`). One arrival is one 
 "import" for a file a system sent; ⛔ not "batch".
 
 **Data status** — The one line that says, for a Dataset, when data last **arrived** (*Received*), the period its kept
-data **covers** (*Data as of* is the end of that period), and whether the **graph** includes it — said only when known.
+data **covers** (*Data as of* is the end of that period), and whether the **graph** includes it (*up to date*, or *N files
+behind*) — said only when known.
+
+**Replace the period it covers** — What an added file may do to an import Dataset with a *When* column: its rows are
+added and the older rows on the days it covers are removed; every other day stays (`LA-ARRIVAL-MODES-1`). Beside
+*Replace everything* and *Add rows*. ⛔ not "upsert" (no row keys; that waits for SCD2).
 
 **Link index** — Link Analysis' prebuilt store of a Dataset's links, built from its files so a graph reads fast; built
 in the import run, or by the Space's `la.index.build` Job (Standard and above). Its state is *up to date* or *waiting*.

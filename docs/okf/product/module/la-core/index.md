@@ -36,8 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `LA-COLUMN-ROLES-2` | P3 | feature | what LA-COLUMN-ROLES-1 deliberately left out, on demand: | — |
 | `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
-| `LA-ARRIVAL-LEDGER-1` | P2 | feature | an arrival ledger per Dataset and a three-clock *Data status* (received · covers through · graph indexed through), in every edition (LA-D… | — |
-| `LA-ARRIVAL-MODES-1` | P3 | feature | incremental semantics for import Datasets: *Replace the period it covers*, duplicate-upload refusal (sha256) and a stated schema-drift po… | — |
+| `LA-ARRIVAL-NEW-COLUMNS-1` | P3 | feature | keep a later file's new columns as details of an import Dataset (schema evolution with union-by-name reads), filed 2026-11-05 from D-6. | — |
 | `LA-ARRIVAL-FEEDS-1` | P3 | feature | files from a foreign process, made visible (LA-DATA-ARRIVAL-1 P3, decision D-1). | — |
 | `LA-DATASET-COMPACT-1` | P3 | feature | compaction of an import Dataset's Parquet in every edition, a retention policy on Standard+ (LA-DATA-ARRIVAL-1 P4, decision D-5). | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22): (1) ✅ decided 2026-10-24 (assistant-decided under operator delegation, pending confirmatio… | — |
