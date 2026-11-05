@@ -255,9 +255,9 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   3. Anything beyond that (joins, SQL steps, remote Collectors) is **Open in editor** in the console, pre-filled.
      Inspecto LA never edits Pipelines itself (§8 A-6).
 - **As built: hand-off only.** The Dataset card shows **Keep this up to date** locked on Basic, *Ask an administrator
-  to keep this up to date* with sign-in, and an *Open in editor* hand-off. The automation itself is not built: the
-  import Pipeline uses a manual trigger until DT-17, and no module declares the `pipeline.automation` feature yet
-  (`LA-ONBOARD-RESIDUALS-1` item 3, demand-gated).
+  to keep this up to date* with sign-in, and an *Open in editor* hand-off. The import Pipeline stays `trigger: manual`
+  (DT-17); *Keep this up to date* needs the `pipeline.automation` feature, which no module declares yet (the gate
+  belongs to `DATA-TIERS-1`).
 
 ### UC-07 Say what the columns hold (Entity Types)
 
@@ -412,7 +412,8 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **As built: done.** **What can I do next?** (the light bulb in the left menu) on every la-app screen; a **?** beside
   a product term explains it; locked controls via `inspecto-locked-action` with the reason; onboarding counters in
   `onboarding-counters.tsv` (`GET /onboarding/metrics`, `POST /onboarding/events`), shown in **Settings → Getting
-  started counters**. "First launch" is the first server start, not the first time a person opened the app.
+  started counters**. The first row is labelled *First server start*: the clock starts when the server first starts, not when a person
+  first opens the app.
 
 ---
 

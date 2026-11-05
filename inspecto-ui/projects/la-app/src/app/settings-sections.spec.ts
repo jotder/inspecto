@@ -46,6 +46,10 @@ describe('Getting started counters in Settings (LA-ONBOARD-1 OB-13)', () => {
         const el = create(METRICS);
         const text = el.querySelector('[data-testid="la-counters"]')?.textContent ?? '';
         expect(text).toContain('First graph');
+        // LA-ONBOARD-RESIDUALS-1: the clock starts at the first SERVER start, and the row says so
+        expect(text).toContain('First server start');
+        expect(text).toContain('Server starts');
+        expect(text).not.toContain('First launch');
         expect(text).toContain('After 7 min 30 s');
         expect(text).toContain('Not yet'); // the guide
         const stopped = Array.from(el.querySelectorAll('[data-testid="la-counters-stopped"] li')).map((l) =>

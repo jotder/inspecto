@@ -1435,7 +1435,8 @@ limits and the commit's write order are in
     sole Space's write root), not `-Ddata.dir`, which is per Space. Reserved in `ReservedConfigPaths` (an import must
     not forge it). No home = `recording: false`.
   * **Who records what.** `OnboardingRoutes.register` installs the file at boot and records `launch` (so "first launch"
-    = the first server start of this installation, the drive's clock start). `SpaceRoutes.createSpace` records
+    = the first server start of this installation, the drive's clock start; Settings → Getting started counters
+    labels the two rows *First server start* and *Server starts*, 2026-11-05). `SpaceRoutes.createSpace` records
     `space_created` (template, sample or bare); `OnboardImport.Job.finishCommit` records `first_dataset` after the undo
     stack is cleared (inline and 202 commits alike); `InvRoutes.project` (projection AND the Start box's neighbours read)
     records `first_graph` when the answer holds a link. The browser reports only what it alone sees through
@@ -1557,8 +1558,13 @@ Calls marked * were assistant-decided under operator delegation, pending confirm
 * **Commits stay inline up to `import.inline_max_bytes`*** (default 64 MiB, per Space; 0 sends every commit to a
   followed 202 run). Not benchmarked; the knob is the bound, so there is no code change.
 * **Find paths (server) stays unlocked on Basic*:** `docs/EDITIONS.md` lists it for all four editions.
-* **Still demand-gated\*:** the `pipeline.automation` feature and DT-17 trigger (item 3), no-code row filtering (6), a
-  stored run summary for replace-vs-append (7), and the phase-8 notes; each is a feature, not a small change.
+* **Settled 2026-11-05:** item 3 - an import's Pipeline stays `trigger: manual` (DT-17 as narrowed by `BASIC-ONBOARD-1`);
+  the `pipeline.automation` feature, which `OnboardImport` and `DatasetFeed` already read, is declared by no module yet
+  and belongs to `DATA-TIERS-1`'s gating phases. A Case saved after *Start from these* keeps no exclusion list written
+  on the graph before it: a new graph starts from the Case's members only, by design. The counters' "first launch" is
+  labelled *First server start*.
+* **Still open:** no-code row filtering (6; in Basic by DT-7, not built) and a real drag-and-drop of a file onto Add
+  data by a person (the acceptance drive handed the files to the file chooser by script).
 
 ### 6.14 Studio UI reorganization (LA-STUDIO-UI-REORG-1, as built 2026-10-28)
 
