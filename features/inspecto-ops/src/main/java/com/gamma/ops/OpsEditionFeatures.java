@@ -18,12 +18,15 @@ import java.util.Set;
  * and up, by a route feature of its own on {@code GeoRoutes}, never through {@code geoLink}. And the Link Analysis dashboard
  * widgets ({@link EditionFeatures#LA_WIDGETS}, D-LAE2): a UI flag only, the routes behind them stay open. And the Entity
  * profile pages ({@link EditionFeatures#ENTITY_PAGES}, D-LAE4, operator 2026-10-25): a route feature on {@code EntityPageRoutes}.
+ *
+ * <p>And Pipelines that run on their own ({@link EditionFeatures#PIPELINE_AUTOMATION}, DT-5, operator 2026-11-05): an import's
+ * <i>Keep this up to date</i> and a Dataset's retention policy.
  */
 public final class OpsEditionFeatures implements EditionFeatureProvider {
 
     @Override
     public Set<String> features() {
         return Set.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.INVESTIGATIONS,
-                EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS, EditionFeatures.ENTITY_PAGES);
+                EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS, EditionFeatures.ENTITY_PAGES, EditionFeatures.PIPELINE_AUTOMATION);
     }
 }

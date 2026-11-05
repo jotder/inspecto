@@ -119,7 +119,9 @@ class ControlApiDatasetFeedTest {
 
     @Test
     void onBasicTheInboxAndItsWaitingFilesAreShownAndRunNowImportsThem(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        EditionFeatures.overrideForTest(Set.of());   // Basic: no pipeline.automation
+        // Basic as a real bundle: no override - this module's class path carries no inspecto-ops, so nothing declares
+        // pipeline.automation and the screens stay locked (automatic false, the Keep PUT refused)
+        EditionFeatures.overrideForTest(null);
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, "inboxed", "stream", ControlApiOnboardFilesTest.transfers(40), null);
             JsonNode empty = data(json(c, "GET", "/datasets/" + id + "/feed", null, null), 200);

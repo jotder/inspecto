@@ -149,6 +149,7 @@ demo; it must be usable."** Where this section and an earlier row disagree, this
 | **P1** "Add data" | **Done** (`ONBOARDING-FIRST-RUN-1`, `BASIC-ONBOARD-1`). |
 | **P2** groundwork | **Kept, shrunk** to what P4, P5 and P7 need. |
 | **P3** automation gate | **Dropped.** Basic offers no schedule authoring in its screens (already true); configurations with schedules still run. |
+| **`pipeline.automation` declared** (operator, 2026-11-05) | `inspecto-ops` (Standard and up) declares it, so *Keep this up to date* and a retention policy work on real Standard bundles (no module declared it before; only tests switched it on). It no longer moves the import's link-index build out of the user's run: a person's import always builds the index in-run (a fresh graph), a scheduled feed's files are the Space's Job's; Expectations are evaluated in the run in every edition (DT-15). Basic's screens stay locked. |
 | **P4** reach | **Kept, narrowed:** `telecom-asn1` and the telecom decoders to Advanced (DT-12); remote kinds other than the Postgres snapshot are Standard **in Basic's screens** (locked with a reason). The Postgres snapshot reads through DuckDB's `postgres` extension, so it does not need `connectors` on Basic. |
 | **P5** egress gate | **Kept:** outbound delivery is Standard, locked with a reason on Basic's screens. |
 | **P6** transform gate | **Shrunk** to palette / step-catalog locks in the screens (Basic has no Pipeline editor); no refuse walk on load. |
@@ -162,7 +163,7 @@ demo; it must be usable."** Where this section and an earlier row disagree, this
 
 | Feature | Covers | Declared by | Gate kind |
 |---|---|---|---|
-| `pipeline.automation` | Continuous and event triggers, scheduled and signal-driven Jobs, incremental recompute (DT-5, DT-16, DT-17) | `inspecto-ops` (Standard+) | config: save, load, run |
+| `pipeline.automation` | *As built (2026-11-05, §5.3):* an import's *Keep this up to date* and a Dataset's retention policy; reported to the screens (`automatic`, `retentionAvailable`). The import's in-run link index and Expectations run in every edition. (Planned: continuous and event triggers, scheduled and signal-driven Jobs - dropped with P3.) | `inspecto-ops` (Standard+), declared | checked by the feed and storage routes; Basic's screens locked |
 | `pipeline.transform` | Step Processors beyond no-code shaping, SQL steps, enrichment, joins that build new data (DT-6, DT-7) | `inspecto-ops` | config, via a `feature` field on `ProcessorCatalog.Processor` |
 | `pipeline.egress` | `objectstore.export`, `publish.postgres` (the webhook, mail and archive gates already exist) | `inspecto-ops` | config: Job save, load, run |
 | module `connectors` | Every remote adapter: SFTP, FTP/FTPS, S3, Azure, GCS, the `db` Collector (DT-4) | Offering | module presence (Standard) |
@@ -177,7 +178,8 @@ data trust is already behind `investigations`. `PII_MASK` (Advanced, `inspecto-p
 
 Line numbers are from the 2026-10-20 survey (Link Analysis plan §4.3), not re-read.
 
-- **`pipeline.automation`.** `EditionFeatures.pipelineRefusals` (draft and parsed forms) refuses an explicit
+- **`pipeline.automation`.** *Superseded by §5.3 (P3 dropped; as built: §6's row). Nothing below was built; kept as
+  the survey it was.* `EditionFeatures.pipelineRefusals` (draft and parsed forms) refuses an explicit
   interval, cron, stream or `EVENT` trigger; reaches `SaveGate`, `ConfigRegistry`, `SpaceManager`. At run time
   `PipelineScheduler.dueThisTick` returns false for every non-`MANUAL` kind, **including `DEFAULT_POLL`**, when the
   feature is absent (DT-17); the same guard sits on the acquire driver (`dispatchAcquireCycle`, the

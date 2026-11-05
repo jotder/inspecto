@@ -21,7 +21,6 @@ class LinkIndexFollowOnTest {
         LinkIndexFollowOn f = new LinkIndexFollowOn();
         assertEquals("index", f.key(), "the run summary key the UI and the arrivals read");
         assertEquals(Set.of("defaultLinkMapping"), f.needs());
-        assertEquals("DEFERRED", f.deferred().get("result"));
     }
 
     @Test
