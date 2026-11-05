@@ -59,6 +59,7 @@ import {
     buildCommit,
     choiceKey,
     count,
+    followOnClause,
     delimiterLabel,
     excelLine,
     fileProblem,
@@ -418,8 +419,8 @@ export class AddDataComponent implements OnInit {
         this.formTick();
         const name = this.form.controls.name.value || '…';
         const what = d.kind === 'reference' ? 'details about entities' : 'events between entities';
-        const index = d.kind === 'stream' && !this.linkMissing() ? ', and builds its link index' : '';
-        return `Creates the Dataset ${name} (${what}) from ${d.file.name}, ${count(d.file.rows)} rows; runs it once${index}.`;
+        const followOn = followOnClause(d.followOns, d.kind === 'stream' && !this.linkMissing());
+        return `Creates the Dataset ${name} (${what}) from ${d.file.name}, ${count(d.file.rows)} rows; runs it once${followOn}.`;
     });
     protected readonly resultDataset = computed<ImportDataset | null>(() => {
         const s = this.summary();

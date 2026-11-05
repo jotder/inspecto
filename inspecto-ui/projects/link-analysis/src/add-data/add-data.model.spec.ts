@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    followOnClause,
     AUTOMATION_FALLBACK,
     buildCommit,
     choiceKey,
@@ -332,5 +333,23 @@ describe('roleUnder - roles under another record type (ENTITY-TYPE-RECORD-ROLES-
         // a guessed base stays a guess, so it still asks for a click
         row.role = { ...row.role!, baseConfidence: 'low' };
         expect(roleUnder(d, 'txn_id', '', [transfer])!.confidence).toBe('low');
+    });
+});
+
+describe('followOnClause (BASIC-ONBOARD-1 P1)', () => {
+    const index = { key: 'index', does: 'builds its link index', needs: ['defaultLinkMapping'] };
+
+    it('names a registered follow-on whose needs the review meets', () => {
+        expect(followOnClause([index], true)).toBe(', and builds its link index');
+    });
+
+    it('says nothing when the Dataset has no link, or no application registered a follow-on', () => {
+        expect(followOnClause([index], false)).toBe('');
+        expect(followOnClause([], true)).toBe('');
+        expect(followOnClause(undefined, true)).toBe('');
+    });
+
+    it('names a follow-on that needs nothing whatever the link', () => {
+        expect(followOnClause([{ key: 'score', does: 'scores it', needs: [] }], false)).toBe(', and scores it');
     });
 });

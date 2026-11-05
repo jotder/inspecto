@@ -76,6 +76,38 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
    poll target that must survive a restart persists its own on/off flag and re-registers it: the inbox does this from the
    Dataset entries on the first tick after start-up (`InboxWatch.attach`); a snapshot poll target needs the same step.
 
+### 4.1 The follow-on seam (P1 - read this if you call it from P2 or P3)
+
+- **Interface:** `com.gamma.onboard.ImportFollowOn` in `platform/inspecto-engine`, found with
+  `OptionalSpi.all(ImportFollowOn.class)` (a `META-INF/services` entry). Methods: `key()` (the run summary key its
+  outcome goes under, LA: `index`), `does()` (the review sentence's clause, LA: *builds its link index*), `needs()`
+  (the Dataset entry keys it needs, LA: `defaultLinkMapping`), `deferred()` (its outcome when the Space's Jobs do it),
+  `run(Context)` with `Context(writeRoot, dataRoot, dataset, entry, actor)`. It returns an outcome map
+  (`result`, `message`, plus its own fields), never throws for a refusal.
+- **LA registers** `com.gamma.geolink.LinkIndexFollowOn` in `la/inspecto-geo-link` (the module that already provides
+  `LinkIndexBuilder`). The link-mapping readers it shares with the platform (`primary`, `carriedColumns`, the
+  `defaultLinkMapping` / `primaryTime` / `primaryMeasure` / `carried` keys) move from `DatasetEntryRules` to
+  `com.gamma.linkindex.LinkMapping` (engine).
+- **Where it runs:** `OnboardImport.Job.followOn(summary)` is the fourth step, unchanged in name and in call sites
+  (commit, *Add a file*, *Run now*). **P2 / P3: land your Parquet the way those three do, then call
+  `job.followOn(summary)` and `job.recordArrival(summary)`; never call a follow-on directly.** Its order: compaction,
+  `followOnInRun`, each registered follow-on under its `key` (or its `deferred()` outcome when `pipeline.automation`
+  is present), then the Expectations.
+- **No follow-on registered** (an application without one, or an install without LA): the summary has no `index`
+  key and the arrival records `index: null`; the import ends at the Parquet it wrote. Before P1 it said
+  `NOT_AVAILABLE`.
+- **The four steps in the import's config:** every `<id>_pipeline.toon` Add data writes carries
+  `import_steps: [read, arrange, write_parquet, follow_on]` (declared in `ConfigSpecs`, read by no engine code, like
+  `origin`). An import written before P1 has none and means the same.
+- **UI:** the draft (`POST /onboard/files`) lists `followOns: [{key, does, needs}]`; the review sentence names those
+  whose `needs` the review satisfies. The shared screen stays in `projects/link-analysis/src/add-data/` for now (P2
+  and P3 edit it); moving it to a platform library is a follow-up row once they land.
+- **Code P1 moves that P2 / P3 may touch:** `OnboardImport.Job.buildIndex` is deleted (now in LA's follow-on);
+  `OnboardImport.pipeline(...)` gains the `import_steps` line; `DatasetEntryRules.primary` / `carriedColumns` /
+  `CARRIED*` move to `LinkMapping`. Nothing else in `OnboardImport` moves.
+- **Left in the platform on purpose:** `DatasetFeed`'s *Keep this up to date* proposes LA's `la.index.build` Job
+  (`DatasetFeed.java` ~336) - a Standard-only path, not this seam.
+
 ## 5. Operator answers (2026-11-05)
 
 | # | Question | Answer |
@@ -83,14 +115,15 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
 | Q1 | "Manual scheduling" | ***Run now*, or auto: a 30-second poll.** No user-defined scheduling. The poll is per import inbox (and per snapshot when the user turns it on), off by default, one interval, not configurable on Basic. |
 | Q2 | Which databases first | **Postgres.** |
 | Q3 | Which applications next | **Decided later, as we go.** The first non-LA placement is its own row when chosen. |
-| Q4 | What "index" means | **The follow-on index is for the applications that need one** (LA's link index). For the others, the default Pipeline ends at sorted, partitioned Parquet; an application adds a follow-on step only when it has its own. *(Recorded reading of "Index for non-LA apps only" - confirm at P0.)* |
+| Q4 | What "index" means | **The follow-on index is for the applications that need one** (LA's link index). For the others, the default Pipeline ends at sorted, partitioned Parquet; an application adds a follow-on step only when it has its own. **Confirmed by the operator at P0 (2026-11-05)**, with one correction: today an import writes one snappy Parquet file per run and compaction merges them later; nothing sorts or partitions it. P1 ends at that Parquet (no behaviour change); sorted, partitioned output is a later board row. |
 
 ## 6. Phases
 
 | Phase | Scope | Size |
 |---|---|---|
-| **P0 verify** | V1 the follow-on list as a seam (where LA's index call sits today in `OnboardImport`); V2 Postgres read via DuckDB's `postgres` extension vs the `db` Collector - which ships in the Basic bundle, and its size; V3 a 30 s poll's cost on an idle install (no Spaces open, many inboxes); V4 confirm Q4's reading | S |
+| **P0 verify** | V1 the follow-on list as a seam (where LA's index call sits today in `OnboardImport`); V2 Postgres read via DuckDB's `postgres` extension vs the `db` Collector - which ships in the Basic bundle, and its size; V3 a 30 s poll's cost on an idle install (no Spaces open, many inboxes); V4 confirm Q4's reading. **V1 done (2026-11-05):** the link index is built in `OnboardImport.Job.followOn` → `buildIndex`, which calls LA's `LinkIndexBuilder` SPI (`la/inspecto-geo-link` `ScheduledLinkIndexBuilder`) when the Dataset has a `defaultLinkMapping`; `followOn` is called by the commit (`finishCommit`), *Add a file* and *Run now*, after compaction and before the Expectations. The seam (§4.1) keeps that call and replaces `buildIndex` with the registered list; the operator chose LA's own module for LA's entry. **V4 done:** §5 Q4. | S |
 | **P1 Platform seam** | *Add data* as a platform feature: the follow-on list (LA registers its index), the default Pipeline's four steps named in the import's config, the console `/add-data` and LA placements on one component (already shared; make the seam explicit) | M |
+| | **P1 built 2026-11-05** as §4.1 describes. Proved by the LA tests unchanged (`ControlApiOnboardLinkAnalysisTest` still sees `index: BUILT` through the seam), `aRegisteredFollowOnIsListedAndRunsInsideTheRun` (a registered follow-on runs after the Parquet is written, in the commit and in *Run now*) and the platform tests without LA (no `index` key, `followOns: []`). Follow-ups for P4 to file: move `projects/link-analysis/src/add-data/` to a platform UI library once P2 / P3 land (chore); sorted, partitioned Parquet in the write step (§5 Q4, feature). Seen, not caused here: `ImportCapabilityGuardTest.everyStricterRouteOfAWritableKindIsCoveredByTheTable` is red on master `ec33608ff` (the `/datasets/{id}/feed` and `/compact` routes are missing from `ImportCapabilityGuard`). | |
 | **P2 Inbox poll** | Per-inbox *Watch this folder* toggle (30 s), on Basic and up; one poller for all inboxes; a refused file is set aside with its reason (as *Run now* does); visible in Data status | M |
 | **P3 Postgres snapshot** | Connect (host, database, user, `${ENV:…}` password), pick a schema / table or paste a read-only `SELECT`, preview, review columns, Create; *Run now* / poll refreshes as *replace everything*; connection test refuses write-capable statements | L |
 | **P4 Docs and sale** | EDITIONS rows, the whitepapers, the user guide; DT-4 / DT-5 / DT-10 / DT-17 amended in `data-tier-editions-plan.md` | S |

@@ -348,11 +348,11 @@ final class DatasetFeed {
         j.put("source_col", String.valueOf(from));
         j.put("target_col", String.valueOf(to));
         if (m.get("kind") != null) j.put("kind_col", String.valueOf(m.get("kind")));
-        String time = DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_TIME, "time");
+        String time = com.gamma.linkindex.LinkMapping.primary(m, DatasetEntryRules.PRIMARY_TIME, "time");
         if (time != null) j.put("time_col", time);
-        String weight = DatasetEntryRules.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount");
+        String weight = com.gamma.linkindex.LinkMapping.primary(m, DatasetEntryRules.PRIMARY_MEASURE, "amount");
         if (weight != null) j.put("weight_col", weight);
-        List<String> carried = DatasetEntryRules.carriedColumns(imp.content());
+        List<String> carried = com.gamma.linkindex.LinkMapping.carriedColumns(imp.content());
         if (!carried.isEmpty()) j.put("attr_cols", String.join(",", carried));
         j.put("owner", actor);
         j.put("allow_full", "true");
