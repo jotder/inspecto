@@ -76,6 +76,36 @@ What makes it Basic: **no transformation**, **no user-defined schedule** (*Run n
 | **P3 Postgres snapshot** | Connect (host, database, user, `${ENV:…}` password), pick a schema / table or paste a read-only `SELECT`, preview, review columns, Create; *Run now* / poll refreshes as *replace everything*; connection test refuses write-capable statements | L |
 | **P4 Docs and sale** | EDITIONS rows, the whitepapers, the user guide; DT-4 / DT-5 / DT-10 / DT-17 amended in `data-tier-editions-plan.md` | S |
 
+### P0 V3 - what a 30 s poll costs on an idle install (measured 2026-11-05)
+
+**What one tick does (the P2 design the measurement assumes).** The poll is to keep the list of watched inboxes
+in memory (read once from each Space's Dataset entries, then kept by the *Watch this folder* toggle), so an idle tick
+reads no registry and opens no Space: per watched inbox it lists the folder (depth 4, as *Import waiting files* does)
+and reads each visible file's size and modified time. A run starts only when a file is waiting and has settled.
+
+**Measured** (JDK 27, Windows 11, 12 logical CPUs, local NTFS disk with the default virus scanner on; synthetic
+folders; 20 warm ticks averaged; CPU and allocation of the poll thread only):
+
+| Watched inboxes | Files waiting in each | CPU per tick | Wall per tick | Allocated per tick | Share of one core at 30 s |
+|---:|---:|---:|---:|---:|---:|
+| 10 | 0 | 1.6 ms | 1.8 ms | 25 KB | 0.005 % |
+| 100 | 0 | 22 ms | 31 ms | 255 KB | 0.07 % |
+| 1,000 | 0 | 176 ms | 185 ms | 1.9 MB | 0.6 % |
+| 10 | 5 | 6 ms | 6 ms | 101 KB | 0.02 % |
+| 100 | 5 | 66 ms | 66 ms | 770 KB | 0.2 % |
+| 1,000 | 5 | 1,010 ms | 1,041 ms | 7.6 MB | 3.4 % |
+
+**Verdict: affordable; no change to the design.** An idle install with empty inboxes costs under 1 % of one core
+at 1,000 watched inboxes (a verification re-run measured 0.87 %, so "under 1 %" is close to its limit there), and the
+garbage per tick is small. The cost grows with the files *left* in inboxes, each stat-ed every tick. A Basic user
+leaves files there in two ways: a file whose columns do not match is moved to `refused/` by the import (so it stops
+costing), and a file already imported under the same name stays and is counted (the inbox says *rename to import
+again*). Not in the harness: for each waiting file the poll also asks whether it was already imported under its name
+(`MarkerManager.isAlreadyProcessed`, one or two more file look-ups), so the "files waiting" rows understate the cost
+somewhat - the same order of magnitude. The design runs one thread for every inbox, at a fixed delay, so a tick that
+overruns 30 s delays the next one rather than overlapping it. A slow network folder is the risk the numbers do not
+cover: there each listing is a round-trip.
+
 ## 7. Not in scope
 
 - Transformation on Basic (joins, derived columns, filters beyond the review step) - Standard.
