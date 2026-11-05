@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `BASIC-ONBOARD-1` | P2 | feature | Basic data onboarding as a platform feature every application reuses: three ways in (an inbox directory, a one-time upload, a Postgres ta… | — |
 | `LA-COLUMN-ROLES-2` | P3 | feature | what LA-COLUMN-ROLES-1 deliberately left out, on demand: | — |
 | `LA-PRESET-ROLES-1` | P3 | defect | preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03). | demand |
 | `LA-ARRIVAL-LEDGER-1` | P2 | feature | an arrival ledger per Dataset and a three-clock *Data status* (received · covers through · graph indexed through), in every edition (LA-D… | — |
