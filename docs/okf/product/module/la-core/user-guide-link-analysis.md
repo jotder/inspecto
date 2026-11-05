@@ -218,6 +218,22 @@ up to date. For each one:
 Files always go to the Dataset you added, never to a Mapping (*Add a file* on a Mapping is refused and names the
 Dataset). A Dataset that Mappings read cannot be deleted until they are.
 
+**What a new file does.** *Add a file* asks once per file:
+
+- **replaces the data**: everything before is set aside;
+- **adds its rows**: everything before stays;
+- **replaces the days it covers** (only for a Dataset with a *When* column): its rows are added, and the older rows on
+  the same days are removed; every other day stays. Send a corrected week this way and you get exactly that week again.
+
+The same file twice is refused ("already imported on …"), so its rows are never counted twice. To load it again, replace
+everything. A file must have the Dataset's columns, by name: a missing column, or one moved to another place, refuses
+the file and says which. A new column is accepted, but not kept (the Dataset reads the columns it was made with), and
+the result names it. A file another system put in the inbox is judged the same way by *Run now*; a refused one is set
+aside in the Dataset's `refused` folder and listed in *Arrivals* with the reason.
+
+The **Data status** line also shows in Explore, under the Start box's Dataset and above the Rows table: *graph up to
+date*, or *graph N files behind* when a later file could not be indexed.
+
 - **Who sees a Mapping:** only someone who may read its Dataset. A Mapping never shows a Dataset's rows to someone the
   Dataset is not shared with; for them it is simply not there.
 - **When a Dataset changes under a Mapping:** if a Pipeline drops a column a Mapping reads, the Mapping is marked

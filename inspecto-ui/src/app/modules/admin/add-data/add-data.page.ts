@@ -1,7 +1,17 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    OnInit,
+    afterNextRender,
+    computed,
+    inject,
+    signal,
+    viewChild,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LensService } from '@inspecto/core/api';
 import { ComponentsService } from '@inspecto/core/api/components.service';
+import { AddDataHandoff } from './add-data-drop.component';
 import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
 import { AddDataComponent } from '@inspecto/link-analysis/add-data/add-data.component';
 import { ImportDataset, ImportKind, ImportSummary } from '@inspecto/link-analysis/add-data/add-data.model';
@@ -13,6 +23,8 @@ import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/imp
  * Analysis, and *Open in editor* opens the import's Pipeline in the guided editor (the expert path). The Catalog's
  * *Onboard a Stream* dialog stays the advanced start (OF-3). Under the screen, a card per Dataset already imported here
  * with **Add a file** and **Run now**; when the person may not add data the screen says why and offers no card (A-15).
+ * A file dropped on Home, the Catalog or an empty Datasets pane arrives here through {@link AddDataHandoff} and is read
+ * at once, as if dropped on the screen itself.
  */
 @Component({
     selector: 'inspecto-console-add-data',
@@ -66,6 +78,15 @@ export class ConsoleAddDataPageComponent implements OnInit {
     /** The Dataset the screen above just made: its card is already shown there. */
     private readonly justImported = signal<string | null>(null);
     protected readonly others = computed(() => this.imports().filter((d) => d.id !== this.justImported()));
+    private readonly addData = viewChild.required(AddDataComponent);
+
+    constructor() {
+        const handoff = inject(AddDataHandoff);
+        afterNextRender(() => {
+            const f = handoff.take();
+            if (f && !this.access.lockReason()) this.addData().read(f);
+        });
+    }
 
     ngOnInit(): void {
         this.load();

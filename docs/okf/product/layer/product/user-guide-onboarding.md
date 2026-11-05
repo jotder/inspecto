@@ -19,8 +19,21 @@ timestamp: 2026-07-16T00:00:00Z
 > and *Read from a database or a remote system* is locked on Basic (DT-4). Home's first-run panel leads with
 > **Add data** (offered to everyone; the screen itself says why when the person may not upload, A-15); the create
 > dialog below (*Onboard a Stream*) stays the **advanced start** (OF-3), linked under it and from Add data for those
-> with `connections.onboard`. Not built yet: drop zones on Home / Catalog / the empty Datasets pane, the Getting
-> started panel and console Space guide (C4), and the console Dataset page (C5) — `docs/BACKLOG.md`.
+> with `connections.onboard`.
+>
+> **Drop a file (C3, 2026-11-05).** Home, the Catalog and the Studio Datasets pane while it holds no Dataset are drop
+> zones: dropping a file there opens `/add-data`, which reads that file at once, as if it had been dropped on the screen
+> itself. While a file is dragged over, an overlay says what a drop does; a drag that carries no file (text, a link) is
+> ignored. A zone is armed only when the person may add data in this Space (the same `AddDataAccess` check as the
+> screen: `canUploadData` with sign-in, and `data.self_import`), so a locked person's drop sends nothing; files only, so
+> Basic needs no further lock (DT-4). The empty Datasets pane says to drop a file and offers an *Add data* button, the
+> keyboard path. As built: `modules/admin/add-data/add-data-drop.component.ts` — `<inspecto-add-data-drop>` replaces
+> the pane's root element (the host gives the layout classes), and `AddDataHandoff` (a root service) carries the `File`,
+> taken once, because a file cannot travel in a URL. It lives in the console's `add-data` feature, not in
+> `app/inspecto`, because core may not import the Link Analysis library (eslint D-5).
+> *Open in editor* on the review screen (before Create, no Pipeline exists yet) is **moved to `BASIC-ONBOARD-1`
+> (operator 2026-11-05)**: not built and not declined. Not built yet: the Getting started panel and console Space guide
+> (C4), and the console Dataset page (C5) — `docs/BACKLOG.md`.
 
 > 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e, plan
 > archived).** Onboarding a data origin now means: this **create dialog**, then the **guided pipeline

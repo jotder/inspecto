@@ -28,6 +28,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { ToastrService } from 'ngx-toastr';
 import { interval } from 'rxjs';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { AddDataDropComponent } from 'app/modules/admin/add-data/add-data-drop.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
 interface AttentionRow {
@@ -75,6 +76,7 @@ const DATASET_WRITE_TYPES = 'dataset.write,job.dataset.produced';
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './home.component.html',
     imports: [
+        AddDataDropComponent,
         InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,

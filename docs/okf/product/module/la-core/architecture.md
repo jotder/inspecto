@@ -1818,6 +1818,43 @@ component that imports `DataTableComponent` brings `MatDialogModule` into its in
 beyond the kind of link (`LA-COLUMN-ROLES-2`); drawing from the Data page (it points to Explore); a live drive on the
 Basic install (the plan's §5 check over IMS and Mobile money) waits for a redeploy.
 
+### 6.17 Arrivals: the ledger, Data status and what a later file does (LA-ARRIVAL-LEDGER-1 + LA-ARRIVAL-MODES-1, as built 2026-11-03/05)
+
+Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrivals).
+
+- **`GET /datasets/{id}/arrivals`** (`inspecto/.../control/DatasetArrivals.java`) is a READ over the engine's per-file
+  audit ledger (`StatusStore.files`) joined to a sidecar `<dataRoot>/<id>/arrivals.jsonl`. The covered period is the
+  min / max of the Dataset's `eventDate` over the arrival's own Parquet, read in a DuckDB sealed to `<dataRoot>/<id>`.
+  Gates as `/freshness` (no capability); an entry whose import fields do not name ITS OWN Add data Pipeline reads nothing.
+- **The sidecar** gets one line per file a run took (`DatasetArrivals.recordRun`): the upload's name, mode, sha256; every
+  file's index outcome and its mode (`append` / `full` / `compact`). *Run now* records the drops it took (`sender: system`).
+  A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A refused
+  waiting file has only its sidecar line (`status: REFUSED`, `reason`, `setAside`) and is merged in by time.
+- **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`),
+  on the Dataset card, under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up
+  to date / N files behind*. A refused arrival is left out. Extension point: `dataStatusLines()` in `add-data.model.ts`.
+- **V4:** on Basic every append (Add a file, or a drop Run now takes) builds the link index in mode `append`; only the
+  first build is `full`. About 7 to 11 s per 10,000-row append at 1 M rows, end to end
+  (`ControlApiOnboardLinkAnalysisTest#v4MeasuredAtScale`).
+- **Three modes** for *Add a file*: `replace` (everything), `append` (add rows), `period` (D-2: the file's rows are added,
+  then every older Parquet file loses its rows on the calendar days the file covers; `DatasetPeriod`, originals kept in
+  `database.period-<stamp>/` until the import succeeded). `period` needs a When column. A rewritten file makes the next
+  index build `full`.
+- **The same bytes again** (D-3): append or period whose sha256 matches an upload whose rows are still held answers 409
+  with the first import's date (`DatasetArrivals.alreadyImported`). Replace everything may always reload. A folder drop
+  under the same name is skipped by the import Pipeline's duplicate policy and stays in the inbox.
+- **Schema drift** (D-6, operator 2026-11-05): `OnboardImport.checkColumns` judges a later file by column NAME before
+  anything lands. A missing column, or a delimited column at another position, refuses it naming each (422 for an upload;
+  Run now, and Add a file for the drops its run takes, move a refused waiting file to `<id>/refused/`). A new column is
+  accepted, not kept (delimited files are rewritten with the read columns only, because the engine sets aside rows with
+  more fields than it reads) and named in the result and the arrival. An import with no header line is judged by its
+  column count only.
+
+**Deliberately not done.** Keeping new columns as details (`LA-ARRIVAL-NEW-COLUMNS-1`); row-key upserts (with SCD2,
+D-ING4); the inbox and *Keep this up to date* (`LA-ARRIVAL-FEEDS-1`); Dataset Parquet compaction (`LA-DATASET-COMPACT-1`);
+a refresh of the Start box / dock status after a run (each reads once per Dataset); a live drive on Basic and Preview.
+Plan: `docs/superpower/la-data-arrival-plan.md` §5a-§5d, §6.
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (28); geo-link → `RouteModule` (4), `InvestigationMeasureProbe`,

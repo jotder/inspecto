@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, of } from 'rxjs';
 import {
@@ -37,6 +37,7 @@ import {
 } from './dataset-freshness';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { ADD_DATA_ROUTE, AddDataDropComponent } from 'app/modules/admin/add-data/add-data-drop.component';
 
 /**
  * Studio **Datasets** — the data-source abstractions (physical / virtual / materialized) widgets build on.
@@ -47,6 +48,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
     selector: 'app-datasets',
     standalone: true,
     imports: [
+        AddDataDropComponent,
         InspectoPageHeaderComponent,
         AiExplainComponent,
         MatButtonModule,
@@ -72,6 +74,7 @@ export class DatasetsComponent implements OnInit {
      */
     readonly opsEnabled = inject(SessionService).opsEnabled;
     private toastr = inject(ToastrService);
+    private router = inject(Router);
     private confirm = inject(InspectoConfirmService);
     private dialog = inject(MatDialog);
     private exchange = inject(ExchangeService);
@@ -105,6 +108,11 @@ export class DatasetsComponent implements OnInit {
     readonly transferItems = computed(() =>
         this.visibleDatasets().map((d) => ({ kind: 'dataset' as const, id: d.id })),
     );
+
+    /** *Add data* from the empty pane (the keyboard path beside the drop, ONBOARDING-FIRST-RUN-1 B1). */
+    protected addData(): void {
+        void this.router.navigateByUrl(ADD_DATA_ROUTE);
+    }
 
     ngOnInit(): void {
         this.load();

@@ -596,6 +596,9 @@ class ControlApiOnboardFilesTest {
             String id = uniqueId("arrivals");
             JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
             data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            // a sidecar line written before senders were recorded (no "sender") still reads as an upload
+            Path sidecar = Path.of("database", id, DatasetArrivals.SIDECAR);
+            Files.writeString(sidecar, Files.readString(sidecar).replace("\"sender\":\"upload\",", ""));
             byte[] november = transfers(30).getBytes(StandardCharsets.UTF_8);
             data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv&mode=append", november, null), 200);
             Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(20));
@@ -604,13 +607,18 @@ class ControlApiOnboardFilesTest {
             JsonNode out = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200);
             JsonNode list = out.get("arrivals");
             assertEquals(3, list.size(), out.toString());
+            assertEquals("upload", list.get(2).get("sender").asText(), "a legacy line: " + list.get(2));
             assertNotNull(out.get("eventDateColumn").textValue(), "Add data names the When column: " + out);
 
             JsonNode drop = list.get(0), nov = list.get(1), first = list.get(2);
             assertEquals("system", drop.get("sender").asText(), drop.toString());
             assertTrue(drop.get("file").asText().contains("foreign_drop"), drop.toString());
             assertEquals(20, drop.get("rowsRead").asLong());
-            assertTrue(drop.get("mode").isNull());
+            assertEquals("append", drop.get("mode").asText(), "Run now adds what it takes: " + drop);
+            // Run now records its own index outcome per file (no Link Analysis here: nothing to build)
+            assertEquals("NOT_AVAILABLE", drop.get("index").asText(), drop.toString());
+            assertTrue(drop.get("sha256").isNull(), "only an upload's bytes are hashed: " + drop);
+            assertEquals("NOT_AVAILABLE", nov.get("index").asText(), nov.toString());
 
             assertEquals("upload", nov.get("sender").asText(), nov.toString());
             assertEquals("november.csv", nov.get("file").asText());
@@ -632,6 +640,26 @@ class ControlApiOnboardFilesTest {
             assertTrue(after.get(0).get("kept").asBoolean());
             for (int i = 1; i < 4; i++) assertFalse(after.get(i).get("kept").asBoolean(), after.get(i).toString());
 
+            // a foreign process sending the SAME name again: the import Pipeline's duplicate policy skips it (no arrival)
+            Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(5));
+            JsonNode resent = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(0, resent.get("rowsIn").asLong(), resent.toString());
+            assertEquals(4, data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").size());
+            // ... while a new name is an arrival of its own - here taken by an upload's run, which records both files
+            Files.writeString(Path.of("database", "inbox", id).resolve("second_drop.csv"), transfers(5));
+            data(send(c, "POST", "/datasets/" + id + "/files?name=extra.csv&mode=append", transfers(7).getBytes(StandardCharsets.UTF_8), null), 200);
+            JsonNode again = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals(6, again.size(), again.toString());
+            JsonNode drop2 = null, extra = null;
+            for (int i = 0; i < 2; i++)
+                if ("system".equals(again.get(i).get("sender").asText())) drop2 = again.get(i); else extra = again.get(i);
+            assertNotNull(drop2, again.toString());
+            assertNotNull(extra, again.toString());
+            assertEquals(5, drop2.get("rowsRead").asLong(), drop2.toString());
+            assertEquals("NOT_AVAILABLE", drop2.get("index").asText(), drop2.toString());
+            assertEquals("extra.csv", extra.get("file").asText(), extra.toString());
+            assertEquals(7, extra.get("rowsRead").asLong(), extra.toString());
+
             // gates: unknown 404; a Dataset no import made answers 200 with no arrivals and why
             assertEquals(404, json(c, "GET", "/datasets/nope/arrivals", null, null).statusCode());
             new ComponentStore(root.resolve("registry")).write("dataset", "piped", Map.of("physicalRef", "piped/database"));
@@ -645,6 +673,193 @@ class ControlApiOnboardFilesTest {
             JsonNode forged = data(json(c, "GET", "/datasets/forged/arrivals", null, null), 200);
             assertEquals(0, forged.get("arrivals").size(), forged.toString());
             assertTrue(forged.get("eventDateColumn").isTextual());
+        }
+    }
+
+    /** Each line's comma-separated fields with {@code a} and {@code b} swapped (header too). */
+    private static String swapColumns(String csv, int a, int b) {
+        StringBuilder sb = new StringBuilder();
+        for (String line : csv.split("\n")) {
+            String[] f = line.split(",", -1);
+            String t = f[a];
+            f[a] = f[b];
+            f[b] = t;
+            sb.append(String.join(",", f)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /** Each line with field {@code drop} removed, or {@code suffix} appended when {@code drop} is negative. */
+    private static String editColumns(String csv, int drop, String headerSuffix, String valueSuffix) {
+        StringBuilder sb = new StringBuilder();
+        boolean header = true;
+        for (String line : csv.split("\n")) {
+            List<String> f = new java.util.ArrayList<>(List.of(line.split(",", -1)));
+            if (drop >= 0) f.remove(drop);
+            else f.add(header ? headerSuffix : valueSuffix);
+            header = false;
+            sb.append(String.join(",", f)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * LA-ARRIVAL-MODES-1 (plan §4 Modes, D-2): <i>Replace the period it covers</i> adds the file's rows and removes, from the
+     * older data, exactly the rows on the days the file covers; every other day stays. Refused without a When column and
+     * on a Reference; the originals of rewritten files are discarded once the import succeeded.
+     */
+    @Test
+    void aFileReplacesExactlyTheDaysItCovers(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("period");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            // transfers(n) puts row i on 2026-09-(1 + i % 28): a 7-row correction covers 2 - 8 September
+            long onThoseDays = 0;
+            for (int i = 1; i <= 100; i++) if (1 + i % 28 >= 2 && 1 + i % 28 <= 8) onThoseDays++;
+            JsonNode s = data(send(c, "POST", "/datasets/" + id + "/files?name=week.csv&mode=period",
+                    transfers(7).replace(",EUR\n", ",USD\n").getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(100 - onThoseDays + 7, s.get("rowsAfter").asLong(), s.toString());
+            JsonNode p = s.get("period");
+            assertEquals(7, p.get("days").asInt(), p.toString());
+            assertEquals("2026-09-02", p.get("from").asText());
+            assertEquals("2026-09-08", p.get("to").asText());
+            assertEquals(onThoseDays, p.get("rowsReplaced").asLong(), p.toString());
+            assertFalse(s.get("replaced").asBoolean());
+
+            JsonNode a = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals("period", a.get(0).get("mode").asText(), a.get(0).toString());
+            assertTrue(a.get(1).get("kept").asBoolean(), "the older file keeps its other days: " + a.get(1));
+            assertEquals("period", ((Map<?, ?>) new ComponentStore(root.resolve("registry")).get("dataset", id).orElseThrow()
+                    .content().get("lastImport")).get("mode"));
+            try (var w = Files.list(Path.of("database", id))) {
+                assertTrue(w.noneMatch(x -> x.getFileName().toString().startsWith("database.period-")), "the originals are discarded");
+            }
+            // the same correction again with other bytes is idempotent: the same days, the same rows
+            JsonNode again = data(send(c, "POST", "/datasets/" + id + "/files?name=week2.csv&mode=period",
+                    transfers(7).replace(",EUR\n", ",GBP\n").getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(s.get("rowsAfter").asLong(), again.get("rowsAfter").asLong(), again.toString());
+            assertEquals(7, again.at("/period/rowsReplaced").asLong(), again.toString());
+
+            // a period step that fails after its run (the When column made a text one, so its days cannot be read) is undone:
+            // the upload's own rows go, while a drop the same run took keeps its rows (it is already marked processed)
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            long held = again.get("rowsAfter").asLong();
+            Map<String, Object> text = new java.util.LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());
+            text.put("eventDate", "channel");
+            registry.write("dataset", id, text);
+            Files.writeString(Path.of("database", "inbox", id).resolve("riding_drop.csv"), transfers(4));
+            HttpResponse<String> failed = send(c, "POST", "/datasets/" + id + "/files?name=bad_week.csv&mode=period",
+                    transfers(6).replace(",EUR\n", ",CHF\n").getBytes(StandardCharsets.UTF_8), null);
+            assertNotEquals(200, failed.statusCode(), failed.body());
+            assertEquals(held + 4, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsAfter").asLong(),
+                    "the failed upload's rows are gone, the drop's stay, no older day was lost");
+
+            // refused: a Dataset with no When column, and an unknown mode
+            Map<String, Object> entry = new java.util.LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());
+            entry.remove("eventDate");
+            registry.write("dataset", id, entry);
+            HttpResponse<String> noWhen = send(c, "POST", "/datasets/" + id + "/files?name=w3.csv&mode=period",
+                    transfers(3).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(422, noWhen.statusCode(), noWhen.body());
+            assertTrue(noWhen.body().contains("no When column"), noWhen.body());
+            assertEquals(422, send(c, "POST", "/datasets/" + id + "/files?name=w3.csv&mode=upsert",
+                    transfers(3).getBytes(StandardCharsets.UTF_8), null).statusCode());
+        }
+    }
+
+    /**
+     * LA-ARRIVAL-MODES-1 (D-3): the same bytes added again (append or period) are refused with the first import's date,
+     * until a Replace everything set those rows aside; Replace everything itself may always reload a file.
+     */
+    @Test
+    void theSameFileAddedAgainIsRefusedUntilEverythingIsReplaced(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("dup");
+            byte[] first = transfers(100).getBytes(StandardCharsets.UTF_8);
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            HttpResponse<String> dup = send(c, "POST", "/datasets/" + id + "/files?name=copy.csv&mode=append", first, null);
+            assertEquals(409, dup.statusCode(), dup.body());
+            assertTrue(dup.body().contains("already imported on 20") && dup.body().contains("as 'transfers.csv'")
+                    && dup.body().contains("replace everything"), dup.body());
+            assertEquals(100, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsAfter").asLong(),
+                    "nothing landed");
+
+            byte[] oct = transfers(30).getBytes(StandardCharsets.UTF_8);
+            data(send(c, "POST", "/datasets/" + id + "/files?name=october.csv&mode=append", oct, null), 200);
+            assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?name=october.csv&mode=append", oct, null).statusCode());
+            assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?name=october.csv&mode=period", oct, null).statusCode());
+
+            byte[] nov = transfers(10).getBytes(StandardCharsets.UTF_8);
+            data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv", nov, null), 200);   // Replace everything
+            assertEquals(40, data(send(c, "POST", "/datasets/" + id + "/files?name=october.csv&mode=append", oct, null), 200)
+                    .get("rowsAfter").asLong(), "October's rows were set aside by the replace, so it may come back");
+            assertEquals(10, data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv", nov, null), 200)
+                    .get("rowsAfter").asLong(), "Replace everything may always reload a file");
+        }
+    }
+
+    /**
+     * LA-ARRIVAL-MODES-1, the schema-drift policy (operator 2026-11-05, D-6): a later file is judged by its column NAMES
+     * before anything lands. A reordered header no longer loads into the wrong columns - it is refused naming each moved
+     * column; a missing column is refused by name; a new column is accepted, not kept, and named in the result and the
+     * arrival. Run now judges a dropped file the same way and sets a refused one aside with the reason.
+     */
+    @Test
+    void aLaterFileIsJudgedByItsColumnNames(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("drift");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(50), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+
+            // channel (column 4) and amount (column 5) swapped: by position it would load amounts as channels
+            HttpResponse<String> moved = send(c, "POST", "/datasets/" + id + "/files?name=swapped.csv&mode=append",
+                    swapColumns(transfers(20), 3, 4).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(422, moved.statusCode(), moved.body());
+            assertTrue(moved.body().contains("'channel' is column 5 here and column 4 in '" + id + "'"), moved.body());
+            assertTrue(moved.body().contains("'amount' is column 4 here and column 5"), moved.body());
+
+            HttpResponse<String> missing = send(c, "POST", "/datasets/" + id + "/files?name=short.csv&mode=append",
+                    editColumns(transfers(20), 6, null, null).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(422, missing.statusCode(), missing.body());
+            assertTrue(missing.body().contains("'currency' is missing"), missing.body());
+            assertEquals(50, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsAfter").asLong(),
+                    "nothing of a refused file landed");
+
+            JsonNode wider = data(send(c, "POST", "/datasets/" + id + "/files?name=wider.csv&mode=append",
+                    editColumns(transfers(20), -1, "fee", "1.5").getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(70, wider.get("rowsAfter").asLong(), wider.toString());
+            assertEquals("[\"fee\"]", wider.get("newColumns").toString(), wider.toString());
+            JsonNode list = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals("[\"fee\"]", list.get(0).get("newColumns").toString(), list.get(0).toString());
+
+            // Run now: a dropped reordered file is refused and set aside, with its reason, and recorded as an arrival
+            Path inbox = Path.of("database", "inbox", id);
+            Files.writeString(inbox.resolve("swapped_drop.csv"), swapColumns(transfers(9), 3, 4));
+            JsonNode now = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(70, now.get("rowsAfter").asLong(), now.toString());
+            assertEquals("swapped_drop.csv", now.at("/refused/0/file").asText(), now.toString());
+            assertTrue(now.at("/refused/0/reason").asText().contains("'channel' is column 5 here"), now.toString());
+            assertEquals("[]", listing(inbox), "the refused file left the inbox");
+            assertTrue(Files.isRegularFile(Path.of("database", id, "refused", "swapped_drop.csv")), "set aside, not deleted");
+            JsonNode after = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals("REFUSED", after.get(0).get("status").asText(), after.get(0).toString());
+            assertEquals("swapped_drop.csv", after.get(0).get("file").asText());
+            assertTrue(after.get(0).get("reason").asText().contains("'amount' is column 4 here"), after.get(0).toString());
+            assertEquals(3, after.size(), "the commit, wider.csv and the refused drop: " + after);
+
+            // a header that needs cleaning up ("Transfer ID" is read as Transfer_ID): the new column is still left out
+            String spaced = uniqueId("spaced");
+            String named = transfers(30).replaceFirst("transfer_id", "Transfer ID");
+            JsonNode d2 = draft(c, "spaced.csv", "stream", named, null);
+            data(json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", "{\"name\":\"" + spaced + "\"}", null), 200);
+            JsonNode w2 = data(send(c, "POST", "/datasets/" + spaced + "/files?name=wider.csv&mode=append",
+                    editColumns(transfers(10).replaceFirst("transfer_id", "Transfer ID"), -1, "fee", "1.5")
+                            .getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(40, w2.get("rowsAfter").asLong(), w2.toString());
+            assertEquals("[\"fee\"]", w2.get("newColumns").toString(), w2.toString());
+            assertEquals(0, w2.get("rowsRejected").asLong(), w2.toString());
         }
     }
 

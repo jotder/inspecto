@@ -4,6 +4,7 @@ import { Observable, filter, switchMap, take, tap, throwError, timer } from 'rxj
 import { apiUrl, toParams } from '@inspecto/core/api';
 import { ShortReads } from '@inspecto/core/api/short-reads';
 import type {
+    AddFileMode,
     Arrivals,
     CommitBody,
     DataSettings,
@@ -68,7 +69,7 @@ export class OnboardService {
     addFile(
         datasetId: string,
         file: File,
-        mode: 'replace' | 'append',
+        mode: AddFileMode,
         onFollow?: (runId: string) => void,
     ): Observable<ImportSummary> {
         return this.settle(

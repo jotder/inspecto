@@ -24,6 +24,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
 import { DISABLED_REASON, expandOnStartCap, mostDegrees } from './disabled-reasons';
+import { DataStatusComponent } from '@inspecto/link-analysis/add-data/data-status.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import {
     EntityProfileService,
@@ -101,6 +102,7 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         StepperFieldComponent,
+        DataStatusComponent,
     ],
     host: { class: 'block w-full max-w-3xl', '[class.p-4]': "mode() === 'draw'" },
     template: `
@@ -139,6 +141,12 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                         [options]="datasetOptions()"
                         formControlName="dataset"
                     ></inspecto-option-picker>
+                    <!-- LA-ARRIVAL-LEDGER-1: what arrived, the period it covers, whether the graph has it -->
+                    <inspecto-la-data-status
+                        class="-mt-1"
+                        data-testid="start-data-status"
+                        [dataset]="datasetId() || null"
+                    ></inspecto-la-data-status>
                 }
 
                 @switch (kind()) {
@@ -426,7 +434,7 @@ export class LinkAnalysisStartBoxComponent {
         timeColZone: new FormControl('', { nonNullable: true }),
         degrees: new FormControl(1, { nonNullable: true }),
     });
-    private readonly datasetId = toSignal(this.form.controls.dataset.valueChanges, { initialValue: '' });
+    protected readonly datasetId = toSignal(this.form.controls.dataset.valueChanges, { initialValue: '' });
     readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: 'entity' as StartKind | 'graph' });
     private readonly entityType = toSignal(this.form.controls.entityType.valueChanges, { initialValue: '' });
     private readonly valueText = toSignal(this.form.controls.value.valueChanges, { initialValue: '' });
