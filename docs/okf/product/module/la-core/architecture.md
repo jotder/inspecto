@@ -2086,21 +2086,29 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   one line for each (`feedSummaryLine`, `storageStatusLine`), so the card, the Start box and the Rows dock say them.
 - **A merged file rewritten since** (*Replace the period*, §6.17, removes days from every older file, the merged one
   included): the map keeps the merged file's `mergedBytes` and `mergedModified` and trusts its row segments only while
-  both match. Otherwise its arrivals stay *kept* with no known period, and the next compaction carries the file as ONE
-  block (`holds` names the arrivals in it) - never sliced by stale offsets.
+  both match. **Replace the period keeps the map true** (`LA-DATASET-COMPACT-2`, as built 2026-11-06): when the file it
+  rewrites IS the map's merged file and the map still holds (`DatasetCompaction.trustedSegments`), it writes the kept
+  rows in their row order (`file_row_number`), re-counts each arrival's segment and period from the same read
+  (`DatasetPeriod.recount`), and commits the map with the new size and time (`segmentsRewritten`; undone with the
+  import, `restoreMap`). An arrival left with no row drops out of the map, so the arrivals answer reads it as replaced
+  (not as a retention removal). So *keep N arrivals* after a *Replace the period* counts every arrival. Only when the
+  map cannot be trusted (an older map, a row outside every segment, a rewrite by anything else) do its arrivals stay
+  *kept* with no known period and the next compaction carries the file as ONE block (`holds` names the arrivals in it),
+  counted as one arrival by *keep N arrivals* - never sliced by stale offsets.
 - **Deliberately not done (review on return; board `LA-DATASET-COMPACT-2` keeps (e)):** (a) *(built 2026-11-05, above:
   a scheduled run compacts on its commit)*; (b) *Compact now* with a retention policy does not rebuild the index - the
   graph reads the flat Dataset until the next build *(since 2026-11-05 it never shows a removed row, above)*; (c) the policy is gated on `pipeline.automation` (the Standard marker
   the data-tier plan already uses; declared by `inspecto-ops` since 2026-11-05 - before, no module did, so real Standard
   bundles refused the policy and *Keep this up to date* like Basic, test `ControlApiKeepUpToDateStandardTest`); (d) a leftover that can never be deleted (a folder named `*.parquet`) keeps
-  compaction waiting, saying why each time - nothing is lost or doubled; (e) *keep N arrivals* counts a rewritten merged
-  file (a `holds` block) as ONE arrival, and its removal names that file; (f) the arrivals answer has no capability (as
+  compaction waiting, saying why each time - nothing is lost or doubled; (e) *(built 2026-11-06, above: Replace the
+  period keeps the map true; only a `holds` block from an untrusted map still counts as ONE arrival)*; (f) the arrivals answer has no capability (as
   before), so its `feed` tells a viewer of the Dataset the Connection's name, the ready marker and the waiting count -
   never the inbox path.
 - Tests: `ControlApiDatasetCompactionTest` (21 arrivals compact with each period kept and listed as kept by the arrivals
   answer, Compact now, a Replace the period that rewrites the merged file, Replace resets the map, retention by arrivals /
   by event date / an unreadable date / a missing When column / never on Basic, the crash heal, a file held open, armed
-  gates, `aRunOutsideAddDataCompactsOnItsCommit`: a run not started by Add data compacts, and leaves a held Dataset alone),
+  gates, `keepNArrivalsAfterAReplaceThePeriodCountsEachArrival`, compaction over files whose columns differ
+  (`ControlApiArrivalNewColumnsTest`), `aRunOutsideAddDataCompactsOnItsCommit`: a run not started by Add data compacts, and leaves a held Dataset alone),
   `ControlApiOnboardLinkAnalysisTest#afterARetentionCompactionTheGraphNoLongerShowsTheRemovedRows` (geo-link: right after a
   *keep 1 arrival* Compact now the neighbours read is `index_stale_refused` and draws no removed row), `dataset-storage.component.spec.ts`, the Data status lines in `dataset-feed.component.spec.ts`.
 
