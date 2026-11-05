@@ -76,9 +76,11 @@ final class OnboardDraft {
 
     /**
      * One column as the commit will write it: output name, the header it came from, its selector and proposed type;
-     * {@code decimal} is the decimal mark its text is read with when the number needs one (C1), else {@code null}.
+     * {@code decimal} is the decimal mark its text is read with when the number needs one (C1), else {@code null};
+     * {@code fraction} is a value anywhere in the file (not only the sample) with a fractional part, such as {@code 12.25},
+     * else {@code null} (DECIMAL-TEXT-NOT-BIGINT-1: a whole-number column must never take it).
      */
-    record Col(String name, String header, String selector, String type, String format, String decimal) {}
+    record Col(String name, String header, String selector, String type, String format, String decimal, String fraction) {}
 
     /** What was read: the draft's format and columns, the row count, and the sample. */
     record Analysis(Map<String, Object> format, List<Map<String, Object>> columns, List<Col> cols, long rows,
@@ -294,7 +296,7 @@ final class OnboardDraft {
         for (int i = 0; i < base.cols().size(); i++) {
             Col c = base.cols().get(i);
             String n = header ? c.name() : "col_" + (i + 1);
-            cols.add(new Col(n, header ? c.header() : null, String.valueOf(i), c.type(), c.format(), c.decimal()));
+            cols.add(new Col(n, header ? c.header() : null, String.valueOf(i), c.type(), c.format(), c.decimal(), c.fraction()));
         }
         List<Map<String, Object>> columns = header ? base.columns() : renameColumns(base.columns(), cols);
         List<EntityShapes.Column> sampled = header ? base.sampled() : renameSampled(base.sampled(), cols);
@@ -739,6 +741,8 @@ final class OnboardDraft {
             }
         }
 
+        List<String> fractions = fractions(conn, relation, headers);
+
         List<List<String>> valuesOf = new ArrayList<>();
         for (String n : names) {
             List<String> values = new ArrayList<>();
@@ -774,6 +778,12 @@ final class OnboardDraft {
                         + "' as the decimal mark (e.g. '" + clip(DecimalMark.example(values, mark)) + "')",
                         k >= MIN_SAMPLE && "high".equals(markChoice.get("confidence")));
                 typeCh.put("format", null);
+            } else if ("BIGINT".equals(type) && !declaredTypes && fractions.get(i) != null) {
+                // DECIMAL-TEXT-NOT-BIGINT-1: the sample is whole numbers but a later row is not; a BIGINT would cut it
+                type = "DOUBLE";
+                typeCh = choice(type, "the " + values.size() + " sampled values are whole numbers, but the file also has '"
+                        + clip(fractions.get(i)) + "', so a decimal number", true);
+                typeCh.put("format", null);
             } else {
                 if ("TIMESTAMP".equals(type) && !declaredTypes) fmt = timestampFormat(conn, n);
                 typeCh = typeChoice(type, fmt, values, declaredTypes ? declared.get(i) : null);
@@ -784,7 +794,7 @@ final class OnboardDraft {
             col.put("type", typeCh);
             col.put("sample", values.stream().distinct().limit(3).toList());
             columns.add(col);
-            cols.add(new Col(n, headers.get(i), selectors == null ? headers.get(i) : selectors.get(i), type, fmt, colMark));
+            cols.add(new Col(n, headers.get(i), selectors == null ? headers.get(i) : selectors.get(i), type, fmt, colMark, fractions.get(i)));
             sampled.add(new EntityShapes.Column(n, type, values));
         }
         List<Map<String, Object>> findings = new ArrayList<>();
@@ -797,6 +807,27 @@ final class OnboardDraft {
             }
         List<Map<String, Object>> preview = sample.subList(0, Math.min(PREVIEW_ROWS, sample.size()));
         return new Analysis(format, columns, cols, rows, new ArrayList<>(preview), sampled, findings);
+    }
+
+    /**
+     * Per column of {@code relation}, one value from the WHOLE file (not only the sample) that is a number with a fractional
+     * part ({@code 12.25}; {@code 47.00} is not), else {@code null}. One scan. DECIMAL-TEXT-NOT-BIGINT-1: the draft types
+     * such a column as a decimal, and a later file's such value is refused by a whole-number column, never cut.
+     */
+    private static List<String> fractions(Connection conn, String relation, List<String> headers) throws SQLException {
+        StringBuilder sql = new StringBuilder("SELECT ");
+        for (int i = 0; i < headers.size(); i++) {
+            String d = "TRY_CAST(trim(CAST(" + SqlIdent.q(headers.get(i)) + " AS VARCHAR)) AS DOUBLE)";
+            if (i > 0) sql.append(", ");
+            sql.append("first(trim(CAST(").append(SqlIdent.q(headers.get(i))).append(" AS VARCHAR))) FILTER (WHERE isfinite(")
+                    .append(d).append(") AND ").append(d).append(" <> floor(").append(d).append("))");
+        }
+        List<String> out = new ArrayList<>();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql + " FROM " + relation)) {
+            rs.next();
+            for (int i = 0; i < headers.size(); i++) out.add(rs.getString(i + 1));
+        }
+        return out;
     }
 
     /**

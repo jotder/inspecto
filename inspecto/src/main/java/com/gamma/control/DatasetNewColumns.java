@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 /**
  * LA-ARRIVAL-NEW-COLUMNS-1 (operator 2026-11-06, plan D-6): a later file's NEW columns are kept as details of an import
  * Dataset. A run keeps the new columns EVERY file it takes carries (for delimited text: the same leading new columns, in
- * the same order, since the engine reads by position); the import's schema grows by each (read as text), and the Dataset
+ * the same order, since the engine reads by position); the import's schema grows by each (typed by its values, {@link #typed}), and the Dataset
  * gains it with role {@code detail} and {@code keptFrom {file, at}}. Older Parquet files lack the column: every read
  * unions by name, so it reads as empty there. Once kept, a later file without it is refused like any missing column.
  *
@@ -88,7 +88,9 @@ final class DatasetNewColumns {
                 }
             }
             if (!kept.isEmpty()) {
-                String grownBy = grow(space, id, schemaFile, pipelineFile, registry, dataset, kept, files, delimited, undo);
+                List<OnboardDraft.Col> typed = new ArrayList<>();
+                for (OnboardDraft.Col c : kept) typed.add(typed(c, files, delimited));
+                String grownBy = grow(space, id, schemaFile, pipelineFile, registry, dataset, typed, files, delimited, undo);
                 if (grownBy != null) {
                     reason = grownBy;
                     kept.clear();
@@ -110,6 +112,38 @@ final class DatasetNewColumns {
             }
         }
         return new Outcome(keptNames, leftOut.isEmpty() ? null : reason);
+    }
+
+    /**
+     * {@code c} with the type every file of the run agrees its values have, by the draft's own inference (operator
+     * 2026-11-06: {@code 0.50} is a decimal, {@code 47.00} too, never a whole number): the same type (and date format) in
+     * every file; whole and decimal numbers together are DOUBLE; anything else, or a number read through a decimal mark
+     * (that needs a custom mapping), stays text.
+     */
+    static OnboardDraft.Col typed(OnboardDraft.Col c, List<Taken> files, boolean delimited) {
+        String type = null, format = null;
+        boolean first = true;
+        for (Taken t : files) {
+            List<OnboardDraft.Col> f = t.check().freshCols();
+            OnboardDraft.Col x = delimited ? f.stream().filter(y -> y.name().equals(c.name())).findFirst().orElse(null)
+                    : f.stream().filter(y -> y.selector().equals(c.selector())).findFirst().orElse(null);
+            if (x == null || x.decimal() != null) return text(c);
+            if (first) {
+                type = x.type();
+                format = x.format();
+                first = false;
+            } else if (Set.of("BIGINT", "DOUBLE").containsAll(java.util.Arrays.asList(type, x.type()))) {
+                if (!type.equals(x.type())) type = "DOUBLE";
+            } else if (!type.equals(x.type()) || !java.util.Objects.equals(format, x.format())) {
+                return text(c);
+            }
+        }
+        if (type == null || !Set.of("BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN").contains(type)) return text(c);
+        return new OnboardDraft.Col(c.name(), c.header(), c.selector(), type, format, null, c.fraction());
+    }
+
+    private static OnboardDraft.Col text(OnboardDraft.Col c) {
+        return new OnboardDraft.Col(c.name(), c.header(), c.selector(), "VARCHAR", null, null, c.fraction());
     }
 
     private static boolean free(Set<String> taken, String name) {
@@ -134,7 +168,7 @@ final class DatasetNewColumns {
     }
 
     /**
-     * The schema reads each kept column (text) and maps it through; the Pipeline is re-read; the Dataset lists it as a
+     * The schema reads each kept column at its type ({@link #typed}) and maps it through; the Pipeline is re-read; the Dataset lists it as a
      * detail. Answers null, or why nothing was kept (the schema did not load: every write here is put back).
      */
     @SuppressWarnings("unchecked")
@@ -157,7 +191,8 @@ final class DatasetNewColumns {
             Map<String, Object> f = new LinkedHashMap<>();
             f.put("name", c.name());
             f.put("selector", delimited ? String.valueOf(next++) : c.selector());
-            f.put("type", "VARCHAR");
+            f.put("type", c.type());
+            if (c.format() != null) f.put("format", c.format());
             fields.add(f);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", c.name());
@@ -188,7 +223,7 @@ final class DatasetNewColumns {
         for (OnboardDraft.Col c : kept) {
             Map<String, Object> col = new LinkedHashMap<>();
             col.put("name", c.name());
-            col.put("type", OnboardImport.datasetType("VARCHAR"));
+            col.put("type", OnboardImport.datasetType(c.type()));
             col.put("role", "detail");
             Map<String, Object> from = new LinkedHashMap<>();
             if (file != null) from.put("file", file);

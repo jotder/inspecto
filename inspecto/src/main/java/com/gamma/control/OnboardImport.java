@@ -1550,12 +1550,13 @@ final class OnboardImport {
                                    Map<String, Object> dataset) throws IOException {
         // LA-ARRIVAL-NEW-COLUMNS-1: a missing column a later file added says so (operator 2026-11-06: refused, as any other)
         Map<String, String> kept = DatasetNewColumns.keptNotes(dataset);
-        List<String[]> fields = new ArrayList<>();   // {selector, name}
+        List<String[]> fields = new ArrayList<>();   // {selector, name, type}
         try {
             Map<String, Object> s = com.gamma.util.ToonHelper.load(schema.toString());
             if (s.get("raw") instanceof Map<?, ?> raw && raw.get("fields") instanceof List<?> fs)
                 for (Object f : fs)
-                    if (f instanceof Map<?, ?> fm) fields.add(new String[] {String.valueOf(fm.get("selector")), String.valueOf(fm.get("name"))});
+                    if (f instanceof Map<?, ?> fm)
+                        fields.add(new String[] {String.valueOf(fm.get("selector")), String.valueOf(fm.get("name")), String.valueOf(fm.get("type"))});
         } catch (Exception unreadable) {
             fields.clear();
         }
@@ -1578,7 +1579,8 @@ final class OnboardImport {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the schema of '" + id + "' does not read columns by position");
             }
             Map<String, String> how = new LinkedHashMap<>();
-            if (!headerless) how.put("header", "true");
+            // a headerless import reads line 1 as data: so must the check (the sniff would take a lone '12.25' line 1 as a header)
+            how.put("header", headerless ? "false" : "true");
             String enc = importEncoding(schema);
             if (enc != null) how.put("encoding", enc);
             OnboardDraft.Analysis a;
@@ -1590,6 +1592,10 @@ final class OnboardImport {
             if (headerless) {
                 if (a.cols().size() <= max)
                     problems.add("it has " + a.cols().size() + " columns and '" + id + "' reads " + (max + 1));
+                else {
+                    String cut = cutRefusal(name, id, fields, f -> a.cols().get(Integer.parseInt(f[0])));
+                    if (cut != null) return new ColumnCheck(cut, List.of(), List.of(), List.of());
+                }
             } else {
                 List<String> actual = a.cols().stream().map(OnboardDraft.Col::name).toList();
                 for (String[] f : fields) {
@@ -1602,6 +1608,10 @@ final class OnboardImport {
                             : "'" + f[1] + "' is column " + (at + 1) + " here and column " + (sel + 1) + " in '" + id + "'");
                 }
                 for (String n : actual) if (!read.contains(n)) fresh.add(n);
+                if (problems.isEmpty()) {
+                    String cut = cutRefusal(name, id, fields, f -> a.cols().get(Integer.parseInt(f[0])));
+                    if (cut != null) return new ColumnCheck(cut, List.copyOf(fresh), List.of(), List.of());
+                }
                 if (problems.isEmpty() && !fresh.isEmpty()) {
                     // the file's OWN header text: read_csv names its columns by it, not by the cleaned-up name
                     List<String> keep = a.cols().subList(0, max + 1).stream().map(OnboardDraft.Col::header).toList();
@@ -1637,12 +1647,33 @@ final class OnboardImport {
             }
             for (String h : headers) if (!read.contains(h)) fresh.add(h);
             List<OnboardDraft.Col> freshCols = a.cols().stream().filter(c -> fresh.contains(c.selector())).toList();
-            String refusal = problems.isEmpty() ? null : refusal(name, id, problems);
+            String refusal = problems.isEmpty()
+                    ? cutRefusal(name, id, fields, f -> a.cols().stream().filter(c -> f[0].equals(c.selector())).findFirst().orElse(null))
+                    : refusal(name, id, problems);
             return new ColumnCheck(refusal, List.copyOf(fresh), List.copyOf(missing), refusal == null ? freshCols : List.of());
         }
         String refusal = problems.isEmpty() ? null : refusal(name, id, problems);
         // delimited text reaching here has no new column it could keep (a headerless import is judged by its count)
         return new ColumnCheck(refusal, List.copyOf(fresh), List.copyOf(missing), List.of());
+    }
+
+    /**
+     * DECIMAL-TEXT-NOT-BIGINT-1 (2026-11-06): a whole-number ({@code BIGINT}) column of the Dataset would cut a value with a
+     * fraction ({@code 12.25} stored as 12, the engine's cast rounds), so the file is refused, naming each such column with
+     * one value from anywhere in the file; {@code null} when nothing would be cut. {@code colOf} finds a read field's column.
+     */
+    private static String cutRefusal(String name, String id, List<String[]> fields,
+                                     java.util.function.Function<String[], OnboardDraft.Col> colOf) {
+        List<String> cut = new ArrayList<>();
+        for (String[] f : fields) {
+            if (!"BIGINT".equalsIgnoreCase(f[2])) continue;
+            OnboardDraft.Col c = colOf.apply(f);
+            if (c != null && c.fraction() != null)
+                cut.add("'" + f[1] + "' holds whole numbers and this file has '" + c.fraction() + "'");
+        }
+        return cut.isEmpty() ? null : "'" + name + "' has values '" + id + "' would cut: " + String.join("; ", cut)
+                + ". Nothing was imported; a whole-number column keeps no fraction, so add the data as a new Dataset "
+                + "with the column as a decimal number (DOUBLE)";
     }
 
     private static String refusal(String name, String id, List<String> problems) {

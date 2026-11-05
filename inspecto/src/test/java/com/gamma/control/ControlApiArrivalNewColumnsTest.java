@@ -157,7 +157,7 @@ class ControlApiArrivalNewColumnsTest {
             Map<String, Object> fee = column(c, id, "fee");
             assertNotNull(fee, "the Dataset lists the kept column");
             assertEquals("detail", fee.get("role"));
-            assertEquals("string", fee.get("type"));
+            assertEquals("number", fee.get("type"), "typed by its values (DECIMAL-TEXT-NOT-BIGINT-1, operator 2026-11-06)");
             assertEquals("wider.csv", ((Map<?, ?>) fee.get(DatasetNewColumns.KEPT_FROM)).get("file"), fee.toString());
             assertTrue(Files.readString(root.resolve("imports").resolve(id + "_schema.toon")).contains("fee"), "the schema reads it");
             JsonNode arrival = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals").get(0);
