@@ -256,8 +256,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
      Inspecto LA never edits Pipelines itself (§8 A-6).
 - **As built: hand-off only.** The Dataset card shows **Keep this up to date** locked on Basic, *Ask an administrator
   to keep this up to date* with sign-in, and an *Open in editor* hand-off. The import Pipeline stays `trigger: manual`
-  (DT-17); *Keep this up to date* needs the `pipeline.automation` feature, which no module declares yet (the gate
-  belongs to `DATA-TIERS-1`).
+  (DT-17); *Keep this up to date* needs the `pipeline.automation` feature, which no module declares; the automation gate was dropped from `DATA-TIERS-1` (plan §5.3, operator 2026-11-05), so no plan declares it; whether `inspecto-ops` should, so that Standard's *Keep this up to date* is offered, is an open operator question.
 
 ### UC-07 Say what the columns hold (Entity Types)
 

@@ -1559,8 +1559,8 @@ Calls marked * were assistant-decided under operator delegation, pending confirm
   followed 202 run). Not benchmarked; the knob is the bound, so there is no code change.
 * **Find paths (server) stays unlocked on Basic*:** `docs/EDITIONS.md` lists it for all four editions.
 * **Settled 2026-11-05:** item 3 - an import's Pipeline stays `trigger: manual` (DT-17 as narrowed by `BASIC-ONBOARD-1`);
-  the `pipeline.automation` feature, which `OnboardImport` and `DatasetFeed` already read, is declared by no module yet
-  and belongs to `DATA-TIERS-1`'s gating phases. A Case saved after *Start from these* keeps no exclusion list written
+  the `pipeline.automation` feature, which `OnboardImport` and `DatasetFeed` already read, is declared by no module;
+  the automation gate was dropped from `DATA-TIERS-1` (plan §5.3, operator 2026-11-05), so no plan declares it; whether `inspecto-ops` should, so that Standard's *Keep this up to date* is offered, is an open operator question. A Case saved after *Start from these* keeps no exclusion list written
   on the graph before it: a new graph starts from the Case's members only, by design. The counters' "first launch" is
   labelled *First server start*.
 * **Still open:** no-code row filtering (6; in Basic by DT-7, not built) and a real drag-and-drop of a file onto Add
