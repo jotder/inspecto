@@ -37,6 +37,7 @@ import {
     RowCondition,
     arrivalLine,
     fileProblem,
+    ledgerTime,
 } from './add-data.model';
 import { DataStatusComponent } from './data-status.component';
 import { ImportSummaryComponent } from './import-summary.component';
@@ -318,7 +319,7 @@ export class ImportDatasetCardComponent {
         this.allArrivals() ? this.arrivals() : this.arrivals().slice(0, this.arrivalsShown),
     );
     protected readonly line = arrivalLine;
-    protected readonly received = (a: Arrival): string => (a.received ?? '').replace('T', ' ').slice(0, 16);
+    protected readonly received = (a: Arrival): string => ledgerTime(a.received);
 
     constructor() {
         effect(() => {

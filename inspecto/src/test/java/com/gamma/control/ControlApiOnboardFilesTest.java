@@ -833,7 +833,8 @@ class ControlApiOnboardFilesTest {
             data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
             HttpResponse<String> dup = send(c, "POST", "/datasets/" + id + "/files?name=copy.csv&mode=append", first, null);
             assertEquals(409, dup.statusCode(), dup.body());
-            assertTrue(dup.body().contains("already imported on 20") && dup.body().contains("as 'transfers.csv'")
+            // DATES-ONE-ZONE-1: the server's local day, the clock the arrivals list shows (not the instant's UTC date)
+            assertTrue(dup.body().contains("already imported on " + java.time.LocalDate.now()) && dup.body().contains("as 'transfers.csv'")
                     && dup.body().contains("replace everything"), dup.body());
             assertEquals(100, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsAfter").asLong(),
                     "nothing landed");

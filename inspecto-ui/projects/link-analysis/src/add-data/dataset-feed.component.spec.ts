@@ -306,7 +306,7 @@ describe('dataset-feed wording', () => {
                 files: 1,
                 bytes: 2048,
                 threshold: 20,
-                compactedAt: '2026-11-05T10:02:00Z',
+                compactedAt: '2026-11-05T10:02:00',
                 compactedArrivals: 21,
                 removedArrivals: 0,
                 retention: { days: 90 },

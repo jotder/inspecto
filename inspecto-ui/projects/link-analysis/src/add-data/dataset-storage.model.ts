@@ -1,5 +1,5 @@
 import type { PickerOption } from '@inspecto/core/components/option-picker.component';
-import { formatSize } from './add-data.model';
+import { formatSize, ledgerTime } from './add-data.model';
 
 /**
  * An import Dataset's storage (`LA-DATASET-COMPACT-1`, `GET /datasets/{id}/storage`): its Parquet files, the last
@@ -55,7 +55,7 @@ export function retentionWords(r: Retention | null): string {
 export function storageWords(s: DatasetStorageState): string {
     const parts = [`${plural(s.files, 'file', 'files')} · ${formatSize(s.bytes)}`];
     if (s.compactedAt) {
-        const at = s.compactedAt.replace('T', ' ').slice(0, 16);
+        const at = ledgerTime(s.compactedAt);
         parts.push(
             s.compactedArrivals
                 ? `compacted ${at} (${plural(s.compactedArrivals, 'arrival', 'arrivals')})`

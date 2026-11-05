@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
     keptFormat,
+    ledgerTime,
     matchLine,
     followOnClause,
     AUTOMATION_FALLBACK,
@@ -477,5 +478,28 @@ describe('row filter words and checks (ADD-DATA-ROW-FILTER-1)', () => {
         const lines = summaryLines(summary({ rowsIn: 100, rowsFilteredOut: 40, rowsAfter: 60 })).map((l) => l.text);
         expect(lines[0]).toBe('100 rows were read from transfers.csv; 60 rows were kept.');
         expect(lines).toContain('40 rows were left out by the row filter.');
+    });
+});
+
+describe('ledgerTime (DATES-ONE-ZONE-1)', () => {
+    const zoned = (tz: string, run: () => void): void => {
+        vi.stubEnv('TZ', tz); // Node re-reads TZ when it is assigned
+        try {
+            run();
+        } finally {
+            vi.unstubAllEnvs();
+        }
+    };
+
+    it('shows an instant in local time, the clock the arrivals list uses', () => {
+        zoned('Asia/Kolkata', () => expect(ledgerTime('2026-11-05T20:32:25Z')).toBe('2026-11-06 02:02'));
+        zoned('UTC', () => expect(ledgerTime('2026-11-05T20:32:25.120Z')).toBe('2026-11-05 20:32'));
+        zoned('UTC', () => expect(ledgerTime('2026-11-06T02:02:25+05:30')).toBe('2026-11-05 20:32'));
+    });
+
+    it('shows a ledger time without a zone as it is (it already is local)', () => {
+        zoned('Asia/Kolkata', () => expect(ledgerTime('2026-11-06 02:02:25')).toBe('2026-11-06 02:02'));
+        zoned('UTC', () => expect(ledgerTime('2026-11-06T02:02:25')).toBe('2026-11-06 02:02'));
+        expect(ledgerTime(null)).toBe('');
     });
 });

@@ -1979,6 +1979,14 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   case-insensitive) or cannot name a column; or the Space's approval policy holds `dataset` or `schema` changes (a
   column is then added only on its own). **Once kept, a later file without it is refused** like any missing column
   (operator 2026-11-06, not accepted blank), the reason saying `'fee' is missing (kept from 'wider.csv' on <date>)`.
+  **One clock for person-facing times (`DATES-ONE-ZONE-1`, fixed 2026-11-06):** an arrival's `received` is the
+  server's local wall clock without a zone (`yyyy-MM-dd HH:mm:ss`), so `<date>` above is `keptFrom.at` (an ISO UTC
+  instant on the wire) turned to the server's local day (`DatasetNewColumns.localDay`), never its UTC date part; the duplicate-import 409 ("'x' was
+  already imported on <date>", from the arrival sidecar line's instant) uses the same. The UI
+  shows every server-recorded time through `ledgerTime()` (`add-data.model.ts`): a zoneless value as it is, a value
+  WITH a zone (`compactedAt`, a carried compaction block's `received`) in local time. Event dates (`coversFrom/To`) are
+  the data's own values and are never moved. Gap: a zoneless value is the server's clock and a zoned one is turned to
+  the browser's, so they agree only when the browser and the server share a zone (always on loopback Basic).
   **Reads:** every read of the Dataset's Parquet already lines files up by name - the engine Dataset read
   (`DatasetRelation` via `SqlViews.readerOverLiteral`, `union_by_name=true`; Link Analysis, Discover, BI and the index
   build read through it), `/db/table` and `/db/query`, `countRows`, the arrivals' periods and *Replace the period*

@@ -1009,11 +1009,29 @@ export function editionLock(
 
 // ── LA-ARRIVAL-LEDGER-1: the arrivals of an import Dataset in words ──────────────────────────────────────────
 
-/** A ledger time (no zone) or an event value as shown: date and minutes, or the date alone. */
+/** An event value (a data date) as shown: date and minutes, or the date alone; never moved between zones. */
 function when(v: string | null, dateOnly = false): string {
     if (!v) return '';
     const t = v.replace('T', ' ');
     return dateOnly ? t.slice(0, 10) : t.slice(0, 16);
+}
+
+/**
+ * A time the server recorded (an arrival's `received`, a compaction's `at`) as shown: `2026-11-06 02:02`, in local
+ * time. Most ledger times come without a zone (the server's local clock) and show as they are; a time WITH a zone
+ * (`2026-11-05T20:32:25Z`, an instant) is turned to local time first, so the two never read as different clocks
+ * (`DATES-ONE-ZONE-1`). Never for a data value: an event date is in the data's own zone and must not move.
+ */
+export function ledgerTime(v: string | null | undefined): string {
+    if (!v) return '';
+    if (/(Z|[+-]\d\d:?\d\d)$/.test(v)) {
+        const d = new Date(v);
+        if (!Number.isNaN(d.getTime())) {
+            const p = (n: number): string => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+        }
+    }
+    return v.replace('T', ' ').slice(0, 16);
 }
 
 /** The period an arrival (or the Dataset) covers, `2026-09-01 – 2026-09-28`; '' when its event dates are unknown. */
@@ -1063,7 +1081,7 @@ export function dataStatusLine(all: readonly Arrival[]): string | null {
     const list = all.filter((a) => a.status !== 'REFUSED'); // a refused file never arrived in the data
     const newest = list[0];
     if (!newest) return null;
-    const parts = [`Received ${when(newest.received)}`];
+    const parts = [`Received ${ledgerTime(newest.received)}`];
     const kept = list.filter((a) => a.kept);
     const froms = kept.map((a) => a.coversFrom).filter((v): v is string => !!v);
     const tos = kept.map((a) => a.coversTo).filter((v): v is string => !!v);

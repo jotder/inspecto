@@ -1370,7 +1370,7 @@ final class OnboardImport {
                 Map<String, Object> first = DatasetArrivals.alreadyImported(dataRoot, pipeline, sha);
                 if (first != null)
                     throw new ApiException(409, ErrorCodes.CONFLICT, "'" + name + "' was already imported"
-                            + (first.get("at") instanceof String at && at.length() >= 10 ? " on " + at.substring(0, 10) : "")
+                            + (first.get("at") instanceof String at && at.length() >= 10 ? " on " + DatasetNewColumns.localDay(at) : "")
                             + (first.get("file") != null && !name.equals(first.get("file")) ? " as '" + first.get("file") + "'" : "")
                             + " and its rows are in '" + id + "'; adding it again would count them twice. To load it again, replace everything");
             }

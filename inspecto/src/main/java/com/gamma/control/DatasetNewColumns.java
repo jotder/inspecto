@@ -225,10 +225,24 @@ final class DatasetNewColumns {
         if (dataset == null || !(dataset.get("columns") instanceof List<?> cols)) return out;
         for (Object o : cols)
             if (o instanceof Map<?, ?> m && m.get(KEPT_FROM) instanceof Map<?, ?> k) {
-                String at = k.get("at") instanceof String a && a.length() >= 10 ? " on " + a.substring(0, 10) : "";
+                String at = k.get("at") instanceof String a && a.length() >= 10 ? " on " + localDay(a) : "";
                 String file = k.get("file") != null ? " from '" + k.get("file") + "'" : " from a later file";
                 out.put(String.valueOf(m.get("name")), "kept" + file + at);
             }
         return out;
+    }
+
+    /**
+     * DATES-ONE-ZONE-1: the day an instant ({@code at}, ISO UTC: a kept column's, an arrival sidecar line's) fell on in
+     * the server's local time: the clock an arrival's {@code received} is written in, so "kept from 'x.csv' on ..." and
+     * "'x.csv' was already imported on ..." name the same day the arrivals list shows for that file. A value that is not
+     * an instant keeps its own date part.
+     */
+    static String localDay(String at) {
+        try {
+            return Instant.parse(at).atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
+        } catch (java.time.format.DateTimeParseException notAnInstant) {
+            return at.substring(0, 10);
+        }
     }
 }

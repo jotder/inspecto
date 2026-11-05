@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-378 test class(es): 138 unit, 240 real-HTTP control-plane, 0 IT.
+379 test class(es): 139 unit, 240 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -262,6 +262,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `CursorTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CursorTest.java` | {@link Cursor} — the opaque keyset pagination token: round-trips the key parts, is URL-safe, and |
 | `DashboardDateRangeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DashboardDateRangeTest.java` | UIE-5 (d): the server's copy of the SPA's date-range maths ({@code dashboard-date-range.spec.ts} pins the same cases). |
 | `DatasetEntryRulesRolesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetEntryRulesRolesTest.java` | {@code columns[].role} on a Dataset entry (LA-COLUMN-ROLES-1 P0, operator decision B 2026-11-04): one vocabulary, |
+| `DatasetNewColumnsLocalDayTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetNewColumnsLocalDayTest.java` | DATES-ONE-ZONE-1 (Basic live check 2026-11-06): the arrivals list showed a file received at {@code 2026-11-06 |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |
 | `EntityShapesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntityShapesTest.java` | ENTITY-TYPE-CATALOG-1 P1: Add data proposes a column's Entity Type from the SPACE's types' value shapes, not from a list |

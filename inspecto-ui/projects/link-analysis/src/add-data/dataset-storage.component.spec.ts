@@ -81,7 +81,7 @@ describe('DatasetStorageComponent - files, Compact now and retention (LA-DATASET
         post.flush({
             ...STATE,
             files: 1,
-            compactedAt: '2026-11-05T10:02:11Z',
+            compactedAt: '2026-11-05T10:02:11', // zoneless: the line must not depend on the runner's zone
             compactedArrivals: 3,
             compaction: {
                 result: 'COMPACTED',
