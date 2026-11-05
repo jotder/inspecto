@@ -253,6 +253,9 @@ public enum LaLimit {
             "Days an Entity profile timeline returns, newest first."),
     ENTITY_PROFILE_RELATIONSHIP_THRESHOLD("entity_profile.relationship_threshold", Layer.SPACE, false, "entity_profile", "count", 6, 2,
             1_000_000, "Entities carrying at least this many of another Entity Type in the same rows are counted as outliers."),
+    ENTITY_PROFILE_MEASURE_SAMPLE_ENTITIES("entity_profile.measure_sample_entities", Layer.SPACE, false, "entity_profile", "count",
+            100_000, 1, 10_000_000, "Entities the per-Entity distribution of a Measure's total groups, at most; above it the "
+                    + "Entities are sampled by key hash and the profile says so."),
     ENTITY_PROFILE_MEMORY_LIMIT_MB("entity_profile.memory_limit_mb", Layer.INSTALL, false, "entity_profile", "mb", 4_096, 64,
             1_048_576, "Memory one Entity profile query may use. Profile SQL is trusted, so it is not held to the 1 GB sandbox "
                     + "default; on 132 million rows the dominant-value and relationship reads need about 4 GB."),

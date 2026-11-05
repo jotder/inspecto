@@ -842,7 +842,8 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
 
 * **Routes** (la-api, gated and audited like the exploration reads): on `EntityProfileRoutes`, every edition, `GET /inv/entity-types`
   (cheap, reads the cache only) and `POST /inv/entities/{type}/resolve {key}`; on `EntityPageRoutes`, Standard and up (`entityPages`,
-  D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships) and
+  D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships,
+  measures - §6.15) and
   `GET /inv/entities/{type}/{key}/profile`. Audit events `LINK_ENTITY_*` (three).
 * **A raw identifier never travels in a URL.** The SPA resolves a typed value with the POST and navigates by the key it returns; for a masked type
   the GET is alias-only (`masked:<16 hex>`) and answers 422 to a raw key. Type pages are aggregates only (D-EP3): a dominant value is reported as
@@ -874,7 +875,8 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
   1 GB the dominant-value and relationship reads fail; at 4 GB they take 58 s and 149 s; hash-sampled at 1 GB 41 s and 123 s.
   Pinned by `ControlApiEntityProfileScaleTest`.
 * **Limits** (Space layer, server-gated): `entity_profile.timeout_s` 30, `.max_datasets` 20, `.shape_sample_rows` 1,000,000, `.top_n` 20,
-  `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6; install layer (system admin, `la-limits.toon`):
+  `.sentinel_share` 20 (%), `.timeline_days` 400, `.relationship_threshold` 6, `.measure_sample_entities` 100,000;
+  install layer (system admin, `la-limits.toon`):
   `entity_profile.memory_limit_mb` 4,096.
 * **Data as of** reads `GET /datasets/{id}/freshness`, a read gate only (D-EP7).
 * **Not built (retired to BACKLOG §6, operator 2026-10-28):** P4 — no scheduled `la.entity.profile` Job, profile Dataset, drift
@@ -1693,6 +1695,19 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   Measure that holds an Entity Type ("an identifier, not a measure"), because its sums would surface raw ids the
   profile masks; the Data page drops an unclaimed Entity Type when a column becomes a Measure. The Entity page shows
   them as **Measures** (absent when there are none).
+- **Entity Type profile measures** (`LA-COLUMN-ROLES-2` D-1 b, 2026-11-05; `EntityProfiles.typeMeasures`, section
+  `measures`): one row per binding x Measure (the same column rule, `measureColumns`) over the rows where the bound
+  column names an Entity (non-empty normalised key) - rows, sum, lowest, highest, unit - in ONE aggregate statement per
+  bound Dataset (each binding is its own row, so no row is summed twice), plus `distribution`: p50 / p90 / max of the
+  per-Entity totals (`quantile_disc`) and the Entities measured, one GROUP BY per binding. That read groups at most
+  `entity_profile.measure_sample_entities` Entities (Space limit, default 100,000, 1..10,000,000): above it a key-hash
+  sample, `hash(k) % every = 0` with `every = ceil(approx distinct x 1.1 / cap)` (the headroom keeps the hash spread under
+  the cap), the cap as a hard `LIMIT`; the answer says `sampled`, `every`, `sampleEntities`, `approximate`, and
+  `truncated` when the LIMIT may have cut it. Optional `from` / `to` on `GET /inv/entity-types/{type}/profile` scope this
+  section only (on each binding's time column; a binding with none is not assessed inside a window), cached per window.
+  A failed or timed-out per-Entity read is `distribution: {assessed:false, retryable}` beside the row's sums and keeps
+  the section out of the cache. The Entity Type page shows it as **Measures**. Measured on 200,000 synthetic Entities
+  with a cap of 1,000: 1 in 232, under 1,000 grouped, the LIMIT not reached (`ControlApiEntityProfileScaleTest`).
 - **Roles from the record type (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05).** A record type names its usual Time,
   Measure and Category columns by hints (entity-store `spec.md` *A record type's usual roles*; the one rule is
   `EntityShapes.hintedRole` / UI `hintedRole` in `column-roles.ts`, kept alike). **Add data:** after the record type is
@@ -1710,7 +1725,7 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   `carriedChoices`). The Mapping's entry writes its OWN `carried: false` marks, so its link index carries what it says,
   whatever its base says; a kept-off column whose base states no role gets the role the page shows (a date is a Time).
 - **Still being built** (board row `LA-COLUMN-ROLES-2`, decisions in [`plan-column-roles-2.md`](plan-column-roles-2.md)):
-  the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the primary Measure (the canvas
+  edge width from the primary Measure (the canvas
   still weighs links by their count); Category values for a multi-Dataset read (the panel offers a single read's
   Dataset only).
 

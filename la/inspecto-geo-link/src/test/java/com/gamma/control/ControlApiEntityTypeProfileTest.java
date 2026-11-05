@@ -37,6 +37,7 @@ import static com.gamma.control.EntityProfileFixture.subjects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -373,6 +374,91 @@ class ControlApiEntityTypeProfileTest {
         if (!Files.exists(dir)) return;
         try (Stream<Path> s = Files.walk(dir)) {
             for (Path p : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(p);
+        }
+    }
+
+    private static JsonNode measureRow(JsonNode measures, String dataset, String column) {
+        for (JsonNode m : measures)
+            if (dataset.equals(m.get("dataset").asText()) && column.equals(m.get("column").asText())) return m;
+        throw new AssertionError("no Measure row of " + dataset + "." + column + " in " + measures);
+    }
+
+    /**
+     * LA-COLUMN-ROLES-2 D-1 b: the type profile's measures - one row per binding x Measure over the rows naming an Entity (a
+     * value the normaliser folds to nothing is no Entity), a Measure holding an Entity Type left out, the per-Entity totals'
+     * distribution, and a window on the binding's time column (a binding with none is not assessed inside one).
+     */
+    @Test
+    void measuresSumEachBindingsRowsAndTheirPerEntityTotals(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            String[] secs = {"'10'", "'x'", "'30'", "'40'", "'50'", "'60'"};   // text, as a CSV column can be; 'x' is no number
+            String[] rows = EntityProfileFixture.ROWS.split("\\),\\(");
+            StringBuilder withSecs = new StringBuilder();
+            for (int i = 0; i < rows.length; i++)
+                withSecs.append(i == 0 ? "" : ",").append("(").append(rows[i].replace("(", "").replace(")", "")).append(",").append(secs[i]).append(")");
+            new com.gamma.pipeline.ViewStore(root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition("calls_view", "flow-x",
+                    List.of(), "SELECT a_msisdn, b_msisdn, imei, kind, ts, secs FROM (VALUES " + withSecs
+                    + ") AS t(a_msisdn,b_msisdn,imei,kind,ts,secs)", "2026-10-15T00:00:00Z"));
+            Map<String, Object> ds = new java.util.HashMap<>(EntityProfileFixture.callsDataset());
+            List<Object> cols = new ArrayList<>((List<?>) ds.get("columns"));
+            // b_msisdn holds a masked Entity Type: an identifier is never summed, even when it says measure (written past the rules)
+            cols.set(1, Map.of("name", "b_msisdn", "classification", "MSISDN", "role", "measure", "type", "number"));
+            cols.add(Map.of("name", "secs", "type", "number", "role", "measure", "unit", "s"));
+            ds.put("columns", cols);
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            reg.write("dataset", "calls_ds", ds);
+            reg.write("dataset", "calls_undated", Map.of("view", "calls_view", "owner", "analyst-1", "shares", List.of(),
+                    "columns", List.of(Map.of("name", "a_msisdn", "classification", "MSISDN"),
+                            Map.of("name", "secs", "type", "number", "role", "measure"))));
+
+            JsonNode p = noRaw(get(c, "/inv/entity-types/msisdn/profile?sections=measures", OWNER));
+            JsonNode m = p.get("measures");
+            assertFalse(p.has("window"), "no window, no echo");
+            assertFalse(m.toString().contains("\"measure\":\"b_msisdn\""), "an identifier is no Measure: " + m);
+            assertEquals(3, m.size(), m.toString());
+            JsonNode a = measureRow(m, "calls_ds", "a_msisdn");
+            assertTrue(a.get("assessed").asBoolean(), a.toString());
+            assertEquals("secs", a.get("measure").asText());
+            assertEquals("s", a.get("unit").asText());
+            assertEquals(4, a.get("rows").asLong(), "'unknown' names no Entity and 'x' is no number: 10, 30, 40, 50");
+            assertEquals(130.0, a.get("sum").asDouble());
+            assertEquals(10.0, a.get("min").asDouble());
+            assertEquals(50.0, a.get("max").asDouble());
+            JsonNode ad = a.get("distribution");
+            assertTrue(ad.get("assessed").asBoolean(), ad.toString());
+            assertEquals(3, ad.get("entities").asLong(), "A (40), B (40) and the -99 placeholder (50)");
+            assertEquals(40.0, ad.get("p50").asDouble());
+            assertEquals(50.0, ad.get("max").asDouble());
+            assertFalse(ad.get("sampled").asBoolean());
+            assertEquals(1, ad.get("every").asLong());
+            assertEquals(100_000, ad.get("sampleEntities").asLong(), "the entity_profile.measure_sample_entities default");
+            JsonNode b = measureRow(m, "calls_ds", "b_msisdn");
+            assertEquals(5, b.get("rows").asLong(), "each binding is its own row: the callee column's rows");
+            assertEquals(190.0, b.get("sum").asDouble());
+            assertEquals(60.0, b.get("max").asDouble());
+            assertEquals(4, b.at("/distribution/entities").asLong());
+            assertEquals(70.0, b.at("/distribution/max").asDouble(), "B is the callee of 10 s and 60 s");
+            JsonNode u = measureRow(m, "calls_undated", "a_msisdn");
+            assertEquals(130.0, u.get("sum").asDouble());
+            assertNull(u.get("unit").textValue());
+
+            // inside a window: only its rows, on each binding's time column; a binding with none has no row inside it
+            JsonNode w = noRaw(get(c, "/inv/entity-types/msisdn/profile?sections=measures&from=" + enc("2026-10-02T00:00:00Z")
+                    + "&to=" + enc("2026-10-04T00:00:00Z"), OWNER));
+            assertEquals("2026-10-02T00:00:00Z", w.at("/window/from").asText());
+            JsonNode wa = measureRow(w.get("measures"), "calls_ds", "a_msisdn");
+            assertEquals(3, wa.get("rows").asLong(), wa.toString());
+            assertEquals(120.0, wa.get("sum").asDouble());
+            assertEquals(3, wa.at("/distribution/entities").asLong());
+            assertEquals(40.0, wa.at("/distribution/p50").asDouble(), "A 30, B 40, the placeholder 50 inside the window");
+            JsonNode wb = measureRow(w.get("measures"), "calls_ds", "b_msisdn");
+            assertEquals(180.0, wb.get("sum").asDouble());
+            assertEquals(60.0, wb.at("/distribution/max").asDouble(), "B's total inside the window is 60, not its whole 70");
+            JsonNode wu = measureRow(w.get("measures"), "calls_undated", "a_msisdn");
+            assertFalse(wu.get("assessed").asBoolean(), wu.toString());
+            assertFalse(wu.has("sum"), "never a zero for rows nobody read");
+            assertEquals(422, get(c, "/inv/entity-types/msisdn/profile?sections=measures&from=yesterday", OWNER).statusCode());
         }
     }
 

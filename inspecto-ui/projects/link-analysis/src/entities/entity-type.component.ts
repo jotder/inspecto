@@ -19,6 +19,7 @@ import {
     EntityTypeProfile,
     ProfileBinding,
     ProfileLineage,
+    ProfileMeasure,
     ProfileRelationship,
     ProfileSentinel,
 } from '@inspecto/link-analysis/api/entity-profile.service';
@@ -32,8 +33,11 @@ import {
     count,
     day,
     dayStart,
+    distributionEntities,
+    distributionValue,
     entitiesBase,
     maskingTile,
+    measureValue,
     notAssessedText,
     notHere,
     percent,
@@ -352,6 +356,28 @@ function measured<T extends { assessed: boolean }>(fmt: (r: T) => string): ColDe
                         }
                     </mat-expansion-panel>
 
+                    <!-- Measures (LA-COLUMN-ROLES-2 D-1) -->
+                    <mat-expansion-panel data-section="measures">
+                        <mat-expansion-panel-header>
+                            <mat-panel-title>Measures</mat-panel-title>
+                            <mat-panel-description>{{ p.measures?.length ?? 0 }}</mat-panel-description>
+                        </mat-expansion-panel-header>
+                        @if (p.measures; as m) {
+                            <p class="text-secondary m-0 mb-2 text-sm">
+                                Over the rows where the column names an Entity. Per Entity: each Entity's total, as the
+                                middle, the 90th percentile and the largest.
+                            </p>
+                            <inspecto-data-table
+                                tier="mini"
+                                [rows]="m"
+                                [columns]="measureCols"
+                                noRowsTitle="No Measure in the Datasets this type is bound in"
+                            ></inspecto-data-table>
+                        } @else {
+                            <p class="text-secondary m-0 text-sm" data-testid="not-assessed">{{ na(undefined) }}</p>
+                        }
+                    </mat-expansion-panel>
+
                     <!-- What is not here -->
                     <mat-expansion-panel data-section="not-here">
                         <mat-expansion-panel-header>
@@ -437,6 +463,7 @@ export class EntityTypeComponent implements OnInit {
         if (p.shapes?.truncated) parts.push('Shapes');
         if (p.time?.truncated) parts.push(`Time (newest ${count(p.time.perDay.length)} days read)`);
         if (p.links?.truncated) parts.push('Links');
+        if (p.measures?.some((m) => m.distribution?.truncated)) parts.push('Measures');
         return parts.length
             ? `A limit was reached: ${parts.join(', ')} ${parts.length === 1 ? 'is' : 'are'} partial.`
             : 'A limit was reached: this profile may not have read every Dataset bound to this type.';
@@ -524,6 +551,33 @@ export class EntityTypeComponent implements OnInit {
         {
             headerName: 'Note',
             valueGetter: (p) => ((p.data as ProfileRelationship)?.assessed ? '' : notAssessedText(p.data)),
+        },
+    ];
+
+    /** LA-COLUMN-ROLES-2 D-1: one row per bound column x Measure, the one-Entity page's columns plus the per-Entity totals. */
+    readonly measureCols: ColDef[] = [
+        { field: 'dataset', headerName: 'Dataset' },
+        { field: 'column', headerName: 'Column' },
+        { field: 'measure', headerName: 'Measure' },
+        { headerName: 'Rows', valueGetter: measured<ProfileMeasure>((r) => count(r.rows)) },
+        { headerName: 'Sum', valueGetter: measured<ProfileMeasure>((r) => measureValue(r, 'sum')) },
+        { headerName: 'Lowest', valueGetter: measured<ProfileMeasure>((r) => measureValue(r, 'min')) },
+        { headerName: 'Highest', valueGetter: measured<ProfileMeasure>((r) => measureValue(r, 'max')) },
+        { headerName: 'Per Entity, middle', valueGetter: measured<ProfileMeasure>((r) => distributionValue(r, 'p50')) },
+        { headerName: 'Per Entity, 90th', valueGetter: measured<ProfileMeasure>((r) => distributionValue(r, 'p90')) },
+        {
+            headerName: 'Per Entity, largest',
+            valueGetter: measured<ProfileMeasure>((r) => distributionValue(r, 'max')),
+        },
+        { headerName: 'Entities', valueGetter: measured<ProfileMeasure>((r) => distributionEntities(r)) },
+        {
+            headerName: 'Note',
+            valueGetter: (p) => {
+                const r = p.data as ProfileMeasure | undefined;
+                if (!r) return '';
+                if (!r.assessed) return notAssessedText(r);
+                return r.distribution && !r.distribution.assessed ? notAssessedText(r.distribution) : '';
+            },
         },
     ];
 

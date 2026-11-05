@@ -941,7 +941,7 @@ In the browser, each algorithm has its own configurable cap, defaulting to `anal
 
 ### 6.3 Layered configurable limits system (LA-CONFIG-LIMITS-1)
 
-Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (152 items on this tree, from canvas caps to rate limits) holds every limit with its key, layer, default and validated range, and the server enforces whatever value is in force. Deployments size the system to their hardware and their analysts, not to the laptop the defaults were measured on. A value outside its range is refused `422` naming the key and the range; a stored value outside its range reads as the default. Limits fall in three layers, separating platform sizing, organisational policy and client rendering:
+Inspecto LA avoids hard-coded limits: the `LaLimit` catalogue (156 items on this tree, from canvas caps to rate limits) holds every limit with its key, layer, default and validated range, and the server enforces whatever value is in force. Deployments size the system to their hardware and their analysts, not to the laptop the defaults were measured on. A value outside its range is refused `422` naming the key and the range; a stored value outside its range reads as the default. Limits fall in three layers, separating platform sizing, organisational policy and client rendering:
 
 ```
                     LAYERED CONFIGURATION ARCHITECTURE
@@ -1001,6 +1001,7 @@ A selection of the shipped items (defaults and ranges are those of the catalogue
 | | `entity_profile.shape_sample_rows` | 1,000,000 | 1 to $10^9$ | above it, value shapes read a sample |
 | | `entity_profile.sentinel_share` | 20 % | 1 to 100 | a single value above this share is reported as dominant |
 | | `entity_profile.timeline_days`, `relationship_threshold` | 400, 6 | 1 to 36,600; 2 to $10^6$ | timeline length; outlier count |
+| | `entity_profile.measure_sample_entities` | 100,000 | 1 to $10^7$ | above it, a Measure's per-Entity totals read a key-hash sample |
 | **Browser** | `projection_node_cap` | 1,000 | 1 to 100,000 | entities admitted to one canvas projection |
 | | `analysis_node_cap`, `suspicion_node_cap` | 2,500, 1,000 | 1 to 100,000 each | above it the browser refuses or hands over to the server |
 | | `display.lod_label_cap`, `layered_max_nodes`, `radial_max_nodes`, `mds_max_nodes`, `force_atlas_max_nodes` | 300, 30, 100, 300, 200 | up to 30,000; 3,000; 200; 400; 400 | labels drawn; layouts offered |

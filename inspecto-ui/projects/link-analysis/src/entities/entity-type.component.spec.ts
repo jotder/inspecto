@@ -110,6 +110,31 @@ const PROFILE: EntityTypeProfile = {
             ...OK,
         },
     ],
+    measures: [
+        {
+            dataset: 'ims_links_dataset',
+            column: 'a_msisdn',
+            measure: 'amount',
+            unit: 'USD',
+            rows: 19000,
+            sum: 1250.5,
+            min: 0.5,
+            max: 400,
+            distribution: {
+                entities: 909,
+                p50: 12.5,
+                p90: 80,
+                max: 400,
+                sampled: true,
+                every: 220,
+                sampleEntities: 1000,
+                approximate: true,
+                truncated: false,
+                ...OK,
+            },
+            ...OK,
+        },
+    ],
     masking: { mode: 'typed' },
 };
 
@@ -171,6 +196,7 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
             'time',
             'links',
             'relationships',
+            'measures',
             'not-here',
         ]);
         expect(section(el, 'identity').classList).toContain('mat-expanded');
@@ -258,6 +284,53 @@ describe('EntityTypeComponent (Entity Type Profile)', () => {
         expect(cal.querySelector('caption')).toBeNull();
         const h = time.querySelector('#' + cal.getAttribute('aria-labelledby'))!;
         expect(h.textContent).toContain('Rows and distinct Entities per day');
+    });
+
+    it('shows each bound column x Measure with its unit and the per-Entity totals, saying when they were sampled', () => {
+        const { el, fixture } = make(PROFILE);
+        const cols = page(fixture).measureCols;
+        const row = PROFILE.measures![0];
+        const cell = (header: string) => {
+            const c = cols.find((x) => x.headerName === header)!;
+            return (c.valueGetter as (p: { data: unknown }) => string)({ data: row });
+        };
+        expect(cell('Sum')).toBe('1,250.5 USD');
+        expect(cell('Per Entity, middle')).toBe('12.5 USD');
+        expect(cell('Per Entity, largest')).toBe('400 USD');
+        expect(cell('Entities')).toBe('909 (1 in 220 sampled)');
+        expect(section(el, 'measures').querySelector('mat-panel-description')!.textContent).toContain('1');
+    });
+
+    it('a per-Entity read that failed reads not assessed, keeps the sums, and is named under What is not here', () => {
+        const failed = {
+            ...PROFILE.measures![0],
+            distribution: {
+                ...PROFILE.measures![0].distribution!,
+                assessed: false,
+                reason: 'the read ran past entity_profile.timeout_s',
+            },
+        };
+        const { el, fixture } = make({ ...PROFILE, measures: [failed] });
+        const cols = page(fixture).measureCols;
+        const cell = (header: string) =>
+            (cols.find((x) => x.headerName === header)!.valueGetter as (p: { data: unknown }) => string)({
+                data: failed,
+            });
+        expect(cell('Sum')).toBe('1,250.5 USD');
+        expect(cell('Per Entity, middle')).toBe('not assessed');
+        expect(cell('Note')).toContain('ran past entity_profile.timeout_s');
+        expect(section(el, 'not-here').textContent).toContain(
+            'Per-Entity totals of amount over ims_links_dataset.a_msisdn: not assessed: the read ran past entity_profile.timeout_s.',
+        );
+    });
+
+    it('names Measures in the limit banner when the per-Entity read reached its cap', () => {
+        const cut = {
+            ...PROFILE.measures![0],
+            distribution: { ...PROFILE.measures![0].distribution!, truncated: true },
+        };
+        const { el } = make({ ...PROFILE, truncated: true, measures: [cut] });
+        expect(el.querySelector('[data-testid=truncated]')!.textContent).toContain('Measures is partial');
     });
 
     it('says when the normaliser declares no safe prefix', () => {

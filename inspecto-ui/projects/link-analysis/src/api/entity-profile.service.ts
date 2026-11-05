@@ -158,6 +158,26 @@ export interface ProfileRelationship extends Assessed {
     entitiesAtOrAboveThreshold: number;
 }
 
+/**
+ * The per-Entity totals of a Measure (LA-COLUMN-ROLES-2 D-1): p50 / p90 / max over the Entities measured. Above the Space's
+ * `entity_profile.measure_sample_entities` the Entities are a key-hash sample of 1 in `every` (`sampled`, `approximate`).
+ */
+export interface MeasureDistribution extends Assessed, Truncatable {
+    entities: number;
+    p50: number | null;
+    p90: number | null;
+    max: number | null;
+    sampled: boolean;
+    every: number;
+    sampleEntities: number;
+    approximate?: boolean;
+}
+
+/** One binding x Measure of the type profile: the Measure over the rows where the bound column names an Entity. */
+export interface ProfileMeasure extends EntityMeasure, Assessed {
+    distribution?: MeasureDistribution;
+}
+
 /** `GET /inv/entity-types/{id}/profile`: a section absent from `sections=` is absent here. */
 export interface EntityTypeProfile {
     entityType: EntityTypeIdentity;
@@ -171,6 +191,8 @@ export interface EntityTypeProfile {
     lineage?: ProfileLineage[];
     links?: ProfileLinks;
     relationships?: ProfileRelationship[];
+    /** LA-COLUMN-ROLES-2 D-1: one row per binding x Measure (absent on older servers). */
+    measures?: ProfileMeasure[];
     /** The Space's masking mode in force and whether THIS type is masked under it (the effective answer). */
     masking?: { mode: string; masked?: boolean };
 }
@@ -182,7 +204,8 @@ export type EntityTypeProfileSection =
     | 'time'
     | 'lineage'
     | 'links'
-    | 'relationships';
+    | 'relationships'
+    | 'measures';
 
 export interface EntityLinks extends Assessed {
     degree: number | null;
