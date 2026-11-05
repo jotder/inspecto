@@ -218,6 +218,11 @@ public final class CapabilityManifest {
             new Entry("POST", "/datasets/([^/]+)/run", Roles.CAN_UPLOAD_DATA),
             new Entry("PUT", "/datasets/([^/]+)/columns/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/datasets/([^/]+)/record-type", Roles.CAN_AUTHOR_WORKBENCH),
+            // LA-ARRIVAL-FEEDS-1: how files reach an import Dataset - its inbox and Keep this up to date - is the upload verb
+            // too (the handler also reads data.self_import and, for the PUT, the pipeline.automation feature).
+            new Entry("GET", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
+            new Entry("PUT", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
+            new Entry("DELETE", "/datasets/([^/]+)/feed", Roles.CAN_UPLOAD_DATA),
             // DecisionRoutes
             new Entry("POST", "/decision-rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

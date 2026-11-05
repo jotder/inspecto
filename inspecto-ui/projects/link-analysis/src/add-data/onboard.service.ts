@@ -13,6 +13,7 @@ import type {
     ImportSummary,
     OnboardDraft,
 } from './add-data.model';
+import type { DatasetFeedState, IndexJob, KeepUpToDate } from './dataset-feed.model';
 
 /** A followed run that ended in `failed`: the server's reason, said as it said it. */
 export class ImportRunFailed extends Error {
@@ -127,6 +128,26 @@ export class OnboardService {
     /** Turn Add data on or off in this Space (`canAdminister`); null = back to the default. Answers the settings in force. */
     setDataSettings(selfImport: boolean | null): Observable<DataSettings> {
         return this.http.put<DataSettings>(apiUrl('/settings/data'), { selfImport });
+    }
+
+    /** LA-ARRIVAL-FEEDS-1: the Dataset's inbox, the files waiting there and its feed (`canUploadData`). */
+    feed(datasetId: string): Observable<DatasetFeedState> {
+        return this.http.get<DatasetFeedState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/feed`));
+    }
+
+    /** *Keep this up to date* (Standard and above): the import's Pipeline watches its inbox, or reads an SFTP Connection. */
+    keepUpToDate(datasetId: string, body: KeepUpToDate): Observable<DatasetFeedState> {
+        return this.http.put<DatasetFeedState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/feed`), body);
+    }
+
+    /** Back to uploads: the import runs only when someone asks. */
+    stopFeed(datasetId: string): Observable<DatasetFeedState> {
+        return this.http.delete<DatasetFeedState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/feed`));
+    }
+
+    /** Save the index Job *Keep this up to date* proposed, through the Jobs route and its own gates. */
+    saveIndexJob(job: IndexJob): Observable<unknown> {
+        return this.http.post(apiUrl('/jobs'), job);
     }
 
     /** 200 = the summary; 202 = a run to follow (the caller is told, so it can say the run continues on the server). */

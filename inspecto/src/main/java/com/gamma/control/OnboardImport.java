@@ -95,7 +95,7 @@ final class OnboardImport {
     static final String AUTOMATION_FEATURE = "pipeline.automation";
 
     /** Ids being imported right now in this JVM (a second commit of the same id is 409, not a race). */
-    private static final Set<String> IN_FLIGHT = ConcurrentHashMap.newKeySet();
+    static final Set<String> IN_FLIGHT = ConcurrentHashMap.newKeySet();
     /** Followed runs (202), newest last; bounded. */
     private static final Map<String, Map<String, Object>> RUNS = Collections.synchronizedMap(new LinkedHashMap<>() {
         @Override
@@ -972,7 +972,7 @@ final class OnboardImport {
      * {@code imports/<id>_pipeline.toon} under this Space's config root - or a forged entry could run (or, with replace,
      * set aside the data of) any other Pipeline.
      */
-    private static Map<String, Object> importDataset(Path writeRoot, HttpExchange ex, String id, CollectorService service) {
+    static Map<String, Object> importDataset(Path writeRoot, HttpExchange ex, String id, CollectorService service) {
         Map<String, Object> content = new ComponentStore(writeRoot.resolve("registry")).get("dataset", id)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset component '" + id + "'"));

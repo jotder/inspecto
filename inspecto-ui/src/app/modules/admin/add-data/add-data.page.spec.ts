@@ -72,7 +72,16 @@ function create(o: Opts = {}) {
 }
 
 describe('ConsoleAddDataPageComponent (/add-data, ONBOARDING-FIRST-RUN-1 C3)', () => {
-    afterEach(() => http?.verify());
+    afterEach(() => {
+        // the Dataset card reads its arrivals (LA-ARRIVAL-LEDGER-1), its inbox and feed (LA-ARRIVAL-FEEDS-1); not looked at here
+        http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        // LA-ARRIVAL-FEEDS-1: and its inbox and feed (and, where Keep this up to date is offered, the Connections)
+        http
+            ?.match((r) => r.url.endsWith('/feed'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        http?.match((r) => r.url.endsWith('/connections')).forEach((r) => !r.cancelled && r.flush([]));
+        http?.verify();
+    });
 
     it('Basic: hosts the shared Add data screen, files only (a remote system is locked with its reason) (no violations)', async () => {
         const { el } = create({ edition: 'basic' });

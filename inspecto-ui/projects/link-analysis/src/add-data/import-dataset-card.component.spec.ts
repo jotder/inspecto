@@ -86,12 +86,27 @@ function create(o: Opts = {}) {
     return { fixture, el };
 }
 
+const FEED_STATE = {
+    dataset: 'transfers',
+    inbox: '/srv/inspecto/data/inbox/transfers',
+    waiting: 0,
+    files: [],
+    truncated: false,
+    automatic: false,
+    feed: { kind: 'uploads' },
+};
+
 const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
 describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-14, DT-14)', () => {
     afterEach(() => {
         // LA-ARRIVAL-LEDGER-1: the Dataset card reads its arrivals; a test that does not look at them answers none
         http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        // LA-ARRIVAL-FEEDS-1: and its inbox and feed (and, where Keep this up to date is offered, the Connections)
+        http
+            ?.match((r) => r.url.endsWith('/feed'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        http?.match((r) => r.url.endsWith('/connections')).forEach((r) => !r.cancelled && r.flush([]));
         http?.verify();
     });
 
@@ -115,14 +130,44 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         const { el } = create({ edition: 'standard', authMode: 'oidc', editorRoute: '/pipelines' });
         const link = q(el, 'open-in-editor') as HTMLAnchorElement;
         expect(link.getAttribute('href')).toBe('/pipelines?guided=1&open=transfers');
-        expect(q(el, 'ask-administrator')).toBeNull();
     });
 
-    it('Standard in Inspecto LA (no editor) or without the right: "Ask an administrator" (no violations)', async () => {
-        const { el } = create({ edition: 'standard', authMode: 'oidc', editorRoute: '/pipelines', canAuthor: false });
+    it('Standard without the editor or the right to author: Keep this up to date is offered on the card itself (no violations)', async () => {
+        const { fixture, el } = create({
+            edition: 'standard',
+            authMode: 'oidc',
+            editorRoute: '/pipelines',
+            canAuthor: false,
+        });
         expect(q(el, 'open-in-editor')).toBeNull();
-        expect(q(el, 'ask-administrator')!.textContent).toContain('Ask an administrator to keep this up to date');
+        http.expectOne(apiUrl('/datasets/transfers/feed')).flush(FEED_STATE);
+        fixture.detectChanges();
+        expect(q(el, 'keep-form')).not.toBeNull();
+        expect(q(el, 'keep-form')!.querySelector('inspecto-locked-action')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it('LA-ARRIVAL-FEEDS-1: the inbox shows the files waiting, and Import waiting files is Run now (re-read after it)', () => {
+        const { fixture, el } = create();
+        http.expectOne(apiUrl('/datasets/transfers/feed')).flush({
+            ...FEED_STATE,
+            waiting: 2,
+            files: [
+                { name: 'drop_a.csv', size: 10, modified: '2026-11-05T09:00:00Z' },
+                { name: 'drop_b.csv', size: 5, modified: '2026-11-05T09:01:00Z' },
+            ],
+        });
+        fixture.detectChanges();
+        expect(q(el, 'waiting')!.textContent).toBe('2 files waiting');
+        expect(q(el, 'keep-form')).toBeNull(); // Basic: no Keep this up to date (D-1)
+        q(el, 'import-waiting')!.click();
+        fixture.detectChanges();
+        http.expectOne(apiUrl('/datasets/transfers/run')).flush(summary());
+        fixture.detectChanges();
+        expect(fixture.componentInstance.got.length).toBe(1);
+        http.expectOne(apiUrl('/datasets/transfers/feed')).flush(FEED_STATE); // re-read after the run
+        fixture.detectChanges();
+        expect(q(el, 'waiting')!.textContent).toBe('No files waiting');
     });
 
     it('Add a file: the chosen mode, the new summary shown and emitted', () => {

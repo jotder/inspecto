@@ -73,6 +73,11 @@ describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
     afterEach(() => {
         // LA-ARRIVAL-LEDGER-1: each Dataset card reads its arrivals; these tests do not look at them
         http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        // LA-ARRIVAL-FEEDS-1: and its inbox and feed (and, where Keep this up to date is offered, the Connections)
+        http
+            ?.match((r) => r.url.endsWith('/feed'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        http?.match((r) => r.url.endsWith('/connections')).forEach((r) => !r.cancelled && r.flush([]));
         http?.verify();
     });
 

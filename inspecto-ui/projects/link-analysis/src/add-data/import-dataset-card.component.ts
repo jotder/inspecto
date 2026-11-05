@@ -27,6 +27,7 @@ import { LockedActionComponent } from '@inspecto/core/components/locked-action.c
 import { AddDataAccess } from './add-data-access';
 import { Arrival, ImportDataset, ImportSummary, arrivalLine, dataStatusLine, fileProblem } from './add-data.model';
 import { ImportSummaryComponent } from './import-summary.component';
+import { DatasetFeedComponent } from './dataset-feed.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
 
 /**
@@ -52,6 +53,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         ChipComponent,
         LockedActionComponent,
         ImportSummaryComponent,
+        DatasetFeedComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -169,7 +171,14 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 <inspecto-alert variant="error">{{ error() }}</inspecto-alert>
             }
 
-            <div class="flex flex-col gap-1 border-t pt-3" data-testid="keep-up-to-date">
+            <div class="flex flex-col gap-3 border-t pt-3" data-testid="keep-up-to-date">
+                <inspecto-dataset-feed
+                    [datasetId]="dataset().id"
+                    [offerKeep]="!access.automationLock()"
+                    [busy]="busy()"
+                    [locked]="locked()"
+                    (importWaiting)="runNow()"
+                ></inspecto-dataset-feed>
                 @if (access.automationLock(); as why) {
                     <inspecto-locked-action label="Keep this up to date" [reason]="why"></inspecto-locked-action>
                 } @else if (editorRoute() && access.canAuthor()) {
@@ -182,13 +191,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                         <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
                         Open in editor
                     </a>
-                    <p class="text-secondary m-0 text-xs">
-                        Keep this up to date: watch a folder or a schedule in the guided editor.
-                    </p>
-                } @else {
-                    <p class="text-secondary m-0 text-sm" data-testid="ask-administrator">
-                        Ask an administrator to keep this up to date.
-                    </p>
+                    <p class="text-secondary m-0 text-xs">More settings for the import in the guided editor.</p>
                 }
             </div>
         </article>
@@ -225,6 +228,8 @@ export class ImportDatasetCardComponent {
     /** Add a file and Run now follow the Add data lock: the server refuses both the same way. */
     protected readonly locked = computed(() => this.access.lockReason());
     private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+    /** LA-ARRIVAL-FEEDS-1: the inbox and the feed, re-read after every import. */
+    private readonly feedPanel = viewChild(DatasetFeedComponent);
 
     /** LA-ARRIVAL-LEDGER-1: every file the import took, newest first; [] while unread or when the read fails. */
     protected readonly arrivals = signal<Arrival[]>([]);
@@ -290,6 +295,7 @@ export class ImportDatasetCardComponent {
                 this.last.set(s);
                 this.imported.emit(s);
                 this.loadArrivals(this.dataset().id);
+                this.feedPanel()?.load();
             },
             error: (err: unknown) => {
                 this.busy.set(false);

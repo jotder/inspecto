@@ -171,8 +171,13 @@ details about these entities**, or **Add another file**.
 
 **The Dataset card** says *one-time import* and shows the last import. **Add a file** brings in the next file (for
 events, choose whether it *replaces the data* or *adds its rows*; details are always replaced); **Run now** runs the
-import again. **Keep this up to date** is locked on Basic; on a secured installation it reads *Ask an administrator
-to keep this up to date*. If adding data is off in this Space the screen says why (*its data comes from Pipelines*);
+import again. **Inbox** shows the folder on the server where another system may write this Dataset's files, how many
+wait there, and **Import waiting files** (the same as Run now); nothing is imported on its own on Basic. **Keep this up
+to date** is locked on Basic. On Standard and up it asks where the files come from (*files written to this inbox*, or
+*files on an SFTP server* through a Connection), how often to check, and an optional ready marker (read `name.csv` only
+once `name.csv.done` is there); new files are then imported on their own, a file sent again is skipped, and the Job that
+adds them to the graph is saved for you when you may author Jobs (else the card names the Job to ask an administrator
+for). **Stop** goes back to importing only when asked. If adding data is off in this Space the screen says why (*its data comes from Pipelines*);
 with sign-in an administrator turns it on per Space (**Settings → Add data**, *People may add data in this Space*), and
 you need the right to upload data.
 

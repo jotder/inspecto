@@ -1782,6 +1782,54 @@ component that imports `DataTableComponent` brings `MatDialogModule` into its in
 beyond the kind of link (`LA-COLUMN-ROLES-2`); drawing from the Data page (it points to Explore); a live drive on the
 Basic install (the plan's §5 check over IMS and Mobile money) waits for a redeploy.
 
+### 6.17 Arrival feeds: the inbox and Keep this up to date (LA-ARRIVAL-FEEDS-1, as built 2026-11-05)
+
+Plan [`la-data-arrival-plan.md`](../../../../superpower/la-data-arrival-plan.md) P3, decision D-1. Class
+`inspecto/.../control/DatasetFeed.java`, registered from `OnboardRoutes`; gates as *Add a file* (`canUploadData`, 503 no
+write root, 403 `data.self_import` off, then `OnboardImport.importDataset`: 404 unknown, 409 not an import Add data wrote
+for THIS id).
+
+| Route | What |
+|---|---|
+| `GET /datasets/{id}/feed` | `inbox` (absolute path on the server), `waiting` (count) and `files` (oldest first, at most 50, `truncated`), `automatic` (`pipeline.automation` present), `feed {kind: uploads \| folder \| sftp, every?, connection?, readyMarker?}` read from the Pipeline itself |
+| `PUT /datasets/{id}/feed` | *Keep this up to date*: `{kind, every?, connection?, readyMarker?}`; 503 without `pipeline.automation` (Basic, D-1); 422 for a Reference, a bad kind, an interval outside 1m-1d, a marker that is not a file-name suffix, an sftp feed without an sftp Connection |
+| `DELETE /datasets/{id}/feed` | back to uploads (`trigger: manual`, the collector Add data wrote); every edition |
+
+- **The feed lives in the import Pipeline, nowhere else.** The PUT sets `imports/<id>_pipeline.toon`'s `trigger`
+  (`{type: schedule, every}`, default `15m`) and, inside the existing `collector`, `discovery: poll`, `connector: local`
+  or `sftp` + `connection`, `accepts_upload: true`, `stability {window: 30s, size_checks: 2, ready_marker?}` and
+  `duplicate {mode: checksum, algorithm: SHA256, on_change: ignore}`; the DELETE removes those feed keys and sets
+  `trigger: manual`. Every other collector key (set in the guided editor) is kept. The write goes the way every Pipeline
+  write does: an approval policy over Pipelines refuses it (409, `PendingChanges.holdRefusing`, as Add data's own writes;
+  `ConfigWriteFunnelTest`), `SaveGate` blocks only the findings the edit introduces, the import is claimed in
+  `OnboardImport.IN_FLIGHT` against a run or a delete of the same Dataset (409), `RefusalConfigAudit.write` +
+  `PipelineHistory.record`, then `refreshConfigs()`; a file that does not load is put back. The quarantine is the one
+  Add data already wrote.
+- **A watched folder IS the Dataset's inbox** (`<dataRoot>/inbox/<id>`): no caller-supplied path, so nothing to jail.
+  An SFTP feed reads the Connection's `base_path`.
+- **Waiting files** = regular files under the inbox (depth 4, links not followed) with the import's extension, never a
+  hidden one (`.landing-*` uploads in flight). A file whose name the import took before (`MarkerManager
+  .isAlreadyProcessed`) is skipped by Run now and would wait for ever, so it is flagged (`alreadyImported`, per file and
+  counted) and the inbox says to rename it (found by the ledger lane).
+- **The index Job is proposed, not written.** The PUT answers `indexJob`: an `la.index.build` Job
+  (`on_signal: pipeline.commit`, `when $signal.pipeline == <id> && SUCCESS`, the link mapping's columns, `allow_full`)
+  or null without a link mapping; the client saves it through `POST /jobs`, so the Jobs route's rights, approvals and
+  owner stamping decide. Without `canAuthorWorkbench` the card names the Job to ask an administrator for; a 409 (Keep
+  again after Stop: the Job is already there) is said as kept.
+- **UI:** `add-data/dataset-feed.component.ts` (Inbox, *Import waiting files* = the card's Run now, the Keep form with
+  option pickers and a pen field, *Stop*), mounted in the card's *Keep this up to date* block; the card keeps *Open in
+  editor* (console) for more settings. The *Data status* line (`feedStatusLine`: *Inbox: N files waiting* or *Kept up to
+  date: …*) is written but joins the shared `<inspecto-la-data-status>` through the arrivals answer once the ledger
+  lane's component is on master (one read for the card, the Start box and the Rows dock).
+- **Decisions taken (review on return):** (a) `on_change: ignore` - a corrected file re-sent under the SAME name is
+  skipped, because a feed's arrivals add rows and re-reading it would double them; send corrections under a new name
+  until *Replace the period* (`LA-ARRIVAL-MODES-1`, D-2) lands, then the feed default follows D-2; (b) an SFTP feed
+  only (no FTP / FTPS / S3) - the plan names SFTP; (c) a Reference is not offered a feed (a feed adds rows; a
+  Reference is replaced); (d) the routes are `canUploadData`, like Add a file, not `canAuthorWorkbench`: the PUT
+  changes only the import's own Pipeline, within fixed safe defaults.
+- Tests: `ControlApiDatasetFeedTest` (real HTTP: Basic inbox + Run now, Standard PUT/DELETE and the reloaded config,
+  every refusal, armed 401/403/200), `dataset-feed.component.spec.ts`, `import-dataset-card.component.spec.ts`.
+
 ## 7. Host registration, Jobs and live detection
 
 * **ServiceLoader files:** la-api → `RouteModule` (28); geo-link → `RouteModule` (4), `InvestigationMeasureProbe`,

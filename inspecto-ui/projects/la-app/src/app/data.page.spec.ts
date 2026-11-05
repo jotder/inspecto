@@ -104,6 +104,11 @@ const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-
 describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)', () => {
     afterEach(() => {
         http?.match((r) => r.url.endsWith('/arrivals')).forEach((r) => !r.cancelled && r.flush({ arrivals: [] }));
+        // LA-ARRIVAL-FEEDS-1: and its inbox and feed (and, where Keep this up to date is offered, the Connections)
+        http
+            ?.match((r) => r.url.endsWith('/feed'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        http?.match((r) => r.url.endsWith('/connections')).forEach((r) => !r.cancelled && r.flush([]));
         http?.verify();
     });
 
