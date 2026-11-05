@@ -199,16 +199,19 @@ final class DatasetNewColumns {
         Map<String, Object> content = new LinkedHashMap<>(dataset);
         content.remove("name");
         content.put("columns", cols);
-        Map<String, Object> prior = new LinkedHashMap<>(dataset);
-        prior.remove("name");
+        Set<String> added = new HashSet<>();
+        for (OnboardDraft.Col c : kept) added.add(c.name());
         registry.write("dataset", id, content);
-        undo.push(() -> {
+        undo.push(() -> {   // only the columns added here go: an edit made meanwhile to another column stays
             Map<String, Object> now = registry.get("dataset", id).map(ComponentRegistry.Component::content).orElse(null);
-            if (now == null) return;
-            Map<String, Object> back = new LinkedHashMap<>(now);
-            back.remove("name");
-            back.put("columns", prior.get("columns"));
-            registry.write("dataset", id, back, false);
+            if (now == null || !(now.get("columns") instanceof List<?> current)) return;
+            List<Object> back = new ArrayList<>();
+            for (Object o : current)
+                if (!(o instanceof Map<?, ?> m && added.contains(String.valueOf(m.get("name"))) && m.get(KEPT_FROM) != null)) back.add(o);
+            Map<String, Object> restored = new LinkedHashMap<>(now);
+            restored.remove("name");
+            restored.put("columns", back);
+            registry.write("dataset", id, restored, false);
         });
         return null;
     }

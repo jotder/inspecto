@@ -265,6 +265,24 @@ class ControlApiArrivalNewColumnsTest {
         }
     }
 
+    /** A run that fails after the column was kept takes it back: the schema and the Dataset are as before. */
+    @Test
+    void aFailedRunTakesAKeptColumnBack(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("undone");
+            commit(c, id, transfers(60), ",\"filter\":[{\"column\":\"channel\",\"op\":\"eq\",\"value\":\"mobile\"}]");
+            Path schema = root.resolve("imports").resolve(id + "_schema.toon");
+            String before = Files.readString(schema);
+            // every row of this file is filtered out, so the run refuses it after the column was kept
+            String none = withColumn(transfers(9).replace(",mobile,", ",branch,").replace("T000", "N000"), "fee", i -> "1");
+            HttpResponse<String> failed = send(c, "POST", "/datasets/" + id + "/files?name=none.csv&mode=append", none);
+            assertEquals(422, failed.statusCode(), failed.body());
+            assertEquals(before, Files.readString(schema), "the schema is as before");
+            assertNull(column(c, id, "fee"), "the Dataset lists no kept column");
+            data(send(c, "POST", "/datasets/" + id + "/files?name=plain.csv&mode=append", transfers(6).replace("T000", "P000")), 200);
+        }
+    }
+
     /** Compaction merges files whose columns differ by name: no row and no value is lost. */
     @Test
     void compactionMergesFilesWhoseColumnsDiffer(@TempDir Path cfg, @TempDir Path root) throws Exception {
