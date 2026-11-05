@@ -1579,7 +1579,8 @@ final class OnboardImport {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the schema of '" + id + "' does not read columns by position");
             }
             Map<String, String> how = new LinkedHashMap<>();
-            if (!headerless) how.put("header", "true");
+            // a headerless import reads line 1 as data: so must the check (the sniff would take a lone '12.25' line 1 as a header)
+            how.put("header", headerless ? "false" : "true");
             String enc = importEncoding(schema);
             if (enc != null) how.put("encoding", enc);
             OnboardDraft.Analysis a;

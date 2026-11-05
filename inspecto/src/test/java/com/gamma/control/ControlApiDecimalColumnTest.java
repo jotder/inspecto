@@ -189,4 +189,39 @@ class ControlApiDecimalColumnTest {
             assertFalse(Files.exists(inbox.resolve("drop.csv")), "set aside");
         }
     }
+
+    /** A headerless import reads line 1 as data, so a fraction on line 1 alone is refused too (verification finding). */
+    @Test
+    void aHeaderlessImportRefusesAFractionOnTheFirstLine(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("bare");
+            String body = payments("P", 20, i -> String.valueOf(1000 + i));
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=bare.csv&kind=stream&header=false",
+                    body.substring(body.indexOf('\n') + 1)), 200);
+            data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}"), 200);
+
+            HttpResponse<String> cut = send(c, "POST", "/datasets/" + id + "/files?name=first.csv&mode=append",
+                    "L1,ACC-1,ACC-12,12.25\nL2,ACC-2,ACC-13,7\n");
+            assertEquals(422, cut.statusCode(), cut.body());
+            assertTrue(cut.body().contains("'col_4' holds whole numbers and this file has '12.25'"), cut.body());
+        }
+    }
+
+    /** NDJSON reads by field name: a fraction into a whole-number field is refused the same way. */
+    @Test
+    void anNdjsonFractionIntoAWholeNumberFieldIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("events");
+            StringBuilder first = new StringBuilder();
+            for (int i = 1; i <= 20; i++) first.append("{\"payment_id\":\"P").append(i).append("\",\"amount\":").append(1000 + i).append("}\n");
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=events.ndjson&kind=stream", first.toString()), 200);
+            assertEquals("BIGINT", amountType(d).get("value").asText(), amountType(d).toString());
+            data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}"), 200);
+
+            HttpResponse<String> cut = send(c, "POST", "/datasets/" + id + "/files?name=later.ndjson&mode=append",
+                    "{\"payment_id\":\"Q1\",\"amount\":7}\n{\"payment_id\":\"Q2\",\"amount\":12.25}\n");
+            assertEquals(422, cut.statusCode(), cut.body());
+            assertTrue(cut.body().contains("'amount' holds whole numbers and this file has '12.25'"), cut.body());
+        }
+    }
 }
