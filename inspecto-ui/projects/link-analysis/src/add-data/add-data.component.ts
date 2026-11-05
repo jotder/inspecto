@@ -77,7 +77,7 @@ import {
     suggestDatasetName,
     roleUnder,
 } from './add-data.model';
-import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '../api/column-roles';
+import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
 import { ImportDatasetCardComponent } from './import-dataset-card.component';
 import { PostgresTableComponent } from './postgres-table.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';

@@ -91,12 +91,16 @@ public final class ImportPaths {
      *       naming them, {@code ServiceBootstrap.java:63}) — none travels in a data-source or Pipeline bundle;</li>
      *   <li>{@code _escalation.toon} and {@code _queue.toon} — no loader reads them since {@code RETIRE-HALVES-1}
      *       (2026-09-14); refused so a loader brought back cannot inherit an import door.</li>
+     *   <li>{@code _snapshot.toon} — not suffix-scanned, but read by name ({@code PostgresSnapshot.configFile},
+     *       {@code imports/<id>_snapshot.toon}): it names the Postgres connection Run now and the 30 s poll copy from,
+     *       written only by the Add data commit (BASIC-ONBOARD-1 P3).</li>
      * </ul>
      * {@code ImportLoaderInventoryTest} fails when a {@code _x.toon} suffix literal appears in main code that is
      * neither refused here nor allow-listed there with a reason.
      */
     static final List<String> REFUSED_SUFFIXES = List.of("_workflow.toon", "_caserule.toon", "_tagrule.toon",
-            "_tag.toon", "_meta.toon", "_rca.toon", "_job_template.toon", "_escalation.toon", "_queue.toon");
+            "_tag.toon", "_meta.toon", "_rca.toon", "_job_template.toon", "_escalation.toon", "_queue.toon",
+            "_snapshot.toon");
 
     private static List<String> subdirSuffixes() {
         List<String> s = new ArrayList<>(ROOT_SUFFIXES);

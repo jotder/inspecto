@@ -85,6 +85,10 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("draft.json", "an Add data draft record under <data root>/_onboard/<draftId>/ - the DATA root, never "
                 + "the config root an import writes");
         ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
+        ALLOWED.put("arrivals.jsonl", "an import Dataset's arrivals ledger (DatasetArrivals, LA-ARRIVAL-LEDGER-1) in "
+                + "<data root>/<id>/ - the DATA root, never the config root an import writes");
+        ALLOWED.put("compaction.json", "an import Dataset's merge map (DatasetCompaction, LA-DATASET-COMPACT-1) in "
+                + "<data root>/<id>/ - the DATA root, never the config root an import writes");
         ALLOWED.put("parked","backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
                 + "outside the config tree; the sweep skips it and no import lands outside <config>");
         // SPACE-DATA-ROOT-CONFIG-AUDIT-1: UploadRoutes resolves records/ under SpaceAuditDir.of(root, "la-uploads").dir(),
@@ -125,13 +129,17 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("out", "the LA index's out-edge table directory (IndexBuilder, D-3; read again since 2026-10-15 for the "
                 + "link statistics kindEdges / degree) inside a staged index version under <write root>/la-index/... - a derived "
                 + "artefact, outside the config tree and never read as config");
+        for (String p : List.of("pairs_back", "loops"))
+            ALLOWED.put(p, "an LA index table directory (IndexBuilder / IndexReader: reciprocal pairs, self-loops) beside `out` "
+                    + "inside a staged index version under <write root>/la-index/... - a derived artefact, outside the config "
+                    + "tree and never read as config");
         ALLOWED.put("audit-anchoring.json", "the durable \"anchoring started\" record (AuditAnchors) in "
                 + "<config root>.secrets/ beside the key — a SIBLING of the config tree, so no import reaches it");
         ALLOWED.put("META-INF/inspecto/module.toon", "a classpath resource read from module jars by ModuleManifests, "
                 + "not a Space file: an import cannot plant it because it is read from the classpath, never from a "
                 + "Space config root (" + REPO + ")");
         for (String p : List.of("META-INF/inspecto/industry-packs.toon", "industry-pack.toon", "industry-pack-terms.toon",
-                "industry-pack-entity-types.toon", "industry-pack-link-kinds.toon"))
+                "industry-pack-entity-types.toon", "industry-pack-link-kinds.toon", "industry-pack-record-types.toon"))
             ALLOWED.put(p, "an Industry pack's file set (IndustryPacks, LA-EDITIONS-1), read from the classpath under "
                     + "META-INF/inspecto/industry-packs/<id>/, never from a Space config root - an import cannot plant it ("
                     + REPO + ")");

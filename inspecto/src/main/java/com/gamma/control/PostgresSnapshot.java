@@ -273,7 +273,7 @@ final class PostgresSnapshot {
         Path f = configFile(writeRoot, id);
         if (!Files.isRegularFile(f)) return null;
         try {
-            return ConfigCodec.toMap(Files.readString(f, StandardCharsets.UTF_8));
+            return com.gamma.util.ToonHelper.load(f.toString());
         } catch (IOException | RuntimeException unreadable) {
             // fall through: refused below with the file named
         }

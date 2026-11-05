@@ -1,5 +1,5 @@
 import type { Choice, ImportSummary, OnboardDraft } from './add-data.model';
-import type { ColumnRole } from '../api/column-roles';
+import type { ColumnRole } from '@inspecto/link-analysis/api/column-roles';
 
 /** SPEC-ONLY: drafts shaped like `POST /onboard/files` answered for the walkthrough's `transfers.csv` (2026-10-22, live). */
 const hi = <T>(value: T, evidence = 'every sampled value agrees'): Choice<T> => ({

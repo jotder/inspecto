@@ -47,6 +47,12 @@ class JobWritersTest {
             Map.entry("POST /inv/investigations/([^/]+)/alert-rules", FIXED + " (alert-rule, inspecto-geo-link)"),
             Map.entry("PUT /inv/investigations/([^/]+)/alert-rules/([^/]+)", FIXED + " (alert-rule edited in place, inspecto-geo-link)"),
             Map.entry("PUT /settings/egress", FIXED + " (egress.toon)"),
+            Map.entry("PUT /datasets/([^/]+)/watch", FIXED + " (dataset: the stored entry with only its watchInbox key "
+                    + "set or removed; the body is one boolean, BASIC-ONBOARD-1 P2)"),
+            Map.entry("PUT /datasets/([^/]+)/storage", FIXED + " (dataset: its retention policy only, LA-DATASET-COMPACT-1)"),
+            Map.entry("PUT /datasets/([^/]+)/feed", FIXED + " (the import pipeline's trigger and collector, built by "
+                    + "DatasetFeed from a few named fields, LA-ARRIVAL-FEEDS-1)"),
+            Map.entry("DELETE /datasets/([^/]+)/feed", FIXED + " (the import pipeline's trigger and collector, LA-ARRIVAL-FEEDS-1)"),
             Map.entry("PUT /settings/mail-attachments", FIXED + " (mail-attachments.toon)"),
             Map.entry("PUT /settings/publication-destinations", FIXED + " (publication-destinations.toon)"),
             Map.entry("PUT /regulatory-reports/templates/([^/]+)", "writes a Regulatory Report TEMPLATE "

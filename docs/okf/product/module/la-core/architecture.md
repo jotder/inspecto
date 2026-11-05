@@ -2027,6 +2027,12 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 - **The poll re-checks on every look** that the Space exists, Add data is on (else it waits), the entry still says
   watch, is not a Reference (the key can be set through another door) and is still an import Add data wrote (`OnboardImport.requireOwnImport`, split out of `importDataset`), else
   the poll target is dropped.
+- **`watchInbox` through the generic door** (`PUT /components/dataset/{id}`, `canAuthorWorkbench`) is not refused. For
+  an inbox that is no wider than the toggle: a builder can already put the import Pipeline on a schedule. For a
+  Postgres snapshot it is: a builder may turn on the 30 s refresh, which Run now (`canUploadData`) otherwise does. The
+  operator accepted this as a bounded widening (2026-11-05): the same stored connection and table, and an import can
+  no longer plant `_snapshot.toon` (`ImportPaths.REFUSED_SUFFIXES`). Recorded as the `PUT /watch` ACTS reason in
+  `ImportCapabilityGuardTest`.
 - **A Postgres table snapshot (P3) refreshes on the same toggle.** For an entry with `importSource: postgres` the toggle
   registers `InboxWatch.Snapshot` instead: each poll runs `PostgresSnapshot.poll` (copy the table again; replace
   everything only when the bytes differ from the last arrival; no settle check - the server makes the copy itself). A

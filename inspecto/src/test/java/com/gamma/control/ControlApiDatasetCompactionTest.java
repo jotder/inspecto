@@ -75,6 +75,11 @@ class ControlApiDatasetCompactionTest {
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
             ControlApi api = new ControlApi(svc, 0);
+            // Add a file and Run now share the standard bucket (burst 20, one more every 3 s): compaction needs 21+ arrivals,
+            // so on the wall clock the test passed only when it ran slower than the refill. Each read of this clock is 3 s
+            // later - one token back per request, whatever the machine's speed.
+            java.util.concurrent.atomic.AtomicLong nanos = new java.util.concurrent.atomic.AtomicLong();
+            api.useRateLimitClock(() -> nanos.addAndGet(3_000_000_000L));
             api.start();
             return new Ctx(svc, api, api.port(), writeRoot);
         } finally {

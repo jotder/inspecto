@@ -21,6 +21,12 @@ Complements the `endpoint` skill. Order:
    edit the fragment, then `node tools/openapi-merge.mjs --write`. The Maven write above never sees module fragments and
    only reformats the file (592 noise lines, 2026-10-31).
 5. `node tools/check-authgate-coverage.mjs` and `route-gating-report.mjs --check` with real exit codes.
+6. **The processor's writer / inventory scanners** - a route or helper that writes a registry component, a Pipeline or a
+   fixed-name file trips them, and a `-Dtest` naming only your own tests never runs them (four were red on master for
+   a day, 2026-11-05). Add them to every new-route run:
+   `-Dtest=…,DecisionRuleWritersTest,ImportCapabilityGuardTest,JobWritersTest,ImportLoaderInventoryTest,AbsentModuleRoutesTest,LinkAnalysisRateClassCoverageTest`
+   and answer each with a table entry and its reason (or a real guard call). A file read by name under the CONFIG
+   root (not the data root) is refused in `ImportPaths.REFUSED_SUFFIXES` / reserved, never just allow-listed.
 
 **Merging openapi-v1.json conflicts:** `json.loads` passing proves nothing (duplicate keys are legal; a route can
 land outside `paths`). Assert the parsed `paths` key set = base + new routes and `components` unchanged, or rebuild

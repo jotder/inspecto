@@ -503,6 +503,9 @@ name, nothing resolved), an unset variable (named), a query that is not one
 `import.max_rows`. Rate class: the standard bucket. The commit is the ordinary `/onboard/files/{draftId}/commit`;
 for a snapshot draft it also writes `imports/<id>_snapshot.toon` (connection with the password as its reference,
 schema+table or query; refused 409 if it already exists) and stamps the Dataset entry `importSource: postgres`.
+Only this commit writes it: an import into an existing Space carrying a `*_snapshot.toon` anywhere is refused
+(`ImportPaths.REFUSED_SUFFIXES`, 2026-11-05), so an import cannot point Run now at another database. A new Space
+created from a bundle (`canAdminister`) keeps the file, as it keeps every file it seeds.
 **Run now** (`POST /datasets/{id}/run`) on such a Dataset copies the table again and runs the Add-a-file replace path.
 
 **How it reads (P0 V2, plan §6.1).** DuckDB's `postgres` extension (`postgres_scanner`), already staged in every

@@ -51,7 +51,22 @@ class ImportCapabilityGuardTest {
             Map.entry("POST /recon/([^/]+)/breaks/status", "sets a break's status in recon-state/, not the config"),
             Map.entry("POST /risk-scores/preview", "read-only POST (keys stay out of URLs), writes nothing (operator, 2026-10-06)"),
             Map.entry("POST /datasets/([^/]+)/files", "Add a file (LA-ONBOARD-1): lands data and runs the import; the Dataset's config is untouched"),
-            Map.entry("POST /datasets/([^/]+)/run", "Run now (LA-ONBOARD-1): runs the import Pipeline; the Dataset's config is untouched"));
+            Map.entry("POST /datasets/([^/]+)/run", "Run now (LA-ONBOARD-1): runs the import Pipeline; the Dataset's config is untouched"),
+            // canUploadData routes of an import Dataset (LA-ARRIVAL-FEEDS-1, LA-DATASET-COMPACT-1, BASIC-ONBOARD-1 P2). Not
+            // dataset -> canUploadData in KIND_CAPABILITY: builders hold canAuthorWorkbench without canUploadData, and that
+            // entry would take every Dataset write from them (assistant-decided 2026-11-05, operator brief: "the right
+            // capability or exemption and a reason").
+            Map.entry("PUT /datasets/([^/]+)/feed", "Keep this up to date: writes the import PIPELINE's trigger and "
+                    + "collector, not the Dataset entry; a builder already edits that Pipeline at canAuthorWorkbench"),
+            Map.entry("DELETE /datasets/([^/]+)/feed", "stops Keep this up to date: rewrites the import PIPELINE's trigger "
+                    + "and collector (DatasetFeed.rewrite), not the Dataset entry"),
+            Map.entry("PUT /datasets/([^/]+)/watch", "turns the 30 s poll on or off (the entry's watchInbox key, nothing "
+                    + "else). For an inbox the generic door writing the same key is no wider: a builder can already put the "
+                    + "import Pipeline on a schedule. For a Postgres snapshot it IS wider - a builder may turn on the 30 s "
+                    + "refresh, Run now's act - an accepted, bounded widening (operator 2026-11-05): the same stored "
+                    + "connection and table, and _snapshot.toon can no longer be planted (ImportPaths.REFUSED_SUFFIXES)"),
+            Map.entry("POST /datasets/([^/]+)/compact", "Compact now: merges the Dataset's stored data files; the "
+                    + "Dataset's config is untouched"));
 
     private static final Set<String> WRITE_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
