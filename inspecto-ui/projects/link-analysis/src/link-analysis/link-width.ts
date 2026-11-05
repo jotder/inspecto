@@ -3,7 +3,7 @@ import type { GraphDisplayOptions } from '@inspecto/core/graph/graph-view.compon
 
 /**
  * What a link's drawn width follows (LA-COLUMN-ROLES-2 D-2): the rows folded into it (`count`), or the total of the link
- * mapping's primary Measure over those rows (`measure`). Count is the default, so nothing changes until the analyst asks.
+ * mapping's primary Measure over those rows (`measure`). Count is the default.
  */
 export type LinkWidthBy = 'count' | 'measure';
 

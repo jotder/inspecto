@@ -265,8 +265,20 @@ import {
     weighLinks,
     withLinkMeasure,
 } from './link-width';
-import { LinkAnalysisRoleFilterComponent, RoleFilterCategory } from './link-analysis-role-filter.component';
-import { NO_ROLE_FILTERS, RoleFilters, categoryValuesSql, withRoleFilters } from './role-filters';
+import {
+    LinkAnalysisRoleFilterComponent,
+    RoleFilterCategory,
+    RoleFilterSection,
+} from './link-analysis-role-filter.component';
+import {
+    DatasetRoleFilters,
+    NO_ROLE_FILTERS,
+    RoleFilters,
+    categoryValuesSql,
+    roleColumnsOf,
+    withDatasetRoleFilters,
+    withRoleFilters,
+} from './role-filters';
 import {
     LA_AI_ASSIST,
     LA_DATASETS,
@@ -3477,37 +3489,66 @@ Its prior copies stay in its version history.`,
         this.filterWhere.set(emptyGroup());
         this.localFilter.set(null);
         this.roleFilters.set(NO_ROLE_FILTERS);
+        this.datasetRoleFilters.set({});
     }
 
     // ── Filter by role (LA-COLUMN-ROLES-1 P3): a range per Measure, a list per Category, a window on a Time column ──
     /** What the role panel last applied. */
     readonly roleFilters = signal<RoleFilters>(NO_ROLE_FILTERS);
     /** The loaded Dataset's role columns the panel offers (empty when the read spans several Datasets). */
-    readonly roleColumns = computed(() => {
-        const cols = this.loadedDataset()?.columns;
-        return {
-            measures: columnsOfRole(cols, 'measure'),
-            categories: columnsOfRole(cols, 'dimension'),
-            times: columnsOfRole(cols, 'temporal'),
-        };
-    });
+    readonly roleColumns = computed(() => roleColumnsOf(this.loadedDataset()?.columns));
     readonly hasRoleColumns = computed(() => {
         const r = this.roleColumns();
-        return r.measures.length + r.categories.length + r.times.length > 0;
+        return r.measures.length + r.categories.length + r.times.length > 0 || this.roleSections().length > 0;
     });
-    /** Each Category column's distinct values, read from the Dataset once the filter is open. */
-    private readonly categoryValues = signal<Record<string, string[]>>({});
-    readonly roleCategories = computed<RoleFilterCategory[]>(() =>
-        this.roleColumns().categories.map((name) => ({ name, values: this.categoryValues()[name] ?? [] })),
+    /** Each Category column's distinct values per Dataset id, read from the Dataset once the filter is open. */
+    private readonly categoryValues = signal<Record<string, Record<string, string[]>>>({});
+    readonly roleCategories = computed<RoleFilterCategory[]>(() => {
+        const values = this.categoryValues()[this.loadedDataset()?.id ?? ''] ?? {};
+        return this.roleColumns().categories.map((name) => ({ name, values: values[name] ?? [] }));
+    });
+    /**
+     * LA-COLUMN-ROLES-2 D-3 b: over a read of several Datasets, one section per edge mapping's Dataset (in mapping order),
+     * from that Dataset's own `columns[].role`; a Dataset with no role column gets none. Empty for any other read.
+     */
+    private readonly multiReadDatasets = computed<LaDataset[]>(() => {
+        const run = this.lastRun();
+        if (run?.sourceId !== 'entity-projection-multi') return [];
+        const ids = [...new Set((run.query.multi?.edges ?? []).map((e) => e.dataset))];
+        return ids.flatMap((id) => this.datasets().find((d) => d.id === id) ?? []);
+    });
+    readonly roleSections = computed<RoleFilterSection[]>(() =>
+        this.multiReadDatasets().flatMap((ds) => {
+            const r = roleColumnsOf(ds.columns);
+            if (!(r.measures.length + r.categories.length + r.times.length)) return [];
+            const values = this.categoryValues()[ds.id] ?? {};
+            const categories = r.categories.map((name) => ({ name, values: values[name] ?? [] }));
+            return [{ key: ds.id, title: ds.name || ds.id, measures: r.measures, categories, times: r.times }];
+        }),
     );
-    /** The Dataset whose Category values are read (or being read): one read per Dataset, not per opening of the filter. */
-    private categoryValuesOf = '';
+    /** What the panel last applied per Dataset over a read of several Datasets (each written as its mappings' `filter`). */
+    readonly datasetRoleFilters = signal<DatasetRoleFilters>({});
+    /** The run whose edge mappings hold the panel's conditions, and which: only those are taken out by the next push. */
+    private datasetRoleFiltersWritten: { run: unknown; filters: DatasetRoleFilters } | null = null;
+    /**
+     * The Datasets whose Category values are read (or being read): one read per Dataset, not per opening of the filter.
+     * A Dataset no longer drawn leaves it, so its late answer is dropped.
+     */
+    private readonly categoryValuesOf = new Set<string>();
     private readonly loadCategoryValues = effect(() => {
-        const ds = this.loadedDataset();
-        const cols = this.roleColumns().categories;
-        if (!this.filterOpen() || !ds?.sourceName || !cols.length || this.categoryValuesOf === ds.id) return;
-        this.categoryValuesOf = ds.id;
-        untracked(() => void this.readCategoryValues(ds.id, ds.sourceName, cols));
+        const one = this.loadedDataset();
+        const drawn = (one ? [one] : this.multiReadDatasets()).filter(
+            (ds) => ds.sourceName && columnsOfRole(ds.columns, 'dimension').length,
+        );
+        if (!this.filterOpen() || !drawn.length) return;
+        for (const id of [...this.categoryValuesOf])
+            if (!drawn.some((ds) => ds.id === id)) this.categoryValuesOf.delete(id);
+        for (const ds of drawn) {
+            if (this.categoryValuesOf.has(ds.id)) continue;
+            this.categoryValuesOf.add(ds.id);
+            const cols = columnsOfRole(ds.columns, 'dimension');
+            untracked(() => void this.readCategoryValues(ds.id, ds.sourceName, cols));
+        }
     });
 
     private async readCategoryValues(id: string, source: string, cols: readonly string[]): Promise<void> {
@@ -3516,7 +3557,8 @@ Its prior copies stay in its version history.`,
             const res = await this.datasetRows.sql(source, categoryValuesSql(source, c), 200);
             out[c] = res.error ? [] : res.rows.map((r) => String(r['v']));
         }
-        if (this.categoryValuesOf === id) this.categoryValues.set(out); // a read for a Dataset no longer drawn is dropped
+        // a read for a Dataset no longer drawn is dropped
+        if (this.categoryValuesOf.has(id)) this.categoryValues.update((v) => ({ ...v, [id]: out }));
     }
 
     /** Write the role filters into the predicate tree (replacing the panel's own conditions) and push it to the server. */
@@ -3524,6 +3566,15 @@ Its prior copies stay in its version history.`,
         const previous = this.roleFilters();
         this.roleFilters.set(f);
         this.filterWhere.set(withRoleFilters(this.filterWhere(), f, previous));
+        return this.pushFilter();
+    }
+
+    /**
+     * LA-COLUMN-ROLES-2 D-3 b: over several Datasets, each section's conditions become that Dataset's edge mappings' own
+     * `filter` (the push writes them, {@link sendPushFilter}); the analyst's top-level predicate tree is not touched.
+     */
+    applyDatasetRoleFilters(f: DatasetRoleFilters): Promise<void> {
+        this.datasetRoleFilters.set(f);
         return this.pushFilter();
     }
 
@@ -3552,6 +3603,13 @@ Its prior copies stay in its version history.`,
         if (!run || !source || !prev) return;
         const w = this.filterWhere();
         const q: GraphSourceQuery = { ...run.query, filter: hasConditions(w) ? cloneGroup(w) : undefined };
+        // LA-COLUMN-ROLES-2 D-3 b: over several Datasets the role panel's conditions are each edge mapping's own filter;
+        // only those this run's mappings hold from the panel are taken out
+        const perDataset = this.datasetRoleFilters();
+        if (run.sourceId === 'entity-projection-multi' && q.multi) {
+            const written = this.datasetRoleFiltersWritten?.run === run ? this.datasetRoleFiltersWritten.filters : {};
+            q.multi = { ...q.multi, edges: withDatasetRoleFilters(q.multi.edges, perDataset, written) };
+        }
         this.pushing.set(true);
         try {
             const hit = await this.cachedQuery(run.sourceId, source, q);
@@ -3560,7 +3618,10 @@ Its prior copies stay in its version history.`,
             const truncated = !!(next as ProjectedGraph).truncated;
             this.graph.set(markStranded(prev, next));
             this.truncated.set(truncated);
-            this.lastRun.set(this.runOf(run.sourceId, q, next as ProjectedGraph));
+            const nextRun = this.runOf(run.sourceId, q, next as ProjectedGraph);
+            this.lastRun.set(nextRun);
+            if (run.sourceId === 'entity-projection-multi')
+                this.datasetRoleFiltersWritten = { run: nextRun, filters: perDataset };
             this.localFilter.set(null); // the server applied it; the local stage starts clean
             const n = next.edges.length.toLocaleString();
             this.pushState.set(truncated ? `${n} links · truncated — refine and push again` : `${n} links · complete`);
@@ -5255,6 +5316,7 @@ Its prior copies stay in its version history.`,
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         this.roleFilters.set(NO_ROLE_FILTERS); // the view's conditions are its own, not the panel's: none is taken out
+        this.datasetRoleFilters.set({});
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
         this.lassoMode.set(false);
         this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };

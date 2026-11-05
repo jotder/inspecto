@@ -1596,6 +1596,117 @@ describe('LinkAnalysisComponent', () => {
         expect(c.roleFilters().measures).toEqual({});
     });
 
+    it('LA-COLUMN-ROLES-2 D-3 b: over several Datasets, one section per Dataset, each applied as its own mapping filter', async () => {
+        const col = (name: string, role: string) => ({ name, type: role === 'measure' ? 'number' : 'string', role });
+        const calls = {
+            ...DS,
+            id: 'calls',
+            name: 'Calls',
+            sourceName: 'calls_t',
+            columns: [col('amount', 'measure'), col('channel', 'dimension')],
+        } as unknown as Dataset;
+        const pays = {
+            ...DS,
+            id: 'pays',
+            name: 'Payments',
+            sourceName: 'pays_t',
+            columns: [col('fee', 'measure'), col('channel', 'dimension')],
+        } as unknown as Dataset;
+        // answered by the test, once it has seen which reads were asked for
+        const answers: (() => void)[] = [];
+        const sql = vi.fn(
+            (source: string) =>
+                new Promise((resolve) =>
+                    answers.push(() =>
+                        resolve({
+                            rows: [{ v: source === 'calls_t' ? 'app' : 'agent' }],
+                            columns: [],
+                            truncated: false,
+                        }),
+                    ),
+                ),
+        );
+        const { fixture, queried } = create({
+            datasets: [calls, pays],
+            rows: { sql } as unknown as Partial<DatasetRowsService>,
+        });
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const own = {
+            kind: 'group' as const,
+            op: 'AND' as const,
+            items: [{ kind: 'condition' as const, field: 'kind', operator: '=' as const, value: 'sms' }],
+        };
+        const paysEdge = { dataset: 'pays', sourceColumn: 'p', targetColumn: 'q', filter: own };
+        await c.loadView({
+            id: 'm',
+            name: 'm',
+            sourceId: 'entity-projection-multi',
+            query: {
+                multi: { nodes: [], edges: [{ dataset: 'calls', sourceColumn: 'a', targetColumn: 'b' }, paysEdge] },
+            },
+        });
+        expect(c.roleColumns()).toEqual({ measures: [], categories: [], times: [] }); // no one loaded Dataset
+        expect(c.roleSections().map((s) => [s.key, s.title, s.measures])).toEqual([
+            ['calls', 'Calls', ['amount']],
+            ['pays', 'Payments', ['fee']],
+        ]);
+        // the Category values are read per Dataset, from that Dataset
+        // detectChanges (inside the zone), not TestBed.tick(): a read started inside a bare tick re-enters it (NG0101)
+        const settle = async () => {
+            for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r));
+        };
+        c.filterOpen.set(true);
+        fixture.detectChanges();
+        expect(sql.mock.calls.map((call) => call[0])).toEqual(['calls_t', 'pays_t']);
+        answers.forEach((answer) => answer());
+        await settle();
+        expect(c.roleSections().map((s) => s.categories)).toEqual([
+            [{ name: 'channel', values: ['app'] }],
+            [{ name: 'channel', values: ['agent'] }],
+        ]);
+        c.filterOpen.set(false);
+        fixture.detectChanges();
+        c.filterOpen.set(true);
+        fixture.detectChanges();
+        expect(sql).toHaveBeenCalledTimes(2); // once per Dataset, not per opening of the filter
+
+        type Pushed = { filter?: { items: unknown[] }; multi: { edges: { dataset: string; filter?: unknown }[] } };
+        c.filterWhere().items.push({ kind: 'condition', field: 'source', operator: '=', value: 'a' }); // the analyst's own
+        await c.applyDatasetRoleFilters({
+            calls: {
+                measures: { amount: { min: '10', max: '' } },
+                categories: { channel: ['app'] },
+                time: { column: '', from: '', to: '' },
+            },
+            pays: { measures: {}, categories: {}, time: { column: '', from: '', to: '' } },
+        });
+        let pushed = queried.at(-1) as Pushed;
+        expect(pushed.multi.edges[0].filter).toEqual({
+            kind: 'group',
+            op: 'AND',
+            items: [
+                { kind: 'condition', field: 'amount', operator: '>=', value: '10' },
+                { kind: 'condition', field: 'channel', operator: 'in', value: 'app' },
+            ],
+        });
+        expect(pushed.multi.edges[1]).toEqual(paysEdge); // the other mapping: no role filter, its own kept
+        expect(pushed.filter!.items).toEqual([{ kind: 'condition', field: 'source', operator: '=', value: 'a' }]);
+
+        // applied again: only the panel's last conditions for that Dataset are replaced
+        await c.applyDatasetRoleFilters({
+            calls: { measures: {}, categories: {}, time: { column: '', from: '', to: '' } },
+            pays: { measures: { fee: { min: '', max: '5' } }, categories: {}, time: { column: '', from: '', to: '' } },
+        });
+        pushed = queried.at(-1) as Pushed;
+        expect('filter' in pushed.multi.edges[0]).toBe(false); // an emptied section sends no filter
+        expect(pushed.multi.edges[1].filter).toEqual({
+            ...own,
+            items: [...own.items, { kind: 'condition', field: 'fee', operator: '<=', value: '5' }],
+        });
+        expect(pushed.filter!.items).toEqual([{ kind: 'condition', field: 'source', operator: '=', value: 'a' }]);
+    });
+
     it('two-stage loop: a local predicate narrows the canvas for free; a push marks stranded nodes, never drops them', async () => {
         const FILTERED: G6GraphData = { nodes: GRAPH.nodes.slice(0, 3), edges: GRAPH.edges.slice(0, 2) }; // a–b–c only
         const { fixture, queried } = create({ filtered: FILTERED });

@@ -1731,11 +1731,23 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   `totalCol`; else flat, `column_not_indexed`). The canvas draws a link's width from `data.weight`
   (`link-width.ts` `weighLinks`): by its count (default, *Width: Count*) or by its total relative to the largest on
   the canvas (null or not positive = thinnest); the client folds add totals (10 + null = 10). The Display menu offers
-  the Measure only when every read Dataset names the same primary Measure, and only over the plain query's canvas
-  (an Investigation or a grown canvas draws by count); the choice is kept in a saved view (`linkWidth: 'measure'`).
+  the Measure only when every read Dataset names the same primary Measure, and not on an Investigation canvas (it
+  draws its Working Set by count); over a graph grown beyond the query it can be picked only once the links carry
+  their totals (else *Run the query again first*); the choice is kept in a saved view (`linkWidth: 'measure'`).
   Not yet weighed: the dashboard link-view widget and the embed view.
-- **Still being built** (board row `LA-COLUMN-ROLES-2`, decisions in [`plan-column-roles-2.md`](plan-column-roles-2.md)):
-  Category values for a multi-Dataset read (the panel offers a single read's Dataset only).
+- **Filter by role over several Datasets** (`LA-COLUMN-ROLES-2` D-3 b, 2026-11-05; `role-filters.ts`
+  `withDatasetRoleFilters`, the panel's `sections`). Over a read of several Datasets (`entity-projection-multi`) the
+  panel draws one section per edge mapping's Dataset, in mapping order, titled by its name, from that Dataset's own
+  `columns[].role` (a Dataset with no Measure, Category or Time column gets none); each section is a group named by its
+  heading and its controls are named `<Dataset>: <field>`, so the same column in two sections reads apart. Category
+  values are read per Dataset (one SQL per column, at most 200), once per Dataset while it is drawn; a late answer for a
+  Dataset no longer drawn is dropped. Applying writes each section's conditions as the own `filter` of every edge
+  mapping over that Dataset on `POST /inv/projection/multi` (which narrows only that mapping,
+  `ControlApiMultiDatasetFilterTest`) and re-runs the read as a push does (merged, stranded nodes marked). Only the
+  conditions the panel wrote into the run on screen are taken out (JSON-equal, per Dataset; tracked per run, so from a
+  new run's or a loaded view's mappings nothing is taken out; loading a view or Clear in the filter also empties the
+  panel); the analyst's own mapping filter and the top-level `filter` stay. A section left empty sends no filter for its Dataset. Node mappings are not narrowed. A single-Dataset read is
+  unchanged.
 
 ### 6.16 Discovery in Basic: presets, Discover, entity summary, query builder (LA-BASIC-DISCOVERY-1, as built 2026-11-03/05)
 
