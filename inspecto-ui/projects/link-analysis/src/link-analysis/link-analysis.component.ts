@@ -256,8 +256,29 @@ import { PivotService } from '@inspecto/link-analysis/investigation/pivot.servic
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { carriedColumns, columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
 import { timeColumnChoices } from './timeline-playback';
-import { LinkAnalysisRoleFilterComponent, RoleFilterCategory } from './link-analysis-role-filter.component';
-import { NO_ROLE_FILTERS, RoleFilters, categoryValuesSql, withRoleFilters } from './role-filters';
+import {
+    LaDisplayOptions,
+    LinkWidthBy,
+    carriesLinkMeasure,
+    linkWidthHint,
+    sharedLinkMeasure,
+    weighLinks,
+    withLinkMeasure,
+} from './link-width';
+import {
+    LinkAnalysisRoleFilterComponent,
+    RoleFilterCategory,
+    RoleFilterSection,
+} from './link-analysis-role-filter.component';
+import {
+    DatasetRoleFilters,
+    NO_ROLE_FILTERS,
+    RoleFilters,
+    categoryValuesSql,
+    roleColumnsOf,
+    withDatasetRoleFilters,
+    withRoleFilters,
+} from './role-filters';
 import {
     LA_AI_ASSIST,
     LA_DATASETS,
@@ -1473,11 +1494,42 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** How far the layout spreads nodes (a multiplier on its distances); wide by default; changed from the Display menu. */
     readonly layoutSpacing = signal(GRAPH_DEFAULT_LAYOUT_SPACING);
 
+    // ── link width (LA-COLUMN-ROLES-2 D-2): by the rows a link folds, or by its link mapping's primary Measure ──
+    /** What the analyst chose for the link width; saved with a view (`display.linkWidth`, absent = count). */
+    readonly linkWidthBy = signal<LinkWidthBy>('count');
+    /** A Dataset's primary Measure, from its link mapping (`defaultLinkMapping`; old entries say `amount`). */
+    private readonly measureOf = (datasetId: string): string | undefined =>
+        this.datasets().find((d) => d.id === datasetId)?.defaultLinkMapping?.primaryMeasure;
+    /** The primary Measure the last read's link mappings name; undefined = the Display menu offers Count only. */
+    readonly linkMeasure = computed(() => {
+        const run = this.lastRun();
+        return run ? sharedLinkMeasure(run.sourceId, run.query, this.measureOf) : undefined;
+    });
+    /** What the width follows on the canvas: the Measure only while it is offered and the query graph is drawn. */
+    readonly linkWidthDrawn = computed<LinkWidthBy>(() =>
+        this.linkWidthBy() === 'measure' && this.linkMeasure() && !this.workingSetCanvas() ? 'measure' : 'count',
+    );
+    /** The Display menu's line saying what the width means. */
+    readonly linkWidthHint = computed(() => linkWidthHint(this.linkWidthDrawn(), this.linkMeasure()));
+    /**
+     * Why Width by the Measure cannot be picked now, or null. Picking it re-reads the last query with the Measure summed
+     * (when its links do not carry the totals yet), which would replace a graph grown beyond what that query drew.
+     */
+    readonly linkMeasureOffReason = computed<string | null>(() => {
+        if (this.workingSetCanvas()) return this.queryGraphOnlyReason;
+        const run = this.lastRun();
+        const measure = this.linkMeasure();
+        if (!run || !measure || carriesLinkMeasure(run.query, measure) || this.graph() === this.plainGraph) return null;
+        return 'Run the query again first: this graph holds more than the query drew.';
+    });
+    /** {@link canvasData} with each link weighed by {@link linkWidthDrawn}: what the graph view draws. */
+    readonly weighedCanvasData = computed(() => weighLinks(this.canvasData(), this.linkWidthDrawn()));
+
     /**
      * What the analyst chose, and only that: this is what a saved view keeps. The automatic look ({@link displayOptions})
      * is derived from the drawn graph every time, so it is never written into a view.
      */
-    readonly chosenDisplay = computed<GraphDisplayOptions>(
+    readonly chosenDisplay = computed<LaDisplayOptions>(
         () => ({
             nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
             edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
@@ -1490,6 +1542,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             ...(this.nodeRules().length ? { nodeRules: this.nodeRules() } : {}),
             ...(this.nodeSize() !== GRAPH_DEFAULT_NODE_SIZE ? { nodeSize: this.nodeSize() } : {}),
             ...(this.layoutSpacing() !== GRAPH_DEFAULT_LAYOUT_SPACING ? { layoutSpacing: this.layoutSpacing() } : {}),
+            ...(this.linkWidthBy() === 'measure' ? { linkWidth: 'measure' as const } : {}),
         }),
         { equal: (a, b) => stableKey(a) === stableKey(b) },
     );
@@ -1540,7 +1593,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             Object.keys(this.nodeShapes()).length > 0 ||
             Object.keys(this.edgePatterns()).length > 0 ||
             Object.keys(this.edgeSizes()).length > 0 ||
-            this.nodeRules().length > 0,
+            this.nodeRules().length > 0 ||
+            this.linkWidthBy() === 'measure',
     );
 
     // ── layout (the Layout toolbox; persisted with a saved view) ──
@@ -2859,7 +2913,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         if (!source?.expand) return [];
         const wanted = values.slice(0, START_MAX_SEEDS);
         const projection = entityType ? { ...ds.mapping, entityType } : ds.mapping;
-        const q: GraphSourceQuery = { projection };
+        const q = this.withWidthMeasure('entity-projection', { projection }); // a start's Dataset is loaded by now
         const firstDraw = !this.graph();
         const focusBefore = this.focusHolder();
         this.starting.set(true);
@@ -3361,7 +3415,10 @@ Its prior copies stay in its version history.`,
         this.clearResults();
         this.pushState.set(q.filter && hasConditions(q.filter) ? 'sent with the query' : 'not pushed');
         try {
-            const hit = await this.cachedQuery(sourceId, source, q, force);
+            // a view opened on a refresh can run before the Datasets (and so their Measures) have arrived
+            if (this.linkWidthBy() === 'measure') await this.datasetsLoaded;
+            const read = this.withWidthMeasure(sourceId, q);
+            const hit = await this.cachedQuery(sourceId, source, read, force);
             const g = hit.value.g;
             this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
@@ -3371,7 +3428,7 @@ Its prior copies stay in its version history.`,
             this.truncated.set(!!(g as ProjectedGraph).truncated);
             this.mappingSummary.set((g as MultiProjectedGraph).mappings ?? []);
             this.kindFilter.set([]);
-            this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
+            this.lastRun.set(this.runOf(sourceId, read, g as ProjectedGraph));
             this.queryPanel?.markPristine(); // what was run is no longer an unsaved change
             this.settingsOpen.set(false); // the drawn graph is the answer: show it
             if (firstDraw) this.focusDrawnGraph(focusBefore, g.nodes.length, g.edges.length);
@@ -3432,37 +3489,70 @@ Its prior copies stay in its version history.`,
         this.filterWhere.set(emptyGroup());
         this.localFilter.set(null);
         this.roleFilters.set(NO_ROLE_FILTERS);
+        this.datasetRoleFilters.set({});
     }
 
     // ── Filter by role (LA-COLUMN-ROLES-1 P3): a range per Measure, a list per Category, a window on a Time column ──
     /** What the role panel last applied. */
     readonly roleFilters = signal<RoleFilters>(NO_ROLE_FILTERS);
     /** The loaded Dataset's role columns the panel offers (empty when the read spans several Datasets). */
-    readonly roleColumns = computed(() => {
-        const cols = this.loadedDataset()?.columns;
-        return {
-            measures: columnsOfRole(cols, 'measure'),
-            categories: columnsOfRole(cols, 'dimension'),
-            times: columnsOfRole(cols, 'temporal'),
-        };
-    });
+    readonly roleColumns = computed(() => roleColumnsOf(this.loadedDataset()?.columns));
     readonly hasRoleColumns = computed(() => {
         const r = this.roleColumns();
-        return r.measures.length + r.categories.length + r.times.length > 0;
+        return r.measures.length + r.categories.length + r.times.length > 0 || this.roleSections().length > 0;
     });
-    /** Each Category column's distinct values, read from the Dataset once the filter is open. */
-    private readonly categoryValues = signal<Record<string, string[]>>({});
-    readonly roleCategories = computed<RoleFilterCategory[]>(() =>
-        this.roleColumns().categories.map((name) => ({ name, values: this.categoryValues()[name] ?? [] })),
+    /** Each Category column's distinct values per Dataset id, read from the Dataset once the filter is open. */
+    private readonly categoryValues = signal<Record<string, Record<string, string[]>>>({});
+    readonly roleCategories = computed<RoleFilterCategory[]>(() => {
+        const values = this.categoryValues()[this.loadedDataset()?.id ?? ''] ?? {};
+        return this.roleColumns().categories.map((name) => ({ name, values: values[name] ?? [] }));
+    });
+    /**
+     * LA-COLUMN-ROLES-2 D-3 b: over a read of several Datasets, one section per edge mapping's Dataset (in mapping order),
+     * from that Dataset's own `columns[].role`; a Dataset with no role column gets none. Empty for any other read.
+     */
+    private readonly multiReadDatasets = computed<LaDataset[]>(() => {
+        const run = this.lastRun();
+        if (run?.sourceId !== 'entity-projection-multi') return [];
+        const ids = [...new Set((run.query.multi?.edges ?? []).map((e) => e.dataset))];
+        return ids.flatMap((id) => this.datasets().find((d) => d.id === id) ?? []);
+    });
+    readonly roleSections = computed<RoleFilterSection[]>(() =>
+        this.multiReadDatasets().flatMap((ds) => {
+            const r = roleColumnsOf(ds.columns);
+            if (!(r.measures.length + r.categories.length + r.times.length)) return [];
+            const values = this.categoryValues()[ds.id] ?? {};
+            const categories = r.categories.map((name) => ({ name, values: values[name] ?? [] }));
+            return [{ key: ds.id, title: ds.name || ds.id, measures: r.measures, categories, times: r.times }];
+        }),
     );
-    /** The Dataset whose Category values are read (or being read): one read per Dataset, not per opening of the filter. */
-    private categoryValuesOf = '';
+    /** What the panel last applied per Dataset over a read of several Datasets (each written as its mappings' `filter`). */
+    readonly datasetRoleFilters = signal<DatasetRoleFilters>({});
+    /**
+     * What the last push wrote per Dataset, and the mapping `filter` objects it sent: a Dataset's conditions are taken
+     * out by the next push only while a mapping of the run on screen still holds one of those objects. A Refresh or a
+     * Measure re-read copies the mappings but keeps their `filter` objects; a new run or a loaded view does not.
+     */
+    private datasetRoleFiltersWritten: { trees: ReadonlySet<unknown>; filters: DatasetRoleFilters } | null = null;
+    /**
+     * The Datasets whose Category values are read (or being read): one read per Dataset, not per opening of the filter.
+     * A Dataset no longer drawn leaves it, so its late answer is dropped.
+     */
+    private readonly categoryValuesOf = new Set<string>();
     private readonly loadCategoryValues = effect(() => {
-        const ds = this.loadedDataset();
-        const cols = this.roleColumns().categories;
-        if (!this.filterOpen() || !ds?.sourceName || !cols.length || this.categoryValuesOf === ds.id) return;
-        this.categoryValuesOf = ds.id;
-        untracked(() => void this.readCategoryValues(ds.id, ds.sourceName, cols));
+        const one = this.loadedDataset();
+        const drawn = (one ? [one] : this.multiReadDatasets()).filter(
+            (ds) => ds.sourceName && columnsOfRole(ds.columns, 'dimension').length,
+        );
+        if (!this.filterOpen() || !drawn.length) return;
+        for (const id of [...this.categoryValuesOf])
+            if (!drawn.some((ds) => ds.id === id)) this.categoryValuesOf.delete(id);
+        for (const ds of drawn) {
+            if (this.categoryValuesOf.has(ds.id)) continue;
+            this.categoryValuesOf.add(ds.id);
+            const cols = columnsOfRole(ds.columns, 'dimension');
+            untracked(() => void this.readCategoryValues(ds.id, ds.sourceName, cols));
+        }
     });
 
     private async readCategoryValues(id: string, source: string, cols: readonly string[]): Promise<void> {
@@ -3471,7 +3561,8 @@ Its prior copies stay in its version history.`,
             const res = await this.datasetRows.sql(source, categoryValuesSql(source, c), 200);
             out[c] = res.error ? [] : res.rows.map((r) => String(r['v']));
         }
-        if (this.categoryValuesOf === id) this.categoryValues.set(out); // a read for a Dataset no longer drawn is dropped
+        // a read for a Dataset no longer drawn is dropped
+        if (this.categoryValuesOf.has(id)) this.categoryValues.update((v) => ({ ...v, [id]: out }));
     }
 
     /** Write the role filters into the predicate tree (replacing the panel's own conditions) and push it to the server. */
@@ -3479,6 +3570,15 @@ Its prior copies stay in its version history.`,
         const previous = this.roleFilters();
         this.roleFilters.set(f);
         this.filterWhere.set(withRoleFilters(this.filterWhere(), f, previous));
+        return this.pushFilter();
+    }
+
+    /**
+     * LA-COLUMN-ROLES-2 D-3 b: over several Datasets, each section's conditions become that Dataset's edge mappings' own
+     * `filter` (the push writes them, {@link sendPushFilter}); the analyst's top-level predicate tree is not touched.
+     */
+    applyDatasetRoleFilters(f: DatasetRoleFilters): Promise<void> {
+        this.datasetRoleFilters.set(f);
         return this.pushFilter();
     }
 
@@ -3507,6 +3607,17 @@ Its prior copies stay in its version history.`,
         if (!run || !source || !prev) return;
         const w = this.filterWhere();
         const q: GraphSourceQuery = { ...run.query, filter: hasConditions(w) ? cloneGroup(w) : undefined };
+        // LA-COLUMN-ROLES-2 D-3 b: over several Datasets the role panel's conditions are each edge mapping's own filter;
+        // only those this run's mappings hold from the panel are taken out
+        const perDataset = this.datasetRoleFilters();
+        if (run.sourceId === 'entity-projection-multi' && q.multi) {
+            const was = this.datasetRoleFiltersWritten;
+            const held = new Set(
+                q.multi.edges.filter((e) => e.filter && was?.trees.has(e.filter)).map((e) => e.dataset),
+            );
+            const written = Object.fromEntries(Object.entries(was?.filters ?? {}).filter(([ds]) => held.has(ds)));
+            q.multi = { ...q.multi, edges: withDatasetRoleFilters(q.multi.edges, perDataset, written) };
+        }
         this.pushing.set(true);
         try {
             const hit = await this.cachedQuery(run.sourceId, source, q);
@@ -3515,7 +3626,13 @@ Its prior copies stay in its version history.`,
             const truncated = !!(next as ProjectedGraph).truncated;
             this.graph.set(markStranded(prev, next));
             this.truncated.set(truncated);
-            this.lastRun.set(this.runOf(run.sourceId, q, next as ProjectedGraph));
+            const nextRun = this.runOf(run.sourceId, q, next as ProjectedGraph);
+            this.lastRun.set(nextRun);
+            if (run.sourceId === 'entity-projection-multi' && q.multi)
+                this.datasetRoleFiltersWritten = {
+                    trees: new Set(q.multi.edges.map((e) => e.filter).filter((f) => !!f)),
+                    filters: perDataset,
+                };
             this.localFilter.set(null); // the server applied it; the local stage starts clean
             const n = next.edges.length.toLocaleString();
             this.pushState.set(truncated ? `${n} links · truncated — refine and push again` : `${n} links · complete`);
@@ -3828,6 +3945,27 @@ Its prior copies stay in its version history.`,
         this.nodeSize.set(size);
     }
 
+    /**
+     * Pick what the link width follows (D-2). The Measure re-reads the last query with it summed when its links do not
+     * carry the totals yet; back to Count needs no read. Not on the undo history: an undo back to the Measure over a graph
+     * read without it would draw every link thinnest.
+     */
+    async setLinkWidth(by: LinkWidthBy): Promise<void> {
+        if (by === 'measure' && this.linkMeasureOffReason()) return; // the button is disabled with the reason
+        this.linkWidthBy.set(by);
+        const run = this.lastRun();
+        const measure = this.linkMeasure();
+        if (by === 'measure' && run && measure && !carriesLinkMeasure(run.query, measure))
+            await this.execute(run.sourceId, run.query); // execute adds the Measure while the width follows it
+    }
+
+    /** The read `q` with the shared primary Measure summed on its links while the width follows it; else `q` as it is. */
+    private withWidthMeasure(sourceId: GraphSourceId, q: GraphSourceQuery): GraphSourceQuery {
+        if (this.linkWidthBy() !== 'measure') return q;
+        const measure = sharedLinkMeasure(sourceId, q, this.measureOf);
+        return measure ? withLinkMeasure(q, measure) : q;
+    }
+
     /** Pick how far the layout spreads nodes (undoable); the layout re-runs. */
     setLayoutSpacing(spacing: number): void {
         this.recordHistory();
@@ -3952,7 +4090,8 @@ Its prior copies stay in its version history.`,
         }
     }
 
-    private applyDisplay(display: GraphDisplayOptions | undefined): void {
+    private applyDisplay(display: LaDisplayOptions | undefined): void {
+        this.linkWidthBy.set(display?.linkWidth === 'measure' ? 'measure' : 'count'); // a view saved before D-2: Count
         this.nodeLabels.set(display?.nodeLabels ?? false);
         this.edgeLabels.set(display?.edgeLabels ?? false);
         this.allEdgeLabels.set(display?.allEdgeLabels ?? false);
@@ -5188,6 +5327,7 @@ Its prior copies stay in its version history.`,
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
         this.roleFilters.set(NO_ROLE_FILTERS); // the view's conditions are its own, not the panel's: none is taken out
+        this.datasetRoleFilters.set({});
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
         this.lassoMode.set(false);
         this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };

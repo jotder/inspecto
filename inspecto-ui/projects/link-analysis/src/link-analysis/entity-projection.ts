@@ -142,6 +142,33 @@ export function isProjectionError(v: ProjectedGraph | ProjectionError): v is Pro
     return 'error' in v;
 }
 
+/** The data a folded link carries: its label, its row count and, when the read named a Measure (D-2), that Measure's total. */
+type FoldedEdge = G6Edge & {
+    data: { kind: string; count: number; total?: number | null; attrs?: Record<string, string | null> };
+};
+
+/**
+ * Two link totals added (LA-COLUMN-ROLES-2 D-2): the sum of those that are numbers, null when neither is — so a link
+ * folded from 10 and null totals 10, and one folded from null and null stays null (drawn thinnest).
+ */
+export function sumTotals(a: number | null | undefined, b: number | null | undefined): number | null {
+    const isNum = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v);
+    if (!isNum(a)) return isNum(b) ? b : null;
+    return isNum(b) ? a + b : a;
+}
+
+/** Fold one more read's `total` onto a link's: undefined while neither carries one, so a read without a Measure is unchanged. */
+function foldTotal(existing: FoldedEdge | undefined, next: number | null | undefined): number | null | undefined {
+    return next === undefined && existing?.data.total === undefined ? undefined : sumTotals(existing?.data.total, next);
+}
+
+/** A row's Measure value as a number, null when it holds none (blank, absent or not numeric). */
+function measureValue(v: unknown): number | null {
+    if (v == null || (typeof v === 'string' && !v.trim())) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
 /** Pure row→graph fold. Rows with a blank source or target value are skipped. */
 export function projectEntities(
     rows: Record<string, unknown>[],
@@ -152,10 +179,7 @@ export function projectEntities(
     if (rows.length && !(p.targetCol in rows[0])) return { error: `Column '${p.targetCol}' is not in the dataset.` };
 
     const nodes = new Map<string, G6Node>();
-    const edges = new Map<
-        string,
-        G6Edge & { data: { kind: string; count: number; attrs?: Record<string, string | null> } }
-    >();
+    const edges = new Map<string, FoldedEdge>();
     let truncated = false;
 
     const ensure = (value: string, column: string, end: 'source' | 'target'): string | null => {
@@ -194,11 +218,16 @@ export function projectEntities(
         // mirroring the backend's GROUP BY semantics (docs/BACKLOG.md INV-1).
         const key = `${sid}->${tid}:${kind}${attrs ? ':' + JSON.stringify(attrs) : ''}`;
         const existing = edges.get(key);
+        // D-2: the read's Measure summed per link, as the server's SUM(TRY_CAST(m AS DOUBLE)) does
+        const total = p.measureCol ? foldTotal(existing, measureValue(row[p.measureCol])) : undefined;
         if (existing) {
             existing.data.count++;
             existing.data.kind = `${kind} · ${existing.data.count}`;
+            if (total !== undefined) existing.data.total = total;
         } else {
-            edges.set(key, { id: key, source: sid, target: tid, data: { kind, count: 1, attrs } });
+            const data: FoldedEdge['data'] = { kind, count: 1, attrs };
+            if (total !== undefined) data.total = total;
+            edges.set(key, { id: key, source: sid, target: tid, data });
         }
     }
     return { nodes: [...nodes.values()], edges: [...edges.values()], truncated };
@@ -218,7 +247,7 @@ export function projectTriples(
 ): ProjectedGraph {
     const nodes = new Map<string, G6Node>();
     // Keyed by edge id: two server triples whose spellings normalise to one pair fold into one edge (D-S4).
-    const edges = new Map<string, G6Edge & { data: { kind: string; count: number } }>();
+    const edges = new Map<string, FoldedEdge>();
     let truncated = serverTruncated;
 
     const ensure = (value: string, column: string | undefined, end: 'source' | 'target'): string | null => {
@@ -254,11 +283,15 @@ export function projectTriples(
         const existing = edges.get(id);
         const count = (existing?.data.count ?? 0) + t.count;
         const label = count > 1 ? `${kind} · ${count}` : kind;
+        const total = foldTotal(existing, t.total);
         if (existing) {
             existing.data.count = count;
             existing.data.kind = label;
+            if (total !== undefined) existing.data.total = total;
         } else {
-            edges.set(id, { id, source: sid, target: tid, data: { kind: label, count, attrs: t.attrs } });
+            const data: FoldedEdge['data'] = { kind: label, count, attrs: t.attrs };
+            if (total !== undefined) data.total = total;
+            edges.set(id, { id, source: sid, target: tid, data });
         }
     }
     return { nodes: [...nodes.values()], edges: [...edges.values()], truncated };
@@ -297,6 +330,7 @@ export class EntityProjectionGraphSource implements GraphSource {
                 linkKindCol: p.linkKindCol || undefined,
                 attrCols: p.attrCols?.length ? p.attrCols : undefined,
                 filter,
+                measureCol: p.measureCol || undefined,
             }),
         );
         const typed = withColumnTypes(p, res.columnTypes);
@@ -320,6 +354,7 @@ export class EntityProjectionGraphSource implements GraphSource {
                 linkKindCol: p.linkKindCol || undefined,
                 attrCols: p.attrCols?.length ? p.attrCols : undefined,
                 filter: q.filter,
+                measureCol: p.measureCol || undefined,
                 value: nodeLabel,
             }),
         );
@@ -370,7 +405,7 @@ export interface MultiProjectedGraph extends ProjectedGraph {
  */
 export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGraph {
     const nodes = new Map<string, G6Node>();
-    const edges = new Map<string, G6Edge & { data: { kind: string; count: number } }>();
+    const edges = new Map<string, FoldedEdge>();
     let truncated = res.truncated;
     // A mapping's category is a free-form entity kind (SIM, IMEI, Cell…), not a catalog NodeKind, so the
     // catalog accent map would draw every one the fallback grey: give each category, in first-seen order, the
@@ -434,17 +469,21 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
         const existing = edges.get(id);
         const count = (existing?.data.count ?? 0) + t.count;
         const label = count > 1 ? `${kind} · ${count}` : kind;
+        const total = foldTotal(existing, t.total);
         if (existing) {
             existing.data.count = count;
             existing.data.kind = label;
             existing.data.provenance = addTo(existing.data.provenance, t.__provenance_dataset);
+            if (total !== undefined) existing.data.total = total;
         } else {
-            edges.set(id, {
-                id,
-                source: sid,
-                target: tid,
-                data: { kind: label, count, attrs: t.attrs, provenance: [t.__provenance_dataset] },
-            });
+            const data: FoldedEdge['data'] = {
+                kind: label,
+                count,
+                attrs: t.attrs,
+                provenance: [t.__provenance_dataset],
+            };
+            if (total !== undefined) data.total = total;
+            edges.set(id, { id, source: sid, target: tid, data });
         }
     }
     // A raw value arriving without its column (a Geo key, a path hop) may be any seen type, or untyped.
@@ -507,6 +546,7 @@ export class MultiProjectionGraphSource implements GraphSource {
                             targetCol: m.targetColumn,
                             attrCols: m.attributes?.length ? m.attributes : undefined,
                             filter: edgeFilter(q.filter, m.filter),
+                            measureCol: m.measureColumn || undefined,
                             value,
                         }),
                     ),

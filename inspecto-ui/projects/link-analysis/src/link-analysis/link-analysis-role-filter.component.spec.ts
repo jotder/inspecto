@@ -3,8 +3,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { LinkAnalysisRoleFilterComponent, RoleFilterCategory } from './link-analysis-role-filter.component';
-import { RoleFilters } from './role-filters';
+import {
+    LinkAnalysisRoleFilterComponent,
+    RoleFilterCategory,
+    RoleFilterSection,
+} from './link-analysis-role-filter.component';
+import { DatasetRoleFilters, RoleFilters } from './role-filters';
 
 @Component({
     standalone: true,
@@ -20,6 +24,38 @@ import { RoleFilters } from './role-filters';
 class HostComponent {
     readonly categories = signal<RoleFilterCategory[]>([{ name: 'channel', values: ['mobile', 'online'] }]);
     readonly applied = vi.fn<(f: RoleFilters) => void>();
+}
+
+/** A read over several Datasets (LA-COLUMN-ROLES-2 D-3 b): two Datasets sharing a Measure and a Category name. */
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [LinkAnalysisRoleFilterComponent],
+    template: `<inspecto-link-analysis-role-filter
+        [sections]="sections"
+        (apply)="applied($event)"
+        (applyByDataset)="appliedByDataset($event)"
+    />`,
+})
+class MultiHostComponent {
+    readonly sections: RoleFilterSection[] = [
+        {
+            key: 'calls',
+            title: 'Calls',
+            measures: ['amount'],
+            categories: [{ name: 'channel', values: ['app', 'web'] }],
+            times: ['at'],
+        },
+        {
+            key: 'pays',
+            title: 'Payments',
+            measures: ['amount'],
+            categories: [{ name: 'channel', values: ['agent'] }],
+            times: [],
+        },
+    ];
+    readonly applied = vi.fn<(f: RoleFilters) => void>();
+    readonly appliedByDataset = vi.fn<(f: DatasetRoleFilters) => void>();
 }
 
 function setup() {
@@ -80,5 +116,56 @@ describe('LinkAnalysisRoleFilterComponent (LA-COLUMN-ROLES-1 P3)', () => {
             categories: {},
             time: { column: '', from: '', to: '' },
         });
+    });
+
+    it('over several Datasets: one titled section per Dataset, distinct names, each applied under its Dataset (no violations)', async () => {
+        TestBed.configureTestingModule({ imports: [MultiHostComponent], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(MultiHostComponent);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const host = fixture.componentInstance;
+        const sections = Array.from(el.querySelectorAll<HTMLElement>('[data-testid^="role-filter-section-"]'));
+        expect(sections.map((s) => s.querySelector('h4')?.textContent?.trim())).toEqual(['Calls', 'Payments']);
+        // each section is a group named by its heading, and the same column in two sections has two names
+        const ids = sections.map((s) => s.getAttribute('aria-labelledby'));
+        expect(new Set(ids).size).toBe(2);
+        sections.forEach((s, i) => {
+            expect(s.getAttribute('role')).toBe('group');
+            expect(el.querySelector('#' + ids[i])?.textContent?.trim()).toBe(['Calls', 'Payments'][i]);
+        });
+        expect(
+            Array.from(el.querySelectorAll('[role="group"][aria-label]')).map((g) => g.getAttribute('aria-label')),
+        ).toEqual(['Calls: channel values', 'Payments: channel values']);
+        const names = Array.from(el.querySelectorAll('[data-testid="measure-amount"] button')).map((b) =>
+            b.getAttribute('aria-label'),
+        );
+        expect(names.filter((n) => n?.startsWith('Calls: amount from'))).toHaveLength(1);
+        expect(names.filter((n) => n?.startsWith('Payments: amount from'))).toHaveLength(1);
+        expect(el.querySelectorAll('[data-testid="time-window"]')).toHaveLength(1); // only Calls has a Time column
+
+        // a chip in the second section picks for that Dataset only
+        (sections[1].querySelector('[data-testid="category-channel"] button') as HTMLButtonElement).click();
+        const panel = fixture.debugElement.children[0].componentInstance as LinkAnalysisRoleFilterComponent;
+        panel.setMeasure('amount', 'min', 10, 'calls');
+        fixture.detectChanges();
+        expect(sections[1].querySelector('[data-testid="category-channel"] button')?.getAttribute('aria-pressed')).toBe(
+            'true',
+        );
+        expect(sections[0].querySelector('[aria-pressed="true"]')).toBeNull();
+        await expectNoA11yViolations(el);
+        (el.querySelector('[data-testid="role-filter-apply"]') as HTMLButtonElement).click();
+        expect(host.appliedByDataset).toHaveBeenCalledWith({
+            calls: {
+                measures: { amount: { min: '10', max: '' } },
+                categories: {},
+                time: { column: '', from: '', to: '' },
+            },
+            pays: { measures: {}, categories: { channel: ['agent'] }, time: { column: '', from: '', to: '' } },
+        });
+        expect(host.applied).not.toHaveBeenCalled();
+        // Clear empties every section
+        (el.querySelector('[data-testid="role-filter-clear"]') as HTMLButtonElement).click();
+        const empty = { measures: {}, categories: {}, time: { column: '', from: '', to: '' } };
+        expect(host.appliedByDataset).toHaveBeenLastCalledWith({ calls: empty, pays: empty });
     });
 });
