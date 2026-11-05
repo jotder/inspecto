@@ -82,19 +82,23 @@ export class OnboardService {
         ).pipe(tap(() => this.reads.clear()));
     }
 
-    /** **Add a file** to an imported Dataset and run it (`replace` is the default; `append` for a Stream only). */
+    /**
+     * **Add a file** to an imported Dataset and run it (`replace` is the default; `append` for a Stream only).
+     * `keepNewColumns` false leaves a later file's new columns out (LA-ARRIVAL-NEW-COLUMNS-1; kept by default).
+     */
     addFile(
         datasetId: string,
         file: File,
         mode: AddFileMode,
         onFollow?: (runId: string) => void,
+        keepNewColumns = true,
     ): Observable<ImportSummary> {
         return this.settle(
             this.http.post<ImportSummary | ImportRun>(
                 apiUrl(`/datasets/${encodeURIComponent(datasetId)}/files`),
                 file,
                 {
-                    params: toParams({ name: file.name, mode }),
+                    params: toParams({ name: file.name, mode, newColumns: keepNewColumns ? 'keep' : 'leave' }),
                     headers: { 'Content-Type': 'application/octet-stream' },
                     observe: 'response',
                 },

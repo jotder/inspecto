@@ -238,8 +238,9 @@ Dataset). A Dataset that Mappings read cannot be deleted until they are.
 
 The same file twice is refused ("already imported on …"), so its rows are never counted twice. To load it again, replace
 everything. A file must have the Dataset's columns, by name: a missing column, or one moved to another place, refuses
-the file and says which. A new column is accepted, but not kept (the Dataset reads the columns it was made with), and
-the result names it. A file another system put in the inbox is judged the same way by *Run now*; a refused one is set
+the file and says which. A new column is kept as a detail of the Dataset: the result says "New column fee: kept as a
+detail", and older files read it as empty. Untick *Keep new columns as details* before you add the file to leave it out
+instead. Once a column is kept, a later file without it is refused, naming the column and the file it was kept from. A file another system put in the inbox is judged the same way by *Run now*; a refused one is set
 aside in the Dataset's `refused` folder and listed in *Arrivals* with the reason.
 
 The **Data status** line also shows in Explore, under the Start box's Dataset and above the Rows table: *graph up to

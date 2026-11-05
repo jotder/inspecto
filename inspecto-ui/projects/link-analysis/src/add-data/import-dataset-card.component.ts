@@ -17,6 +17,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
 import { RouterLink } from '@angular/router';
@@ -67,6 +68,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         MatButtonModule,
         MatIconModule,
         MatRadioModule,
+        MatCheckboxModule,
         InspectoAlertComponent,
         ChipComponent,
         LockedActionComponent,
@@ -154,6 +156,11 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                         >
                     }
                 </mat-radio-group>
+            }
+            @if (!snapshot()) {
+                <mat-checkbox class="text-sm" [formControl]="keepNewColumns" data-testid="keep-new-columns"
+                    >Keep new columns as details</mat-checkbox
+                >
             }
             <div class="flex flex-wrap items-center gap-2">
                 <input
@@ -283,6 +290,8 @@ export class ImportDatasetCardComponent {
     /** ADD-DATA-FILTER-EDIT-1: the conditions Edit filter saved, until the host passes a fresh entry. */
     protected readonly savedFilter = signal<RowCondition[] | null>(null);
     protected readonly mode = new FormControl<AddFileMode>('replace', { nonNullable: true });
+    /** LA-ARRIVAL-NEW-COLUMNS-1 (operator 2026-11-06): a later file's new columns are kept unless unticked. */
+    protected readonly keepNewColumns = new FormControl(true, { nonNullable: true });
     protected readonly last = signal<ImportSummary | null>(null);
     protected readonly busy = signal(false);
     protected readonly following = signal(false);
@@ -357,7 +366,9 @@ export class ImportDatasetCardComponent {
             return;
         }
         const mode = this.dataset().kind === 'stream' ? this.mode.value : 'replace';
-        this.start(this.onboard.addFile(this.dataset().id, file, mode, () => this.following.set(true)));
+        this.start(
+            this.onboard.addFile(this.dataset().id, file, mode, () => this.following.set(true), this.keepNewColumns.value),
+        );
     }
 
     protected runNow(): void {

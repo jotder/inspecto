@@ -216,6 +216,53 @@ final class DatasetCompaction {
         }
     }
 
+    /**
+     * {@code LA-DATASET-COMPACT-2}: the arrivals' segments of the merged file, when {@code file} IS the map's merged file and
+     * unchanged since, so its row segments hold (null otherwise). <i>Replace the period</i> re-counts them as it rewrites the
+     * file ({@link #segmentsRewritten}), so <i>keep N arrivals</i> still counts every arrival after it.
+     */
+    static List<Segment> trustedSegments(Path base, Path file) {
+        Map<String, Object> map = readMap(base.resolve(MAP));
+        Path merged = mergedFile(map, base.resolve("database"));
+        if (merged == null || !merged.toAbsolutePath().normalize().equals(file.toAbsolutePath().normalize()) || !unchanged(map, merged))
+            return null;
+        List<Segment> s = segments(map);
+        return s.isEmpty() || s.stream().anyMatch(x -> x.rows() < 0) ? null : s;
+    }
+
+    /**
+     * Commit the map after the merged file {@code file} was rewritten with {@code next} (each arrival with a row left, its new
+     * segment, in order; an arrival left with none drops out, so the arrivals answer reads it as replaced - not as a
+     * retention removal). Answers the map's bytes before, for an undo ({@link #restoreMap}).
+     */
+    static byte[] segmentsRewritten(Path base, Path file, List<Segment> next) throws IOException {
+        Path mapFile = base.resolve(MAP);
+        byte[] before = Files.readAllBytes(mapFile);
+        Map<String, Object> map = new LinkedHashMap<>(readMap(mapFile));
+        List<Map<String, Object>> arrivals = new ArrayList<>();
+        for (Segment s : next) {
+            Map<String, Object> a = new LinkedHashMap<>();
+            a.put("file", s.file());
+            a.put("received", s.received());
+            a.put("firstRow", s.firstRow());
+            a.put("rows", s.rows());
+            a.put("coversFrom", s.coversFrom());
+            a.put("coversTo", s.coversTo());
+            if (!s.holds().isEmpty()) a.put("holds", s.holds());
+            arrivals.add(a);
+        }
+        map.put("arrivals", arrivals);
+        map.put("mergedBytes", Files.size(file));
+        map.put("mergedModified", Files.getLastModifiedTime(file).toMillis());
+        AtomicFiles.write(mapFile, JSON.writeValueAsBytes(map), ".cmp-");
+        return before;
+    }
+
+    /** Put back the map {@link #segmentsRewritten} replaced (the import failed after it). */
+    static void restoreMap(Path base, byte[] before) throws IOException {
+        AtomicFiles.write(base.resolve(MAP), before, ".cmp-");
+    }
+
     // ── compaction ─────────────────────────────────────────────────────────────────────────────────────────────
 
     /** What a compaction did: {@code COMPACTED}, {@code NOT_NEEDED} or {@code FAILED}, in words. */

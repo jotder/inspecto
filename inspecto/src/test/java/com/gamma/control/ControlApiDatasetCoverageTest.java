@@ -137,6 +137,16 @@ class ControlApiDatasetCoverageTest {
             assertFalse(r.body().contains("ACC-"), r.body());
             assertFalse(r.body().contains("Holder"), r.body());
 
+            // a later, wider file (LA-ARRIVAL-NEW-COLUMNS-1 keeps `fee`): both files are read together, by name, and
+            // ACC-0045 / ACC-0046 now appear too
+            String wider = "transfer_id,from_account,to_account,channel,amount,booked_at,currency,fee\n"
+                    + "T90001,ACC-0045,ACC-0046,mobile,12.50,2026-10-01 10:00:00,EUR,0.10\n";
+            JsonNode added = data(send(c, "POST", "/datasets/" + transfers + "/files?name=wider.csv&mode=append", wider), 200);
+            assertEquals("[\"fee\"]", added.get("keptColumns").toString(), added.toString());
+            JsonNode after = data(send(c, "GET", "/datasets/" + accounts + "/coverage", null), 200).get("datasets").get(0);
+            assertEquals(22, after.get("appear").asLong(), after.toString());
+            assertEquals(18, after.get("absent").asLong(), after.toString());
+
             // not a Reference: 200, no counts, the reason
             JsonNode notRef = data(send(c, "GET", "/datasets/" + transfers + "/coverage", null), 200);
             assertTrue(notRef.get("described").isNull());

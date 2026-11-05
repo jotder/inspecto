@@ -238,6 +238,39 @@ class ControlApiOnboardLinkAnalysisTest {
     }
 
     /**
+     * LA-ARRIVAL-NEW-COLUMNS-1: a later file's new column is kept; made a Category it rides the link index, which is then
+     * built over the older files (no such column: read as empty, by name) and the newer one together.
+     */
+    @Test
+    void aKeptNewColumnRidesTheIndexBuiltOverOlderAndNewerFiles(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("BUILT", data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200).at("/index/result").asText());
+            StringBuilder more = new StringBuilder();
+            String[] lines = transfers(50).replace("T0", "W0").split("\n");
+            for (int i = 0; i < lines.length; i++) more.append(lines[i]).append(',').append(i == 0 ? "region" : "R" + i % 4).append('\n');
+            JsonNode app = data(send(c, "POST", "/datasets/" + id + "/files?name=more.csv&mode=append",
+                    more.toString().getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("[\"region\"]", app.get("keptColumns").toString(), app.toString());
+            assertEquals("BUILT", app.at("/index/result").asText(), app.toString());
+
+            data(send(c, "PUT", "/datasets/" + id + "/columns/region", "{\"role\":\"dimension\"}".getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode now = data(send(c, "POST", "/datasets/" + id + "/run", new byte[0]), 200).get("index");
+            assertEquals("BUILT", now.get("result").asText(), now.toString());
+            assertEquals(250, now.get("edges").asLong(), "every row of both files: " + now);
+            boolean rides = false;
+            for (JsonNode ix : data(send(c, "GET", "/inv/index", null), 200).get("indexes"))
+                if (id.equals(ix.get("dataset").asText())) rides = ix.at("/mapping/attrCols").toString().contains("\"region\"");
+            assertTrue(rides, "the kept column is an attribute of the index");
+
+            JsonNode g = data(send(c, "POST", "/inv/projection", ("{\"dataset\":\"" + id
+                    + "\",\"sourceCol\":\"from_account\",\"targetCol\":\"to_account\",\"linkKindCol\":\"region\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertTrue(g.toString().contains("\"kind\":\"R1\""), "the newer file's values ride the links: " + g);
+        }
+    }
+
+    /**
      * Operator 2026-11-05: where Pipelines run on their own (Standard and up, {@code pipeline.automation}), a person's import
      * still builds the link index inside the run - the graph is fresh at once; a scheduled feed's files are the Job's.
      */
