@@ -31,7 +31,7 @@ timestamp: 2026-07-16T00:00:00Z
 > the pane's root element (the host gives the layout classes), and `AddDataHandoff` (a root service) carries the `File`,
 > taken once, because a file cannot travel in a URL. It lives in the console's `add-data` feature, not in
 > `app/inspecto`, because core may not import the Link Analysis library (eslint D-5).
-> *Open in editor* on the review screen (before Create, no Pipeline exists yet) is **moved to the Basic ELT plan
+> *Open in editor* on the review screen (before Create, no Pipeline exists yet) is **moved to `BASIC-ONBOARD-1`
 > (operator 2026-11-05)**: not built and not declined. Not built yet: the Getting started panel and console Space guide
 > (C4), and the console Dataset page (C5) — `docs/BACKLOG.md`.
 
