@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  * under {@code /inv}. The verb is <i>Onboard</i> (GLOSSARY); the screens call it <i>Add data</i>.
  *
  * <ul>
- *   <li>{@code POST /onboard/files?name=&kind=stream|reference[&delimiter=&header=&quote=]} - raw file body; stores it in
+ *   <li>{@code POST /onboard/files?name=&kind=stream|reference[&delimiter=&header=&quote=&decimal=&recordPath=]} - raw file body; stores it in
  *       the Space's draft area and answers the DRAFT ({@link OnboardDraft}, {@link EntityShapes}): every proposed choice is
  *       {@code {value, evidence, confidence}}. Nothing is written to config.</li>
  *   <li>{@code POST /onboard/files/{draftId}/commit} - the confirmed choices; writes the schema and an ordinary Pipeline
@@ -263,6 +263,7 @@ final class OnboardRoutes implements RouteModule {
             m.put("selector", c.selector());
             m.put("type", c.type());
             m.put("format", c.format());
+            if (c.decimal() != null) m.put("decimal", c.decimal());
             return m;
         }).toList());
         AtomicFiles.write(dir.resolve("draft.json"), JSON.writeValueAsBytes(record), ".draft-");
@@ -293,6 +294,21 @@ final class OnboardRoutes implements RouteModule {
             if (k.equals("header") && !v.equals("true") && !v.equals("false"))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "header must be true or false");
             o.put(k, v);
+        }
+        // C1: the decimal mark (every text format) and, for a JSON document, where its records are
+        String decimal = ApiContext.query(ex, "decimal");
+        if (decimal != null) {
+            if (type.equals("parquet"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'decimal' applies to text formats only; a Parquet file declares its numbers");
+            if (!decimal.equals(".") && !decimal.equals(","))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decimal must be '.' or ','");
+            o.put("decimal", decimal);
+        }
+        String recordPath = ApiContext.query(ex, "recordPath");
+        if (recordPath != null) {
+            if (!type.equals("json") && !type.equals("ndjson"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'recordPath' applies to JSON files only");
+            o.put("recordPath", recordPath.trim());
         }
         return o;
     }

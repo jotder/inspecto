@@ -51,7 +51,7 @@ final class OnboardDraft {
     private OnboardDraft() {}
 
     /** OF-2: below this many non-blank sampled values a choice is never {@code high}. */
-    static final int MIN_SAMPLE = 50;
+    static final int MIN_SAMPLE = 200;
     /** Rows read to propose types and Entity Types. */
     static final int SAMPLE_ROWS = 1000;
     /** Rows returned in the draft for the screen's preview. */
@@ -74,8 +74,11 @@ final class OnboardDraft {
         return m;
     }
 
-    /** One column as the commit will write it: output name, the header it came from, its selector and proposed type. */
-    record Col(String name, String header, String selector, String type, String format) {}
+    /**
+     * One column as the commit will write it: output name, the header it came from, its selector and proposed type;
+     * {@code decimal} is the decimal mark its text is read with when the number needs one (C1), else {@code null}.
+     */
+    record Col(String name, String header, String selector, String type, String format, String decimal) {}
 
     /** What was read: the draft's format and columns, the row count, and the sample. */
     record Analysis(Map<String, Object> format, List<Map<String, Object>> columns, List<Col> cols, long rows,
@@ -99,7 +102,15 @@ final class OnboardDraft {
         if (lower.endsWith(".xlsx") || lower.endsWith(".xlsm")) throw unsupported(name, "it is not a valid .xlsx workbook");
         if (lower.endsWith(".parquet")) throw unsupported(name, "it does not start with the Parquet magic bytes");
         if (lower.endsWith(".ndjson") || lower.endsWith(".jsonl")) return "ndjson";
-        if (lower.endsWith(".json")) return firstNonBlank(file) == '[' ? "json" : "ndjson";
+        if (lower.endsWith(".json")) {
+            if (firstNonBlank(file) == '[') return "json";
+            // C1: one document (an API export) holding its records in a list somewhere inside, else one object per line
+            if (!OnboardJson.singleDocument(file)) return "ndjson";
+            if (!OnboardJson.candidates(file).isEmpty()) return "json";
+            if (nonBlankLines(file) <= 1) return "ndjson";
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' is one JSON object with no list of "
+                    + "records in it; Add data reads a JSON array, one object per line (NDJSON), or a document holding a list of records");
+        }
         if (lower.endsWith(".tsv") || lower.endsWith(".tab")) return "tsv";
         if (lower.endsWith(".csv") || lower.endsWith(".txt")) return "csv";
         throw unsupported(name, "its type is not one Add data reads");
@@ -115,6 +126,14 @@ final class OnboardDraft {
             for (int i = 0, c; i < 4096 && (c = in.read()) != -1; i++) if (!Character.isWhitespace(c) && c != 0xEF && c != 0xBB && c != 0xBF) return c;
         }
         return -1;
+    }
+
+    private static int nonBlankLines(Path file) throws IOException {
+        int n = 0;
+        try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            for (String l; n < 2 && (l = r.readLine()) != null; ) if (!l.isBlank()) n++;
+        }
+        return n;
     }
 
     /** Whether this bundle can read Excel: the DuckDB {@code excel} extension loads (DT-8). Never installs from the network here. */
@@ -153,19 +172,19 @@ final class OnboardDraft {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(e);
         }
+        String decimal = overrides.get("decimal");
         try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir), "excel".equals(type) ? ExcelExtension::ensureLoaded : null)) {
-            return switch (type) {
+            Analysis a = switch (type) {
                 case "csv", "tsv" -> delimited(conn, file, name, type, overrides);
                 case "parquet" -> typed(conn, file, com.gamma.sql.SqlViews.parquetFile(file),
-                        choice("parquet", "the file starts with the Parquet magic bytes", true), true);
-                case "json" -> typed(conn, file, "read_json(" + SqlIdent.pathStr(file) + ", format = 'array')",
-                        choice("json", "the file is a JSON array", true), false);
-                case "ndjson" -> typed(conn, file, "read_json(" + SqlIdent.pathStr(file) + ", format = 'newline_delimited')",
-                        choice("ndjson", "the file holds one JSON object per line", true), false);
+                        choice("parquet", "the file starts with the Parquet magic bytes", true), true, null, null);
+                case "json", "ndjson" -> json(conn, file, name, type, overrides.get("recordPath"), decimal);
                 case "excel" -> typed(conn, file, "read_xlsx(" + SqlIdent.pathStr(file) + ", header = true, all_varchar = true)",
-                        choice("excel", "the file is an .xlsx workbook; its first sheet is read", true), false);
+                        choice("excel", "the file is an .xlsx workbook; its first sheet is read", true), false, null, decimal);
                 default -> throw new IllegalStateException(type);
             };
+            a.format().put("fileDate", fileDate(name));
+            return a;
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' could not be read as "
                     + type.toUpperCase(Locale.ROOT) + ": " + firstLine(e.getMessage()));
@@ -243,7 +262,7 @@ final class OnboardDraft {
 
         String relation = "read_csv(" + SqlIdent.pathStr(file) + ", delim = " + SqlIdent.sqlStr(delim) + ", quote = " + SqlIdent.sqlStr(quote)
                 + ", header = " + header + ", all_varchar = true, null_padding = true, ignore_errors = true)";
-        Analysis base = typed(conn, file, relation, null, false);
+        Analysis base = typed(conn, file, relation, null, false, null, overrides.get("decimal"));
 
         Map<String, Object> format = new LinkedHashMap<>();
         boolean extMatches = name.toLowerCase(Locale.ROOT).endsWith(finalType.equals("tsv") ? ".tsv" : ".csv")
@@ -258,12 +277,13 @@ final class OnboardDraft {
         format.put("quote", overrides.containsKey("quote") ? choice(quote, "you chose " + (quote.isEmpty() ? "no quote" : "'" + quote + "'"), true) : choice(quote, quote.isEmpty() ? "no field is quoted" : quotedFields == 0
                 ? "no sampled field is quoted; '" + quote + "' is honoured if one is" : quotedFields + " sampled fields are quoted with '" + quote + "'",
                 allLinesAgree && sniffed && lines >= MIN_SAMPLE));
+        format.put("decimalMark", base.format().get("decimalMark"));
         // header=false ⇒ DuckDB named the columns column0..; give them positional names the user can rename
         List<Col> cols = new ArrayList<>();
         for (int i = 0; i < base.cols().size(); i++) {
             Col c = base.cols().get(i);
             String n = header ? c.name() : "col_" + (i + 1);
-            cols.add(new Col(n, header ? c.header() : null, String.valueOf(i), c.type(), c.format()));
+            cols.add(new Col(n, header ? c.header() : null, String.valueOf(i), c.type(), c.format(), c.decimal()));
         }
         List<Map<String, Object>> columns = header ? base.columns() : renameColumns(base.columns(), cols);
         List<EntityShapes.Column> sampled = header ? base.sampled() : renameSampled(base.sampled(), cols);
@@ -343,14 +363,155 @@ final class OnboardDraft {
         return n;
     }
 
+    // ── JSON (C1: record path, fields to flatten) ───────────────────────────────────────────────────────────────
+
+    /**
+     * A JSON array, NDJSON, or one document holding its records in a list ({@code format.recordPath}); nested objects
+     * are spread into dotted columns ({@code format.flatten}), a list stays one column of JSON text. The same records
+     * relation the engine reads ({@code json.records_path} and dotted selectors in {@code DuckDbCsvIngester}).
+     */
+    private static Analysis json(Connection conn, Path file, String name, String type, String wantedPath, String decimal)
+            throws SQLException, IOException {
+        String p = SqlIdent.pathStr(file);
+        String records;
+        Map<String, Object> typeCh, pathCh;
+        if ("ndjson".equals(type)) {
+            if (wantedPath != null && !"$".equals(wantedPath))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an NDJSON file holds one record per line; it has no record path");
+            records = "read_json_objects(" + p + ", format = 'newline_delimited')";
+            typeCh = choice("ndjson", "the file holds one JSON object per line", true);
+            pathCh = choice("$", "each line is one record", true);
+        } else {
+            List<OnboardJson.Candidate> found = OnboardJson.candidates(file);
+            if (found.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' holds no list of records");
+            OnboardJson.Candidate pick = found.get(0);
+            if (wantedPath != null) {
+                String w = wantedPath.startsWith("$.") ? wantedPath.substring(2) : wantedPath;
+                pick = found.stream().filter(c -> c.path().equals(w)).findFirst().orElseThrow(() ->
+                        new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + wantedPath + "' is not a list of records in '" + name
+                                + "'; its lists of records are " + found.stream().map(c -> "'" + c.path() + "'").toList()));
+            }
+            if ("$".equals(pick.path())) {
+                records = "read_json_objects(" + p + ", format = 'array')";
+                typeCh = choice("json", "the file is a JSON array", true);
+                pathCh = choice("$", "the document is a list of " + pick.records() + " records", pick.records() >= MIN_SAMPLE);
+            } else {
+                if (Files.size(file) > OnboardJson.MAX_DOCUMENT)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' is one JSON document larger than "
+                            + (OnboardJson.MAX_DOCUMENT >> 20) + " MB; save its records as NDJSON (one object per line) and add that");
+                records = "(SELECT unnest(json_extract(json, " + SqlIdent.sqlStr(OnboardJson.jsonPath(OnboardJson.segments(pick.path())))
+                        + ")::JSON[]) AS json FROM read_json_objects(" + p + ", format = 'auto'))";
+                typeCh = choice("json", "the file is one JSON document holding its records in a list", true);
+                List<String> others = new ArrayList<>();
+                for (OnboardJson.Candidate c : found) if (c != pick) others.add("'" + c.path() + "'");
+                pathCh = choice(pick.path(), "'" + pick.path() + "' holds " + pick.records() + " records"
+                        + (wantedPath != null ? "; you chose it" : others.isEmpty() ? ", the document's only list of records"
+                        : "; the document also has " + String.join(", ", others)), wantedPath != null || (others.isEmpty() && pick.records() >= MIN_SAMPLE));
+            }
+        }
+        List<String> sampleJson = new ArrayList<>();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT CAST(json AS VARCHAR) FROM " + records + " LIMIT " + SAMPLE_ROWS)) {
+            while (rs.next()) if (rs.getString(1) != null) sampleJson.add(rs.getString(1));
+        }
+        OnboardJson.Flat flat = OnboardJson.flatten(sampleJson);
+        if (flat.columns().isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the file has no columns");
+        StringBuilder proj = new StringBuilder();
+        List<String> selectors = new ArrayList<>();
+        for (List<String> seg : flat.columns()) {
+            if (!proj.isEmpty()) proj.append(", ");
+            proj.append("json_extract_string(json, ").append(SqlIdent.sqlStr(OnboardJson.jsonPath(seg))).append(") AS ")
+                    .append(SqlIdent.q(String.join(".", seg)));
+            selectors.add(OnboardJson.selector(seg));
+        }
+        Analysis a = typed(conn, file, "(SELECT " + proj + " FROM " + records + ")", typeCh, false, selectors, decimal);
+        a.format().put("recordPath", pathCh);
+        a.format().put("flatten", flattenChoice(flat, sampleJson.size()));
+        return a;
+    }
+
+    private static Map<String, Object> flattenChoice(OnboardJson.Flat flat, int records) {
+        StringBuilder why = new StringBuilder();
+        if (flat.flattened().isEmpty()) why.append("no record holds a nested object");
+        else why.append(flat.flattened().size()).append(flat.flattened().size() == 1 ? " nested object is" : " nested objects are")
+                .append(" spread into columns (").append(String.join(", ", flat.flattened().subList(0, Math.min(3, flat.flattened().size()))))
+                .append(flat.flattened().size() > 3 ? ", …" : "").append(')');
+        if (!flat.lists().isEmpty()) why.append("; ").append(flat.lists().size() == 1 ? "a list stays" : flat.lists().size() + " lists stay")
+                .append(" one column of JSON text (").append(String.join(", ", flat.lists().subList(0, Math.min(3, flat.lists().size())))).append(')');
+        if (!flat.mixed().isEmpty()) why.append("; ").append(String.join(", ", flat.mixed()))
+                .append(" is an object in some records and a value in others, so it stays JSON text");
+        return choice(flat.flattened(), why.toString(), flat.mixed().isEmpty() && records >= MIN_SAMPLE);
+    }
+
+    // ── a date in the file name (C1) ─────────────────────────────────────────────────────────────────────────
+
+    /** A date pattern a file name may hold, the strptime format it is read with, and whether it is unambiguous. */
+    private record NameDate(Pattern pattern, String format, boolean clear) {}
+
+    private static final List<NameDate> NAME_DATES = List.of(
+            new NameDate(Pattern.compile("(?<!\\d)(\\d{4})([-_.])(\\d{2})\\2(\\d{2})(?!\\d)"), "%Y{s}%m{s}%d", true),
+            new NameDate(Pattern.compile("(?<!\\d)(\\d{2})([-_.])(\\d{2})\\2(\\d{4})(?!\\d)"), "%d{s}%m{s}%Y", false),
+            new NameDate(Pattern.compile("(?<!\\d)(\\d{4})(\\d{2})(\\d{2})(?!\\d)"), "%Y%m%d", false),
+            new NameDate(Pattern.compile("(?<!\\d)(\\d{4})([-_])(\\d{2})(?![\\d])"), "%Y{s}%m", true),
+            new NameDate(Pattern.compile("(?<!\\d)(\\d{4})(\\d{2})(?!\\d)"), "%Y%m", false));
+
+    /**
+     * {@code format.fileDate}: the date the file name holds ({@code value}, ISO {@code yyyy-MM-dd} or {@code yyyy-MM}),
+     * the strptime {@code format} it is written in, and the {@code name} the Dataset is proposed under without it
+     * ({@code sales_2026-10.csv} → {@code sales}; UC-2). A bare digit run or a day-first date is a {@code low} guess.
+     */
+    static Map<String, Object> fileDate(String fileName) {
+        String stem = fileName.replaceFirst("\\.[A-Za-z0-9]{1,8}$", "");
+        for (NameDate nd : NAME_DATES) {
+            java.util.regex.Matcher m = nd.pattern().matcher(stem);
+            while (m.find()) {
+                String iso = isoDate(nd, m);
+                if (iso == null) continue;
+                String sep = nd.format().contains("{s}") ? m.group(2) : "";
+                String fmt = nd.format().replace("{s}", sep);
+                String rest = (stem.substring(0, m.start()) + " " + stem.substring(m.end())).replaceAll("^[\\s_.-]+|[\\s_.-]+$", "")
+                        .replaceAll("[\\s_.-]*\\s[\\s_.-]*", "_").replace('.', '_');
+                Map<String, Object> ch = choice(iso, "the file name '" + fileName + "' holds " + m.group() + ", read as " + fmt, nd.clear());
+                ch.put("format", fmt);
+                ch.put("name", rest.isEmpty() ? null : rest);
+                return ch;
+            }
+        }
+        Map<String, Object> none = choice(null, "the file name holds no date", true);
+        none.put("format", null);
+        none.put("name", null);
+        return none;
+    }
+
+    private static String isoDate(NameDate nd, java.util.regex.Matcher m) {
+        try {
+            String f = nd.format();
+            if (f.startsWith("%d")) return java.time.LocalDate.of(year(m.group(4)), Integer.parseInt(m.group(3)), Integer.parseInt(m.group(1))).toString();
+            boolean sep = f.contains("{s}");
+            int y = year(m.group(1)), mo = Integer.parseInt(m.group(sep ? 3 : 2));
+            if (f.endsWith("%d")) return java.time.LocalDate.of(y, mo, Integer.parseInt(m.group(sep ? 4 : 3))).toString();
+            return java.time.YearMonth.of(y, mo).toString();
+        } catch (java.time.DateTimeException | IllegalArgumentException notADate) {
+            return null;
+        }
+    }
+
+    /** A plausible year (1990-2099) or an exception: a digit run like 123456 is not a date. */
+    private static int year(String s) {
+        int y = Integer.parseInt(s);
+        if (y < 1990 || y > 2099) throw new IllegalArgumentException(s);
+        return y;
+    }
+
     // ── any relation ─────────────────────────────────────────────────────────────────────────────────────────
 
     /**
      * Columns, types, rows and sample of {@code relation}. {@code declaredTypes}: the file carries its own types
-     * (Parquet), so they are taken, not voted.
+     * (Parquet), so they are taken, not voted. {@code selectors}: what the schema reads each column by, when that is not
+     * its header (a flattened JSON field's dotted path); {@code null} = the header. {@code decimal}: the decimal mark the
+     * user stated, or {@code null} to detect it (never for declared types).
      */
-    private static Analysis typed(Connection conn, Path file, String relation, Map<String, Object> typeChoice, boolean declaredTypes)
-            throws SQLException, IOException {
+    private static Analysis typed(Connection conn, Path file, String relation, Map<String, Object> typeChoice, boolean declaredTypes,
+                                  List<String> selectors, String decimal) throws SQLException, IOException {
         List<String> headers = new ArrayList<>();
         List<String> declared = new ArrayList<>();
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM " + relation)) {
@@ -397,32 +558,55 @@ final class OnboardDraft {
             }
         }
 
+        List<List<String>> valuesOf = new ArrayList<>();
+        for (String n : names) {
+            List<String> values = new ArrayList<>();
+            for (Map<String, Object> r : sample) {
+                Object v = r.get(n);
+                if (v != null && !String.valueOf(v).isBlank()) values.add(String.valueOf(v));
+            }
+            valuesOf.add(values);
+        }
+        Map<String, Object> format = new LinkedHashMap<>();
+        if (typeChoice != null) format.put("type", typeChoice);
+        Map<String, Object> markChoice = declaredTypes ? null : DecimalMark.choose(names, valuesOf, decimal);
+        if (markChoice != null) format.put("decimalMark", markChoice);
+        String mark = markChoice == null ? null : String.valueOf(markChoice.get("value"));
+
         List<Map<String, Object>> columns = new ArrayList<>();
         List<Col> cols = new ArrayList<>();
         List<EntityShapes.Column> sampled = new ArrayList<>();
         for (int i = 0; i < names.size(); i++) {
             String n = names.get(i);
             SchemaSuggest.Field f = voted.get(i);
-            List<String> values = new ArrayList<>();
-            for (Map<String, Object> r : sample) {
-                Object v = r.get(n);
-                if (v != null && !String.valueOf(v).isBlank()) values.add(String.valueOf(v));
+            List<String> values = valuesOf.get(i);
+            String type = f.type(), fmt = f.format(), colMark = null;
+            Map<String, Object> typeCh;
+            String numeric = mark == null ? null : DecimalMark.numberType(values, mark);
+            if (numeric != null) {
+                // C1: numbers written with grouping or a ',' decimal mark: read through the mark, never left as text
+                type = numeric;
+                fmt = null;
+                colMark = mark;
+                int k = values.size();
+                typeCh = choice(type, (k >= MIN_SAMPLE ? "all " : "only ") + k + " sampled values are numbers written with '" + mark
+                        + "' as the decimal mark (e.g. '" + clip(DecimalMark.example(values, mark)) + "')",
+                        k >= MIN_SAMPLE && "high".equals(markChoice.get("confidence")));
+                typeCh.put("format", null);
+            } else {
+                if ("TIMESTAMP".equals(type) && !declaredTypes) fmt = timestampFormat(conn, n);
+                typeCh = typeChoice(type, fmt, values, declaredTypes ? declared.get(i) : null);
             }
-            String fmt = f.format();
-            if ("TIMESTAMP".equals(f.type()) && !declaredTypes) fmt = timestampFormat(conn, n);
-            Map<String, Object> typeCh = typeChoice(f.type(), fmt, values, declaredTypes ? declared.get(i) : null);
             Map<String, Object> col = new LinkedHashMap<>();
             col.put("name", n);
             col.put("header", headers.get(i));
             col.put("type", typeCh);
             col.put("sample", values.stream().distinct().limit(3).toList());
             columns.add(col);
-            cols.add(new Col(n, headers.get(i), headers.get(i), f.type(), fmt));
-            sampled.add(new EntityShapes.Column(n, f.type(), values));
+            cols.add(new Col(n, headers.get(i), selectors == null ? headers.get(i) : selectors.get(i), type, fmt, colMark));
+            sampled.add(new EntityShapes.Column(n, type, values));
         }
         List<Map<String, Object>> preview = sample.subList(0, Math.min(PREVIEW_ROWS, sample.size()));
-        Map<String, Object> format = new LinkedHashMap<>();
-        if (typeChoice != null) format.put("type", typeChoice);
         return new Analysis(format, columns, cols, rows, new ArrayList<>(preview), sampled);
     }
 

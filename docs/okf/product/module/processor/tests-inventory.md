@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-369 test class(es): 136 unit, 233 real-HTTP control-plane, 0 IT.
+370 test class(es): 137 unit, 233 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -290,6 +290,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `NoScoringShipsInThePersonalBuildTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/NoScoringShipsInThePersonalBuildTest.java` | MODULE-REORG-1 P7 — the assertion that makes the Scoring gating REAL rather than claimed, on the DEFAULT (Basic) |
 | `NotificationContentMaskingTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/NotificationContentMaskingTest.java` | OBJECT-READ-MASKING-RESIDUALS-1 (2): notification content (in-app + every channel) is always masked. |
 | `ObjectReadMaskingTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ObjectReadMaskingTest.java` | TELCO-FRAUD-MASKED-DASHBOARD-1 (c): an Alert / Incident read masks the breached key for a caller who cannot reveal. |
+| `OnboardDraftFormatPropertyTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/OnboardDraftFormatPropertyTest.java` | {@code ONBOARDING-FIRST-RUN-1} C1, property tests over generated sample files: for many seeded random files, the |
 | `OpenApiPathsContractTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/OpenApiPathsContractTest.java` | OPENAPI-GEN-1 (decided 2026-09-10, built 2026-09-15): the OpenAPI document's <b>path + method skeleton is |
 | `PendingChangesKeyTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesKeyTest.java` | The Pending Change MAC key (`ASSURE-MAKER-CHECKER-1` round-3 findings 2 and 4): it lives OUTSIDE the config |
 | `PendingChangesLockTimeoutTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesLockTimeoutTest.java` | The Pending Change store lock waits a BOUNDED time: a held lock yields 503 STORE_BUSY, never a hang. |

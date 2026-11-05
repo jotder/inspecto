@@ -131,7 +131,7 @@ final class OnboardImport {
         LaLimitValues lim = OnboardRoutes.limits(writeRoot);
         String kind = String.valueOf(draft.get("kind"));
         String fileName = String.valueOf(((Map<String, Object>) draft.get("file")).get("name"));
-        String id = datasetId(body.get("name"), fileName);
+        String id = datasetId(body.get("name"), proposedStem(draft, fileName));
 
         // claim the id BEFORE the existence checks: a commit of the same id finishing between check and write would
         // otherwise be undone by this one's rollback
@@ -244,6 +244,17 @@ final class OnboardImport {
         throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's " + what + " was refused: " + sb);
     }
 
+    /**
+     * The name a Dataset takes when the commit states none: the file name without the date it holds
+     * ({@code format.fileDate.name}; {@code sales_2026-10.csv} → {@code sales}, C1), else the file name.
+     */
+    @SuppressWarnings("unchecked")
+    static String proposedStem(Map<String, Object> draft, String fileName) {
+        if (draft.get("format") instanceof Map<?, ?> f && f.get("fileDate") instanceof Map<?, ?> d && d.get("name") instanceof String n && !n.isBlank())
+            return n;
+        return fileName;
+    }
+
     /** {@code name} (or the file name's stem) as a Dataset and Pipeline id: lower-case letters, digits and {@code _}. */
     static String datasetId(Object requested, String fileName) {
         String raw = requested instanceof String s && !s.isBlank() ? s.trim() : fileName.replaceFirst("\\.[A-Za-z0-9]{1,8}$", "");
@@ -271,7 +282,7 @@ final class OnboardImport {
      * and is left out of the mapping, so it never reaches the Dataset.
      */
     record PlanCol(String source, String name, String selector, String type, String format, String classification, String entityType,
-                   boolean keep, String role) {}
+                   boolean keep, String role, String decimal) {}
 
     record Plan(List<PlanCol> cols, Map<String, Object> format, String primaryEntityType, Map<String, Object> link,
                 String identifying, String description, String frontendType) {
@@ -319,7 +330,7 @@ final class OnboardImport {
                 String n = String.valueOf(p.get("name"));
                 Map<String, Object> o = overrides.getOrDefault(n, Map.of());
                 if (Boolean.TRUE.equals(o.get("drop"))) {
-                    cols.add(new PlanCol(n, n, String.valueOf(p.get("selector")), "VARCHAR", null, null, null, false, null));
+                    cols.add(new PlanCol(n, n, String.valueOf(p.get("selector")), "VARCHAR", null, null, null, false, null, null));
                     continue;
                 }
                 String out = o.get("rename") instanceof String r && !r.isBlank() ? r.trim() : n;
@@ -352,8 +363,10 @@ final class OnboardImport {
                             : t.classifications().isEmpty() ? null : t.classifications().get(0);
                 }
                 boolean holds = typeId != null && !typeId.isEmpty();
+                // C1: a number written with a decimal mark the cast cannot read is read through that mark, while it stays a number
+                String decimal = p.get("decimal") instanceof String dm && (type.equals("DOUBLE") || type.equals("BIGINT")) ? dm : null;
                 cols.add(new PlanCol(n, out, String.valueOf(p.get("selector")), type, fmt == null || fmt.isBlank() ? null : fmt,
-                        classification, holds ? typeId : null, true, role(n, o, roleByColumn.get(n), holds, type)));
+                        classification, holds ? typeId : null, true, role(n, o, roleByColumn.get(n), holds, type), decimal));
                 renamed.put(n, out);
             }
             if (renamed.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every column was dropped");
@@ -443,7 +456,7 @@ final class OnboardImport {
                 String r = want.get(c.name());
                 Object stated = overrides.getOrDefault(c.source(), Map.of()).get("role");
                 out.add(c.keep() && r != null && stated == null && c.entityType() == null
-                        ? new PlanCol(c.source(), c.name(), c.selector(), c.type(), c.format(), c.classification(), c.entityType(), true, r)
+                        ? new PlanCol(c.source(), c.name(), c.selector(), c.type(), c.format(), c.classification(), c.entityType(), true, r, c.decimal())
                         : c);
             }
             return out;
@@ -488,14 +501,20 @@ final class OnboardImport {
                 Map<String, Object> f = new LinkedHashMap<>();
                 f.put("name", c.source());
                 f.put("selector", c.selector());
-                f.put("type", c.type());
+                f.put("type", c.decimal() != null ? "VARCHAR" : c.type());
                 if (c.format() != null) f.put("format", c.format());
                 fields.add(f);
                 if (!c.keep()) continue;
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("name", c.name());
                 m.put("from", c.source());
-                m.put("fn", "keep");
+                if (c.decimal() != null) {
+                    // the raw text is read through its decimal mark (a plain cast reads '1.234,50' as nothing)
+                    m.put("fn", "custom");
+                    m.put("args", Map.of("expression", DecimalMark.sql(SqlIdent.q(c.source()), c.type(), c.decimal())));
+                } else {
+                    m.put("fn", "keep");
+                }
                 mapping.add(m);
             }
             raw.put("fields", fields);
@@ -551,7 +570,10 @@ final class OnboardImport {
             switch (type) {
                 case "json" -> {
                     parsing.put("frontend", "json");
-                    parsing.put("json", Map.of("format", "array"));
+                    // C1: a document holding its records in a list names that list (the engine's json.records_path)
+                    Object path = formatValue("recordPath");
+                    parsing.put("json", path == null || "$".equals(path) ? Map.of("format", "array")
+                            : Map.of("format", "auto", "records_path", String.valueOf(path)));
                 }
                 case "ndjson" -> {
                     parsing.put("frontend", "json");
@@ -1332,7 +1354,7 @@ final class OnboardImport {
         } else {
             OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, Map.of());
             Set<String> headers = new LinkedHashSet<>();
-            for (OnboardDraft.Col c : a.cols()) headers.add(c.header());
+            for (OnboardDraft.Col c : a.cols()) headers.add(c.selector());   // a flattened JSON field by its dotted path
             for (String[] f : fields) {
                 read.add(f[0]);
                 if (!headers.contains(f[0])) problems.add("'" + f[0] + "' is missing");
