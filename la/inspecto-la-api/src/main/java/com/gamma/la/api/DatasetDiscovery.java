@@ -71,8 +71,12 @@ final class DatasetDiscovery {
         List<Measure> measures = measures(dataset, columns, t.roles());
         List<Held> held = held(dataset, columns, settings.effectiveEntityTypes());
         ValueMeasures.Fences fences = ValueMeasures.Fences.of(writeRoot);
-        String key = sha256(writeRoot + "|" + t.datasetId() + "|" + dataset + "|" + t.roles() + "|" + fences + "|" + held);
-        String stamp = stamp(api, writeRoot, t.datasetId(), dataset);
+        // the masking mode is in the key: a cached Entity Type's `masked` must follow a change of the Space's mode
+        String key = sha256(writeRoot + "|" + t.datasetId() + "|" + dataset + "|" + t.roles() + "|" + fences + "|" + held + "|"
+                + settings.effectiveMaskingMode());
+        String files = stamp(api, writeRoot, t.datasetId(), dataset);
+        // ... and the link index published for it is in the stamp: an index built (or rebuilt) since, answers the busiest
+        String stamp = files == null ? null : files + "|" + indexStamp(writeRoot, t.datasetId());
         Map<String, Object> hit = stamp == null ? null : Cache.get(key, stamp);
         if (hit != null) {
             Map<String, Object> out = new LinkedHashMap<>(hit);
@@ -99,6 +103,7 @@ final class DatasetDiscovery {
             passFailed = e;
         }
         out.put("rows", pass == null ? null : ColumnProfile.num(pass.get("n")));
+        if (pass == null) out.put("rowsReason", EntityProfiles.reason(passFailed));   // never a bare null for a count not taken
         out.put("entityTypes", entityTypes(t, held, settings.effectiveMaskingMode(), policy));
         out.put("period", period(t, pass, passFailed));
         out.put("linkKinds", linkKinds(t, policy));
@@ -107,7 +112,8 @@ final class DatasetDiscovery {
         busiest.put("toType", typeHolding(held, t.roles().to()));
         out.put("busiest", busiest);
         out.put("measures", measureTotals(measures, pass, passFailed));
-        if (stamp != null && !failedAnywhere(out)) Cache.put(key, stamp, out);
+        // a read that failed or ran out of time is answered but never kept: the next read tries again
+        if (stamp != null && passFailed == null && !failedAnywhere(out)) Cache.put(key, stamp, out);
         return out;
     }
 
@@ -219,8 +225,8 @@ final class DatasetDiscovery {
             r.put("column", measures.get(i).column());
             r.put("unit", measures.get(i).unit());
             r.put("rows", ColumnProfile.num(pass.get("c" + i)));
-            r.put("sum", number(pass.get("s" + i)));
-            r.put("median", number(pass.get("m" + i)));
+            r.put("sum", EntityProfiles.number(pass.get("s" + i)));
+            r.put("median", EntityProfiles.number(pass.get("m" + i)));
             items.add(r);
         }
         m.put("items", items);
@@ -324,9 +330,12 @@ final class DatasetDiscovery {
         } catch (Exception e) {
             m.put("from", List.of());
             m.put("to", List.of());
-            if (EntityProfiles.isTimeout(String.valueOf(e.getMessage())) || e instanceof java.sql.SQLTimeoutException)
-                return notAssessed(m, "ranking every entity took longer than this Space allows (" + fences.timeoutSeconds()
+            if (EntityProfiles.isTimeout(String.valueOf(e.getMessage())) || e instanceof java.sql.SQLTimeoutException) {
+                notAssessed(m, "ranking every entity took longer than this Space allows (" + fences.timeoutSeconds()
                         + " s); a link index of this Dataset answers it quickly");
+                m.put("retryable", true);   // a timeout is never cached: an index built next answers the following read
+                return m;
+            }
             return failed(m, e);
         }
         m.put("source", source == null ? Map.of("kind", "dataset") : source);
@@ -384,12 +393,6 @@ final class DatasetDiscovery {
         return m;
     }
 
-    /** A DOUBLE aggregate as a JSON number (null when no row held one), at most 6 decimals. */
-    static Double number(Object v) {
-        if (!(v instanceof Number n) || !Double.isFinite(n.doubleValue())) return null;
-        return java.math.BigDecimal.valueOf(n.doubleValue()).setScale(6, java.math.RoundingMode.HALF_UP).doubleValue();
-    }
-
     private static boolean failedAnywhere(Map<String, Object> out) {
         for (Object v : out.values()) if (v instanceof Map<?, ?> s && Boolean.TRUE.equals(s.get("retryable"))) return true;
         return false;
@@ -400,6 +403,20 @@ final class DatasetDiscovery {
         InputFingerprint fp = InputFingerprintCache.get(writeRoot, datasetId, "discover",
                 () -> DatasetProviders.require().inputFingerprint(dataset, api.dataRoot(), writeRoot));
         return fp == null || fp.value() == null || !fp.value().startsWith(InputFingerprint.FILES) ? null : fp.value();
+    }
+
+    /** The versions the link index currently publishes for the Dataset (one per mapping), and whether indexes are on. */
+    private static String indexStamp(Path writeRoot, String datasetId) {
+        StringBuilder sb = new StringBuilder(String.valueOf(LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex().enabledInForce()));
+        Path root = writeRoot.resolve(IndexRoutes.INDEX_DIR);
+        try {
+            for (String hash : com.gamma.la.storage.IndexStore.mappingHashes(root, datasetId))
+                sb.append('|').append(hash).append('=').append(new com.gamma.la.storage.IndexStore(root, datasetId, hash).current()
+                        .map(p -> p.getFileName().toString()).orElse("-"));
+        } catch (IllegalArgumentException cannotNameADirectory) {
+            sb.append("|none");
+        }
+        return sb.toString();
     }
 
     private static String sha256(String s) {

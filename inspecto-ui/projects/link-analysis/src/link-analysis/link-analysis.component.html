@@ -1520,6 +1520,7 @@
                                 [notice]="startNotice()"
                                 [busy]="starting()"
                                 [addData]="addDataOffered"
+                                (datasetPicked)="pickedDataset.set($event)"
                                 (start)="startFrom($event)"
                                 (listsWanted)="refreshEntityLists()"
                                 (openAddData)="openAddData()"
@@ -1531,6 +1532,16 @@
                                 [initialDataset]="startDataset()"
                                 (draw)="drawPreset($event)"
                             ></inspecto-link-analysis-presets>
+                            <!-- LA-BASIC-DISCOVER-1: what is in the Dataset before drawing; Draw these starts from the busiest -->
+                            @if (aboutDataset(); as about) {
+                                <inspecto-link-analysis-dataset-discover
+                                    class="block w-full max-w-3xl p-4"
+                                    [dataset]="about"
+                                    [title]="aboutTitle()"
+                                    [level]="2"
+                                    (draw)="drawPreset($event)"
+                                ></inspecto-link-analysis-dataset-discover>
+                            }
                         }
                     </div>
                 }

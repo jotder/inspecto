@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+    untracked,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
@@ -31,7 +41,11 @@ import type { PresetDraw } from './link-analysis-presets.component';
     imports: [MatButtonModule, InspectoAlertComponent, InspectoSkeletonComponent, DataTableComponent],
     host: { class: 'block' },
     template: `
-        <section class="flex flex-col gap-2 text-sm" [attr.aria-labelledby]="titleId()" data-testid="la-discover">
+        <section
+            class="flex flex-col gap-2 text-sm"
+            [attr.aria-label]="title() + ': ' + dataset()"
+            data-testid="la-discover"
+        >
             <div class="flex flex-wrap items-center gap-2">
                 <p role="heading" [attr.aria-level]="level()" [id]="titleId()" class="m-0 text-base font-semibold">
                     {{ title() }}
@@ -184,6 +198,14 @@ export class LinkAnalysisDatasetDiscoverComponent {
     protected readonly measureLine = discoverMeasureLine;
 
     private loading?: Subscription;
+
+    constructor() {
+        // another Dataset: the answer on screen (and what Draw these would send) belonged to the old one
+        effect(() => {
+            this.dataset();
+            untracked(() => this.hide());
+        });
+    }
 
     load(): void {
         this.loading?.unsubscribe();

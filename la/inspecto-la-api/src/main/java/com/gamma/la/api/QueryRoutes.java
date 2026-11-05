@@ -88,7 +88,7 @@ public final class QueryRoutes implements RouteModule {
             Map<String, Object> c = new LinkedHashMap<>();
             for (PresetQueries.Column col : columns) {
                 Object v = row.get(col.id());
-                c.put(col.id(), col.entity() ? mask.out(v) : "total".equals(col.id()) ? DatasetDiscovery.number(v) : v);
+                c.put(col.id(), col.entity() ? mask.out(v) : "total".equals(col.id()) ? EntityProfiles.number(v) : v);
             }
             shown.add(c);
         }

@@ -5119,6 +5119,24 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('LA-BASIC-DISCOVER-1: About this Dataset sits under Basic\'s Start box and follows the Dataset picked there', async () => {
+        const PAYMENTS: Dataset = { ...TRANSFERS, id: 'payments', name: 'Payments', sourceName: 'payments' };
+        const { fixture } = create({ features: BASIC, datasets: [TRANSFERS, PAYMENTS], queryParams: { dataset: 'transfers' } });
+        await settle(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        expect(c.aboutDataset()).toBe('transfers');
+        expect(el.querySelector('[data-testid="la-discover"]')?.textContent).toContain('About Transfers');
+        const box = fixture.debugElement.query((d) => d.name === 'inspecto-link-analysis-start-box');
+        (box.componentInstance as LinkAnalysisStartBoxComponent).datasetPicked.emit('payments');
+        fixture.detectChanges();
+        expect(c.aboutDataset()).toBe('payments');
+        expect(el.querySelector('[data-testid="la-discover"]')?.textContent).toContain('About Payments');
+        c.pickedDataset.set('gone');   // a pick no longer offered falls back to the page's Dataset
+        expect(c.aboutDataset()).toBe('transfers');
+    });
+
     it('?dataset= naming a Dataset added since the list was read (the page is kept alive) reads the list again and preselects it', async () => {
         const { fixture } = create({ features: BASIC, datasets: [DS], queryParams: { dataset: 'transfers' } });
         const list = vi
@@ -6637,6 +6655,13 @@ describe('LinkAnalysisComponent - the node dialog Entity page link follows /boot
         c.boundProfile.set('telecom'); // a pack whose investigate.entityType is msisdn
         expect(pageOf('b')).toBe('/s1/entities/device/DEV-99'); // the node's own type wins over the pack default
         expect(pageOf('c')).toBe('/s1/entities/msisdn/C-7');
+
+        // LA-ENTITY-SUMMARY-1: the node dialog's Summary reads the Dataset the graph was drawn from
+        (c as unknown as { openNodeDetail: (id: string) => void }).openNodeDetail('a');
+        type Ctx = { extension: { inputs: { ctx: { summaryDataset: unknown } } } };
+        const ctx = (open.mock.lastCall as unknown as [unknown, { data: Ctx }])[1].data.extension.inputs.ctx;
+        expect(ctx.summaryDataset).toBe(c.traversalTargets()[0]?.dataset);
+        expect(ctx.summaryDataset).toBeTruthy();
     });
 });
 

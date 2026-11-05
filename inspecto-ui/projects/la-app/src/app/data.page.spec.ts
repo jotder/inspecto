@@ -111,6 +111,8 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         const { el } = create();
         expect(q(el, 'data-transfers')).not.toBeNull();
         expect(q(el, 'columns')!.textContent).toContain('from_account');
+        // LA-BASIC-DISCOVER-1: each Dataset can be discovered here, read only when asked
+        expect(q(el, 'discover-transfers')?.querySelector('[data-testid="la-discover-run"]')).not.toBeNull();
         const maps = q(el, 'mappings')!.textContent ?? '';
         expect(maps).toContain('from_account → to_account');
         expect(q(el, 'mapping-by_channel')!.textContent).toContain('from_account → channel');

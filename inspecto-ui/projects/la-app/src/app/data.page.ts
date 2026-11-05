@@ -16,6 +16,7 @@ import { ColumnChange, DatasetColumnsService } from '@inspecto/link-analysis/api
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { EntityFamily, RecordTypeGuide, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
+import { LinkAnalysisDatasetDiscoverComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-dataset-discover.component';
 import { ADD_DATA_ROUTE } from './first-run';
 import {
     ColumnRole,
@@ -57,6 +58,7 @@ import {
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         ImportDatasetCardComponent,
+        LinkAnalysisDatasetDiscoverComponent,
     ],
     template: `
         <div class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-6">
@@ -175,6 +177,16 @@ import {
                                 }
                             </div>
                         </div>
+
+                        <!-- LA-BASIC-DISCOVER-1: what is in it - entities, busiest, kinds, period, Measure totals -->
+                        <inspecto-link-analysis-dataset-discover
+                            class="bg-card rounded-2xl border p-4"
+                            [dataset]="d.id"
+                            title="Discover"
+                            [level]="3"
+                            drawWhyNot="Draw from Explore: its Start box has the same Discover."
+                            [attr.data-testid]="'discover-' + d.id"
+                        ></inspecto-link-analysis-dataset-discover>
 
                         <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="mappings">
                             <div class="flex flex-wrap items-center gap-2">

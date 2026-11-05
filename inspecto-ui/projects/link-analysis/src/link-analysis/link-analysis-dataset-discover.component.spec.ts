@@ -209,4 +209,16 @@ describe('LinkAnalysisDatasetDiscoverComponent', () => {
         expect(host.drawn).toEqual([]);
         expect(el.textContent).toContain('Pick a Dataset you can view');
     });
+    it("drops the answer when its Dataset changes, so Draw these never sends another Dataset's entities", () => {
+        const { fixture, el, c, host } = setup();
+        c.load();
+        fixture.detectChanges();
+        expect(c.result()).not.toBeNull();
+        host.dataset.set('other');
+        fixture.detectChanges();
+        expect(c.result()).toBeNull();
+        expect(el.querySelector('[data-testid="la-discover-run"]')).not.toBeNull();
+        c.drawThese();
+        expect(host.drawn).toEqual([]);
+    });
 });

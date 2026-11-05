@@ -282,6 +282,85 @@ class ControlApiDatasetDiscoverTest {
     }
 
     @Test
+    void aFailedOrTimedOutReadIsNeverCachedAndAMaskingChangeOrANewIndexRecomputes(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        java.util.concurrent.atomic.AtomicLong tick = new java.util.concurrent.atomic.AtomicLong();
+        InputFingerprintCache.forTest(() -> tick.addAndGet(60_000L), 30_000L);
+        String store = "discover_" + System.nanoTime();
+        Path dir = Path.of("database").resolve(store);
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "f_ds", Map.of("physicalRef", store,
+                    "columns", List.of(Map.of("name", "s", "classification", "MSISDN"), Map.of("name", "t", "classification", "MSISDN"))));
+            plant(dir.resolve("p1.parquet"), "('" + A + "','" + B + "'),('" + A + "','" + C + "')", 1_700_000_000_000L);
+
+            ControlApiEntityProfileScaleTest.Faulty f = new ControlApiEntityProfileScaleTest.Faulty();
+            f.error = "INTERRUPT Error: Interrupted!";
+            f.fail = sql -> sql.contains("COUNT(DISTINCT");   // the busiest, over the Dataset
+            com.gamma.la.core.DatasetProviders.forTest(f);
+            try {
+                JsonNode timedOut = discover(c, "f_ds", true);
+                assertFalse(timedOut.at("/busiest/assessed").asBoolean(), timedOut.toString());
+                f.fail = sql -> sql.startsWith("SELECT COUNT(*) AS n");   // the one pass: rows, period, Measures
+                f.error = "IO Error: the file went away";
+                JsonNode failed = discover(c, "f_ds", true);
+                assertFalse(failed.get("cached").asBoolean(), "a timed-out read was not kept: " + failed);
+                assertTrue(failed.get("rows").isNull(), failed.toString());
+                assertFalse(failed.get("rowsReason").asText().isBlank(), "an unmeasured count says why: " + failed);
+            } finally {
+                com.gamma.la.core.DatasetProviders.forTest(null);
+            }
+            JsonNode ok = discover(c, "f_ds", true);
+            assertFalse(ok.get("cached").asBoolean(), "a failed read was not kept either: " + ok);
+            assertEquals(2, ok.get("rows").asLong());
+            assertTrue(discover(c, "f_ds", true).get("cached").asBoolean(), "a whole answer is kept");
+            assertFalse(ok.at("/entityTypes/items/0/masked").asBoolean());
+
+            // the Space starts masking everything: the cached answer is not reused
+            Files.writeString(root.resolve("link-analysis.toon"), "domain_profile: mobile-money\nmasking_mode: all\n");
+            JsonNode masked = discover(c, "f_ds", false);
+            assertFalse(masked.get("cached").asBoolean(), masked.toString());
+            assertTrue(masked.at("/entityTypes/items/0/masked").asBoolean(), masked.toString());
+
+            // a link index built since answers the busiest at once, not after the next arrival
+            Files.writeString(root.resolve("link-analysis.toon"), "domain_profile: mobile-money\nmasking_mode: none\n");
+            assertEquals("dataset", discover(c, "f_ds", true).at("/busiest/source/kind").asText());
+            buildIndex(c, "f_ds", "s", "t");
+            JsonNode indexed = discover(c, "f_ds", true);
+            assertFalse(indexed.get("cached").asBoolean(), indexed.toString());
+            assertEquals("index", indexed.at("/busiest/source/kind").asText(), indexed.toString());
+        } finally {
+            InputFingerprintCache.forTest(null, 0);
+            rmTree(dir);
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
+    private void buildIndex(Ctx c, String dataset, String from, String to) throws Exception {
+        Authenticators.forTest(ex -> "Bearer builder".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("analyst-1", Set.of("canBuildLinkIndex"))) : Optional.empty());
+        try {
+            HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/inv/index/builds"))
+                    .header("Content-Type", "application/json").header("Authorization", "Bearer builder")
+                    .POST(BodyPublishers.ofString("{\"dataset\":\"" + dataset + "\",\"sourceCol\":\"" + from + "\",\"targetCol\":\"" + to + "\"}"))
+                    .build(), BodyHandlers.ofString());
+            assertEquals(202, r.statusCode(), r.body());
+            String id = JSON.readTree(r.body()).at("/data/buildId").asText();
+            long end = System.nanoTime() + 30_000_000_000L;
+            String status;
+            do {
+                status = JSON.readTree(client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                        + "/api/v1/inv/index/builds/" + id)).header("Authorization", "Bearer builder").GET().build(),
+                        BodyHandlers.ofString()).body()).at("/data/status").asText();
+                if (System.nanoTime() > end) throw new AssertionError("build " + id + " is still " + status);
+                Thread.sleep(10);
+            } while (!status.equals("COMPLETED") && !status.equals("FAILED") && !status.equals("CANCELLED"));
+            assertEquals("COMPLETED", status);
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    @Test
     void refusesInGateOrderAndAuditsEveryRead(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "masking_mode: none\n")) {
             assertEquals(404, get(c, "/inv/datasets/nope/discover").statusCode());

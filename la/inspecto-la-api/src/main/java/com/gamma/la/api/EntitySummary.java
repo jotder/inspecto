@@ -106,10 +106,10 @@ final class EntitySummary {
             measure = new LinkedHashMap<>();
             measure.put("column", r.amount());
             measure.put("unit", measureUnit);
-            Double total = head == null ? null : DatasetDiscovery.number(head.get("a"));
-            Double sent = head == null ? null : DatasetDiscovery.number(head.get("a_out"));
+            Double total = head == null ? null : EntityProfiles.number(head.get("a"));
+            Double sent = head == null ? null : EntityProfiles.number(head.get("a_out"));
             measure.put("out", sent);
-            measure.put("in", total == null ? null : DatasetDiscovery.number(total - (sent == null ? 0 : sent)));
+            measure.put("in", total == null ? null : EntityProfiles.number(total - (sent == null ? 0 : sent)));
         }
         m.put("measure", measure);
         m.put("counterpartsByLinks", byLinks);
@@ -127,7 +127,7 @@ final class EntitySummary {
         c.put("links", n);
         c.put("out", out);
         c.put("in", n - out);
-        if (withAmount) c.put("amount", DatasetDiscovery.number(row.get("a")));
+        if (withAmount) c.put("amount", EntityProfiles.number(row.get("a")));
         return c;
     }
 }

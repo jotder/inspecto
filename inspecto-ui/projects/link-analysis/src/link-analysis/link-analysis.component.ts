@@ -293,6 +293,7 @@ import {
 } from './link-analysis.service';
 import { FoundAction, LinkAnalysisDiscoverComponent } from './link-analysis-discover.component';
 import { LinkAnalysisPresetsComponent, PresetDraw } from './link-analysis-presets.component';
+import { LinkAnalysisDatasetDiscoverComponent } from './link-analysis-dataset-discover.component';
 import { AddToListData, AddToListResult, LinkAnalysisAddToListDialog } from './link-analysis-add-to-list.dialog';
 import { LinkAnalysisTemporalFindingsComponent, TemporalRunRequest } from './link-analysis-temporal-findings.component';
 import { LinkAnalysisTimelinePlaybackComponent } from './link-analysis-timeline-playback.component';
@@ -506,6 +507,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
         LinkAnalysisPresetsComponent,
+        LinkAnalysisDatasetDiscoverComponent,
         LinkAnalysisGlossaryComponent,
         LinkAnalysisDisplayRulesComponent,
         LinkAnalysisSettingsComponent,
@@ -2095,6 +2097,20 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly entityLists = signal<EntityListSummary[]>([]);
     /** The Dataset the Start box preselects (`?dataset=`); null = its first. */
     readonly startDataset = signal<string | null>(null);
+    /** LA-BASIC-DISCOVER-1: the Dataset the analyst last picked in Basic's Start box. */
+    readonly pickedDataset = signal<string | null>(null);
+    /** The Dataset *About this Dataset* reads: the one picked in the Start box, else the page's, else the first that can start a graph. */
+    readonly aboutDataset = computed(() => {
+        const ids = this.startCatalogue().datasets.map((d) => d.id);
+        const want = [this.pickedDataset(), this.startDataset()].find((d) => !!d && ids.includes(d));
+        return want ?? ids[0] ?? null;
+    });
+    /** Its heading, naming the Dataset. */
+    readonly aboutTitle = computed(() => {
+        const id = this.aboutDataset();
+        const name = this.startCatalogue().datasets.find((d) => d.id === id)?.name ?? id;
+        return `About ${name}`;
+    });
     /** What the last start did (drawn, held, not found) - shown under the Start box and the graph's status line. */
     readonly startNotice = signal<StartNotice | null>(null);
     readonly starting = signal(false);
@@ -4457,6 +4473,8 @@ Its prior copies stay in its version history.`,
             onListChanged: () => this.investigation.entityListsChanged.update((n) => n + 1),
             canHide: !this.investigation.active(),
             entityPage: this.entityPageOf(entityType, key),
+            // LA-ENTITY-SUMMARY-1: the Summary reads the links of the Dataset the graph was drawn from
+            summaryDataset: this.traversalTargets()[0]?.dataset ?? null,
         };
         this.dialog
             .open(ElementDetailDialog, {
