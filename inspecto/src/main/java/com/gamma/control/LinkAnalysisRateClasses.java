@@ -68,6 +68,7 @@ final class LinkAnalysisRateClasses {
             {"GET", "/inv/schema/relationships"},
             {"GET", "/inv/value-measures"},
             {"GET", "/inv/presets"},                       // LA-PRESET-QUERIES-1: a zero-row probe of one Dataset's columns
+            {"GET", "/inv/datasets/([^/]+)/shapes"},       // ENTITY-TYPE-RECORD-ROLES-1: marks over at most 200 rows of one Dataset
             {"POST", "/inv/snapshots"},
             {"GET", "/inv/uploads"},                       // LA-I2-GAPS-RESIDUALS-1: the upload-enabled Collectors, from config
             {"DELETE", "/inv/uploads/([^/]+)/([^/]+)"},    // LA-I2-GAPS-RESIDUALS-1: removes one pending file and its record
