@@ -8,8 +8,15 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
-import { InvService, PresetList, PresetQuery, PresetRunResult } from '@inspecto/link-analysis/api/inv.service';
+import { InvService, PresetList, PresetQuery, PresetRunResult, SavedPresetQuery } from '@inspecto/link-analysis/api/inv.service';
+import { LinkAnalysisQueryBuilderComponent } from './link-analysis-query-builder.component';
 import { PRESET_PATTERNS, presetColumns, presetEntityValues, presetParamValues, presetSourceLine } from './presets';
+
+/** A saved preset's value in the Question picker (pack preset ids never carry it). */
+const SAVED = 'saved:';
+
+/** An answer the panel shows: a preset run's, or a saved builder question's (which has no index source). */
+type PanelAnswer = Pick<PresetRunResult, 'columns' | 'rows' | 'count' | 'truncated'> & { source?: PresetRunResult['source'] };
 
 /** What *Draw these* asks the host to start: the Dataset, the entities, and what they are in words. */
 export interface PresetDraw {
@@ -34,6 +41,7 @@ export interface PresetDraw {
         InspectoOptionPickerComponent,
         PenFieldComponent,
         DataTableComponent,
+        LinkAnalysisQueryBuilderComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -67,6 +75,12 @@ export interface PresetDraw {
                         Name them on the Data page (a Mapping), then come back.
                     </p>
                 }
+            }
+            @if (chosenSaved(); as s) {
+                <p class="text-secondary m-0 text-xs" data-testid="la-presets-saved-description">{{ s.description }}</p>
+                <button mat-flat-button color="primary" type="button" class="self-start" [disabled]="busy()" (click)="run()" data-testid="la-presets-run-saved">
+                    Ask
+                </button>
             }
             @if (chosen(); as p) {
                 <p class="text-secondary m-0 text-xs">{{ p.description }}</p>
@@ -120,6 +134,20 @@ export interface PresetDraw {
                     <p id="la-presets-draw-why" class="text-secondary m-0 text-xs">{{ drawWhyNot() }}</p>
                 }
             }
+            @if (list(); as l) {
+              @if (l.roles.from && l.roles.to) {
+                <!-- LA-QUERY-BUILDER-1: a question of one's own over the same Dataset; Save as preset adds it to the list above -->
+                <inspecto-link-analysis-query-builder
+                    class="mt-2"
+                    [dataset]="dataset.value"
+                    [list]="l"
+                    [drawWhyNot]="drawWhyNot()"
+                    [takenIds]="savedIds()"
+                    (draw)="draw.emit($event)"
+                    (saved)="load(dataset.value)"
+                ></inspecto-link-analysis-query-builder>
+              }
+            }
         </section>
     `,
 })
@@ -144,13 +172,24 @@ export class LinkAnalysisPresetsComponent {
     readonly loadError = signal('');
     readonly runError = signal('');
     readonly busy = signal(false);
-    readonly result = signal<PresetRunResult | null>(null);
+    readonly result = signal<PanelAnswer | null>(null);
 
     private readonly presetId = toSignal(this.preset.valueChanges, { initialValue: null });
     readonly datasetOptions = computed<PickerOption[]>(() => this.datasets().map((d) => ({ value: d.id, label: d.name })));
-    readonly presetOptions = computed<PickerOption[]>(() =>
-        (this.list()?.presets ?? []).map((p) => ({ value: p.id, label: p.label, description: p.description })),
-    );
+    readonly presetOptions = computed<PickerOption[]>(() => [
+        ...(this.list()?.presets ?? []).map((p) => ({ value: p.id, label: p.label, description: p.description })),
+        // LA-QUERY-BUILDER-1: this Space's presets saved from the builder that this Dataset can answer
+        ...(this.list()?.saved ?? []).map((s) => ({
+            value: SAVED + s.id,
+            label: s.label + ' (saved here)',
+            description: s.description,
+        })),
+    ]);
+    readonly chosenSaved = computed<SavedPresetQuery | null>(() => {
+        const id = this.presetId();
+        return id?.startsWith(SAVED) ? (this.list()?.saved?.find((s) => SAVED + s.id === id) ?? null) : null;
+    });
+    readonly savedIds = computed(() => (this.list()?.saved ?? []).map((s) => s.id));
     readonly chosen = computed<PresetQuery | null>(() => this.list()?.presets.find((p) => p.id === this.presetId()) ?? null);
     /** The chosen preset's parameters, less a kinds filter the Dataset cannot apply (it maps no kind of link). */
     readonly shownParams = computed(() =>
@@ -175,7 +214,7 @@ export class LinkAnalysisPresetsComponent {
         this.preset.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.buildParams());
     }
 
-    private load(id: string | null): void {
+    load(id: string | null): void {
         this.loading?.unsubscribe();
         this.list.set(null);
         this.loadError.set('');
@@ -215,8 +254,25 @@ export class LinkAnalysisPresetsComponent {
     }
 
     run(): void {
-        const p = this.chosen();
+        const saved = this.chosenSaved();
         const ds = this.dataset.value;
+        if (saved && ds) {
+            this.busy.set(true);
+            this.runError.set('');
+            this.inv.runQuery(ds, saved.query).subscribe({
+                next: (r) => {
+                    this.busy.set(false);
+                    this.result.set(r);
+                },
+                error: (e) => {
+                    this.busy.set(false);
+                    this.result.set(null);
+                    this.runError.set(apiErrorMessage(e, 'The question could not be answered.'));
+                },
+            });
+            return;
+        }
+        const p = this.chosen();
         if (!p || !ds) return;
         if (this.params.invalid) {
             this.params.markAllAsTouched();
@@ -238,10 +294,10 @@ export class LinkAnalysisPresetsComponent {
     }
 
     drawThese(): void {
-        const p = this.chosen();
+        const label = this.chosen()?.label ?? this.chosenSaved()?.label;
         const ds = this.dataset.value;
         const values = this.drawValues();
-        if (!p || !ds || !values.length || this.drawWhyNot()) return;
-        this.draw.emit({ datasetId: ds, values, what: `the answer to "${p.label}"` });
+        if (!label || !ds || !values.length || this.drawWhyNot()) return;
+        this.draw.emit({ datasetId: ds, values, what: `the answer to "${label}"` });
     }
 }

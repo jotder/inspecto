@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.linkAnalysis`](../../../../../product-map/addon/linkAnalysis.toon).
 
-115 row(s).
+116 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -80,6 +80,7 @@ tags: [feature-db, addon]
 | "POST /geo/projection" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /geo/projection"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /geo/routes" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /geo/routes"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/case-history" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/case-history"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /inv/datasets/([^/]+)/query" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/datasets/([^/]+)/query"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/deep-links/resolve" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/deep-links/resolve"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/entities/([^/]+)/resolve" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/entities/([^/]+)/resolve"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /inv/entities/([^/]+)/suggest" | route | la-api | basic;standard;advanced;preview | linkAnalysis | ga | `"POST /inv/entities/([^/]+)/suggest"` | `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon` |

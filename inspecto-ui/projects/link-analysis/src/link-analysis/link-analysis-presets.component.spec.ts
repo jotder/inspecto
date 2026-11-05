@@ -183,4 +183,26 @@ describe('LinkAnalysisPresetsComponent', () => {
         expect(refused.el.querySelector('inspecto-alert')).not.toBeNull();
         expect(refused.el.querySelector('[data-testid="la-presets-draw"]')).toBeNull();
     });
+    it('lists the Space presets saved from the builder and runs one through the builder route', () => {
+        const saved = {
+            ...LIST,
+            saved: [{ id: 'busiest', label: 'Busiest', description: 'The senders with the most links.', query: { by: 'from' as const } }],
+        };
+        const { fixture, el, c, inv } = setup({ list: () => of(saved) });
+        expect(c.presetOptions().map((o) => o.value)).toContain('saved:busiest');
+        const runQuery = vi.fn(() => of({ ...ANSWER, query: { by: 'from' } }));
+        (inv as unknown as { runQuery: typeof runQuery }).runQuery = runQuery;
+        c.preset.setValue('saved:busiest');
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="la-presets-saved-description"]')?.textContent).toContain('most links');
+        c.run();
+        fixture.detectChanges();
+        expect(runQuery).toHaveBeenCalledWith('pays', { by: 'from' });
+        expect(inv.runPreset).not.toHaveBeenCalled();
+        expect(el.querySelector('[data-testid="la-builder"]')).not.toBeNull();
+    });
+    it('offers no builder over a Dataset that does not say which columns link one entity to another', () => {
+        const { el } = setup({ list: () => of({ ...LIST, presets: [], roles: { ...LIST.roles, from: null, to: null } }) });
+        expect(el.querySelector('[data-testid="la-builder"]')).toBeNull();
+    });
 });

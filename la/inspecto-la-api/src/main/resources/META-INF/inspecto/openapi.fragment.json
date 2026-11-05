@@ -1259,7 +1259,7 @@
         "tags" : [ "inv" ],
         "summary" : "List the preset queries a Dataset can answer",
         "operationId" : "getInvPresets",
-        "description" : "LA-PRESET-QUERIES-1. The presets the Space's Industry pack (domain_profile) offers - always the core set, the pack's own first - whose roles the Dataset maps. {dataset, pack, roles {from, to, kind, time, amount} (a column name or null), presets [{id, label, description, kind (aggregate|measure|graph), needs [role], params [{name, label, type (entity|number|kinds|window), default}]}]}. Roles come from the Dataset's defaultLinkMapping, else its first two columns classified as an Entity Type; kind, time and amount are found by name, type and the pack's measure_hints. A preset whose roles are not all mapped is not listed.",
+        "description" : "LA-PRESET-QUERIES-1. The presets the Space's Industry pack (domain_profile) offers - always the core set, the pack's own first - whose roles the Dataset maps. {dataset, pack, roles {from, to, kind, time, amount} (a column name or null), presets [{id, label, description, kind (aggregate|measure|graph), needs [role], params [{name, label, type (entity|number|kinds|window), default}]}]}. Roles come from the Dataset's defaultLinkMapping, else its first two columns classified as an Entity Type; kind, time and amount are found by name, type and the pack's measure_hints. A preset whose roles are not all mapped is not listed. LA-QUERY-BUILDER-1 adds columns {time [column], measure [{column, unit}]} - the role columns the query builder may name - and saved [{id, label, description, query}]: the Space presets saved from the builder (preset-query components) whose query this Dataset can answer.",
         "parameters" : [ {
           "name" : "dataset",
           "in" : "query",
@@ -1813,6 +1813,52 @@
           },
           "422" : {
             "description" : "No dataset; a raw key for a masked type; an alias this server never minted; a Dataset that maps no From and To."
+          },
+          "503" : {
+            "description" : "No write root, or no Dataset provider."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
+    "/inv/datasets/{datasetId}/query" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "Run one query-builder question over a Dataset",
+        "operationId" : "postInvDatasetQuery",
+        "description" : "LA-QUERY-BUILDER-1 (Basic and up). Body {query {by (from|to), rank (links|counterparts|sum), sumColumn?, from?, to?, kinds?, timeColumn?, after?, before?, measureColumn?, measureMin?, measureMax?, min?, top?}}. Declarative, never free SQL: any other key is refused; timeColumn must be a Time column of the Dataset, sumColumn and measureColumn a Measure (GET /inv/presets lists them); after / before are a day or an ISO instant, a half-open window; every value is bound. Answer {dataset, query, columns [{id, label, entity}], rows, count, truncated, masking}, like a preset run. Entity columns are exploration aliases when the Space masks; from / to may be such an alias. At most top rows (500, and the Space's entity fence), under the Space's statement timeout. Read-shaped: persists nothing. Audited as LINK_QUERY_RUN. A Space preset saved from the builder is a preset-query component {label, description, query}, run through this route.",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string" }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "query" ],
+                "properties" : {
+                  "query" : {
+                    "type" : "object",
+                    "additionalProperties" : true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The answer table."
+          },
+          "404" : {
+            "description" : "No such Dataset, or not viewable by the caller (the same answer)."
+          },
+          "422" : {
+            "description" : "No query; a query the Dataset's roles do not support; an unknown alias; a read past the statement timeout."
           },
           "503" : {
             "description" : "No write root, or no Dataset provider."

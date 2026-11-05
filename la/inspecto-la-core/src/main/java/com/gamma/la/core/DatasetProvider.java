@@ -83,6 +83,14 @@ public interface DatasetProvider {
         return List.of();
     }
 
+    /**
+     * Every Space preset saved from the query builder ({@code preset-query} registry entries, LA-QUERY-BUILDER-1:
+     * {@code {label, description, query}}). Empty by default, so a test double keeps compiling.
+     */
+    default List<Entry> presetQueries(Path writeRoot) {
+        return List.of();
+    }
+
     /** The trusted relation SQL of a Dataset's configuration. */
     String relationSql(Map<String, Object> dataset, Path dataRoot, Path writeRoot);
 

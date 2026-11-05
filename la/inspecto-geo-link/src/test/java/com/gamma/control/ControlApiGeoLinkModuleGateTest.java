@@ -62,6 +62,7 @@ class ControlApiGeoLinkModuleGateTest {
             new String[]{"POST", "/inv/pattern/branching"},                   // PatternRoutes
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/presets"},                              // PresetRoutes
+            new String[]{"POST", "/inv/datasets/x/query"},                    // QueryRoutes
             new String[]{"GET", "/inv/datasets/x/discover"},                  // DiscoverRoutes
             new String[]{"GET", "/inv/entities/msisdn/447700900123/summary"},  // EntitySummaryRoutes
             new String[]{"GET", "/inv/investigations/x/working-set"},         // WorkingSetRoutes

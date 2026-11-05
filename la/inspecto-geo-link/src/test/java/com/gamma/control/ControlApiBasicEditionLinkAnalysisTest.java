@@ -53,6 +53,7 @@ class ControlApiBasicEditionLinkAnalysisTest {
             new String[]{"POST", "/inv/projection/neighbors/preview"},       // InvRoutes: the explorer's Grow preview (LA-GROW-EXCLUDE-1 GE-10)
             new String[]{"GET", "/inv/value-measures"},                       // ValueMeasureRoutes
             new String[]{"GET", "/inv/presets"},                              // PresetRoutes
+            new String[]{"POST", "/inv/datasets/x/query"},                    // QueryRoutes (LA-QUERY-BUILDER-1, Q-1: Basic and up)
             new String[]{"GET", "/inv/datasets/x/discover"},                  // DiscoverRoutes (LA-BASIC-DISCOVER-1, Q-1: Basic and up)
             new String[]{"GET", "/inv/entities/msisdn/447700900123/summary"},  // EntitySummaryRoutes (LA-ENTITY-SUMMARY-1, Q-1: Basic and up)
             new String[]{"GET", "/inv/entity-identities"},                    // EntityIdentityRoutes

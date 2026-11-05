@@ -103,6 +103,10 @@ public final class ComponentStore {
                     // reserved system Space — a Space's packs may fork from another's, deliberately. Absent
                     // any, the UI's shipped PATTERN_PACKS const stays the fallback.
                     "pattern-pack",
+                    // Link-Analysis Space presets (LA-QUERY-BUILDER-1): a query-builder question saved as a preset -
+                    // {label, description, query}. The query is parsed against a Dataset's roles each time it is listed
+                    // or run (la-api QueryBuilder), so a stored one is never trusted as written.
+                    "preset-query",
                     // Rule Template (data-table Pro Max "save as rule", 2026-07-27): a saved parameterized
                     // query template (projection + condition group / SQL override + `:fieldValue` binds).
                     // The UI's RulesService has spoken the /components contract since it shipped, but this

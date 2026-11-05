@@ -47,6 +47,10 @@ public final class LinkEventTypes {
      *  {@code entityType}/{@code dataset}/{@code found}/{@code assessed} carry the reach; the key is never recorded. */
     public static final String LINK_ENTITY_SUMMARIZED = "LINK_ENTITY_SUMMARIZED";
 
+    /** A query-builder question was run over a Dataset ({@code POST /inv/datasets/{id}/query}, LA-QUERY-BUILDER-1).
+     *  {@code dataset}/{@code by}/{@code rank}/{@code rows}/{@code truncated} carry what was asked; no entity value is recorded. */
+    public static final String LINK_QUERY_RUN = "LINK_QUERY_RUN";
+
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */

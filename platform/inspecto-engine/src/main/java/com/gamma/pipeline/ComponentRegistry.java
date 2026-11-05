@@ -80,6 +80,7 @@ public final class ComponentRegistry {
             Map.entry("notification-rules", "notification-rule"),    // Authored notification rules — NotificationRoutes
             Map.entry("findings-specs", "findings-spec"),             // C3/D6: configurable Findings sections — GET /findings/{type}
             Map.entry("pattern-packs", "pattern-pack"),               // V2 (c)/D16: Link-Analysis pattern packs
+            Map.entry("preset-queries", "preset-query"),              // LA-QUERY-BUILDER-1: Space presets saved from the query builder
             Map.entry("rule-templates", "rule-template"),             // Pro Max saved query templates — RulesService
             Map.entry("kpis", "kpi"),                                 // ASSURE-KPI-DEFINITIONS-1: KPI definitions — KpiRoutes
             Map.entry("runbooks", "runbook"),                         // Runbooks: guidance an Alert Rule links (operator 2026-10-10)

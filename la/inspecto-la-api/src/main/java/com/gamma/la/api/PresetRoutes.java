@@ -1,9 +1,11 @@
 package com.gamma.la.api;
 
+import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.entitystore.IndustryPack;
+import com.gamma.entitystore.MaskTokens;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.DatasetProviders;
@@ -222,6 +224,35 @@ public final class PresetRoutes implements RouteModule {
         out.put("roles", t.roles().toMap());
         out.put("presets", PresetQueries.forPack(t.packId()).stream().filter(p -> p.offeredFor(t.roles()))
                 .map(PresetQueries.Preset::toMap).toList());
+        // LA-QUERY-BUILDER-1: the role columns the builder may name, and the Space's saved presets this Dataset can answer (Q-5:
+        // one whose query names a role or column it lacks is not offered)
+        Map<String, Object> dataset = DatasetProviders.require().dataset(writeRoot, t.datasetId()).orElseThrow();
+        List<DatasetProvider.Column> real = QueryRoutes.realColumns(t, writeRoot);
+        out.put("columns", QueryRoutes.columnsOf(t, dataset, real));
+        QueryBuilder.Columns cols = QueryBuilder.columns(dataset, real, t.roles());
+        List<Map<String, Object>> saved = new ArrayList<>();
+        ExplorationMasking mask = ExplorationMasking.of(writeRoot, t.datasetId(), Map.of("sourceCol",
+                t.roles().from() == null ? "" : t.roles().from(), "targetCol", t.roles().to() == null ? "" : t.roles().to()));
+        for (DatasetProvider.Entry e : DatasetProviders.require().presetQueries(writeRoot)) {
+            Map<String, Object> c = e.content();
+            if (!ComponentAccess.canView(ex, c)) continue;   // R3: a preset shared with others is not there for this caller
+            try {
+                QueryBuilder.parse(c.get("query"), t.roles(), cols);
+            } catch (IllegalArgumentException notHere) {
+                continue;
+            }
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("id", e.name());
+            s.put("label", c.get("label") instanceof String l && !l.isBlank() ? l : e.name());
+            s.put("description", c.get("description") instanceof String d ? d : "");
+            // a From / To stored raw (saved while masking was off, or written through /components) leaves as its alias
+            Map<String, Object> query = new LinkedHashMap<>();
+            if (c.get("query") instanceof Map<?, ?> qm) qm.forEach((k, v) -> query.put(String.valueOf(k),
+                    ("from".equals(k) || "to".equals(k)) && v instanceof String id && !id.startsWith(MaskTokens.TOKEN_PREFIX) ? mask.out(id) : v));
+            s.put("query", query);
+            saved.add(s);
+        }
+        out.put("saved", saved);
         return out;
     }
 

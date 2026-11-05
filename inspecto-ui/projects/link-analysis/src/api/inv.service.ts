@@ -1525,6 +1525,47 @@ export interface PresetList {
     pack: string | null;
     roles: PresetRoles;
     presets: PresetQuery[];
+    /** LA-QUERY-BUILDER-1: the role columns the query builder may name. */
+    columns?: { time: string[]; measure: { column: string; unit: string | null }[] };
+    /** LA-QUERY-BUILDER-1: the Space presets saved from the builder that this Dataset can answer. */
+    saved?: SavedPresetQuery[];
+}
+
+/** LA-QUERY-BUILDER-1: a builder question - every key optional; the server refuses any it cannot apply to the Dataset. */
+export interface BuilderQuery {
+    by?: 'from' | 'to';
+    rank?: 'links' | 'counterparts' | 'sum';
+    sumColumn?: string;
+    from?: string;
+    to?: string;
+    kinds?: string[];
+    timeColumn?: string;
+    after?: string;
+    before?: string;
+    measureColumn?: string;
+    measureMin?: number;
+    measureMax?: number;
+    min?: number;
+    top?: number;
+}
+
+/** A Space preset saved from the builder (a `preset-query` component). */
+export interface SavedPresetQuery {
+    id: string;
+    label: string;
+    description: string;
+    query: BuilderQuery;
+}
+
+/** `POST /inv/datasets/{id}/query`: the answer table, like a preset run. */
+export interface BuilderQueryResult {
+    dataset: string;
+    query: BuilderQuery;
+    columns: PresetColumn[];
+    rows: Record<string, unknown>[];
+    count: number;
+    truncated: boolean;
+    masking?: { mode: string; masked: boolean; basis?: string };
 }
 
 export interface PresetColumn {
@@ -2373,6 +2414,11 @@ export class InvService {
             apiUrl(`/inv/entities/${encodeURIComponent(type)}/${encodeURIComponent(key)}/summary`),
             { params: toParams({ dataset }) },
         );
+    }
+
+    /** LA-QUERY-BUILDER-1: run one builder question (or a saved preset's). Read-only; 404 unknown Dataset · 422 unsupported. */
+    runQuery(dataset: string, query: BuilderQuery): Observable<BuilderQueryResult> {
+        return this.http.post<BuilderQueryResult>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/query`), { query });
     }
 
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──

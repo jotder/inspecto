@@ -7,7 +7,7 @@ import type { PresetParam, PresetRunResult } from '@inspecto/link-analysis/api/i
  */
 
 /** The result table's columns, in the server's order and words; a number reads at most two decimals. */
-export function presetColumns(r: PresetRunResult | null): ColDef[] {
+export function presetColumns(r: Pick<PresetRunResult, 'columns'> | null): ColDef[] {
     return (r?.columns ?? []).map((c) =>
         c.entity
             ? { field: c.id, headerName: c.label }
@@ -25,7 +25,7 @@ export function presetNumber(v: unknown): string {
 }
 
 /** What *Draw these* starts from: every entity column's values (aliases when the Space masks), once each. */
-export function presetEntityValues(r: PresetRunResult | null): string[] {
+export function presetEntityValues(r: Pick<PresetRunResult, 'columns' | 'rows'> | null): string[] {
     if (!r) return [];
     const cols = r.columns.filter((c) => c.entity).map((c) => c.id);
     const out = new Set<string>();

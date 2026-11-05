@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-126 test class(es): 18 unit, 108 real-HTTP control-plane, 0 IT.
+127 test class(es): 18 unit, 109 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -119,6 +119,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiPresetQueriesTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiPresetQueriesTest.java` | LA-PRESET-QUERIES-1 over real HTTP: {@code GET /inv/presets} offers the Industry pack's presets whose roles a Dataset |
 | `ControlApiProjectionCacheKeyTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiProjectionCacheKeyTest.java` | PERF-P4-2 round 2: every component of the projection cache key is load-bearing (a change in it alone is a different ETag |
 | `ControlApiProjectionConditionalReadTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiProjectionConditionalReadTest.java` | PERF-P4-2 - the conditional read of {@code POST /inv/projection} and {@code /inv/projection/neighbors} over the real |
+| `ControlApiQueryBuilderTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiQueryBuilderTest.java` | LA-QUERY-BUILDER-1 over real HTTP: {@code POST /inv/datasets/{id}/query} answers a builder question over the Dataset's role |
 | `ControlApiReplayDriftOnFileAppendTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiReplayDriftOnFileAppendTest.java` | DR-T8 with a REAL file append: the bound Dataset reads a directory of CSV files, a second file lands after the |
 | `ControlApiSnapshotsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiSnapshotsTest.java` | LA-03 — durable Link Analysis evidence snapshots ({@code POST\|GET /inv/snapshots}, |
 | `ControlApiStandingDetectionLd5Test` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiStandingDetectionLd5Test.java` | LA-LIVE-DETECTION-1 slices LD-4 and LD-5 over real HTTP: the {@code la.detect} Job Type run through |

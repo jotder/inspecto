@@ -27,6 +27,8 @@ export type ComponentType =
     | 'link-analysis-view'
     | 'geo-map-view'
     | 'pattern-pack'
+    // A Link Analysis Space preset saved from the query builder (LA-QUERY-BUILDER-1): {label, description, query}.
+    | 'preset-query'
     // A KPI definition (ASSURE-KPI-DEFINITIONS-1) — the KPI tile binds to one by `kpiId`.
     | 'kpi'
     // A Runbook (operator 2026-10-10): linked guidance an Alert Rule names by `runbook:`; its Incident or Case page shows it.

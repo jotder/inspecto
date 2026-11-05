@@ -33,6 +33,7 @@ final class LinkAnalysisRateClasses {
             {"POST", "/inv/pattern/branching"},
             {"POST", "/inv/schema/overlap-profile"},
             {"POST", "/inv/presets/([^/]+)/run"},    // LA-PRESET-QUERIES-1: groups a whole Dataset by one end
+            {"POST", "/inv/datasets/([^/]+)/query"},      // LA-QUERY-BUILDER-1: groups a whole Dataset by one end, filtered
             {"GET", "/inv/datasets/([^/]+)/discover"},    // LA-BASIC-DISCOVER-1: scans a whole Dataset (cached until its files change)
             {"POST", "/inv/graph/runs"},
             {"POST", "/inv/index/builds"},
