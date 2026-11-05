@@ -86,6 +86,66 @@ class ControlApiEntityProfileTest {
         }
     }
 
+    /**
+     * LA-COLUMN-ROLES-1 P3: the Entity profile sums and ranges every Measure of the Datasets it is in, over the rows naming
+     * it in each bound column, inside the window when one is given; a value that is no number is not counted.
+     */
+    @Test
+    void theProfileSumsAndRangesEveryMeasure(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            // the same rows with a Measure: a call's seconds (A's second call holds no number)
+            String[] secs = {"'10'", "'x'", "'30'", "'40'", "'50'", "'60'"}; // text, as a CSV column can be
+            String[] rows = EntityProfileFixture.ROWS.split("\\),\\(");
+            StringBuilder withSecs = new StringBuilder();
+            for (int i = 0; i < rows.length; i++) {
+                String r = rows[i].replace("(", "").replace(")", "");
+                withSecs.append(i == 0 ? "" : ",").append("(").append(r).append(",").append(secs[i]).append(")");
+            }
+            new com.gamma.pipeline.ViewStore(root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition("calls_view", "flow-x",
+                    List.of(), "SELECT a_msisdn, b_msisdn, imei, kind, ts, secs FROM (VALUES " + withSecs
+                    + ") AS t(a_msisdn,b_msisdn,imei,kind,ts,secs)", "2026-10-15T00:00:00Z"));
+            Map<String, Object> ds = new HashMap<>(EntityProfileFixture.callsDataset());
+            List<Object> cols = new java.util.ArrayList<>((List<?>) ds.get("columns"));
+            // b_msisdn holds a masked Entity Type: an identifier is never summed, even when it says measure (written past the rules)
+            cols.set(1, Map.of("name", "b_msisdn", "classification", "MSISDN", "role", "measure", "type", "number"));
+            cols.add(Map.of("name", "secs", "type", "number", "role", "measure", "unit", "s"));
+            ds.put("columns", cols);
+            com.gamma.pipeline.ComponentStore reg = new com.gamma.pipeline.ComponentStore(root.resolve("registry"));
+            reg.write("dataset", "calls_ds", ds);
+            // the same rows with no time column: outside every window
+            reg.write("dataset", "calls_undated", Map.of("view", "calls_view", "owner", "analyst-1", "shares", List.of(),
+                    "columns", List.of(Map.of("name", "a_msisdn", "classification", "MSISDN"),
+                            Map.of("name", "secs", "type", "number", "role", "measure"))));
+
+            String p = profileOf("msisdn", keyOfA(c));
+            JsonNode prof = noRaw(get(c, p, OWNER));
+            assertTrue(prof.has("measures"), prof.toString());
+            JsonNode m = prof.get("measures");
+            assertFalse(m.toString().contains("\"measure\":\"b_msisdn\""), "an identifier is no measure: " + m);
+            assertEquals(3, m.size(), m.toString());
+            assertEquals("calls_undated", m.get(2).get("dataset").asText());
+            JsonNode asCaller = m.get(0), asCallee = m.get(1);
+            assertEquals("a_msisdn", asCaller.get("column").asText());
+            assertEquals("secs", asCaller.get("measure").asText());
+            assertEquals("s", asCaller.get("unit").asText());
+            assertEquals(2, asCaller.get("rows").asLong(), "a value that is no number is not counted");
+            assertEquals(40.0, asCaller.get("sum").asDouble());
+            assertEquals(10.0, asCaller.get("min").asDouble());
+            assertEquals(30.0, asCaller.get("max").asDouble());
+            assertEquals("b_msisdn", asCallee.get("column").asText());
+            assertEquals(1, asCallee.get("rows").asLong(), "the -99 row names A as its callee");
+            assertEquals(50.0, asCallee.get("sum").asDouble());
+
+            // inside a window: only that window's rows
+            JsonNode w = noRaw(get(c, p + "?from=" + enc("2026-10-02T00:00:00Z") + "&to=" + enc("2026-10-04T00:00:00Z"), OWNER))
+                    .get("measures");
+            assertEquals(30.0, w.get(0).get("sum").asDouble(), w.toString());
+            assertEquals(1, w.get(0).get("rows").asLong());
+            assertEquals(2, w.size(), "a binding with no time column has no rows inside a window: " + w);
+        }
+    }
+
     /** LA-EDITIONS-RESIDUALS-1 (4a): a deep link's window scopes the Entity page's rows, days and span, and the answer echoes it. */
     @Test
     void aWindowScopesTheEntityProfileAndIsEchoed(@TempDir Path cfg, @TempDir Path root) throws Exception {

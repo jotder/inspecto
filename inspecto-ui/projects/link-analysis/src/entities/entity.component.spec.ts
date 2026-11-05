@@ -153,6 +153,38 @@ describe('EntityComponent (Entity Profile)', () => {
         expect(section(el, 'freshness').textContent).toContain('9 Oct 2026');
     });
 
+    it('LA-COLUMN-ROLES-1 P3: a Measures section sums and ranges each Measure, with its unit; none when there are none', async () => {
+        const withMeasures: EntityProfile = {
+            ...MASKED,
+            measures: [
+                {
+                    dataset: 'ims_links_dataset',
+                    column: 'a_msisdn',
+                    measure: 'duration_s',
+                    unit: 's',
+                    rows: 7,
+                    sum: 1250.5,
+                    min: 3,
+                    max: 600,
+                },
+            ],
+        };
+        const { el, fixture } = make(withMeasures);
+        const m = section(el, 'measures');
+        expect(m.querySelector('mat-panel-description')!.textContent).toContain('1');
+        m.querySelector<HTMLElement>('mat-expansion-panel-header')!.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(m.textContent).toContain('duration_s');
+        expect(m.textContent).toContain('1,250.5 s');
+        expect(m.textContent).toContain('600 s');
+    });
+
+    it('LA-COLUMN-ROLES-1 P3: no Measures section for an Entity whose Datasets have no Measure', () => {
+        const { el } = make(MASKED);
+        expect(section(el, 'measures')).toBeNull();
+    });
+
     it('reads the identity group by the normalised typed key for an unmasked type', () => {
         const raw = { ...MASKED, entity: { type: 'msisdn', key: '+249 911', masked: false } };
         const { el, identityGroup } = make(raw, TYPE({ masked: false }));

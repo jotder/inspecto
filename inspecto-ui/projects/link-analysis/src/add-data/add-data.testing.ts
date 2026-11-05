@@ -1,4 +1,5 @@
 import type { Choice, ImportSummary, OnboardDraft } from './add-data.model';
+import type { ColumnRole } from '../api/column-roles';
 
 /** SPEC-ONLY: drafts shaped like `POST /onboard/files` answered for the walkthrough's `transfers.csv` (2026-10-22, live). */
 const hi = <T>(value: T, evidence = 'every sampled value agrees'): Choice<T> => ({
@@ -62,7 +63,7 @@ export function transfersDraft(over: Partial<OnboardDraft> = {}): OnboardDraft {
         ],
         entityTypes: {
             columns: [
-                { column: 'txn_id', entityType: hi<string | null>(null) },
+                { column: 'txn_id', entityType: hi<string | null>(null), role: hi<ColumnRole>('detail'), distinct: 2 },
                 {
                     column: 'from_account',
                     entityType: {
@@ -77,17 +78,22 @@ export function transfersDraft(over: Partial<OnboardDraft> = {}): OnboardDraft {
                         classification: 'ACCOUNT',
                     },
                 },
-                { column: 'amount', entityType: hi<string | null>(null) },
-                { column: 'channel', entityType: hi<string | null>(null) },
-                { column: 'ts', entityType: hi<string | null>(null) },
+                { column: 'amount', entityType: hi<string | null>(null), role: hi<ColumnRole>('measure') },
+                {
+                    column: 'channel',
+                    entityType: hi<string | null>(null),
+                    role: hi<ColumnRole>('dimension'),
+                    distinct: 3,
+                },
+                { column: 'ts', entityType: hi<string | null>(null), role: hi<ColumnRole>('temporal') },
             ],
             primary: hi<string | null>('account', '2 columns hold account'),
             link: {
                 from: hi<string | null>('from_account', 'the names say from_account → to_account'),
                 to: hi<string | null>('to_account', 'the names say from_account → to_account'),
                 kind: hi<string | null>('channel'),
-                time: hi<string | null>('ts'),
-                amount: hi<string | null>('amount'),
+                primaryTime: hi<string | null>('ts'),
+                primaryMeasure: hi<string | null>('amount'),
                 details: hi(['txn_id']),
             },
         },

@@ -41,14 +41,39 @@ export interface LaDataset extends RowSourceRef {
     defaultLinkMapping?: LaLinkMapping;
 }
 
-/** A Dataset's default link (`defaultLinkMapping` on its registry entry): the from / to columns, and kind and time when named. */
+/**
+ * A Dataset's default link (`defaultLinkMapping` on its registry entry): the from / to columns, the kind when named, and
+ * the primary Time (dates each link) and Measure (weighs it) among the role columns (LA-COLUMN-ROLES-1 P1).
+ */
 export interface LaLinkMapping {
     from: string;
     to: string;
     kind?: string;
-    time?: string;
-    amount?: string;
+    primaryTime?: string;
+    primaryMeasure?: string;
     details?: string[];
+}
+
+/**
+ * A stored `defaultLinkMapping` as a {@link LaLinkMapping}: undefined unless it names its two link ends (the server refuses
+ * one that does not; an old entry has none). `time` / `amount` are the old names of the primaries, read for entries
+ * written before.
+ */
+export function readLinkMapping(v: unknown): LaLinkMapping | undefined {
+    const m = v as Record<string, unknown> | null;
+    if (!m || typeof m !== 'object' || typeof m['from'] !== 'string' || typeof m['to'] !== 'string') return undefined;
+    const s = (k: string) =>
+        typeof m[k] === 'string' && (m[k] as string).trim() ? (m[k] as string).trim() : undefined;
+    const out: LaLinkMapping = { from: m['from'] as string, to: m['to'] as string };
+    const kind = s('kind');
+    const primaryTime = s('primaryTime') ?? s('time');
+    const primaryMeasure = s('primaryMeasure') ?? s('amount');
+    if (kind) out.kind = kind;
+    if (primaryTime) out.primaryTime = primaryTime;
+    if (primaryMeasure) out.primaryMeasure = primaryMeasure;
+    if (Array.isArray(m['details']))
+        out.details = (m['details'] as unknown[]).filter((d): d is string => typeof d === 'string');
+    return out;
 }
 
 export interface LaDatasets {

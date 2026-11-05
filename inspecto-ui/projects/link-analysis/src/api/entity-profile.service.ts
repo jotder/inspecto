@@ -192,6 +192,19 @@ export interface EntityLinks extends Assessed {
     from: string | null;
 }
 
+/** One Measure of a Dataset over an Entity's rows: how many hold a number, their sum, lowest and highest. */
+export interface EntityMeasure {
+    dataset: string;
+    /** The Dataset column that names the Entity. */
+    column: string;
+    measure: string;
+    unit: string | null;
+    rows: number;
+    sum: number | null;
+    min: number | null;
+    max: number | null;
+}
+
 /** `GET /inv/entities/{type}/{key}/profile`: one Entity. */
 export interface EntityProfile extends Assessed {
     entity: { type: string; key: string; masked: boolean };
@@ -201,6 +214,8 @@ export interface EntityProfile extends Assessed {
     coveredDays: number | null;
     perDay: { day: string; rows: number }[];
     where: { dataset: string; column: string; rows: number }[];
+    /** LA-COLUMN-ROLES-1 P3: each Measure of each Dataset it is in, over the rows naming it there (absent on older servers). */
+    measures?: EntityMeasure[];
     links: EntityLinks;
     related: { type: string; count: number; keys: string[] }[];
     dataAsOf: DatasetAsOf[];

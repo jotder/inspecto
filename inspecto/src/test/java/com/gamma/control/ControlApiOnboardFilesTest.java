@@ -197,14 +197,14 @@ class ControlApiOnboardFilesTest {
             assertEquals("account", et.get("primary").get("value").asText());
             assertTrue(et.get("primary").get("evidence").asText().contains("2 columns hold account (from_account, to_account)"), et.toString());
             JsonNode link = et.get("link");
-            for (String k : List.of("from", "to", "kind", "time", "amount", "details")) assertChoice(link.get(k));
+            for (String k : List.of("from", "to", "kind", "primaryTime", "primaryMeasure", "details")) assertChoice(link.get(k));
             assertEquals("from_account", link.get("from").get("value").asText());
             assertEquals("to_account", link.get("to").get("value").asText());
             assertEquals("high", link.get("from").get("confidence").asText());
             assertTrue(link.get("from").get("evidence").asText().contains("the names say from_account → to_account"), link.toString());
             assertEquals("channel", link.get("kind").get("value").asText());
-            assertEquals("booked_at", link.get("time").get("value").asText());
-            assertEquals("amount", link.get("amount").get("value").asText());
+            assertEquals("booked_at", link.get("primaryTime").get("value").asText());
+            assertEquals("amount", link.get("primaryMeasure").get("value").asText());
             assertEquals("[\"transfer_id\",\"currency\"]", link.get("details").get("value").toString());
 
             JsonNode lim = d.get("limits");
@@ -289,11 +289,18 @@ class ControlApiOnboardFilesTest {
             assertEquals("from_account", m.get("from").asText());
             assertEquals("to_account", m.get("to").asText());
             assertEquals("channel", m.get("kind").asText());
-            assertEquals("booked_at", m.get("time").asText());
-            assertEquals("amount", m.get("amount").asText());
+            assertEquals("booked_at", m.get("primaryTime").asText());
+            assertEquals("amount", m.get("primaryMeasure").asText());
+            assertFalse(m.has("time") || m.has("amount"), "the old names are only read, never written: " + m);
             int classified = 0;
             for (JsonNode col : ds.get("columns")) if ("ACCOUNT".equals(col.path("classification").asText())) classified++;
             assertEquals(2, classified, ds.get("columns").toString());
+            // LA-COLUMN-ROLES-1 P1: every column is written with its role
+            assertEquals("entity", stored(ds, "from_account").get("role").asText());
+            assertEquals("temporal", stored(ds, "booked_at").get("role").asText());
+            assertEquals("measure", stored(ds, "amount").get("role").asText());
+            assertEquals("dimension", stored(ds, "channel").get("role").asText());
+            assertEquals("detail", stored(ds, "transfer_id").get("role").asText());
 
             // the rows are queryable as a Dataset
             JsonNode rows = data(json(c, "GET", "/datasets/" + id + "/rows?limit=5", null, null), 200);
@@ -305,6 +312,93 @@ class ControlApiOnboardFilesTest {
             HttpResponse<String> again = json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null);
             assertEquals(409, again.statusCode(), again.body());
         }
+    }
+
+    /** LA-COLUMN-ROLES-1 P1: the draft proposes a role per column with its evidence, and a text column's distinct count. */
+    @Test
+    void theDraftProposesARolePerColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(120), null);
+            for (String col : List.of("transfer_id", "from_account", "to_account", "amount", "currency", "channel", "booked_at"))
+                assertChoice(roleOf(d, col));
+            assertEquals("entity", roleOf(d, "from_account").get("value").asText());
+            assertEquals("temporal", roleOf(d, "booked_at").get("value").asText());
+            assertEquals("measure", roleOf(d, "amount").get("value").asText());
+            assertEquals("dimension", roleOf(d, "channel").get("value").asText(), "the link's kind is a Category");
+            JsonNode currency = roleOf(d, "currency");
+            assertEquals("dimension", currency.get("value").asText(), "a few repeating values: " + currency);
+            assertTrue(currency.get("evidence").asText().contains("distinct values in 120 sampled rows"), currency.toString());
+            JsonNode id = roleOf(d, "transfer_id");
+            assertEquals("detail", id.get("value").asText(), "every value different: not a Category");
+            assertEquals("high", id.get("confidence").asText());
+            assertEquals(120, columnRow(d, "transfer_id").get("distinct").asInt());
+            assertFalse(columnRow(d, "amount").has("distinct"), "a distinct count only for a text column");
+        }
+    }
+
+    /** LA-COLUMN-ROLES-1 P1: a stated role is written; a contradiction with the link's primaries or the Entity Type is refused. */
+    @Test
+    void aCommitWritesStatedRolesAndRefusesAContradiction(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("roles");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(80), null);
+            String body = "{\"name\":\"" + id + "\",\"columns\":[{\"name\":\"currency\",\"role\":\"detail\"}],"
+                    + "\"link\":{\"from\":\"from_account\",\"to\":\"to_account\",\"kind\":\"transfer_id\",\"primaryTime\":\"booked_at\","
+                    + "\"primaryMeasure\":\"amount\"}}";
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", body, null), 200);
+            JsonNode ds = data(json(c, "GET", "/components/dataset/" + id, null, null), 200).get("content");
+            assertEquals("detail", stored(ds, "currency").get("role").asText(), "the stated role wins over the proposal");
+            assertEquals("measure", stored(ds, "amount").get("role").asText());
+            assertEquals("dimension", stored(ds, "transfer_id").get("role").asText(),
+                    "the column the link's kind names is a Category, though its proposal was a Detail");
+
+            // a body may still say time / amount (the primaries' old names); the Dataset is written with the new ones
+            String oldId = uniqueId("oldnames");
+            JsonNode d3 = draft(c, "transfers.csv", "stream", transfers(60), null);
+            data(json(c, "POST", "/onboard/files/" + d3.get("draftId").asText() + "/commit", "{\"name\":\"" + oldId + "\",\"link\":"
+                    + "{\"from\":\"from_account\",\"to\":\"to_account\",\"time\":\"booked_at\",\"amount\":\"amount\"}}", null), 200);
+            JsonNode old = data(json(c, "GET", "/components/dataset/" + oldId, null, null), 200).get("content");
+            assertEquals("booked_at", old.at("/defaultLinkMapping/primaryTime").asText(), old.toString());
+            assertEquals("amount", old.at("/defaultLinkMapping/primaryMeasure").asText(), old.toString());
+            assertEquals("booked_at", old.get("eventDate").asText());
+
+            // the primary Time names a column stated as a Measure: refused before anything is written
+            JsonNode d2 = draft(c, "transfers.csv", "stream", transfers(60), null);
+            String clash = "{\"name\":\"" + uniqueId("clash") + "\",\"columns\":[{\"name\":\"booked_at\",\"role\":\"dimension\"}],"
+                    + "\"link\":{\"from\":\"from_account\",\"to\":\"to_account\",\"primaryTime\":\"booked_at\"}}";
+            HttpResponse<String> r = json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", clash, null);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("primaryTime names 'booked_at', which is not a Time column"), r.body());
+
+            // an Entity role without an Entity Type, and another role on a column that holds one
+            String noType = "{\"name\":\"" + uniqueId("nt") + "\",\"columns\":[{\"name\":\"currency\",\"role\":\"entity\"}]}";
+            r = json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", noType, null);
+            assertEquals(422, r.statusCode(), r.body());
+            String typed = "{\"name\":\"" + uniqueId("ty") + "\",\"columns\":[{\"name\":\"from_account\",\"role\":\"measure\"}]}";
+            r = json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", typed, null);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("holds an Entity Type, so its role is entity"), r.body());
+
+            // a Measure on a text column
+            String text = "{\"name\":\"" + uniqueId("tx") + "\",\"columns\":[{\"name\":\"currency\",\"role\":\"measure\"}]}";
+            r = json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", text, null);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("is a measure but holds string values, not numbers"), r.body());
+        }
+    }
+
+    private static JsonNode columnRow(JsonNode draft, String column) {
+        for (JsonNode c : draft.get("entityTypes").get("columns")) if (column.equals(c.get("column").asText())) return c;
+        throw new AssertionError("no column " + column + " in " + draft.get("entityTypes"));
+    }
+
+    private static JsonNode roleOf(JsonNode draft, String column) {
+        return columnRow(draft, column).get("role");
+    }
+
+    private static JsonNode stored(JsonNode dataset, String column) {
+        for (JsonNode c : dataset.get("columns")) if (column.equals(c.get("name").asText())) return c;
+        throw new AssertionError("no column " + column + " in " + dataset.get("columns"));
     }
 
     @Test
@@ -937,7 +1031,7 @@ class ControlApiOnboardFilesTest {
     void aColumnsEntityTypeCanBeChangedOnAnExistingDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             new ComponentStore(root.resolve("registry")).write("dataset", "calls", Map.of("physicalRef", "calls/database",
-                    "columns", List.of(Map.of("name", "a_party", "type", "string"), Map.of("name", "b_party", "type", "string"))));
+                    "columns", List.of(Map.of("name", "a_party", "type", "string"), Map.of("name", "b_party", "type", "number"))));
             JsonNode r = data(json(c, "PUT", "/datasets/calls/columns/a_party", "{\"entityType\":\"msisdn\"}", null), 200);
             assertEquals("MSISDN", r.get("classification").asText());
             JsonNode ds = data(json(c, "GET", "/components/dataset/calls", null, null), 200).get("content");
@@ -953,6 +1047,18 @@ class ControlApiOnboardFilesTest {
             data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"measure\",\"unit\":\"USD\"}", null), 200);
             String cols = data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString();
             assertTrue(cols.contains("\"role\":\"entity\"") && cols.contains("\"unit\":\"USD\""), cols);
+            // LA-COLUMN-ROLES-1 P1: a measure holds numbers
+            HttpResponse<String> textMeasure = json(c, "PUT", "/datasets/calls/columns/a_party", "{\"entityType\":null,\"role\":\"measure\"}", null);
+            assertEquals(422, textMeasure.statusCode(), textMeasure.body());
+            assertTrue(error(textMeasure).contains("is a measure but holds string values"), textMeasure.body());
+            // LA-COLUMN-ROLES-1 P2: a column kept off the links stores carried: false; null carries it again
+            data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"carried\":false}", null), 200);
+            assertTrue(data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString()
+                    .contains("\"carried\":false"));
+            data(json(c, "PUT", "/datasets/calls/columns/b_party", "{\"carried\":null}", null), 200);
+            assertFalse(data(json(c, "GET", "/components/dataset/calls", null, null), 200).at("/content/columns").toString()
+                    .contains("carried"));
+            assertEquals(422, json(c, "PUT", "/datasets/calls/columns/b_party", "{\"carried\":\"no\"}", null).statusCode());
             HttpResponse<String> badRole = json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"amount\"}", null);
             assertEquals(422, badRole.statusCode(), badRole.body());
             assertEquals(422, json(c, "PUT", "/datasets/calls/columns/b_party", "{\"role\":\"entity\"}", null).statusCode(),

@@ -74,19 +74,63 @@ final class EntityShapes {
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("primary", primary(typeOf, highOf));
+        Map<String, Object> link = null;
+        if ("reference".equals(kind)) out.put("identifying", identifying(columns, typeOf, highOf));
+        else out.put("link", link = link(columns, typeOf, highOf));
         List<Map<String, Object>> cols = new ArrayList<>();
-        for (var e : perColumn.entrySet()) {
+        for (Column c : columns) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("column", e.getKey());
-            row.put("entityType", e.getValue());
+            row.put("column", c.name());
+            row.put("entityType", perColumn.get(c.name()));
+            row.put("role", roleProposal(c, perColumn.get(c.name()), link));
+            if (TEXT.contains(c.type())) row.put("distinct", new LinkedHashSet<>(c.values()).size());
             cols.add(row);
         }
         out.put("columns", cols);
-        out.put("primary", primary(typeOf, highOf));
-        if ("reference".equals(kind)) out.put("identifying", identifying(columns, typeOf, highOf));
-        else out.put("link", link(columns, typeOf, highOf));
         return out;
     }
+
+    // ── roles (LA-COLUMN-ROLES-1 P1) ─────────────────────────────────────────────────────────────────────────────────
+
+    /** A text column with at most this many distinct sampled values, repeating, is proposed as a Category (plan Q-6). */
+    static final int CATEGORY_MAX = 200;
+    private static final Set<String> TEXT = Set.of("VARCHAR", "BOOLEAN");
+
+    /**
+     * The role proposed for one column: Entity when it holds an Entity Type; Time for a date or time; Measure for a
+     * decimal number, or a whole number named as an amount; Category for a text column whose sampled values repeat and
+     * stay under {@link #CATEGORY_MAX} distinct (high under 20); else Detail. The link's own choices agree: its kind is a
+     * Category, its time a Time, its measure a Measure. A Detail costs nothing, so it is always a sure proposal.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> roleProposal(Column c, Map<String, Object> entity, Map<String, Object> link) {
+        int n = c.values().size();
+        String t = c.type() == null ? "VARCHAR" : c.type().toUpperCase(Locale.ROOT);
+        if (entity != null && entity.get("value") != null)
+            return OnboardDraft.choice("entity", c.name() + " holds " + entity.get("value"), "high".equals(entity.get("confidence")));
+        if (link != null) {
+            for (var e : Map.of("kind", "dimension", "primaryTime", "temporal", "primaryMeasure", "measure").entrySet())
+                if (link.get(e.getKey()) instanceof Map<?, ?> ch && c.name().equals(ch.get("value")))
+                    return OnboardDraft.choice(e.getValue(), "the link's " + ROLE_WORDS.get(e.getValue()), "high".equals(ch.get("confidence")));
+        }
+        if (t.equals("DATE") || t.equals("TIMESTAMP"))
+            return OnboardDraft.choice("temporal", c.name() + " holds " + t.toLowerCase(Locale.ROOT) + " values", true);
+        if (t.equals("DOUBLE") || (t.equals("BIGINT") && hasAny(c.name(), AMOUNT_WORDS)))
+            return OnboardDraft.choice("measure", c.name() + (t.equals("DOUBLE") ? " holds decimal numbers" : " is named as an amount and holds numbers"),
+                    n >= OnboardDraft.MIN_SAMPLE);
+        if (TEXT.contains(t) && n > 0) {
+            int distinct = new LinkedHashSet<>(c.values()).size();
+            if (distinct <= CATEGORY_MAX && distinct < n)
+                return OnboardDraft.choice("dimension", c.name() + " has " + distinct + " distinct values in " + n + " sampled rows",
+                        t.equals("BOOLEAN") || (distinct <= 20 && n >= OnboardDraft.MIN_SAMPLE));
+            if (distinct == n)
+                return OnboardDraft.choice("detail", "every one of the " + n + " sampled values of " + c.name() + " is different", true);
+        }
+        return OnboardDraft.choice("detail", c.name() + " is shown on the link", true);
+    }
+
+    private static final Map<String, String> ROLE_WORDS = Map.of("dimension", "kind", "temporal", "time", "measure", "measure");
 
     // ── per column ───────────────────────────────────────────────────────────────────────────────────────────
 
@@ -349,8 +393,8 @@ final class EntityShapes {
             used.add(to);
         }
         out.put("kind", pick(columns, used, typeOf, KIND_WORDS, Set.of("VARCHAR"), "kind"));
-        out.put("time", pickTime(columns, used));
-        out.put("amount", pick(columns, used, typeOf, AMOUNT_WORDS, Set.of("DOUBLE", "BIGINT"), "amount"));
+        out.put("primaryTime", pickTime(columns, used));
+        out.put("primaryMeasure", pick(columns, used, typeOf, AMOUNT_WORDS, Set.of("DOUBLE", "BIGINT"), "amount"));
         List<String> details = new ArrayList<>();
         for (Column c : columns) if (!used.contains(c.name())) details.add(c.name());
         out.put("details", OnboardDraft.choice(details, details.isEmpty() ? "every column has a role" : "every other column is shown on the link",

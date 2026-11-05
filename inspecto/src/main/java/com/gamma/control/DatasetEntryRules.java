@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * The shape rules of the two Link Analysis keys a Dataset registry entry may carry ({@code LA-ONBOARD-1} OB-8):
  * {@code primaryEntityType} (the Entity Type id its graph leads with) and {@code defaultLinkMapping}
- * ({@code {from, to, kind?, time?, amount?, details?[]}}: the link every start draws without asking again; entity
+ * ({@code {from, to, kind?, primaryTime?, primaryMeasure?, details?[]}}: the link every start draws without asking again; entity
  * profiles assess links from it when no saved view or index names one). Run by {@code ComponentRoutes.validateKind}
  * on every Dataset write, so the generic component routes and Add data refuse the same malformed entry (422).
  *
@@ -25,7 +25,14 @@ final class DatasetEntryRules {
     /** What one row is (ENTITY-TYPE-CATALOG-1 P2): a record type id of the Space's packs. */
     static final String RECORD_TYPE = "recordType";
 
-    private static final Set<String> MAPPING_KEYS = Set.of("from", "to", "kind", "time", "amount", "details");
+    /**
+     * LA-COLUMN-ROLES-1 P1: {@code primaryTime} / {@code primaryMeasure} name the Time that dates each link and the Measure
+     * that weighs it; {@code time} / {@code amount} are their old names, still read for entries written before (one or the
+     * other, never two different columns).
+     */
+    static final String PRIMARY_TIME = "primaryTime", PRIMARY_MEASURE = "primaryMeasure";
+    private static final Set<String> MAPPING_KEYS = Set.of("from", "to", "kind", "time", "amount", PRIMARY_TIME, PRIMARY_MEASURE,
+            "details");
 
     private DatasetEntryRules() {}
 
@@ -43,7 +50,8 @@ final class DatasetEntryRules {
         Object raw = content.get(DEFAULT_LINK_MAPPING);
         if (raw == null) return;
         if (!(raw instanceof Map<?, ?> m))
-            throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + " must be an object {from, to, kind?, time?, amount?, details?}");
+            throw new IllegalArgumentException(DEFAULT_LINK_MAPPING
+                    + " must be an object {from, to, kind?, primaryTime?, primaryMeasure?, details?}");
         for (Object k : m.keySet())
             if (!MAPPING_KEYS.contains(String.valueOf(k)))
                 throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + " has an unknown key '" + k + "' (allowed: " + MAPPING_KEYS + ")");
@@ -52,7 +60,17 @@ final class DatasetEntryRules {
         String to = column(m, "to", true, columns);
         if (from.equalsIgnoreCase(to))
             throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + ".from and .to must be two different columns");
-        for (String k : List.of("kind", "time", "amount")) column(m, k, false, columns);
+        for (String k : List.of("kind", "time", "amount", PRIMARY_TIME, PRIMARY_MEASURE)) column(m, k, false, columns);
+        String time = primary(m, PRIMARY_TIME, "time"), measure = primary(m, PRIMARY_MEASURE, "amount");
+        Map<String, Map<?, ?>> byName = columnsByName(content);
+        if (time != null) requireRole(byName, time, "temporal", PRIMARY_TIME, "a Time");
+        if (measure != null) {
+            requireRole(byName, measure, "measure", PRIMARY_MEASURE, "a Measure");
+            Map<?, ?> c = byName.get(measure.toLowerCase(Locale.ROOT));
+            if (c != null && !numeric(c.get("type")))
+                throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + "." + PRIMARY_MEASURE + " names '" + measure + "', which holds "
+                        + c.get("type") + " values, not numbers");
+        }
         Object details = m.get("details");
         if (details != null) {
             if (!(details instanceof List<?> l))
@@ -85,12 +103,90 @@ final class DatasetEntryRules {
                 throw new IllegalArgumentException("column '" + name + "' has role '" + role + "' (allowed: " + ROLES + ")");
             if ("entity".equals(role) && !(c.get("classification") instanceof String k && !k.isBlank()))
                 throw new IllegalArgumentException("column '" + name + "' is an Entity column but holds no Entity Type (classification)");
+            if (c.get(CARRIED) != null && !(c.get(CARRIED) instanceof Boolean))
+                throw new IllegalArgumentException("column '" + name + "' has carried '" + c.get(CARRIED) + "' (true or false)");
+            if ("measure".equals(role) && c.get("classification") instanceof String k && !k.isBlank())
+                throw new IllegalArgumentException("column '" + name + "' holds an Entity Type (" + k + "), so it is an identifier, not a measure");
+            if ("measure".equals(role) && !numeric(c.get("type")))
+                throw new IllegalArgumentException("column '" + name + "' is a measure but holds " + c.get("type") + " values, not numbers");
             if (unit == null) continue;
             if (!"measure".equals(role))
                 throw new IllegalArgumentException("column '" + name + "' has a unit, which only a measure column has");
             if (!(unit instanceof String u) || u.isBlank() || u.length() > UNIT_MAX)
                 throw new IllegalArgumentException("column '" + name + "' has a unit that is not a short text (1-" + UNIT_MAX + " characters)");
         }
+    }
+
+    /**
+     * The primary a link mapping names under {@code key}, else under its old name; {@code null} when neither. Two
+     * different columns under the two names are refused: an entry says which column dates (or weighs) its links once.
+     */
+    static String primary(Map<?, ?> m, String key, String oldKey) {
+        String now = m.get(key) instanceof String s && !s.isBlank() ? s.trim() : null;
+        String old = m.get(oldKey) instanceof String s && !s.isBlank() ? s.trim() : null;
+        if (now != null && old != null && !now.equalsIgnoreCase(old))
+            throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + " names " + key + " '" + now + "' and " + oldKey + " '" + old
+                    + "' (its old name): state " + key + " only");
+        return now != null ? now : old;
+    }
+
+    /** A primary's column, when it states a role, has the role the primary needs (an entry without roles is read as before). */
+    private static void requireRole(Map<String, Map<?, ?>> byName, String column, String role, String key, String what) {
+        Map<?, ?> c = byName.get(column.toLowerCase(Locale.ROOT));
+        Object r = c == null ? null : c.get("role");
+        if (r instanceof String s && !s.isBlank() && !role.equalsIgnoreCase(s.trim()))
+            throw new IllegalArgumentException(DEFAULT_LINK_MAPPING + "." + key + " names '" + column + "', which is not " + what
+                    + " column (its role is " + s.trim().toLowerCase(Locale.ROOT) + ")");
+    }
+
+    /** LA-COLUMN-ROLES-1 P2: {@code columns[].carried: false} keeps a Time, Measure or Category column off the links. */
+    static final String CARRIED = "carried";
+    /** The roles whose columns ride on every link and in its index (plan Q-5: opt-out, not opt-in). */
+    static final Set<String> CARRIED_ROLES = Set.of("temporal", "measure", "dimension");
+    /** At most this many carried columns: a link index build's own bound ({@code IndexRoutes.MAX_ATTR_COLS}). */
+    static final int MAX_CARRIED = 50;
+
+    /**
+     * The columns that ride on every link of the entry (LA-COLUMN-ROLES-1 P2): each Time, Measure and Category column,
+     * in column order, unless it says {@code carried: false}, and never a link end; the first {@link #MAX_CARRIED} only, so
+     * the index it builds can be rebuilt through {@code POST /inv/index/builds}. Empty for an entry without roles.
+     * These become a link index's {@code attributeColumns} and a link read's {@code attrCols}.
+     */
+    static List<String> carriedColumns(Map<String, Object> content) {
+        List<String> out = new java.util.ArrayList<>();
+        if (!(content.get("columns") instanceof List<?> cols)) return out;
+        Set<String> ends = new HashSet<>();
+        if (content.get(DEFAULT_LINK_MAPPING) instanceof Map<?, ?> m)
+            for (String k : List.of("from", "to"))
+                if (m.get(k) instanceof String s) ends.add(s.trim().toLowerCase(Locale.ROOT));
+        for (Object o : cols)
+            if (o instanceof Map<?, ?> c && c.get("name") instanceof String n && !n.isBlank()
+                    && c.get("role") instanceof String r && CARRIED_ROLES.contains(r.trim().toLowerCase(Locale.ROOT))
+                    && !Boolean.FALSE.equals(c.get(CARRIED)) && !ends.contains(n.trim().toLowerCase(Locale.ROOT))
+                    && out.size() < MAX_CARRIED)
+                out.add(n.trim());
+        return out;
+    }
+
+    /** Column types that hold numbers: the registry's {@code number} and the engine's own spellings. */
+    private static final Set<String> NUMERIC = Set.of("number", "numeric", "integer", "int", "bigint", "smallint", "tinyint",
+            "hugeint", "ubigint", "uinteger", "usmallint", "utinyint", "double", "float", "real", "decimal", "long");
+
+    /** A column type that holds numbers; an absent type is not checked (a Dataset whose columns are read at query time). */
+    static boolean numeric(Object type) {
+        if (type == null || String.valueOf(type).isBlank()) return true;
+        String t = String.valueOf(type).trim().toLowerCase(Locale.ROOT);
+        int paren = t.indexOf('(');
+        return NUMERIC.contains(paren < 0 ? t : t.substring(0, paren).trim());
+    }
+
+    /** The entry's columns by lower-cased name; empty when it lists none. */
+    private static Map<String, Map<?, ?>> columnsByName(Map<String, Object> content) {
+        Map<String, Map<?, ?>> out = new java.util.HashMap<>();
+        if (content.get("columns") instanceof List<?> cols)
+            for (Object o : cols)
+                if (o instanceof Map<?, ?> c && c.get("name") != null) out.put(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT), c);
+        return out;
     }
 
     private static String column(Map<?, ?> m, String key, boolean required, Set<String> columns) {

@@ -1,24 +1,14 @@
 import type { ComponentDef } from '@inspecto/core/api';
 import type { EntityTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
+import { ColumnRole, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
+
+export { ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
+export type { ColumnRole } from '@inspecto/link-analysis/api/column-roles';
 
 /**
  * The **Data** page's pure half (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): a Dataset registry
  * entry read for the page, a column's Entity Type from its classification, and the entry a saved Mapping becomes.
  */
-
-/**
- * A column's role as stored (`columns[].role`, LA-COLUMN-ROLES-1; one vocabulary with the Studio Dataset editor's
- * dimension / measure / temporal). The words the UI shows are {@link ROLE_LABELS}.
- */
-export type ColumnRole = 'entity' | 'temporal' | 'measure' | 'dimension' | 'detail';
-
-export const ROLE_LABELS: Record<ColumnRole, string> = {
-    entity: 'Entity',
-    temporal: 'Time',
-    measure: 'Measure',
-    dimension: 'Category',
-    detail: 'Detail',
-};
 
 const ROLES = Object.keys(ROLE_LABELS) as ColumnRole[];
 
@@ -30,14 +20,17 @@ export interface DataColumn {
     role: ColumnRole | null;
     /** What a Measure counts in (USD, s, bytes); null when not said. */
     unit: string | null;
+    /** False when a Time, Measure or Category column is kept off the links (LA-COLUMN-ROLES-1 P2); else absent. */
+    carried?: false;
 }
 
+/** A link mapping: its ends, its kind, and the primary Time and Measure among the role columns (LA-COLUMN-ROLES-1 P1). */
 export interface LinkMapping {
     from: string;
     to: string;
     kind?: string | null;
-    time?: string | null;
-    amount?: string | null;
+    primaryTime?: string | null;
+    primaryMeasure?: string | null;
 }
 
 export interface DataEntry {
@@ -84,7 +77,7 @@ const ENTITY_LIST_STORE = 'entity_list_';
 export function driftedColumns(m: DataEntry, base: DataEntry): string[] {
     if (!m.mapping || !base.columns.length) return [];
     const has = new Set(base.columns.map((c) => c.name.toLowerCase()));
-    const read = [m.mapping.from, m.mapping.to, m.mapping.kind, m.mapping.time, m.mapping.amount];
+    const read = [m.mapping.from, m.mapping.to, m.mapping.kind, m.mapping.primaryTime, m.mapping.primaryMeasure];
     return read.filter((c): c is string => !!c && !has.has(c.toLowerCase()));
 }
 
@@ -98,8 +91,9 @@ export function dataEntry(def: ComponentDef): DataEntry {
                   from: str(raw['from'])!,
                   to: str(raw['to'])!,
                   kind: str(raw['kind']),
-                  time: str(raw['time']),
-                  amount: str(raw['amount']),
+                  // `time` / `amount` are the old names, read for entries written before
+                  primaryTime: str(raw['primaryTime']) ?? str(raw['time']),
+                  primaryMeasure: str(raw['primaryMeasure']) ?? str(raw['amount']),
               }
             : null;
     const columns = Array.isArray(c['columns'])
@@ -111,6 +105,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
                   classification: str(x['classification']),
                   role: ROLES.find((r) => r === str(x['role'])?.toLowerCase()) ?? null,
                   unit: str(x['unit']),
+                  ...(x['carried'] === false ? { carried: false as const } : {}),
               }))
         : [];
     // the server's base rule (DatasetEntryRules.validateMapping), plus what the form needs: two columns to pick from
@@ -148,16 +143,17 @@ export function typeOf(classification: string | null, types: readonly TypeChoice
 
 /**
  * A column's role: the stored one, else (an entry written before roles) read from the rest of the entry - holds an
- * Entity Type → Entity; the link mapping's time or the event date → Time; its amount → Measure; its kind → Category;
- * anything else → Detail.
+ * Entity Type → Entity; the link mapping's primary Time or the event date → Time; its primary Measure → Measure; its kind
+ * → Category; a date or timestamp column → Time (LA-COLUMN-ROLES-1 P1, so a Mapping can pick it); anything else → Detail.
  */
 export function roleOf(col: DataColumn, entry: DataEntry, types: readonly TypeChoice[]): ColumnRole {
     if (col.role) return col.role;
     const is = (n: string | null | undefined) => !!n && n.toLowerCase() === col.name.toLowerCase();
     if (typeOf(col.classification, types)) return 'entity';
-    if (is(entry.mapping?.time) || is(entry.eventDate)) return 'temporal';
-    if (is(entry.mapping?.amount)) return 'measure';
+    if (is(entry.mapping?.primaryTime) || is(entry.eventDate)) return 'temporal';
+    if (is(entry.mapping?.primaryMeasure)) return 'measure';
     if (is(entry.mapping?.kind)) return 'dimension';
+    if (/^(date|timestamp)/i.test(col.type)) return 'temporal';
     return 'detail';
 }
 
@@ -166,8 +162,8 @@ export function mappingLine(m: LinkMapping | null): string {
     if (!m) return 'No link mapping yet';
     const parts = [`${m.from} → ${m.to}`];
     if (m.kind) parts.push(`kind ${m.kind}`);
-    if (m.time) parts.push(`when ${m.time}`);
-    if (m.amount) parts.push(`amount ${m.amount}`);
+    if (m.primaryTime) parts.push(`when ${m.primaryTime}`);
+    if (m.primaryMeasure) parts.push(`measure ${m.primaryMeasure}`);
     return parts.join(' · ');
 }
 
@@ -180,8 +176,8 @@ export interface MappingForm {
     to: string;
     toType: string;
     kind: string;
-    time: string;
-    amount: string;
+    primaryTime: string;
+    primaryMeasure: string;
 }
 
 /** A Mapping name: the Dataset id rule (a lower-case letter, then letters, digits or _), unique among Datasets. */
@@ -197,20 +193,30 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
     const columns = base.columns.map((c) => {
         const chosen = c.name === f.from ? f.fromType : c.name === f.to ? f.toType : undefined;
         const classification = chosen === undefined ? c.classification : chosen ? classify(chosen) : null;
-        // a From / To re-classified here is an Entity column, or no longer one; every other column keeps its role
-        const role = chosen === undefined ? c.role : classification ? 'entity' : c.role === 'entity' ? null : c.role;
+        // a From / To re-classified here is an Entity column, or no longer one; every other column keeps its role, and the
+        // primaries take theirs when the base states none (an entry written before roles)
+        const primary = c.name === f.primaryTime ? 'temporal' : c.name === f.primaryMeasure ? 'measure' : null;
+        const role =
+            chosen === undefined
+                ? (c.role ?? primary)
+                : classification
+                  ? 'entity'
+                  : c.role === 'entity'
+                    ? null
+                    : c.role;
         return {
             name: c.name,
             type: c.type,
             ...(classification ? { classification } : {}),
             ...(role ? { role } : {}),
             ...(role === 'measure' && c.unit ? { unit: c.unit } : {}),
+            ...(c.carried === false ? { carried: false } : {}),
         };
     });
     const mapping: Record<string, string> = { from: f.from, to: f.to };
     if (f.kind) mapping['kind'] = f.kind;
-    if (f.time) mapping['time'] = f.time;
-    if (f.amount) mapping['amount'] = f.amount;
+    if (f.primaryTime) mapping['primaryTime'] = f.primaryTime;
+    if (f.primaryMeasure) mapping['primaryMeasure'] = f.primaryMeasure;
     return {
         origin: 'mapping',
         basedOn: base.id,
@@ -220,7 +226,7 @@ export function mappingEntry(base: DataEntry, f: MappingForm, types: readonly Ty
             f.description.trim() || `A Mapping of ${base.id}: ${mappingLine(mapping as unknown as LinkMapping)}`,
         columns,
         defaultLinkMapping: mapping,
-        ...(f.time ? { eventDate: f.time } : {}),
+        ...(f.primaryTime ? { eventDate: f.primaryTime } : {}),
         ...(f.fromType ? { primaryEntityType: f.fromType } : {}),
     };
 }
@@ -237,7 +243,7 @@ export function formOf(entry: DataEntry, types: readonly TypeChoice[], name = ''
         to: m?.to ?? '',
         toType: typeOf(col(m?.to)?.classification ?? null, types)?.id ?? '',
         kind: m?.kind ?? '',
-        time: m?.time ?? '',
-        amount: m?.amount ?? '',
+        primaryTime: m?.primaryTime ?? '',
+        primaryMeasure: m?.primaryMeasure ?? '',
     };
 }

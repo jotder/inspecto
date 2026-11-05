@@ -285,7 +285,7 @@
                     } @else {
                         <p class="text-secondary m-0 text-sm">
                             An Entity Type is a kind of thing, like an account. Columns that hold one become the dots of
-                            the graph; the others are details.
+                            the graph; every other column is a Time, a Measure, a Category or a Detail.
                         </p>
                         <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2" formArrayName="columns">
                             @for (g of columnGroups(); track g.controls.name.value; let i = $index) {
@@ -313,6 +313,32 @@
                                                 }
                                             "
                                         ></ng-container>
+                                        <!-- LA-COLUMN-ROLES-1 P1: a column holding no Entity Type is a Time, Measure,
+                                             Category or Detail -->
+                                        @if (!g.controls.entityType.value) {
+                                            <div
+                                                class="flex flex-col gap-1 rounded"
+                                                [class]="lowClasses(key.role(g.controls.name.value))"
+                                            >
+                                                <inspecto-option-picker
+                                                    formControlName="role"
+                                                    [attr.data-testid]="'role-' + g.controls.name.value"
+                                                    [label]="
+                                                        'Role of ' + (g.controls.rename.value || g.controls.name.value)
+                                                    "
+                                                    [options]="roleOptions(g.controls.type.value)"
+                                                ></inspecto-option-picker>
+                                                <ng-container
+                                                    *ngTemplateOutlet="
+                                                        evidence;
+                                                        context: {
+                                                            c: roleChoice(g.controls.name.value),
+                                                            k: key.role(g.controls.name.value),
+                                                        }
+                                                    "
+                                                ></ng-container>
+                                            </div>
+                                        }
                                     </li>
                                 }
                             }
@@ -352,7 +378,8 @@
                                             <inspecto-option-picker
                                                 [label]="role.label"
                                                 [formControlName]="role.id"
-                                                [options]="optionalColumnOptions()"
+                                                [attr.data-testid]="'link-' + role.id"
+                                                [options]="linkColumnOptions()[role.id]"
                                             ></inspecto-option-picker>
                                             <ng-container
                                                 *ngTemplateOutlet="

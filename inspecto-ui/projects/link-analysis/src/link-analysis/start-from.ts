@@ -157,6 +157,8 @@ export function startMapping(
     bindings: readonly { column: string; role: string }[],
 ): { mapping: EntityProjection; timeCol?: string; from: string } | null {
     const m = ds.defaultLinkMapping;
+    // LA-COLUMN-ROLES-1 P2 (operator 2026-11-04, decision A): the default link carries no role column, so its links fold
+    // exactly as before; the index carries them, Play re-reads with the one Time column it plays through.
     if (m?.from && m.to)
         return {
             mapping: {
@@ -165,7 +167,7 @@ export function startMapping(
                 targetCol: m.to,
                 ...(m.kind ? { linkKindCol: m.kind } : {}),
             },
-            ...(m.time ? { timeCol: m.time } : {}),
+            ...(m.primaryTime ? { timeCol: m.primaryTime } : {}),
             from: 'default link',
         };
     const profile = domainProfiles().find((p) => p.investigate?.mapping.dataset === ds.id)?.investigate?.mapping;

@@ -253,6 +253,10 @@ import {
 } from '@inspecto/link-analysis/investigation/element-detail.dialog';
 import { PivotService } from '@inspecto/link-analysis/investigation/pivot.service';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
+import { carriedColumns, columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
+import { timeColumnChoices } from './timeline-playback';
+import { LinkAnalysisRoleFilterComponent, RoleFilterCategory } from './link-analysis-role-filter.component';
+import { NO_ROLE_FILTERS, RoleFilters, categoryValuesSql, withRoleFilters } from './role-filters';
 import {
     LA_AI_ASSIST,
     LA_DATASETS,
@@ -491,6 +495,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
     for (const l of next.links) if (!links.has(key(l))) links.set(key(l), l);
     return { entities: [...entities.values()], links: [...links.values()], excluded: prev.excluded, hash: '' };
 }
+
 @Component({
     selector: 'inspecto-link-analysis',
     standalone: true,
@@ -539,6 +544,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         LinkAnalysisLegendComponent,
         LinkAnalysisWorkingSetComponent,
         LinkAnalysisFilterComponent,
+        LinkAnalysisRoleFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         LinkAnalysisInvestigationComponent,
@@ -1003,6 +1009,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 entityType: p.entityType,
                 idMappings: [p] as (EntityIdMapping | undefined)[],
                 linkKindCol: p.linkKindCol || undefined,
+                attrCols: p.attrCols?.length ? p.attrCols : undefined,
                 filter: q.filter,
                 label: `${dsName(p.datasetId)}: ${p.sourceCol} → ${p.targetCol}`,
             }));
@@ -1031,6 +1038,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             sourceCol: t.sourceCol,
             targetCol: t.targetCol,
             kindCol: t.linkKindCol,
+            // LA-COLUMN-ROLES-1 P2: the index carries every Time, Measure and Category column of the Dataset
+            ...this.indexCarriage(t),
             label: t.label,
         })),
     );
@@ -1147,8 +1156,27 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const g = this.graph();
         const picked = this.timeColumn();
         const cols = this.attrColumns().filter((c) => c === picked || (!!g && isTemporalColumn(g, c)));
-        return [{ value: '', label: 'Off' }, ...cols.map((c) => ({ value: c, label: c }))];
+        // LA-COLUMN-ROLES-1 P2: the Dataset's Time columns too (picking one re-reads the links), its primary first
+        const times = g && g === this.plainGraph ? columnsOfRole(this.loadedDataset()?.columns, 'temporal') : [];
+        return [{ value: '', label: 'Off' }, ...timeColumnChoices(cols, times, this.primaryTime())];
     });
+    /** The Time columns playback can step through: every timeline choice but Off. */
+    readonly playColumns = computed(() => this.timeColumnOptions().filter((o) => o.value !== ''));
+    /**
+     * The graph the last plain query drew, while the canvas still IS it (LA-COLUMN-ROLES-1 P2): only then can Play re-read
+     * it with another Time column. A seeded start, an unsaved Investigation, an expand, a Grow or a push each draw another
+     * graph, which a re-read of the last query would replace by the whole Dataset.
+     */
+    private plainGraph: G6GraphData | null = null;
+    /** The Dataset a single-projection read drew from (LA-COLUMN-ROLES-1 P2); undefined otherwise. */
+    private readonly loadedDataset = computed(() => {
+        const run = this.lastRun();
+        const single = run?.sourceId === 'entity-projection' && !run.query.projections?.length;
+        const p = single ? run.query.projection : undefined;
+        return p ? this.datasets().find((d) => d.id === p.datasetId) : undefined;
+    });
+    /** The primary Time of the loaded Dataset's link mapping (LA-COLUMN-ROLES-1 P1), '' when none or several Datasets. */
+    readonly primaryTime = computed(() => this.loadedDataset()?.defaultLinkMapping?.primaryTime ?? '');
     /**
      * The default event time of a new Investigation: the timeline's column when one is on, else the profile's
      * time hint, else the first edge-attribute column whose every value parses as a date (what the working-set
@@ -3317,6 +3345,7 @@ Its prior copies stay in its version history.`,
             const g = hit.value.g;
             this.cachedAsOf.set(hit.fromCache ? hit.fetchedAt : null);
             this.growExclude.reset(); // a new graph: an Undo of the old one's Grow must not bring it back
+            this.plainGraph = g;
             this.graph.set(g);
             this.resolvePendingPivot(g);
             this.truncated.set(!!(g as ProjectedGraph).truncated);
@@ -3382,6 +3411,55 @@ Its prior copies stay in its version history.`,
     clearFilter(): void {
         this.filterWhere.set(emptyGroup());
         this.localFilter.set(null);
+        this.roleFilters.set(NO_ROLE_FILTERS);
+    }
+
+    // ── Filter by role (LA-COLUMN-ROLES-1 P3): a range per Measure, a list per Category, a window on a Time column ──
+    /** What the role panel last applied. */
+    readonly roleFilters = signal<RoleFilters>(NO_ROLE_FILTERS);
+    /** The loaded Dataset's role columns the panel offers (empty when the read spans several Datasets). */
+    readonly roleColumns = computed(() => {
+        const cols = this.loadedDataset()?.columns;
+        return {
+            measures: columnsOfRole(cols, 'measure'),
+            categories: columnsOfRole(cols, 'dimension'),
+            times: columnsOfRole(cols, 'temporal'),
+        };
+    });
+    readonly hasRoleColumns = computed(() => {
+        const r = this.roleColumns();
+        return r.measures.length + r.categories.length + r.times.length > 0;
+    });
+    /** Each Category column's distinct values, read from the Dataset once the filter is open. */
+    private readonly categoryValues = signal<Record<string, string[]>>({});
+    readonly roleCategories = computed<RoleFilterCategory[]>(() =>
+        this.roleColumns().categories.map((name) => ({ name, values: this.categoryValues()[name] ?? [] })),
+    );
+    /** The Dataset whose Category values are read (or being read): one read per Dataset, not per opening of the filter. */
+    private categoryValuesOf = '';
+    private readonly loadCategoryValues = effect(() => {
+        const ds = this.loadedDataset();
+        const cols = this.roleColumns().categories;
+        if (!this.filterOpen() || !ds?.sourceName || !cols.length || this.categoryValuesOf === ds.id) return;
+        this.categoryValuesOf = ds.id;
+        untracked(() => void this.readCategoryValues(ds.id, ds.sourceName, cols));
+    });
+
+    private async readCategoryValues(id: string, source: string, cols: readonly string[]): Promise<void> {
+        const out: Record<string, string[]> = {};
+        for (const c of cols) {
+            const res = await this.datasetRows.sql(source, categoryValuesSql(source, c), 200);
+            out[c] = res.error ? [] : res.rows.map((r) => String(r['v']));
+        }
+        if (this.categoryValuesOf === id) this.categoryValues.set(out); // a read for a Dataset no longer drawn is dropped
+    }
+
+    /** Write the role filters into the predicate tree (replacing the panel's own conditions) and push it to the server. */
+    applyRoleFilters(f: RoleFilters): Promise<void> {
+        const previous = this.roleFilters();
+        this.roleFilters.set(f);
+        this.filterWhere.set(withRoleFilters(this.filterWhere(), f, previous));
+        return this.pushFilter();
     }
 
     /**
@@ -4748,11 +4826,41 @@ Its prior copies stay in its version history.`,
 
     /** Pick the timeline's `attrs` column (or '' to turn it off); resets the cutoff to the column's max. */
     setTimeColumn(col: string): void {
+        // LA-COLUMN-ROLES-1 P2 (decision A): a Time column the links do not carry yet is read onto them first
+        if (col && !this.attrColumns().includes(col)) {
+            const times = columnsOfRole(this.loadedDataset()?.columns, 'temporal');
+            if (times.includes(col) && this.graph() === this.plainGraph) {
+                void this.playThrough(col, times);
+                return;
+            }
+        }
         this.recordHistory();
         this.timeColumn.set(col);
         this.timeCutoff.set(col ? (this.timeExtent()?.[1] ?? null) : null);
         // The playback strip leaves with the column; so must the slice it had highlighted.
         if (!col) this.emphasis.set(null);
+    }
+
+    /**
+     * Re-read the last single-projection query carrying `col` as its only Time column (decision A: a link read carries no
+     * role column by default, so links fold as before; playing through a Time splits them by it), then play through it.
+     */
+    private async playThrough(col: string, times: readonly string[]): Promise<void> {
+        const run = this.lastRun();
+        const p = run?.query.projection;
+        if (!run || !p) return;
+        const kept = (p.attrCols ?? []).filter((c) => !times.includes(c));
+        await this.execute(run.sourceId, { ...run.query, projection: { ...p, attrCols: [...kept, col] } });
+        if (this.attrColumns().includes(col)) this.setTimeColumn(col);
+    }
+
+    /** The columns a first build of `t`'s mapping indexes: the Dataset's carried role columns, else what its links carry. */
+    private indexCarriage(t: { dataset: string; sourceCol: string; targetCol: string }): { attrCols?: string[] } {
+        const ds = this.datasets().find((d) => d.id === t.dataset);
+        const carried = carriedColumns(ds?.columns, [t.sourceCol, t.targetCol]);
+        const own = (t as { attrCols?: string[] }).attrCols ?? [];
+        const cols = carried.length ? carried : own;
+        return cols.length ? { attrCols: cols } : {};
     }
 
     /** Move the timeline cutoff (epoch millis, from the slider). Not recorded per-drag (like search). */
@@ -5057,6 +5165,7 @@ Its prior copies stay in its version history.`,
         this.boundProfile.set(null);
         // A saved predicate is part of the question: seed the builder so the analyst sees and can refine it.
         this.filterWhere.set(view.query.filter ? cloneGroup(view.query.filter) : emptyGroup());
+        this.roleFilters.set(NO_ROLE_FILTERS); // the view's conditions are its own, not the panel's: none is taken out
         if (view.view?.plugins) this.viewOptions.set(canvasModeOptions(view.view.plugins));
         this.lassoMode.set(false);
         this.overlaysStated = { legend: view.view?.legend, workingSet: view.view?.workingSet };

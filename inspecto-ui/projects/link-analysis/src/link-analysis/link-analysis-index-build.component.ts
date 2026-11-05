@@ -43,6 +43,8 @@ export interface IndexMappingTarget {
     sourceCol: string;
     targetCol: string;
     kindCol?: string;
+    /** The columns its links carry (LA-COLUMN-ROLES-1 P2: the Dataset's Time, Measure and Category columns). */
+    attrCols?: string[];
     label: string;
 }
 
@@ -353,7 +355,13 @@ export class LinkAnalysisIndexBuildComponent {
     readonly mappingInitial = computed<Record<string, unknown> | undefined>(() => {
         const m = this.mappings()[0];
         return m
-            ? { dataset: m.dataset, sourceCol: m.sourceCol, targetCol: m.targetCol, kindCol: m.kindCol ?? '' }
+            ? {
+                  dataset: m.dataset,
+                  sourceCol: m.sourceCol,
+                  targetCol: m.targetCol,
+                  kindCol: m.kindCol ?? '',
+                  ...(m.attrCols?.length ? { attrCols: [...m.attrCols] } : {}),
+              }
             : undefined;
     });
     /** The mapping form shows when the analyst asked for it, and always when there is no listed index to rebuild. */

@@ -5,11 +5,12 @@ import { MatSelectModule } from '@angular/material/select';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { DatasetColumn, DatasetRole } from './dataset-types';
 
-const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
+const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal', 'entity', 'detail'];
 
 /**
  * Presentational role/format tagger for a dataset's columns (seeded by `inferRoles`). One row per column:
- * its inferred type, an editable **role** (dimension / measure / temporal — what a widget may bind it to), an
+ * its inferred type, an editable **role** (dimension / measure / temporal — what a widget may bind it to; entity /
+ * detail, LA-COLUMN-ROLES-1 — entity only on a column that holds an Entity Type, which the Data page sets), an
  * optional display **label** and **format**. No HTTP / services — emits the edited array to the editor host.
  */
 @Component({
@@ -45,7 +46,7 @@ const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
                                         (ngModelChange)="patch(col.name, { role: $event })"
                                         [aria-label]="'Role for ' + col.name"
                                     >
-                                        @for (r of roles; track r) {
+                                        @for (r of rolesFor(col); track r) {
                                             <mat-option [value]="r">{{ r }}</mat-option>
                                         }
                                     </mat-select>
@@ -78,6 +79,11 @@ const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal'];
 })
 export class DatasetColumnsComponent {
     readonly roles = ROLES;
+
+    /** The roles a column may take: `entity` only when it holds an Entity Type (the server refuses one that holds none). */
+    rolesFor(col: DatasetColumn): DatasetRole[] {
+        return col.classification || col.role === 'entity' ? ROLES : ROLES.filter((r) => r !== 'entity');
+    }
     readonly rows = signal<DatasetColumn[]>([]);
 
     @Input({ required: true }) set columns(cols: DatasetColumn[]) {

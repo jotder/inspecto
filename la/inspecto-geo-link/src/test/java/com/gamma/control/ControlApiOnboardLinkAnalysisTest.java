@@ -114,7 +114,11 @@ class ControlApiOnboardLinkAnalysisTest {
             assertTrue(s.get("index").get("edges").asLong() > 0, s.get("index").toString());
             boolean indexed = false;
             for (JsonNode ix : data(send(c, "GET", "/inv/index", null), 200).get("indexes"))
-                if (id.equals(ix.get("dataset").asText())) indexed = true;
+                if (id.equals(ix.get("dataset").asText())) {
+                    indexed = true;
+                    // LA-COLUMN-ROLES-1 P2: every Time, Measure and Category column rides in the index, in column order
+                    assertEquals("[\"channel\",\"amount\",\"booked_at\"]", ix.at("/mapping/attrCols").toString(), ix.toString());
+                }
             assertTrue(indexed, "the index is published for the Dataset");
 
             // LA-ONBOARD-1 OB-13: the commit counted the first Dataset where it happened; no graph is drawn yet
@@ -160,6 +164,44 @@ class ControlApiOnboardLinkAnalysisTest {
             JsonNode now = data(send(c, "POST", "/datasets/" + id + "/run", new byte[0]), 200);
             assertTrue(List.of("BUILT", "UP_TO_DATE").contains(now.get("index").get("result").asText()), now.get("index").toString());
         }
+    }
+
+    /**
+     * LA-COLUMN-ROLES-1 P3: a role filter (a Measure range, a Category list, a Time window) on a link read is answered from the link index's
+     * attribute columns - which Add data's first build carries - with exactly the rows the Dataset read gives, and narrows them.
+     */
+    @Test
+    void aRoleFilterIsServedFromTheIndexAndAgreesWithTheDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", transfers(200).getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode s = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("BUILT", s.get("index").get("result").asText(), s.get("index").toString());
+            String filter = "{\"kind\":\"group\",\"op\":\"AND\",\"items\":["
+                    + "{\"kind\":\"condition\",\"field\":\"channel\",\"operator\":\"in\",\"value\":\"mobile,online\"},"
+                    + "{\"kind\":\"condition\",\"field\":\"amount\",\"operator\":\"between\",\"value\":\"100\",\"value2\":\"600\"},"
+                    // a window on the Time column, as the role panel writes it (datetime-local, no zone)
+                    + "{\"kind\":\"condition\",\"field\":\"booked_at\",\"operator\":\">=\",\"value\":\"2026-09-05T00:00\"},"
+                    + "{\"kind\":\"condition\",\"field\":\"booked_at\",\"operator\":\"<\",\"value\":\"2026-09-25T12:30\"}]}";
+            String read = "{\"dataset\":\"" + id + "\",\"sourceCol\":\"from_account\",\"targetCol\":\"to_account\",\"value\":\"ACC-0001\"";
+            JsonNode all = data(send(c, "POST", "/inv/projection/neighbors", (read + "}").getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode viaIndex = data(send(c, "POST", "/inv/projection/neighbors",
+                    (read + ",\"filter\":" + filter + "}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals("index", viaIndex.at("/source/kind").asText(), viaIndex.get("source").toString());
+            Files.writeString(root.resolve("link-analysis.toon"), "index:\n  enabled: false\n");
+            JsonNode viaDataset = data(send(c, "POST", "/inv/projection/neighbors",
+                    (read + ",\"filter\":" + filter + "}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals(sorted(viaDataset.get("rows")), sorted(viaIndex.get("rows")), "the index answers as the Dataset does");
+            assertTrue(viaIndex.get("rows").size() > 0, viaIndex.toString());
+            assertTrue(viaIndex.get("rows").size() < all.get("rows").size(), "the filter narrows the hub's links");
+        }
+    }
+
+    private static List<String> sorted(JsonNode rows) {
+        List<String> out = new java.util.ArrayList<>();
+        for (JsonNode r : rows) out.add(r.toString());
+        out.sort(null);
+        return out;
     }
 
     /**

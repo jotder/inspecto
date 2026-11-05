@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { G6GraphData } from '@inspecto/core/graph';
 import {
     AGE_FADE_FLOOR,
+    timeColumnChoices,
     PLAYBACK_SLICES,
     activeInSlice,
     ageOpacity,
@@ -105,5 +106,14 @@ describe('timeline playback slices', () => {
                 expect(t >= from && t < to, `slice ${i} at ${t} ms`).toBe(lit);
             }
         }
+    });
+
+    it('LA-COLUMN-ROLES-1 P2: the Time choices are the dated link columns then the Dataset Time columns, the primary first', () => {
+        expect(timeColumnChoices(['when'], ['WHEN', 'settled', 'booked'], 'Settled')).toEqual([
+            { value: 'settled', label: 'settled (primary)' },
+            { value: 'when', label: 'when' },
+            { value: 'booked', label: 'booked' },
+        ]);
+        expect(timeColumnChoices(['when'], [], '')).toEqual([{ value: 'when', label: 'when' }]);
     });
 });

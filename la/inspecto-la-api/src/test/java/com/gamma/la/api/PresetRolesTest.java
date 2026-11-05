@@ -28,6 +28,14 @@ class PresetRolesTest {
         assertEquals("fee", PresetQueries.roles(dataset, COLUMNS, List.of(), null).amount());
     }
 
+    /** LA-COLUMN-ROLES-1 P1: the primary Measure (and Time) are read under their names, before the old ones. */
+    @Test
+    void thePrimaryMeasureIsTheAmount() {
+        Map<String, Object> dataset = Map.of("defaultLinkMapping",
+                Map.of("from", "caller", "to", "callee", "primaryMeasure", "fee"));
+        assertEquals("fee", PresetQueries.roles(dataset, COLUMNS, List.of(), null).amount());
+    }
+
     @Test
     void withoutAMappedAmountThePackHintStillPicksOne() {
         Map<String, Object> dataset = Map.of("defaultLinkMapping", Map.of("from", "caller", "to", "callee"));

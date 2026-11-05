@@ -1,5 +1,7 @@
 # Column roles: several times, measures and categories per Dataset (`LA-COLUMN-ROLES-1`)
 
+> **SHIPPED 2026-11-05 (P0-P3; archived).** As-built truth: [la-core architecture](../../okf/product/module/la-core/architecture.md) §6.15 "Column roles"; open remainder: BACKLOG `LA-COLUMN-ROLES-2`.
+
 > **PLAN 2026-11-04 — decisions Q-1…Q-6 accepted by the operator 2026-11-04 (the recommended options, §5).** Operator ask, on the Data page's
 > Entities card: *"some of the important fields missing like date (would be more than one), amount, volume, type
 > (would be multiple) which would be used for play / filter"*. Board row `LA-COLUMN-ROLES-1`.
@@ -46,8 +48,11 @@ Dataset or Mapping says is the amount. A Mapping chosen for a different amount g
    A Measure may say what it measures (money, duration, bytes, count) and its unit. There may be several of each.
 2. **A link mapping picks its primaries** among those columns: the **time** that dates each link (the window, playback,
    newcomers) and the **measure** that weighs it (presets' sums, edge width). Every other Time, Measure and Category
-   column rides on each link without being named again.
-3. **Play** can step through any Time column of the link (the primary by default; a picker beside the play control).
+   column rides in the **link index** without being named again. *(Operator decision A, 2026-11-04, found building P2:
+   a link READ carries no role column by default, because a carried column is a grouping key of the read and would
+   unfold the links - about one edge per row, other counts and weights. So links fold as before.)*
+3. **Play** can step through any Time column of the Dataset (the primary first; a picker beside the play control).
+   Picking one the links do not carry re-reads them carrying that one Time column only.
 4. **Filter** gains, beside today's kinds and window: a **range per Measure** and a **value list per Category**, and a
    window on any Time column. Reads from a published link index filter server side on the carried columns; reads from
    the Dataset filter in SQL.
@@ -74,7 +79,14 @@ Dataset or Mapping says is the amount. A Mapping chosen for a different amount g
 - **Category means low cardinality.** A text column with thousands of distinct values is a Detail, not a filter list;
   Add data measures distinct counts in its sample (it already samples for confidence).
 - **Index carriage is opt-out, not opt-in**: every Time / Measure / Category column becomes an index attribute, so a
-  filter or a play column never needs a rebuild to appear. The cost is width; a Mapping may mark a column "not carried".
+  filter or a play column never needs a rebuild to appear. The cost is width; a column may be marked "not carried"
+  (`columns[].carried: false`, set per Dataset column on the Data page; a Mapping keeps its base's mark). At most 50
+  (the index build's own bound).
+- **Carriage on a link read (operator decision A, 2026-11-04).** A read's `attrCols` are grouping keys (server
+  `edgeSql`, the UI fold key), so the default link read carries **no** role column and folds exactly as before. Play
+  re-reads with the one Time column it plays through; Measure and Category filters go to the server as the read's
+  `filter` (rendered over the Dataset in SQL, over the index's attribute columns when served from it), so they need no
+  carriage. Rejected: (B) carry Categories only; (C) carry every role column and let links unfold.
 - **Filter UI follows the form idiom** (`spec-forms-state.md`): a Measure range is two pen-field rows, a Category is a
   picker with search (several values: the picker's multi-select — or `UI-PICKER-OPTIONS-1` if it needs groups).
 

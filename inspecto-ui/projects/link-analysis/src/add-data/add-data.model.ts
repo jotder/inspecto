@@ -1,4 +1,5 @@
 import { formatNumber } from '@inspecto/core/viz/number-format';
+import type { ColumnRole } from '../api/column-roles';
 
 /**
  * **Add data** - the contract of `POST /onboard/files` and its commit (LA-ONBOARD-1 OB-2, phase 2), and the pure rules the
@@ -32,14 +33,26 @@ export interface DraftEntityTypeChoice extends Choice<string | null> {
     classification?: string | null;
 }
 
+/** The link a draft proposes: its ends, its kind, and the primary Time and Measure (LA-COLUMN-ROLES-1 P1). */
 export interface DraftLink {
     from: Choice<string | null>;
     to: Choice<string | null>;
     kind: Choice<string | null>;
-    time: Choice<string | null>;
-    amount: Choice<string | null>;
+    primaryTime: Choice<string | null>;
+    primaryMeasure: Choice<string | null>;
     details: Choice<string[]>;
 }
+
+/** The link choices beside its two ends, in screen order. */
+export const LINK_PRIMARIES = ['kind', 'primaryTime', 'primaryMeasure'] as const;
+export type LinkPrimary = (typeof LINK_PRIMARIES)[number];
+
+/** The role a link choice's column takes (the kind is a Category). */
+export const PRIMARY_ROLE: Record<LinkPrimary, ColumnRole> = {
+    kind: 'dimension',
+    primaryTime: 'temporal',
+    primaryMeasure: 'measure',
+};
 
 export interface DraftLimits {
     maxBytes: number;
@@ -66,7 +79,8 @@ export interface OnboardDraft {
     columns: DraftColumn[];
     rows: Record<string, unknown>[];
     entityTypes: {
-        columns: { column: string; entityType: DraftEntityTypeChoice }[];
+        /** Per column: what it holds, its proposed role, and for a text column its distinct sampled values. */
+        columns: { column: string; entityType: DraftEntityTypeChoice; role?: Choice<ColumnRole>; distinct?: number }[];
         primary: Choice<string | null>;
         link?: DraftLink;
         identifying?: Choice<string | null> & { entityType?: string | null };
@@ -87,6 +101,8 @@ export interface CommitColumn {
     name: string;
     type?: string;
     entityType?: string | null;
+    /** Absent = the server derives it (an Entity when it holds an Entity Type, else the draft's proposal). */
+    role?: ColumnRole;
     rename?: string;
     drop?: boolean;
 }
@@ -95,8 +111,8 @@ export interface CommitLink {
     from: string;
     to: string;
     kind?: string;
-    time?: string;
-    amount?: string;
+    primaryTime?: string;
+    primaryMeasure?: string;
 }
 
 /** The body of `POST /onboard/files/{draftId}/commit`; every key optional (absent = the draft's proposal). */
@@ -318,6 +334,7 @@ export const choiceKey = {
     type: (column: string) => `type.${column}`,
     entityType: (column: string) => `entity.${column}`,
     link: (role: string) => `link.${role}`,
+    role: (column: string) => `role.${column}`,
     primary: 'primary',
     identifying: 'identifying',
 };
@@ -341,18 +358,29 @@ export function lowChoices(
     for (const c of d.entityTypes.columns)
         if (!dropped.has(c.column) && low(c.entityType) && c.entityType.value)
             out.push({ key: choiceKey.entityType(c.column), label: `What ${c.column} holds` });
+    for (const c of d.entityTypes.columns)
+        if (!dropped.has(c.column) && !c.entityType.value && c.role && low(c.role))
+            out.push({ key: choiceKey.role(c.column), label: `The role of ${c.column}` });
     if (low(d.entityTypes.primary) && d.entityTypes.primary.value)
         out.push({ key: choiceKey.primary, label: 'The main kind of thing' });
     const l = d.entityTypes.link;
     if (l && l.from.value && (low(l.from) || low(l.to)))
         out.push({ key: choiceKey.link('from'), label: 'Which way the link goes' });
-    for (const role of ['kind', 'time', 'amount'] as const)
-        if (l && l[role].value && low(l[role])) out.push({ key: choiceKey.link(role), label: `The link's ${role}` });
+    for (const role of LINK_PRIMARIES)
+        if (l && l[role].value && low(l[role]))
+            out.push({ key: choiceKey.link(role), label: `The link's ${PRIMARY_WORDS[role]}` });
     const id = d.entityTypes.identifying;
     if (id && id.value && low(id))
         out.push({ key: choiceKey.identifying, label: 'The column that identifies each entity' });
     return out;
 }
+
+/** A link choice in the words a person reads. */
+export const PRIMARY_WORDS: Record<LinkPrimary, string> = {
+    kind: 'kind',
+    primaryTime: 'time',
+    primaryMeasure: 'measure',
+};
 
 const FORMAT_LABELS: Record<string, string> = {
     type: 'The file type',
@@ -371,6 +399,8 @@ export interface ColumnState {
     drop: boolean;
     /** '' = nothing (a detail). */
     entityType: string;
+    /** The role when it holds no Entity Type (LA-COLUMN-ROLES-1 P1): Time, Measure, Category or Detail. */
+    role: ColumnRole;
 }
 
 /** What the screen holds for the link (stream) or the identifying column (reference); '' = none. */
@@ -379,8 +409,8 @@ export interface RolesState {
     from: string;
     to: string;
     kind: string;
-    time: string;
-    amount: string;
+    primaryTime: string;
+    primaryMeasure: string;
     identifying: string;
     /** What one row is (ENTITY-TYPE-CATALOG-1 P2); '' = not said, absent = not asked. */
     recordType?: string;
@@ -400,6 +430,7 @@ export function buildCommit(
     opts: { withEntityTypes: boolean },
 ): CommitBody {
     const proposedEntity = new Map(d.entityTypes.columns.map((c) => [c.column, c.entityType]));
+    const proposedRole = new Map(d.entityTypes.columns.map((c) => [c.column, c.role]));
     const draftType = new Map(d.columns.map((c) => [c.name, c.type.value]));
     const out: CommitBody = { name: name.trim(), columns: [] };
     if (description.trim()) out.description = description.trim();
@@ -416,7 +447,10 @@ export function buildCommit(
         if (!opts.withEntityTypes) {
             const p = proposedEntity.get(c.name);
             entity = p && p.value && p.confidence === 'high' ? p.value : null;
-        }
+            // a guessed role is not applied either: the column stays a Detail
+            const r = proposedRole.get(c.name);
+            if (!entity && r && r.confidence === 'low') col.role = 'detail';
+        } else if (!entity) col.role = columnRole(c);
         col.entityType = entity;
         out.columns.push(col);
     }
@@ -433,8 +467,8 @@ export function buildCommit(
                       from: l.from.value!,
                       to: l.to.value!,
                       kind: high(l.kind),
-                      time: high(l.time),
-                      amount: high(l.amount),
+                      primaryTime: high(l.primaryTime),
+                      primaryMeasure: high(l.primaryMeasure),
                   })
                 : null;
         } else {
@@ -444,6 +478,12 @@ export function buildCommit(
         return out;
     }
     const keep = (v: string) => (v && kept.has(v) ? v : '');
+    // a primary names a column of its role (LA-COLUMN-ROLES-1 P1): one changed to another role since is no primary
+    const byName = new Map(columns.map((c) => [c.name, c]));
+    const keepAs = (v: string, role: ColumnRole) => {
+        const c = byName.get(keep(v));
+        return c && columnRole(c) === role ? c.name : '';
+    };
     const heldTypes = new Set(columns.filter((c) => !c.drop && c.entityType).map((c) => c.entityType));
     out.primaryEntityType = roles.primary && heldTypes.has(roles.primary) ? roles.primary : null;
     if (roles.recordType !== undefined) out.recordType = roles.recordType || null;
@@ -452,7 +492,13 @@ export function buildCommit(
         const to = keep(roles.to);
         out.link =
             from && to && from !== to
-                ? stripEmpty({ from, to, kind: keep(roles.kind), time: keep(roles.time), amount: keep(roles.amount) })
+                ? stripEmpty({
+                      from,
+                      to,
+                      kind: keep(roles.kind),
+                      primaryTime: keepAs(roles.primaryTime, 'temporal'),
+                      primaryMeasure: keepAs(roles.primaryMeasure, 'measure'),
+                  })
                 : null;
     } else {
         out.identifyingColumn = keep(roles.identifying) || null;
@@ -464,23 +510,36 @@ function high(c: Choice<string | null>): string {
     return c.value && c.confidence === 'high' ? c.value : '';
 }
 
-function stripEmpty(l: { from: string; to: string; kind: string; time: string; amount: string }): CommitLink {
+function stripEmpty(l: { from: string; to: string } & Record<LinkPrimary, string>): CommitLink {
     const out: CommitLink = { from: l.from, to: l.to };
-    if (l.kind) out.kind = l.kind;
-    if (l.time) out.time = l.time;
-    if (l.amount) out.amount = l.amount;
+    for (const k of LINK_PRIMARIES) if (l[k]) out[k] = l[k];
     return out;
+}
+
+/** The column types a Measure may have: numbers (the server refuses a Measure on any other). */
+export const MEASURE_TYPES: ReadonlySet<string> = new Set(['DOUBLE', 'BIGINT']);
+
+/**
+ * The role a column takes: an Entity when it holds an Entity Type; else the one picked - never Entity without a type, and
+ * a Measure only while the column holds numbers (one whose type was changed to text is a Detail again).
+ */
+export function columnRole(c: ColumnState): ColumnRole {
+    if (c.entityType) return 'entity';
+    if (c.role === 'entity' || (c.role === 'measure' && !MEASURE_TYPES.has(c.type))) return 'detail';
+    return c.role;
 }
 
 /** The screen's starting state: every proposal pre-applied (OF-2). */
 export function initialColumns(d: OnboardDraft): ColumnState[] {
     const entity = new Map(d.entityTypes.columns.map((c) => [c.column, c.entityType.value ?? '']));
+    const role = new Map(d.entityTypes.columns.map((c) => [c.column, c.role?.value ?? 'detail']));
     return d.columns.map((c) => ({
         name: c.name,
         rename: c.name,
         type: c.type.value,
         drop: false,
         entityType: entity.get(c.name) ?? '',
+        role: role.get(c.name) ?? 'detail',
     }));
 }
 
@@ -491,8 +550,8 @@ export function initialRoles(d: OnboardDraft): RolesState {
         from: l?.from.value ?? '',
         to: l?.to.value ?? '',
         kind: l?.kind.value ?? '',
-        time: l?.time.value ?? '',
-        amount: l?.amount.value ?? '',
+        primaryTime: l?.primaryTime.value ?? '',
+        primaryMeasure: l?.primaryMeasure.value ?? '',
         identifying: d.entityTypes.identifying?.value ?? '',
         recordType: d.entityTypes.recordType?.value ?? '',
     };

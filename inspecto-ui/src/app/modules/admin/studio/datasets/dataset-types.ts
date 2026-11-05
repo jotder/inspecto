@@ -1,5 +1,6 @@
 import { ColumnMeta, ColumnType, QueryModel } from 'app/inspecto/query';
 import { roleFor } from 'app/inspecto/viz/result-set';
+import type { FieldRole } from 'app/inspecto/viz/viz-types';
 
 /**
  * Studio **Dataset** model — a data-source abstraction (not merely "a saved query"), the first Studio kind
@@ -14,14 +15,25 @@ import { roleFor } from 'app/inspecto/viz/result-set';
  */
 export type DatasetKind = 'physical' | 'virtual' | 'materialized';
 
-/** A column's analytic role — what a widget may bind it to (Tableau-style measure/dimension/time split). */
-export type DatasetRole = 'dimension' | 'measure' | 'temporal';
+/**
+ * A column's role (`columns[].role`) — what a widget may bind it to (Tableau-style measure/dimension/time split), plus
+ * LA-COLUMN-ROLES-1's `entity` (holds an Entity Type: its `classification`) and `detail` (carried along). One vocabulary
+ * with the Link Analysis Data page (`docs/GLOSSARY.md` *Column Role*).
+ */
+export type DatasetRole = 'entity' | 'temporal' | 'measure' | 'dimension' | 'detail';
+
+/** The role a widget binds a column by: an Entity or a Detail column is a dimension to a chart. */
+export function fieldRole(role: DatasetRole): FieldRole {
+    return role === 'measure' || role === 'temporal' ? role : 'dimension';
+}
 
 /** One typed, role-tagged column with an optional display label + format. */
 export interface DatasetColumn {
     name: string;
     type: ColumnType;
     role: DatasetRole;
+    /** Read-only here: what an Entity column holds (set on the Link Analysis Data page); carried as read. */
+    classification?: string;
     label?: string;
     /** A format key resolved by Studio's formatter later (e.g. `int`, `bytes`, `percent`); free-form for now. */
     format?: string;
@@ -83,13 +95,13 @@ export interface Dataset extends DatasetConfig {
     description?: string;
     /** LA-ONBOARD-1 OB-8, read-only here: the Entity Type the Dataset's graph leads with. */
     primaryEntityType?: string;
-    /** LA-ONBOARD-1 OB-8, read-only here: the link every Link Analysis start draws (`{from, to, kind?, time?, …}`). */
+    /** LA-ONBOARD-1 OB-8, read-only here: the link every Link Analysis start draws (`{from, to, kind?, primaryTime?, primaryMeasure?, …}`). */
     defaultLinkMapping?: {
         from: string;
         to: string;
         kind?: string;
-        time?: string;
-        amount?: string;
+        primaryTime?: string;
+        primaryMeasure?: string;
         details?: string[];
     };
     /**

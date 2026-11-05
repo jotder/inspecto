@@ -99,6 +99,22 @@ const label = (t: number): string => new Date(t).toISOString().slice(0, 16).repl
                     (input)="seek($event)"
                 />
             </label>
+            @if (columns().length > 1) {
+                <!-- LA-COLUMN-ROLES-1 P2: step through any Time column the links carry -->
+                <label class="flex items-center gap-1 text-xs">
+                    <span class="text-secondary">Time</span>
+                    <select
+                        class="bg-card rounded border px-1 py-0.5"
+                        data-test="playback-column"
+                        [value]="column()"
+                        (change)="pickColumn($event)"
+                    >
+                        @for (c of columns(); track c.value) {
+                            <option [value]="c.value" [selected]="c.value === column()">{{ c.label }}</option>
+                        }
+                    </select>
+                </label>
+            }
             <label class="flex items-center gap-1 text-xs">
                 <span class="text-secondary">Window</span>
                 <select
@@ -154,6 +170,10 @@ export class LinkAnalysisTimelinePlaybackComponent {
     readonly graph = input.required<G6GraphData | null>();
     /** The edge `attrs` column holding each link's date (the timeline's column). */
     readonly column = input.required<string>();
+    /** The Time columns the links carry, the primary first (LA-COLUMN-ROLES-1 P2); a picker shows when there are two or more. */
+    readonly columns = input<readonly { value: string; label: string }[]>([]);
+    /** Another Time column picked to play through. */
+    readonly columnChange = output<string>();
     /** `[min, max]` epoch millis of that column — the playback's range. */
     readonly extent = input.required<[number, number]>();
 
@@ -263,6 +283,11 @@ export class LinkAnalysisTimelinePlaybackComponent {
             this.go(this.index() + 1);
             if (this.atEnd()) this.halt();
         }, TICK_MS);
+    }
+
+    pickColumn(e: Event): void {
+        const v = (e.target as HTMLSelectElement).value;
+        if (v && v !== this.column()) this.columnChange.emit(v);
     }
 
     setWindow(e: Event): void {

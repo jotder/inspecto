@@ -33,6 +33,17 @@ describe('DatasetColumnsComponent', () => {
         expect(emitted?.find((x) => x.name === 'duration_s')?.role).toBe('measure');
     });
 
+    it('LA-COLUMN-ROLES-1: offers entity only on a column that holds an Entity Type, and detail always', () => {
+        const c = create().componentInstance;
+        const plain = c.rolesFor({ name: 'tariff', type: 'string', role: 'dimension' });
+        expect(plain).toContain('detail');
+        expect(plain).not.toContain('entity');
+        expect(c.rolesFor({ name: 'caller', type: 'string', role: 'dimension', classification: 'MSISDN' })).toContain(
+            'entity',
+        );
+        expect(c.rolesFor({ name: 'caller', type: 'string', role: 'entity' })).toContain('entity'); // shown as stored
+    });
+
     it('renders with no a11y violations', async () => {
         const fixture = create();
         await expectNoA11yViolations(fixture.nativeElement);

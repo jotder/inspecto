@@ -1,7 +1,7 @@
 import type { ActivatedRoute } from '@angular/router';
 import { formatNumber } from '@inspecto/core/viz/number-format';
 import { rampColor, sequentialLevel } from '@inspecto/core/viz/heatmap';
-import type { Assessed } from '@inspecto/link-analysis/api/entity-profile.service';
+import type { Assessed, EntityMeasure } from '@inspecto/link-analysis/api/entity-profile.service';
 import { formatDay, formatDayStart } from '@inspecto/link-analysis/link-analysis/data-trust';
 
 /**
@@ -19,6 +19,16 @@ export function notAssessedText(s: Assessed | null | undefined, inline = false):
 /** A count in the shared number format; an em dash for an absent one (never a 0 nobody measured). */
 export function count(n: number | null | undefined): string {
     return n == null || !Number.isFinite(n) ? '—' : formatNumber(n);
+}
+
+/**
+ * One aggregate of a Measure in the shared number format, with its unit when the Dataset says one ("1,250.5 USD"); an em
+ * dash when no row held a number (LA-COLUMN-ROLES-1 P3).
+ */
+export function measureValue(m: EntityMeasure | undefined, k: 'sum' | 'min' | 'max'): string {
+    const v = m?.[k];
+    if (v == null || !Number.isFinite(v)) return '—';
+    return m?.unit ? `${formatNumber(v)} ${m.unit}` : formatNumber(v);
 }
 
 /** A row count with its noun in the right number: "1 row", "2 rows". */

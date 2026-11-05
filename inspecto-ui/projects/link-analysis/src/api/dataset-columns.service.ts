@@ -18,6 +18,8 @@ export interface ColumnChange {
     entityType?: string | null;
     role?: string | null;
     unit?: string | null;
+    /** `false` keeps a Time, Measure or Category column off the links; `null` carries it again (LA-COLUMN-ROLES-1 P2). */
+    carried?: false | null;
 }
 
 /**

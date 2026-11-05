@@ -25,7 +25,9 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **81<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 66<!--count:backlog-p3--> × P3** —
+> **81<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 67<!--count:backlog-p3--> × P3** —
+> ⬆ **80 → 81 (P3 66 → 67) on 2026-11-05**: filed P3 feature `LA-COLUMN-ROLES-2`, the deliberately deferred remainder of `LA-COLUMN-ROLES-1` [items: module.la-core · kind: feature].
+> ⬇ **81 → 80 (P2 15 → 14) on 2026-11-05**: closed P2 feature `LA-COLUMN-ROLES-1` [items: module.la-core · kind: feature] — a role per column (Entity · Time · Measure · Category · Detail, several of each) checked on every Dataset write and proposed by Add data; the link mapping's `primaryTime` / `primaryMeasure`; the link index carries every Time, Measure and Category column while a link read carries none (operator decision A); play over any Time column; Filter by role on the server; Measures on the entity profile; presets now use the mapping's measure. P0-P3 built in five commits (as built: `okf/product/module/la-core/architecture.md` §6.15; plan archived).
 > ⬆ **80 → 81 (P3 65 → 66) on 2026-11-04**: filed P3 feature `ENTITY-TYPE-RECORD-ROLES-1`, the deferred remainder of `ENTITY-TYPE-CATALOG-1` [items: module.entity-store, module.la-core · kind: feature].
 > ⬇ **81 → 80 (P2 16 → 15) on 2026-11-04**: closed P2 feature `ENTITY-TYPE-CATALOG-1` [items: module.entity-store, module.la-core · kind: feature] — a domain Entity Type catalogue: neutral core families, pack-added types with closed value shapes and examples, several packs per Space, record types that narrow the "what does this column hold" picker, comprehensive telecom and mobile-money packs and a neutral starter catalogue; P0-P3 built in five commits (plan archived).
 > ⬆ **80 → 81 (P2 15 → 16) on 2026-11-04**: filed P2 feature `ENTITY-TYPE-CATALOG-1` (plan `entity-type-catalog-plan.md`, decisions Q-1…Q-6 accepted by the operator) [items: module.entity-store, module.la-core · kind: feature].
@@ -430,10 +432,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 66<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 66<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 67<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 67<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 81<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -717,7 +719,7 @@ provenance in [`archived-documents/plans-archive/link-analysis-backlog-plan.md`]
 What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 
-- **P2** · `LA-COLUMN-ROLES-1` — **a column has a role: Entity, Time, Measure, Category or Detail, several of each, so play and filter can use every date, measure and category a Dataset has (operator ask 2026-11-04).** Today a Dataset names ONE time, ONE amount and ONE kind (`defaultLinkMapping`), the Entities card can only say which Entity Type a column holds, playback steps through one time column, and the filter has no measure range or category list. Includes a defect found while planning: `PresetQueries.roles()` checks the mapping's `amount` but never uses it, so presets sum the Industry pack's hinted column instead (P0). → [`superpower/la-column-roles-plan.md`](superpower/la-column-roles-plan.md) (Q-1…Q-6 accepted 2026-11-04) [items: module.la-core · kind: feature]
+- **P3** · `LA-COLUMN-ROLES-2` — **what `LA-COLUMN-ROLES-1` deliberately left out, on demand:** the Entity *Type* profile's Measure aggregates (today only one Entity's profile has them); edge width from the link mapping's primary Measure (the canvas still weighs links by their count); a Mapping-level override of a column's `carried` mark (a Mapping keeps its base's); Category values for a read over several Datasets (the Filter by role panel offers one read's Dataset only). → `okf/product/module/la-core/architecture.md` §6.15 [items: module.la-core · kind: feature]
 - **P3** · `LA-PRESET-ROLES-1` — **preset role detection guesses From/To from the first two classified columns, which can be the wrong pair (filed 2026-11-03).** IMS `ims_cdr_dataset` resolves From = `served_msisdn`, To = `served_imsi` (one subscriber's number and SIM), not caller and callee; prefer the link index's or a Mapping's columns, or the pack's role hints, before the first-two rule. → [`la-index-pairs-loops-plan.md`](archived-documents/plans-archive/la-index-pairs-loops-plan.md) §7 [items: module.la-core · kind: defect · hold: demand]
 - **P3** · `LA-BASIC-DISCOVER-1` — **Discover a Dataset in Basic: entities per Entity Type, busiest entities, link kinds, period, amount totals (LA-BASIC-DISCOVERY-1 P0 + P1, filed 2026-11-03).** `GET /inv/datasets/{id}/discover` from `EntityProfiles` blocks over the Dataset's mapping, masked, cached per last arrival; the Data page's *Discover* tab and the Start box's *About this Dataset*. → [`superpower/la-basic-discovery-plan.md`](superpower/la-basic-discovery-plan.md) [items: module.la-core · kind: feature]
 - **P3** · `LA-ENTITY-SUMMARY-1` — **an entity summary in Basic (first / last seen, top counterparts by links and amount, link kinds, activity) - the full profile pages stay Standard (D-LAE4) (LA-BASIC-DISCOVERY-1 P2).** `GET /inv/entities/{type}/{key}/summary`, *Summary* in the node dialog. → [`superpower/la-basic-discovery-plan.md`](superpower/la-basic-discovery-plan.md) [items: module.la-core · kind: feature]
