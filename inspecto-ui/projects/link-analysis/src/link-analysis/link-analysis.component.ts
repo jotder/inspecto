@@ -71,6 +71,7 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
+import { DataStatusComponent } from '@inspecto/link-analysis/add-data/data-status.component';
 import {
     START_MAX_SEEDS,
     StartDataset,
@@ -544,6 +545,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         LinkAnalysisStartBoxComponent,
+        DataStatusComponent,
         InspectoSkeletonComponent,
         GraphViewComponent,
         DataTableComponent,
@@ -1186,6 +1188,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const p = single ? run.query.projection : undefined;
         return p ? this.datasets().find((d) => d.id === p.datasetId) : undefined;
     });
+    /** Its id, for the Rows dock's Data status (LA-ARRIVAL-LEDGER-1); null when none or several Datasets. */
+    readonly loadedDatasetId = computed(() => this.loadedDataset()?.id ?? null);
     /** The primary Time of the loaded Dataset's link mapping (LA-COLUMN-ROLES-1 P1), '' when none or several Datasets. */
     readonly primaryTime = computed(() => this.loadedDataset()?.defaultLinkMapping?.primaryTime ?? '');
     /**

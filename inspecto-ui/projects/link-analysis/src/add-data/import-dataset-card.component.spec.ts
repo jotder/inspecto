@@ -143,6 +143,43 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(fixture.componentInstance.got.length).toBe(1);
     });
 
+    it('LA-ARRIVAL-MODES-1: "replaces the days it covers" is offered only with a When column, and sent as mode=period', async () => {
+        const { fixture, el } = create();
+        expect(q(el, 'add-file-period')).toBeNull(); // the arrivals (and so the When column) are not read yet
+        http.expectOne(apiUrl('/datasets/transfers/arrivals')).flush({
+            dataset: 'transfers',
+            eventDateColumn: 'booked_at',
+            arrivals: [],
+            truncated: false,
+            reason: null,
+        });
+        fixture.detectChanges();
+        (q(el, 'add-file-period')!.querySelector('input[type=radio]') as HTMLInputElement).click();
+        fixture.detectChanges();
+        const input = el.querySelector('input[type=file]') as HTMLInputElement;
+        Object.defineProperty(input, 'files', { value: [new File(['a'], 'week.csv')], configurable: true });
+        input.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        const req = http.expectOne((r) => r.url === apiUrl('/datasets/transfers/files'));
+        expect(req.request.params.get('mode')).toBe('period');
+        req.flush(
+            summary({
+                file: 'week.csv',
+                rowsBefore: 100,
+                rowsAfter: 79,
+                rowsChanged: -21,
+                period: { days: 7, from: '2026-09-02', to: '2026-09-08', rowsReplaced: 28, filesRewritten: 1 },
+                newColumns: ['fee'],
+            }),
+        );
+        fixture.detectChanges();
+        expect(el.textContent).toContain(
+            'It replaced 2026-09-02 – 2026-09-08 (7 days): 28 older rows were removed, 79 rows now.',
+        );
+        expect(el.textContent).toContain('New column not kept: fee.');
+        await expectNoA11yViolations(el);
+    });
+
     it('a Reference is always replaced (no mode choice)', () => {
         const { el } = create({ kind: 'reference' });
         expect(q(el, 'add-file-mode')).toBeNull();
@@ -262,6 +299,43 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(dataStatusLine([{ ...base, index: 'BUILT' }])).toBe('Received 2026-11-02 08:00 · graph up to date');
         expect(dataStatusLine([{ ...base, index: 'DEFERRED' }])).toContain("updated by the Space's Jobs");
         expect(dataStatusLine([])).toBeNull();
+        // the graph clock: how many files arrived after the newest one the graph took (Run now records its own outcome)
+        const drop: Arrival = { ...base, sender: 'system', index: 'FAILED' };
+        expect(dataStatusLine([drop, { ...base, index: 'BUILT' }])).toBe(
+            'Received 2026-11-02 08:00 · graph 1 file behind',
+        );
+        expect(dataStatusLine([drop, drop, { ...base, index: 'UP_TO_DATE' }])).toContain('graph 2 files behind');
+        expect(
+            dataStatusLine([
+                { ...drop, index: 'BUILT' },
+                { ...base, index: 'FAILED' },
+            ]),
+        ).toContain('graph up to date');
+        // an arrival with no recorded outcome is not counted as behind: nothing is said rather than guessed
+        expect(dataStatusLine([base, { ...base, index: 'BUILT' }])).toBe('Received 2026-11-02 08:00');
+        expect(dataStatusLine([drop])).toContain('the graph was not updated');
+        // a Dataset with no link mapping has no graph to speak of
+        expect(dataStatusLine([{ ...base, index: 'SKIPPED' }])).toBe('Received 2026-11-02 08:00');
+        // LA-ARRIVAL-MODES-1: a period arrival, a file's new columns, and a refused drop (never in the Data status)
+        expect(arrivalLine({ ...base, mode: 'period', newColumns: ['fee'] })).toBe(
+            'uploaded · replaced the days it covers · 1 row · not kept: fee',
+        );
+        const refused: Arrival = {
+            ...base,
+            sender: 'system',
+            status: 'REFUSED',
+            rowsRead: null,
+            kept: false,
+            received: '2026-11-03 10:00:00',
+            reason: "'x.csv' does not have the columns of 't': 'fee' is missing.",
+            setAside: 'refused/x.csv',
+        };
+        expect(arrivalLine(refused)).toBe(
+            "from a system · refused: 'x.csv' does not have the columns of 't': 'fee' is missing. · set aside in refused/x.csv",
+        );
+        expect(dataStatusLine([refused, { ...base, index: 'BUILT' }])).toBe(
+            'Received 2026-11-02 08:00 · graph up to date',
+        );
         expect(arrivalLine({ ...base, rowsRead: 5, rowsRejected: 2 })).toBe(
             'uploaded · added its rows · 5 rows (2 rejected)',
         );

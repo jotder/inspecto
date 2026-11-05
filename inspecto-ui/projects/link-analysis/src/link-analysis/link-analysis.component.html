@@ -1965,6 +1965,12 @@
                                 ></inspecto-link-analysis-role-filter>
                             }
                         }
+                        <!-- LA-ARRIVAL-LEDGER-1: the drawn Dataset's arrivals, period and graph clock -->
+                        <inspecto-la-data-status
+                            class="mb-2"
+                            data-testid="dock-data-status"
+                            [dataset]="loadedDatasetId()"
+                        ></inspecto-la-data-status>
                         <inspecto-data-table
                             stateKey="link-analysis-rows"
                             tier="standard"
