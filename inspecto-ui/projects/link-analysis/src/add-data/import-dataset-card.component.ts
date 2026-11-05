@@ -33,11 +33,13 @@ import {
     ImportSummary,
     isSnapshot,
     keepsRowsLine,
+    RowCondition,
     arrivalLine,
     fileProblem,
 } from './add-data.model';
 import { DataStatusComponent } from './data-status.component';
 import { ImportSummaryComponent } from './import-summary.component';
+import { ImportFilterEditComponent } from './import-filter-edit.component';
 import { DatasetFeedComponent } from './dataset-feed.component';
 import { DatasetStorageComponent } from './dataset-storage.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
@@ -71,6 +73,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         DataStatusComponent,
         DatasetFeedComponent,
         DatasetStorageComponent,
+        ImportFilterEditComponent,
     ],
     host: { class: 'block' },
     template: `
@@ -203,6 +206,14 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 <inspecto-alert variant="error">{{ error() }}</inspecto-alert>
             }
 
+            <inspecto-import-filter-edit
+                [datasetId]="dataset().id"
+                [snapshot]="snapshot()"
+                [busy]="busy()"
+                [locked]="locked()"
+                (saved)="savedFilter.set($event)"
+            ></inspecto-import-filter-edit>
+
             <div class="flex flex-col gap-3 border-t pt-3" data-testid="keep-up-to-date">
                 <inspecto-dataset-feed
                     [datasetId]="dataset().id"
@@ -263,7 +274,9 @@ export class ImportDatasetCardComponent {
     /** A Postgres snapshot (BASIC-ONBOARD-1 P3): refreshed from its table, never added to by a file. */
     protected readonly snapshot = computed(() => isSnapshot(this.dataset()));
     /** ADD-DATA-ROW-FILTER-1: "Keeps rows where …" when the import keeps only some rows; '' otherwise. */
-    protected readonly keepsRows = computed(() => keepsRowsLine(this.dataset().importFilter));
+    protected readonly keepsRows = computed(() => keepsRowsLine(this.savedFilter() ?? this.dataset().importFilter));
+    /** ADD-DATA-FILTER-EDIT-1: the conditions Edit filter saved, until the host passes a fresh entry. */
+    protected readonly savedFilter = signal<RowCondition[] | null>(null);
     protected readonly mode = new FormControl<AddFileMode>('replace', { nonNullable: true });
     protected readonly last = signal<ImportSummary | null>(null);
     protected readonly busy = signal(false);
@@ -297,6 +310,10 @@ export class ImportDatasetCardComponent {
         effect(() => {
             const s = this.summary();
             untracked(() => this.last.set(s));
+        });
+        effect(() => {
+            this.dataset();
+            untracked(() => this.savedFilter.set(null)); // a fresh entry carries its own importFilter
         });
         effect(() => {
             const id = this.dataset().id;

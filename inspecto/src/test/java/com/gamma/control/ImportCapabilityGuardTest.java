@@ -60,6 +60,9 @@ class ImportCapabilityGuardTest {
                     + "collector, not the Dataset entry; a builder already edits that Pipeline at canAuthorWorkbench"),
             Map.entry("DELETE /datasets/([^/]+)/feed", "stops Keep this up to date: rewrites the import PIPELINE's trigger "
                     + "and collector (DatasetFeed.rewrite), not the Dataset entry"),
+            Map.entry("PUT /datasets/([^/]+)/filter", "Edit filter (ADD-DATA-FILTER-EDIT-1): rewrites the import PIPELINE's "
+                    + "csv_settings.where and the entry's display-only importFilter, both rendered by ImportRowFilter from typed "
+                    + "conditions (no raw SQL); the commit sets the same two at canUploadData, and the Pipeline passes the save gate"),
             Map.entry("PUT /datasets/([^/]+)/watch", "turns the 30 s poll on or off (the entry's watchInbox key, nothing "
                     + "else). For an inbox the generic door writing the same key is no wider: a builder can already put the "
                     + "import Pipeline on a schedule. A Postgres snapshot is refused (422): it is never polled since the "

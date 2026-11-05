@@ -19,6 +19,7 @@ import type {
 } from './add-data.model';
 import type { DatasetFeedState, IndexJob, KeepUpToDate } from './dataset-feed.model';
 import type { DatasetStorageState, Retention } from './dataset-storage.model';
+import type { ImportFilterState, RowCondition } from './add-data.model';
 
 /** A followed run that ended in `failed`: the server's reason, said as it said it. */
 export class ImportRunFailed extends Error {
@@ -184,6 +185,18 @@ export class OnboardService {
     setRetention(datasetId: string, retention: Retention | null): Observable<DatasetStorageState> {
         return this.http.put<DatasetStorageState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/storage`), {
             retention,
+        });
+    }
+
+    /** ADD-DATA-FILTER-EDIT-1: the rows an import keeps and the columns a condition may name. */
+    importFilter(datasetId: string): Observable<ImportFilterState> {
+        return this.http.get<ImportFilterState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/filter`));
+    }
+
+    /** *Edit filter*: new conditions for the files added from now on; `[]` keeps every row. */
+    setImportFilter(datasetId: string, filter: RowCondition[]): Observable<ImportFilterState> {
+        return this.http.put<ImportFilterState>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/filter`), {
+            filter,
         });
     }
 

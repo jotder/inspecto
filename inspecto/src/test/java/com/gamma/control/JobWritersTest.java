@@ -52,6 +52,8 @@ class JobWritersTest {
             Map.entry("PUT /datasets/([^/]+)/storage", FIXED + " (dataset: its retention policy only, LA-DATASET-COMPACT-1)"),
             Map.entry("PUT /datasets/([^/]+)/feed", FIXED + " (the import pipeline's trigger and collector, built by "
                     + "DatasetFeed from a few named fields, LA-ARRIVAL-FEEDS-1)"),
+            Map.entry("PUT /datasets/([^/]+)/filter", FIXED + " (the import pipeline's csv_settings.where and the dataset "
+                    + "entry's importFilter, both rendered by ImportRowFilter from typed conditions, ADD-DATA-FILTER-EDIT-1)"),
             Map.entry("DELETE /datasets/([^/]+)/feed", FIXED + " (the import pipeline's trigger and collector, LA-ARRIVAL-FEEDS-1)"),
             Map.entry("PUT /settings/mail-attachments", FIXED + " (mail-attachments.toon)"),
             Map.entry("PUT /settings/publication-destinations", FIXED + " (publication-destinations.toon)"),

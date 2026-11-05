@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-375 test class(es): 138 unit, 237 real-HTTP control-plane, 0 IT.
+376 test class(es): 138 unit, 238 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -142,6 +142,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiIdempotencyScopeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiIdempotencyScopeTest.java` | SEC-IDEMPOTENCY-REPLAY-1 over real HTTP with armed Subjects: an {@code Idempotency-Key} replay is scoped to |
 | `ControlApiImportCapabilityGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportCapabilityGateTest.java` | `IMPORT-CONNECTION-JOB-GATE-1`, over real HTTP with an ARMED Authenticator (without a Subject every capability |
 | `ControlApiImportConcurrentRollbackTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportConcurrentRollbackTest.java` | `IMPORT-RESIDUALS-1` (3) over real HTTP: a refused {@code POST /spaces/{id}/import} rolls back every file it |
+| `ControlApiImportFilterEditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportFilterEditTest.java` | {@code ADD-DATA-FILTER-EDIT-1} over real HTTP: {@code PUT /datasets/{id}/filter} rewrites an import's row conditions |
 | `ControlApiImportRefusalAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRefusalAuditTest.java` | Round 5: the IMPORT doors write Pipeline configs through {@code ImportJournal}, not the write routes — each import |
 | `ControlApiImportReservedPathsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportReservedPathsTest.java` | `SEC-IMPORT-ROLES-ESCALATION-1`, over real HTTP with an ARMED Authenticator (without a Subject |
 | `ControlApiImportRowFilterTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRowFilterTest.java` | {@code ADD-DATA-ROW-FILTER-1} over real HTTP: a commit's {@code filter: [{column, op, value \| min \| max}]} becomes the |

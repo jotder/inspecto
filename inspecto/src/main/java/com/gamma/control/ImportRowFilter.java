@@ -63,6 +63,15 @@ final class ImportRowFilter {
      * it. {@code dropped} names the draft columns left out (named in the refusal). Any refusal is 422 naming the condition.
      */
     static Result of(Object raw, List<Column> kept, Set<String> dropped) {
+        return of(raw, kept, dropped, null);
+    }
+
+    /**
+     * As {@link #of(Object, List, Set)}, over the columns of an existing import ({@code ADD-DATA-FILTER-EDIT-1}: <i>Edit
+     * filter</i>): {@code dataset} names it in a refusal ("'x' has no column 'y'"); null = the commit's draft.
+     */
+    static Result of(Object raw, List<Column> kept, Set<String> dropped, String dataset) {
+        String owner = dataset == null ? "the draft" : "'" + dataset + "'";
         if (raw == null) return Result.NONE;
         if (!(raw instanceof List<?> list))
             throw refuse("filter must be a list of {column, op, value | min | max}");
@@ -80,11 +89,11 @@ final class ImportRowFilter {
                 if (!KEYS.contains(String.valueOf(k)))
                     throw refuse(at + " has an unknown key '" + k + "'; a condition is {column, op, value | min | max}");
             if (!(m.get("column") instanceof String col) || col.isBlank())
-                throw refuse(at + " needs the draft column's name");
+                throw refuse(at + " needs " + (dataset == null ? "the draft column's name" : "a column's name"));
             Column c = bySource.get(col);
             if (c == null)
                 throw refuse(at + ": " + (dropped.contains(col) ? "'" + col + "' is left out, so no row can be kept by it"
-                        : "the draft has no column '" + col + "'"));
+                        : owner + " has no column '" + col + "'"));
             if (!(m.get("op") instanceof String op) || !OPS.contains(op))
                 throw refuse(at + " (" + col + "): op must be one of eq, ne, contains, range; not '" + m.get("op") + "'");
             String label = at + " (" + col + " " + op + ")";

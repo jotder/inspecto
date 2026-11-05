@@ -253,6 +253,41 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         await expectNoA11yViolations(el);
     });
 
+    it('ADD-DATA-FILTER-EDIT-1: Edit filter on the card saves new conditions and the card says them', () => {
+        const { fixture, el } = create();
+        fixture.componentInstance.dataset.set({
+            id: 'transfers',
+            kind: 'stream',
+            importPipeline: 'transfers',
+            importFilter: [{ column: 'channel', op: 'eq', value: 'mobile' }],
+        });
+        fixture.detectChanges();
+        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe('Keeps rows where channel is mobile.');
+        q(el, 'edit-filter')!.click();
+        http.expectOne(apiUrl('/datasets/transfers/filter')).flush({
+            dataset: 'transfers',
+            filter: [{ column: 'channel', op: 'eq', value: 'mobile' }],
+            columns: [{ name: 'channel', type: 'VARCHAR' }],
+        });
+        fixture.detectChanges();
+        expect(q(el, 'filter-applies')!.textContent).toContain('rows already imported stay');
+        el.querySelector<HTMLButtonElement>('[data-condition="0"] [data-testid="remove-condition"]')!.click();
+        fixture.detectChanges();
+        q(el, 'save-filter')!.click();
+        http.expectOne(apiUrl('/datasets/transfers/filter')).flush({ dataset: 'transfers', filter: [], columns: [] });
+        fixture.detectChanges();
+        expect(q(el, 'keeps-rows')).toBeNull(); // every row is kept from now on
+        // a fresh entry from the host carries its own conditions again
+        fixture.componentInstance.dataset.set({
+            id: 'transfers',
+            kind: 'stream',
+            importPipeline: 'transfers',
+            importFilter: [{ column: 'channel', op: 'ne', value: 'branch' }],
+        });
+        fixture.detectChanges();
+        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe('Keeps rows where channel is not branch.');
+    });
+
     it('ADD-DATA-ROW-FILTER-1: an import that keeps only some rows says which, and the arrivals how many were left out (no violations)', async () => {
         const { fixture, el } = create();
         expect(q(el, 'keeps-rows')).toBeNull(); // no filter: no line
