@@ -1310,12 +1310,16 @@ final class OnboardImport {
 
     /** The Latin-1 encoding an import's Pipeline reads with ({@code csv_settings.encoding}), else {@code null} (UTF-8). */
     private static String importEncoding(Path schema) {
+        return "latin-1".equals(importSetting(schema, "processing", "csv_settings", "encoding")) ? "latin-1" : null;
+    }
+
+    /** One {@code <block>.<sub>.<key>} value of the Pipeline Add data wrote beside {@code schema}, else {@code null}. */
+    private static String importSetting(Path schema, String block, String sub, String key) {
         String n = schema.getFileName().toString();
         if (!n.endsWith("_schema.toon")) return null;
         try {
             Map<String, Object> p = com.gamma.util.ToonHelper.load(schema.resolveSibling(n.replace("_schema.toon", "_pipeline.toon")).toString());
-            return p.get("processing") instanceof Map<?, ?> proc && proc.get("csv_settings") instanceof Map<?, ?> csv
-                    && "latin-1".equals(csv.get("encoding")) ? "latin-1" : null;
+            return p.get(block) instanceof Map<?, ?> b && b.get(sub) instanceof Map<?, ?> s && s.get(key) != null ? String.valueOf(s.get(key)) : null;
         } catch (Exception unreadable) {
             return null;
         }
@@ -1414,11 +1418,20 @@ final class OnboardImport {
                 }
             }
         } else {
-            OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, Map.of());
+            // the later file is read where the import reads its records (a chosen json.records_path), not the first list
+            Map<String, String> how = new LinkedHashMap<>();
+            String recordPath = importSetting(schema, "parsing", "json", "records_path");
+            if (recordPath != null && !"$".equals(recordPath)) how.put("recordPath", recordPath);
+            OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, how);
             Set<String> headers = new LinkedHashSet<>();
             for (OnboardDraft.Col c : a.cols()) headers.add(c.selector());   // a flattened JSON field by its dotted path
             for (String[] f : fields) {
                 read.add(f[0]);
+                // an import written before C1 reads a nested object whole by its root key, which the file still has
+                if (!headers.contains(f[0]) && headers.stream().anyMatch(h -> h.startsWith(f[0] + "."))) {
+                    headers.removeIf(h -> h.startsWith(f[0] + "."));
+                    continue;
+                }
                 if (!headers.contains(f[0])) {
                     problems.add("'" + f[0] + "' is missing");
                     missing.add(f[0]);

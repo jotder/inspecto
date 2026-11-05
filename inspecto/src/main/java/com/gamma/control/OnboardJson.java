@@ -98,12 +98,15 @@ final class OnboardJson {
         return n;
     }
 
-    /** Segments as one dotted selector, a literal {@code .} or {@code \} in a key escaped. */
+    /**
+     * Segments as one dotted selector, a literal {@code .} in a key escaped as {@code \.} - exactly what the engine's
+     * {@code DuckDbCsvIngester.selectorSegments} undoes (it unescapes nothing else, so a {@code \} is kept as it is).
+     */
     static String selector(List<String> segments) {
         StringBuilder sb = new StringBuilder();
         for (String s : segments) {
             if (!sb.isEmpty()) sb.append('.');
-            sb.append(s.replace("\\", "\\\\").replace(".", "\\."));
+            sb.append(s.replace(".", "\\."));
         }
         return sb.toString();
     }
@@ -115,7 +118,7 @@ final class OnboardJson {
         StringBuilder cur = new StringBuilder();
         for (int i = 0; i < p.length(); i++) {
             char c = p.charAt(i);
-            if (c == '\\' && i + 1 < p.length()) cur.append(p.charAt(++i));
+            if (c == '\\' && i + 1 < p.length() && p.charAt(i + 1) == '.') cur.append(p.charAt(++i));
             else if (c == '.') {
                 out.add(cur.toString());
                 cur.setLength(0);
@@ -125,10 +128,13 @@ final class OnboardJson {
         return out;
     }
 
-    /** The DuckDB JSON path of a segment list: {@code $."a"."b"}. */
+    /**
+     * The DuckDB JSON path of a segment list: {@code $."a"."b"}, built exactly as the engine builds it (no escaping), so a
+     * key the engine cannot read fails the draft rather than the commit.
+     */
     static String jsonPath(List<String> segments) {
         StringBuilder sb = new StringBuilder("$");
-        for (String s : segments) sb.append(".\"").append(s.replace("\"", "\\\"")).append('"');
+        for (String s : segments) sb.append(".\"").append(s).append('"');
         return sb.toString();
     }
 

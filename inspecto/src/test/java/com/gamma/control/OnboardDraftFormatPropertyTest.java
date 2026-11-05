@@ -132,7 +132,19 @@ class OnboardDraftFormatPropertyTest {
         OnboardDraft.Analysis b = analyse(dir, "either2.csv", csv.toString(), Map.of("decimal", ","));
         assertEquals(",", fmt(b, "decimalMark").get("value"));
         assertEquals("high", fmt(b, "decimalMark").get("confidence"));
-        assertEquals("BIGINT", col(b, "qty").type(), "'1.234' with ',' as the mark is 1234: " + b.columns());
+        assertEquals("DOUBLE", col(b, "qty").type(), "'1.234' with ',' as the mark is 1234, kept DOUBLE so a later fraction is not cut: " + b.columns());
+
+        // identifiers with a leading zero are never numbers, under either mark: the zeros would be lost
+        StringBuilder ids = new StringBuilder("siren;account;amount\n");
+        for (int i = 0; i < 240; i++)
+            ids.append(String.format("000 %03d %03d", i, i)).append(';').append(String.format("012.%03d.%03d", i, i)).append(';')
+                    .append(i).append(",50\n");
+        OnboardDraft.Analysis z = analyse(dir, "ids.csv", ids.toString(), Map.of());
+        assertEquals(",", fmt(z, "decimalMark").get("value"), "the amounts decide the mark");
+        assertFalse(String.valueOf(fmt(z, "decimalMark").get("evidence")).contains("'account'"), "an identifier is no evidence: " + fmt(z, "decimalMark"));
+        assertEquals("VARCHAR", col(z, "siren").type(), z.columns().toString());
+        assertEquals("VARCHAR", col(z, "account").type(), z.columns().toString());
+        assertEquals("DOUBLE", col(z, "amount").type());
         assertEquals(",", col(b, "qty").decimal());
 
         // two columns that disagree: '.' kept, low, both named
@@ -229,6 +241,10 @@ class OnboardDraftFormatPropertyTest {
         OnboardDraft.Analysis dotted = analyse(dir, "dot.json", "{\"r.s\":[{\"k\":{\"m.n\":2}}]}", Map.of());
         assertEquals("r\\.s", fmt(dotted, "recordPath").get("value"));
         assertEquals("k.m\\.n", dotted.cols().get(0).selector());
+        // a backslash is kept as it is: the engine's selector reading unescapes only '\.'
+        OnboardDraft.Analysis slash = analyse(dir, "slash.json", "[{\"w\\\\k\":\"v\"}]", Map.of());
+        assertEquals("w\\k", slash.cols().get(0).selector());
+        assertEquals(List.of("w\\k"), OnboardJson.segments(slash.cols().get(0).selector()));
     }
 
     // ── a date in the file name ──────────────────────────────────────────────────────────────────────────────

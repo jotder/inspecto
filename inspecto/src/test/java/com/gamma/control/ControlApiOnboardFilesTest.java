@@ -1505,6 +1505,24 @@ class ControlApiOnboardFilesTest {
         }
     }
 
+    @Test
+    void aChosenRecordPathIsWhereALaterFileIsReadToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            StringBuilder doc = new StringBuilder("{\"links\":[{\"href\":\"x\"}],\"data\":[");
+            for (int i = 0; i < 240; i++) doc.append(i == 0 ? "" : ",").append("{\"id\":\"R").append(i).append("\",\"v\":").append(i).append('}');
+            String json = doc.append("]}").toString();
+            JsonNode first = draft(c, "page.json", "stream", json, null);
+            assertEquals("links", first.get("format").get("recordPath").get("value").asText(), "the first list, low: another exists");
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=page.json&recordPath=data", json.getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals("data", d.get("format").get("recordPath").get("value").asText());
+            String id = uniqueId("page");
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            String later = json.replace("\"R", "\"P");   // the same shape, other rows (the same bytes would be refused as a duplicate)
+            JsonNode more = data(send(c, "POST", "/datasets/" + id + "/files?name=page2.json&mode=append", later.getBytes(StandardCharsets.UTF_8), null), 200);
+            assertEquals(480, more.get("rowsAfter").asLong(), more.toString());
+        }
+    }
+
     /** {@code n} transfers under {@code response.transfers}, payer and payee nested objects, tags a list. */
     private static String nestedDoc(int from, int n) {
         StringBuilder sb = new StringBuilder("{\n  \"meta\": {\"source\": \"bank api\", \"page\": 1},\n  \"response\": {\"status\": \"ok\", \"transfers\": [\n");

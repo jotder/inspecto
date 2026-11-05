@@ -369,9 +369,11 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   `SchemaSuggest`, TIMESTAMP from a fixed candidate list).
 * **The decimal mark (`format.decimalMark`, C1; `DecimalMark`).** `.` (`1,234.50`) or `,` (`1.234,50`); digit groups
   may be split by the other mark or a space. A column decides when every sampled value reads with one mark and not the
-  other (`12.5` → `.`; `12,5`, `1.234,50` → `,`); `1.234` reads either way and decides nothing (then `.` is assumed,
+  other (`12.5` → `.`; `12,5`, `1.234,50` → `,`); a whole part with a leading zero (`000 345 678`, `012.000.789`) is
+  an identifier, never a number; `1.234` reads either way and decides nothing (then `.` is assumed,
   `low`). Columns that disagree keep `.`, `low`, both named. No number with a mark: `high`, "changes nothing". A column
-  whose numbers need the mark (a `,` mark, or grouping) is typed DOUBLE (BIGINT without a fraction) and carries it in
+  whose numbers need the mark (a `,` mark, or grouping) is typed DOUBLE (never BIGINT: a later `7.500,25` keeps its
+  fraction) and carries it in
   the draft's `plan` (`decimal`); the commit writes that raw field as VARCHAR and maps it with `fn: custom`,
   `TRY_CAST(REPLACE(…) AS DOUBLE)` (the engine's cast has no decimal-mark option; ⚠ a `custom` field is outside the
   cast-failure audit, so an unreadable value becomes empty without being counted). Not on Parquet (`?decimal=` 422).
@@ -385,7 +387,10 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   a value in others stays whole (JSON text), so no value is lost. A key holding a `.` is escaped (`r\.s`), the
   engine's one notation. A nested document over 16 MB is 422 "save it as NDJSON" (DuckDB's `maximum_object_size`
   default; raising it is a deliberate deferral - its buffer cost was not measured). Add a file judges a later JSON file
-  by these dotted selectors.
+  by these dotted selectors, read at the import's own `json.records_path` (a chosen `?recordPath=` included); an import
+  written before C1 that reads a nested object whole by its root key still takes a file holding that object. Only `.` is
+  escaped and a `"` is not, exactly as the engine's `selectorSegments` / `jsonPath` read them, so a key holding `"`
+  fails the draft (422) rather than the commit.
 * **A date in the file name (`format.fileDate`, C1).** `%Y-%m-%d` / `%Y_%m_%d` / `%Y.%m.%d` and `%Y-%m` / `%Y_%m` are
   `high`; a bare `%Y%m%d` or `%Y%m` digit run and day-first `%d-%m-%Y` are `low`; the date must be real, the year
   1990-2099. `value` is ISO (`2026-10-31` or `2026-10`), `name` the file name without it (`sales_2026-10.csv` →

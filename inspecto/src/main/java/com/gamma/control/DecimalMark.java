@@ -23,8 +23,18 @@ final class DecimalMark {
     private static final Pattern POINT = Pattern.compile("[+-]?(\\d+|\\d{1,3}([, ]\\d{3})+)(\\.\\d+)?");
     private static final Pattern COMMA = Pattern.compile("[+-]?(\\d+|\\d{1,3}([. ]\\d{3})+)(,\\d+)?");
 
+    /**
+     * Whether {@code value} is a number written with {@code mark}. A whole part with a leading zero ({@code 000 345 678},
+     * {@code 012.000.789}) is an identifier, not a number: reading it as one would drop the zeros.
+     */
     static boolean reads(String value, String mark) {
-        return (",".equals(mark) ? COMMA : POINT).matcher(value.trim()).matches();
+        String t = value.trim();
+        if (!(",".equals(mark) ? COMMA : POINT).matcher(t).matches()) return false;
+        String whole = t.replaceFirst("^[+-]", "");
+        int at = whole.indexOf(mark.charAt(0));
+        if (at >= 0) whole = whole.substring(0, at);
+        whole = whole.replaceAll("[^0-9]", "");
+        return whole.length() <= 1 || whole.charAt(0) != '0';
     }
 
     private static boolean all(List<String> values, String mark) {
@@ -67,23 +77,22 @@ final class DecimalMark {
         if (eitherWay >= 0)
             return OnboardDraft.choice(".", "'" + names.get(eitherWay) + "' holds numbers like '" + example(valuesOf.get(eitherWay), ".")
                     + "', which read either way; '.' is assumed", false);
-        return OnboardDraft.choice(".", "no sampled number has a decimal or grouping mark, so the mark changes nothing", true);
+        return OnboardDraft.choice(".", "no sampled number has a decimal mark, so the mark changes nothing", true);
     }
 
     /**
-     * The type a column takes when its numbers need {@code mark} to be read ({@code DOUBLE}, or {@code BIGINT} when no
-     * value has a fraction), else {@code null}: not every value is such a number, or a plain cast already reads them.
+     * {@code DOUBLE} when a column's numbers need {@code mark} to be read, else {@code null}: not every value is such a
+     * number, or a plain cast already reads them. Always DOUBLE, never BIGINT: a later file's {@code 7.500,25} must keep
+     * its fraction even when the sample had none.
      */
     static String numberType(List<String> values, String mark) {
         if (!all(values, mark)) return null;
-        boolean needs = false, fraction = false;
         for (String v : values) {
             String t = v.trim();
             if (",".equals(mark) ? t.indexOf('.') >= 0 || t.indexOf(',') >= 0 || t.indexOf(' ') >= 0
-                    : t.indexOf(',') >= 0 || t.indexOf(' ') >= 0) needs = true;
-            if (t.contains(mark)) fraction = true;
+                    : t.indexOf(',') >= 0 || t.indexOf(' ') >= 0) return "DOUBLE";
         }
-        return needs ? (fraction ? "DOUBLE" : "BIGINT") : null;
+        return null;
     }
 
     /** The first value that shows a mark, else the first value. */
