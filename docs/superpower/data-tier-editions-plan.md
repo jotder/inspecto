@@ -1,6 +1,6 @@
 # Data layer by edition — what Basic, Standard and Advanced get from ingestion, Pipelines and data quality (`DATA-TIERS-1`)
 
-**Re-planned 2026-11-05 (§5.3): P3 dropped, DT-9 narrowed to "gate in screens", P1 / P10 done, P9 superseded; P2, P4 (narrowed), P5, P6 (shrunk), P7, P8 remain.** **Status: PLAN — every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25); nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
+**Re-planned 2026-11-05 (§5.3): P3 dropped, DT-9 narrowed to "gate in screens", P1 / P10 done, P9 superseded; P8 (docs) done 2026-11-06; P2, P4 (narrowed), P5, P6 (shrunk), P7 remain.** **Status: PLAN — every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25); nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
 2026-10-22** with the parallel draft `PIPELINE-EDITIONS-1` (never pushed; operator: "merge into a single plan"),
 which added the grounding in §3 and §7, the operator decisions DT-11…DT-14, and the open decisions DT-15…DT-19.
 **Operator answers of 2026-10-22** recorded in the Inspecto LA first-time user use cases (§8, A-1…A-16; confirmed
@@ -154,7 +154,7 @@ demo; it must be usable."** Where this section and an earlier row disagree, this
 | **P5** egress gate | **Kept:** outbound delivery is Standard, locked with a reason on Basic's screens. |
 | **P6** transform gate | **Shrunk** to palette / step-catalog locks in the screens (Basic has no Pipeline editor); no refuse walk on load. |
 | **P7** upgrade test | **Kept.** |
-| **P8** docs | **Kept.** |
+| **P8** docs | **Done 2026-11-06** (docs only, as the code stands): `docs/EDITIONS.md` *Data layer by edition* with its release note, the board rows ING-01 / JOB-02 (Basic *not stated*, DT-16), JOB-01 / JOB-06 and the Step Processor note (SP-XFM, remote SP-ACQ, SP-PRS-06: not locked yet), the edition hubs, the enterprise whitepaper's ladder, the onboarding and LA user guides. Left for the phases that build them: the P4 / P5 / P6 locks, and DT-18 (`la-daily-feed` still in `offerings/basic.toon`; content packs were not moved). |
 | **P9** per-application Basic forms | **Superseded** by `BASIC-ONBOARD-1` §5 Q3 ("decided later, as we go"). |
 | **P10** large files in place | **Done** (DT-3). |
 | `ONBOARDING-FIRST-RUN-1` C5 / C6 | **No longer wait on this plan:** C5 (console Dataset page) reuses the shared import Dataset card; C6a (lookups) builds now; C6b (remote systems on Standard, grown from the Postgres flow) is its own row. |
@@ -220,7 +220,7 @@ lane per push.
 | 5 | Egress gate and its console locks | 2 | 1 day |
 | 6 | Step catalog `feature` field, refuse walk, no schema expression check (DT-7 keeps expression columns on Basic), palette locks, contract regeneration | 2 | 3 to 5 days |
 | 7 | Upgrade path: a test that boots Basic, imports, then boots Standard on the same Space and edits the import as an ordinary Pipeline | 1, 3 | 1 day |
-| 8 | Content packs (DT-18), release note, `docs/EDITIONS.md` matrix and rows (JOB-02, ING-01, SP-PRS-06, the remote SP-ACQ rows, JOB-01 / JOB-06, the SP-XFM rows), the edition hubs, the platform whitepaper's edition ladder, user guides | 3 to 6 | 1 day |
+| 8 | **Done 2026-11-06 (§5.3), except the DT-18 pack move.** Content packs (DT-18), release note, `docs/EDITIONS.md` matrix and rows (JOB-02, ING-01, SP-PRS-06, the remote SP-ACQ rows, JOB-01 / JOB-06, the SP-XFM rows), the edition hubs, the platform whitepaper's edition ladder, user guides | 3 to 6 | 1 day |
 | 9 | Per-application Basic forms (DT-10), application by application | — | per application |
 | 10 | Large files in place with the change guard (DT-3): size + modified-time fingerprint stored at import and re-checked on every read, a changed / missing file answers "re-import", the link index marked stale by the same check, a size threshold in the configurable-limits catalogue | 1 | to be sized |
 

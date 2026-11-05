@@ -2209,7 +2209,10 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   operator accepted this as a bounded widening (2026-11-05): the same stored connection and table, and an import can
   no longer plant `_snapshot.toon` (`ImportPaths.REFUSED_SUFFIXES`). Recorded as the `PUT /watch` ACTS reason in
   `ImportCapabilityGuardTest`.
-- **A Postgres table snapshot (P3) refreshes on the same toggle.** For an entry with `importSource: postgres` the toggle
+- ⚠ **Superseded the same day (operator, 2026-11-05): a snapshot is never polled.** *Refresh now* exports the table and
+  moves the finished file into the inbox; `InboxWatch.Snapshot`, `PostgresSnapshot.poll` and the card's 30 s toggle
+  were removed (`InboxWatch.watched` excludes `importSource: postgres`). The bullet below records the first design, which no longer exists.
+- ~~**A Postgres table snapshot (P3) refreshes on the same toggle.**~~ For an entry with `importSource: postgres` the toggle
   registers `InboxWatch.Snapshot` instead: each poll runs `PostgresSnapshot.poll` (copy the table again; replace
   everything only when the bytes differ from the last arrival; no settle check - the server makes the copy itself). A
   snapshot is never inbox-polled; a Reference snapshot may refresh (it replaces). The feed read says `snapshot`; the

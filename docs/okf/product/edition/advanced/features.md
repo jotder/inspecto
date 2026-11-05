@@ -42,6 +42,10 @@ Advanced includes Standard and adds policy, a PostgreSQL investigation store and
 
 - None added; packs of lower Editions carry over.
 
+## Data layer over Standard
+
+- The same data layer as Standard (DATA-TIERS-1, as built 2026-11-06). The planned move of the ASN.1 and telecom decoders to Advanced (DT-12) is not built: they stay Standard and up. Full table: [EDITIONS.md](../../../../EDITIONS.md) *Data layer by edition*.
+
 ## Limits
 
 - No Edition-specific limits are declared in the offering file (`defaultSpaceSettings` is empty or absent).

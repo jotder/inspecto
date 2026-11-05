@@ -586,21 +586,26 @@ Professional and Enterprise across the whole product. The placement below follow
   │                        │  Reconciliation & Breaks · Alerts → Incidents → Cases ·
   │                        │  Inspecto LA Investigations, Geo map and third-party integration ·
   │                        │  ASN.1 CDR decoder · backup/restore · notification channels ·
-  │                        │  cross-Space Exchange · fault-tolerant DR (T4) · Tier A assistant
+  │                        │  cross-Space Exchange · fault-tolerant DR (T4) · Tier A assistant ·
+  │                        │  Keep this up to date on an imported Dataset · retention · enrichment
   └───────────▲────────────┘
               │
   ┌───────────┴────────────┐
   │         BASIC          │  the data plane on a laptop, no sign-in:
-  │                        │  acquisition · parsers · lakehouse · Query Library · Studio dashboards ·
-  │                        │  Spaces · the Inspecto LA explorer (no Investigations) · industry packs
+  │                        │  Add data (file, inbox, Postgres snapshot) · acquisition · parsers ·
+  │                        │  lakehouse · Query Library · Studio dashboards · Spaces ·
+  │                        │  the Inspecto LA explorer (no Investigations) · industry packs
   └────────────────────────┘
 ```
 
 **Basic is usable on its own data.** Add data has three ways in on every edition: upload a file; point an inbox
 folder at it, imported on request or watched every 30 seconds; or choose a Postgres table, copied as a read-only
-snapshot and refreshed on request or every 30 seconds. One default Pipeline converts and arranges the data into
-Parquet - no transformation, no schedule to write, no Pipeline editor - and each application adds its own follow-on
-step, such as Inspecto LA's link index. Standard adds scheduled feeds, every Collector and transformation.
+snapshot and refreshed on request. One default Pipeline converts and arranges the data into Parquet: a review of
+names, types and column roles, a no-code row filter, then each application's own follow-on step, such as Inspecto
+LA's link index. Expectations, quarantine and dedupe check every import, and the arrivals are listed and compacted,
+in every edition. Standard adds *Keep this up to date* on an imported Dataset (a watched folder or an
+SFTP feed on a chosen schedule), a retention policy and enrichment from a Reference. The edition line is drawn in what each edition's screens offer: a Basic install runs
+any configuration it is given.
 
 *Basic explores the data; Standard owns the problem; Advanced governs and scales it.* The moment a Break or
 an Investigation needs an owner, an audit export or a second team, you are in Standard — because that is
@@ -723,6 +728,10 @@ explore the result in a dashboard — and ask the offline assistant why a row wa
 * **Vocabulary of record:** `docs/GLOSSARY.md`
 
 ---
+
+*2026-11-06 (no version change): the Basic and Standard rungs of the edition ladder and the paragraph under it aligned
+to `docs/EDITIONS.md` *Data layer by edition* (`DATA-TIERS-1` P8): a Postgres snapshot is refreshed on request only,
+and *Keep this up to date*, retention and enrichment are named on Standard.*
 
 *Version 1.4 (2026-10-21) supersedes 1.3. Changes: Inspecto LA detail moved to the LA whitepaper; Section 5
 keeps a short reference.*
