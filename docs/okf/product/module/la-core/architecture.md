@@ -1693,6 +1693,17 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   Measure that holds an Entity Type ("an identifier, not a measure"), because its sums would surface raw ids the
   profile masks; the Data page drops an unclaimed Entity Type when a column becomes a Measure. The Entity page shows
   them as **Measures** (absent when there are none).
+- **Roles from the record type (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05).** A record type names its usual Time,
+  Measure and Category columns by hints (entity-store `spec.md` *A record type's usual roles*; the one rule is
+  `EntityShapes.hintedRole` / UI `hintedRole` in `column-roles.ts`, kept alike). **Add data:** after the record type is
+  proposed, `EntityShapes.recordTypeRoles` gives each column a hint names its role - never one holding an Entity Type
+  or chosen as the link's kind, time or measure - sure when the record type is, and keeps the role proposed without it
+  as `base`. Picking another record type on the screen re-proposes (`roleUnder`) every role still as proposed: back to
+  `base`, then the new record type's hint; a role the person picked stays. **Data page:** under *Each row is*, the
+  roles the record type proposes for columns that state none or Detail and are none of the link mapping's
+  (`recordTypeProposals`; a role the column already reads as is not repeated), saved together by *Use these roles*;
+  a role the person set is never proposed over. The Holds picker marks *Shape matches* per column from
+  `GET /inv/datasets/{id}/shapes` (read once per page per Dataset).
 - **Deliberately not built** (board row `LA-COLUMN-ROLES-2`): the Entity *Type* profile's measure aggregates (only one Entity's); edge width from the
   primary Measure (the canvas still weighs links by their count); a Mapping-level override of `carried` (a Mapping keeps
   its base's mark); Category values for a multi-Dataset read (the panel offers a single read's Dataset only).
@@ -1710,6 +1721,7 @@ Rows closed: `LA-PRESET-QUERIES-1`, `LA-BASIC-DISCOVER-1`, `LA-ENTITY-SUMMARY-1`
 | `GET /inv/presets?dataset=` | `PresetRoutes` | the pack's preset questions the Dataset can answer, its roles, the builder's role columns (`columns {time, measure}`) and the Space presets saved from the builder (`saved`) |
 | `POST /inv/presets/{id}/run` | `PresetRoutes` + `PresetQueries` | one preset; read-shaped, EXPENSIVE, `LINK_PRESET_RUN` |
 | `GET /inv/datasets/{id}/discover` | `DiscoverRoutes` + `DatasetDiscovery` | what is in a Dataset; EXPENSIVE, `LINK_DATASET_DISCOVERED` |
+| `GET /inv/datasets/{id}/shapes` | `DiscoverRoutes` | the Entity Types whose shape each column's first 200 rows fit, marks only (the Data page's *Shape matches*; `ENTITY-TYPE-RECORD-ROLES-1`); cheap, not audited (no value leaves) |
 | `GET /inv/entities/{type}/{key}/summary?dataset=` | `EntitySummaryRoutes` + `EntitySummary` | one entity over one Dataset; EXPENSIVE, `LINK_ENTITY_SUMMARIZED` |
 | `POST /inv/datasets/{id}/query` | `QueryRoutes` + `QueryBuilder` | a builder question (or a saved preset's); read-shaped, EXPENSIVE, `LINK_QUERY_RUN` |
 
@@ -1723,7 +1735,10 @@ included, `before` not), a Measure range inclusive.
 
 **Roles.** `PresetQueries.roles` gives From, To, Kind and the primaries (`defaultLinkMapping.primaryTime` /
 `primaryMeasure`, or their old names `time` / `amount`; else the classified columns, `*_kind`, the event date, the pack's
-`measure_hints`). `DatasetDiscovery.measures` and `QueryBuilder.columns` add every Measure and Time column
+`measure_hints`). Without a mapping, From / To are (`PresetQueries.ends`, `LA-PRESET-ROLES-1` fixed 2026-11-05) the
+Dataset's record type's parties (its `from_hints` / `to_hints` among the classified columns), else the first two
+columns holding the SAME Entity Type, else the first two - so a subscriber's number and SIM are no longer read as a
+link when the call's two parties are classified too. `DatasetDiscovery.measures` and `QueryBuilder.columns` add every Measure and Time column
 (LA-COLUMN-ROLES-1). A role the Dataset lacks: the preset or saved question is not offered (Q-5); a Discover section is
 `assessed:false` with why; a summary part is null.
 

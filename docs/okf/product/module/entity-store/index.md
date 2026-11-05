@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.entity-store` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `ENTITY-TYPE-RECORD-ROLES-1` | P3 | feature | a record type also says which columns are usually its times, measures and categories, so Add data and the Data page propose column roles… | — |
+_No open rows._

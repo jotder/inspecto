@@ -88,16 +88,26 @@ Term keys are `concept.`, `entity_type.`, `record_type.`, `link_kind.`, `measure
 - **Record types:** a pack's `record_types[n]{id, likely_types[]}`, label from `record_type.<id>`; a Dataset's
   `recordType` (`PUT /datasets/{id}/record-type`, or the Add data commit); `GET /inv/entity-types` answers
   `recordTypes`. The "what does this column hold" picker puts the record type's likely types first (*Likely in a …*)
-  and marks a type whose shape the column's sample fits (*Shape matches*) — in Add data only, because the Data page's
-  row sample is masked for masked types. Add data proposes the record type from its sure (high-confidence) column
-  proposals: the most likely types held, then the larger share of the record type's list; a remaining tie is low.
+  and marks a type whose shape the column's values fit (*Shape matches*): Add data from the file's own sample, the
+  Data page from `GET /inv/datasets/{id}/shapes` (its own row sample is masked for masked types, so the server reads
+  the first 200 rows unmasked and answers marks only, `{columns: {<col>: [{type, strong}]}}`, never a value). Add data
+  proposes the record type from its sure (high-confidence) column proposals: the most likely types held, then the
+  larger share of the record type's list; a remaining tie is low.
+- **A record type's usual roles (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05):** optional `time_hints`, `measure_hints`,
+  `category_hints`, `from_hints`, `to_hints` per record type (`IndustryPack.RoleHints`; written and matched as the
+  profile's hints: case-insensitive, anywhere unless anchored with `^` / `$`; a bad pattern refuses the pack); wire
+  `recordTypes[].roleHints {time, measure, category, from, to}`. A hint gives a role only where the column's type can
+  hold it (Time: a date or timestamp; Measure: a number; Category: neither a decimal number nor a date), first Time,
+  then Measure, then Category. Readers: Add data and the Data page (column roles, la-core `architecture.md` §6.15) and
+  the preset questions' From / To (§6.16). Telecom's and mobile money's record types carry generic hints; a broad word
+  is anchored (`^to_`, `_to$`: a *total* is no payee).
 
 ⚠ Gotchas: a pack restating a starter id must repeat its classifications exactly (the agreement rule); a new type
 needs both its `entity_type.<id>` term and a family or the whole pack is refused; adding a starter type changes what a
 no-pack Space reads (tests pin the starter size); a shape is evidence, so a pack must not give a broad shape (`digits(5-6)`) to a type
 whose values look like any small number — leave it `free` and let the name propose it.
 
-Deliberate deferrals: likely column ROLES per record type (with `LA-COLUMN-ROLES-1`) — not carried; the Studio
-Entity Types settings page shows the new fields read-only at most.
+Deliberate deferrals: the Studio Entity Types settings page shows the new fields read-only at most; a record type's
+hints are pack content only (no per-Space edit).
 
 Tests: [tests-inventory](tests-inventory.md).
