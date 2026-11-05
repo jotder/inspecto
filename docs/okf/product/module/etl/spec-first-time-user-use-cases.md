@@ -16,7 +16,7 @@ plan itself.
 
 **Owners.** The edition gates are [`data-tier-editions-plan.md`](../../../../superpower/data-tier-editions-plan.md)
 (`DATA-TIERS-1`, DT-13 and DT-14); the onboarding experience is
-[`first-run-onboarding-plan.md`](../../../../superpower/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the
+[`first-run-onboarding-plan.md`](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the
 console) on the shared import route of [`la-onboarding-plan.md`](../../../../archived-documents/plans-archive/la-onboarding-plan.md)
 (`LA-ONBOARD-1`, Inspecto LA). The Inspecto LA side of the same journey:
 [`spec-first-time-user-use-cases.md`](../la-core/spec-first-time-user-use-cases.md).
@@ -261,4 +261,4 @@ are DT-6 and DT-7; points 6 and 7 are `ONBOARDING-FIRST-RUN-1`.
 with a reason; *Add a file* and *Run now* sit together on Basic; Activate copy follows the edition; `orders-starter`
 gets a load-and-run sample button. **Everything else in §5 point 6, plus pre-applied inference (Q2), file-first
 entry points (Q1) and first-run detection (§5 point 7), is
-[`first-run-onboarding-plan.md`](../../../../superpower/first-run-onboarding-plan.md).**
+[`first-run-onboarding-plan.md`](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md).**

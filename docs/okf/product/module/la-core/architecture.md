@@ -431,6 +431,24 @@ and any column whose registry/lineage class is claimed by a masked Entity Type o
 (MSISDN/IMSI/ACCOUNT/PII) is masked, and under `all` every value but fractional numbers and booleans (an integral column may be an unclassified id), to the Space's exploration alias; untraceable lineage masks every column. Audited as
 `LINK_REFERENCE_READ` (counts only, never the keys).
 
+**Reference details on nodes (`ONBOARDING-FIRST-RUN-1` C6a step 4, 2026-11-05; A-5, every edition).** A Reference is
+an Add data Dataset of kind `reference` with an `identifyingColumn` and a `primaryEntityType` (`LaDataset` gained
+`kind` and `identifyingColumn`, filled by both hosts: the LA app from the registry entry, the console from Studio's
+`extra`). `reference-details.ts` (`nodeReferences`, `referencesFor`, `nodesNotMatching`) keys References by that
+Entity Type. **Node dialog:** `NodeInsightContext.references` lists the References for the node's type (its own
+`entityType`, else the type the graph is drawn as); the **Details** section reads the node's row of each through
+`NodeRiskService.lookup` (`POST /inv/reference-rows`, so masked, the key as asked, the Investigation's aliases
+resolved) and lists its other columns. **Filter by details** (`<inspecto-la-reference-filter>`, in the filter panel of
+the *rows* dock tab, explorer only, shown while a drawn Entity Type has a Reference): a Reference (when several), a
+detail and a text; `filterByDetails` looks up the drawn nodes of that type (chunked at 500 keys) and `hideLocally` the
+ones whose detail does not contain the text (case ignored) or that have no row - unless the read was cut
+(`truncated`: a missing row may lie beyond the cut, so those stay, and the line says so). The filter remembers the nodes it
+hid: it is *active* while any of them is still hidden (Undo, a new draw or *Show hidden again* end it), and *Show all*
+brings back only those, never another hide. The panel is offered from the whole drawn graph, so a filter that hid every
+node of its type keeps its *Show all*. No
+join builds data (DT-6). Tests: `reference-details.spec`, `link-analysis-reference-filter.component.spec`,
+`node-insight.component.spec` (Details), `link-analysis.component.spec` (*Filter by details*).
+
 **Case history (`POST /inv/case-history`, 2026-10-11).** Body `{key, investigationId?, status?, limit?}` →
 `{entityType, resolved, reason?, objects, total, truncated, masking{mode, masked}}`. The node dialog's Case history for a
 key it holds only as an alias (`GET /objects/by-entity` needs the raw id). The key resolves with the reference-rows rules:

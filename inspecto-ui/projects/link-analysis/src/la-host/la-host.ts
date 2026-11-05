@@ -39,6 +39,10 @@ export interface LaDataset extends RowSourceRef {
     primaryEntityType?: string;
     /** LA-ONBOARD-1 OB-8: the link every start draws without asking again. */
     defaultLinkMapping?: LaLinkMapping;
+    /** ONBOARDING-FIRST-RUN-1 C6a: `reference` for details about entities (an Add data Reference); else as stored. */
+    kind?: string;
+    /** A Reference's identifying column: its rows are keyed by it, and it holds `primaryEntityType`. */
+    identifyingColumn?: string;
 }
 
 /**

@@ -270,6 +270,9 @@ import {
     RoleFilterCategory,
     RoleFilterSection,
 } from './link-analysis-role-filter.component';
+import { LinkAnalysisReferenceFilterComponent, ReferenceFilter } from './link-analysis-reference-filter.component';
+import { NodeRiskService } from './node-risk.service';
+import { DrawnNode, nodeReferences, nodesNotMatching, referencesFor } from './reference-details';
 import {
     DatasetRoleFilters,
     NO_ROLE_FILTERS,
@@ -570,6 +573,7 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
         LinkAnalysisWorkingSetComponent,
         LinkAnalysisFilterComponent,
         LinkAnalysisRoleFilterComponent,
+        LinkAnalysisReferenceFilterComponent,
         InspectoSplitDirective,
         InspectoOptionPickerComponent,
         LinkAnalysisInvestigationComponent,
@@ -963,6 +967,72 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     // ── query source (the form itself lives in the query-panel child) ──
     readonly sourceId = signal<GraphSourceId>('entity-projection');
     readonly datasets = signal<LaDataset[]>([]);
+    /** ONBOARDING-FIRST-RUN-1 C6a: the Space's References (details about entities), keyed by their identifying type. */
+    readonly references = computed(() => nodeReferences(this.datasets()));
+    private readonly nodeRisk = inject(NodeRiskService);
+    /** The Entity Type a drawn node holds: its own, else the type the graph was drawn as. */
+    private typeOfNode(n: { data: { entityType?: unknown } }): string | null {
+        return (n.data.entityType as string | undefined) ?? this.growEntityType() ?? null;
+    }
+    /** C6a: the References describing an Entity Type drawn on the explorer canvas (an Investigation hides by its own ops). */
+    readonly drawnReferences = computed(() => {
+        if (this.investigation.active()) return [];
+        // the whole drawn graph, hidden nodes included: a filter that hid every node of a type keeps its Show all
+        const types = new Set((this.baseGraph()?.nodes ?? []).map((n) => this.typeOfNode(n)).filter((t): t is string => !!t));
+        return this.references().filter((r) => types.has(r.entityType));
+    });
+    /** The nodes the details filter hid (and only those: *Show all* brings back nothing another hide took off). */
+    private readonly detailsHidden = signal<string[]>([]);
+    /** Some node is still hidden by a details filter (Undo, a new draw or Show hidden again end it): offer *Show all*. */
+    readonly detailsFilterActive = computed(() => {
+        const hidden = new Set(this.hiddenNodeIds());
+        return this.detailsHidden().some((id) => hidden.has(id));
+    });
+    readonly detailsFiltering = signal(false);
+
+    /**
+     * *Filter by details* (C6a step 4, A-5): look the drawn nodes of the Reference's Entity Type up in it
+     * (`POST /inv/reference-rows`, masked) and hide those whose detail does not contain the text - or that it has no row
+     * for, unless the read was cut (`truncated`: a missing row may only be beyond the cut). Presentation only, undoable,
+     * nothing recorded (`hideLocally`).
+     */
+    async filterByDetails(f: ReferenceFilter): Promise<void> {
+        const nodes: DrawnNode[] = (this.canvasData()?.nodes ?? [])
+            .filter((n) => this.typeOfNode(n) === f.reference.entityType)
+            .map((n) => ({ id: n.id, key: rawIdsOf(n)[0] ?? n.data.label }));
+        if (!nodes.length) return;
+        this.detailsFiltering.set(true);
+        try {
+            const table = await this.nodeRisk.lookup(
+                f.reference,
+                nodes.map((n) => n.key),
+                this.graphRunInvestigationId(),
+            );
+            if (table.error) {
+                this.growExclude.lastChange.set({ text: `${f.reference.name} could not be read: ${table.error}` });
+                return;
+            }
+            const hide = nodesNotMatching(nodes, table.byKey, f.column, f.text, !table.truncated);
+            if (!hide.length) {
+                this.growExclude.lastChange.set({ text: `Every drawn node's ${f.column} contains "${f.text}".` });
+                return;
+            }
+            const cut = table.truncated ? ` (${f.reference.name} returned only part of its rows: nodes without one stay)` : '';
+            this.hideLocally(hide, `hidden: their ${f.column} in ${f.reference.name} does not contain "${f.text}"${cut}`);
+            const still = new Set(this.hiddenNodeIds());
+            this.detailsHidden.update((h) => [...h.filter((id) => still.has(id)), ...hide]);
+        } finally {
+            this.detailsFiltering.set(false);
+        }
+    }
+
+    /** *Show all* after a details filter: the nodes it hid come back; another hide stays. */
+    clearDetailsFilter(): void {
+        const mine = new Set(this.detailsHidden());
+        this.recordHistory();
+        this.hiddenNodeIds.update((h) => h.filter((id) => !mine.has(id)));
+        this.detailsHidden.set([]);
+    }
     readonly pipelines = signal<PipelineSummary[]>([]);
 
     // ── result state ──
@@ -4618,6 +4688,8 @@ Its prior copies stay in its version history.`,
             entityPage: this.entityPageOf(entityType, key),
             // LA-ENTITY-SUMMARY-1: the Summary reads the links of the Dataset the graph was drawn from
             summaryDataset: this.traversalTargets()[0]?.dataset ?? null,
+            // ONBOARDING-FIRST-RUN-1 C6a: the node's details from every Reference describing its Entity Type
+            references: referencesFor(this.references(), entityType),
         };
         this.dialog
             .open(ElementDetailDialog, {

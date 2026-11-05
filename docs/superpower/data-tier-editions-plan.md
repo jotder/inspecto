@@ -22,7 +22,7 @@ tier, so each phase is built from the decided table in §5. When a phase ships, 
   answers A-1…A-16 (§8).
 - [`la-onboarding-plan.md`](../archived-documents/plans-archive/la-onboarding-plan.md) (`LA-ONBOARD-1`): Inspecto LA onboarding and the **shared
   `/onboard/files` import route** this plan's phase 1 needs.
-- [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the console on that
+- [`first-run-onboarding-plan.md`](../archived-documents/plans-archive/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the console on that
   route (entry points, format evidence, fix catalogue, Dataset page, lookups, remote systems).
 
 ## 1. Why

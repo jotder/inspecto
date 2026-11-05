@@ -19,6 +19,7 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } from './node-risk';
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
+import { NodeReference, detailLines } from './reference-details';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
 import { laLimit } from './la-limits';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
@@ -56,6 +57,8 @@ export interface NodeInsightContext {
     entityPage?: UrlTree | null;
     /** LA-ENTITY-SUMMARY-1: the Dataset whose links the Summary reads (the node's mapping's); absent = no Summary offered. */
     summaryDataset?: string | null;
+    /** ONBOARDING-FIRST-RUN-1 C6a: the References that describe this node's Entity Type; its row of each is shown. */
+    references?: NodeReference[];
 }
 
 interface Membership {
@@ -185,6 +188,38 @@ interface Membership {
                 }
             }
         </section>
+
+        @if (ctx().references?.length) {
+            <section class="mt-4" aria-labelledby="ni-details" data-testid="node-details">
+                <h3 id="ni-details" class="text-base font-semibold">Details</h3>
+                @for (d of details(); track d.ref.dataset) {
+                    <div class="mt-1" [attr.data-testid]="'node-details-' + d.ref.dataset">
+                        <p class="text-secondary m-0 text-xs">From {{ d.ref.name }}</p>
+                        @if (d.table; as t) {
+                            @if (t.error) {
+                                <p class="text-secondary text-sm">{{ d.ref.name }} could not be read: {{ t.error }}</p>
+                            } @else if (lines(d).length) {
+                                @if (t.masked) {
+                                    <p class="text-secondary text-xs">{{ maskedNote }}</p>
+                                }
+                                <dl class="mt-1 flex flex-col gap-1 text-sm">
+                                    @for (r of lines(d); track r.name) {
+                                        <div class="flex items-baseline gap-3">
+                                            <dt class="text-secondary w-40 shrink-0">{{ r.name }}</dt>
+                                            <dd class="min-w-0 break-words">{{ r.value }}</dd>
+                                        </div>
+                                    }
+                                </dl>
+                            } @else {
+                                <p class="text-secondary text-sm">No {{ d.ref.name }} row for {{ ctx().label }}.</p>
+                            }
+                        } @else {
+                            <p class="text-secondary text-sm">Reading {{ d.ref.name }}…</p>
+                        }
+                    </div>
+                }
+            </section>
+        }
 
         <section class="mt-4" aria-labelledby="ni-enrich">
             <h3 id="ni-enrich" class="text-base font-semibold">Enrichment</h3>
@@ -402,6 +437,11 @@ export class NodeInsightComponent implements OnInit {
     readonly mapping = computed(() => riskMappingFor(this.ctx().profileId));
     readonly indicators = signal<ReferenceTable | null>(null);
     readonly enrichment = signal<ReferenceTable | null>(null);
+    /** C6a: each Reference describing this node's type, and its row of it once read (null while reading). */
+    readonly details = signal<{ ref: NodeReference; table: ReferenceTable | null }[]>([]);
+    protected lines(d: { ref: NodeReference; table: ReferenceTable | null }): { name: string; value: string }[] {
+        return detailLines(d.table?.byKey.get(this.ctx().key), d.ref.keyCol);
+    }
     readonly riskResult = signal<GraphRunResult | null>(null);
     readonly computing = signal(false);
     readonly runState = signal('');
@@ -523,6 +563,13 @@ export class NodeInsightComponent implements OnInit {
             if (m.enrichment)
                 void this.svc.lookup(m.enrichment, [c.key], c.investigationId).then((t) => this.enrichment.set(t));
         }
+        // C6a: the node's row of every Reference describing its Entity Type (masked by the server like every LA read)
+        const refs = c.references ?? [];
+        this.details.set(refs.map((ref) => ({ ref, table: null })));
+        for (const ref of refs)
+            void this.svc.lookup(ref, [c.key], c.investigationId).then((table) =>
+                this.details.update((all) => all.map((d) => (d.ref === ref ? { ref, table } : d))),
+            );
         if (c.graphKey) this.riskResult.set(this.svc.cachedRisk(this.cacheKey(c.graphKey)));
         void this.loadMemberships();
     }

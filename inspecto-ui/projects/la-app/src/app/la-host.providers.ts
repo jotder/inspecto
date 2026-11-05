@@ -127,6 +127,11 @@ export function provideLaAppHostServices(): Provider[] {
                     ...(readLinkMapping(content['defaultLinkMapping'])
                         ? { defaultLinkMapping: readLinkMapping(content['defaultLinkMapping']) }
                         : {}),
+                    // ONBOARDING-FIRST-RUN-1 C6a: a Reference's details show on the nodes its identifying column names
+                    ...(typeof content['kind'] === 'string' ? { kind: content['kind'] } : {}),
+                    ...(typeof content['identifyingColumn'] === 'string'
+                        ? { identifyingColumn: content['identifyingColumn'] }
+                        : {}),
                 });
                 return {
                     list: () =>

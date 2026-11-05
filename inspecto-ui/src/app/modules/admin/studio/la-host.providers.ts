@@ -36,6 +36,7 @@ import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-dat
 import { REGISTRY_KINDS } from 'app/modules/admin/catalog/registry-kinds';
 import { provenanceCounts, toPipelineG6Data } from 'app/modules/admin/pipelines/pipeline-graph';
 import { DashboardHeaderComponent } from './dashboards/dashboard-header.component';
+import { Dataset } from './datasets/dataset-types';
 import { DatasetsService } from './datasets/datasets.service';
 import { buildWidget } from './widgets/widget-types';
 import { WidgetsService } from './widgets/widgets.service';
@@ -51,7 +52,15 @@ export function provideLaHostServices(): Provider[] {
             provide: LA_DATASETS,
             useFactory: (): LaDatasets => {
                 const datasets = inject(DatasetsService);
-                return { list: () => datasets.list(), get: (id) => datasets.get(id) };
+                // ONBOARDING-FIRST-RUN-1 C6a: a Reference's identifying column (Studio carries it in `extra`)
+                const withKey = (d: Dataset) =>
+                    typeof d.extra?.['identifyingColumn'] === 'string'
+                        ? { ...d, identifyingColumn: d.extra['identifyingColumn'] as string }
+                        : d;
+                return {
+                    list: () => datasets.list().pipe(map((all) => all.map(withKey))),
+                    get: (id) => datasets.get(id).pipe(map(withKey)),
+                };
             },
         },
         {

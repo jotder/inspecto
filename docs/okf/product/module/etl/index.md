@@ -38,7 +38,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | P4 Test mapping on a generic parser node | — |
 | — | P3 | feature | Step Processor catalog | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
-| `ONBOARDING-FIRST-RUN-1` | P2 | feature | console first-run onboarding: from a blank install to a queryable Dataset, in every edition — the console companion LA-ONBOARD-1 OB-1 exp… | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `LA-DATASET-COMPACT-2` | P3 | feature | compaction for a feed's scheduled runs, and the graph after a retention compaction (deferred from LA-DATASET-COMPACT-1, 2026-11-05). | — |

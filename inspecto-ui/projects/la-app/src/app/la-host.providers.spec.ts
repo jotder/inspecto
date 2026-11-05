@@ -125,6 +125,30 @@ describe('la-app host provider set', () => {
         ]);
     });
 
+    it('LA_DATASETS carries a Reference kind and identifying column (ONBOARDING-FIRST-RUN-1 C6a)', () => {
+        const http = TestBed.inject(HttpTestingController);
+        let got: { id: string; kind?: string; identifyingColumn?: string; primaryEntityType?: string }[] = [];
+        TestBed.inject(LA_DATASETS)
+            .list()
+            .subscribe((rows) => (got = rows));
+        http.expectOne((r) => r.url.endsWith('/components/dataset')).flush([
+            {
+                name: 'stores',
+                content: {
+                    physicalRef: 'stores/database',
+                    kind: 'reference',
+                    identifyingColumn: 'store_id',
+                    primaryEntityType: 'store',
+                },
+            },
+            { name: 'calls', content: { sourceName: 'calls_store' } },
+        ]);
+        expect(got.map((d) => [d.id, d.kind, d.identifyingColumn, d.primaryEntityType])).toEqual([
+            ['stores', 'reference', 'store_id', 'store'],
+            ['calls', undefined, undefined, undefined],
+        ]);
+    });
+
     it('LA_TAGS opens the core Tag assignment dialog', () => {
         const dialog = TestBed.inject(MatDialog) as unknown as { open: ReturnType<typeof vi.fn> };
         const target = { targetKind: 'link-analysis-view', targetId: 'v1', label: 'View' };

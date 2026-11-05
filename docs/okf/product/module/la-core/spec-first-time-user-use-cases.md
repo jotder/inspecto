@@ -31,7 +31,7 @@ the one verb for creating a data origin (GLOSSARY).
 
 Related: [DATA-TIERS-1 plan](../../../../superpower/data-tier-editions-plan.md) ·
 [LA-ONBOARD-1 plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md) ·
-[ONBOARDING-FIRST-RUN-1 console plan](../../../../superpower/first-run-onboarding-plan.md) · [user guide](user-guide-link-analysis.md) ·
+[ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide-link-analysis.md) ·
 [Space guide steps](user-guide-link-analysis.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
 
 ---
@@ -230,6 +230,16 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   entity?**; a later **Add a file** always replaces a Reference. Not verified on 2026-10-24: whether nodes can be
   filtered and coloured by the details (the node detail reads Reference rows through `POST /inv/reference-rows`, which
   predates this work), and the "N of them appear in your transfers" count.
+- **As built: details and filter (`ONBOARDING-FIRST-RUN-1` C6a step 4, operator 2026-11-05; every edition).** A node whose
+  Entity Type a Reference's identifying column holds shows that Reference's row under **Details** in the node dialog
+  (one block per such Reference, the key column left out, masked by the server). **Filter by details** in the filter
+  panel keeps the drawn nodes whose Reference detail contains a text and hides the others, and those the Reference has
+  no row for (a local hide: undoable; *Show all* brings back only what the filter hid; nothing recorded; the explorer only - an Investigation hides by its
+  own recorded ops). Verified by specs (`reference-details.spec`, the node dialog, the filter, the Link Analysis
+  component over a drawn graph), each mutation-checked; not driven live (the lane's backend had no Link Analysis
+  module). Still not built: colouring by a detail, and the "N of them appear in your transfers" count (Add data's
+  `matches` gives the share, `ONBOARDING-FIRST-RUN-1` C6a) - BACKLOG `LA-REFERENCE-DETAILS-MORE-1`. Detail: `la-core/architecture.md` (*Reference details on
+  nodes*).
 
 ### UC-05 Use a Dataset that a Pipeline already builds
 

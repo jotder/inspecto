@@ -18,7 +18,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 # Editions
 
 * [Advanced](edition/advanced/index.md) - `edition.advanced` · 2 doc(s) · 0 open row(s)
-* [Basic](edition/basic/index.md) - `edition.basic` · 2 doc(s) · 2 open row(s)
+* [Basic](edition/basic/index.md) - `edition.basic` · 2 doc(s) · 1 open row(s)
 * [Preview](edition/preview/index.md) - `edition.preview` · 2 doc(s) · 0 open row(s)
 * [Standard](edition/standard/index.md) - `edition.standard` · 2 doc(s) · 1 open row(s)
 
@@ -49,7 +49,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 * [Feature modules](layer/features/index.md) - `layer.features` · 2 doc(s) · 0 open row(s)
 * [Link Analysis modules](layer/la/index.md) - `layer.la` · 2 doc(s) · 1 open row(s)
 * [Platform](layer/platform/index.md) - `layer.platform` · 40 doc(s) · 17 open row(s)
-* [Product host](layer/product/index.md) - `layer.product` · 51 doc(s) · 8 open row(s)
+* [Product host](layer/product/index.md) - `layer.product` · 51 doc(s) · 7 open row(s)
 * [Providers](layer/providers/index.md) - `layer.providers` · 2 doc(s) · 0 open row(s)
 * [Service contracts (SPI)](layer/spi/index.md) - `layer.spi` · 2 doc(s) · 0 open row(s)
 
@@ -95,7 +95,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 * [Execution engine](module/engine/index.md) - `module.engine` · 33 doc(s) · 9 open row(s)
 * [Entity lists](module/entity-list/index.md) - `module.entity-list` · 9 doc(s) · 0 open row(s)
 * [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 0 open row(s)
-* [ETL model and step registry](module/etl/index.md) - `module.etl` · 18 doc(s) · 9 open row(s)
+* [ETL model and step registry](module/etl/index.md) - `module.etl` · 18 doc(s) · 8 open row(s)
 * [Event model and log](module/event/index.md) - `module.event` · 9 doc(s) · 1 open row(s)
 * [Exchange (publication and ingestion contracts)](module/exchange/index.md) - `module.exchange` · 10 doc(s) · 2 open row(s)
 * [MaxMind geo-country resolver](module/geo-country/index.md) - `module.geo-country` · 7 doc(s) · 0 open row(s)
@@ -104,7 +104,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 * [Route module contract](module/http-spi/index.md) - `module.http-spi` · 3 doc(s) · 0 open row(s)
 * [AI assist and intelligence](module/intelligence/index.md) - `module.intelligence` · 12 doc(s) · 1 open row(s)
 * [Link analysis and geo routes](module/la-api/index.md) - `module.la-api` · 8 doc(s) · 0 open row(s)
-* [Link analysis core and ports](module/la-core/index.md) - `module.la-core` · 21 doc(s) · 11 open row(s)
+* [Link analysis core and ports](module/la-core/index.md) - `module.la-core` · 21 doc(s) · 12 open row(s)
 * [Link analysis storage](module/la-storage/index.md) - `module.la-storage` · 7 doc(s) · 2 open row(s)
 * [Link analysis PostgreSQL store](module/la-store-pg/index.md) - `module.la-store-pg` · 6 doc(s) · 2 open row(s)
 * [Notification channels](module/notify-channels/index.md) - `module.notify-channels` · 8 doc(s) · 0 open row(s)
@@ -113,7 +113,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 * [Case management and objects](module/ops/index.md) - `module.ops` · 9 doc(s) · 1 open row(s)
 * [Attribute-based access policy](module/policy/index.md) - `module.policy` · 7 doc(s) · 0 open row(s)
 * [Predictive Analytics](module/predictive/index.md) - `module.predictive` · 8 doc(s) · 1 open row(s)
-* [Control plane and processor host](module/processor/index.md) - `module.processor` · 23 doc(s) · 6 open row(s)
+* [Control plane and processor host](module/processor/index.md) - `module.processor` · 23 doc(s) · 5 open row(s)
 * [Reconciliation](module/reconciliation/index.md) - `module.reconciliation` · 10 doc(s) · 1 open row(s)
 * [Regulatory Reporting](module/regulatory-reporting/index.md) - `module.regulatory-reporting` · 10 doc(s) · 1 open row(s)
 * [Scoring](module/scoring/index.md) - `module.scoring` · 14 doc(s) · 0 open row(s)

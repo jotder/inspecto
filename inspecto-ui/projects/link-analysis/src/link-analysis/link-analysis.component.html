@@ -1968,6 +1968,17 @@
                                     (applyByDataset)="applyDatasetRoleFilters($event)"
                                 ></inspecto-link-analysis-role-filter>
                             }
+                            <!-- ONBOARDING-FIRST-RUN-1 C6a: keep the nodes whose Reference detail contains a text -->
+                            @if (drawnReferences().length) {
+                                <inspecto-la-reference-filter
+                                    class="mb-3 block"
+                                    [references]="drawnReferences()"
+                                    [busy]="detailsFiltering()"
+                                    [active]="detailsFilterActive()"
+                                    (apply)="filterByDetails($event)"
+                                    (clear)="clearDetailsFilter()"
+                                ></inspecto-la-reference-filter>
+                            }
                         }
                         <!-- LA-ARRIVAL-LEDGER-1: the drawn Dataset's arrivals, period and graph clock -->
                         <inspecto-la-data-status

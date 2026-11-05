@@ -213,6 +213,31 @@ const settle = async (f: { detectChanges(): void; whenStable(): Promise<unknown>
 };
 
 describe('NodeInsightComponent (telecom demo S2 UI)', () => {
+    it('Details (C6a): the node row of each Reference describing its Entity Type, the key column left out', async () => {
+        const ref = {
+            dataset: 'crm_kyc_dataset',
+            keyCol: 'msisdn',
+            name: 'subscribers',
+            entityType: 'msisdn',
+            columns: ['subscriber_type'],
+        };
+        const { fixture, el, svc } = make({ references: [ref] });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(svc.lookup).toHaveBeenCalledWith(ref, ['999'], 'inv');
+        const d = el.querySelector('[data-testid="node-details-crm_kyc_dataset"]') as HTMLElement;
+        expect(d.textContent).toContain('From subscribers');
+        expect(d.textContent).toContain('subscriber_type');
+        expect(d.textContent).toContain('prepaid');
+        expect(Array.from(d.querySelectorAll('dt')).map((t) => t.textContent?.trim())).not.toContain('msisdn');
+        await expectNoA11yViolations(el);
+    });
+
+    it('Details (C6a): no Reference describes the type, no Details section', () => {
+        const { el } = make({ references: [] });
+        expect(el.querySelector('[data-testid="node-details"]')).toBeNull();
+    });
+
     it('shows the own indicator score + factors, CRM/KYC enrichment and list membership; computes propagated risk on demand', async () => {
         const { fixture, el, svc } = make({}, { matched: ['bl'] });
         await settle(fixture);

@@ -6,6 +6,7 @@ import type { LaFeatures, LaImportDraft } from '@inspecto/link-analysis/la-host'
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { ApplicationRef, Component, EventEmitter, Input, Output, getDebugNode, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { NodeRiskService } from './node-risk.service';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -4581,6 +4582,133 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         c.hiddenNodeIds.update((h) => [...h, 'd']); // hidden later, elsewhere
         await c.growExclude.undoLast();
         expect(c.hiddenNodeIds()).toEqual(['e', 'd']);
+    });
+
+    it('Filter by details (C6a): keeps the nodes whose Reference detail contains the text; Show all brings the rest back', async () => {
+        const typed: G6GraphData = {
+            ...GRAPH,
+            nodes: GRAPH.nodes.map((n) => ({
+                ...n,
+                data: { ...n.data, entityType: n.id < 'd' ? 'store' : 'cell' },
+            })),
+        };
+        const stores: Dataset = {
+            ...DS,
+            id: 'stores',
+            name: 'stores',
+            kind: 'reference' as never,
+            primaryEntityType: 'store',
+            columns: [
+                { name: 'store_id', type: 'string', role: 'entity', classification: 'STORE' },
+                { name: 'region', type: 'string', role: 'dimension' },
+            ],
+            extra: { origin: 'import', identifyingColumn: 'store_id' },
+        };
+        const { fixture, c, el } = await drawn({ features: BASIC_EDITION_FEATURES, graph: typed, datasets: [DS, stores] });
+        const lookup = vi.spyOn(TestBed.inject(NodeRiskService), 'lookup').mockResolvedValue({
+            byKey: new Map([
+                ['A', { store_id: 'A', region: 'North' }],
+                ['B', { store_id: 'B', region: 'South' }],
+            ]),
+            columns: ['store_id', 'region'],
+            truncated: false,
+            unresolved: 0,
+            masked: false,
+        });
+        c.openDock('rows');
+        c.filterOpen.set(true);
+        fixture.detectChanges();
+        expect(c.drawnReferences().map((r) => r.dataset)).toEqual(['stores']);
+        expect(el.querySelector('[data-testid="reference-filter"]')).not.toBeNull();
+        await c.filterByDetails({ reference: c.drawnReferences()[0], column: 'region', text: 'north' });
+        // only the store nodes were looked up, by their keys; B is South, C has no row: both hidden; the cells untouched
+        expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'stores', keyCol: 'store_id' }), ['A', 'B', 'C'], null);
+        expect(c.hiddenNodeIds()).toEqual(['b', 'c']);
+        expect(c.canvasData()!.nodes.map((n) => n.id)).toEqual(['a', 'd', 'e']);
+        expect(c.detailsFilterActive()).toBe(true);
+        c.clearDetailsFilter();
+        expect(c.hiddenNodeIds()).toEqual([]);
+        expect(c.detailsFilterActive()).toBe(false);
+
+        // the node dialog of a store node reads its row of `stores`; a cell node has no Reference
+        const open = vi
+            .spyOn(fixture.debugElement.injector.get(MatDialog), 'open')
+            .mockReturnValue({ afterClosed: () => of(undefined) } as never);
+        type Ctx = { extension: { inputs: { ctx: { references?: { dataset: string; keyCol: string }[] } } } };
+        const refsOf = (id: string) => {
+            (c as unknown as { openNodeDetail: (id: string) => void }).openNodeDetail(id);
+            return (open.mock.lastCall as unknown as [unknown, { data: Ctx }])[1].data.extension.inputs.ctx.references;
+        };
+        expect(refsOf('a')?.map((r) => [r.dataset, r.keyCol])).toEqual([['stores', 'store_id']]);
+        expect(refsOf('d')).toEqual([]);
+    });
+
+    it('Filter by details (C6a): nothing matching keeps Show all, which brings back only its own; Undo ends it; errors and cut reads', async () => {
+        const typed: G6GraphData = {
+            ...GRAPH,
+            nodes: GRAPH.nodes.map((n) => ({ ...n, data: { ...n.data, entityType: n.id < 'd' ? 'store' : 'cell' } })),
+        };
+        const stores: Dataset = {
+            ...DS,
+            id: 'stores',
+            name: 'stores',
+            kind: 'reference' as never,
+            primaryEntityType: 'store',
+            columns: [
+                { name: 'store_id', type: 'string', role: 'entity', classification: 'STORE' },
+                { name: 'region', type: 'string', role: 'dimension' },
+            ],
+            extra: { origin: 'import', identifyingColumn: 'store_id' },
+        };
+        const { c } = await drawn({ features: BASIC_EDITION_FEATURES, graph: typed, datasets: [DS, stores] });
+        const table = (over: object = {}) => ({
+            byKey: new Map([
+                ['A', { store_id: 'A', region: 'North' }],
+                ['B', { store_id: 'B', region: 'South' }],
+            ]),
+            columns: ['store_id', 'region'],
+            truncated: false,
+            unresolved: 0,
+            masked: false,
+            ...over,
+        });
+        const lookup = vi.spyOn(TestBed.inject(NodeRiskService), 'lookup').mockResolvedValue(table());
+        const ref = () => c.drawnReferences()[0];
+        // nothing matches: every store hidden, yet the filter (and its Show all) stays offered
+        await c.filterByDetails({ reference: ref(), column: 'region', text: 'Nrth' });
+        expect(c.hiddenNodeIds()).toEqual(['a', 'b', 'c']);
+        expect(c.drawnReferences().map((r) => r.dataset)).toEqual(['stores']);
+        expect(c.detailsFilterActive()).toBe(true);
+        // another hide meanwhile: Show all brings back only what the details filter hid
+        c.hiddenNodeIds.update((h) => [...h, 'd']);
+        c.clearDetailsFilter();
+        expect(c.hiddenNodeIds()).toEqual(['d']);
+        expect(c.detailsFilterActive()).toBe(false);
+        // Undo of the filter's own hide ends it too
+        c.hiddenNodeIds.set([]);
+        await c.filterByDetails({ reference: ref(), column: 'region', text: 'north' });
+        expect(c.detailsFilterActive()).toBe(true);
+        await c.growExclude.undoLast();
+        expect(c.hiddenNodeIds()).toEqual([]);
+        expect(c.detailsFilterActive()).toBe(false);
+        // a read that failed hides nothing and says why
+        lookup.mockResolvedValueOnce(table({ error: 'no dataset' }));
+        await c.filterByDetails({ reference: ref(), column: 'region', text: 'north' });
+        expect(c.hiddenNodeIds()).toEqual([]);
+        expect(c.growExclude.lastChange()?.text).toContain('stores could not be read: no dataset');
+        // a cut read: C has no row, but may lie beyond the cut, so only B (South) is hidden
+        lookup.mockResolvedValueOnce(table({ truncated: true }));
+        await c.filterByDetails({ reference: ref(), column: 'region', text: 'north' });
+        expect(c.hiddenNodeIds()).toEqual(['b']);
+        expect(c.growExclude.lastChange()?.text).toContain('returned only part of its rows');
+        // every drawn node matches: nothing hidden, said so
+        c.hiddenNodeIds.set([]);
+        lookup.mockResolvedValueOnce(
+            table({ byKey: new Map(['A', 'B', 'C'].map((k) => [k, { store_id: k, region: 'North' }])) }),
+        );
+        await c.filterByDetails({ reference: ref(), column: 'region', text: 'north' });
+        expect(c.hiddenNodeIds()).toEqual([]);
+        expect(c.growExclude.lastChange()?.text).toContain('Every drawn node\'s region contains "north"');
     });
 
     it('Basic Grow is blocked, with the reason, when the graph source has no neighbours read', async () => {
