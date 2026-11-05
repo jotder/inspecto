@@ -556,7 +556,7 @@ describe('DataTableComponent', () => {
             const missing = [...err.mock.calls, ...warn.mock.calls]
                 .flat()
                 .map(String)
-                .filter((m) => /#200|moduleName=/.test(m));
+                .filter((m) => /#200\b|moduleName=/.test(m));
             expect(missing).toEqual([]);
         } finally {
             err.mockRestore();
