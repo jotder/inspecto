@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import {
     ApprovalsService,
     EventsService,
@@ -12,6 +12,9 @@ import {
     SessionService,
     SpacesService,
 } from 'app/inspecto/api';
+import { OnboardingEventsService } from 'app/inspecto/onboarding/onboarding-events.service';
+import { SpaceGuideState } from 'app/inspecto/onboarding/space-guide';
+import { SpaceGuideService } from 'app/inspecto/onboarding/space-guide.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
 import { of, throwError } from 'rxjs';
@@ -37,7 +40,22 @@ interface Stubs {
     multiSpace?: boolean;
     lens?: 'business' | 'builder' | 'ops';
     can?: Partial<Record<'onboard' | 'author' | 'operate' | 'administer', boolean>>;
+    /** The console Space guide's state; defaults to a finished setup (the guide hidden). */
+    guide?: SpaceGuideState;
 }
+
+const GUIDE = (over: Partial<SpaceGuideState> = {}): SpaceGuideState => ({
+    hasSpace: true,
+    datasets: 1,
+    columnsDescribed: false,
+    views: 0,
+    lists: 0,
+    queries: 1,
+    dashboards: 1,
+    ...over,
+});
+/** A Space with no Dataset yet: setup is incomplete, so Getting started shows. */
+const NO_DATA = GUIDE({ datasets: 0, queries: 0, dashboards: 0 });
 
 /**
  * ⚠ Several tests here build TWO fixtures, because the gating they assert is read in `ngOnInit` — a
@@ -75,7 +93,10 @@ function create(s: Stubs = {}) {
     const spaces = {
         multiSpace: signal(s.multiSpace ?? false),
         currentSpace: signal(null),
+        availableSpaces: signal([]),
     };
+    const guide = { load: vi.fn((_kind?: string) => of(s.guide ?? GUIDE())) };
+    const onboarding = { guideCompleted: vi.fn(), stepAbandoned: vi.fn() };
     const lens = {
         currentLens: signal(s.lens ?? 'builder'),
         canOnboardConnections: signal(s.can?.onboard ?? true),
@@ -97,12 +118,14 @@ function create(s: Stubs = {}) {
             { provide: SessionService, useValue: session },
             { provide: SpacesService, useValue: spaces },
             { provide: LensService, useValue: lens },
+            { provide: SpaceGuideService, useValue: guide },
+            { provide: OnboardingEventsService, useValue: onboarding },
             { provide: ToastrService, useValue: { error: vi.fn() } },
         ],
     });
     const fixture = TestBed.createComponent(HomeComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, jobs, objects, approvals, events };
+    return { fixture, el: fixture.nativeElement as HTMLElement, jobs, objects, approvals, events, guide, onboarding };
 }
 
 const RUN = (over: Record<string, unknown> = {}) => ({
@@ -124,24 +147,55 @@ describe('HomeComponent', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('greets a fresh install with the first-run guidance and no activity tiles', () => {
-        const { el } = create({ runs: [] });
+    it('greets a Space with no Dataset with Getting started and the console Space guide, no activity tiles', async () => {
+        const { el, guide } = create({ runs: [], guide: NO_DATA });
+        expect(guide.load).toHaveBeenCalledWith('console');
         expect(el.querySelector('h1')?.textContent).toContain('Welcome to Inspecto.');
         expect(el.textContent).toContain('Nothing has been onboarded yet');
+        expect(el.textContent).toContain('Getting started');
+        expect(el.querySelector('inspecto-getting-started')).not.toBeNull();
+        expect(Array.from(el.querySelectorAll('[data-step]')).map((b) => b.getAttribute('data-step'))).toEqual([
+            'space',
+            'data',
+            'query',
+            'dashboard',
+        ]);
         expect(el.textContent).not.toContain('Needs attention');
+        await expectNoA11yViolations(el);
+    });
+
+    it('keys first run on no Dataset yet, not on an empty run history (B1, LA-ONBOARD-1 phase 3)', () => {
+        const { el } = create({ runs: [], guide: GUIDE() });
+        expect(el.querySelector('inspecto-getting-started')).toBeNull();
+        expect(el.textContent).toContain('Needs attention');
     });
 
     it('first run leads with Add data; Onboard a Stream stays the advanced start (ONBOARDING-FIRST-RUN-1 C3, OF-3)', async () => {
-        const { el } = create({ runs: [] });
-        expect(el.querySelector('[data-testid="home-add-data"]')?.getAttribute('href')).toBe('/add-data');
+        const { el } = create({ runs: [], guide: NO_DATA });
+        const go = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        (el.querySelector('[data-testid="home-add-data"]') as HTMLButtonElement).click();
+        expect(go).toHaveBeenCalledWith('/add-data');
         expect(el.querySelector('[data-testid="home-onboard-stream"]')?.getAttribute('href')).toBe(
             '/catalog?onboard=stream',
         );
         await expectNoA11yViolations(el);
     });
 
+    it('keeps the Space guide beside the tiles until its required steps are done', () => {
+        const { el } = create({ runs: [RUN()], guide: GUIDE({ queries: 0 }) });
+        expect(el.querySelector('inspecto-getting-started')).toBeNull();
+        expect(el.textContent).toContain('Space guide');
+        expect(el.textContent).toContain('2 of 3 done');
+    });
+
+    it('reports the console guide completed once its required steps are done (OB-13)', () => {
+        const { el, onboarding } = create({ runs: [RUN()], guide: GUIDE({ dashboards: 0 }) });
+        expect(onboarding.guideCompleted).toHaveBeenCalled();
+        expect(el.textContent).not.toContain('Space guide');
+    });
+
     it('Add data is offered without the connection-onboarding right; the advanced start is not', () => {
-        const { el } = create({ runs: [], can: { onboard: false } });
+        const { el } = create({ runs: [], guide: NO_DATA, can: { onboard: false } });
         expect(el.querySelector('[data-testid="home-add-data"]')).not.toBeNull();
         expect(el.querySelector('[data-testid="home-onboard-stream"]')).toBeNull();
     });
@@ -298,18 +352,42 @@ describe('HomeComponent', () => {
         });
 
         /** Live 2026-10-23: a fresh Space's Home stayed on the first-run panel beside 14 finished Jobs until a reload. */
-        it('leaves the first-run panel on the tick once runs exist, and stops re-reading runs after', () => {
+        it('re-reads an empty run list on the tick, and stops once runs exist', () => {
             vi.useFakeTimers();
             try {
-                const { fixture, el, jobs } = create({ runs: [] });
-                expect(el.textContent).toContain('Nothing has been onboarded yet');
+                const { jobs } = create({ runs: [] });
                 jobs.recentRuns.mockImplementation(() => of([RUN()]));
+                vi.advanceTimersByTime(30_000);
+                vi.advanceTimersByTime(30_000);
+                expect(jobs.recentRuns).toHaveBeenCalledTimes(2); // operational Home: the run list is not polled
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('reads the guide once beside the tiles, never on the tick', () => {
+            vi.useFakeTimers();
+            try {
+                const { guide } = create({ runs: [RUN()], guide: GUIDE({ queries: 0 }) });
+                vi.advanceTimersByTime(60_000);
+                expect(guide.load).toHaveBeenCalledTimes(1);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('leaves Getting started on the tick once a Dataset exists, and stops re-reading the guide once it is done', () => {
+            vi.useFakeTimers();
+            try {
+                const { fixture, el, guide } = create({ runs: [], guide: NO_DATA });
+                expect(el.textContent).toContain('Nothing has been onboarded yet');
+                guide.load.mockImplementation(() => of(GUIDE()));
                 vi.advanceTimersByTime(30_000);
                 fixture.detectChanges();
                 expect(el.textContent).not.toContain('Nothing has been onboarded yet');
                 expect(el.querySelector('[data-testid="tile-datasets-written"]')).not.toBeNull();
                 vi.advanceTimersByTime(30_000);
-                expect(jobs.recentRuns).toHaveBeenCalledTimes(2); // operational Home: the run list is not polled
+                expect(guide.load).toHaveBeenCalledTimes(2); // the guide is done: it is no longer polled
             } finally {
                 vi.useRealTimers();
             }
