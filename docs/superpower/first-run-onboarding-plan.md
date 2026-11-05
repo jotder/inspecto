@@ -162,8 +162,8 @@ skill (design system, WCAG 2.2 AA, axe gate).
 | C2 | B3 fix catalogue (server), wired into draft findings, commit refusals and quarantine reasons | C1 | every entry has a test that applies its fix and re-runs — **built 2026-11-05**: `OnboardFixes`, seven entries, `ControlApiOnboardFixesTest` |
 | C3 | B1 console entry points and Add data (the shared component) | `LA-ONBOARD-1` phases 2 and 4, C1 | file to queried Dataset in three gestures, driven in the preview — **built**: `/add-data` + Home entry (2026-11-01), drop zones on Home / Catalog / empty Datasets pane (2026-11-05); *Open in editor* on the review screen **moved to `BASIC-ONBOARD-1` (operator 2026-11-05)**, not built and not declined |
 | C4 | B1 Getting started and the console Space guide; *New from sample* on the Spaces pane | `LA-ONBOARD-1` phase 3 and OB-12 | a blank install reaches the `orders-starter` dashboard with no file-system access — **built 2026-11-05**: Getting started on Home, the console Space guide (*First query* ticked by a saved query, *A dashboard* by a saved dashboard), *New from sample* on the Spaces pane; as built in `okf/product/layer/product/user-guide-onboarding.md` |
-| C5 | B4 console Dataset page | C3, `DATA-TIERS-1` phase 3 | console UC-5 and UC-8 pass on Basic and Standard |
-| C6 | B5 lookups; B6 remote systems with test and browse | C3, `DATA-TIERS-1` phase 4 | console UC-4 and UC-6 pass; Basic shows the locks |
+| C5 | B4 console Dataset page — **re-planned 2026-11-05 (`DATA-TIERS-1` §5.3): no longer waits on phase 3 (dropped); reuses the shared import Dataset card in the console Datasets pane, plus *What this Dataset can feed*** | C3 | console UC-5 and UC-8 pass on Basic and Standard |
+| C6 | B5 lookups; B6 remote systems with test and browse — **split 2026-11-05 (`DATA-TIERS-1` §5.3): C6a = B5 lookups, Basic and up, builds now; C6b = B6 remote systems on Standard, moved to its own row `ONBOARDING-REMOTE-SYSTEMS-1`** | C3 | console UC-4 and UC-6 pass; Basic shows the locks |
 
 C1 and C2 are server work that `LA-ONBOARD-1` phase 4 also benefits from; they can start as soon as its phase 2
 contract is fixed.
