@@ -7,6 +7,7 @@ import {
     mappingEntry,
     carriedChoices,
     mappingLine,
+    mappingRole,
     recordTypeProposals,
     roleOf,
     typeOf,
@@ -142,6 +143,65 @@ describe('the Data page model (LA-DATA-PAGE-1)', () => {
         expect(roleOf(stored.columns[1], stored, TYPES)).toBe('temporal');
         expect(stored.columns[2].role).toBeNull(); // not a role: read as if none were stored
         expect(roleOf(stored.columns[2], stored, TYPES)).toBe('detail');
+    });
+
+    describe('a base reads an unset role from the Mappings built on it (operator 2026-11-05, display only)', () => {
+        const piped = dataEntry(
+            def('links', {
+                columns: [
+                    { name: 'src', type: 'string', classification: 'ACCOUNT_ID' },
+                    { name: 'dst', type: 'string', classification: 'ACCOUNT_ID' },
+                    { name: 'kind', type: 'string' },
+                    { name: 'ts', type: 'timestamp' },
+                    { name: 'amount', type: 'number' },
+                    { name: 'note', type: 'string', role: 'detail' },
+                ],
+            }),
+        );
+        const mapping = (name: string, m: Record<string, string>) =>
+            dataEntry(def(name, { origin: 'mapping', basedOn: 'links', columns: [], defaultLinkMapping: m }));
+        const roles = (ms: ReturnType<typeof dataEntry>[]) =>
+            piped.columns.map((c) => mappingRole(c, piped, ms, TYPES));
+
+        it('one Mapping: its Measure and kind become Measure and Category, naming the Mapping', () => {
+            const wallet = mapping('wallet_links', {
+                from: 'src',
+                to: 'dst',
+                kind: 'kind',
+                time: 'ts',
+                amount: 'amount',
+                note: 'note',
+            });
+            expect(roles([wallet])).toEqual([
+                null, // an Entity: never derived
+                null,
+                { role: 'dimension', mappings: ['wallet_links'] },
+                null, // a timestamp already reads as a Time
+                { role: 'measure', mappings: ['wallet_links'] },
+                null, // a stated role (even Detail) is never read over
+            ]);
+            // a Mapping of another base says nothing here
+            const other = dataEntry(
+                def('elsewhere', {
+                    origin: 'mapping',
+                    basedOn: 'other',
+                    columns: [],
+                    defaultLinkMapping: { from: 'src', to: 'dst', amount: 'amount' },
+                }),
+            );
+            expect(mappingRole(piped.columns[4], piped, [other], TYPES)).toBeNull();
+        });
+
+        it('two Mappings that disagree leave it a Detail; two that agree name both', () => {
+            const a = mapping('by_amount', { from: 'src', to: 'dst', amount: 'amount', kind: 'kind' });
+            const b = mapping('by_kind', { from: 'src', to: 'dst', kind: 'amount' });
+            const c = mapping('also_kind', { from: 'src', to: 'dst', kind: 'kind' });
+            expect(mappingRole(piped.columns[4], piped, [a, b], TYPES)).toBeNull();
+            expect(mappingRole(piped.columns[2], piped, [a, b, c], TYPES)).toEqual({
+                role: 'dimension',
+                mappings: ['by_amount', 'also_kind'],
+            });
+        });
     });
 
     it('a Mapping keeps each column role and unit; a From or To re-classified there is an Entity, or no longer one', () => {

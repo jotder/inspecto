@@ -1,6 +1,6 @@
 # Console first-run onboarding: from a blank install to a queryable Dataset (`ONBOARDING-FIRST-RUN-1`)
 
-**Status: PLAN 2026-10-22, every decision answered (OF-1…OF-3 on 2026-10-25); C3 built 2026-11-01 and 2026-11-05** (console `/add-data` on the shared screen, Home's first-run Add data, drop zones on Home / Catalog / the empty Datasets pane - as built in `okf/product/layer/product/user-guide-onboarding.md`; *Open in editor* on the review screen moved to `BASIC-ONBOARD-1`, operator 2026-11-05). C1, C2, C4…C6 open. The direction is decided (§2, operator
+**Status: PLAN 2026-10-22, every decision answered (OF-1…OF-3 on 2026-10-25); C3 built 2026-11-01 and 2026-11-05** (console `/add-data` on the shared screen, Home's first-run Add data, drop zones on Home / Catalog / the empty Datasets pane - as built in `okf/product/layer/product/user-guide-onboarding.md`; *Open in editor* on the review screen moved to `BASIC-ONBOARD-1`, operator 2026-11-05). **C4 built 2026-11-05** (Getting started, the console Space guide, *New from sample*). C1, C2, C5, C6 open. The direction is decided (§2, operator
 2026-10-22); the decisions OF-1…OF-3 (§7) were answered 2026-10-25. When a slice ships, distil
 the as-built facts into the product hubs (`layer/product`, `module/etl`, `module/processor`), close its board rows,
 and archive this file when the last slice ships.
@@ -159,7 +159,7 @@ skill (design system, WCAG 2.2 AA, axe gate).
 | C1 | B2 format evidence and confidence in the `/onboard/files` draft; nested JSON record path; file-name dates; decimal mark | `LA-ONBOARD-1` phase 2 contract | the draft returns evidence; property tests over sample files |
 | C2 | B3 fix catalogue (server), wired into draft findings, commit refusals and quarantine reasons | C1 | every entry has a test that applies its fix and re-runs |
 | C3 | B1 console entry points and Add data (the shared component) | `LA-ONBOARD-1` phases 2 and 4, C1 | file to queried Dataset in three gestures, driven in the preview — **built**: `/add-data` + Home entry (2026-11-01), drop zones on Home / Catalog / empty Datasets pane (2026-11-05); *Open in editor* on the review screen **moved to `BASIC-ONBOARD-1` (operator 2026-11-05)**, not built and not declined |
-| C4 | B1 Getting started and the console Space guide; *New from sample* on the Spaces pane | `LA-ONBOARD-1` phase 3 and OB-12 | a blank install reaches the `orders-starter` dashboard with no file-system access |
+| C4 | B1 Getting started and the console Space guide; *New from sample* on the Spaces pane | `LA-ONBOARD-1` phase 3 and OB-12 | a blank install reaches the `orders-starter` dashboard with no file-system access — **built 2026-11-05**: Getting started on Home, the console Space guide (*First query* ticked by a saved query, *A dashboard* by a saved dashboard), *New from sample* on the Spaces pane; as built in `okf/product/layer/product/user-guide-onboarding.md` |
 | C5 | B4 console Dataset page | C3, `DATA-TIERS-1` phase 3 | console UC-5 and UC-8 pass on Basic and Standard |
 | C6 | B5 lookups; B6 remote systems with test and browse | C3, `DATA-TIERS-1` phase 4 | console UC-4 and UC-6 pass; Basic shows the locks |
 

@@ -12,6 +12,10 @@ What a Space created from `orders-starter` shows, and how to use it as a pattern
 
 ## Watch the feed land
 
+**From the browser (no file-system access):** Home's *Getting started* → **Try the sample**, or Spaces → **New from
+sample**, creates the Space, loads `data/samples/orders` and runs the Pipeline once, then opens `orders_overview`
+([onboarding](../../layer/product/user-guide-onboarding.md), slice C4). By hand:
+
 1. Copy the files of `data/samples/orders` into `data/inbox/orders`.
 2. The `orders` Pipeline picks up each `ORDERS_<yyyyMMdd>.csv`, applies the Schema (adding `GROSS`) and writes Parquet. A repeated file is skipped by the duplicate check; a missing day is reported by gap detection. See [Pipelines](../../module/etl/user-guide-pipelines.md).
 3. The `orders_id_non_null` Expectation checks that every row has an `ORDER_ID`.

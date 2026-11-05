@@ -29,6 +29,17 @@ import { ToastrService } from 'ngx-toastr';
 import { interval } from 'rxjs';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { AddDataDropComponent } from 'app/modules/admin/add-data/add-data-drop.component';
+import { OnboardingEventsService } from 'app/inspecto/onboarding/onboarding-events.service';
+import { SpaceGuideComponent } from 'app/inspecto/onboarding/space-guide.component';
+import { SpaceGuideService } from 'app/inspecto/onboarding/space-guide.service';
+import {
+    CONSOLE_STEP_ROUTES,
+    guideDone,
+    setupIncomplete,
+    SpaceGuideState,
+    SpaceGuideStepId,
+} from 'app/inspecto/onboarding/space-guide';
+import { GettingStartedComponent } from './getting-started.component';
 
 /** One row of the "Needs attention" list — the three sources normalised onto one shape. */
 interface AttentionRow {
@@ -77,6 +88,8 @@ const DATASET_WRITE_TYPES = 'dataset.write,job.dataset.produced';
     templateUrl: './home.component.html',
     imports: [
         AddDataDropComponent,
+        GettingStartedComponent,
+        SpaceGuideComponent,
         InspectoPageHeaderComponent,
         MatButtonModule,
         MatIconModule,
@@ -96,6 +109,8 @@ export class HomeComponent implements OnInit {
     private spaces = inject(SpacesService);
     private router = inject(Router);
     private toastr = inject(ToastrService);
+    private guide = inject(SpaceGuideService);
+    private onboardingEvents = inject(OnboardingEventsService);
     readonly session = inject(SessionService);
     readonly lens = inject(LensService);
 
@@ -150,6 +165,14 @@ export class HomeComponent implements OnInit {
     /** A genuinely empty install: the run history loaded and holds nothing. */
     readonly firstRun = computed(() => !this.loading() && !this.runsUnavailable() && this.runs().length === 0);
 
+    /** The console Space guide's state (ONBOARDING-FIRST-RUN-1 B1); null while it loads or when it cannot be read. */
+    readonly guideState = signal<SpaceGuideState | null>(null);
+    /** Getting started replaces the first-run cards while setup is incomplete: no Space, or no Dataset yet. */
+    readonly gettingStarted = computed(() => {
+        const s = this.guideState();
+        return !!s && setupIncomplete(s);
+    });
+
     readonly attention = computed<AttentionRow[]>(() =>
         [
             ...this.failedRuns().map((r) => ({
@@ -191,7 +214,6 @@ export class HomeComponent implements OnInit {
 
     // ── Capability-gated actions ────────────────────────────────────────────────────────────────
     readonly canOnboard = this.lens.canOnboardConnections;
-    readonly canAuthor = this.lens.canAuthorWorkbench;
     readonly canOperate = this.lens.canOperateRuns;
     readonly canAdminister = this.lens.canAdminister;
     /** Incident triage is only reachable when the optional ops module registered its routes. */
@@ -216,6 +238,7 @@ export class HomeComponent implements OnInit {
     load(): void {
         this.loading.set(true);
         this.loadRuns();
+        this.loadGuide();
 
         // Gate on the flag first: an absent ops module 503s on every path, so asking at all would only
         // produce an error to swallow (the dashboard's precedent).
@@ -248,8 +271,27 @@ export class HomeComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe(() => {
                 if (this.firstRun()) this.loadRuns();
+                // Only while Getting started shows: beside the tiles the guide is read once per page load, so a Space
+                // that never saves a query is not polled for ever.
+                if (this.guideState() === null || this.gettingStarted()) this.loadGuide();
                 this.loadCounts();
             });
+    }
+
+    private loadGuide(): void {
+        this.guide.load('console').subscribe({
+            next: (s) => {
+                this.guideState.set(s);
+                if (guideDone(s, 'console')) this.onboardingEvents.guideCompleted(); // OB-13
+            },
+            error: () => this.guideState.set(null),
+        });
+    }
+
+    /** A Space guide line chosen beside the tiles (setup is complete, so the Space exists). */
+    openGuideStep(id: SpaceGuideStepId): void {
+        const to = CONSOLE_STEP_ROUTES[id];
+        if (to) void this.router.navigateByUrl(to);
     }
 
     private loadRuns(): void {

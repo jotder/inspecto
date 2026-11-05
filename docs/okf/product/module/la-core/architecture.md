@@ -1658,6 +1658,12 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   boolean. An entry without roles still loads and reads back-compatibly: holds an Entity Type → Entity; the mapping's
   primary Time or `eventDate` → Time; its primary Measure → Measure; its kind → Category; on the Data page a
   date/timestamp column → Time; anything else → Detail.
+- **A base's roles from its Mappings (operator 2026-11-05, display only).** On the Data page's Columns card, a base's
+  column that states no role and that the base itself reads as a Detail shows the role the primaries of the Mappings
+  built on it give it (primary Time → Time, primary Measure → Measure, kind → Category; `data-page.ts` `mappingRole`),
+  with a note naming them (*From Mapping mm_wallet_links - not set on this Dataset*). Mappings that disagree leave it a
+  Detail. Nothing is written: only a person's pick (or a Unit, which saves the Measure) stores a role. The server's
+  readers (`DatasetEntryRules`, presets, profiles) do not derive it.
 - **Primaries.** `defaultLinkMapping` names `primaryTime` (dates each link: the window, newcomers, playback's first
   choice, Reconciliation's `DatasetRelation.temporalColumn` when several Times exist) and `primaryMeasure` (presets'
   sums). `time` / `amount` are their old names, read for stored entries and in an Add data commit body; two different
@@ -1849,7 +1855,10 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   Gates as `/freshness` (no capability); an entry whose import fields do not name ITS OWN Add data Pipeline reads nothing.
 - **The sidecar** gets one line per file a run took (`DatasetArrivals.recordRun`): the upload's name, mode, sha256; every
   file's index outcome and its mode (`append` / `full` / `compact`). *Run now* records the drops it took (`sender: system`).
-  A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A refused
+  A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A file
+  with NO line (imported before the sidecar existed, 2026-11-03, or its best-effort write lost) is an upload when its
+  inbox name is Add data's own `add_<stamp>_<name>` (`DatasetArrivals.ADD_DATA_NAME`), shown as `<name>`; else a
+  system's. A refused
   waiting file has only its sidecar line (`status: REFUSED`, `reason`, `setAside`) and is merged in by time.
 - **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`),
   on the Dataset card, under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up

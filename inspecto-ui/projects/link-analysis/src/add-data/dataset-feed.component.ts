@@ -421,7 +421,7 @@ export class DatasetFeedComponent {
                     this.adopt(s);
                     this.note.set({
                         variant: 'info',
-                        text: 'Files are imported only when you add them or press Run now.',
+                        text: 'The feed is stopped. Add a file or press Run now to import.',
                     });
                 },
                 error: (err: unknown) => {
