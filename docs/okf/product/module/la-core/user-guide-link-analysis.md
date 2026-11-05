@@ -152,8 +152,9 @@ is sent anywhere. Administrators see it in **Settings → Getting started counte
 1. **Drop or choose a file.** Say what is in it: *Events between entities* (transfers, calls, messages) or *Details
    about entities* (customers, accounts, devices). Drop the file or press **Choose a file**. The screen lists what it
    reads (CSV or TSV, Parquet, JSON or NDJSON; Excel when this installation includes it) and this Space's limits
-   (for example *up to 500 MB and 10,000,000 rows per file; 20 imports per Space*). *Read from a database or a remote
-   system* is locked on Basic, with the reason.
+   (for example *up to 500 MB and 10,000,000 rows per file; 20 imports per Space*). Or choose **A Postgres table**
+   (every edition; see *Data* below). *Read from another database or a remote system* is locked on Basic, with the
+   reason.
 2. **Check the columns.** What was detected is applied, with the reason beside it. A guess is highlighted and marked
    **A guess**: **Confirm** it or change it. Rename a column, change its type or **Leave out** a column; a table shows
    the first rows as they will be kept.
@@ -172,8 +173,9 @@ details about these entities**, or **Add another file**.
 **The Dataset card** says *one-time import* and shows the last import. **Add a file** brings in the next file (for
 events, choose whether it *replaces the data* or *adds its rows*; details are always replaced); **Run now** runs the
 import again. **Inbox** shows the folder on the server where another system may write this Dataset's files, how many
-wait there, and **Import waiting files** (the same as Run now); nothing is imported on its own on Basic. **Keep this up
-to date** is locked on Basic. On Standard and up it asks where the files come from (*files written to this inbox*, or
+wait there, and **Import waiting files** (the same as Run now); on Basic nothing is imported on its own unless you turn
+on **Watch this folder**, which checks the inbox every 30 seconds (every edition). **Keep this up to date** is locked on
+Basic. On Standard and up it asks where the files come from (*files written to this inbox*, or
 *files on an SFTP server* through a Connection), how often to check, and an optional ready marker (read `name.csv` only
 once `name.csv.done` is there); new files are then imported on their own, a file sent again is skipped, and the Job that
 adds them to the graph is saved for you when you may author Jobs (else the card names the Job to ask an administrator
@@ -1101,7 +1103,9 @@ Inspecto LA level (see [EDITIONS](../../../../EDITIONS.md) and the [level admin 
 | Start a graph, Expand…, Clean up, Collapse, browser catalogue, saved views, Snapshot | ✓ (exploring only: nothing recorded) | ✓ |
 | Investigations, step log, Dossier, four-eyes, Drafts, Case history | hidden or locked, with one line naming what has it (*Start an Investigation from this*) | ✓ |
 | Server side of the catalogue | hidden, with the reason | ✓ (with `canRunLinkGraphAnalysis`) |
-| *Read from a database*, *Keep this up to date* on Add data | locked | ✓ |
+| Add data from a file, an inbox (*Watch this folder*) or a Postgres table; Discover, *About*, *Build a question* | ✓ | ✓ |
+| *Read from another database or a remote system*, *Keep this up to date* | locked | ✓ |
+| *Keep* (retention) on the Dataset card | not shown: every file stays, compacted | ✓ |
 
 **Masking.** Per Space, ids are shown *typed* (only sensitive types masked), *all* masked, or *none*; a Space that sets
 nothing uses *typed* in Standard and above and *none* in Basic. The same rule applies on the graph, the node list,

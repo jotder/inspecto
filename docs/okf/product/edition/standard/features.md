@@ -74,6 +74,12 @@ Standard includes Basic and adds sign-in, operations, case, assurance and detect
 - [telco-fraud](../../solution-pack/telco-fraud/index.md)
 - [telco-ra](../../solution-pack/telco-ra/index.md)
 
+## Data layer over Basic (DATA-TIERS-1, as built 2026-11-06)
+
+- `pipeline.automation` is declared here (by `inspecto-ops`): an import Dataset's *Keep this up to date* (a watched folder or SFTP feed on a chosen schedule) and its retention policy (*every arrival*, *the last N days*, *the last N arrivals*).
+- Add data does not lock *another database or a remote system* (the screen says a Pipeline reads them), and the Dataset page offers adding a Reference's details to each row (enrichment).
+- Everything in Basic's data layer is here too. Full table: [EDITIONS.md](../../../../EDITIONS.md) *Data layer by edition*.
+
 ## Limits
 
 - No Edition-specific limits are declared in the offering file (`defaultSpaceSettings` is empty or absent).

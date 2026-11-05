@@ -9,6 +9,16 @@ timestamp: 2026-07-16T00:00:00Z
 
 # Stream & Reference Onboarding
 
+> **What each edition offers (`DATA-TIERS-1`, as built 2026-11-06).** Every edition: Add data's three ways in (upload
+> a file, an import inbox with *Import waiting files* or *Watch this folder* every 30 seconds, a Postgres table snapshot
+> refreshed with *Refresh now*), the column review with column roles, the row filter and *Edit filter*, Expectations
+> and quarantine, the arrivals list and compaction. **Standard and up** add *Keep this up to date* on a chosen schedule,
+> a retention policy and enrichment from a Reference, and Add data no longer locks *another database or a remote
+> system* (a Pipeline reads them). On **Basic** those offers show locked with one line of why, except retention, which is not shown (every file
+> stays, compacted). Basic still runs any configuration it is given:
+> the line is drawn in the screens, and the console's Pipelines, Collectors and Jobs panes are not edition-locked yet.
+> Full table: [`EDITIONS.md`](../../../../EDITIONS.md) *Data layer by edition*.
+
 > **File first: Add data in the console (`ONBOARDING-FIRST-RUN-1` slice C3, 2026-11-01).** The primary start is
 > **Add data** at `/add-data` (screen title *Onboard a file*): the one Add data screen Inspecto LA uses
 > (`@inspecto/link-analysis/add-data`, OF-1) over the shared `/onboard/files` draft and commit — no new route.
@@ -20,7 +30,7 @@ timestamp: 2026-07-16T00:00:00Z
 > and up); on Basic *Keep this up to date* shows locked with its reason, and *Watch this folder* (every edition,
 > `BASIC-ONBOARD-1` P2) looks at the inbox every 30 seconds and imports its files the way *Import waiting files* does,
 > once they have stopped changing,
-> and *Read from a database or a remote system* is locked on Basic (DT-4). Home's first-run panel leads with
+> and *Read from a database or a remote system* is locked on Basic (Postgres has its own way in, *Choose a table*). Home's first-run panel leads with
 > **Add data** (offered to everyone; the screen itself says why when the person may not upload, A-15); the create
 > dialog below (*Onboard a Stream*) stays the **advanced start** (OF-3), linked under it and from Add data for those
 > with `connections.onboard`.

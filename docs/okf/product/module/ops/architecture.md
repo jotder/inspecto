@@ -22,7 +22,10 @@ It was moved out of mandatory core on 2026-09-08 (EDG-01 cell 7).
 
 `OpsEngineProvider` is found through `ServiceLoader`. A bundle without the jar has no provider, so the host holds no
 engine and every operational-object surface answers 503 with the module's absent message. `OpsEditionFeatures`
-also declares Alert Rules and the Link Analysis Investigation surface present wherever this module ships.
+also declares Alert Rules and the Link Analysis Investigation surface present wherever this module ships, plus the Geo
+map, the Link Analysis dashboard widgets, the Entity profile pages and, since 2026-11-05, `pipeline.automation`: an
+import Dataset's *Keep this up to date* and its retention policy, which the feed and storage routes check themselves
+(`docs/EDITIONS.md` *Data layer by edition*). Basic does not ship this module, so it has none of them.
 
 ## Request path
 

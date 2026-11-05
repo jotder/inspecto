@@ -26,7 +26,7 @@ explorer* below.
 |---|---|---|---|---|---|
 | Data | Add data: upload a file, review its columns, a Dataset (one default Pipeline, no transformation; `BASIC-ONBOARD-1`) | ✅ | ✅ | ✅ | ✅ |
 | | An import's inbox: *Import waiting files*, or *Watch this folder* (a fixed 30 s poll, off by default) | ✅ | ✅ | ✅ | ✅ |
-| | *Choose a table*: a Postgres table snapshot, *Refresh now* or every 30 s | ✅ | ✅ | ✅ | ✅ |
+| | *Choose a table*: a Postgres table snapshot, refreshed with *Refresh now* only (no poll since 2026-11-05) | ✅ | ✅ | ✅ | ✅ |
 | | *Keep this up to date* on a chosen schedule (watched folder, SFTP), other databases and remote systems | — | ✅ | ✅ | ✅ |
 | Explore | Graph studio, projections from any Dataset, saved views | ✅ | ✅ | ✅ | ✅ |
 | | Find paths, neighbours, "Investigate a number", connect seeds | ✅ | ✅ | ✅ | ✅ |
@@ -331,18 +331,68 @@ swaps the OIDC trio for `inspecto-demo-auth.jar`). Held by the `Preview carries 
 `tools/offering-classpath.test.mjs` (the generator table, the plain and demo classpaths and the `edition-preview`
 profile) and by `tools/check-offerings.mjs` (Offering == bundle == pom profile).
 
-## Basic — data onboarding (BASIC-ONBOARD-1, 2026-11-05)
+## Data layer by edition (DATA-TIERS-1, as built 2026-11-06)
 
-Operator rule: *"Basic is not a demo; it must be usable."* Add data is a platform feature in every edition with three
-ways in - **upload a file**, **an inbox folder** (imported with *Import waiting files*, or watched every 30 s with *Watch
-this folder*), **a Postgres table** (a read-only snapshot, refreshed with *Refresh now* or every 30 s) - and one default
-Pipeline: read, arrange (the column review), write Parquet, then each application's follow-on (Inspecto LA: its link
-index). No transformation, no user-defined schedule, no Pipeline editor on Basic. The poll is one fixed interval, off by
-default, run by the platform's one poller (`InboxWatch`), not a Pipeline trigger: an import's Pipeline stays
-`trigger: manual`, so DT-17 holds. Postgres is read through DuckDB's `postgres` extension, already in every bundle (no
-added dependency); a write-capable login is refused. Standard keeps *Keep this up to date* on a chosen schedule, every
-Collector, other databases and transformation. Reverses DT-4, narrows DT-5 / DT-17, widens DT-10
-([`data-tier-editions-plan.md`](superpower/data-tier-editions-plan.md)). As built:
+Operator rule: *"Basic is not a demo; it must be usable."* **Basic runs any configuration it is given.** Since the
+2026-11-05 re-plan (DT-9 narrowed, [`data-tier-editions-plan.md`](superpower/data-tier-editions-plan.md) §5.3) the
+edition line in the data layer is **what each edition's screens offer**, not what the engine refuses: no DATA-TIERS-1 gate refuses a Pipeline,
+Step, Collector kind or trigger when a Basic install loads its configuration. The edition refusals that predate it stay
+(a PII `mask` Step, DuckLake registration and the compliance archive are refused on load, `EditionFeatures.requirePipeline`;
+Alert Rules are held, not armed). The engine is the same in every edition; what differs is the offer.
+
+**Add data — the three ways in, every edition.** Add data is a platform feature with three ways in and one default
+Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspecto LA's is its link index):
+
+1. **Upload a file** (CSV / TSV, Parquet, JSON / NDJSON, Excel when the bundle carries the DuckDB `excel` extension), or
+   point at a large file in place, re-checked by size and modified time on every read (DT-3).
+2. **An import inbox**: files dropped there are imported with *Import waiting files* (*Run now*), or, when the person
+   turns on *Watch this folder* on the Dataset card, by a fixed 30 s poll (off by default, not configurable, run by the
+   platform's one poller `InboxWatch`, not a Pipeline trigger: an import's Pipeline stays `trigger: manual`).
+3. **Choose a table**: a Postgres table or a read-only `SELECT`, copied as a *replace everything* snapshot. *Refresh
+   now* exports the table into a temporary folder and moves the finished file into the Dataset's inbox; a snapshot is
+   **never polled** (since 2026-11-05). Read through DuckDB's `postgres` extension, already in every bundle; a
+   write-capable login is refused, and only a `${ENV:INSPECTO_PG_…}` password reference is resolved.
+
+| Data layer | Basic | Standard | Advanced |
+|---|---|---|---|
+| Add data: upload, inbox (*Watch this folder*, 30 s), Postgres snapshot (*Refresh now*) | ✅ | ✅ | ✅ |
+| Column review: names, types, column roles (Entity · Time · Measure · Category · Detail), Entity Types | ✅ | ✅ | ✅ |
+| Row filter on the review step, and *Edit filter* on the Dataset card (applies to the next files) | ✅ | ✅ | ✅ |
+| Expectations, quarantine and dedupe, evaluated in the import's own run (DT-15) | ✅ | ✅ | ✅ |
+| Arrivals list, name-checked columns, duplicate refusal, *Replace the period*, compaction (automatic, and *Compact now*) | ✅ | ✅ | ✅ |
+| Retention policy on an import Dataset (`PUT /datasets/{id}/storage`) | — every file stays, compacted | ✅ | ✅ |
+| *Keep this up to date*: a watched folder or SFTP feed on a chosen schedule (`PUT /datasets/{id}/feed`) | — locked | ✅ | ✅ |
+| Discover, entity summary, query builder, preset questions (Inspecto LA, feature `geoLink`) | ✅ | ✅ | ✅ |
+| Add data's *another database or a remote system* | — locked | not locked: the screen says a Pipeline reads them | as Standard |
+| Enrichment offer on the Dataset page (*Add the details from X to each row*) | — locked; join in a Studio query | ✅ | ✅ |
+
+**How the locks work today.** `pipeline.automation` (`EditionFeatures.PIPELINE_AUTOMATION`) is declared by
+`inspecto-ops` (`OpsEditionFeatures`), so Standard and up have it and Basic does not. The feed and storage routes check
+it themselves (Basic answers `503 CAPABILITY_UNAVAILABLE`; a retention policy already stored is ignored on Basic, so Basic
+never drops rows), and the feed and storage reads report it (`automatic`, `retentionAvailable`). `/bootstrap` does **not**
+yet serve `features.pipelineAutomation`, `remoteSystems` or `pipelineTransform` (DATA-TIERS-1 P2): the screens lock
+those offers when the flag is absent and the edition is `basic`, with their own wording until the server names one.
+
+**Where the line is not drawn yet.** The console's Pipelines, Collectors and Jobs panes carry no edition lock: on Basic
+they open as on Standard. The step-palette locks (P6), the outbound-delivery locks (P5) and the ASN.1 move to Advanced (P4)
+are not built, so the Step Processor, `objectstore.export` and `publish.postgres` rows below still show what the build
+carries. The product states nothing either way about scheduled or signal-driven Jobs on Basic (DT-16).
+
+### Release note — the data layer by edition (2026-11-06)
+
+- **New in every edition:** Add data's three ways in (upload, an import inbox with *Watch this folder*, a Postgres
+  table snapshot by *Refresh now*), column roles, row filtering and *Edit filter*, the arrivals list with compaction,
+  and Discover, the entity summary and the query builder in Inspecto LA.
+- **Standard and up:** *Keep this up to date* and a retention policy now work on a real Standard bundle (before
+  2026-11-05 no module declared `pipeline.automation`, so both were refused everywhere outside tests). An import's link
+  index is still built in the person's own run.
+- **Basic:** *Keep this up to date* is locked with a reason, and so are another database or a remote system in Add data
+  and enrichment on the Dataset page; the retention form is not shown (every file stays, compacted). A Postgres snapshot is refreshed by *Refresh now* only; the
+  30 s refresh it had for part of 2026-11-05 is gone.
+- **Nothing breaks on load.** A Basic install keeps running the configuration it has: no DATA-TIERS-1 gate refuses a
+  Step, Collector kind or trigger (DT-9 narrowed); the older refusals (PII masking, DuckLake, the archive) are unchanged. The breaking changes the plan's §9 listed are not shipped.
+
+Reverses DT-4 (Postgres only), narrows DT-5 / DT-17 to the import inbox, widens DT-10. As built:
 [`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §6.20,
 [`okf/product/module/processor/api-onboarding-authoring.md`](okf/product/module/processor/api-onboarding-authoring.md);
 plan [`archived-documents/plans-archive/basic-onboard-plan.md`](archived-documents/plans-archive/basic-onboard-plan.md).
@@ -459,6 +509,7 @@ board exists for the cells that *differ* or are *undecided*.
 | 🔲 | planned for this edition, not built |
 | — | deliberately not in this edition (a decision, not a gap) |
 | ❓ | undecided — needs an operator call before anyone builds |
+| *not stated* | the product deliberately states nothing either way (DATA-TIERS-1 DT-16, operator 2026-11-05: "no promise, keep silent") |
 
 🔴 **A ✅ means the capability is PRESENT AND USABLE on that edition. It does NOT mean "gated to this
 tier and above."** (Convention stated 2026-09-15, `SPEC-GREENCELL-1`.) The distinction is load-bearing
@@ -485,7 +536,7 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
-| ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | ✅ | ✅ | ✅ | FEATURE_INVENTORY §A |
+| ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | *not stated* | ✅ | ✅ | FEATURE_INVENTORY §A. P cell *not stated* since 2026-11-06 (DATA-TIERS-1 DT-16 / §5.3): Basic runs any configuration it is given, and the product makes no promise either way about Pipelines that run on their own there. What Basic offers is Add data's own arrival: *Run now*, and *Watch this folder* (a fixed 30 s poll of an import inbox, `InboxWatch`, not a Pipeline trigger) — *Data layer by edition* above |
 | ING-02 | Consignment formation (`collector.consignment: max_files / max_bytes / order`) | ✅ | ✅ | ✅ | moved to the Collector 2026-09-02 (CONSIGNMENT-HOME-1); legacy `processing.batch` dual-read |
 | ING-05 | Unpack stage (zip/tar/gz/bz2/Z) | ✅ | ✅ | ✅ | ⚠ **nested archives are refused by design** (`UnpackLimits.depth` = 1, any other value refused by name) — this row promised them until 2026-09-08; xz/zstd have no codec (BACKLOG §3) |
 | SCH-01 | Schema registry: field types (all DuckDB scalars, fail-closed), rules (`DIRECT`/`EXPR`/`CONCAT_DT`/`FILENAME_DATE`), multi-format dates | ✅ | ✅ | ✅ | fail-closed types = `SchemaFieldTypes` (2026-08-22); the `rules[]` spelling now *loads by conversion* — the engine reads `fields[]` first (`MAPPING-SPELLING-1`, BACKLOG §1). *(This cell pointed at a §C that does not exist until 2026-09-08.)* |
@@ -493,11 +544,11 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 | SCH-03 | Field classification metadata (PII / INTERNAL) | ✅ | ✅ | ✅ | metadata; Link Analysis masks entity ids by it (`maskingMode`, editions that ship `inspecto-geo-link`); no other surface masks on it (see SEC-08) |
 | XFM-04 | Decision Rules (space-registry, rule-routed outputs) | ✅ | ✅ | ✅ | keep a pipeline on the flat lane when they route rows |
 | OUT-04 | Auto-chunking of huge files, DuckDB scratch/memory tuning | ✅ | ✅ | ✅ | |
-| JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `objectstore.export`, `recon.run`, `risk.score`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F. ⚠ **`caserule.evaluate` and `objects.analytics` are `inspecto-ops` Job Types (EDG-01 cell 7) — unknown on Basic; `recon.run` is an `inspecto-reconciliation` Job Type and `risk.score` an `inspecto-scoring` Job Type (MODULE-REORG-1 P7) — also unknown on Basic**; the framework cell stays ✅ (corrected 2026-09-08, `okf/product/addon/incidents/plan-incidents.md` §2) |
-| JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | ✅ | ✅ | ✅ | |
+| JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `objectstore.export`, `recon.run`, `risk.score`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F. ⚠ **`caserule.evaluate` and `objects.analytics` are `inspecto-ops` Job Types (EDG-01 cell 7) — unknown on Basic; `recon.run` is an `inspecto-reconciliation` Job Type and `risk.score` an `inspecto-scoring` Job Type (MODULE-REORG-1 P7) — also unknown on Basic**; the framework cell stays ✅ (corrected 2026-09-08, `okf/product/addon/incidents/plan-incidents.md` §2). `objectstore.export` is planned Standard and up as outbound delivery (DATA-TIERS-1 P5, locked in Basic's screens; not built 2026-11-06): today it registers on Basic as before |
+| JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | *not stated* | ✅ | ✅ | P cell *not stated* since 2026-11-06: DT-16's Jobs gate was dropped (operator 2026-11-05, "no promise, keep silent"), so a Basic install arms the Jobs its Spaces define and the product states nothing either way. An import's own follow-on work (its link index, its Expectations) runs inside the person's run in every edition, never as a Job |
 | JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | 🟡 | ✅ | ✅ | P is 🟡 (corrected 2026-09-08): four of the listed tasks are not on Basic. `event_prune` added 2026-09-02 (COMPLY-3). ⚠ **`incident_purge` is an `inspecto-ops` task (EDG-01 cell 7) — unknown on Basic**; backup/restore/verify are `inspecto-backup` (cell 2), also not Basic (corrected 2026-09-08) |
 | JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | Intake file cap ON by default — `ingest.maxFilesPerCycle` = 500 (`IntakeGovernor.DEFAULT_MAX_FILES_PER_CYCLE`; operator, 2026-10-06, soak waived); `0` = unbounded. The byte cap stays off by default |
-| JOB-06 | BI publication — `publish.postgres` Job: curated Datasets to a Postgres schema, full refresh (atomic swap) or partition-incremental, Catalog column comments (ASSURE-BI-PUBLICATION-1) | ⚠ | ✅ | ✅ | The Job Type is core and registers everywhere, but the PostgreSQL JDBC driver ships only as the Standard/Advanced `postgresql.jar` sidecar (PG-1), so on Basic a run fails with `No suitable driver`. Without an authenticator (Basic) four-eyes approval can never be met, so the Job cannot be created through the API, and sensitive-classified columns are never published. [`okf/product/layer/product/plan-studio.md`](okf/product/layer/product/plan-studio.md) §3.6 |
+| JOB-06 | BI publication — `publish.postgres` Job: curated Datasets to a Postgres schema, full refresh (atomic swap) or partition-incremental, Catalog column comments (ASSURE-BI-PUBLICATION-1) | ⚠ | ✅ | ✅ | The Job Type is core and registers everywhere, but the PostgreSQL JDBC driver ships only as the Standard/Advanced `postgresql.jar` sidecar (PG-1), so on Basic a run fails with `No suitable driver`. Without an authenticator (Basic) four-eyes approval can never be met, so the Job cannot be created through the API, and sensitive-classified columns are never published. [`okf/product/layer/product/plan-studio.md`](okf/product/layer/product/plan-studio.md) §3.6. Planned Standard and up as outbound delivery (DATA-TIERS-1 P5, not built 2026-11-06). Not to be confused with Add data's *Choose a table*, which READS a Postgres table on every edition through DuckDB, with no JDBC driver |
 | JOB-05 | Risk Scores — `risk-score` model, `risk.score` Job, `GET /risk-scores/{model}/{entityKey}` + `POST /risk-scores/preview` (ASSURE-RISK-SCORE-1) | — | ✅ | ✅ | **NOT in Basic (MODULE-REORG-1 P7, 2026-10-07) — a deliberate behaviour change.** The two `/risk-scores` routes, the model/evaluator, the `risk.score` Job Type and the save-time checks of the `risk-score` kind left the core for the optional `inspecto-scoring` module (the Scoring half of the plan §8a Scoring and Lists add-on; it depends on `inspecto-entity-list` for the watch-list seam), staged from Standard up. On Basic the paths answer **503 "not installed"** (`AbsentModuleRoutes`), `/bootstrap` reports `features.scoring=false` and `risk.score` is an unknown Job Type; a `risk-score` component is accepted there as opaque config (nothing can evaluate it). The core keeps the pending Alert Rule feature (`PendingAlertRules`, over `RiskScoreOutputs`) and the `EvidenceMasker` (`com.gamma.mask`). Turning a high score into an Incident is an ordinary per-entity Alert Rule, so it follows Alert Rule authoring (Standard+, G9). The read route is `canWorkIncidents`-gated. [`okf/product/module/scoring/spec-risk-scores.md`](okf/product/module/scoring/spec-risk-scores.md) |
 
 ### Step Processors (one row per processor; the board's authoring surface) [`ING` · `PIP`]
@@ -508,6 +559,15 @@ Generated from the processor catalog (`ProcessorCatalog`, served on `GET /pipeli
 of it — the gap is in Notes), 🔲 planned. Every processor is VISIBLE in the editor palettes; 🔲 and 🟡-without-node entries
 render inactive. Edition cells default to the same value in all three unless a board decision says otherwise (SEC-08 →
 E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for Basic). Row ids are `SP-<family>-<nn>`.
+
+⚠ **DATA-TIERS-1 (2026-11-06): these cells say what the build CARRIES and runs, not what Basic's screens offer.** Basic
+runs any configuration it is given (DT-9 narrowed, §5.3), so a configured Step, remote Collector or decoder runs there
+as the cell says. The planned screen locks are not built: the **SP-XFM** transforms are to be locked in Basic's step
+palette (P6; Basic's offer is Add data's no-code shaping: types, rename, choose columns, the row filter, dedupe and
+schema `expression:` columns, DT-7); the remote **SP-ACQ** rows (SFTP / FTPS, JDBC, S3, Azure, GCS) are to be locked in
+Basic's screens apart from the Postgres snapshot (P4; `inspecto-connectors` stays in the Basic Offering, and Add data
+already locks *another database or a remote system* on Basic); **SP-PRS-06** (ASN.1) is to move from Standard to
+Advanced (P4, DT-12; still Standard). See *Data layer by edition* above.
 
 | ID | Processor | Family | P | S | E | Maps to | Notes |
 |---|---|---|---|---|---|---|---|

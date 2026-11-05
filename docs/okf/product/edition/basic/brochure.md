@@ -16,16 +16,18 @@ A single analyst, a team lead running a pilot, or a presales engineer who needs 
 
 ## What is included
 
-- The core platform: Collectors, Pipelines with typed schemas and quality Expectations, Datasets, SQL, Alert Rules, KPIs and dashboards.
+- **Add data, three ways in:** upload a file, drop files in an import inbox (imported on request, or watched every 30 seconds), or copy a Postgres table as a read-only snapshot you refresh on request. A review of names, types and column roles, a no-code row filter, then a Dataset — no transformation and no schedule to write.
+- Every import is checked: Expectations, quarantine and dedupe, the arrivals listed, small files compacted.
+- The core platform: Collectors, Pipelines with typed schemas and quality Expectations, Datasets, SQL, KPIs and dashboards.
 - The standard connectors module.
-- Link Analysis explorer ([Link Analysis](../../addon/linkAnalysis/index.md) Add-on, explorer part): graph studio, paths and neighbours, pattern packs, geo map, Entity Lists, identity resolution, Entity profile pages, PNG/CSV export.
+- Link Analysis explorer ([Link Analysis](../../addon/linkAnalysis/index.md) Add-on, explorer part): graph studio, paths and neighbours, pattern packs, Discover, an entity summary and a question builder without SQL, Entity Lists, identity resolution, PNG/CSV export.
 - Both industry vocabularies for Link Analysis (Telecom, Mobile Money).
 - Content packs: [Orders starter](../../solution-pack/orders-starter/brochure.md) and [Link Analysis daily feed](../../solution-pack/la-daily-feed/brochure.md).
 - Audit log, recorded and readable.
 
 ## How it fits with the Editions
 
-Basic is the entry Edition and the base the others build on: [Standard](../../edition/standard/brochure.md) includes everything in Basic. Basic runs without sign-in, so masking is display-only and there are no Investigations, Dossiers, Drafts or four-eyes — those start at Standard. Moving up is a different build of the same product, not a migration: your Spaces and configuration carry over.
+Basic is the entry Edition and the base the others build on: [Standard](../../edition/standard/brochure.md) includes everything in Basic. Basic runs without sign-in, so masking is display-only and there are no Investigations, Dossiers, Drafts or four-eyes — those start at Standard, as do the Geo map, Entity profile pages and, on an imported Dataset, the *Keep this up to date* card and a retention policy. Moving up is a different build of the same product, not a migration: your Spaces and configuration carry over.
 
 ## How it works
 
