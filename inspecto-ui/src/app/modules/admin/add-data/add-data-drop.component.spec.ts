@@ -54,6 +54,12 @@ describe('AddDataDropComponent (ONBOARDING-FIRST-RUN-1 B1 drop zones)', () => {
         const overlay = zone.querySelector('[data-testid="add-data-drop-overlay"]')!;
         expect(overlay.textContent).toContain('Drop the file to add it as data');
         await expectNoA11yViolations(fixture.nativeElement);
+        // moving onto the pane's own content is not leaving the pane: the overlay stays (no flicker)
+        const intoChild = drag('dragleave');
+        Object.defineProperty(intoChild, 'relatedTarget', { value: zone.querySelector('p') });
+        zone.dispatchEvent(intoChild);
+        fixture.detectChanges();
+        expect(zone.querySelector('[data-testid="add-data-drop-overlay"]')).not.toBeNull();
         zone.dispatchEvent(drag('dragleave'));
         fixture.detectChanges();
         expect(zone.querySelector('[data-testid="add-data-drop-overlay"]')).toBeNull();

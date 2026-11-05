@@ -35,7 +35,9 @@ function carriesFiles(event: DragEvent): boolean {
  * A pane that takes a dropped file (`ONBOARDING-FIRST-RUN-1` B1: Home, the Catalog, an empty Datasets pane). Dropping a
  * file opens **Add data** with it. Only armed when the person may add data here ({@link AddDataAccess}: `canUploadData`
  * with sign-in, and the Space's `data.self_import`); otherwise the content renders as it is and a drop does nothing.
- * Dropping is a mouse gesture: each host keeps its keyboard path (*Add data*).
+ * Dropping is a mouse gesture; the keyboard path is the *Add data* link (Home's first-run panel, the empty Datasets
+ * pane) or the `/add-data` route itself. While the Space's switch is still unread the zone is armed and the server
+ * decides (a 403 locks the screen with its reason).
  *
  * @example <inspecto-add-data-drop [enabled]="firstRun()"> …pane… </inspecto-add-data-drop>
  */
