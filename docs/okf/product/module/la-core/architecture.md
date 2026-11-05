@@ -1658,6 +1658,12 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   boolean. An entry without roles still loads and reads back-compatibly: holds an Entity Type → Entity; the mapping's
   primary Time or `eventDate` → Time; its primary Measure → Measure; its kind → Category; on the Data page a
   date/timestamp column → Time; anything else → Detail.
+- **A base's roles from its Mappings (operator 2026-11-05, display only).** On the Data page's Columns card, a base's
+  column that states no role and that the base itself reads as a Detail shows the role the primaries of the Mappings
+  built on it give it (primary Time → Time, primary Measure → Measure, kind → Category; `data-page.ts` `mappingRole`),
+  with a note naming them (*From Mapping mm_wallet_links - not set on this Dataset*). Mappings that disagree leave it a
+  Detail. Nothing is written: only a person's pick (or a Unit, which saves the Measure) stores a role. The server's
+  readers (`DatasetEntryRules`, presets, profiles) do not derive it.
 - **Primaries.** `defaultLinkMapping` names `primaryTime` (dates each link: the window, newcomers, playback's first
   choice, Reconciliation's `DatasetRelation.temporalColumn` when several Times exist) and `primaryMeasure` (presets'
   sums). `time` / `amount` are their old names, read for stored entries and in an Add data commit body; two different
