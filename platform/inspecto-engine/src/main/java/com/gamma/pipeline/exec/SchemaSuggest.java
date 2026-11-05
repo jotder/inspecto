@@ -20,7 +20,8 @@ import java.util.Set;
  * rows.</b> TRY_CAST voting on a throwaway DuckDB (the {@link ComponentPreview} scratch idiom): per
  * column, the most specific candidate type every non-blank value accepts wins — {@code BIGINT} →
  * {@code DOUBLE} → {@code TIMESTAMP} (demoted to {@code DATE} when every value is midnight, i.e. the
- * strings carried no time part) → {@code BOOLEAN} — else {@code VARCHAR}. {@code BIGINT} is checked
+ * strings carried no time part) → {@code BOOLEAN} — else {@code VARCHAR}. Text written with a decimal
+ * point or an exponent is never {@code BIGINT}, even {@code 47.00}. {@code BIGINT} is checked
  * before {@code BOOLEAN} so a {@code 0/1} column stays numeric. A column no bare cast accepts is then
  * tried against {@link #DATE_FORMATS} (human spellings such as {@code March 22,2025}); a unique fit
  * votes {@code DATE} <b>with that strptime format</b>, which the draft carries as
@@ -178,10 +179,13 @@ public final class SchemaSuggest {
             }
             // ⚠ DuckDB's TRY_CAST('1.5' AS BIGINT) SUCCEEDS by rounding, so a bare cast check lets
             // BIGINT swallow every decimal column. The round-trip guard: BIGINT only wins a value
-            // whose DOUBLE cast equals its BIGINT cast (no fractional part was lost).
+            // whose DOUBLE cast equals its BIGINT cast (no fractional part was lost). And text written
+            // with a decimal point or an exponent ('47.00', '1e3') is a decimal even when its fraction
+            // is zero (DECIMAL-TEXT-NOT-BIGINT-1): a later '12.25' in that column must not be cut to 12.
             String accepts = "BIGINT".equals(candidate)
                     ? "(TRY_CAST(" + col + " AS BIGINT) IS NOT NULL"
-                            + " AND TRY_CAST(" + col + " AS DOUBLE) = TRY_CAST(" + col + " AS BIGINT))"
+                            + " AND TRY_CAST(" + col + " AS DOUBLE) = TRY_CAST(" + col + " AS BIGINT)"
+                            + " AND NOT regexp_matches(" + col + ", '[.eE]'))"
                     : "TRY_CAST(" + col + " AS " + candidate + ") IS NOT NULL";
             long failures = count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank
                     + " AND NOT " + accepts);

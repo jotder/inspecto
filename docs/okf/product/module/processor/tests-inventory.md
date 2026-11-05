@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-377 test class(es): 138 unit, 239 real-HTTP control-plane, 0 IT.
+378 test class(es): 138 unit, 240 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -113,6 +113,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiDbBrowserTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserTest.java` | Real-HTTP + real-DuckDB tests for the raw table browser (design {@code docs/superpower/db-browser-design.md}): |
 | `ControlApiDbQueryTypedOutputTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbQueryTypedOutputTest.java` | Found driving the UI 2026-09-25: the {@code web_orders} Pipeline (types in a sibling Structure CSV, a |
 | `ControlApiDeadPropertyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDeadPropertyTest.java` | `DUCKLE-C3-DEAD-PROPERTY-1` at the STRICT seam, over real HTTP: a config block no component reads |
+| `ControlApiDecimalColumnTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDecimalColumnTest.java` | {@code DECIMAL-TEXT-NOT-BIGINT-1} over real HTTP (P2 defect, live check 2026-11-06): an {@code amount} column whose sampled |
 | `ControlApiDecisionRuleSpaceTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDecisionRuleSpaceTest.java` | Cross-Space consequence slice 1 ({@code docs/archived-documents/plans-archive/cross-space-consequence-design.md} §6): a Decision |
 | `ControlApiDecisionRulesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDecisionRulesTest.java` | Real-HTTP tests for the Decision Rule routes ({@code /decision-rules*}): authored CRUD over the |
 | `ControlApiDecodeProfileReadTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDecodeProfileReadTest.java` | Real-HTTP proof of {@code GET /parsers/asn1/profile} — the read the Parse drawer uses to show a Decode |

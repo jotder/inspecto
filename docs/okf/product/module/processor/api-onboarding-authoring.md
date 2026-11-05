@@ -385,6 +385,12 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   `?recordPath=` on a re-draft) is `high` by definition. The sample is the first 1,000 rows. A column's date or time
   format rides its `type` choice (`format`, the strptime pattern every sampled value parsed with: DATE through
   `SchemaSuggest`, TIMESTAMP from a fixed candidate list).
+* **A whole number is only text with no decimal point** (`DECIMAL-TEXT-NOT-BIGINT-1`, 2026-11-06). The type vote
+  (`SchemaSuggest`) gives BIGINT only to digits with no `.` and no exponent: `47.00`, `370.00` are DOUBLE (the text
+  says decimal even when every fraction is zero), so a later `12.25` is kept, not cut to 12. A column whose sample is
+  whole numbers but whose file has a fraction further down (`OnboardDraft.fractions`, one scan of the whole file) is
+  DOUBLE too, `high`, evidence `the 1000 sampled values are whole numbers, but the file also has '99.95', so a decimal
+  number`. A later file into an existing BIGINT column with such a value is refused (la-core architecture §6.17).
 * **The decimal mark (`format.decimalMark`, C1; `DecimalMark`).** `.` (`1,234.50`) or `,` (`1.234,50`); digit groups
   may be split by the other mark or a space. A column decides when every sampled value reads with one mark and not the
   other (`12.5` → `.`; `12,5`, `1.234,50` → `,`); a whole part with a leading zero (`000 345 678`, `012.000.789`) is

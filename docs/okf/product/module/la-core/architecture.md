@@ -1931,6 +1931,15 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   anything lands. A missing column, or a delimited column at another position, refuses it naming each (422 for an upload;
   Run now, and Add a file for the drops its run takes, move a refused waiting file to `<id>/refused/`). An import with no
   header line is judged by its column count only.
+- **A value a whole-number column would cut** (`DECIMAL-TEXT-NOT-BIGINT-1`, P2 defect from the 2026-11-06 Basic live
+  check, as built 2026-11-06): the engine's `TRY_CAST('12.25' AS BIGINT)` rounds to 12 with no rejection, so
+  `checkColumns` also refuses a later file when a column the Dataset reads as `BIGINT` holds a value with a fractional
+  part ANYWHERE in the file (`OnboardDraft.Col.fraction`, one scan of the whole file, not the 1,000-row sample), with
+  the same 422 / set-aside as a missing column: `'amount' holds whole numbers and this file has '12.25'`. `60.00` is
+  taken (nothing is cut). Refused rather than quarantined because the arrival rules judge a whole file before it lands
+  and nothing in the engine's cast marks the row. A Dataset's column type cannot be widened yet: the reason says to add
+  the data as a new Dataset with the column as DOUBLE. The draft no longer proposes BIGINT for such a column (see
+  `api-onboarding-authoring.md`). Test: `ControlApiDecimalColumnTest`.
 - **New columns are kept as details** (`LA-ARRIVAL-NEW-COLUMNS-1`, operator 2026-11-06, as built 2026-11-06;
   `inspecto/.../control/DatasetNewColumns.java`). A run keeps the new columns EVERY file it takes carries (delimited
   text: the same leading new columns in the same order, since the engine reads by position; JSON / Parquet: by field

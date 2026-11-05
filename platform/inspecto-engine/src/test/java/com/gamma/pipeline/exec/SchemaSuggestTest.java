@@ -56,6 +56,20 @@ class SchemaSuggestTest {
         assertEquals("BIGINT", fields.get(0).type());
     }
 
+    /**
+     * DECIMAL-TEXT-NOT-BIGINT-1: text written with a decimal point is a decimal even when every fraction is zero, so a
+     * later {@code 12.25} is not cut to 12; plain digits stay whole numbers.
+     */
+    @Test
+    void aDecimalPointMakesADecimalEvenWhenTheFractionIsZero() throws Exception {
+        List<SchemaSuggest.Field> fields = SchemaSuggest.infer(List.of(
+                Map.of("AMOUNT", "47.00", "N", "47"), Map.of("AMOUNT", "370.00", "N", "370")));
+        Map<String, String> type = new java.util.HashMap<>();
+        for (SchemaSuggest.Field f : fields) type.put(f.name(), f.type());
+        assertEquals("DOUBLE", type.get("AMOUNT"));
+        assertEquals("BIGINT", type.get("N"));
+    }
+
     /** Blanks don't poison a vote: the non-blank values decide, blanks abstain. */
     @Test
     void blanksAbstainFromTheVote() throws Exception {
