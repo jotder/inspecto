@@ -63,7 +63,7 @@ class PipelineDocumentXlsxTest {
         String flag = System.getProperty(ExcelExtension.DIR_PROPERTY);
         if (flag != null && !flag.isBlank()) candidates.add(Path.of(flag));
         Path repo = Path.of("").toAbsolutePath().getParent();
-        candidates.add(repo.resolve("inspecto-deploy/duckdb-extensions").resolve(platform));
+        candidates.add(repo.resolve("inspecto-deploy/lib/duckdb").resolve(platform));
         for (String cache : new String[]{System.getenv("DUCKDB_EXTENSION_CACHE"),
                 repo.resolve(".duckdb-extension-cache").toString(),
                 Path.of(System.getProperty("user.home"), ".duckdb", "extensions").toString()})

@@ -14,11 +14,12 @@
  *
  * For every inline markdown link `[label](target)` outside a code fence whose target does NOT resolve in the
  * bundle:
- *   1. WITHHELD — the target is a withheld doc tree/file (step 7's two lists, passed in, never restated
- *      here): the link is replaced by `label (internal document - not shipped)`.
- *   2. RELOCATED — the target ships, but packaging moved it (`inspecto/README.md` → `README.md`,
- *      `inspecto/examples/` → `examples/`), or moved the linking file: the link is re-pointed at where the
- *      target actually is in the bundle.
+ *   1. WITHHELD — the target is under docs/ but outside step 7's ALLOW-LIST of shipped docs (`$docsShipped`,
+ *      passed in, never restated here; BUNDLE-LAYOUT-1, 2026-11-06): the link is replaced by
+ *      `label (internal document - not shipped)`.
+ *   2. RELOCATED — the target ships, but packaging moved it (`inspecto/README.md` → `README.md`), or moved
+ *      the linking file: the link is re-pointed at where the target actually is in the bundle. (The examples/
+ *      tree no longer ships; a link to it is a repo citation, class 3.)
  *   3. CITED — the target EXISTS IN THE REPO but never ships (a source-code citation, root `compliance/`,
  *      a sibling module above the bundle root): the link is replaced by `label (`repo/path` - not shipped)`
  *      — the same shape as class 1, the label kept and the repo path kept in code so a reader holding the
@@ -30,7 +31,7 @@
  * Decided by RESOLVING the target, not by a substring match on the tree name (the old PowerShell pattern
  * also neutralised any link whose text merely contained `BACKLOG` or `superpower`).
  *
- * CLI:  node tools/bundle-doc-rewrite.mjs --bundle <dir> --withheld-trees a,b --withheld-files x.md,y.md
+ * CLI:  node tools/bundle-doc-rewrite.mjs --bundle <dir> --shipped-docs USER_GUIDE.md,api,...
  *       Rewrites every shipped markdown file in place; prints the counts. Exit 2 on bad arguments.
  *       "Exists in the repo" (class 3) is judged against the checkout this script lives in (`tools/..`).
  */
@@ -46,12 +47,11 @@ export const NOT_SHIPPED = ' (internal document - not shipped)';
 export const citedSuffix = (repoPath) => ` (\`${repoPath}\` - not shipped)`;
 
 /**
- * Repo path prefix → bundle path prefix for everything packaging MOVES. Mirrors `package.ps1` step 4b
- * (examples) and step 7 (README). Everything not listed keeps its repo path.
+ * Repo path prefix → bundle path prefix for everything packaging MOVES. Mirrors `package.ps1` step 7 (README).
+ * Everything not listed keeps its repo path.
  */
 export const RELOCATIONS = [
     ['inspecto/README.md', 'README.md'],
-    ['inspecto/examples', 'examples'],
 ];
 
 const swap = (p, from, to) => {
@@ -65,10 +65,10 @@ const swap = (p, from, to) => {
 export const repoToBundle = (p) => swap(p, 0, 1);
 export const bundleToRepo = (p) => swap(p, 1, 0);
 
-/** True if a bundle path falls inside a doc tree/file step 7 withholds. */
+/** True if a bundle path falls under docs/ but outside step 7's allow-list (`excl.shipped`: the top-level docs/ entries that ship). */
 export function isWithheld(bundlePath, excl) {
     const parts = bundlePath.split('/');
-    return parts[0] === 'docs' && (excl.trees.includes(parts[1]) || excl.files.includes(parts[1]));
+    return parts[0] === 'docs' && parts.length > 1 && parts[1] !== '' && !excl.shipped.includes(parts[1]);
 }
 
 /** Fence-aware line walk, shared so the guard and the rewrite agree on what is quoted text. */
@@ -94,7 +94,7 @@ const decode = (t) => {
 
 /**
  * Rewrite one shipped markdown file. `bundleFile` is its path in the bundle; `present(p)` says whether a
- * bundle path (file or directory) ships; `excl` is step 7's `{ trees, files }`; `inRepo(p)` says whether a
+ * bundle path (file or directory) ships; `excl` is step 7's `{ shipped }` allow-list; `inRepo(p)` says whether a
  * repo path (file or directory) exists in the checkout.
  */
 export function rewriteForBundle(text, bundleFile, present, excl, inRepo) {
@@ -141,10 +141,9 @@ function cli(argv) {
         return i >= 0 ? argv[i + 1] : undefined;
     };
     const dir = arg('--bundle');
-    const trees = (arg('--withheld-trees') ?? '').split(',').filter(Boolean);
-    const files = (arg('--withheld-files') ?? '').split(',').filter(Boolean);
-    if (!dir || !existsSync(dir) || !statSync(dir).isDirectory() || !trees.length || !files.length) {
-        console.error('usage: bundle-doc-rewrite.mjs --bundle <dir> --withheld-trees a,b --withheld-files x.md,y.md');
+    const shipped = (arg('--shipped-docs') ?? '').split(',').filter(Boolean);
+    if (!dir || !existsSync(dir) || !statSync(dir).isDirectory() || !shipped.length) {
+        console.error('usage: bundle-doc-rewrite.mjs --bundle <dir> --shipped-docs USER_GUIDE.md,api,...');
         process.exit(2);
     }
     const all = new Set();
@@ -156,7 +155,7 @@ function cli(argv) {
         }
     };
     walk(dir, '');
-    const excl = { trees, files };
+    const excl = { shipped };
     const repoRoot = fileURLToPath(new URL('..', import.meta.url));
     const inRepo = (p) => existsSync(join(repoRoot, p));
     let neutralised = 0;

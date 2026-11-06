@@ -4,12 +4,13 @@
 # then replace the folder with that worktree's inspecto-demo while this server is stopped.
 $bundle = 'C:\sandbox\inspecto-mfs-bundle'
 Set-Location $bundle
-$cp = (Get-Content modules.list) -join ';'
+# BUNDLE-LAYOUT-1: lib\modules.list names each jar as a root-relative lib/<jar> path, so it is used from the bundle root as is.
+$cp = (Get-Content lib\modules.list) -join ';'
 $jvm = @(
     '--enable-native-access=ALL-UNNAMED',
     '-Dcontrol.bind=127.0.0.1', '-Dauth.mode=demo', '-Dobjects.backend=db', '-Devents.backend=parquet', '-Djobs.backend=duckdb',
     '-Dcontrol.port=8091', '-Dspaces.root=C:\sandbox\inspecto-mfs-root', "-Dui.dir=$bundle\ui",
-    '-Dduckdb.extension.dir=duckdb-extensions\windows_amd64',
+    '-Dduckdb.extension.dir=lib\duckdb\windows_amd64',
     '-cp', $cp, 'com.gamma.control.ControlApi'
 )
 & java @jvm

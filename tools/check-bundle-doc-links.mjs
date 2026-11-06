@@ -16,14 +16,15 @@
  * differs from the repo, and only a check that models the ARTIFACT can see it.
  *
  * TWO MODES, because the honest check and the runnable check are not the same thing.
- *   (default)        SIMULATED. Builds the bundle's file set from `git ls-files` + the exclusion lists
+ *   (default)        SIMULATED. Builds the bundle's file set from `git ls-files` + step 7's docs allow-list
  *                    parsed out of `package.ps1` itself, so it needs no `pwsh` and no build. What it
  *                    cannot see: anything packaging generates rather than copies.
  *   --bundle <dir>   REAL. Walks an actual staged bundle (or unzipped `inspecto-deploy`) and resolves
  *                    every link against the files that are genuinely in it. This is the verdict; the
  *                    simulation is the early warning.
  *
- * ⛔ The exclusion lists are PARSED FROM `package.ps1`, never restated here. A guard that keeps its own
+ * ⛔ The allow-list is PARSED FROM `package.ps1`, never restated here (BUNDLE-LAYOUT-1, 2026-11-06: step 7 turned its two
+ * exclusion lists into one explicit allow-list - USER_GUIDE, ADVANCED_GUIDE, EDITIONS and api/ ship, nothing else under docs/). A guard that keeps its own
  * copy of the thing it checks drifts away from it, silently, and then reports on a bundle nobody ships.
  * If the parse fails this exits 2 (CANNOT RUN), never 0.
  *
@@ -64,9 +65,14 @@ import { LINK, forEachLiveLine, repoToBundle, rewriteForBundle } from './bundle-
 const ROOT = process.cwd();
 const PACKAGE_PS1 = 'inspecto/package.ps1';
 
-/** Floors — see the header. Today: 207 shipped markdown files, ~1,670 relative links. */
-const MIN_FILES = 100;
-const MIN_LINKS = 400;
+/**
+ * Floors — see the header. Since BUNDLE-LAYOUT-1 (2026-11-06) the bundle ships README.md + three guides + docs/api/ (+ the
+ * spaces/_templates notes): 33 markdown files and 15 relative links that survive the package-time rewrite (measured 2026-11-06;
+ * every other link points into a document that no longer ships and is neutralised). The floors sit below that and above zero -
+ * a run over nothing still fails.
+ */
+const MIN_FILES = 20;
+const MIN_LINKS = 8;
 
 const EXTERNAL = /^(https?:|mailto:|tel:|ftp:|data:|#)/i;
 
@@ -84,7 +90,7 @@ function cannotRun(message) {
 }
 
 /**
- * The step-7 exclusion lists, read out of `package.ps1`.
+ * The step-7 allow-list of shipped docs, read out of `package.ps1`.
  *
  * ⚠ PowerShell comments are stripped BEFORE the quoted entries are read. The comments carry apostrophes
  * ("the product's name"), which a naive quote scan pairs with the next entry's opening quote and returns
@@ -93,7 +99,7 @@ function cannotRun(message) {
  * it is. Note `/#.*$/` does NOT work on this file: it is CRLF, and JS treats `\r` as a line terminator,
  * so `$` never matches before it and nothing is stripped at all.
  */
-function step7Exclusions() {
+function step7AllowList() {
     if (!existsSync(PACKAGE_PS1)) cannotRun(`${PACKAGE_PS1} not found — run this from the repo root.`);
     const ps = readFileSync(PACKAGE_PS1, 'utf8');
     const listOf = (name) => {
@@ -104,25 +110,21 @@ function step7Exclusions() {
             .map((l) => l.replace(/#.*/, ''))
             .join('\n');
         const entries = [...body.matchAll(/'([^']+)'/g)].map((x) => x[1]);
-        if (!entries.length) cannotRun(`\`$${name}\` in ${PACKAGE_PS1} parsed as EMPTY. An empty exclusion list would make every link look fine.`);
+        if (!entries.length) cannotRun(`\`$${name}\` in ${PACKAGE_PS1} parsed as EMPTY. An empty allow-list would ship no docs at all.`);
         return entries;
     };
-    return { trees: listOf('docsExcludedTrees'), files: listOf('docsExcludedFiles') };
+    return { shipped: listOf('docsShipped') };
 }
 
 /**
  * Where a repo path lands in the bundle, or null if it does not ship.
- * Mirrors `package.ps1` steps 4, 4b and 7 — the only staging steps that copy files a doc can link to.
+ * Mirrors `package.ps1` steps 4 and 7 — the only staging steps that copy files a doc can link to.
  */
 function toBundlePath(rel, excl) {
     const parts = rel.split('/');
-    if (parts[0] === 'docs') {
-        const top = parts[1];
-        if (excl.trees.includes(top) || excl.files.includes(top)) return null;
-        return rel;
-    }
-    // step 4b (inspecto/examples/** → examples/**) and step 7 (inspecto/README.md → README.md): the
-    // relocation table is the rewrite's, so the file set and the link re-pointing cannot disagree.
+    if (parts[0] === 'docs') return excl.shipped.includes(parts[1]) ? rel : null;
+    // step 7 (inspecto/README.md → README.md): the relocation table is the rewrite's, so the file set and
+    // the link re-pointing cannot disagree.
     const moved = repoToBundle(rel);
     if (moved !== rel) return moved;
     // step 4: only spaces/_templates/** — bundles ship no Spaces (operator decision 2026-09-25)
@@ -138,7 +140,7 @@ function simulatedBundle() {
     } catch (e) {
         cannotRun(e.message);
     }
-    const excl = step7Exclusions();
+    const excl = step7AllowList();
     const map = new Map();
     const repo = new Set(tracked);
     for (const rel of tracked) {
@@ -253,8 +255,7 @@ function classify(resolved, bundle) {
     const excl = bundle.excl;
     if (!excl) return 'absent from the bundle';
     const parts = resolved.split('/');
-    if (parts[0] === 'docs' && excl.trees.includes(parts[1])) return `withheld tier: docs/${parts[1]}/`;
-    if (parts[0] === 'docs' && excl.files.includes(parts[1])) return `withheld audience: docs/${parts[1]}`;
+    if (parts[0] === 'docs' && parts[1] && !excl.shipped.includes(parts[1])) return `not on step 7's allow-list: docs/${parts[1]}`;
     if (resolved.startsWith('..')) return 'climbs above the bundle root';
     if (bundle.repo.has(resolved)) return 'exists in the repo but is not staged into the bundle';
     return 'BROKEN IN THE REPO TOO — pre-existing link rot, not a packaging effect';
@@ -271,7 +272,7 @@ if (checked < MIN_LINKS) {
 const scopeNote =
     `scope: ${bundle.label}; ${bundle.map.size} file(s) staged, ${markdown.length} of them markdown; ` +
     (bundle.excl
-        ? `withheld by step 7 — trees: ${bundle.excl.trees.join(', ')}; files: ${bundle.excl.files.join(', ')}; ` +
+        ? `docs shipped by step 7's allow-list: ${bundle.excl.shipped.join(', ')}; ` +
           `package-time rewrite applied: ${neutralised} neutralised, ${retargeted} re-pointed, ${cited} repo citation(s) unlinked; ` +
           `⚠ ui/ and the generated launchers are NOT modelled here — confirm with --bundle`
         : `every target resolved against the real staged tree`);

@@ -7,7 +7,7 @@
 
 ## Run it
 
-- **Serve** — one JVM: fat JAR + bundled JDK runtime; `serve.sh`/`serve.bat` in the deploy bundle
+- **Serve** — one JVM: fat JAR + bundled JDK runtime; `bin/serve.sh`/`bin/serve.bat` in the deploy bundle (they cd to the bundle root, so any cwd works)
   hosts API + UI on `:8080` (SPA served by the engine). [`admin-guide-operations-reference.md`](admin-guide-operations-reference.md).
 - **Mandatory JVM flag** — DuckDB needs the native-access flag; the bundle scripts set it. Details:
   [build & run](admin-guide-launch-flags.md).

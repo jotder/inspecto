@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { EDITIONS, editionOnlyModules, coreModules, bundleModules } from './bund
 import { parsePom } from './check-offerings.mjs';
 import { gather } from './check-offerings.mjs';
 import {
-    CLASSPATH_ORDER, classpath, mvnModules, normalizeEdition, renderEdition, renderList, resolveOffering, verifyBundle,
+    CLASSPATH_ORDER, classpath, listEntries, mvnModules, normalizeEdition, renderEdition, renderList, resolveOffering, verifyBundle,
 } from './offering-classpath.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -104,10 +104,13 @@ test('--list-mvn: exactly the modules the edition adds beyond the default reacto
     }
 });
 
+/** A temp bundle root with an empty lib/ (BUNDLE-LAYOUT-1: every jar lives in <bundle>/lib). */
+const tempBundle = (prefix) => { const dir = mkdtempSync(join(tmpdir(), prefix)); mkdirSync(join(dir, 'lib')); return dir; };
+
 test('verifyBundle: a listed jar that is not staged, and a staged jar that is not listed, are both RED', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'oc-'));
+    const dir = tempBundle('oc-');
     try {
-        for (const j of ['inspecto.jar', 'stray.jar']) writeFileSync(join(dir, j), '');
+        for (const j of ['inspecto.jar', 'stray.jar']) writeFileSync(join(dir, 'lib', j), '');
         const p = verifyBundle(['inspecto.jar', 'inspecto-connectors.jar'], dir).join('\n');
         assert.match(p, /inspecto-connectors\.jar is on the classpath list but not staged/);
         assert.match(p, /stray\.jar is staged .* but not on the classpath list/);
@@ -115,20 +118,33 @@ test('verifyBundle: a listed jar that is not staged, and a staged jar that is no
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('CLI --bundle writes modules.list + edition.properties; a stray staged jar fails it with exit 1 and writes nothing', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'oc-'));
+test('BUNDLE-LAYOUT-1: a jar left at the bundle ROOT is RED even when lib/ matches the list', () => {
+    const dir = tempBundle('oc-root-');
+    try {
+        writeFileSync(join(dir, 'lib', 'inspecto.jar'), '');
+        writeFileSync(join(dir, 'inspecto.jar'), '');
+        assert.match(verifyBundle(['inspecto.jar'], dir).join('\n'), /inspecto\.jar is staged at the bundle root .* every jar belongs in lib\//);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('listEntries: list files name each jar as a bundle-root-relative lib/<jar> path', () => {
+    assert.deepEqual(listEntries(['inspecto.jar', 'postgresql.jar']), ['lib/inspecto.jar', 'lib/postgresql.jar']);
+});
+
+test('CLI --bundle writes lib/modules.list (lib/<jar> entries) + lib/edition.properties; a stray staged jar fails it with exit 1 and writes nothing', () => {
+    const dir = tempBundle('oc-');
     try {
         const jars = classpath('Basic', { g: g() });
-        for (const j of jars) writeFileSync(join(dir, j), '');
+        for (const j of jars) writeFileSync(join(dir, 'lib', j), '');
         execFileSync(process.execPath, [SCRIPT, '--edition', 'basic', '--bundle', dir], { encoding: 'utf8' });
-        assert.equal(readFileSync(join(dir, 'modules.list'), 'utf8'), renderList(jars));
-        assert.equal(readFileSync(join(dir, 'edition.properties'), 'utf8'), 'edition=Basic\n');
-        writeFileSync(join(dir, 'zzz-stray.jar'), '');
-        rmSync(join(dir, 'modules.list'));
+        assert.equal(readFileSync(join(dir, 'lib', 'modules.list'), 'utf8'), renderList(jars.map((j) => `lib/${j}`)));
+        assert.equal(readFileSync(join(dir, 'lib', 'edition.properties'), 'utf8'), 'edition=Basic\n');
+        writeFileSync(join(dir, 'lib', 'zzz-stray.jar'), '');
+        rmSync(join(dir, 'lib', 'modules.list'));
         const r = spawnSync(process.execPath, [SCRIPT, '--edition', 'basic', '--bundle', dir], { encoding: 'utf8' });
         assert.equal(r.status, 1);
         assert.match(r.stderr, /zzz-stray\.jar is staged/);
-        assert.throws(() => readFileSync(join(dir, 'modules.list')));
+        assert.throws(() => readFileSync(join(dir, 'lib', 'modules.list')));
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -163,14 +179,14 @@ test('--list-core prints artifactId<TAB>dir for every core jar, no edition neede
 });
 
 test('--bundle writes core.list = inspecto.jar + the core thin jars only (the one-shot tools\' classpath: no optional module, no sidecar)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'oc-core-'));
+    const dir = tempBundle('oc-core-');
     try {
-        for (const j of classpath('Standard', { g: g() })) writeFileSync(join(dir, j), '');
+        for (const j of classpath('Standard', { g: g() })) writeFileSync(join(dir, 'lib', j), '');
         execFileSync(process.execPath, [SCRIPT, '--edition', 'standard', '--bundle', dir], { encoding: 'utf8' });
-        const core = readFileSync(join(dir, 'core.list'), 'utf8');
-        assert.equal(core, ['inspecto.jar', ...CORE_JARS].join('\n') + '\n');
+        const core = readFileSync(join(dir, 'lib', 'core.list'), 'utf8');
+        assert.equal(core, ['inspecto.jar', ...CORE_JARS].map((j) => `lib/${j}`).join('\n') + '\n');
         assert.ok(!core.includes('oidc') && !core.includes('connectors') && !core.includes('postgresql'));
-        assert.equal(readFileSync(join(dir, 'modules.list'), 'utf8').split('\n')[0], 'inspecto.jar');
+        assert.equal(readFileSync(join(dir, 'lib', 'modules.list'), 'utf8').split('\n')[0], 'lib/inspecto.jar');
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -219,13 +235,13 @@ test('--needs-pg answers yes/no for package.ps1', () => {
 });
 
 test('stagedClasspath: postgresql.jar leaves the list when it was not staged and nothing needs it; a bundle that needs it keeps it (and verifyBundle names it)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cp-'));
+    const dir = tempBundle('cp-');
     const jars = ['inspecto.jar', 'postgresql.jar'];
-    writeFileSync(join(dir, 'inspecto.jar'), '');
+    writeFileSync(join(dir, 'lib', 'inspecto.jar'), '');
     assert.deepEqual(stagedClasspath(jars, dir, false), ['inspecto.jar']);
     assert.deepEqual(stagedClasspath(jars, dir, true), jars);
     assert.match(verifyBundle(stagedClasspath(jars, dir, true), dir).join('\n'), /postgresql\.jar is on the classpath list but not staged/);
-    writeFileSync(join(dir, 'postgresql.jar'), '');
+    writeFileSync(join(dir, 'lib', 'postgresql.jar'), '');
     assert.deepEqual(stagedClasspath(jars, dir, false), jars);
     assert.deepEqual(verifyBundle(stagedClasspath(jars, dir, false), dir), []);
     rmSync(dir, { recursive: true, force: true });

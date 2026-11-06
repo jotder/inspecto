@@ -35,7 +35,7 @@ Build recipes and Maven profiles: [build & test](../platform/spec-build-test.md)
 
 ## 3. Launch
 
-The bundle's `serve.sh` / `serve.bat` start `ControlApi`. The flags that matter most — `-Dcontrol.port`,
+The bundle's `bin/serve.sh` / `bin/serve.bat` start `ControlApi` (from any directory: they cd to the bundle root, where `lib/`, `spaces/`, `ui/` and `docs/api/` are resolved). The flags that matter most — `-Dcontrol.port`,
 `-Dcontrol.bind`, `-Dspaces.root`, `-Dui.dir`, `-Dcontrol.cors`, `-Dassist.write.root` — are described in
 [launch flags](../platform/admin-guide-launch-flags.md); the complete list is in
 [`ADVANCED_GUIDE.md`](../../../../ADVANCED_GUIDE.md) §9.

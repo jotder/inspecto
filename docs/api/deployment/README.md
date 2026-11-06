@@ -112,7 +112,7 @@ JVM default truststore. A self-signed dev IdP must have its certificate imported
 ⚠ On this repo `-DargLine` does **not** reach a forked surefire JVM — the parent POM's `@{argLine}`
 resolves the project property — so TLS flags need `-DforkCount=0` plus `MAVEN_OPTS`.
 
-`serve.sh`/`serve.bat` (bundled by `package.ps1 -Edition Standard`) read these from
+`bin/serve.sh`/`bin/serve.bat` (bundled by `package.ps1 -Edition Standard`) read these from
 `AUTH_OIDC_ISSUER` / `AUTH_OIDC_JWKS_URI` / `AUTH_OIDC_AUDIENCE` / `AUTH_OIDC_CLIENT_ID` /
 `AUTH_OIDC_PROVIDER` / `AUTH_OIDC_DISCOVERY_URL` / `AUTH_OIDC_CLIENT_SECRET` environment variables — the secret is forwarded as an `${ENV:…}` reference
 the backend resolves at use, so neither the bundle nor the process command line ever holds it.

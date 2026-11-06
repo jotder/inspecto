@@ -7,7 +7,7 @@ metadata:
 
 - **:8080 serves `inspecto-ui/dist/gamma/browser`** (`tools/run-backend.ps1` `-Dui.dir`) — stale until
   `npm run build`; the :4204 dev server is a different surface. Say which port was verified. Likewise
-  `mvn clean test` leaves `inspecto-deploy/inspecto.jar` untouched.
+  `mvn clean test` leaves `inspecto-deploy/lib/inspecto.jar` untouched.
 - **jlinked runtime:** the bundle JVM has only the modules `tools/jlink-modules.mjs` derives (jdeps over staged
   jars + `tools/jlink-runtime-extra.txt`, checked against `tools/jlink-modules.lock`, fail closed; corrected
   2026-10-19 — the old hand list in `package.ps1` was retired 2026-10-18). A new `com.sun.*`/`jdk.*` import

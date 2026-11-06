@@ -22,11 +22,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
+import { LIB_DIR } from './bundle-modules.mjs';
 
 export const SBOM_SUFFIX = '.sbom.cdx.json';
 /** `inspecto-api.jar` -> `inspecto-api.sbom.cdx.json` */
-export const sbomName = (jar) => jar.replace(/\.jar$/, '') + SBOM_SUFFIX;
+export const sbomName = (jar) => basename(jar).replace(/\.jar$/, '') + SBOM_SUFFIX;
 const DEMO_JAR = 'inspecto-demo-auth.jar';
 
 export const sha256File = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -56,7 +57,7 @@ export function generatePerModule({ bundleDir, jars, componentsByPurl, buildId =
     mkdirSync(outDir, { recursive: true });
     const written = [];
     for (const j of jars) {
-        const jarPath = join(bundleDir, j.bundleFile);
+        const jarPath = join(bundleDir, LIB_DIR, j.bundleFile);
         if (!existsSync(jarPath)) throw new Error(`per-module SBOM: ${j.bundleFile} is not in the bundle (${bundleDir}) - run this AFTER the jars are staged`);
         const rootPurl = `pkg:maven/${j.group}/${j.artifact}@${j.version}`;
         const root = {
@@ -91,27 +92,28 @@ const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 /** Problems between a staged bundle directory's per-module SBOMs, its modules.list and its combined SBOM. */
 export function verifyPerModule(bundleDir) {
     const problems = [];
-    const listPath = join(bundleDir, 'modules.list');
+    const listPath = join(bundleDir, LIB_DIR, 'modules.list');
     if (!existsSync(listPath)) return [`${listPath} is missing - cannot tell which jars need a per-module SBOM`];
     const jars = readFileSync(listPath, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-    const props = existsSync(join(bundleDir, 'edition.properties')) ? readFileSync(join(bundleDir, 'edition.properties'), 'utf8') : '';
+    const propsPath = join(bundleDir, LIB_DIR, 'edition.properties');
+    const props = existsSync(propsPath) ? readFileSync(propsPath, 'utf8') : '';
     const edition = (/^edition=(\w+)/m.exec(props) || [])[1];
     const demo = /^variant=demo/m.test(props);
-    if (!edition) return [`${join(bundleDir, 'edition.properties')} is missing or names no edition`];
+    if (!edition) return [`${propsPath} is missing or names no edition`];
     const combinedPath = join(bundleDir, 'sbom', `inspecto-${edition.toLowerCase()}.cdx.json`);
     if (!existsSync(combinedPath)) return [`the combined SBOM ${combinedPath} is missing`];
     const combined = new Map(readJson(combinedPath).components.map((c) => [c.purl, c]));
     const sbomDir = join(bundleDir, 'sbom');
     const expected = new Set();
     for (const jar of jars) {
-        if (demo && jar === DEMO_JAR) continue; // the demo build swaps the OIDC trio for this jar AFTER the SBOMs are written; it is not part of any edition's bill of materials
+        if (demo && basename(jar) === DEMO_JAR) continue; // the demo build swaps the OIDC trio for this jar AFTER the SBOMs are written; it is not part of any edition's bill of materials
         expected.add(sbomName(jar));
         const file = join(sbomDir, sbomName(jar));
         if (!existsSync(file)) { problems.push(`${jar} is on modules.list but has no per-module SBOM (${sbomName(jar)})`); continue; }
         let doc;
         try { doc = readJson(file); } catch (e) { problems.push(`${sbomName(jar)} is not valid JSON: ${e.message}`); continue; }
         const root = doc.metadata?.component;
-        const jarPath = join(bundleDir, jar);
+        const jarPath = join(bundleDir, jar); // modules.list entries are bundle-ROOT-relative (lib/<jar>)
         const want = existsSync(jarPath) ? sha256File(jarPath) : null;
         const got = root?.hashes?.find((h) => h.alg === 'SHA-256')?.content;
         if (!root?.purl) problems.push(`${sbomName(jar)} has no root component purl`);
@@ -147,7 +149,7 @@ function main() {
         console.error(`✗ per-module SBOMs: ${problems.length} problem(s):\n  - ${problems.join('\n  - ')}`);
         process.exit(1);
     }
-    const n = readFileSync(join(process.argv[i + 1], 'modules.list'), 'utf8').split(/\r?\n/).filter((s) => s.trim()).length;
+    const n = readFileSync(join(process.argv[i + 1], LIB_DIR, 'modules.list'), 'utf8').split(/\r?\n/).filter((s) => s.trim()).length;
     console.log(`✓ per-module SBOMs: every jar on modules.list (${n}) has one; roots match the staged jars; components ⊆ the combined SBOM`);
 }
 

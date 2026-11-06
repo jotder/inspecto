@@ -145,7 +145,7 @@ shadowed `.duckdb-extension-cache`, so running the fetch tool never cured a miss
 
 🔴 **Each deployment zip carries ONLY its own platform's DuckDB extensions** (`AIRGAP-CROSSPLAT-DEADWEIGHT-1`,
 built and closed 2026-09-15). `package.ps1` step 8 cuts each zip through `Compress-BundleForPlatform`, which
-parks the *other* platform's `duckdb-extensions/<plat>/` directory, zips, and restores it in a `finally` — so
+parks the *other* platform's `lib/duckdb/<plat>/` directory (was `duckdb-extensions/<plat>/` before BUNDLE-LAYOUT-1), zips, and restores it in a `finally` — so
 `$bundleDir` is a **superset** of either zip, not a mirror of `inspecto-deploy.zip`. ⛔ The launchers stay
 cross-copied on purpose (`run.sh` in the Windows zip, `serve.bat` in the Linux one); the filter touches the
 extension directory only. **Evidence, from the zips' own entry tables** (a desk build on 2026-09-15, Windows

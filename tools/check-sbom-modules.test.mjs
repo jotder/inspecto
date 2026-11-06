@@ -26,12 +26,12 @@ test('RED: $modules no longer comes from offering-classpath --list-mvn', () => {
 });
 
 test('RED: a staged jar disappears from the staging steps (bundle-modules still declares it)', () => {
-    const t = mutate('Copy-Item $backupJarSrc "$bundleDir\\inspecto-backup.jar"', 'Write-Host skipped');
+    const t = mutate('Copy-Item $backupJarSrc "$libDir\\inspecto-backup.jar"', 'Write-Host skipped');
     assert.match(problems(t), /tools\/bundle-modules\.mjs declares, but .* never stages: inspecto-backup\.jar/);
 });
 
 test('RED: package.ps1 stages a jar nothing declares', () => {
-    const t = mutate('Copy-Item $backupJarSrc "$bundleDir\\inspecto-backup.jar"', 'Copy-Item $backupJarSrc "$bundleDir\\inspecto-backup.jar"\n    Copy-Item $backupJarSrc "$bundleDir\\inspecto-rogue.jar"');
+    const t = mutate('Copy-Item $backupJarSrc "$libDir\\inspecto-backup.jar"', 'Copy-Item $backupJarSrc "$libDir\\inspecto-backup.jar"\n    Copy-Item $backupJarSrc "$libDir\\inspecto-rogue.jar"');
     assert.match(problems(t), /stages, but no SBOM would declare: inspecto-rogue\.jar/);
 });
 
@@ -44,14 +44,14 @@ test('RED: the generated classpath misses a staged jar / lists one nothing stage
 });
 
 test('RED: the boot smoke goes back to a hand-kept $cp literal', () => {
-    const t = mutate("$cp = @(Get-Content (Join-Path $bundleDir 'modules.list')", "$cp = @('inspecto.jar', 'inspecto-oidc.jar') + @(Get-Content (Join-Path $bundleDir 'modules.list')");
+    const t = mutate("$cp = @(Get-Content (Join-Path $libDir 'modules.list')", "$cp = @('inspecto.jar', 'inspecto-oidc.jar') + @(Get-Content (Join-Path $libDir 'modules.list')");
     assert.match(problems(t), /boot-smoke `\$cp` is not read from the bundle's modules\.list/);
 });
 
 test('RED: a launcher re-grows a hand-kept jar list (sh and bat shapes)', () => {
     assert.match(problems(mutate('JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"\n# Extra', 'JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"\n[ -f inspecto-foo.jar ] && CP="${CP}:inspecto-foo.jar"\n# Extra')), /still hand-keeps a classpath/);
     assert.match(problems(mutate('set "CP=%CP:~1%"\nrem ASSURE', 'set "CP=%CP:~1%"\nif exist inspecto-foo.jar set "CP=%CP%;inspecto-foo.jar"\nrem ASSURE')), /still hand-keeps a classpath/);
-    assert.match(problems(mutate('if [ -f edition.properties ]; then', 'if [ -f inspecto-oidc.jar ]; then CP="inspecto.jar:inspecto-oidc.jar"; fi\nif [ -f edition.properties ]; then')), /still hand-keeps a classpath/);
+    assert.match(problems(mutate('if [ -f lib/edition.properties ]; then', 'if [ -f lib/inspecto-oidc.jar ]; then CP="lib/inspecto.jar:lib/inspecto-oidc.jar"; fi\nif [ -f lib/edition.properties ]; then')), /still hand-keeps a classpath/);
 });
 
 test('RED: a launcher stops reading modules.list, and serve.* stops reading edition.properties', () => {

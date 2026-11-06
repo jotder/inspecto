@@ -11,7 +11,7 @@ the Investigation tab's start form, Expand filter, Clean up or canvas toolbar.*
 | Item | Value |
 |---|---|
 | Bundle | `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo`, built from `origin/master` `dc1300f1b` in a sibling worktree |
-| Server | the staged `inspecto-demo\serve-demo.bat` on `127.0.0.1:8092`, started in a terminal and stopped with Ctrl+C (graceful) |
+| Server | the staged `inspecto-demo\bin\serve-demo.bat` (root `serve-demo.bat` before BUNDLE-LAYOUT-1) on `127.0.0.1:8092`, started in a terminal and stopped with Ctrl+C (graceful) |
 | Space | a COPY of the demo's `la-showcase`; the shared demo at `inspecto-preview\inspecto-la` was not touched |
 | User | Demo User `admin`, built-in browser pane (800 × 600 shown, 1024 px CSS width) |
 | Investigation | ONE throwaway on `telecom_links_dataset` (time column `last_seen`), suspect MSISDN 99979100001, 10 recorded steps, deleted with *⋯ ▸ Delete…* (its log then answers 404; the seeded *mule-hub-case* untouched). A first attempt on `mule_transfers_dataset` (2 steps) was deleted through the API once it showed that Dataset has one Entity Type and no usable time column |

@@ -93,21 +93,22 @@ test('trimBundle removes unbought jars, SBOMs and Templates and stamps the custo
     try {
         const src = join(root, 'src');
         mkdirSync(join(src, 'sbom'), { recursive: true });
+        mkdirSync(join(src, 'lib'), { recursive: true });
         for (const t of ['fraud', 'starter']) mkdirSync(join(src, 'spaces', '_templates', t), { recursive: true });
         const jars = ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-la.jar', 'inspecto-ops.jar', 'inspecto-cases.jar', 'inspecto-anomaly.jar', 'inspecto-lists.jar'];
-        for (const j of jars) { writeFileSync(join(src, j), 'x'); writeFileSync(join(src, 'sbom', j.replace('.jar', '.sbom.cdx.json')), '{}'); }
-        writeFileSync(join(src, 'modules.list'), jars.join('\n') + '\n');
-        writeFileSync(join(src, 'edition.properties'), 'edition=Standard\n');
+        for (const j of jars) { writeFileSync(join(src, 'lib', j), 'x'); writeFileSync(join(src, 'sbom', j.replace('.jar', '.sbom.cdx.json')), '{}'); }
+        writeFileSync(join(src, 'lib', 'modules.list'), jars.map((j) => `lib/${j}`).join('\n') + '\n');
+        writeFileSync(join(src, 'lib', 'edition.properties'), 'edition=Standard\n');
         const r = resolve(cust(['AO-LA'], 'standard'), files(), world(), { 'AO-LA': { listPrice: '900', currency: 'USD' } });
         const dest = join(root, 'out');
         const t = trimBundle(src, dest, cust(['AO-LA']), r);
         assert.deepEqual(t.jars.sort(), ['inspecto-anomaly.jar', 'inspecto-cases.jar', 'inspecto-lists.jar', 'inspecto-ops.jar']);
-        assert.equal(readFileSync(join(dest, 'modules.list'), 'utf8'), 'inspecto.jar\ninspecto-oidc.jar\ninspecto-la.jar\n');
+        assert.equal(readFileSync(join(dest, 'lib', 'modules.list'), 'utf8'), 'lib/inspecto.jar\nlib/inspecto-oidc.jar\nlib/inspecto-la.jar\n');
         assert.ok(!existsSync(join(dest, 'sbom', 'inspecto-ops.sbom.cdx.json')) && existsSync(join(dest, 'sbom', 'inspecto-la.sbom.cdx.json')));
         assert.ok(!existsSync(join(dest, 'spaces', '_templates', 'fraud')) && !existsSync(join(dest, 'spaces', '_templates', 'starter')));
-        assert.match(readFileSync(join(dest, 'edition.properties'), 'utf8'), /^edition=Standard\ncustomer=acme\noffering=customer-acme\n$/);
+        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\ncustomer=acme\noffering=customer-acme\n$/);
         assert.doesNotMatch(readFileSync(join(dest, 'customer-bom.csv'), 'utf8'), /900/);
-        assert.ok(existsSync(join(src, 'inspecto-ops.jar')), 'the source bundle is untouched');
+        assert.ok(existsSync(join(src, 'lib', 'inspecto-ops.jar')), 'the source bundle is untouched');
         assert.throws(() => trimBundle(src, dest, cust([], 'advanced'), r), /edition 'standard', the customer's Edition is 'advanced'/);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });

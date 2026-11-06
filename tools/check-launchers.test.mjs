@@ -39,7 +39,7 @@ test('RED (static): serve.* guess the edition again (no edition.properties read)
 test('RED (static): the serve.bat self-referential-set-in-a-block rule, and delayed expansion, still fire', () => {
     const block = mutate('if "%EDITION%"=="Advanced" set "OPTS=%OPTS% -Dobjects.backend=postgres"', 'if defined X (\nset "OPTS=%OPTS% -Da=b"\nset "OPTS=%OPTS% -Dc=d"\n)');
     assert.match(statics(block), /re-expands a variable inside a parenthesised block/);
-    assert.match(statics(mutate('setlocal\ncd /d "%~dp0"\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="', 'setlocal EnableDelayedExpansion\ncd /d "%~dp0"\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="')), /enables delayed expansion/);
+    assert.match(statics(mutate('setlocal\ncd /d "%~dp0.."\nrem bin\\ -> the bundle ROOT: spaces\\, ui\\, docs\\, lib\\ and logs\\ are root-relative.\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="', 'setlocal EnableDelayedExpansion\ncd /d "%~dp0.."\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="')), /enables delayed expansion/);
 });
 
 test('RED (static): the demo launchers keep a jar list of their own', () => {
@@ -52,18 +52,18 @@ test('RED (static): the demo launchers ignore INSPECTO_JAVA_OPTS / never append 
     assert.notEqual(noAppend, REAL);
     assert.match(statics(noAppend), /serveDemoBat reads INSPECTO_JAVA_OPTS but never appends[\s\S]*serveDemoSh reads INSPECTO_JAVA_OPTS but never appends/);
     // the real read is stripped from its place and re-added behind -cp
-    const late = REAL.replace(/^rem Extra JVM flags from the operator, same contract as serve\.bat \(LAUNCHER[\s\S]*?extra JVM opts: %EXTRA_OPTS%\n/m, '').replace('com.gamma.control.ControlApi\n"@\n    Write-CrlfScript -Path "$bundleDir\\serve-demo.bat"', 'com.gamma.control.ControlApi %INSPECTO_JAVA_OPTS% %EXTRA_JAVA_OPTS% %OPTS% %EXTRA_OPTS%\n"@\n    Write-CrlfScript -Path "$bundleDir\\serve-demo.bat"');
+    const late = REAL.replace(/^rem Extra JVM flags from the operator, same contract as serve\.bat \(LAUNCHER[\s\S]*?extra JVM opts: %EXTRA_OPTS%\n/m, '').replace('com.gamma.control.ControlApi\n"@\n    Write-CrlfScript -Path "$binDir\\serve-demo.bat"', 'com.gamma.control.ControlApi %INSPECTO_JAVA_OPTS% %EXTRA_JAVA_OPTS% %OPTS% %EXTRA_OPTS%\n"@\n    Write-CrlfScript -Path "$binDir\\serve-demo.bat"');
     assert.notEqual(late, REAL);
     assert.match(statics(late), /serveDemoBat reads INSPECTO_JAVA_OPTS only after -cp/);
 });
 
 test('RED (executed): a serve.sh that ignores modules.list (falls to the *.jar glob) puts the jars in the WRONG ORDER', () => {
-    const t = mutate('if [ -f modules.list ]; then\n    CP="$(tr -d \'\\r\' < modules.list | tr \'\\n\' \':\')"; CP="${CP%:}"\nelse\n    echo "[serve.sh] modules.list', 'if false; then\n    CP=x\nelse\n    echo "[serve.sh] modules.list');
+    const t = mutate('if [ -f lib/modules.list ]; then\n    CP="$(tr -d \'\\r\' < lib/modules.list | tr \'\\n\' \':\')"; CP="${CP%:}"\nelse\n    echo "[serve.sh] lib/modules.list', 'if false; then\n    CP=x\nelse\n    echo "[serve.sh] lib/modules.list');
     assert.match(scenarios(t), /expected exactly the Offering's modules\.list/);
 });
 
 test('RED (executed): a serve.sh that sniffs jar presence instead of reading the marker lets a stray jar change the edition', () => {
-    const t = mutate('if [ -f edition.properties ]; then\n    EDITION=', 'if false; then\n    EDITION=');
+    const t = mutate('if [ -f lib/edition.properties ]; then\n    EDITION=', 'if false; then\n    EDITION=');
     assert.match(scenarios(t), /stray inspecto-oidc\.jar[\s\S]*printed `edition: Advanced`, expected `Basic`/);
 });
 
@@ -82,6 +82,6 @@ test('the real run.sh/run.bat, EXECUTED, put exactly modules.list on -cp', () =>
 });
 
 test('RED (executed): a run.sh that ignores modules.list (the *.jar glob) puts the jars in the WRONG ORDER', () => {
-    const t = mutate('if [ -f modules.list ]; then\n    CP="$(tr -d \'\\r\' < modules.list | tr \'\\n\' \':\')"; CP="${CP%:}"\nelse\n    echo "[run.sh] modules.list', 'if false; then\n    CP=x\nelse\n    echo "[run.sh] modules.list');
+    const t = mutate('if [ -f lib/modules.list ]; then\n    CP="$(tr -d \'\\r\' < lib/modules.list | tr \'\\n\' \':\')"; CP="${CP%:}"\nelse\n    echo "[run.sh] lib/modules.list', 'if false; then\n    CP=x\nelse\n    echo "[run.sh] lib/modules.list');
     assert.match(runOneShot(t).findings.join('\n'), /run\.sh · Standard: classpath is[\s\S]*expected exactly the Offering's modules\.list/);
 });

@@ -21,7 +21,7 @@
  *   A. the Maven module list is no longer a literal: package.ps1 must take `$modules` from
  *      `tools/offering-classpath.mjs --list-mvn`, and that generator's list must equal the generator
  *      table's edition-only modules for every edition (Standard, Advanced, Preview);
- *   B. the `Copy-Item … "$bundleDir\*.jar"` staging steps — what lands in the bundle — must equal
+ *   B. the `Copy-Item … "$libDir\*.jar"` staging steps — what lands in the bundle — must equal
  *      tools/bundle-modules.mjs's maximal (Advanced) set + the PostgreSQL sidecar, and Basic must equal
  *      what is staged unconditionally;
  *   C. the boot smoke and every launcher must READ the bundle's `modules.list` (no jar list of their own),
@@ -103,7 +103,8 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     // assertion below fails loudly rather than quietly passing over a set nobody matched.
     // `[ \t]*`, not `\s*`: `\s` matches newlines, so a greedy run would start at an earlier line and
     // capture the newline as part of the "indentation", making every match look indented.
-    const STAGE = /^([ \t]*)Copy-Item[ \t]+\$\w+[ \t]+"\$bundleDir\\([\w.-]+\.jar)"/gm;
+    // BUNDLE-LAYOUT-1: every jar is staged into $libDir (<bundle>/lib).
+    const STAGE = /^([ \t]*)Copy-Item[ \t]+\$\w+[ \t]+"\$libDir\\([\w.-]+\.jar)"/gm;
     const staged = new Set();
     const stagedAlways = new Set();
     for (const m of text.matchAll(STAGE)) {
@@ -155,7 +156,7 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     const handKept = [
         ...[...text.matchAll(/^.*\[ -f \S+\.jar \]\s*&&\s*CP="\$\{CP\}:\S+\.jar".*$/gm)],
         ...[...text.matchAll(/^.*if exist \S+\.jar set "CP=%CP%;\S+\.jar".*$/gm)],
-        ...[...text.matchAll(/^.*CP="inspecto\.jar:inspecto-\S+\.jar".*$/gm)],
+        ...[...text.matchAll(/^.*CP="(?:lib\/)?inspecto\.jar:(?:lib\/)?inspecto-\S+\.jar".*$/gm)],
     ].map((m) => m[0].trim());
     if (handKept.length) {
         problems.push(`${SCRIPT} still hand-keeps a classpath: ${handKept.length} launcher statement(s) append a named jar to CP (first: ${handKept[0].slice(0, 100)}) — the launchers must read modules.list.`);

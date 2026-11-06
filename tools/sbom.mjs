@@ -31,7 +31,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { m2Repo } from './maven-repo.mjs';
-import { bundleModules, coreModules, editionProfile, EDITIONS, PG_SIDECAR } from './bundle-modules.mjs';
+import { bundleModules, coreModules, editionProfile, EDITIONS, LIB_DIR, PG_SIDECAR } from './bundle-modules.mjs';
 import { cdxComponent, generatePerModule } from './sbom-modules.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -208,7 +208,7 @@ const thirdParty = resolve();
 // Standard/Advanced — a duplicate `bom-ref` and a duplicate SPDXID, both of which their schemas forbid,
 // in a document whose whole purpose is to be machine-validated by an auditor.
 const hasPg = (c) => c.group === 'org.postgresql' && c.artifact === 'postgresql';
-if (edition !== 'Basic' && pgVersion && existsSync(join(bundleDir, 'postgresql.jar')) && !thirdParty.some(hasPg)) {
+if (edition !== 'Basic' && pgVersion && existsSync(join(bundleDir, LIB_DIR, PG_SIDECAR)) && !thirdParty.some(hasPg)) {
     thirdParty.push({ group: 'org.postgresql', artifact: 'postgresql', type: 'jar', classifier: null, version: pgVersion, scope: 'runtime' });
 }
 
@@ -224,7 +224,7 @@ for (const c of thirdParty) {
 }
 // first-party: the bundle's own jars, hashed AS SHIPPED (inspecto.jar = the processor + all third-party code; the core libraries are thin jars)
 for (const [artifactId, file] of Object.entries(SHIPPED)) {
-    const path = join(bundleDir, file);
+    const path = join(bundleDir, LIB_DIR, file);
     if (!existsSync(path)) {
         console.error(`✖ SBOM: ${file} is not in the bundle (${bundleDir}) — run this AFTER the jars are staged`);
         process.exit(2);
@@ -305,7 +305,7 @@ const perModuleJars = Object.entries(SHIPPED).map(([artifactId, file]) => ({
     bundleFile: file, group: 'com.gamma.inspector', artifact: artifactId, version: projectVersion, depPurls: moduleCoords.get(artifactId) ?? [],
 }));
 const pgComponent = components.find((c) => !c.firstParty && hasPg(c));
-if (existsSync(join(bundleDir, PG_SIDECAR)) && pgComponent) {
+if (existsSync(join(bundleDir, LIB_DIR, PG_SIDECAR)) && pgComponent) {
     perModuleJars.push({ bundleFile: PG_SIDECAR, group: pgComponent.group, artifact: pgComponent.artifact, version: pgComponent.version, depPurls: [] });
 }
 let perModulePaths;

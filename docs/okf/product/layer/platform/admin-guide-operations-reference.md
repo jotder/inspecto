@@ -477,14 +477,14 @@ Angular SPA as static files, so one process hosts both the API and the UI (v4.1)
   preflight, for a separately-hosted dev SPA. Omit for prod (same-origin needs no CORS).
 
 Both flags are **off by default**: unset, the control plane behaves exactly as a headless API. The
-deploy bundle's `serve.sh` / `serve.bat` wire these up automatically (`-Dui.dir=./ui` when a `ui/`
+deploy bundle's `bin/serve.sh` / `bin\serve.bat` wire these up automatically (`-Dui.dir=./ui` when a `ui/`
 folder is present; `CORS_ORIGIN` env → `-Dcontrol.cors`). See the
 [User Guide](../../../../USER_GUIDE.md) for the full UI walkthrough.
 
 ```bash
 # bundle root — serve API + UI on :8080
-bash serve.sh        # Linux/Mac
-serve.bat            # Windows
+bash bin/serve.sh    # Linux/Mac
+bin\serve.bat        # Windows
 # then open http://localhost:8080/
 ```
 
@@ -1023,73 +1023,84 @@ This produces **`inspecto-deploy-<platform>.zip`** in the sandbox root, one per 
 
 ### Bundle contents
 
+Since `BUNDLE-LAYOUT-1` (2026-11-06) the bundle root holds `README.md` and folders only (a `-DemoAuth` build adds
+`DEMO-BUILD.txt`). `package.ps1` step 7 asserts it: an unexpected entry at the root, a missing `bin/`, `lib/`, `logs/`,
+`docs/` or `sbom/`, or a staged `examples/` stops the package.
+
 ```
 inspecto-deploy/
-  inspecto.jar              ← the product jar: processor classes + ALL third-party dependencies (~98 MB)
-  inspecto-api.jar … inspecto-engine.jar   ← the 14 first-party CORE libraries as thin jars (api, util, config, sql, etl, audit-spi, auth-spi, access, http-spi, entity-store, event, workflow, acquire, engine; ~2.9 MB together)
-  modules.list / core.list / edition.properties   ← the classpath (one jar per line) the launchers read / the one-shot tools' core-only classpath / the edition
-  config/
-    <data_source>/<data_source>_pipeline.toon
-                  <data_source>_schema.toon
-                  adj_gen.toon
-    <data_source>/<data_source>_pipeline.toon
-                  <data_source>_schema.toon
-  inbox/<data_source>/               ← drop input files here (or run pre-ETL utilities)
-  database/<data_source>/               ← partitioned Parquet output
-  backup/<data_source>/               ← original source files archived after processing
-  temp/<data_source>/               ← scratch space for tar extraction
-  errors/<data_source>/               ← per-file error CSVs
-  quarantine/<data_source>/               ← quarantined files
-  markers/<data_source>/               ← .processed sentinel files (auto-pruned; mirrors inbox tree)
-  ui/                         ← built Inspector SPA (present only when inspecto-ui/ was built); served via -Dui.dir=./ui
-  run.sh                      ← Linux/Mac ETL launcher  (java -jar ... <adapter>_pipeline.toon)
-  run.bat                     ← Windows ETL launcher
-  serve.sh                    ← Linux/Mac control-plane + UI launcher (ControlApi; reads PORT/SPACES_ROOT/CORS_ORIGIN/AUTH_OIDC_*)
-  serve.bat                   ← Windows control-plane + UI launcher
-  ura.sh                      ← Linux/Mac utility CLI   (java -cp ... MainApp <command> ...)
-  ura.bat                     ← Windows utility CLI
-  Dockerfile                  ← container wrapper over serve.sh (PKG-3; see "Containerized deployment")
-  .dockerignore               ← keeps runtime/, *.bat and nested zips out of the image
-  warehouse_setup.sql         ← pg_duckdb warehouse schema, views, and RBAC (run once on server)
   README.md
+  bin/                        ← every launcher; each cd's to the bundle ROOT (the parent of bin/) first, so it runs from any directory
+    serve.sh  serve.bat       ← control plane + UI (ControlApi; reads PORT/SPACES_ROOT/CORS_ORIGIN/AUTH_OIDC_*/INSPECTO_JAVA_OPTS)
+    run.sh    run.bat         ← one-shot ETL (CollectorProcessor) for spaces/*/config/<adapter>/*_pipeline.toon
+    ura.sh    ura.bat         ← pre-ETL utility CLI (MainApp); a relative pipeline path resolves against the bundle root
+    install-service.sh  install-service.ps1   ← systemd unit / Windows boot Scheduled Task (SCR-3)
+    serve-demo.sh serve-demo.bat               ← -DemoAuth builds only (they replace serve.* and the installers)
+  lib/
+    inspecto.jar              ← the product jar: processor classes + ALL third-party dependencies
+    inspecto-api.jar … inspecto-engine.jar     ← the first-party CORE libraries as thin jars
+    inspecto-*.jar, postgresql.jar             ← the edition's optional modules and sidecars
+    modules.list / core.list  ← the classpath the launchers read, one ROOT-relative `lib/<jar>` per line, in order
+                                (written by tools/offering-classpath.mjs - the one seam between layout and classpath)
+    edition.properties        ← edition=Basic|Standard|Advanced|Preview
+    duckdb/<platform>/*.duckdb_extension       ← air-gap DuckDB extensions; -Dduckdb.extension.dir=lib/duckdb/<platform>
+  deploy/
+    Dockerfile                ← container wrapper over bin/serve.sh (PKG-3; see "Containerized deployment")
+    Dockerfile.dockerignore   ← BuildKit's per-Dockerfile ignore file (keeps bin/*.bat, bin/*.ps1 and nested zips out)
+    inspecto.service          ← the systemd unit bin/install-service.sh installs
+  logs/                       ← captured launcher output (bin/install-service.ps1 appends serve.bat's output to logs/service.log)
+  runtime/                    ← the embedded jlink JVM; every launcher prefers it over a system java
+  ui/                         ← the built SPA (present when inspecto-ui/ was built); served via -Dui.dir=./ui
+  spaces/_templates/          ← the Space-template gallery; drop your Space folder(s) beside it
+  docs/                       ← USER_GUIDE.md, ADVANCED_GUIDE.md, EDITIONS.md and api/ ONLY (step 7's allow-list;
+                                the server serves docs/api/openapi-v1.json at GET /api/v1/openapi.json, cwd-relative)
+  sbom/                       ← the combined CycloneDX + SPDX SBOMs and one SBOM per jar
+  licenses/                   ← third-party licence texts for bundled native libraries (Advanced/Preview)
 ```
+
+The worked examples (`inspecto/examples/`) are **not** in the bundle; they stay in the repository with their
+`run-example` / `serve-example` runners.
+
+**Logging.** `ControlApi` logs to **stdout only** (logback `CONSOLE` appender + the in-process event store; there is no
+file appender). A shell launch therefore logs to the console. Where a wrapper captures that output it goes to the
+bundle's `logs/`: the Windows Scheduled Task appends to `logs/service.log`; the systemd unit sends it to the journal
+(`journalctl -u inspecto`); the container keeps it on stdout (`docker logs`), with `/app/logs` writable. A one-shot
+`bin/run.*` writes its per-run log to the pipeline's own `dirs.logs`, inside the Space.
 
 ### Deploy and run
 
 ```bash
 # 1. Copy the zip to the server and extract
-unzip inspecto-deploy-windows_amd64.zip
+unzip inspecto-deploy-linux_amd64.zip
 cd inspecto-deploy
 
-# 2. Stage files (optional — use pre-ETL utilities if source is on a network share or in tarballs)
-bash ura.sh copy-tars config/<data_source>/<data_source>_pipeline.toon
-bash ura.sh extract   config/<data_source>/<data_source>_pipeline.toon
+# 2. Attach your Space(s): drop each Space folder into spaces/ (or set SPACES_ROOT)
 
-# 3. Drop input files directly into the inbox (if no pre-ETL staging needed)
-cp /data/feeds/*.csv.gz inbox/<data_source>/
+# 3. Stage files (optional — pre-ETL utilities, if the source is on a network share or in tarballs)
+bash bin/ura.sh copy-tars spaces/<space>/config/<data_source>/<data_source>_pipeline.toon
+bash bin/ura.sh extract   spaces/<space>/config/<data_source>/<data_source>_pipeline.toon
 
-# 4. Run the ETL (Linux)
-bash run.sh <data_source>          # or: bash run.sh <data_source>
+# 4. Run the ETL once
+bash bin/run.sh <data_source>          # Linux
+bin\run.bat <data_source>              # Windows
 
-# 5. Run the ETL (Windows)
-run.bat <data_source>
-
-# 6. OR run the always-on control plane + operator console (serves every pipeline under config/)
-bash serve.sh                                             # Linux/Mac → http://localhost:8080/
-serve.bat                                                 # Windows
+# 5. OR run the always-on control plane + operator console
+bash bin/serve.sh                      # Linux/Mac → http://localhost:8080/
+bin\serve.bat                          # Windows
 # Auth is an edition feature: Basic serves unauthenticated, Standard/Advanced take AUTH_OIDC_*.
 ```
 
 ### Containerized deployment (PKG-3, shipped 2026-08-28)
 
-The bundle carries a `Dockerfile` + `.dockerignore` (emitted by `package.ps1` step 6b-2, like the
-launcher scripts). It wraps `serve.sh` over **existing seams only** — no configuration surface of its
+The bundle carries `deploy/Dockerfile` + `deploy/Dockerfile.dockerignore` (emitted by `package.ps1` step 6b-2, like the
+launcher scripts). It wraps `bin/serve.sh` over **existing seams only** — no configuration surface of its
 own: every serve.sh env var passes straight through `docker run -e` (PORT / SPACES_ROOT /
-CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS …).
+CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS …). The build context is the bundle ROOT; the Dockerfile is named with `-f`,
+and BuildKit (the default builder) reads `deploy/Dockerfile.dockerignore` as that build's ignore file.
 
 ```bash
 unzip inspecto-deploy-linux_amd64.zip && cd inspecto-deploy
-docker build -t inspecto .
+docker build -f deploy/Dockerfile -t inspecto .
 docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
@@ -1132,8 +1143,8 @@ the spaces root and the auth wiring cannot be clobbered from the environment. Th
 echoes whatever was passed, so a flag that did not land is visible rather than silent.
 
 ```bash
-INSPECTO_JAVA_OPTS="-Xmx4g" bash serve.sh                                       # bigger heap for the server
-INSPECTO_JAVA_OPTS="-Xmx8g" bash run.sh <data_source>                           # bigger heap for one run
+INSPECTO_JAVA_OPTS="-Xmx4g" bash bin/serve.sh                                   # bigger heap for the server
+INSPECTO_JAVA_OPTS="-Xmx8g" bash bin/run.sh <data_source>                        # bigger heap for one run
 ```
 
 ⛔ **Do not use `JAVA_OPTS`.** The scripts *assign* that name, so an exported `JAVA_OPTS` is silently

@@ -73,12 +73,12 @@ const RED = {
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'a staging step under a NEGATED gate': [
-        edit('inspecto/package.ps1', 'Copy-Item $jarSrc "$bundleDir\\inspecto.jar"',
-            'Copy-Item $jarSrc "$bundleDir\\inspecto.jar"\nif (-not $DemoAuth) { Copy-Item $x "$bundleDir\\inspecto-demo-auth.jar" }'),
+        edit('inspecto/package.ps1', 'Copy-Item $jarSrc "$libDir\\inspecto.jar"',
+            'Copy-Item $jarSrc "$libDir\\inspecto.jar"\nif (-not $DemoAuth) { Copy-Item $x "$libDir\\inspecto-demo-auth.jar" }'),
         /outside an `if \(\$DemoAuth\)` block/,
     ],
     'the demo branch no longer removing inspecto-oidc.jar': [
-        edit('inspecto/package.ps1', "Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar')", "Write-Host 'kept'"),
+        edit('inspecto/package.ps1', "Remove-Item (Join-Path $libDir 'inspecto-oidc.jar')", "Write-Host 'kept'"),
         /removes inspecto-oidc.jar/,
     ],
     'inspecto-oidc.jar on the demo launcher classpath': [

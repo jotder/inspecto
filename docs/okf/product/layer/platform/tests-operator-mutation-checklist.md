@@ -20,7 +20,7 @@ guard inventories approved in 2026-10.
    Read **`Tests run:`**: `0` tests means the filter matched nothing (a false green), not a pass.
 5. **Red for the RIGHT reason.** Read the failure text against the "Expect" column. A compile error or a different
    test failing is not the proof. In a fresh worktree copy the DuckDB extensions from the main checkout
-   (`inspecto-deploy/duckdb-extensions/windows_amd64/`, gitignored) before a Maven run.
+   (`inspecto-deploy/lib/duckdb/windows_amd64/`, gitignored) before a Maven run.
 6. Tick the box only when the expected test failed AND the revert left the tree clean.
 
 Line numbers are as of `origin/master` `22ccbe952` and drift: locate by the quoted text. Module paths in `-pl`:

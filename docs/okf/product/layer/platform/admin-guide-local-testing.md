@@ -140,7 +140,7 @@ pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth
 - adds the demo jar and flags to its boot smoke.
 
 Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo\spaces\`, seed its
-inbox if needed (below), run `serve-demo.bat` (or `./serve-demo.sh`), open `http://127.0.0.1:8080`
+inbox if needed (below), run `bin\serve-demo.bat` (or `./bin/serve-demo.sh`), open `http://127.0.0.1:8080`
 and pick a Demo User.
 
 > ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Advanced -DemoAuth`
@@ -210,7 +210,7 @@ $env:AUTH_OIDC_JWKS_URI = "https://localhost:9443/oauth2/jwks"
 $env:AUTH_OIDC_AUDIENCE = "inspecto_spa_client"          # WSO2: the CLIENT ID, not a separate API identifier
 $env:AUTH_OIDC_CLIENT_ID = "inspecto_spa_client"
 $env:INSPECTO_JAVA_OPTS = "-Dauth.oidc.tokenEndpoint=https://localhost:9443/oauth2/token -Dauth.oidc.rolesClaim=groups"
-.\serve.bat
+.\bin\serve.bat
 ```
 
 WSO2-specific gotchas (proven against a real instance, `docs/api/deployment/README.md`):

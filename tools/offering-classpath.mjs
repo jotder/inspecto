@@ -10,8 +10,8 @@
 //   node tools/offering-classpath.mjs --edition standard [--demo] --print          modules.list to stdout
 //   node tools/offering-classpath.mjs --edition standard --list-mvn                the `-pl` string for package.ps1
 //   node tools/offering-classpath.mjs --list-core                                      the core thin jars (artifactId<TAB>dir) package.ps1 stages
-//   node tools/offering-classpath.mjs --edition standard [--demo] --bundle <dir>   write modules.list +
-//                                                                                      edition.properties into <dir>
+//   node tools/offering-classpath.mjs --edition standard [--demo] --bundle <dir>   write modules.list + core.list +
+//                                                                                      edition.properties into <dir>/lib
 //                                                                                      after verifying the staged jars
 //
 // RESOLUTION. offerings/<edition>.toon (includes, transitively, + `modules`) -> the `requires.modules` closure over the module
@@ -32,10 +32,15 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITIONS, PG_SIDECAR, DEMO_JAR, DEMO_REPLACES, bundleModules, editionOnlyModules, coreModules, needsPostgresDriver } from './bundle-modules.mjs';
+import { EDITIONS, LIB_DIR, PG_SIDECAR, DEMO_JAR, DEMO_REPLACES, bundleModules, editionOnlyModules, coreModules, needsPostgresDriver } from './bundle-modules.mjs';
 import { gather, idOf } from './check-offerings.mjs';
 
-/** The marker file name and the list file name the launchers read (inspecto/package.ps1 here-strings). */
+/**
+ * The marker file name and the list file name the launchers read (inspecto/package.ps1 here-strings). BUNDLE-LAYOUT-1: all three live
+ * in `<bundle>/lib/` beside the jars, and each list names its jars as bundle-ROOT-relative `lib/<jar>` paths (listEntries) - the one seam
+ * between the layout and the classpath: a launcher cd's to the bundle root and puts the list on -cp as it stands.
+ */
+export { LIB_DIR };
 export const MODULES_LIST = 'modules.list';
 export const EDITION_FILE = 'edition.properties';
 /** P3d stage 2: the product jar + the core thin jars ONLY (no optional module, no sidecar) - for the one-shot tools (ura.*, the examples), which never carried the optional modules. */
@@ -140,19 +145,23 @@ export const coreClasspath = () => ['inspecto.jar', ...coreModules().map((m) => 
  * it leaves the list when package.ps1 did not stage it; a bundle that needs it keeps it, and verifyBundle then names the missing jar.
  */
 export function stagedClasspath(jars, dir, needsPg) {
-    return needsPg || existsSync(join(dir, PG_SIDECAR)) ? jars : jars.filter((j) => j !== PG_SIDECAR);
+    return needsPg || existsSync(join(dir, LIB_DIR, PG_SIDECAR)) ? jars : jars.filter((j) => j !== PG_SIDECAR);
 }
 
-/** modules.list text: one jar per line, LF. */
+/** jar file names -> the entries a list file carries: bundle-root-relative `lib/<jar>` (always `/`, which java -cp accepts on Windows too). */
+export const listEntries = (jars) => jars.map((j) => `${LIB_DIR}/${j}`);
+/** modules.list text: one jar per line, LF. Pass listEntries(jars) for a bundle's file. */
 export const renderList = (jars) => jars.join('\n') + '\n';
 /** edition.properties text. */
 export const renderEdition = (edition, demo = false) => `edition=${normalizeEdition(edition)}\n` + (demo ? 'variant=demo\n' : '');
 
-/** Problems between a staged bundle directory and the list: a listed jar missing, or a staged jar the list omits. */
+/** Problems between a staged bundle (its ROOT) and the list: a listed jar missing from lib/, or a jar in lib/ the list omits. A jar left at the root is refused too. */
 export function verifyBundle(jars, dir) {
     const problems = [];
-    for (const j of jars) if (!existsSync(join(dir, j))) problems.push(`${j} is on the classpath list but not staged in ${dir}`);
-    for (const f of readdirSync(dir).filter((n) => n.endsWith('.jar'))) if (!jars.includes(f)) problems.push(`${f} is staged in ${dir} but not on the classpath list`);
+    const lib = join(dir, LIB_DIR);
+    for (const j of jars) if (!existsSync(join(lib, j))) problems.push(`${j} is on the classpath list but not staged in ${lib}`);
+    for (const f of existsSync(lib) ? readdirSync(lib).filter((n) => n.endsWith('.jar')) : []) if (!jars.includes(f)) problems.push(`${f} is staged in ${lib} but not on the classpath list`);
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.jar'))) problems.push(`${f} is staged at the bundle root ${dir} - every jar belongs in ${LIB_DIR}/`);
     return problems;
 }
 
@@ -173,10 +182,11 @@ function main() {
             jars = stagedClasspath(jars, bundle, needsPostgresDriver(normalizeEdition(edition), { demo }));
             const problems = verifyBundle(jars, bundle);
             if (problems.length) throw new Error(`the staged bundle and the Offering classpath disagree:\n  ${problems.join('\n  ')}`);
-            writeFileSync(join(bundle, MODULES_LIST), renderList(jars));
-            writeFileSync(join(bundle, EDITION_FILE), renderEdition(edition, demo));
-            writeFileSync(join(bundle, CORE_LIST), renderList(coreClasspath()));
-            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} + ${CORE_LIST} in ${bundle}`);
+            const lib = join(bundle, LIB_DIR);
+            writeFileSync(join(lib, MODULES_LIST), renderList(listEntries(jars)));
+            writeFileSync(join(lib, EDITION_FILE), renderEdition(edition, demo));
+            writeFileSync(join(lib, CORE_LIST), renderList(listEntries(coreClasspath())));
+            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} + ${CORE_LIST} in ${lib}`);
         } else process.stdout.write(renderList(jars));
     } catch (e) {
         console.error(`offering-classpath: ${e.message}`);

@@ -43,7 +43,7 @@
 #   with the windows_amd64 extension set — a Linux JVM that could load none of its DuckDB extensions.
 #   (all in the sandbox root, alongside inbox/ and database/)
 #
-# Both bundles also carry duckdb-extensions/{windows_amd64,linux_amd64}/{excel,ducklake,postgres_scanner}.duckdb_extension
+# Both bundles also carry lib/duckdb/{windows_amd64,linux_amd64}/{excel,ducklake,postgres_scanner}.duckdb_extension
 # when a local DuckDB extension cache is found — none is statically linked into duckdb_jdbc, so an
 # air-gapped deployment needs the files shipped (multiformat X1 for `excel`/frontend: xlsx;
 # AIRGAP-EXTENSIONS-1 for `ducklake`/output.ducklake.enabled). See DuckDbExtension.tryLoad and
@@ -55,10 +55,10 @@
 # The zip is a self-contained deployment unit.  On the target server:
 #   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
 #   2. Create your inbox directories under inspecto-deploy/inbox/<adapter>/
-#   3. Use the bundled run.sh / run.bat (RUNSH-CP-1): they cd to the bundle root and launch with
-#      -cp <modules.list>, NEVER java -jar (which ignores -cp and CLASSPATH outright,
+#   3. Use the bundled bin/run.sh / bin\run.bat (RUNSH-CP-1): they cd to the bundle root (the parent of bin/) and launch
+#      with -cp <lib/modules.list>, NEVER java -jar (which ignores -cp and CLASSPATH outright,
 #      making every sidecar unreachable) — see the run.sh / run.bat here-strings in step 5.
-#      (or use the bundled run.bat / run.sh — they cd to the bundle root automatically)
+#   Layout of the unzipped bundle (BUNDLE-LAYOUT-1): README.md + bin/ lib/ deploy/ logs/ runtime/ ui/ spaces/ docs/ sbom/ licenses/.
 #
 param(
     [switch]$NoBuild,   # skip mvn build; use existing JAR in target/
@@ -148,7 +148,7 @@ param(
     #
     # ⛔ Why this is a switch and not the default: a developer with no cache must still be able to build,
     # which is exactly why the warning exists. But a RELEASE that quietly ships an empty
-    # duckdb-extensions/ is the defect this flag was filed for — measured 2026-09-14, EVERY released
+    # lib/duckdb/ (was duckdb-extensions/) is the defect this flag was filed for — measured 2026-09-14, EVERY released
     # bundle had shipped that way on every platform, because CI populated no cache and nothing failed.
     # release.yml passes this for the same reason it passes -Sign: the release path is stricter than the
     # desk path, and the difference is stated rather than assumed.
@@ -643,12 +643,28 @@ if (Test-Path $bundleDir) {
 } else {
     $null = New-Item -ItemType Directory $bundleDir
 }
+# BUNDLE-LAYOUT-1 (operator 2026-11-06): the bundle root holds README.md and FOLDERS only:
+#   bin/     the launchers and service installers - each cd's to the bundle ROOT (the parent of bin/) before starting Java,
+#            because the server resolves docs/api/, spaces/, ui/ and logs/ relative to its working directory
+#   lib/     every jar, modules.list / core.list / edition.properties, and duckdb/<platform>/*.duckdb_extension
+#   deploy/  Dockerfile (+ Dockerfile.dockerignore) and the systemd unit
+#   logs/    where the launchers' captured output goes (the service wrappers); shipped empty with a .keep
+#   runtime/ ui/ spaces/ docs/ sbom/ licenses/
+# modules.list / core.list name every jar as a ROOT-relative `lib/<jar>` path (tools/offering-classpath.mjs writes them), so a
+# launcher that has cd'ed to the root puts the list on -cp as it stands - the one seam between the layout and the classpath.
+$binDir    = Join-Path $bundleDir 'bin'
+$libDir    = Join-Path $bundleDir 'lib'
+$deployDir = Join-Path $bundleDir 'deploy'
+$logsDir   = Join-Path $bundleDir 'logs'
+foreach ($d in $binDir, $libDir, $deployDir, $logsDir) { $null = New-Item -ItemType Directory $d -Force }
+# A zip drops an empty folder (Compress-Archive keeps no directory entries for it), so logs/ carries a placeholder.
+Set-Content -Path (Join-Path $logsDir '.keep') -Value "Inspecto writes captured launcher output here (bin/install-service.ps1 -> logs/service.log).`n" -NoNewline
 
 # The per-space layout (config + runtime dirs) is bundled from the repo's spaces/ tree in step 4;
 # runtime dirs (data/audit/duckdb/flows) are created on first run, so nothing to pre-create here.
 
 # ── step 3: copy JAR (canonical name for deployment) ──────────────────────────
-Copy-Item $jarSrc "$bundleDir\inspecto.jar"
+Copy-Item $jarSrc "$libDir\inspecto.jar"
 
 # ── step 3-core: the first-party CORE libraries as THIN jars (MODULE-REORG-P3d stage 2, 2026-10-08) ───────────
 # inspecto.jar is no longer one fat jar of everything: inspecto/pom.xml's shade now carries only the processor's own classes plus
@@ -669,8 +685,8 @@ foreach ($coreLine in $coreLines) {
     $coreSrc = Get-ChildItem -Path $coreTarget -Filter "$coreId-*.jar" -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match ('^' + [regex]::Escape($coreId) + '-\d+\.\d+\.\d+(-SNAPSHOT)?\.jar$') } | Select-Object -First 1
     if (-not $coreSrc) { throw "core thin jar $coreId not found under $coreTarget (looked for $coreId-<version>.jar). Run without -NoBuild." }
-    Copy-Item $coreSrc.FullName "$bundleDir\$coreId.jar"
-    $coreZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\$coreId.jar")
+    Copy-Item $coreSrc.FullName "$libDir\$coreId.jar"
+    $coreZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\$coreId.jar")
     try {
         $entries = @($coreZip.Entries | ForEach-Object { $_.FullName })
         $leaked = @($entries | Where-Object { $e = $_; $thirdPartyPrefixes | Where-Object { $e.StartsWith($_) } } | Select-Object -First 3)
@@ -686,7 +702,7 @@ foreach ($coreLine in $coreLines) {
         foreach ($e in $entries) { if ($e.EndsWith('.class') -and -not $e.StartsWith('META-INF/')) { $coreClasses[$e] = $coreId } }
     } finally { $coreZip.Dispose() }
 }
-$procZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto.jar")
+$procZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto.jar")
 try {
     $dup = @($procZip.Entries | Where-Object { $coreClasses.ContainsKey($_.FullName) } | Select-Object -First 3 | ForEach-Object { "$($_.FullName) (also in $($coreClasses[$_.FullName]).jar)" })
     if ($dup.Count) { throw "inspecto.jar still carries first-party library classes that have their own thin jar: $($dup -join '; ') - the shade artifactSet in inspecto/pom.xml no longer excludes them." }
@@ -700,14 +716,14 @@ try {
 } finally { $procZip.Dispose() }
 Write-Host "Bundled $($coreLines.Count) core thin jars (no third-party classes, own module.toon, own services; none of their classes inside inspecto.jar)" -ForegroundColor Green
 if ($oidcJarSrc) {
-    Copy-Item $oidcJarSrc "$bundleDir\inspecto-oidc.jar"
+    Copy-Item $oidcJarSrc "$libDir\inspecto-oidc.jar"
     Write-Host "Bundled Standard-edition OIDC authenticator module → inspecto-oidc.jar" -ForegroundColor Green
 
     # Verify the STAGED artifact, the same way the connector sidecar is verified. This is the check that
     # would have caught SEC-SIDECAR-BOOT-1: the module's own tests pass with Nimbus on the compile
     # classpath, and the core-side auth tests inject a lambda, so nothing else can see the thin jar.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $secZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-oidc.jar")
+    $secZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-oidc.jar")
     try {
         if (-not ($secZip.Entries | Where-Object { $_.FullName -like 'com/nimbusds/*' })) {
             throw "inspecto-oidc.jar carries no com/nimbusds classes - OidcAuthenticator would throw NoClassDefFoundError while ControlApi resolves the Authenticator SPI, and the bundle would not boot."
@@ -721,10 +737,10 @@ if ($oidcJarSrc) {
     } finally { $secZip.Dispose() }
 }
 if ($secretsJarSrc) {
-    Copy-Item $secretsJarSrc "$bundleDir\inspecto-secrets.jar"
+    Copy-Item $secretsJarSrc "$libDir\inspecto-secrets.jar"
     Write-Host "Bundled Standard-edition secrets provider → inspecto-secrets.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $secretsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-secrets.jar")
+    $secretsZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-secrets.jar")
     try {
         if (-not ($secretsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.auth.secrets.SecretsProvider' })) {
             throw "inspecto-secrets.jar has no META-INF/services/com.gamma.auth.secrets.SecretsProvider - the file-keystore secrets provider would never be discovered."
@@ -732,10 +748,10 @@ if ($secretsJarSrc) {
     } finally { $secretsZip.Dispose() }
 }
 if ($geoCountryJarSrc) {
-    Copy-Item $geoCountryJarSrc "$bundleDir\inspecto-geo-country.jar"
+    Copy-Item $geoCountryJarSrc "$libDir\inspecto-geo-country.jar"
     Write-Host "Bundled Standard-edition geo-country resolver → inspecto-geo-country.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $geoZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-geo-country.jar")
+    $geoZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-geo-country.jar")
     try {
         if (-not ($geoZip.Entries | Where-Object { $_.FullName -like 'com/maxmind/*' })) {
             throw "inspecto-geo-country.jar carries no com/maxmind classes - MaxMindGeoCountryResolver would throw NoClassDefFoundError when the core resolves the GeoCountryResolver SPI."
@@ -746,10 +762,10 @@ if ($geoCountryJarSrc) {
     } finally { $geoZip.Dispose() }
 }
 if ($kafkaJarSrc) {
-    Copy-Item $kafkaJarSrc "$bundleDir\inspecto-connectors-kafka.jar"
+    Copy-Item $kafkaJarSrc "$libDir\inspecto-connectors-kafka.jar"
     Write-Host "Bundled Standard-edition Kafka stream connector -> inspecto-connectors-kafka.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $kafkaZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-connectors-kafka.jar")
+    $kafkaZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-connectors-kafka.jar")
     try {
         if (-not ($kafkaZip.Entries | Where-Object { $_.FullName -like 'org/apache/kafka/*' })) {
             throw "inspecto-connectors-kafka.jar carries no org/apache/kafka classes - it is a THIN jar; KafkaConnector would fail with NoClassDefFoundError at run time."
@@ -767,10 +783,10 @@ if ($kafkaJarSrc) {
     } finally { $kafkaZip.Dispose() }
 }
 if ($asn1JarSrc) {
-    Copy-Item $asn1JarSrc "$bundleDir\inspecto-telecom-asn1.jar"
+    Copy-Item $asn1JarSrc "$libDir\inspecto-telecom-asn1.jar"
     Write-Host "Bundled Standard-edition Telecom ASN.1 decoder -> inspecto-telecom-asn1.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $asn1Zip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-telecom-asn1.jar")
+    $asn1Zip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-telecom-asn1.jar")
     try {
         if (-not ($asn1Zip.Entries | Where-Object { $_.FullName -like 'com/gamma/asn/facade/*' })) {
             throw "inspecto-telecom-asn1.jar carries no com/gamma/asn/facade classes - it is a THIN jar; Asn1ParserPlugin would fail with NoClassDefFoundError at run time."
@@ -788,7 +804,7 @@ if ($asn1JarSrc) {
     } finally { $asn1Zip.Dispose() }
 }
 if ($channelsJarSrc) {
-    Copy-Item $channelsJarSrc "$bundleDir\inspecto-notify-channels.jar"
+    Copy-Item $channelsJarSrc "$libDir\inspecto-notify-channels.jar"
     Write-Host "Bundled Standard-edition delivery channels -> inspecto-notify-channels.jar" -ForegroundColor Green
 
     # Verify the STAGED artifact, exactly as the security and connector sidecars are. Both halves matter:
@@ -796,7 +812,7 @@ if ($channelsJarSrc) {
     # enumerates channels, and a dropped ServicesResourceTransformer means the jar ships but registers
     # NOTHING - which looks identical to Basic, i.e. the bug this module exists to fix.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $chZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-notify-channels.jar")
+    $chZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-notify-channels.jar")
     try {
         if (-not ($chZip.Entries | Where-Object { $_.FullName -like 'javax/mail/*' })) {
             throw "inspecto-notify-channels.jar carries no javax/mail classes - SmtpEmailChannel would throw NoClassDefFoundError as soon as NotificationService enumerates channels."
@@ -822,12 +838,12 @@ if ($channelsJarSrc) {
     } finally { $chZip.Dispose() }
 }
 if ($backupJarSrc) {
-    Copy-Item $backupJarSrc "$bundleDir\inspecto-backup.jar"
+    Copy-Item $backupJarSrc "$libDir\inspecto-backup.jar"
     Write-Host "Bundled Standard-edition backup module -> inspecto-backup.jar" -ForegroundColor Green
     # A thin jar cannot lose classes to a shade, so the only way it ships INERT is a missing
     # META-INF/services entry - and inert here looks exactly like Basic, i.e. the bug this fixes.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $bkZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-backup.jar")
+    $bkZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-backup.jar")
     try {
         $spiEntry = $bkZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.job.MaintenanceTaskProvider' }
         if (-not $spiEntry) {
@@ -841,12 +857,12 @@ if ($backupJarSrc) {
         Write-Host "  verified: MaintenanceTaskProvider registration present in the backup module" -ForegroundColor DarkGray
     } finally { $bkZip.Dispose() }
 }
-Copy-Item $entityListJarSrc "$bundleDir\inspecto-entity-list.jar"
+Copy-Item $entityListJarSrc "$libDir\inspecto-entity-list.jar"
 Write-Host "Bundled Entity List module -> inspecto-entity-list.jar" -ForegroundColor Green
 # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the six /entity-lists paths would 503
 # on a bundle supposed to have them, and the risk-score WatchListFeed would never be installed.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$elZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-entity-list.jar")
+$elZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-entity-list.jar")
 try {
     $spiEntry = $elZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
     if (-not $spiEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.spi.http.RouteModule - EntityListRoutes would never be discovered." }
@@ -857,16 +873,16 @@ try {
     if (-not $feedEntry) { throw "inspecto-entity-list.jar has no META-INF/services/com.gamma.entitylist.WatchListFeed - watch lists would never feed the risk score." }
     Write-Host "  verified: RouteModule and WatchListFeed registrations present in the Entity List module" -ForegroundColor DarkGray
 } finally { $elZip.Dispose() }
-Copy-Item $laStorageJarSrc "$bundleDir\inspecto-la-storage.jar"
+Copy-Item $laStorageJarSrc "$libDir\inspecto-la-storage.jar"
 Write-Host "Bundled Link Analysis index store -> inspecto-la-storage.jar" -ForegroundColor Green
-Copy-Item $laCoreJarSrc "$bundleDir\inspecto-la-core.jar"
+Copy-Item $laCoreJarSrc "$libDir\inspecto-la-core.jar"
 Write-Host "Bundled Link Analysis core module -> inspecto-la-core.jar" -ForegroundColor Green
-Copy-Item $laApiJarSrc "$bundleDir\inspecto-la-api.jar"
+Copy-Item $laApiJarSrc "$libDir\inspecto-la-api.jar"
 Write-Host "Bundled Link Analysis routes module -> inspecto-la-api.jar" -ForegroundColor Green
 # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the Link Analysis paths would 503 on a
 # bundle supposed to have them.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$laZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-la-api.jar")
+$laZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-la-api.jar")
 try {
     $spiEntry = $laZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
     if (-not $spiEntry) { throw "inspecto-la-api.jar has no META-INF/services/com.gamma.spi.http.RouteModule - GeoRoutes/InvRoutes would never be discovered." }
@@ -877,13 +893,13 @@ try {
     }
     Write-Host "  verified: both RouteModule registrations present in the Link Analysis routes module" -ForegroundColor DarkGray
 } finally { $laZip.Dispose() }
-Copy-Item $geoLinkJarSrc "$bundleDir\inspecto-geo-link.jar"
+Copy-Item $geoLinkJarSrc "$libDir\inspecto-geo-link.jar"
 Write-Host "Bundled Link Analysis bridge -> inspecto-geo-link.jar" -ForegroundColor Green
 # The bridge implements the two Link Analysis ports. A thin jar cannot lose classes to a shade, so the only way it
 # ships INERT is a missing or incomplete META-INF/services entry - and inert here means every Dataset-reading
 # Link Analysis route answers 503 "no Dataset provider" on a bundle supposed to have them.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$glZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-geo-link.jar")
+$glZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-geo-link.jar")
 try {
     foreach ($svc in @(
             @('com.gamma.spi.http.RouteModule', 'com.gamma.geolink.InvestigationMeasureRoutes'),
@@ -899,10 +915,10 @@ try {
     Write-Host "  verified: RouteModule, DatasetProvider, CasePort and InvestigationMeasureProbe registrations present in the bridge" -ForegroundColor DarkGray
 } finally { $glZip.Dispose() }
 if ($exchangeJarSrc) {
-    Copy-Item $exchangeJarSrc "$bundleDir\inspecto-exchange.jar"
+    Copy-Item $exchangeJarSrc "$libDir\inspecto-exchange.jar"
     Write-Host "Bundled Standard-edition exchange module -> inspecto-exchange.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $exZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-exchange.jar")
+    $exZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-exchange.jar")
     try {
         $spiEntry = $exZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
         if (-not $spiEntry) { throw "inspecto-exchange.jar has no META-INF/services/com.gamma.spi.http.RouteModule - ExchangeRoutes would never be discovered and the shared-ref resolver would never install." }
@@ -913,10 +929,10 @@ if ($exchangeJarSrc) {
     } finally { $exZip.Dispose() }
 }
 if ($obsJarSrc) {
-    Copy-Item $obsJarSrc "$bundleDir\inspecto-observability.jar"
+    Copy-Item $obsJarSrc "$libDir\inspecto-observability.jar"
     Write-Host "Bundled Standard-edition observability module -> inspecto-observability.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $obsZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-observability.jar")
+    $obsZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-observability.jar")
     try {
         $spiEntry = $obsZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
         if (-not $spiEntry) { throw "inspecto-observability.jar has no META-INF/services/com.gamma.spi.http.RouteModule - GET /metrics and every /events* path would 503 on a bundle supposed to serve them." }
@@ -924,10 +940,10 @@ if ($obsJarSrc) {
     } finally { $obsZip.Dispose() }
 }
 if ($opsJarSrc) {
-    Copy-Item $opsJarSrc "$bundleDir\inspecto-ops.jar"
+    Copy-Item $opsJarSrc "$libDir\inspecto-ops.jar"
     Write-Host "Bundled Standard-edition operational-objects module -> inspecto-ops.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $opZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-ops.jar")
+    $opZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-ops.jar")
     try {
         # TWO seams must be declared, not one: the routes AND the engine provider core resolves
         # ObjectAccess through. A jar with routes but no provider would 503 every path while claiming
@@ -940,12 +956,12 @@ if ($opsJarSrc) {
     } finally { $opZip.Dispose() }
 }
 if ($reconJarSrc) {
-    Copy-Item $reconJarSrc "$bundleDir\inspecto-reconciliation.jar"
+    Copy-Item $reconJarSrc "$libDir\inspecto-reconciliation.jar"
     Write-Host "Bundled Reconciliation module -> inspecto-reconciliation.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the /recon paths would 503 and recon.run
     # would be an unknown Job Type on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $rcZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-reconciliation.jar")
+    $rcZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-reconciliation.jar")
     try {
         foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.recon.ReconRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.recon.ReconRunJobType'), @('com.gamma.spi.http.ComponentDeleteHook', 'com.gamma.recon.ReconComponentDeleteHook'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.recon.ReconKindValidator'))) {
             $rcEntry = $rcZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
@@ -958,12 +974,12 @@ if ($reconJarSrc) {
     } finally { $rcZip.Dispose() }
 }
 if ($scoringJarSrc) {
-    Copy-Item $scoringJarSrc "$bundleDir\inspecto-scoring.jar"
+    Copy-Item $scoringJarSrc "$libDir\inspecto-scoring.jar"
     Write-Host "Bundled Scoring module -> inspecto-scoring.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the /risk-scores paths would 503, risk.score
     # would be an unknown Job Type and a risk-score component would be saved unvalidated on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $scZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-scoring.jar")
+    $scZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-scoring.jar")
     try {
         foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.risk.RiskScoreRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.risk.RiskScoreJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.risk.RiskScoreKindValidator'))) {
             $scEntry = $scZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
@@ -976,12 +992,12 @@ if ($scoringJarSrc) {
     } finally { $scZip.Dispose() }
 }
 if ($screeningJarSrc) {
-    Copy-Item $screeningJarSrc "$bundleDir\inspecto-screening.jar"
+    Copy-Item $screeningJarSrc "$libDir\inspecto-screening.jar"
     Write-Host "Bundled Screening module -> inspecto-screening.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /screening* would 503 and screening.run
     # would be an unknown Job Type on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $srZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-screening.jar")
+    $srZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-screening.jar")
     try {
         foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.screening.ScreeningRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.screening.ScreeningJobType'))) {
             $srEntry = $srZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
@@ -994,11 +1010,11 @@ if ($screeningJarSrc) {
     } finally { $srZip.Dispose() }
 }
 if ($anomalyJarSrc) {
-    Copy-Item $anomalyJarSrc "$bundleDir\inspecto-anomaly.jar"
+    Copy-Item $anomalyJarSrc "$libDir\inspecto-anomaly.jar"
     Write-Host "Bundled Anomaly Detection module -> inspecto-anomaly.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - anomaly.score would be an unknown Job Type.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $adZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-anomaly.jar")
+    $adZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-anomaly.jar")
     try {
         foreach ($svc in @(@('com.gamma.job.JobTypeProvider', 'com.gamma.anomaly.AnomalyScoreJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.anomaly.AnomalyKindValidator'))) {
             $adEntry = $adZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
@@ -1011,11 +1027,11 @@ if ($anomalyJarSrc) {
     } finally { $adZip.Dispose() }
 }
 if ($predictiveJarSrc) {
-    Copy-Item $predictiveJarSrc "$bundleDir\inspecto-predictive.jar"
+    Copy-Item $predictiveJarSrc "$libDir\inspecto-predictive.jar"
     Write-Host "Bundled Predictive Analytics module -> inspecto-predictive.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - predict.segment / predict.churn / predict.forecast would be an unknown Job Type.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $paZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-predictive.jar")
+    $paZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-predictive.jar")
     try {
         foreach ($svc in @(@('com.gamma.job.JobTypeProvider', 'com.gamma.predictive.SegmentJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.predictive.SegmentationKindValidator'), @('com.gamma.job.JobTypeProvider', 'com.gamma.predictive.ChurnJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.predictive.ChurnKindValidator'), @('com.gamma.job.JobTypeProvider', 'com.gamma.predictive.ForecastJobType'), @('com.gamma.spi.http.ComponentKindValidator', 'com.gamma.predictive.ForecastKindValidator'))) {
             $paEntry = $paZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
@@ -1028,12 +1044,12 @@ if ($predictiveJarSrc) {
     } finally { $paZip.Dispose() }
 }
 if ($caseMgmtJarSrc) {
-    Copy-Item $caseMgmtJarSrc "$bundleDir\inspecto-case-management.jar"
+    Copy-Item $caseMgmtJarSrc "$libDir\inspecto-case-management.jar"
     Write-Host "Bundled Case Management module -> inspecto-case-management.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - the Case routes would 503, caserule.evaluate
     # would be an unknown Job Type and *_caserule.toon would never load on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $cmZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-case-management.jar")
+    $cmZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-case-management.jar")
     try {
         foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.ops.cases.CaseRoutes'), @('com.gamma.job.JobTypeProvider', 'com.gamma.ops.cases.CaseRuleEvaluate'), @('com.gamma.ops.ObjectEngineExtension', 'com.gamma.ops.cases.CaseConfigExtension'))) {
             $cmEntry = $cmZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
@@ -1046,11 +1062,11 @@ if ($caseMgmtJarSrc) {
     } finally { $cmZip.Dispose() }
 }
 if ($actionReqJarSrc) {
-    Copy-Item $actionReqJarSrc "$bundleDir\inspecto-action-requests.jar"
+    Copy-Item $actionReqJarSrc "$libDir\inspecto-action-requests.jar"
     Write-Host "Bundled Action Requests module -> inspecto-action-requests.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /action-requests* would 503 and invoke-api would be unavailable on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $arZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-action-requests.jar")
+    $arZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-action-requests.jar")
     try {
         foreach ($svc in @(@('com.gamma.spi.http.RouteModule', 'com.gamma.actionrequests.ActionRequestRoutes'), @('com.gamma.decision.ConsequenceProvider', 'com.gamma.actionrequests.InvokeApiConsequence')))
         {
@@ -1064,11 +1080,11 @@ if ($actionReqJarSrc) {
     } finally { $arZip.Dispose() }
 }
 if ($regReportJarSrc) {
-    Copy-Item $regReportJarSrc "$bundleDir\inspecto-regulatory-reporting.jar"
+    Copy-Item $regReportJarSrc "$libDir\inspecto-regulatory-reporting.jar"
     Write-Host "Bundled Regulatory Reporting module -> inspecto-regulatory-reporting.jar" -ForegroundColor Green
     # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /regulatory-reports* would 503 on a bundle supposed to have them.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $rrZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-regulatory-reporting.jar")
+    $rrZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-regulatory-reporting.jar")
     try {
         $rrEntry = $rrZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
         if (-not $rrEntry) { throw "inspecto-regulatory-reporting.jar has no META-INF/services/com.gamma.spi.http.RouteModule - RegulatoryReportRoutes would never be discovered." }
@@ -1079,12 +1095,12 @@ if ($regReportJarSrc) {
     } finally { $rrZip.Dispose() }
 }
 if ($agentJarSrc) {
-    Copy-Item $agentJarSrc "$bundleDir\inspecto-agent.jar"
+    Copy-Item $agentJarSrc "$libDir\inspecto-agent.jar"
     Write-Host "Bundled Standard-edition assist agent -> inspecto-agent.jar" -ForegroundColor Green
 
     # Verify the sidecar is USABLE, not merely present - the lesson CONNECTORS-BUNDLE-1 taught (a
     # module's own tests can never fail for a packaging gap). This runs on the STAGED ARTIFACT.
-    $agentZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-agent.jar")
+    $agentZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-agent.jar")
     try {
         $assistSpi = $agentZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.assist.spi.AssistAgent' }
         if (-not $assistSpi) { throw "inspecto-agent.jar has no META-INF/services/com.gamma.assist.spi.AssistAgent - the shade lost the ServicesResourceTransformer, so CollectorService.start() would discover nothing and every assist path would 503." }
@@ -1103,24 +1119,24 @@ if ($agentJarSrc) {
     } finally { $agentZip.Dispose() }
 }
 if ($policyJarSrc) {
-    Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
+    Copy-Item $policyJarSrc "$libDir\inspecto-policy.jar"
     Write-Host "Bundled Advanced-edition policy module → inspecto-policy.jar" -ForegroundColor Green
 }
 if ($laStorePgJarSrc) {
-    Copy-Item $laStorePgJarSrc "$bundleDir\inspecto-la-store-pg.jar"
+    Copy-Item $laStorePgJarSrc "$libDir\inspecto-la-store-pg.jar"
     Write-Host "Bundled Advanced-edition PostgreSQL Investigation store -> inspecto-la-store-pg.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $laPgZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-la-store-pg.jar")
+    $laPgZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-la-store-pg.jar")
     try {
         if (-not ($laPgZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.la.core.InvestigationStoreProvider' })) { throw "inspecto-la-store-pg.jar has no InvestigationStoreProvider service file - investigations.backend=db would answer 503 on an Advanced bundle." }
     } finally { $laPgZip.Dispose() }
 }
 if ($intelligenceJarSrc) {
-    Copy-Item $intelligenceJarSrc "$bundleDir\inspecto-intelligence.jar"
+    Copy-Item $intelligenceJarSrc "$libDir\inspecto-intelligence.jar"
     Write-Host "Bundled Advanced-edition intelligence agent -> inspecto-intelligence.jar" -ForegroundColor Green
     # Same staged-artifact checks as the assist sidecar: registered, shaded, core-free, one SLF4J binding.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $intelZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-intelligence.jar")
+    $intelZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-intelligence.jar")
     try {
         if (-not ($intelZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.intelligence.spi.IntelligenceAgent' })) { throw "inspecto-intelligence.jar has no IntelligenceAgent service file - every /agent/* path would 503 on an Advanced bundle." }
         if (-not ($intelZip.Entries | Where-Object { $_.FullName.StartsWith('ai/onnxruntime/native/') } | Select-Object -First 1)) { throw "inspecto-intelligence.jar carries no onnxruntime native libraries - it is a THIN jar." }
@@ -1141,7 +1157,7 @@ if ($intelligenceJarSrc) {
 # all three), so the sidecar is NOT edition-gated. It is inert until a pipeline names a non-local
 # `collector.connector`. NOTE it adds ~32 MB, dominated by BouncyCastle (sshj) - kafka-clients left for inspecto-connectors-kafka (Standard+) in P7 - if
 # Basic must stay leaner, gate this copy on $Edition and correct the SP-ACQ rows to match.
-Copy-Item $connectorsJarSrc "$bundleDir\inspecto-connectors.jar"
+Copy-Item $connectorsJarSrc "$libDir\inspecto-connectors.jar"
 Write-Host "Bundled remote connector sidecar -> inspecto-connectors.jar" -ForegroundColor Green
 
 # Verify the sidecar is actually USABLE, not merely present. CONNECTORS-BUNDLE-1 went unnoticed for 85 days
@@ -1150,7 +1166,7 @@ Write-Host "Bundled remote connector sidecar -> inspecto-connectors.jar" -Foregr
 # packaging gap. This check runs on the STAGED ARTIFACT and is the one thing that could have caught it --
 # a thin jar, a shade config that dropped the ServicesResourceTransformer, or a lost dependency all fail here.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$connZip = [System.IO.Compression.ZipFile]::OpenRead("$bundleDir\inspecto-connectors.jar")
+$connZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-connectors.jar")
 try {
     $spi = $connZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.acquire.CollectorConnectorFactory' }
     if (-not $spi) { throw "inspecto-connectors.jar has no CollectorConnectorFactory service file - the shade lost the ServicesResourceTransformer, so no connector would be discovered at run time." }
@@ -1174,7 +1190,7 @@ try {
 # package time. 'dev' (an unstamped local build) is unknown, so a git-less checkout still bundles.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $stamps = @{}
-foreach ($stagedJar in Get-ChildItem -Path $bundleDir -Filter 'inspecto*.jar' -File) {
+foreach ($stagedJar in Get-ChildItem -Path $libDir -Filter 'inspecto*.jar' -File) {
     $z = [System.IO.Compression.ZipFile]::OpenRead($stagedJar.FullName)
     try {
         $mfEntry = $z.GetEntry('META-INF/MANIFEST.MF')
@@ -1200,7 +1216,7 @@ Write-Host "  verified: $($stamps.Count) module jars, build id $(if ($distinct.C
 # stage -> sign -> SBOM/modules.list -> verify -> zip -> zip signature). The demo-auth jar is staged later and signed there.
 if ($SignJars) {
     Write-Host "Signing first-party jars (jarsigner, alias $JarAlias)..." -ForegroundColor Cyan
-    $toSign = @(Get-ChildItem -Path $bundleDir -Filter 'inspecto*.jar' -File)
+    $toSign = @(Get-ChildItem -Path $libDir -Filter 'inspecto*.jar' -File)
     foreach ($j in $toSign) { Invoke-JarSign -Jar $j.FullName }
     Write-Host "  signed + verified: $($toSign.Count) jars" -ForegroundColor DarkGray
 }
@@ -1222,7 +1238,7 @@ if ($Edition -ne 'Basic') {
     $pgNeeded = ((& node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') @pgArgs) -join '').Trim() -eq 'yes'
     $pgJar = ((& node (Join-Path $sandboxRoot 'tools\maven-repo.mjs') --pg-driver $pgVersion) | Select-Object -First 1)
     if (Test-Path -LiteralPath $pgJar) {
-        Copy-Item $pgJar "$bundleDir\postgresql.jar"
+        Copy-Item $pgJar "$libDir\postgresql.jar"
         Write-Host "Bundled PostgreSQL JDBC driver $pgVersion → postgresql.jar" -ForegroundColor Green
     } elseif ($pgNeeded) {
         throw "$Edition bundle carries a PostgreSQL module (inspecto-la-store-pg) but the PostgreSQL driver $pgVersion is not in the local Maven repository ($pgJar). Run a build once (inspecto-connectors depends on it) or fetch it (mvn -o dependency:get -Dartifact=org.postgresql:postgresql:$pgVersion), or point M2_REPO at the repository that holds it, then re-package."
@@ -1259,15 +1275,15 @@ if ($DemoAuth) {
     $demoJar = Get-ChildItem (Join-Path $sandboxRoot 'providers\inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' } | Select-Object -First 1
     if (-not $demoJar) { throw "no inspecto-demo-auth jar under providers\inspecto-demo-auth\target - build it first or drop -NoBuild" }
-    Remove-Item (Join-Path $bundleDir 'inspecto-oidc.jar') -ErrorAction SilentlyContinue
-    Remove-Item (Join-Path $bundleDir 'inspecto-secrets.jar') -ErrorAction SilentlyContinue
-    Remove-Item (Join-Path $bundleDir 'inspecto-geo-country.jar') -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $libDir 'inspecto-oidc.jar') -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $libDir 'inspecto-secrets.jar') -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $libDir 'inspecto-geo-country.jar') -ErrorAction SilentlyContinue
     # P3f: the per-module SBOMs of the removed trio go with them (the combined SBOM keeps describing the Advanced set)
     foreach ($gone in 'inspecto-oidc','inspecto-secrets','inspecto-geo-country') { Remove-Item (Join-Path $bundleDir "sbom\$gone.sbom.cdx.json") -ErrorAction SilentlyContinue }
-    Copy-Item -Path $demoJar.FullName -Destination (Join-Path $bundleDir 'inspecto-demo-auth.jar')
-    if ($SignJars) { Invoke-JarSign -Jar (Join-Path $bundleDir 'inspecto-demo-auth.jar') }
+    Copy-Item -Path $demoJar.FullName -Destination (Join-Path $libDir 'inspecto-demo-auth.jar')
+    if ($SignJars) { Invoke-JarSign -Jar (Join-Path $libDir 'inspecto-demo-auth.jar') }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $bundleDir 'inspecto-demo-auth.jar'))
+    $z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $libDir 'inspecto-demo-auth.jar'))
     try {
         foreach ($svc in 'META-INF/services/com.gamma.spi.auth.Authenticator', 'META-INF/services/com.gamma.spi.auth.TokenRelay') {
             if (-not ($z.Entries | Where-Object { $_.FullName -eq $svc })) { throw "inspecto-demo-auth.jar lacks $svc" }
@@ -1278,7 +1294,7 @@ if ($DemoAuth) {
 
 # P3h: with -SignJars the bundle must END with every first-party jar signed by ONE certificate (the demo jar included).
 if ($SignJars) {
-    & node (Join-Path $sandboxRoot 'tools\check-jar-signatures.mjs') $bundleDir
+    & node (Join-Path $sandboxRoot 'tools\check-jar-signatures.mjs') $libDir
     if ($LASTEXITCODE -ne 0) { throw "per-jar signature verification failed (see above)" }
 }
 
@@ -1357,30 +1373,18 @@ if ($staged.Modified.Count -gt 0) {
     Write-Warning "spaces/: $($staged.Modified.Count) tracked file(s) modified locally — bundled the COMMITTED version: $($staged.Modified -join ', ')"
 }
 
-# ── step 4b: copy runnable examples ───────────────────────────────────────────
-# The examples/ tree is self-contained (each example uses paths relative to its own
-# dir and writes only under its own out/), so no path rewrite is needed — copy as-is,
-# then drop any out/ left over from local test runs. Users run an example with the
-# bundled examples/run-example.(ps1|sh), which resolves the JAR at ../inspecto.jar.
-$examplesSrc = Join-Path $adjParserDir 'examples'
-if (Test-Path $examplesSrc) {
-    $examplesOut = Join-Path $bundleDir 'examples'
-    Copy-Item $examplesSrc $examplesOut -Recurse -Force
-    Get-ChildItem -Path $examplesOut -Recurse -Directory -Filter 'out' -ErrorAction SilentlyContinue |
-        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "Bundled runnable examples → $examplesOut" -ForegroundColor Green
-}
-
+# (step 4b, the runnable examples/ tree, was RETIRED by BUNDLE-LAYOUT-1, operator 2026-11-06: examples stay in the repo under
+# inspecto/examples/ with their run-example / serve-example scripts, and no bundle ships them.)
 
 # ── step 5: bundle run scripts (Linux + Windows) ───────────────────────────────
 $runShContent = @'
 #!/usr/bin/env bash
-# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] ./run.sh <adapter>
+# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] bin/run.sh <adapter>   (from any directory)
 # Looks up the pipeline file as spaces/<space>/config/<adapter>/*_pipeline.toon (first match wins),
 # so it transparently handles both "<adapter>_pipeline.toon" and variants like
 # "<adapter>_unknown_pipeline.toon" across every space.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
 ADAPTER="${1:?Usage: run.sh <adapter>   (e.g. voucher)}"
 # Bundles ship no Spaces: say so plainly rather than "no pipeline file found".
 if ! ls -d spaces/*/config >/dev/null 2>&1; then
@@ -1415,7 +1419,7 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=${SPACE_DIR
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
 # binary, exactly like the runtime/ auto-detect above; a networked deployment without it still
 # falls back to INSTALL inside ExcelExtension.
-[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
+[ -d lib/duckdb/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=lib/duckdb/linux_amd64")
 EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
 if [ -n "${EXTRA_OPTS}" ]; then
     read -r -a _extra_opts <<< "${EXTRA_OPTS}"
@@ -1431,17 +1435,17 @@ fi
 # MODULE-REORG-P3d stage 1: the classpath is READ from modules.list - one jar per line, classpath order, written at package time
 # by tools/offering-classpath.mjs from the bundle's Offering (the same list serve.sh reads). Nothing here names a jar.
 # FALLBACK, for a hand-assembled directory with no modules.list: inspecto.jar first, then every *.jar beside it.
-if [ -f modules.list ]; then
-    CP="$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="${CP%:}"
+if [ -f lib/modules.list ]; then
+    CP="$(tr -d '\r' < lib/modules.list | tr '\n' ':')"; CP="${CP%:}"
 else
-    echo "[run.sh] modules.list not found - falling back to every *.jar in this directory" >&2
-    CP="inspecto.jar"; for _jar in *.jar; do [ "$_jar" = "inspecto.jar" ] || CP="${CP}:${_jar}"; done
+    echo "[run.sh] lib/modules.list not found - falling back to every *.jar in lib/" >&2
+    CP="lib/inspecto.jar"; for _jar in lib/*.jar; do [ "$_jar" = "lib/inspecto.jar" ] || CP="${CP}:${_jar}"; done
 fi
 # ASSURE-INTELLIGENCE-BUNDLE-1: the intelligence agent's native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at
 # first use. Keep them OFFLINE and out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created
 # owner-only (0700). onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted
 # dir), so java.io.tmpdir itself is pinned. Keyed on the jar being STAGED, not on the classpath list, so a drop-in works too.
-if [ -f inspecto-intelligence.jar ]; then
+if [ -f lib/inspecto-intelligence.jar ]; then
     NATIVES="$(pwd)/runtime-natives"
     ( umask 077; mkdir -p "${NATIVES}/tmp" "${NATIVES}/djl" ) && chmod 700 "${NATIVES}"
     JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
@@ -1450,16 +1454,17 @@ exec "$JAVA" "${JAVA_OPTS[@]}" \
           -cp "$CP" com.gamma.inspector.CollectorProcessor \
           "$PIPELINE"
 '@
-Write-LfScript -Path "$bundleDir\run.sh" -Content $runShContent
+Write-LfScript -Path "$binDir\run.sh" -Content $runShContent
 
 $runBatContent = @'
 @echo off
-rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] run.bat ADAPTER    (e.g. voucher)
+rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] bin\run.bat ADAPTER    (e.g. voucher; from any directory)
 rem Looks up the pipeline file as spaces\SPACE\config\ADAPTER\*_pipeline.toon (first match wins),
 rem so it handles both "ADAPTER_pipeline.toon" and variants like
 rem "ADAPTER_unknown_pipeline.toon" across every space.
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
+rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
 if "%1"=="" (
     echo Usage: run.bat ADAPTER   [e.g. voucher]
     exit /b 1
@@ -1510,7 +1515,7 @@ set "OPTS=%OPTS% -Dassist.safety.roots=%SPACE_DIR%"
 rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
 rem per-platform binary; a networked deployment without it still falls back to INSTALL
 rem inside ExcelExtension.
-if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
+if exist "lib\duckdb\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=lib\duckdb\windows_amd64"
 set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
 if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
 if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
@@ -1523,47 +1528,48 @@ rem Built WITHOUT delayed expansion (these single-line statements: `call set` re
 rem states at SERVEBAT-OPTS-1. The list is accumulated as ;a;b;c and the leading ; is stripped. FALLBACK, for a hand-assembled
 rem directory with no modules.list: inspecto.jar first, then every *.jar beside it.
 set "CP="
-if exist modules.list for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
-if not exist modules.list echo [run.bat] modules.list not found - falling back to every *.jar in this directory
-if not exist modules.list set "CP=;inspecto.jar"
-if not exist modules.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
+if exist lib\modules.list for /f "usebackq delims=" %%J in ("lib\modules.list") do call set "CP=%%CP%%;%%J"
+if not exist lib\modules.list echo [run.bat] lib/modules.list not found - falling back to every *.jar in lib/
+if not exist lib\modules.list set "CP=;lib\inspecto.jar"
+if not exist lib\modules.list for %%J in (lib\*.jar) do if /i not "%%J"=="lib\inspecto.jar" call set "CP=%%CP%%;%%J"
 set "CP=%CP:~1%"
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
 rem runtime-natives\, whose inherited ACL is replaced by one owner-only grant at first start.
-if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
-if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
-if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
-if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
+if exist lib\inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
+if exist lib\inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
+if exist lib\inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
+if exist lib\inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
 "%JAVA%" %OPTS% ^
      -cp "%CP%" com.gamma.inspector.CollectorProcessor ^
      "%PIPELINE%"
 '@
-Write-CrlfScript -Path "$bundleDir\run.bat" -Content $runBatContent
+Write-CrlfScript -Path "$binDir\run.bat" -Content $runBatContent
 
 # ── step 6: bundle ura scripts (pre-ETL utility CLI, Linux + Windows) ─────────
 $uraShContent = @'
 #!/usr/bin/env bash
 # URA File Management Suite — utility CLI runner
 #
-# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] ./ura.sh [--dry-run] <command> <pipeline.toon> [args...]
+# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] bin/ura.sh [--dry-run] <command> <pipeline.toon> [args...]
+# Relative pipeline paths resolve against the bundle ROOT (this script cd's there).
 #
 # Examples:
-#   ./ura.sh help
-#   ./ura.sh search           spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   ./ura.sh copy             spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   ./ura.sh --dry-run backup spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   ./ura.sh prepare-inbox    spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   ./ura.sh create-schema    voucher  samples/voucher_sample.csv  spaces/<your-space>/config/voucher/voucher_gen.toon
+#   bin/ura.sh help
+#   bin/ura.sh search           spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   bin/ura.sh copy             spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   bin/ura.sh --dry-run backup spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   bin/ura.sh prepare-inbox    spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   bin/ura.sh create-schema    voucher  samples/voucher_sample.csv  spaces/<your-space>/config/voucher/voucher_gen.toon
 # Bundles ship no Spaces: drop your Space folder(s) into spaces/ first (or pass any pipeline path).
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 # Extra JVM flags from the operator, same contract as serve.sh: INSPECTO_JAVA_OPTS (fallback
 # EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory
 # --enable-native-access=ALL-UNNAMED and BEFORE -cp (a JVM flag after it would be parsed as a
 # program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
-[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
+[ -d lib/duckdb/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=lib/duckdb/linux_amd64")
 EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
 if [ -n "${EXTRA_OPTS}" ]; then
     read -r -a _extra_opts <<< "${EXTRA_OPTS}"
@@ -1572,26 +1578,28 @@ if [ -n "${EXTRA_OPTS}" ]; then
 fi
 # MODULE-REORG-P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars beside it. The classpath is
 # READ from core.list (written at package time by tools/offering-classpath.mjs): inspecto.jar + the core thin jars only (no optional module or sidecar: the pre-ETL utilities never carried them).
-if [ -f core.list ]; then
-    CP="$(tr -d '\r' < core.list | tr '\n' ':')"; CP="${CP%:}"
+if [ -f lib/core.list ]; then
+    CP="$(tr -d '\r' < lib/core.list | tr '\n' ':')"; CP="${CP%:}"
 else
-    CP="inspecto.jar"; for _jar in *.jar; do [ "$_jar" = "inspecto.jar" ] || CP="${CP}:${_jar}"; done
+    CP="lib/inspecto.jar"; for _jar in lib/*.jar; do [ "$_jar" = "lib/inspecto.jar" ] || CP="${CP}:${_jar}"; done
 fi
 exec "$JAVA" "${JAVA_OPTS[@]}" \
           -cp "$CP" \
           com.gamma.inspector.MainApp "$@"
 '@
-Write-LfScript -Path "$bundleDir\ura.sh" -Content $uraShContent
+Write-LfScript -Path "$binDir\ura.sh" -Content $uraShContent
 
 $uraBatContent = @'
 @echo off
 rem URA File Management Suite - utility CLI runner
-rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] ura.bat [--dry-run] COMMAND pipeline.toon [args...]
+rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] bin\ura.bat [--dry-run] COMMAND pipeline.toon [args...]
+rem   Relative pipeline paths resolve against the bundle ROOT (this script cd's there).
 rem   Commands: search, copy, copy-tars, extract, backup, prepare-inbox,
 rem             create-schema, move-by-date, extract-unknown, extract-move, help
-rem   Run 'ura.bat help' for full command reference.
+rem   Run 'bin\ura.bat help' for full command reference.
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
+rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 rem Extra JVM flags from the operator, same contract as serve.bat: INSPECTO_JAVA_OPTS (fallback
@@ -1599,7 +1607,7 @@ rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UN
 rem -cp (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
 rem that name is assigned, so it is silently discarded.
 set "OPTS=--enable-native-access=ALL-UNNAMED"
-if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
+if exist "lib\duckdb\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=lib\duckdb\windows_amd64"
 set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
 if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
 if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
@@ -1607,15 +1615,15 @@ if not "%EXTRA_OPTS%"=="" echo [ura.bat] extra JVM opts: %EXTRA_OPTS%
 rem MODULE-REORG-P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars beside it. The classpath is
 rem READ from core.list (written at package time by tools/offering-classpath.mjs): inspecto.jar + the core thin jars only (no optional module or sidecar). No delayed expansion.
 set "CP="
-if exist core.list for /f "usebackq delims=" %%J in ("core.list") do call set "CP=%%CP%%;%%J"
-if not exist core.list set "CP=;inspecto.jar"
-if not exist core.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
+if exist lib\core.list for /f "usebackq delims=" %%J in ("lib\core.list") do call set "CP=%%CP%%;%%J"
+if not exist lib\core.list set "CP=;lib\inspecto.jar"
+if not exist lib\core.list for %%J in (lib\*.jar) do if /i not "%%J"=="lib\inspecto.jar" call set "CP=%%CP%%;%%J"
 set "CP=%CP:~1%"
 "%JAVA%" %OPTS% ^
      -cp "%CP%" ^
      com.gamma.inspector.MainApp %*
 '@
-Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
+Write-CrlfScript -Path "$binDir\ura.bat" -Content $uraBatContent
 
 # ── step 6b: bundle serve scripts (run the control plane + operator UI) ─────────
 # Unlike run.sh (one-shot ETL), serve.sh launches the long-running ControlApi service with the
@@ -1628,14 +1636,14 @@ Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
 # Real authentication is the inspecto-oidc module (Standard+, OIDC); see docs/EDITIONS.md.
 $serveShContent = @'
 #!/usr/bin/env bash
-# Usage: [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
+# Usage: [PORT=8080] [SPACES_ROOT=spaces] bin/serve.sh   (from any directory: it cd's to the bundle root)
 # The core is AUTH-FREE by design. Real authentication is the `inspecto-oidc` module (Standard+, OIDC) — see docs/EDITIONS.md.
-# Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" ./serve.sh   (see below)
+# Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" bin/serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
 # The bundle ships NO Spaces: drop your Space folder(s) into spaces/ (or set SPACES_ROOT) and restart.
 # With none attached the server still starts; create one in the UI under Settings -> Spaces.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
 PORT="${PORT:-8080}"
 SPACES_ROOT="${SPACES_ROOT:-spaces}"
 ls -d "${SPACES_ROOT}"/*/config >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
@@ -1643,7 +1651,7 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
 # binary; a networked deployment without it still falls back to INSTALL inside ExcelExtension.
-[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
+[ -d lib/duckdb/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=lib/duckdb/linux_amd64")
 [ -n "${CORS_ORIGIN:-}" ]   && JAVA_OPTS+=("-Dcontrol.cors=${CORS_ORIGIN}")
 [ -n "${HTTPS_KEYSTORE:-}" ]          && JAVA_OPTS+=("-Dhttps.keystore=${HTTPS_KEYSTORE}")
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
@@ -1653,21 +1661,21 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 # which jars happen to be present, so a jar dropped into the directory is NOT on the classpath until the list says so.
 # FALLBACKS for a hand-assembled directory: no modules.list => inspecto.jar first, then every *.jar beside it; no
 # edition.properties => the old heuristic (inspecto-oidc.jar present => Standard, + inspecto-policy.jar => Advanced).
-if [ -f modules.list ]; then
-    CP="$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="${CP%:}"
+if [ -f lib/modules.list ]; then
+    CP="$(tr -d '\r' < lib/modules.list | tr '\n' ':')"; CP="${CP%:}"
 else
-    echo "[serve.sh] modules.list not found - falling back to every *.jar in this directory" >&2
-    CP="inspecto.jar"; for _jar in *.jar; do [ "$_jar" = "inspecto.jar" ] || CP="${CP}:${_jar}"; done
+    echo "[serve.sh] lib/modules.list not found - falling back to every *.jar in lib/" >&2
+    CP="lib/inspecto.jar"; for _jar in lib/*.jar; do [ "$_jar" = "lib/inspecto.jar" ] || CP="${CP}:${_jar}"; done
 fi
-if [ -f edition.properties ]; then
-    EDITION="$(sed -n 's/^edition=//p' edition.properties | tr -d '\r')"
-elif [ -f inspecto-oidc.jar ] && [ -f inspecto-policy.jar ]; then EDITION="Advanced"
-elif [ -f inspecto-oidc.jar ]; then EDITION="Standard"
+if [ -f lib/edition.properties ]; then
+    EDITION="$(sed -n 's/^edition=//p' lib/edition.properties | tr -d '\r')"
+elif [ -f lib/inspecto-oidc.jar ] && [ -f lib/inspecto-policy.jar ]; then EDITION="Advanced"
+elif [ -f lib/inspecto-oidc.jar ]; then EDITION="Standard"
 else EDITION="Basic"
 fi
 case "${EDITION}" in
     Basic|Standard|Advanced|Preview) ;;
-    *) echo "[serve.sh] edition.properties names an unknown edition '${EDITION}' (expected Basic, Standard, Advanced or Preview)" >&2; exit 1 ;;
+    *) echo "[serve.sh] lib/edition.properties names an unknown edition '${EDITION}' (expected Basic, Standard, Advanced or Preview)" >&2; exit 1 ;;
 esac
 # Every edition above Basic authenticates (OIDC); the OIDC module is on the classpath for exactly
 # those editions because the Offering puts it there. Basic stays the auth-free flag set.
@@ -1705,7 +1713,7 @@ fi
 # first use. Keep them OFFLINE and out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created
 # owner-only (0700). onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted
 # dir), so java.io.tmpdir itself is pinned. Keyed on the jar being STAGED, not on the classpath list, so a drop-in works too.
-if [ -f inspecto-intelligence.jar ]; then
+if [ -f lib/inspecto-intelligence.jar ]; then
     NATIVES="$(pwd)/runtime-natives"
     ( umask 077; mkdir -p "${NATIVES}/tmp" "${NATIVES}/djl" ) && chmod 700 "${NATIVES}"
     JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
@@ -1717,7 +1725,7 @@ fi
 # ⚠ Driver PRESENCE alone must not select PostgreSQL: OperationalDb.verifySelectable() fails the boot
 # when postgres is chosen without a URL, so auto-enabling on the sidecar would break every Standard
 # deployment that has not configured one yet. The URL is the signal.
-if [ -f postgresql.jar ] && [ -n "${INSPECTO_DB_URL:-}" ]; then
+if [ -f lib/postgresql.jar ] && [ -n "${INSPECTO_DB_URL:-}" ]; then
     JAVA_OPTS+=("-Dinspecto.db=postgres" "-Dinspecto.db.url=${INSPECTO_DB_URL}")
     [ -n "${INSPECTO_DB_USER:-}" ] && JAVA_OPTS+=("-Dinspecto.db.user=${INSPECTO_DB_USER}")
     [ -n "${INSPECTO_DB_PASSWORD:-}" ] && JAVA_OPTS+=("-Dinspecto.db.password=${INSPECTO_DB_PASSWORD}")
@@ -1739,11 +1747,11 @@ exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
 # OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Advanced's exact jars, which the old jar-sniffing launcher
 # would have called Advanced (and demanded PostgreSQL). Preview keeps the objects on DuckDB (operator decision 2026-09-25);
 # since P3d the launcher reads `edition=Preview` from edition.properties, so no text substitution is needed any more.
-Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
+Write-LfScript -Path "$binDir\serve.sh" -Content $serveShContent
 
 $serveBatContent = @'
 @echo off
-rem Usage: serve.bat
+rem Usage: bin\serve.bat   (from any directory: it cd's to the bundle root)
 rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
 rem The core is AUTH-FREE by design; real auth is the inspecto-oidc module (Standard+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
@@ -1751,7 +1759,8 @@ rem Starts the control plane + operator UI over every space under .\spaces (serv
 rem The bundle ships NO Spaces: drop your Space folder(s) into spaces\ (or set SPACES_ROOT) and restart.
 rem With none attached the server still starts; create one in the UI under Settings -> Spaces.
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
+rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
 if "%PORT%"=="" set "PORT=8080"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
 set "ANY_SPACE="
@@ -1762,7 +1771,7 @@ if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
 rem per-platform binary; a networked deployment without it still falls back to INSTALL
 rem inside ExcelExtension.
-if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
+if exist "lib\duckdb\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=lib\duckdb\windows_amd64"
 if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
 if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%"
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
@@ -1774,18 +1783,18 @@ rem per jar - NO delayed expansion, for the reason given below) and the leading 
 rem FALLBACKS for a hand-assembled directory: no modules.list => inspecto.jar first, then every *.jar beside it; no
 rem edition.properties => the old heuristic (inspecto-oidc.jar => Standard, + inspecto-policy.jar => Advanced).
 set "CP="
-if exist modules.list for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
-if not exist modules.list echo [serve.bat] modules.list not found - falling back to every *.jar in this directory
-if not exist modules.list set "CP=;inspecto.jar"
-if not exist modules.list for %%J in (*.jar) do if /i not "%%J"=="inspecto.jar" call set "CP=%%CP%%;%%J"
+if exist lib\modules.list for /f "usebackq delims=" %%J in ("lib\modules.list") do call set "CP=%%CP%%;%%J"
+if not exist lib\modules.list echo [serve.bat] lib/modules.list not found - falling back to every *.jar in lib/
+if not exist lib\modules.list set "CP=;lib\inspecto.jar"
+if not exist lib\modules.list for %%J in (lib\*.jar) do if /i not "%%J"=="lib\inspecto.jar" call set "CP=%%CP%%;%%J"
 set "CP=%CP:~1%"
 set "EDITION=Basic"
-if not exist edition.properties if exist inspecto-oidc.jar set "EDITION=Standard"
-if not exist edition.properties if exist inspecto-oidc.jar if exist inspecto-policy.jar set "EDITION=Advanced"
-if exist edition.properties for /f "usebackq tokens=1,* delims==" %%A in ("edition.properties") do if /i "%%A"=="edition" set "EDITION=%%B"
+if not exist lib\edition.properties if exist lib\inspecto-oidc.jar set "EDITION=Standard"
+if not exist lib\edition.properties if exist lib\inspecto-oidc.jar if exist lib\inspecto-policy.jar set "EDITION=Advanced"
+if exist lib\edition.properties for /f "usebackq tokens=1,* delims==" %%A in ("lib\edition.properties") do if /i "%%A"=="edition" set "EDITION=%%B"
 set "EDITION_OK="
 for %%E in (Basic Standard Advanced Preview) do if "%EDITION%"=="%%E" set "EDITION_OK=1"
-if not defined EDITION_OK echo [serve.bat] edition.properties names an unknown edition "%EDITION%" - expected Basic, Standard, Advanced or Preview & exit /b 1
+if not defined EDITION_OK echo [serve.bat] lib\edition.properties names an unknown edition "%EDITION%" - expected Basic, Standard, Advanced or Preview & exit /b 1
 rem Every edition above Basic authenticates (OIDC); the OIDC module is on the classpath for exactly
 rem those editions because the Offering puts it there. Basic stays the auth-free flag set.
 rem 🔴 SERVEBAT-OPTS-1 (2026-09-11): these are single-line `if`s, NOT a parenthesized block, and that
@@ -1819,17 +1828,17 @@ rem Every other jar (the PostgreSQL driver, the connector sidecar, delivery chan
 rem on the classpath because modules.list names it - see the top of this section. See serve.sh for what each does.
 rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
 rem runtime-natives\, whose inherited ACL is replaced by one owner-only grant at first start.
-if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
-if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
-if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
-if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
+if exist lib\inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
+if exist lib\inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
+if exist lib\inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
+if exist lib\inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
 rem WARNING: OPTS, never JAVA_OPTS - that name is assigned below and a flag set on it never reaches
 rem the JVM (BUNDLE-1). Single-line ifs, not a parenthesised block, so %OPTS% expands per statement.
-if exist postgresql.jar if defined INSPECTO_DB_URL set "OPTS=%OPTS% -Dinspecto.db=postgres -Dinspecto.db.url=%INSPECTO_DB_URL%"
-if exist postgresql.jar if defined INSPECTO_DB_URL if defined INSPECTO_DB_USER set "OPTS=%OPTS% -Dinspecto.db.user=%INSPECTO_DB_USER%"
-if exist postgresql.jar if defined INSPECTO_DB_URL if defined INSPECTO_DB_PASSWORD set "OPTS=%OPTS% -Dinspecto.db.password=%INSPECTO_DB_PASSWORD%"
+if exist lib\postgresql.jar if defined INSPECTO_DB_URL set "OPTS=%OPTS% -Dinspecto.db=postgres -Dinspecto.db.url=%INSPECTO_DB_URL%"
+if exist lib\postgresql.jar if defined INSPECTO_DB_URL if defined INSPECTO_DB_USER set "OPTS=%OPTS% -Dinspecto.db.user=%INSPECTO_DB_USER%"
+if exist lib\postgresql.jar if defined INSPECTO_DB_URL if defined INSPECTO_DB_PASSWORD set "OPTS=%OPTS% -Dinspecto.db.password=%INSPECTO_DB_PASSWORD%"
 rem Operator-supplied extra JVM flags. Appended LAST, on purpose: the flags this script requires
 rem (--enable-native-access=ALL-UNNAMED, port, spaces root, auth) are already in OPTS and cannot
 rem be clobbered from the environment. INSPECTO_JAVA_OPTS wins over EXTRA_JAVA_OPTS. Deliberately
@@ -1844,7 +1853,7 @@ if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)
 "%JAVA%" %OPTS% -cp %CP% com.gamma.control.ControlApi
 '@
-Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
+Write-CrlfScript -Path "$binDir\serve.bat" -Content $serveBatContent
 
 # ── step 6b-2: Dockerfile wrapping serve.sh (PKG-3, backend-hardening plan item 6) ──────
 # Containerized deployment over EXISTING seams only: serve.sh already reads PORT/SPACES_ROOT/
@@ -1858,9 +1867,12 @@ Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 # HEALTHCHECK hits /health tokenless — correct, it is in ControlApi's PUBLIC_PATHS. It probes via
 # bash /dev/tcp, NOT curl: the slim base ships no curl/wget.
 $dockerfileContent = @'
-# Build from an unzipped inspecto-deploy bundle:  docker build -t inspecto .
+# Build from the ROOT of an unzipped inspecto-deploy bundle (the context is the root, this file lives in deploy/):
+#   docker build -f deploy/Dockerfile -t inspecto .
+# BuildKit (the default builder) reads deploy/Dockerfile.dockerignore beside this file as the context's ignore list.
 # Run:  docker run -p 8080:8080 inspecto
-# All serve.sh env vars pass straight through (-e PORT / SPACES_ROOT /
+# Logs: the server logs to stdout, so `docker logs` is the log; /app/logs is writable for anything captured to a file.
+# All bin/serve.sh env vars pass straight through (-e PORT / SPACES_ROOT /
 # CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS ...). Persist data by mounting the spaces
 # root:  -v /srv/inspecto/spaces:/app/spaces
 # Pinned by DIGEST (the linux/amd64 manifest of debian:stable-slim, approved by the operator 2026-09-29):
@@ -1874,23 +1886,26 @@ COPY . /app
 # runtime and the launcher stay root-owned and read-only to it.
 RUN groupadd --system --gid 10001 inspecto \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home --shell /usr/sbin/nologin inspecto \
- && chmod +x serve.sh runtime/bin/* && runtime/bin/java -version \
- && mkdir -p spaces && chown 10001:10001 /app && chown -R 10001:10001 spaces
+ && chmod +x bin/serve.sh runtime/bin/* && runtime/bin/java -version \
+ && mkdir -p spaces logs && chown 10001:10001 /app && chown -R 10001:10001 spaces logs
 USER 10001:10001
 ENV PORT=8080
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s CMD ["bash", "-c", \
   "exec 3<>/dev/tcp/localhost/${PORT} && printf 'GET /health HTTP/1.0\r\n\r\n' >&3 && grep -q '200' <&3"]
-ENTRYPOINT ["./serve.sh"]
+ENTRYPOINT ["./bin/serve.sh"]
 '@
-Write-LfScript -Path "$bundleDir\Dockerfile" -Content $dockerfileContent
+Write-LfScript -Path "$deployDir\Dockerfile" -Content $dockerfileContent
 $dockerignoreContent = @'
+# BuildKit's per-Dockerfile ignore file: `docker build -f deploy/Dockerfile .` reads deploy/Dockerfile.dockerignore
+# (patterns are relative to the context, i.e. the bundle root). The classic builder ignores it; nothing here is required.
 # runtime/ is NOT excluded: the bundle's jlinked runtime is the image's only JVM.
 # Windows-only launchers are dead weight in a Linux container.
-*.bat
+bin/*.bat
+bin/*.ps1
 inspecto-deploy*.zip*
 '@
-Write-LfScript -Path "$bundleDir\.dockerignore" -Content $dockerignoreContent
+Write-LfScript -Path "$deployDir\Dockerfile.dockerignore" -Content $dockerignoreContent
 
 # -- step 6b-3: OS service wrappers (SCR-3 / DEPLOY-SERVICE-WRAPPER-1) -------------------------
 # Until now nothing restarted a dead process: editions.md 3.11 states that recovery from process
@@ -1913,7 +1928,7 @@ Write-LfScript -Path "$bundleDir\.dockerignore" -Content $dockerignoreContent
 #     in services.msc; it is a third-party binary, which is why it is not the default.
 $serviceUnitContent = @'
 # systemd unit for the Inspecto control plane (SCR-3).
-# Installed by install-service.sh, which substitutes @BUNDLE_ROOT@ and @RUN_USER@.
+# Installed by bin/install-service.sh, which substitutes @BUNDLE_ROOT@ and @RUN_USER@.
 # Manual install: copy to /etc/systemd/system/inspecto.service, edit the two placeholders,
 # then `systemctl daemon-reload && systemctl enable --now inspecto`.
 [Unit]
@@ -1934,11 +1949,11 @@ StartLimitIntervalSec=120
 Type=simple
 User=@RUN_USER@
 WorkingDirectory=@BUNDLE_ROOT@
-# serve.sh reads PORT / SPACES_ROOT / CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS from the
+# bin/serve.sh reads PORT / SPACES_ROOT / CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS from the
 # environment -- the same contract as a shell launch, so this file is the ONLY configuration
 # surface the unit adds. The leading `-` means an absent file is not a startup error.
 EnvironmentFile=-@BUNDLE_ROOT@/inspecto.env
-ExecStart=@BUNDLE_ROOT@/serve.sh
+ExecStart=@BUNDLE_ROOT@/bin/serve.sh
 # Recovery from process death is RESTART, not failover (editions.md 3.11) -- this line IS that
 # mechanism. on-failure covers a kill -9 (systemd treats death by signal as failure) while still
 # honouring a clean `systemctl stop`; the rate limit that bounds it is in [Unit] above.
@@ -1956,15 +1971,15 @@ ReadWritePaths=@BUNDLE_ROOT@
 [Install]
 WantedBy=multi-user.target
 '@
-Write-LfScript -Path "$bundleDir\inspecto.service" -Content $serviceUnitContent
+Write-LfScript -Path "$deployDir\inspecto.service" -Content $serviceUnitContent
 
 $installServiceShContent = @'
 #!/usr/bin/env bash
 # Install the Inspecto control plane as a systemd service (SCR-3).
-#   sudo ./install-service.sh [--user <account>] [--name <service>] [--uninstall]
+#   sudo bin/install-service.sh [--user <account>] [--name <service>] [--uninstall]
 # Re-runnable: it rewrites the unit and restarts the service.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
 BUNDLE_ROOT="$(pwd)"
 RUN_USER="${SUDO_USER:-$(id -un)}"
 SERVICE_NAME="inspecto"
@@ -1987,7 +2002,7 @@ fi
 if ! command -v systemctl >/dev/null 2>&1; then
     echo "[install-service] no systemctl on this host. This installer is systemd-only; on a" >&2
     echo "                  non-systemd init, run serve.sh under that init with an equivalent" >&2
-    echo "                  restart-on-failure policy. See inspecto.service for the settings." >&2
+    echo "                  restart-on-failure policy. See deploy/inspecto.service for the settings." >&2
     exit 1
 fi
 
@@ -1999,7 +2014,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
     exit 0
 fi
 
-[ -x serve.sh ] || chmod +x serve.sh
+[ -x bin/serve.sh ] || chmod +x bin/serve.sh
 # Seed an env file rather than baking configuration into the unit: secrets belong in a
 # root-owned file, never on the process command line or in a world-readable unit.
 if [ ! -f inspecto.env ]; then
@@ -2020,7 +2035,7 @@ ENV
 fi
 
 sed -e "s|@BUNDLE_ROOT@|${BUNDLE_ROOT}|g" -e "s|@RUN_USER@|${RUN_USER}|g" \
-    inspecto.service > "${UNIT_PATH}"
+    deploy/inspecto.service > "${UNIT_PATH}"
 chmod 644 "${UNIT_PATH}"
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}"
@@ -2033,12 +2048,12 @@ echo "[install-service] verify recovery (SCR-3 acceptance):"
 echo "[install-service]   sudo kill -9 \$(systemctl show -p MainPID --value ${SERVICE_NAME})"
 echo "[install-service]   sleep 10 && curl -fsS http://localhost:8080/health"
 '@
-Write-LfScript -Path "$bundleDir\install-service.sh" -Content $installServiceShContent
+Write-LfScript -Path "$binDir\install-service.sh" -Content $installServiceShContent
 
 $installServicePs1Content = @'
 # Install the Inspecto control plane as a Windows boot service (SCR-3).
 #   Run from an ELEVATED PowerShell, inside the bundle:
-#     .\install-service.ps1 [-Name Inspecto] [-Uninstall]
+#     .\bin\install-service.ps1 [-Name Inspecto] [-Uninstall]
 #
 # Implemented as a Scheduled Task running as SYSTEM at boot, with restart-on-failure -- NOT as an
 # sc.exe service. sc.exe cannot host this process: a Windows service binary must connect to the
@@ -2054,7 +2069,8 @@ param(
     [switch]$Uninstall
 )
 $ErrorActionPreference = "Stop"
-$bundleRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+# This script lives in bin/; the bundle ROOT is its parent (where serve.bat cd's to as well).
+$bundleRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
 $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -2073,9 +2089,9 @@ if ($Uninstall) {
     return
 }
 
-$serveBat = Join-Path $bundleRoot "serve.bat"
+$serveBat = Join-Path $bundleRoot "bin\serve.bat"
 if (-not (Test-Path $serveBat)) {
-    throw "serve.bat not found beside this script ($bundleRoot) -- run it from inside the bundle."
+    throw "bin\serve.bat not found under the bundle root ($bundleRoot) -- run this script from the bundle's bin\ folder."
 }
 
 # cmd /c so the task hosts serve.bat itself; WorkingDirectory is the bundle root, matching the
@@ -2107,7 +2123,7 @@ Write-Host "[install-service]   Invoke-WebRequest http://localhost:8080/health"
 Write-Host "[install-service] NOTE: a task restarts on the RestartInterval (1 min), so allow up to"
 Write-Host "[install-service]       ~70s before concluding that recovery failed."
 '@
-Write-CrlfScript -Path "$bundleDir\install-service.ps1" -Content $installServicePs1Content
+Write-CrlfScript -Path "$binDir\install-service.ps1" -Content $installServicePs1Content
 
 # -- step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained --
 # Produces bundle/runtime/ — the run/serve/ura scripts auto-prefer it over system java.
@@ -2134,7 +2150,7 @@ function New-JlinkRuntime {
     Write-Host "Embedded runtime ready: $OutputDir (${rtSize} MB, $PlatformLabel)" -ForegroundColor Green
 }
 
-# The DuckDB-extension platform key (`duckdb-extensions/<key>/`) a runtime can actually load, read from
+# The DuckDB-extension platform key (`lib/duckdb/<key>/`) a runtime can actually load, read from
 # the image itself: bin\java.exe = windows_amd64; an ELF x86-64 bin/java = linux_amd64. Anything else is
 # a platform this script stages no extensions for, and is refused rather than guessed.
 # ⛔ This is the ONLY source of the platform label used to name a zip and pick its extension set —
@@ -2164,7 +2180,7 @@ if (-not $NoRuntime) {
     # An intended change: re-run with --write-lock (see the tool's header) and commit the lock.
     # PACKAGE-DEMOAUTH-ADVANCED-1: a -DemoAuth bundle stages inspecto-demo-auth.jar where the OIDC trio was; --demo makes the tool expect
     # (and derive from) exactly that, instead of demanding jars the demo step removed.
-    $jlinkArgs = @('--edition', $Edition, '--staged-dir', $bundleDir, '--emit'); if ($DemoAuth) { $jlinkArgs += '--demo' }
+    $jlinkArgs = @('--edition', $Edition, '--staged-dir', $libDir, '--emit'); if ($DemoAuth) { $jlinkArgs += '--demo' }
     $derivedOut = & node (Join-Path $sandboxRoot 'tools\jlink-modules.mjs') @jlinkArgs 2>&1
     $derivedExit = $LASTEXITCODE
     $derivedOut | ForEach-Object { Write-Host "  [jlink-modules] $_" -ForegroundColor DarkGray }
@@ -2254,16 +2270,16 @@ if (-not $NoRuntime) {
 #                             serve.* leaves it unset (default none) -- job reporting is opt-in there; a demo
 #                             whose Home says "Run history needs the DuckDB jobs backend" is not a demo
 if ($DemoAuth) {
-    foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {
+    foreach ($f in 'bin\serve.sh', 'bin\serve.bat', 'deploy\Dockerfile', 'deploy\Dockerfile.dockerignore', 'deploy\inspecto.service', 'bin\install-service.sh', 'bin\install-service.ps1') {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
     }
     # MODULE-REORG-P3d stage 1: the demo launchers READ modules.list too (written above by `offering-classpath.mjs --demo`: the
     # OIDC trio replaced by the demo jar) instead of embedding a jar list of their own. No FALLBACK glob here: a demo bundle is
     # always built by this script, which always writes the list. $demoJars is that list, held here only to assert the demo
     # invariant at package time: never two Authenticators (no OIDC jar beside the demo jar), and the demo jar really is on it.
-    $demoJars = @(Get-Content (Join-Path $bundleDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    if ($demoJars -contains 'inspecto-oidc.jar') { throw "the demo bundle's modules.list names inspecto-oidc.jar next to the demo jar - two Authenticators is unsupported." }
-    if ($demoJars -notcontains 'inspecto-demo-auth.jar') { throw "the demo bundle's modules.list does not name inspecto-demo-auth.jar - the Demo User sign-in would not load." }
+    $demoJars = @(Get-Content (Join-Path $libDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($demoJars -contains 'lib/inspecto-oidc.jar') { throw "the demo bundle's modules.list names inspecto-oidc.jar next to the demo jar - two Authenticators is unsupported." }
+    if ($demoJars -notcontains 'lib/inspecto-demo-auth.jar') { throw "the demo bundle's modules.list does not name inspecto-demo-auth.jar - the Demo User sign-in would not load." }
     $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
 @echo off
@@ -2271,12 +2287,13 @@ rem DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO r
 rem Listens on 127.0.0.1 only. The bundle ships NO Spaces: drop your Space folder(s) into .\spaces
 rem (or set SPACES_ROOT), then open http://127.0.0.1:%PORT%
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
+rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
 if "%PORT%"=="" set "PORT=8080"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
 set "OPTS=$demoFlags -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
-if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
+if exist "lib\duckdb\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=lib\duckdb\windows_amd64"
 rem Extra JVM flags from the operator, same contract as serve.bat (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1): INSPECTO_JAVA_OPTS (fallback
 rem EXTRA_JAVA_OPTS), appended AFTER the mandatory flags and BEFORE -cp (a JVM flag after it would be parsed as a program argument).
 set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
@@ -2286,32 +2303,32 @@ if not "%EXTRA_OPTS%"=="" echo [serve-demo] extra JVM opts: %EXTRA_OPTS%
 set "JAVA=java"
 if exist runtime\bin\java.exe set "JAVA=runtime\bin\java.exe"
 rem ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only, offline native dirs as serve.bat.
-if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
-if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
-if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
-if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
+if exist lib\inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
+if exist lib\inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
+if exist lib\inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
+if exist lib\inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
 rem The classpath is READ from modules.list (one jar per line, classpath order), accumulated as ;a;b;c with `call set` and the
 rem leading ; stripped - see serve.bat for why there is no delayed expansion.
 set "CP="
-for /f "usebackq delims=" %%J in ("modules.list") do call set "CP=%%CP%%;%%J"
+for /f "usebackq delims=" %%J in ("lib\modules.list") do call set "CP=%%CP%%;%%J"
 set "CP=%CP:~1%"
 echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT%)
 "%JAVA%" %OPTS% -cp "%CP%" com.gamma.control.ControlApi
 "@
-    Write-CrlfScript -Path "$bundleDir\serve-demo.bat" -Content $serveDemoBat
+    Write-CrlfScript -Path "$binDir\serve-demo.bat" -Content $serveDemoBat
     $serveDemoSh = @"
 #!/usr/bin/env bash
 # DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
 # Listens on 127.0.0.1 only. The bundle ships NO Spaces: drop your Space folder(s) into ./spaces
 # (or set SPACES_ROOT), then open http://127.0.0.1:`${PORT}
 set -euo pipefail
-cd "`$(dirname "`$0")"
+cd "`$(dirname "`$0")/.."   # bin/ -> the bundle ROOT
 PORT="`${PORT:-8080}"
 SPACES_ROOT="`${SPACES_ROOT:-spaces}"
 # An ARRAY, like serve.sh: a SPACES_ROOT (or cwd) containing a space must stay one argument.
 JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}" "-Dspaces.root=`${SPACES_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
-[ -d duckdb-extensions/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=duckdb-extensions/linux_amd64")
+[ -d lib/duckdb/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=lib/duckdb/linux_amd64")
 # Extra JVM flags from the operator, same contract as serve.sh (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1): INSPECTO_JAVA_OPTS (fallback
 # EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory flags and BEFORE -cp.
 EXTRA_OPTS="`${INSPECTO_JAVA_OPTS:-`${EXTRA_JAVA_OPTS:-}}"
@@ -2323,22 +2340,22 @@ fi
 JAVA=java
 [ -x runtime/bin/java ] && JAVA=runtime/bin/java
 # ASSURE-INTELLIGENCE-BUNDLE-1: the same owner-only (0700), offline native dirs as serve.sh.
-if [ -f inspecto-intelligence.jar ]; then
+if [ -f lib/inspecto-intelligence.jar ]; then
     NATIVES="`$(pwd)/runtime-natives"
     ( umask 077; mkdir -p "`${NATIVES}/tmp" "`${NATIVES}/djl" ) && chmod 700 "`${NATIVES}"
     JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=`${NATIVES}/tmp" "-Djna.tmpdir=`${NATIVES}/tmp" "-DDJL_CACHE_DIR=`${NATIVES}/djl" "-DENGINE_CACHE_DIR=`${NATIVES}/djl")
 fi
 # The classpath is READ from modules.list (one jar per line, classpath order); same fallback as serve.sh for a hand-assembled directory.
-if [ -f modules.list ]; then
-    CP="`$(tr -d '\r' < modules.list | tr '\n' ':')"; CP="`${CP%:}"
+if [ -f lib/modules.list ]; then
+    CP="`$(tr -d '\r' < lib/modules.list | tr '\n' ':')"; CP="`${CP%:}"
 else
-    echo "[serve-demo] modules.list not found - falling back to every *.jar in this directory" >&2
-    CP="inspecto.jar"; for _jar in *.jar; do [ "`$_jar" = "inspecto.jar" ] || CP="`${CP}:`${_jar}"; done
+    echo "[serve-demo] lib/modules.list not found - falling back to every *.jar in lib/" >&2
+    CP="lib/inspecto.jar"; for _jar in lib/*.jar; do [ "`$_jar" = "lib/inspecto.jar" ] || CP="`${CP}:`${_jar}"; done
 fi
 echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: ./`${SPACES_ROOT})"
 exec "`$JAVA" "`${JAVA_OPTS[@]}" -cp "`$CP" com.gamma.control.ControlApi
 "@
-    Write-LfScript -Path "$bundleDir\serve-demo.sh" -Content $serveDemoSh
+    Write-LfScript -Path "$binDir\serve-demo.sh" -Content $serveDemoSh
     $demoReadme = @"
 INSPECTO DEMO BUILD - INTERNAL EVALUATION ONLY
 ===============================================
@@ -2347,7 +2364,7 @@ It is not secure and must never be given to a customer, exposed on a network, or
 
 1. This bundle ships NO Spaces. Drop your Space folder(s) (for example telco-assurance/) into .\spaces\
    (or set SPACES_ROOT to a folder holding them). spaces\_templates is the template gallery, not a Space.
-2. Run serve-demo.bat (Windows) or ./serve-demo.sh (Linux)
+2. Run bin\serve-demo.bat (Windows) or bin/serve-demo.sh (Linux)
 3. Open http://127.0.0.1:8080 and pick a Demo User
 
 Demo Users are defined per Space in config/demo-users.toon; their roles come from that Space's role table. If two attached Spaces list the same user id, the rows must be identical, otherwise sign-in answers a DEMO_ROSTER_CONFLICT error naming the user and both Spaces.
@@ -2367,7 +2384,7 @@ UNZIP, RUN, SIGN IN. The Space la-showcase is PRE-INSTALLED under .\spaces\la-sh
 the Investigation mule-hub-case (8 steps, 3 members), Drafts, Entity Lists (smurf-accounts, telecom-watch-msisdn), an identity assertion,
 a Case, an Alert Rule with standing detection, and the Jobs (la_index_build, la_detect). Nothing needs a seed step; no node is required.
 
-1. Run serve-demo.bat (Windows) or ./serve-demo.sh (Linux). Set PORT to change the port (default 8080).
+1. Run bin\serve-demo.bat (Windows) or bin/serve-demo.sh (Linux). Set PORT to change the port (default 8080).
 2. Open http://127.0.0.1:8080 and pick a Demo User:
      fm.analyst    Demo FM Analyst   Fraud analyst (lead): owns mule-hub-case; works Investigations, Alert Rules and Incidents
      fm.manager    Demo FM Manager   Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user
@@ -2396,7 +2413,7 @@ omits inspecto-demo-auth (shipped here).
 # auto-detect linux_amd64, each only on its own OS. Best-effort: a platform whose binary isn't
 # cached locally is a yellow warning, never a build failure — the fail-closed INSTALL fallback in
 # ExcelExtension still covers a networked deployment.
-$duckdbExtOut = Join-Path $bundleDir 'duckdb-extensions'
+$duckdbExtOut = Join-Path $libDir 'duckdb'
 $bundledAnyExt = $false
 # AIRGAP-EXTENSIONS-1 (2026-09-11): every extension the product LOADs at run time, not just excel.
 # `ducklake` joined the list because DuckLakeRegistrar used to open with an unconditional
@@ -2429,7 +2446,7 @@ $bundledAnyExt = $false
 #     MinIO/on-prem one does not. ⚠ It costs 24 MB per platform on EVERY bundle; drop it first if bundle
 #     size ever becomes the binding constraint, and nothing that passes explicit keys will notice.
 # ⛔ Staging is NECESSARY, NOT SUFFICIENT, and the difference is invisible: a flat
-# `duckdb-extensions/<plat>/<name>.duckdb_extension` is reachable ONLY by `DuckDbExtension`'s explicit
+# `lib/duckdb/<plat>/<name>.duckdb_extension` is reachable ONLY by `DuckDbExtension`'s explicit
 # `LOAD '<file>'`. DuckDB's AUTOLOAD ignores `-Dduckdb.extension.dir` entirely and reads its own
 # `extension_directory`, which this product never sets -- measured: autoload against the flat staged dir
 # FAILS, against a `<version>/<platform>` tree it succeeds. So every autoloaded extension needs a named
@@ -2454,10 +2471,10 @@ if ($duckdbExtCacheDir) {
                 $dest = Join-Path $duckdbExtOut $plat
                 New-Item -ItemType Directory -Path $dest -Force | Out-Null
                 Copy-Item $found.FullName -Destination (Join-Path $dest $extFile) -Force
-                Write-Host "Bundled DuckDB $extName extension ($plat) -> duckdb-extensions/$plat/" -ForegroundColor Green
+                Write-Host "Bundled DuckDB $extName extension ($plat) -> lib/duckdb/$plat/" -ForegroundColor Green
                 $bundledAnyExt = $true
             } elseif ($RequireExtensions) {
-                throw "-RequireExtensions: no cached $extFile for $plat ($duckdbAbi) under $duckdbExtCacheDir. This bundle would ship without it, and since D-8 the launcher points -Dduckdb.extension.dir at duckdb-extensions/$plat/, where a missing file FAILS that feature outright (no INSTALL fallback). Populate the cache first: node tools/fetch-duckdb-extensions.mjs"
+                throw "-RequireExtensions: no cached $extFile for $plat ($duckdbAbi) under $duckdbExtCacheDir. This bundle would ship without it, and since D-8 the launcher points -Dduckdb.extension.dir at lib/duckdb/$plat/, where a missing file FAILS that feature outright (no INSTALL fallback). Populate the cache first: node tools/fetch-duckdb-extensions.mjs"
             } else {
                 Write-Host "  (no cached $extFile for $plat ($duckdbAbi) under $duckdbExtCacheDir — in a bundle that stages ANY extension for $plat, that feature now FAILS LOUDLY at first use; fetch it: node tools/fetch-duckdb-extensions.mjs)" -ForegroundColor Yellow
             }
@@ -2487,7 +2504,7 @@ if (-not $SkipBootCheck) {
     # THE classpath the launchers build: the bundle's own modules.list (written at step 3a-ter by tools/offering-classpath.mjs, which
     # already refused a listed jar that is not staged). Read here exactly as run.sh/serve.sh read it - no list of our own - so
     # the smoke boots the same jars, in the same order, the shipped launchers will. Names only: Test-Path is not needed.
-    $cp = @(Get-Content (Join-Path $bundleDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $cp = @(Get-Content (Join-Path $libDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     # CONNECTOR-SIDECAR-SHADES-LOGGING-1: assert exactly ONE SLF4J binding registration across the
     # assembled classpath. The core owns the logging binding; every sidecar's shade config excludes
     # META-INF/services/org.slf4j.spi.SLF4JServiceProvider, org/slf4j/impl/** and ch/qos/logback/** so a
@@ -2548,9 +2565,9 @@ if (-not $SkipBootCheck) {
         } finally { $z.Dispose() }
         return $found
     }
-    $coreVersions = Get-ShadedVersions (Join-Path $bundleDir 'inspecto.jar')
+    $coreVersions = Get-ShadedVersions (Join-Path $libDir 'inspecto.jar')
     $splits = @()
-    foreach ($jarName in ($cp | Where-Object { $_ -ne 'inspecto.jar' })) {
+    foreach ($jarName in ($cp | Where-Object { $_ -ne 'lib/inspecto.jar' })) {
         $side = Get-ShadedVersions (Join-Path $bundleDir $jarName)
         foreach ($ga in $side.Keys) {
             if ($coreVersions.ContainsKey($ga) -and $coreVersions[$ga] -ne $side[$ga]) {
@@ -2574,7 +2591,7 @@ if (-not $SkipBootCheck) {
     # These placeholders exist ONLY so the constructor completes: RemoteJWKSet wraps the URL and fetches
     # lazily, so nothing is contacted. Never mistake them for a working auth configuration.
     $oidcArgs = @()
-    if (Test-Path (Join-Path $bundleDir 'inspecto-oidc.jar')) {
+    if (Test-Path (Join-Path $libDir 'inspecto-oidc.jar')) {
         $oidcArgs = @('-Dauth.oidc.jwksUri=http://127.0.0.1:1/boot-smoke-never-fetched',
                       '-Dauth.oidc.issuer=http://127.0.0.1:1/boot-smoke')
     }
@@ -2621,74 +2638,46 @@ if (-not $SkipBootCheck) {
 # copies the Space in; any failure throws (never a half-seeded demo). tools/check-bundle-spaces.mjs guards the gate below.
 if ($DemoAuth -and $Ui -eq 'la-app' -and -not $NoBakeDemo) {
     . (Join-Path $adjParserDir 'package-demo-bake.ps1')
-    Invoke-DemoSpaceBake -RepoRoot $sandboxRoot -BundleDir $bundleDir -Java $(if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" } elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" } else { 'java' }) -ModuleJars @(Get-Content (Join-Path $bundleDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -DemoFlags ($demoFlags -split ' ') -Port ([int]$env:INSPECTO_BAKE_PORT)
+    Invoke-DemoSpaceBake -RepoRoot $sandboxRoot -BundleDir $bundleDir -Java $(if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" } elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" } else { 'java' }) -ModuleJars @(Get-Content (Join-Path $libDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -DemoFlags ($demoFlags -split ' ') -Port ([int]$env:INSPECTO_BAKE_PORT)
     & node (Join-Path $sandboxRoot 'tools/check-bundle-spaces.mjs') --bundle $bundleDir --demo-auth --ui la-app
     if ($LASTEXITCODE -ne 0) { throw "the baked demo bundle fails the bundle-spaces guard" }
 }
 
-# ── step 7: copy README + docs tree ─────────────────────────────────────────────
+# ── step 7: copy README + the shipped docs (an explicit ALLOW-LIST) ──────────────
 # In the repo the README lives in inspecto/ and links to ../docs/. In the
 # bundle the README sits at the root, so rewrite ../docs/ → docs/ and ship the
-# docs tree alongside it so the links resolve.
+# allowed docs alongside it so the links resolve.
 $readme = Get-Content "$adjParserDir\README.md" -Raw
 $readme = $readme -replace '\.\./docs/', 'docs/'
 Set-Content -Path "$bundleDir\README.md" -Value $readme -NoNewline
 $docsSrc = Join-Path $sandboxRoot 'docs'
 
-# BUNDLE-SHIPS-THE-ARCHIVE-1 (2026-09-16). Until this date the copy below staged ALL of docs/
-# recursively with nothing excluded, so every customer bundle carried the two NON-CURRENT doc
-# tiers that CLAUDE.md defines (measured from the entry table of the 2026-09-15 inspecto-deploy.zip:
-# 491 docs files, of which 246 were archived-documents/ and 26 were superpower/ - i.e. 55% of the
-# shipped documentation was material the project itself declares not current).
-#
-# The tiers are CLAUDE.md's, not this script's:
-#   tier 1  current knowledge  -> okf/ + the root canon + stakeholders/ api/ ui/ ops/ roadmap/ wiki/   SHIPS
-#   tier 2  active plans       -> superpower/        "a plan lives here ONLY while its work is in flight"  DOES NOT SHIP
-#   tier 3  history            -> archived-documents/ "never maintained, never linked as current"         DOES NOT SHIP
-#
-# Excluded by NAME, one entry per tree, so the next shift can audit the list by reading it.
-# Do NOT replace this with a pattern/glob: the reason each tree is out is a tier decision, and a
-# glob records no reason. Adding a tree here is a product call, not a refactor.
-$docsExcludedTrees = @(
-    'archived-documents',  # CLAUDE.md tier 3 - provenance only, ~570 known-broken internal links,
-                           # superseded designs and retracted claims. Shipping it publishes stale
-                           # statements under the product's name.
-    'superpower'           # CLAUDE.md tier 2 - in-flight plans. These describe work that is NOT
-                           # built yet; a customer reading one would read a roadmap as a manual.
-)
-# Withheld for a DIFFERENT reason than the trees above, and kept in its own list so the two reasons
-# are never conflated. These two ARE current-tier by CLAUDE.md's canon list - they are accurate and
-# maintained. They are withheld because of AUDIENCE: they are written for the team working ON the
-# product, not for the operator running it. Operator decision 2026-09-16.
-$docsExcludedFiles = @(
-    'BACKLOG.md',       # the internal defect board - it names open P1s, by identifier, in the very
-                        # product the customer has just installed, together with their severity.
-    'PROJECT_NOTES.md'  # internal working notes, same audience argument.
-)
-# Trees/files that MUST survive the exclusion. A filter that also drops wanted docs is worse than
-# shipping the archive, so this is asserted after the copy rather than trusted.
-$docsRequiredEntries = @(
-    'okf', 'api',   # every current doc lives in okf/product/ hubs since PRODUCT-DOCS-HUB-1 (2026-10-19)
-    'INDEX.md', 'GLOSSARY.md', 'USER_GUIDE.md', 'ADVANCED_GUIDE.md', 'EDITIONS.md'
+# BUNDLE-LAYOUT-1 (operator 2026-11-06): the bundle ships ONLY the operator-facing documents, named here one by one.
+# This used to be a DENY-list (BUNDLE-SHIPS-THE-ARCHIVE-1, 2026-09-16: archived-documents/ and superpower/ withheld as
+# non-current tiers, BACKLOG.md and PROJECT_NOTES.md withheld for audience), and a deny-list leaks whatever nobody thought
+# to name: "docs/Inspecto Backlog Board.md" - an internal board, the same audience argument as BACKLOG.md - and the whole
+# okf/ hub tree, INDEX.md, GLOSSARY.md, REQUIREMENTS.md, BRANCHING.md and FEATURE_INVENTORY.md were shipping to customers.
+# Those are written for the team working ON the product (the hubs, the canon, the board), not for the operator running it.
+# An allow-list cannot leak a new file: a doc ships only when its top-level docs/ entry is added here - a product call.
+$docsShipped = @(
+    'USER_GUIDE.md',      # the operator's guide
+    'ADVANCED_GUIDE.md',  # the advanced operator's guide
+    'EDITIONS.md',        # what each edition carries
+    'api'                 # the HTTP contract; the server serves docs/api/openapi-v1.json (ControlApi.locateOpenApiDoc, cwd-relative)
 )
 
 if (Test-Path $docsSrc) {
-    # Copy file-by-file (not one Copy-Item -Recurse) so a single locked/inaccessible
-    # file (e.g. held by another process/AV) can't silently truncate the rest of the
-    # tree under $ErrorActionPreference = 'Stop' — a whole-tree recursive copy was
-    # observed to abort at the first such file and skip every remaining item.
     $docsOut = "$bundleDir\docs"
     $docsSkipped = 0
+    # Copy file-by-file (not one Copy-Item -Recurse) so a single locked/inaccessible file (held by another process/AV) cannot
+    # silently truncate the rest of a tree under $ErrorActionPreference = 'Stop'.
     Get-ChildItem -Path $docsSrc -Recurse -File | ForEach-Object {
         $srcFile = $_
         $relPath = $srcFile.FullName.Substring($docsSrc.Length + 1)
-        # Match the FIRST path segment only: an exclusion is a top-level tree under docs/, never a
-        # substring anywhere in the path (which would also drop e.g. okf/.../compliance notes).
-        # For a file sitting directly under docs/, the first segment IS the file name, so one
-        # comparison serves both lists.
+        # The FIRST path segment decides: an entry is a top-level docs/ file or tree. For a file directly under docs/
+        # the first segment IS the file name, so one comparison serves both.
         $topSegment = ($relPath -split '[\\/]')[0]
-        if ($docsExcludedTrees -contains $topSegment) { $docsSkipped++; return }
-        if ($docsExcludedFiles -contains $topSegment) { $docsSkipped++; return }
+        if ($docsShipped -notcontains $topSegment) { $docsSkipped++; return }
         $destPath = Join-Path $docsOut $relPath
         try {
             $destDir = Split-Path $destPath -Parent
@@ -2699,54 +2688,47 @@ if (Test-Path $docsSrc) {
         }
     }
 
-    # Fail closed in BOTH directions. The point of the row is auditability, so packaging asserts the
-    # outcome it intends instead of leaving it to be re-derived from this source later.
-    foreach ($tree in $docsExcludedTrees) {
-        if (Test-Path (Join-Path $docsOut $tree)) {
-            throw "DOCS TIER LEAK: '$tree' is on the non-current list but was staged into the bundle at docs\$tree. See BUNDLE-SHIPS-THE-ARCHIVE-1."
-        }
-    }
-    foreach ($file in $docsExcludedFiles) {
-        if (Test-Path (Join-Path $docsOut $file)) {
-            throw "DOCS AUDIENCE LEAK: '$file' is withheld from customer bundles by the 2026-09-16 operator decision but was staged at docs\$file. See BUNDLE-SHIPS-THE-ARCHIVE-1."
-        }
-    }
-    foreach ($entry in $docsRequiredEntries) {
+    # Fail closed in BOTH directions: every allowed entry staged, and NOTHING else under docs/.
+    foreach ($entry in $docsShipped) {
         if (-not (Test-Path (Join-Path $docsOut $entry))) {
-            throw "DOCS OVER-FILTERED: the bundle is missing docs\$entry, which is current-tier documentation that MUST ship. The exclusion in step 7 is too wide. See BUNDLE-SHIPS-THE-ARCHIVE-1."
+            throw "DOCS OVER-FILTERED: the bundle is missing docs\$entry, which is on step 7's allow-list and MUST ship. See BUNDLE-LAYOUT-1."
         }
     }
-    # BUNDLE-DANGLING-LINKS-1 (2026-09-16, single-sourced 2026-09-24). Withholding the two non-current
-    # tiers leaves the SHIPPED docs pointing INTO them (250 links, ~100 in INDEX.md alone - the customer's
-    # front door), and relocating README.md / examples/ leaves 15 more pointing at the old place.
-    #
-    # The rewrite is tools/bundle-doc-rewrite.mjs - ONE implementation, which tools/check-bundle-doc-links.mjs
-    # imports and applies in its simulated mode. It used to be a regex here that the guard never modelled,
-    # so the guard stayed red at 321 after this fix shipped. Do not re-inline it. Per link (fence-aware):
-    #   withheld target  -> `label (internal document - not shipped)`
-    #   relocated target -> re-pointed at where it lands in the bundle
-    #   repo-only target -> `label (`repo/path` - not shipped)` (source-code citations, compliance/,
-    #                       sibling modules above the bundle root; operator decision 2026-09-25)
-    #   anything else    -> left alone (a link broken in the repo too), so the guard still reports
-    #                       it - hiding that here would hide real rot.
-    #
-    # Option (b), shipping a marked stub per withheld target, stays REFUSED BY THIS SCRIPT'S OWN
-    # ASSERTIONS: every stub would land under docs/archived-documents/ or docs/superpower/, which the
-    # DOCS TIER LEAK / DOCS AUDIENCE LEAK throws above exist to forbid.
+    $docsLeaked = @(Get-ChildItem -Path $docsOut -Force | Where-Object { $docsShipped -notcontains $_.Name } | ForEach-Object { $_.Name })
+    if ($docsLeaked.Count -gt 0) {
+        throw "DOCS LEAK: docs\ holds $($docsLeaked -join ', '), which step 7's allow-list does not name. Only $($docsShipped -join ', ') ship. See BUNDLE-LAYOUT-1."
+    }
+    # BUNDLE-DANGLING-LINKS-1. The shipped docs and README point INTO documents that do not ship (the hubs, the canon, the
+    # board) and at repo files above the bundle root. The rewrite is tools/bundle-doc-rewrite.mjs - ONE implementation,
+    # which tools/check-bundle-doc-links.mjs imports and applies in its simulated mode. Do not re-inline it. Per link:
+    #   docs/ target off the allow-list -> `label (internal document - not shipped)`
+    #   relocated target                -> re-pointed at where it lands in the bundle (inspecto/README.md -> README.md)
+    #   repo-only target                -> `label (`repo/path` - not shipped)` (source citations, compliance/, inspecto/examples/)
+    #   anything else                   -> left alone (a link broken in the repo too), so the guard still reports it.
     Push-Location $sandboxRoot
-    & node (Join-Path $sandboxRoot 'tools\bundle-doc-rewrite.mjs') --bundle $bundleDir --withheld-trees ($docsExcludedTrees -join ',') --withheld-files ($docsExcludedFiles -join ',')
+    & node (Join-Path $sandboxRoot 'tools\bundle-doc-rewrite.mjs') --bundle $bundleDir --shipped-docs ($docsShipped -join ',')
     $rewriteExit = $LASTEXITCODE
     Pop-Location
-    if ($rewriteExit -ne 0) { throw "docs link rewrite failed (exit $rewriteExit) - the bundle would ship links into withheld docs. See BUNDLE-DANGLING-LINKS-1." }
+    if ($rewriteExit -ne 0) { throw "docs link rewrite failed (exit $rewriteExit) - the bundle would ship links into documents it does not carry. See BUNDLE-DANGLING-LINKS-1." }
 
-    $docsShipped = (Get-ChildItem -Path $docsOut -Recurse -File).Count
-    Write-Host "  docs: staged $docsShipped files; withheld $docsSkipped (tiers: $($docsExcludedTrees -join ', '); audience: $($docsExcludedFiles -join ', '))" -ForegroundColor DarkGray
+    $docsShippedCount = (Get-ChildItem -Path $docsOut -Recurse -File).Count
+    Write-Host "  docs: staged $docsShippedCount files ($($docsShipped -join ', ')); left out $docsSkipped" -ForegroundColor DarkGray
 }
+
+# BUNDLE-LAYOUT-1: the bundle ROOT holds README.md and folders only (a demo build adds DEMO-BUILD.txt beside it). Asserted, not
+# assumed: a step that writes a launcher, a list or a jar at the root again fails the package here instead of shipping.
+$rootAllowed = @('README.md', 'DEMO-BUILD.txt', 'bin', 'lib', 'deploy', 'logs', 'runtime', 'ui', 'spaces', 'docs', 'sbom', 'licenses')
+$rootStray = @(Get-ChildItem -Path $bundleDir -Force | Where-Object { $rootAllowed -notcontains $_.Name } | ForEach-Object { $_.Name })
+if ($rootStray.Count -gt 0) { throw "BUNDLE LAYOUT: unexpected entries at the bundle root: $($rootStray -join ', '). Every jar/list goes to lib\, every launcher to bin\, deployment files to deploy\ (BUNDLE-LAYOUT-1)." }
+foreach ($need in 'README.md', 'bin', 'lib', 'logs', 'docs', 'sbom') {
+    if (-not (Test-Path (Join-Path $bundleDir $need))) { throw "BUNDLE LAYOUT: the bundle has no $need (BUNDLE-LAYOUT-1)." }
+}
+if (Test-Path (Join-Path $bundleDir 'examples')) { throw "BUNDLE LAYOUT: examples\ is staged, but examples stay in the repo (BUNDLE-LAYOUT-1)." }
 
 # ── step 8: zip the host-platform bundle, then swap runtime/ and zip again for a cross-built target ──
 # Each zip carries ONLY its own platform's DuckDB extensions. Both platforms are staged into the one
 # $bundleDir above (so a single assembly serves both targets), but a bundle can only ever LOAD the
-# directory its own launcher probes: run.sh reads duckdb-extensions/linux_amd64, serve.bat reads
+# directory its own launcher probes: run.sh reads lib/duckdb/linux_amd64, serve.bat reads
 # windows_amd64. Shipping both was called "harmless — like run.sh sitting unused in the Windows zip",
 # and at three extensions it was. At five it is ~43-45 MB zipped per bundle, about 16% of the
 # download, unreachable by construction — httpfs + aws added 33.5 MB of that on 2026-09-14
@@ -2761,7 +2743,7 @@ function Compress-BundleForPlatform {
         [Parameter(Mandatory)][string] $Platform,
         [Parameter(Mandatory)][string] $DestinationPath
     )
-    $extRoot = Join-Path $bundleDir 'duckdb-extensions'
+    $extRoot = Join-Path $libDir 'duckdb'
     $parked  = @()
     if (Test-Path $extRoot) {
         foreach ($dir in Get-ChildItem -Path $extRoot -Directory) {
@@ -2779,7 +2761,7 @@ function Compress-BundleForPlatform {
             # RELEASE-LAUNCHERS-NOT-EXECUTABLE-1: Compress-Archive stores NO POSIX mode bits, and on a
             # Windows host there are none to store — NTFS has no exec bit. A linux_amd64 zip cross-built here
             # therefore unzips with 0644 launchers; install-service.sh chmods serve.sh itself (its own
-            # `[ -x serve.sh ] || chmod +x serve.sh`), run.sh/ura.sh need a by-hand `chmod +x` on that path.
+            # `[ -x bin/serve.sh ] || chmod +x bin/serve.sh`), run.sh/ura.sh need a by-hand `chmod +x` on that path.
             Compress-Archive -Path $bundleDir -DestinationPath $DestinationPath
         } else {
             # On a POSIX host (ubuntu-latest) modes CAN be preserved: Info-ZIP `zip` records them in the
@@ -2897,28 +2879,23 @@ Write-Host "     or:  unzip inspecto-deploy-linux_amd64.zip         (Linux)"
 Write-Host "  3. cd inspecto-deploy"
 Write-Host "  3b. Attach your Space(s): the bundle ships NO Spaces (only spaces\_templates, the template gallery)."
 Write-Host "       Drop your Space folder(s) into spaces\ (or set SPACES_ROOT), or create one in Settings -> Spaces."
-Write-Host "  4. ETL pipeline (one-shot):"
-Write-Host "       run.bat voucher         (Windows)"
-Write-Host "       bash run.sh voucher     (Linux)"
+Write-Host "  4. ETL pipeline (one-shot; every launcher is in bin\ and works from any directory):"
+Write-Host "       bin\run.bat voucher         (Windows)"
+Write-Host "       bash bin/run.sh voucher     (Linux)"
 Write-Host "  4b. Control plane + operator UI (long-running service):"
-Write-Host "       serve.bat                (Windows)"
-Write-Host "       bash serve.sh            (Linux)"
+Write-Host "       bin\serve.bat                (Windows)"
+Write-Host "       bash bin/serve.sh            (Linux)"
 Write-Host "       then open http://localhost:8080/  (UI served from ./ui)"
 Write-Host "  4c. Run it as an OS service so a crashed process comes back (SCR-3):"
-Write-Host "       .\install-service.ps1    (Windows, ELEVATED PowerShell)"
-Write-Host "       sudo ./install-service.sh (Linux, systemd)"
+Write-Host "       .\bin\install-service.ps1    (Windows, ELEVATED PowerShell; output -> logs\service.log)"
+Write-Host "       sudo bin/install-service.sh  (Linux, systemd; output -> journalctl -u inspecto)"
 Write-Host "       verify recovery: kill the process, then curl /health -- do not assume it"
+Write-Host "  4d. Container: docker build -f deploy/Dockerfile -t inspecto .   (from the bundle root, linux_amd64 bundle)"
 Write-Host "  5. Pre-ETL utilities:"
-Write-Host "       ura.bat help            (Windows)"
-Write-Host "       bash ura.sh help        (Linux)"
-Write-Host "       bash ura.sh search  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
-Write-Host "       bash ura.sh backup  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
-Write-Host "  6. Try the worked feature examples (self-contained, synthetic data):"
-Write-Host "       pwsh examples/run-example.ps1 01-ingest/hello-csv     (Windows)"
-Write-Host "       bash examples/run-example.sh  01-ingest/hello-csv     (Linux)"
-Write-Host "     or run one as a service (poll loop + Control API probes):"
-Write-Host "       pwsh examples/serve-example.ps1 06-serve/sequence-gap --demo"
-Write-Host "       see examples/README.md for the full catalog"
+Write-Host "       bin\ura.bat help            (Windows)"
+Write-Host "       bash bin/ura.sh help        (Linux)"
+Write-Host "       bash bin/ura.sh search  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
+Write-Host "       bash bin/ura.sh backup  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
 Write-Host ""
 if (-not $NoRuntime) {
     Write-Host "Embedded Java runtime included (bundle\runtime\) — no JVM needed on the target."
