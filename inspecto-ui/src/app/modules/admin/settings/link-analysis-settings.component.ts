@@ -117,7 +117,7 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
                     [attr.aria-describedby]="canEdit() ? null : 'la-settings-readonly-reason'"
                     (ngSubmit)="save()"
                 >
-                    <mat-accordion multi class="flex flex-col gap-2">
+                    <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
                         <mat-expansion-panel [expanded]="true" data-group="Masking">
                             <mat-expansion-panel-header>
                                 <mat-panel-title>Masking</mat-panel-title>

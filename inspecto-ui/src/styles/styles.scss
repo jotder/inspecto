@@ -14,6 +14,22 @@
     color: var(--gamma-text-default);
 }
 
+/* Flat accordion for configuration pages (operator 2026-11-06): the theme draws every expansion panel as a raised
+ * card, which on a settings page reads as grey boxes on the page. `inspecto-flat-accordion` keeps the collapsing
+ * groups but draws them as outlined rows on the page background, like the pages that have no accordion.
+ * Equal specificity to the theme's `.mat-accordion .mat-expansion-panel` rules; this file loads after them. */
+.mat-accordion.inspecto-flat-accordion .mat-expansion-panel {
+    --mat-expansion-container-background-color: transparent;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 1px solid var(--gamma-border);
+    margin-bottom: 0;
+
+    .mat-expansion-panel-body {
+        color: var(--gamma-text-default) !important;
+    }
+}
+
 /* Material options inside select & autocomplete panels */
 .mat-mdc-option {
     color: var(--gamma-text-default) !important;
