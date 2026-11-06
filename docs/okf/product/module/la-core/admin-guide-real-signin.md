@@ -53,7 +53,7 @@ Output: `inspecto-deploy\` at the worktree root. Then:
    set "AUTH_OIDC_CLIENT_ID=la_app_local_signin_1"
    set "INSPECTO_JAVA_OPTS=-Dauth.oidc.tokenEndpoint=https://localhost:9443/oauth2/token -Dauth.oidc.rolesClaim=groups -Dauth.oidc.authorizeUrl=https://localhost:9443/oauth2/authorize -Dauth.oidc.endSessionUrl=https://localhost:9443/oidc/logout"
    set "PORT=8098"
-   call "%~dp0serve.bat"
+   call "%~dp0bin\serve.bat"
    ```
 
    `audience` is the client id itself on WSO2. `serve.bat` wires neither `tokenEndpoint` nor `rolesClaim` from env.
