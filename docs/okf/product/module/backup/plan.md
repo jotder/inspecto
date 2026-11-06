@@ -10,7 +10,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 **Requirement of record:** System Maintenance MNT-5 (backup, verify), MNT-6 (restore) and MNT-10 (backup
 catalog), restated in [plan-observability](../observability/plan-observability.md) §3.6; edition placement is
-EDITIONS `OPS-06` and `EDG-01` cell 2 ([EDITIONS](../../../../EDITIONS.md)). The original plan is archived at
+EDITIONS `OPS-06` and `EDG-01` cell 2 ([spec-editions](../../layer/platform/spec-editions.md)). The original plan is archived at
 [system-maintenance-plan](../../../../archived-documents/plans-archive/system-maintenance-plan.md).
 
 ## Required

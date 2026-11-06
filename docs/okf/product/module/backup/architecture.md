@@ -13,7 +13,7 @@ timestamp: 2026-10-19T00:00:00Z
 The core `maintenance` Job Type (`MaintenanceJob` in `inspecto-engine`) dispatches on its `task` parameter.
 Tasks the core does not own are looked up through the `MaintenanceTaskProvider` ServiceLoader seam;
 `inspecto-backup` is one such provider. Bundles from Standard up carry the jar and Basic does not, so on Basic
-the three task names are unknown and a job naming one fails at run ([EDITIONS](../../../../EDITIONS.md) `OPS-06`).
+the three task names are unknown and a job naming one fails at run ([spec-editions](../../layer/platform/spec-editions.md) `OPS-06`).
 The module has no HTTP routes, screens or settings of its own: everything is a Job, authored and triggered
 through the Jobs surface.
 

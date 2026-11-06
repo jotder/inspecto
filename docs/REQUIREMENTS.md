@@ -289,7 +289,7 @@ template gallery + apply).*
 | [`BACKLOG.md`](BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
 | [`okf/product/module/intelligence/architecture-embedded-intelligence.md`](okf/product/module/intelligence/architecture-embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
 | [`okf/product/layer/platform/plan-roadmap.md`](okf/product/layer/platform/plan-roadmap.md) · [`okf/product/layer/product/brochure-stakeholder-overview.md`](okf/product/layer/product/brochure-stakeholder-overview.md) | Horizons; value proposition; maturity |
-| [`EDITIONS.md`](EDITIONS.md) | Edition capability tiers |
+| [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) | Edition capability tiers |
 | [`GLOSSARY.md`](GLOSSARY.md) | Binding vocabulary (§0 rules; §13 rename status) |
 | [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) | Per-feature TOON shapes + runnability constraints |
 

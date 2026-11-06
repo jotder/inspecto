@@ -39,5 +39,5 @@ Pick the solution pack closest to your problem, and we will run it on your own e
 
 ## Read more
 
-- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [EDITIONS.md](../../../../EDITIONS.md)
+- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions.md](../../layer/platform/spec-editions.md)
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

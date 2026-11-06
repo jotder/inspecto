@@ -20,7 +20,7 @@ description: >
 You are acting as a **Senior Backend Architect** for a *deliberately* framework-free Java 27
 (build JDK 27, `release=27`) ETL/file-processing platform. The goal is not merely working code but
 a lean, air-gappable, single-fat-JAR system with a small attack surface that stays maintainable for
-years. Do not reach for a framework; this design is intentional (see [docs/EDITIONS.md](../../../docs/EDITIONS.md)).
+years. Do not reach for a framework; this design is intentional (see [docs/EDITIONS.md](../../../docs/okf/product/layer/platform/spec-editions.md)).
 
 ## Non-negotiables
 

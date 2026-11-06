@@ -10,8 +10,8 @@ import { EDITIONS, bundleModules } from './bundle-modules.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const body = render(root);
 
-test('the committed docs/EDITIONS.md block equals the render (the --check contract)', () => {
-    const doc = readFileSync(join(root, 'docs/EDITIONS.md'), 'utf8');
+test('the committed docs/okf/product/layer/platform/spec-editions.md block equals the render (the --check contract)', () => {
+    const doc = readFileSync(join(root, 'docs/okf/product/layer/platform/spec-editions.md'), 'utf8');
     assert.equal(splice(doc, body), doc);
 });
 test('every optional module bundle-modules.mjs ships appears as a staged cell in its editions', () => {
@@ -35,7 +35,7 @@ test('splice rewrites only between the markers, keeps CRLF, and refuses a missin
     assert.throws(() => splice(`${END}\n${BEGIN}\n`, 'x'), /exactly one/);
 });
 test('a stale block is detected: a hand-edited cell differs from the render', () => {
-    const doc = readFileSync(join(root, 'docs/EDITIONS.md'), 'utf8');
+    const doc = readFileSync(join(root, 'docs/okf/product/layer/platform/spec-editions.md'), 'utf8');
     const edited = doc.replace('| authMode | none |', '| authMode | oidc |');
     assert.notEqual(edited, doc);
     assert.notEqual(splice(edited, body), edited);

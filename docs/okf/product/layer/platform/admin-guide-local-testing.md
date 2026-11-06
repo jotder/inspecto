@@ -26,7 +26,7 @@ Advanced-only by construction.)
 ## Preview edition
 
 **`Preview`** (added 2026-09-21, `-Pedition-preview` / `package.ps1 -Edition Preview`) bundles **every**
-optional module unconditionally — see [`EDITIONS.md` §Preview](../../../../EDITIONS.md#preview--not-a-customer-facing-tier).
+optional module unconditionally — see [`spec-editions.md` §Preview](spec-editions.md#preview--not-a-customer-facing-tier).
 It is not an auth bypass: it ships the real `inspecto-oidc.jar`/`inspecto-policy.jar` and fails
 closed exactly like Advanced without a real IdP. `package.ps1 -DemoAuth` accepts
 `-Edition Advanced` or `-Edition Preview` (`inspecto/package.ps1`, LA-EDITIONS-1 ED-3).

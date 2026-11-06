@@ -17,7 +17,7 @@ records what falls to the `inspecto-event` module.
 
 - **Every edition records events and the audit trail.** Recording is a compliance obligation, not a
   feature; only reading the feed back over HTTP is edition-gated (`EDG-01` cell 6, 2026-09-08, see
-  [`EDITIONS.md`](../../../../EDITIONS.md) *Audit* and `CP-13`).
+  [`spec-editions.md`](../../layer/platform/spec-editions.md) *Audit* and `CP-13`).
 - **A tamper-evident audit chain** — `ASSURE-AUDIT-CHAIN-1` (shipped 2026-09-27) and its residuals
   `ASSURE-AUDIT-CHAIN-RESIDUALS-1` ([REQUIREMENTS](../../../../REQUIREMENTS.md)).
 - **Durable events** — a configured durable backend must not silently lose the trail on restart

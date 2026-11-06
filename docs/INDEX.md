@@ -37,7 +37,7 @@
 - [`PROJECT_NOTES.md`](PROJECT_NOTES.md) — consolidated cross-cutting knowledge that isn't obvious from code
   or git: key decisions, gotchas, engine seams & perf, pointer map.
 - [`REQUIREMENTS.md`](REQUIREMENTS.md) — **requirements-of-record**: the full platform requirement set with
-  MoSCoW, edition mapping, NFRs, sequencing. ⚠ [`EDITIONS.md`](EDITIONS.md) is authoritative for the Edition
+  MoSCoW, edition mapping, NFRs, sequencing. ⚠ [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) is authoritative for the Edition
   column; this table mirrors it.
 - [`BACKLOG.md`](BACKLOG.md) — **the one board of open work**, grouped by **product area → functionality**
   (consolidated 2026-09-24; the previous 644 KB page is frozen as
@@ -50,10 +50,13 @@
 - [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **Advanced Operations & Internals Guide** (the production
   investigation hub): per-component process, events, metrics, persisted state, `-D` flags, the full Control
   API, troubleshooting playbooks. **Living doc.**
-- [`EDITIONS.md`](EDITIONS.md) — the edition model (Personal/Professional/Enterprise = build flavors, never
-  branches) + the **feature × edition board** and the generated **Step Processors** table
-  (`tools/render-processor-board.mjs` from `processor-catalog.contract.json` — edit the catalog, regenerate
-  the table; do not hand-edit rows).
+- [`EDITIONS.md`](EDITIONS.md) — **the customer guide to the editions** (Basic / Standard / Advanced), shipped in
+  every bundle: what each edition includes, security and deployment by edition, the Investigations add-on,
+  upgrade notes. No class, test or decision ids and no internal links (split by audience 2026-11-06). The
+  engineering record — gate mechanisms, decisions, Preview, the assembly model, the generated Offerings matrix,
+  the **feature × edition board** with its generated **Step Processors** table (`tools/render-processor-board.mjs`
+  from `processor-catalog.contract.json` — edit the catalog, regenerate the table; do not hand-edit rows) and the
+  edition-gating debt — is [`okf/product/layer/platform/spec-editions.md`](okf/product/layer/platform/spec-editions.md).
 - [`BRANCHING.md`](BRANCHING.md) — branch & release policy (versions = branches; merge-forward; SemVer + CC).
 
 ## The knowledge bundle — product hubs (current as-built truth)
@@ -216,7 +219,7 @@ and `path-containment-unification` had been archived with no row — and the cou
 | [`step-column-metadata-plan`](archived-documents/plans-archive/step-column-metadata-plan.md) | 2026-10-11 — BUILT (`AUTHORING-REDESIGN-1` (e): Step column metadata, STEP catalog node, additive masking) | [`okf/product/module/etl/user-guide-schema-mapping.md`](okf/product/module/etl/user-guide-schema-mapping.md) §0 |
 | [`la-embed-view-design`](archived-documents/plans-archive/la-embed-view-design.md) | 2026-10-05 — consolidated (deferred, `LA-EMBED-VIEW-1`) | [`superpower/link-analysis-roadmap.md`](superpower/link-analysis-roadmap.md) §Separation |
 | [`la-entity-profile-plan`](archived-documents/plans-archive/la-entity-profile-plan.md) | 2026-10-15 — **SHIPPED** P0-P3 (D-EP1…D-EP8; P4 deferred) | [`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §6.3 · [`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) §*Entity profile pages* · [`BACKLOG.md`](BACKLOG.md) (`LA-ENTITY-PROFILE-RESIDUALS-1`). Its §9 records where the build departed from the contract, §10 the live pass. |
-| [`inspecto-la-editions-plan`](archived-documents/plans-archive/inspecto-la-editions-plan.md) | 2026-10-17 — **SHIPPED** (`LA-EDITIONS-1`; ED-1…ED-7; phases 1–7) | [`EDITIONS.md`](EDITIONS.md) (Basic / Standard / Advanced / Preview matrix, Basic explorer) · [`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) (§3.6 packs, §6.4 inbound, §6.5 outbound, §8 editions) · [`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) · [`GLOSSARY.md`](GLOSSARY.md) (*Inspecto LA*, *Domain Profile*, *Edition*) · [`BACKLOG.md`](BACKLOG.md) §3.12 (`LA-EDITIONS-RESIDUALS-1`). Its §7 records the lane decisions. |
+| [`inspecto-la-editions-plan`](archived-documents/plans-archive/inspecto-la-editions-plan.md) | 2026-10-17 — **SHIPPED** (`LA-EDITIONS-1`; ED-1…ED-7; phases 1–7) | [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) (Basic / Standard / Advanced / Preview matrix, Basic explorer) · [`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) (§3.6 packs, §6.4 inbound, §6.5 outbound, §8 editions) · [`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) · [`GLOSSARY.md`](GLOSSARY.md) (*Inspecto LA*, *Domain Profile*, *Edition*) · [`BACKLOG.md`](BACKLOG.md) §3.12 (`LA-EDITIONS-RESIDUALS-1`). Its §7 records the lane decisions. |
 | [`la-configurable-limits-plan`](archived-documents/plans-archive/la-configurable-limits-plan.md) | 2026-10-15 — **SHIPPED** (`LA-CONFIG-LIMITS-1`; CL-1…CL-18; P1a, P1b, P2, P3, P4) | [`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §9 · [`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) §*Grounded limits* · [`BACKLOG.md`](BACKLOG.md) §3.12 (`LA-CONFIG-LIMITS-RESIDUALS-1`). Its §8 records where the build departed from the design. |
 | [`la-data-trust-plan`](archived-documents/plans-archive/la-data-trust-plan.md) + [`la-data-trust-s9-dossier-footer`](archived-documents/plans-archive/la-data-trust-s9-dossier-footer.md) | 2026-10-14 - consolidated (S1-S9 built, S10 driven twice; closed 2026-10-14 with the last-look rule; polish items 5-7 stay on `LA-DATA-TRUST-POLISH-1`) | [`okf/product/module/la-core/user-guide-link-analysis.md`](okf/product/module/la-core/user-guide-link-analysis.md) section *Data trust* |
 | [`la-data-preparation-plan`](archived-documents/plans-archive/la-data-preparation-plan.md) | 2026-10-05 — consolidated (plan only, nothing built) | [`superpower/link-analysis-roadmap.md`](superpower/link-analysis-roadmap.md) §Data preparation |

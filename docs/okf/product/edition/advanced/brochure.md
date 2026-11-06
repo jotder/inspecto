@@ -36,5 +36,5 @@ Bring your architecture and security requirements to a design session; we will m
 
 ## Read more
 
-- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [EDITIONS.md](../../../../EDITIONS.md)
+- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions.md](../../layer/platform/spec-editions.md)
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

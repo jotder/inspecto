@@ -1,0 +1,801 @@
+---
+type: Spec
+title: Editions — engineering specification (Basic / Standard / Advanced / Preview)
+description: The engineering record of the editions - gate mechanisms, routes, classes and tests, decisions and history, Preview, the assembly model, the generated Offerings matrix, the feature x edition working board and the edition-gating debt.
+resource: offerings/
+tags: [editions, packaging, offerings, gating, decisions]
+timestamp: 2026-11-06T00:00:00Z
+---
+
+# Editions — engineering specification
+
+> **Audience: the team building the product.** Split by audience on 2026-11-06 (operator, after `BUNDLE-LAYOUT-1`):
+> the customer guide is [`docs/EDITIONS.md`](../../../../EDITIONS.md), which ships in every bundle and carries no
+> class, test or decision ids, no Preview and no internal links. This file holds everything else that used to live
+> there, unchanged in substance. ⚠ When an edition fact changes, change BOTH: this file for the mechanism and its
+> history, `docs/EDITIONS.md` for what a customer sees. Mentions of "EDITIONS.md §…" or "EDITIONS `<row-id>`" in older
+> docs, code comments and tests mean the section or board row of the same name in THIS file.
+>
+> 🔴 **Correction found by the split (2026-11-06): TLS is not an edition feature.** The *Matrix* below reads "Plain HTTP"
+> for Basic and HTTPS for Standard, but `ControlApi.createServer` serves HTTPS (TLS 1.3, PKCS12 keystore) in EVERY edition
+> when `-Dhttps.keystore` is set, and every edition's generated `serve.sh` / `serve.bat` passes `HTTPS_KEYSTORE` through
+> (`inspecto/package.ps1`, the launcher templates). Plain HTTP is only the default. The customer guide states it that way.
+
+> Editions are **build/packaging flavors over one codebase** — the same `ServiceLoader`-module + `-D`-flag
+> mechanism already used to omit the hosted-AI SDKs from air-gapped builds. **Editions are NEVER git
+> branches** (see [`BRANCHING.md`](../../../../BRANCHING.md)); there is no `basic`/`standard` branch. An edition is
+> *which modules are assembled* from a given commit.
+>
+> **Names (LA-EDITIONS-1 ED-2, operator 2026-10-17):** **Basic / Standard / Advanced** replaced Personal / Professional /
+> Enterprise across the whole product — Maven profiles `edition-standard` / `edition-advanced` (Basic is the default build,
+> no profile), `package.ps1 -Edition Basic|Standard|Advanced|Preview`, `offerings/<edition>.toon` (basic, standard, advanced, preview),
+> `edition.properties`, `/bootstrap` `edition` (`basic`/`standard`/`advanced`). The old ids were dropped, not aliased.
+> Text below that records history under the old names was renamed with them; read "Basic" in an entry dated before
+> 2026-10-17 as "Personal" (it then carried no Link Analysis). Code comments, pom descriptions, compliance evidence
+> and examples were swept too (2026-10-19, 2026-10-23); `tools/check-vocabulary.mjs` rule `edition-old-name` fails a
+> main Java or SPA source line, comments included, that names an old edition. Test identifiers keep the old names.
+> Editions stay **build flavours plus capability gates, never branches**.
+
+## Inspecto LA feature placement (LA-EDITIONS-1 §2, decided 2026-10-17)
+
+Inspecto LA (Link Analysis) is sold in the same editions. Principle: never sell weaker analysis or weaker evidence —
+editions differ by **who** (one analyst, a team, an organisation), **how much data**, and **how much governance**
+(ED-7: placement accepted as proposed). How Basic withholds the Investigation surface: *Basic — the Link Analysis
+explorer* below.
+
+| Area | Feature | Basic | Standard | Advanced | Preview |
+|---|---|---|---|---|---|
+| Data | Add data: upload a file, review its columns, a Dataset (one default Pipeline, no transformation; `BASIC-ONBOARD-1`) | ✅ | ✅ | ✅ | ✅ |
+| | An import's inbox: *Import waiting files*, or *Watch this folder* (a fixed 30 s poll, off by default) | ✅ | ✅ | ✅ | ✅ |
+| | *Choose a table*: a Postgres table snapshot, refreshed with *Refresh now* only (no poll since 2026-11-05) | ✅ | ✅ | ✅ | ✅ |
+| | *Keep this up to date* on a chosen schedule (watched folder, SFTP), other databases and remote systems | — | ✅ | ✅ | ✅ |
+| Explore | Graph studio, projections from any Dataset, saved views | ✅ | ✅ | ✅ | ✅ |
+| | Find paths, neighbours, "Investigate a number", connect seeds | ✅ | ✅ | ✅ | ✅ |
+| | Temporal and branching patterns, pattern packs | ✅ | ✅ | ✅ | ✅ |
+| | Value Measures | ✅ | ✅ | ✅ | ✅ |
+| | Geo map, routes, co-location | — | ✅ | ✅ | ✅ |
+| | Browser graph algorithms | ✅ | ✅ | ✅ | ✅ |
+| | Entity Lists, identity resolution | ✅ | ✅ | ✅ | ✅ |
+| | Entity profile pages | — | ✅ | ✅ | ✅ |
+| | Reference data beside a node | ✅ | ✅ | ✅ | ✅ |
+| | Export (PNG, CSV), snapshots (not evidence-grade) | ✅ | ✅ | ✅ | ✅ |
+| | Link Analysis widgets on dashboards (offer hidden on Basic; routes stay open) | — | ✅ | ✅ | ✅ |
+| | Industry packs (Telecom, Mobile Money) | ✅ | ✅ | ✅ | ✅ |
+| | Masking (the default follows sign-in, never the LA level: `LA-ONBOARD-1` OB-6) | off by default (`none`); a mode the Space states is display only (no sign-in: anyone may reveal) | ✅ enforced, default `typed` (with or without the Investigations add-on) | ✅ | ✅ |
+| Investigate | **Investigations add-on** `INS-AO-LA-INVESTIGATIONS` (`LA-ONBOARD-1` OB-5): billable, enforced at runtime, included by default; every Investigate, Share, Scale and Operate row below needs it. Without it the install runs Link Analysis at the **Explorer** level: the toolbox shows only its *On screen* tab (the *Whole Dataset* and *Investigation* tabs and the "Also on Whole Dataset" labels are hidden, operator 2026-11-02); other Investigation actions show locked with the reason | — | ✅ default | ✅ default | ✅ default |
+| | Investigations: sealed op log, replay, compare, temporal findings | — | ✅ | ✅ | ✅ |
+| | Dossier and Dossier bundle with verification | — | ✅ | ✅ | ✅ |
+| | Templates, external references | — | ✅ | ✅ | ✅ |
+| | Data trust: data strip, Files, coverage, delivery Alerts | — | ✅ | ✅ | ✅ |
+| Team | Sign-in, members and roles, four-eyes, audited reveal | — | ✅ | ✅ | demo sign-in |
+| | Drafts: parallel analysts, rebase, promote | — | ✅ | ✅ | ✅ |
+| Share | Embed links (read-only Investigation view) | — | ✅ | ✅ | ✅ |
+| | Case linking, Case history beside a node | — | ✅ | ✅ | ✅ |
+| Scale | Server Graph Run (29 algorithms) | — | ✅ | ✅ | ✅ |
+| | Link index, daily ingestion | — | ✅ | ✅ | ✅ |
+| Operate | Alert Rules on Investigations, standing detection (Basic: the LA app's Alerts area is hidden) | — | ✅ | ✅ | ✅ |
+| | Assistant: AI-proposed column mappings | — | ✅ | ✅ | ✅ |
+| Integrate | Third-party integration (case managers, fraud products) | — | ✅ | ✅ | ✅ |
+| Govern | Investigations on Postgres (multi-node, HA) | — | — | ✅ | ✅ |
+| | Policy engine (ABAC; can only narrow) | — | — | ✅ | ✅ |
+| | Scale-out, retention, legal hold, residency (not built yet) | — | — | ✅ | ✅ |
+| All | Configurable limits (Basic: Space layer; Standard: Space + install; Advanced: all) | ✅ | ✅ | ✅ | ✅ |
+| | Standalone Inspecto LA app or inside the console | ✅ | ✅ | ✅ | ✅ |
+
+⚠ **As built (2026-10-17, phases 2–7).** The explorer rows hold in the Basic build (below). Industry packs (phase 4:
+the Telecom and Mobile Money packs and the server Domain Profile, `GET/PUT /settings/link-analysis/domain-profile`) live
+in the base module `inspecto-entity-store` and the core, so they are in every edition, Basic included (ED-5); the
+Telecom ASN.1 decoder (`inspecto-telecom-asn1`, a CDR parser rather than a pack) stays Standard and up. Third-party
+integration (phases 5–6: `POST /inv/inbound/investigations`, `POST /inv/deep-links/resolve`, `GET/PUT /inv/integration`,
+`POST /inv/investigations/{id}/handoff`, the outbound webhooks) is withheld on Basic by the same `investigations` edition
+feature (ED-6, `LD-EDITIONS-12`): the routes answer 503 and the webhook tap sends nothing; the SPA `/open` page explains
+it. "Investigate a number" on Basic explains that Investigations are a Standard feature and leaves the number
+to a projection instead of seeding the canvas. **Case history beside a node** (`POST /inv/case-history`) is Standard and up
+**by an explicit gate** (D-LAE1, operator 2026-10-20): it has its own route module (`CaseHistoryRoutes`) naming the
+`investigations` feature, so Basic answers `503 CAPABILITY_UNAVAILABLE` "available in Standard and above" at dispatch, and
+the SPA hides the section (`LA_FEATURES.investigations`). ⚠ This overrides the archived LA-EDITIONS-1 plan, which left Case
+history "explorer" with Basic refusing it only because no Case module was there to read. Release note: an existing Basic
+install loses Case history on upgrade; no migration shim (D-LAE12).
+
+**Geo map, routes and co-location are Standard and up (D-LAE5, operator 2026-10-20), by a feature of their own.** `GeoRoutes`
+names a second edition feature, `EditionFeatures.GEO_MAP` (`geoMap`), declared by `inspecto-ops` beside `investigations`:
+Basic answers `POST /geo/projection` and `POST /geo/routes` `503 CAPABILITY_UNAVAILABLE` "available in Standard and above"
+at dispatch, while every other Link Analysis module stays up. ⛔ It is deliberately **not** done through `geoLink`: that
+id is the Space-level module switch every one of the Link Analysis route modules shares, so withholding it would take them
+all down. `/bootstrap` reports `features.geoMap` (false on Basic, with `geoLink` still true); the console nav (`navFeature:
+'geoMap'`), the Geo area of the standalone LA app and the Menu Builder's Geo view key on it, so Basic offers nothing that
+only 503s. Release note: an existing Basic install loses the Geo map on upgrade; no migration shim (D-LAE12). The module
+switch stays as before: a Space may still turn `geoLink` (all of Link Analysis) off.
+
+**Entity profile pages are Standard and up (D-LAE4, operator 2026-10-25), by a feature of their own.** The two profile
+reads, `GET /inv/entity-types/{id}/profile` and `GET /inv/entities/{type}/{key}/profile`, moved to their own route module
+`EntityPageRoutes`, which names a third edition feature, `EditionFeatures.ENTITY_PAGES` (`entityPages`), declared by
+`inspecto-ops`: Basic answers them `503 CAPABILITY_UNAVAILABLE` "available in Standard and above". The Entity Type list
+(`GET /inv/entity-types`), resolve and suggest stay on `EntityProfileRoutes`, open in every edition, because the Basic
+Start box, Add data and "Open in Link Analysis" read them. `/bootstrap` reports `features.entityPages`; the console nav
+(`navFeature: 'entityPages'`), the Entities area of the standalone LA app and the Open-in-LA page's "Open the Entity" link
+key on it. Release note: an existing Basic install loses the Entity profile pages on upgrade; no migration shim (D-LAE12).
+
+**Link Analysis widgets on dashboards are Standard and up as a UI flag only (D-LAE2, operator 2026-10-20).** `EditionFeatures.LA_WIDGETS`
+(`laWidgets`), declared by `inspecto-ops`, is reported as `/bootstrap` `features.laWidgets` (true only where `geoLink` is on and the
+edition has it). On Basic the Widget builder (Explore) does not offer the *Link analysis* and *Geo map* widget types (the Geo map one
+also needs `geoMap`). ⚠ **This is cosmetic, by decision, not access control:** the feature is deliberately not a route feature, the
+Link view's projection route (`POST /inv/projection`) stays open on Basic (the Geo map widget's routes are gated by `geoMap`, above), and a widget saved earlier still opens.
+Release note: an existing Basic install can no longer add these widget types; no migration shim (D-LAE12).
+
+## Matrix
+
+| Aspect | **Basic** | **Standard** | **Advanced (partially shipped)** |
+|---|---|---|---|
+| Transport | Plain HTTP; binds **every interface** unless you set `-Dcontrol.bind` — see the note below | HTTPS (`HttpsServer` + keystore; FIPS provider for Gov) | HTTPS, TLS at LB/gateway |
+| AuthN | **None** | **Delegated to an external IAM** (Keycloak / WSO2 / Okta / Entra) — app is an OIDC/OAuth2 **resource server** | Same, centralized IAM + token introspection |
+| AuthZ | None | **RBAC + ABAC** from IAM token claims/groups | RBAC/ABAC + per-tenant boundaries |
+| User mgmt / LDAP / SAML | n/a | **IAM's job** (federates AD/LDAP, brokers SAML) | IAM's job |
+| Secrets | env / file | `SecretsProvider` (file + OS keystore, or Vault) | Vault / cloud secrets manager |
+| At-rest encryption | optional (volume) | Volume encryption + AES-GCM for stored creds | Volume + shared-store encryption |
+| Audit | local append-only logs — **recorded in every edition and readable on Basic** via the core `/audit/search` + `/audit/export` routes (EDG-01 cell 6, 2026-09-08). ⛔ Not the same thing as CP-13's events feed, which IS gated: gating the feed alone would have taken this row's promise away, so the audit projection deliberately stayed in core. | **actor-attributed**, tamper-evident compliance log | shared, centralized audit store |
+| State | local disk | local disk (or optional Postgres — driver bundled as the `postgresql.jar` sidecar, selected by `-Dinspecto.db`) | **shared backends** (Postgres / object store / Vault) |
+| Scheduler | in-JVM | in-JVM | **distributed coordination** (leader election / locks) |
+| Compliance scope | none | SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI | inherits Standard + multi-node controls |
+| Packaging | `inspecto.jar` (processor + third-party), the core thin jars and the `inspecto-connectors.jar` sidecar; `-Dauth.mode` unset (auth-free) | The Basic jars plus the Standard-and-up optional modules (OIDC, secrets, geo, Kafka and ASN.1 connectors, delivery channels, backup, Link Analysis, ops, agent, …) and the `postgresql.jar` sidecar; `-Dauth.mode=oidc`, TLS on. ⚠ **The module list and every jar count are generated, not stated here** — see *Offerings matrix (generated)* below; this cell used to carry hand-typed counts ("seventeen optional modules, 19 jars") that had drifted twice | The Standard jars plus `policy` (ABAC), `la-store-pg` and `intelligence`; `-Dobjects.backend=postgres` (counts: see the generated matrix) — later + shared-store modules, coordinator |
+
+> ### 🔴 Listen address — read this before running Basic on a shared network
+>
+> **The control plane binds every interface by default, in every edition.** `-Dcontrol.bind=<host-or-IP>`
+> restricts it (`-Dcontrol.bind=127.0.0.1` for loopback); an unresolvable value fails the boot rather
+> than falling back to the wider address.
+>
+> ⚠ **This matters most on Basic, which ships no authenticator at all.** Left on the default, a
+> Basic install serves an unauthenticated control plane — including the config-write routes — to
+> every host that can reach the port. Set `-Dcontrol.bind=127.0.0.1`, or firewall the port, for any
+> single-user install.
+>
+> The default is deliberate (2026-08-29): narrowing it to loopback would silently make every deployed
+> Standard and Advanced install unreachable on upgrade, so the flag lets a deployment restrict itself
+> rather than changing what an existing one does. ⛔ **This table previously read "bind localhost only"
+> for Basic, which the code never enforced** — the claim, not the behaviour, was the defect. Pinned by
+> `ControlApiBindTest`.
+
+## Offerings matrix (generated)
+
+The module-by-edition matrix, the add-on table, the deployment posture and the staged-jar counts below are **generated** from
+`offerings/*.toon` (the Offerings), the module manifests and `tools/bundle-modules.mjs` by `tools/render-offerings-matrix.mjs`
+(`--write` to regenerate, `--check` in CI). Rows the generator cannot derive — transport, secrets, at-rest encryption, audit,
+compliance scope, HA and the capability rows — stay hand-authored in the matrix above, because no Offering holds a verifiable
+source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-decisions.md`, *Declined*).
+
+<!-- offerings-matrix:begin -->
+> Generated by `tools/render-offerings-matrix.mjs` from `offerings/*.toon`, the module manifests and `tools/bundle-modules.mjs` -
+> **do not hand-edit**; fix the Offering or the manifest and run `node tools/render-offerings-matrix.mjs --write`.
+> Cells: ✅ the edition stages it · — absent · 🟦 base (always present: shaded into the processor jar or a core thin jar).
+
+### Modules by edition
+
+| Module | Layer | Role | Requires | Basic | Standard | Advanced | Preview |
+|---|---|---|---|:-:|:-:|:-:|:-:|
+| `audit-spi` - Audit contract | spi | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `auth-spi` - Authentication and capability contract | spi | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `http-spi` - Route module contract | spi | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `access` - Access policy (roles, grants, row scope, audit trail) | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `acquire` - Acquisition and collectors | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `analytics` - Analytics Kernel (canonical statistics and baselines) | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `api` - Public API annotations | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `config` - Config model and codecs | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `engine` - Execution engine | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `entity-store` - Entity store | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `etl` - ETL model and step registry | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `event` - Event model and log | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `graph` - Graph algorithms | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `sql` - SQL guard and helpers | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `util` - Utilities, DuckDB access, TOON helpers, module manifests | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `workflow` - Workflow and SLA models | platform | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+| `action-requests` - Action Requests | features | optional | `notify-channels` | — | ✅ | ✅ | ✅ |
+| `agent` - Assistant agent | features | optional | — | — | ✅ | ✅ | ✅ |
+| `anomaly` - Anomaly Detection | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
+| `backup` - Backup and restore | features | optional | — | — | ✅ | ✅ | ✅ |
+| `case-management` - Case Management | features | optional | `ops` | — | ✅ | ✅ | ✅ |
+| `entity-list` - Entity lists | features | optional | `entity-store` | ✅ | ✅ | ✅ | ✅ |
+| `exchange` - Exchange (publication and ingestion contracts) | features | optional | — | — | ✅ | ✅ | ✅ |
+| `intelligence` - AI assist and intelligence | features | optional | — | — | — | ✅ | ✅ |
+| `observability` - Observability (metrics endpoint + events feed API) | features | optional | — | — | ✅ | ✅ | ✅ |
+| `ops` - Case management and objects | features | optional | — | — | ✅ | ✅ | ✅ |
+| `predictive` - Predictive Analytics | features | optional | — | — | ✅ | ✅ | ✅ |
+| `reconciliation` - Reconciliation | features | optional | — | — | ✅ | ✅ | ✅ |
+| `regulatory-reporting` - Regulatory Reporting | features | optional | `ops` | — | ✅ | ✅ | ✅ |
+| `scoring` - Scoring | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
+| `screening` - Screening | features | optional | `entity-list`, `ops` | — | ✅ | ✅ | ✅ |
+| `geo-link` - Geo and link adapters over platform data | la | optional | `la-api`, `la-core` | ✅ | ✅ | ✅ | ✅ |
+| `la-api` - Link analysis and geo routes | la | optional | `la-core`, `la-storage` | ✅ | ✅ | ✅ | ✅ |
+| `la-core` - Link analysis core and ports | la | optional | `graph` | ✅ | ✅ | ✅ | ✅ |
+| `la-storage` - Link analysis storage | la | optional | `la-core` | ✅ | ✅ | ✅ | ✅ |
+| `la-store-pg` - Link analysis PostgreSQL store | la | provider | `la-core` | — | — | ✅ | ✅ |
+| `agent-hosted` - Hosted model providers for the assistant | providers | provider | `agent` | — | — | — | — |
+| `asn-decoders` - ASN.1 decoders | providers | provider | — | — | — | — | — |
+| `connectors` - Collector and export connectors | providers | provider | — | ✅ | ✅ | ✅ | ✅ |
+| `connectors-kafka` - Kafka stream connector | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `demo-auth` - Demo authenticator | providers | provider | — | — | — | — | — |
+| `geo-country` - MaxMind geo-country resolver | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `notify-channels` - Notification channels | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `oidc` - OIDC authenticator and token relay | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `policy` - Attribute-based access policy | providers | provider | — | — | — | ✅ | ✅ |
+| `secrets` - File-keystore secrets provider | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `telecom-asn1` - Telecom ASN.1 decoder | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `processor` - Control plane and processor host | inspecto | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
+
+### Add-ons by edition
+
+| Add-on | Modules / hosted by | Basic | Standard | Advanced | Preview |
+|---|---|:-:|:-:|:-:|:-:|
+| actionRequests | `action-requests` | — | built | built | built |
+| aiAssist | `agent` | — | built | built | built |
+| anomalyDetection | `anomaly` | — | built | built | built |
+| caseManagement | `case-management` | — | built | built | built |
+| incidents | `ops` | — | built | built | built |
+| integrationDelivery | `notify-channels` | — | built | built | built |
+| laInvestigations | `ops` | — | built | built | built |
+| linkAnalysis | `la-storage`, `la-core`, `la-api`, `geo-link` | built | built | built | built |
+| multiEntity | `exchange` | — | built | built | built |
+| predictiveAnalytics | `predictive` | — | built | built | built |
+| premiumConnectors | `connectors-kafka` | — | built | built | built |
+| reconciliation | `reconciliation` | — | built | built | built |
+| regulatoryReporting | `regulatory-reporting` | — | built | built | built |
+| scoringLists | `entity-list`, `scoring` | — | built | built | built |
+| screening | `screening` | — | built | built | built |
+| telecomIndustryPack | `telecom-asn1` | — | built | built | built |
+| workflowSla | `ops` | — | built | built | built |
+
+### Deployment posture
+
+| Posture | Basic | Standard | Advanced | Preview |
+|---|:-:|:-:|:-:|:-:|
+| authMode | none | oidc | oidc | oidc |
+| eventsBackend | parquet | parquet | parquet | parquet |
+| objectsBackend | default | default | postgres | default |
+| postgresSidecar | absent | bundled | bundled | bundled |
+
+### Staged jars
+
+| | Basic | Standard | Advanced | Preview |
+|---|:-:|:-:|:-:|:-:|
+| First-party jars (processor + connectors + optional + core thin) | 23 | 42 | 45 | 45 |
+| of which core thin jars | 16 | 16 | 16 | 16 |
+| Optional modules beyond Basic | 0 | 19 | 22 | 22 |
+| Total on the classpath (+ third-party sidecars) | 23 | 43 | 46 | 46 |
+<!-- offerings-matrix:end -->
+
+## Preview — not a customer-facing tier
+
+**Preview exists only for testing/incubation (operator decision, 2026-09-21) and is deliberately not a
+row in the matrix above.** It is the one place this document's organising rule gets an exception on
+purpose: *"a feature an edition lacks is a module that edition does not bundle"* still holds, but Preview
+answers it by bundling **every** optional module unconditionally, so a module still in incubation is
+reachable for testing the day it compiles — without an edition decision having been made yet for where it
+eventually lands (Basic/Standard/Advanced).
+
+- `mvn -o clean package -Pedition-preview` (`pom.xml`) and `pwsh -File inspecto/package.ps1 -Edition
+  Preview` build/stage it.
+- `tools/bundle-modules.mjs`'s `bundleModules('Preview')` takes the whole module table unconditionally
+  (not floor-based like the other editions), so a brand-new optional module needs **no edit there** to
+  reach Preview the moment it exists. `pom.xml`'s `edition-preview` profile is static XML and does
+  **not** auto-union — a new module must be added to it by hand or Preview silently stops being
+  "everything" (comment at the profile, `pom.xml`).
+- Today Preview's module set is byte-identical to Advanced's (nothing is currently incubation-only)
+  — since P3d (2026-10-08) `serve.bat`/`serve.sh` read the edition from the bundle's
+  `edition.properties` (`edition=Preview`) rather than guessing it from jar presence, so a Preview bundle
+  reports `edition: Preview` at boot (and keeps the operational objects on DuckDB — only `Advanced`
+  pins PostgreSQL). The distinction in module sets only starts to matter once an incubating module
+  exists that Advanced doesn't carry.
+- Never ship Preview to a customer, never advertise it externally, and never let it gate a compliance
+  claim — it carries no compliance-scope guarantee at all.
+- See [`okf/product/layer/platform/admin-guide-local-testing.md`](admin-guide-local-testing.md)
+  for the companion no-IAM/no-Postgres local path (Demo User sign-in, an Advanced-only demo build).
+
+## Basic — the Link Analysis explorer (LA-EDITIONS-1 phase 3, 2026-10-17)
+
+**What ships.** `inspecto-entity-list`, `inspecto-la-core`, `inspecto-la-storage`, `inspecto-la-api` and
+`inspecto-geo-link` are default-reactor modules (`pom.xml`) staged in every bundle (`tools/bundle-modules.mjs` floor
+`all`, `offerings/basic.toon`), so a Basic install answers the explorer routes — projection, neighbours, paths, patterns,
+Value Measures, Entity identities, the Entity Type list, resolve and suggest, reference rows, snapshots — **with no
+sign-in** (Basic ships no Authenticator). The graph library the plan called `la-graph` is the core thin jar
+`inspecto-graph`, already in every edition.
+
+**What is withheld, and how.** One edition feature, `EditionFeatures.INVESTIGATIONS` (`investigations`), declared by
+`inspecto-ops` (`OpsEditionFeatures`) — a module only Standard, Advanced and Preview bundle. Every Link Analysis route
+module of the Investigation surface names it in `featureIds()` beside `geoLink` (Investigations, Drafts, Dossier and
+bundle, Working Set, references, templates, coverage, compare, Case link, Case history, members, embeds and the public embed view,
+Graph Run, link index builds, Dataset Files, measures / Alert Rules / standing detection, data-changes). When no
+installed module declares it, the host answers those routes **`503 CAPABILITY_UNAVAILABLE`** — "Link Analysis
+Investigations (…) are available in Standard and above — this build (Basic) is the Link Analysis explorer and does not
+include them" — at dispatch (`ControlApi.requireModuleEnabled` → `EditionFeatures.gatesRoutes`), before the Space's own
+module switch (404 `MODULE_DISABLED`). The rule this document keeps — *a feature an edition lacks is a module that
+edition does not bundle* — still holds: Basic lacks the Investigation surface because it lacks `inspecto-ops`.
+`/bootstrap` reports `features.geoLink: true, investigations: false`, `laLevel: "explorer"` and
+`featureReasons.investigations` on Basic, and the SPA (`LA_FEATURES.investigations` / `featureReasons`, from
+`SessionService`) shows the Investigation actions LOCKED with that line (`<inspecto-locked-action>`, `LA-ONBOARD-1` OB-10;
+operator answer A-11 "locked with a reason inside screens"): the Investigation tab's *Start an Investigation*, "start an
+Investigation from the top results", every Run-on-server / Run-on-index control and the edge-index and server-algorithm
+tools. The `?investigation=` and `?seed=` openers still open nothing, so nothing offered can 503. The standalone Inspecto LA app also hides its **Alerts** area on
+Basic (operator 2026-10-21): those are the standing-detection Alerts behind Investigations, so the rail and landing page
+omit it (`la-nav.ts` `feature: 'investigations'`) and a typed `/alerts` lands on the landing page (`investigationsGuard`). Pinned by `ControlApiBasicEditionLinkAnalysisTest`
+(`la/inspecto-geo-link`: Basic answers an explorer route 200 with no sign-in and refuses one route per Investigation
+module; Standard answers both) and the Explorer-level specs in `link-analysis.component.spec.ts` /
+`link-analysis-toolbox.server-run.spec.ts`.
+
+**The Investigations add-on: the same Explorer level on Standard and above** (`LA-ONBOARD-1` OB-5, operator-confirmed
+2026-10-22, DATA-TIERS-1 DT-11 clarified). Investigations is a billable add-on (Product Map `addon.laInvestigations`,
+`INS-AO-LA-INVESTIGATIONS`, `enforcement: runtime`) included by default wherever the edition carries `inspecto-ops`. An
+installation that does not hold it starts with `-Daddons.laInvestigations=false` (for example in `INSPECTO_JAVA_OPTS`):
+`EditionFeatures.present(INVESTIGATIONS)` then answers false, so the same routes answer `503 CAPABILITY_UNAVAILABLE` naming
+the add-on ("… need the Investigations add-on (INS-AO-LA-INVESTIGATIONS), which this installation does not hold …") and
+`/bootstrap` reports `laLevel: "explorer"`. The edition stays the one governance switch: sign-in, roles and enforced
+masking are unchanged. Until a signed entitlement exists, whoever runs the server can claim the add-on; the one place the
+proof is read is `EditionFeatures.holdsInvestigationsAddon()`. Basic never has it, whatever the setting says. Pinned by
+`ControlApiInvestigationsAddonTest`.
+
+**Masking on Basic is off by default, and display-only when on** (operator 2026-10-21; since `LA-ONBOARD-1` OB-6 the default
+keys on SIGN-IN, operator answer A-16). A Space that states no `masking_mode` masks nothing when nobody signs in (`auth.mode`
+none and no Authenticator: Basic); wherever people sign in the shipped `typed` holds, with or without the Investigations
+add-on. The seam is `LinkAnalysisSettings.effectiveMaskingMode`, which every masking reader and `GET /settings/link-analysis`
+`maskingModeInForce` go through; it asks the `MaskingDefault` provider the control plane ships (`EditionMaskingDefault`), so
+the API and the SPA agree. Pinned by `ControlApiMaskingDefaultBySignInTest`.
+⚠ It is the Space's ONE masking mode, so on Basic the BI reads (`BiResultMasking`: queries, KPIs, the DB browser and
+Report Job exports) are unmasked by default too. The exception is a public dashboard share: its holder is anonymous and
+cannot reveal, so it masks under the shipped `typed` unless the Space states a mode (`BI-QUERY-MASKING-1` review, 2026-10-23).
+A Space that STATES a mode keeps it in every edition. Such a mode still masks entity ids in explorer answers, but with no
+sign-in there is no Subject, so the capability an audited reveal needs (`canRevealLinkEntities`) is never checked and
+anyone may reveal. Masking on Basic stops a casual glance; it is not access control. Enforced masking (and the audited
+reveal on an Investigation) starts in Standard.
+
+**Preview carries all of it (phase 7).** Preview bundles every module of every edition and builds with demo sign-in:
+`package.ps1 -Edition Preview -DemoAuth` (Advanced or Preview; `tools/offering-classpath.mjs --edition preview --demo`
+swaps the OIDC trio for `inspecto-demo-auth.jar`). Held by the `Preview carries every module …` test in
+`tools/offering-classpath.test.mjs` (the generator table, the plain and demo classpaths and the `edition-preview`
+profile) and by `tools/check-offerings.mjs` (Offering == bundle == pom profile).
+
+## Data layer by edition (DATA-TIERS-1, as built 2026-11-06)
+
+Operator rule: *"Basic is not a demo; it must be usable."* **Basic runs any configuration it is given.** Since the
+2026-11-05 re-plan (DT-9 narrowed, [`data-tier-editions-plan.md`](../../../../superpower/data-tier-editions-plan.md) §5.3) the
+edition line in the data layer is **what each edition's screens offer**, not what the engine refuses: no DATA-TIERS-1 gate refuses a Pipeline,
+Step, Collector kind or trigger when a Basic install loads its configuration. The edition refusals that predate it stay
+(a PII `mask` Step, DuckLake registration and the compliance archive are refused on load, `EditionFeatures.requirePipeline`;
+Alert Rules are held, not armed). The engine is the same in every edition; what differs is the offer.
+
+**Add data — the three ways in, every edition.** Add data is a platform feature with three ways in and one default
+Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspecto LA's is its link index):
+
+1. **Upload a file** (CSV / TSV, Parquet, JSON / NDJSON, Excel when the bundle carries the DuckDB `excel` extension), or
+   point at a large file in place, re-checked by size and modified time on every read (DT-3).
+2. **An import inbox**: files dropped there are imported with *Import waiting files* (*Run now*), or, when the person
+   turns on *Watch this folder* on the Dataset card, by a fixed 30 s poll (off by default, not configurable, run by the
+   platform's one poller `InboxWatch`, not a Pipeline trigger: an import's Pipeline stays `trigger: manual`).
+3. **Choose a table**: a Postgres table or a read-only `SELECT`, copied as a *replace everything* snapshot. *Refresh
+   now* exports the table into a temporary folder and moves the finished file into the Dataset's inbox; a snapshot is
+   **never polled** (since 2026-11-05). Read through DuckDB's `postgres` extension, already in every bundle; a
+   write-capable login is refused, and only a `${ENV:INSPECTO_PG_…}` password reference is resolved.
+
+| Data layer | Basic | Standard | Advanced |
+|---|---|---|---|
+| Add data: upload, inbox (*Watch this folder*, 30 s), Postgres snapshot (*Refresh now*) | ✅ | ✅ | ✅ |
+| Column review: names, types, column roles (Entity · Time · Measure · Category · Detail), Entity Types | ✅ | ✅ | ✅ |
+| Row filter on the review step, and *Edit filter* on the Dataset card (applies to the next files) | ✅ | ✅ | ✅ |
+| Expectations, quarantine and dedupe, evaluated in the import's own run (DT-15) | ✅ | ✅ | ✅ |
+| Arrivals list, name-checked columns, duplicate refusal, *Replace the period*, compaction (automatic, and *Compact now*) | ✅ | ✅ | ✅ |
+| A later file's new columns kept as details (*Keep new columns as details* on *Add a file*; unattended runs keep them; `LA-ARRIVAL-NEW-COLUMNS-1`) | ✅ | ✅ | ✅ |
+| Retention policy on an import Dataset (`PUT /datasets/{id}/storage`; *keep N arrivals* counts each arrival, also after *Replace the period*, `LA-DATASET-COMPACT-2`) | — every file stays, compacted | ✅ | ✅ |
+| *Keep this up to date*: a watched folder or SFTP feed on a chosen schedule (`PUT /datasets/{id}/feed`) | — locked | ✅ | ✅ |
+| Discover, entity summary, query builder, preset questions (Inspecto LA, feature `geoLink`) | ✅ | ✅ | ✅ |
+| Add data's *another database or a remote system* | — locked | not locked: the screen says a Pipeline reads them | as Standard |
+| Enrichment offer on the Dataset page (*Add the details from X to each row*) | — locked; join in a Studio query | ✅ | ✅ |
+
+**How the locks work today.** `pipeline.automation` (`EditionFeatures.PIPELINE_AUTOMATION`) is declared by
+`inspecto-ops` (`OpsEditionFeatures`), so Standard and up have it and Basic does not. The feed and storage routes check
+it themselves (Basic answers `503 CAPABILITY_UNAVAILABLE`; a retention policy already stored is ignored on Basic, so Basic
+never drops rows), and the feed and storage reads report it (`automatic`, `retentionAvailable`). `/bootstrap` does **not**
+yet serve `features.pipelineAutomation`, `remoteSystems` or `pipelineTransform` (DATA-TIERS-1 P2): the screens lock
+those offers when the flag is absent and the edition is `basic`, with their own wording until the server names one.
+
+**Where the line is not drawn yet.** The console's Pipelines, Collectors and Jobs panes carry no edition lock: on Basic
+they open as on Standard. The step-palette locks (P6), the outbound-delivery locks (P5) and the ASN.1 move to Advanced (P4)
+are not built, so the Step Processor, `objectstore.export` and `publish.postgres` rows below still show what the build
+carries. The product states nothing either way about scheduled or signal-driven Jobs on Basic (DT-16).
+
+### Release note — the data layer by edition (2026-11-06)
+
+- **New in every edition:** Add data's three ways in (upload, an import inbox with *Watch this folder*, a Postgres
+  table snapshot by *Refresh now*), column roles, row filtering and *Edit filter*, the arrivals list with compaction,
+  a later file's new columns kept as details, and Discover, the entity summary and the query builder in Inspecto LA.
+- **Standard and up:** *Keep this up to date* and a retention policy now work on a real Standard bundle (before
+  2026-11-05 no module declared `pipeline.automation`, so both were refused everywhere outside tests). An import's link
+  index is still built in the person's own run.
+- **Basic:** *Keep this up to date* is locked with a reason, and so are another database or a remote system in Add data
+  and enrichment on the Dataset page; the retention form is not shown (every file stays, compacted). A Postgres snapshot is refreshed by *Refresh now* only; the
+  30 s refresh it had for part of 2026-11-05 is gone.
+- **Nothing breaks on load.** A Basic install keeps running the configuration it has: no DATA-TIERS-1 gate refuses a
+  Step, Collector kind or trigger (DT-9 narrowed); the older refusals (PII masking, DuckLake, the archive) are unchanged. The breaking changes the plan's §9 listed are not shipped.
+
+Reverses DT-4 (Postgres only), narrows DT-5 / DT-17 to the import inbox, widens DT-10. As built:
+[`okf/product/module/la-core/architecture.md`](../../module/la-core/architecture.md) §6.20,
+[`okf/product/module/processor/api-onboarding-authoring.md`](../../module/processor/api-onboarding-authoring.md);
+plan [`archived-documents/plans-archive/basic-onboard-plan.md`](../../../../archived-documents/plans-archive/basic-onboard-plan.md).
+
+## UI flavor — not an edition
+
+`package.ps1 -Ui gamma|la-app` (default `gamma`, since 2026-10-02) chooses which Angular application the bundle's `ui/` serves: the
+Inspecto console (`gamma`) or the Link Analysis application (`la-app`). It is orthogonal to `-Edition`: there is no fifth edition, no
+Maven profile and no edition branch for it, every edition can ship either, and the Link Analysis backend modules stay where the
+matrix puts them (the explorer in every edition, the Investigation surface Standard and above). A bundle holds exactly one application. An LA-only edition (only the Link Analysis
+modules plus security) remains a possible later promotion, not a decision taken. See
+[`okf/product/layer/platform/spec-build-test.md`](spec-build-test.md) (*Packaging*).
+
+## Assembly model (how an edition is produced)
+
+| Mechanism | Used for |
+|---|---|
+| **Separate Maven module** — **the list below is illustrative; the authoritative set is derived by `tools/bundle-modules.mjs`** (re-derived 2026-10-07: 20 optional modules): `inspecto-oidc`, `inspecto-secrets`, `inspecto-geo-country`, `inspecto-policy`, `inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-observability`, `inspecto-ops` | Standard-and-up code (OIDC resource-server, TLS, RBAC; the webhook + SMTP delivery transports; the backup/restore maintenance tasks; cross-space sharing; the Prometheus `/metrics` exposition). Basic simply doesn't bundle it. (The geo map + link analysis modules were in this group until LA-EDITIONS-1 phase 3 moved the explorer into every edition.) Beyond those, **Advanced-only and optional**, is `inspecto-la-store-pg` (2026-10-04, `LA-INVESTIGATION-STORE-DESIGN-1` S6): the PostgreSQL Link Analysis Investigation store a second pod needs to share a Space. It is a thin jar over plain JDBC, built under `-Pedition-advanced` / `-Pedition-preview`, staged by `package.ps1`, and **inert until `-Dinvestigations.backend=db`**: every edition, Advanced included, defaults to the filesystem. |
+| **Maven profiles** (`-Pedition-standard` / `-Pedition-advanced`) | Which modules + shade includes go into the fat-JAR. `edition-advanced` = `edition-standard` + `inspecto-policy`. 🔴 **There is no `edition-basic` profile** — the parent POM declares `edition-standard`, `edition-preview` and `edition-advanced` (plus `coverage`). **Basic is the DEFAULT**, i.e. the reactor with no profile at all, which is what `package.ps1` does (`if ($Edition -ne 'Basic')` guards every Standard+ step). ⚠ The old text named a third flag; Maven only *warns* on a profile that does not exist and then builds the default, so a shift following this table would have got the right bundle for the wrong reason and learnt nothing from the build. |
+| **`ServiceLoader`** | Runtime discovery — absent module ⇒ the no-op impl is the only one found (mirrors the optional assist agent). **Since 2026-09-07 this includes whole route groups**: `com.gamma.spi.http.RouteModule` is a public SPI, discovered and registered *after* the built-in list (first-match order is preserved; a colliding `(method, pattern)` fails the boot). |
+| **`-D` flags** (`-Dauth.mode`, TLS on/off) | Runtime toggles within an edition. |
+| **`package.ps1 -Edition …`** | Emits the per-edition bundles from one build. |
+
+The core engine never contains `if (edition == …)` branches; it depends on SPIs (`Authenticator`,
+`SecretsProvider`, …) and the **build** decides which implementation ships. One SemVer version spans all
+editions. 🔴 **No classifier is emitted** (corrected 2026-09-09): all three flavours write the same
+`inspecto-deploy-<platform>.zip` path (Since 2026-09-17 the zip is named after the EMBEDDED runtime's platform — `inspecto-deploy-<platform>.zip` (`windows_amd64`, `linux_amd64`), read off the jlink image, never the host OS (`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`).) and `release.yml` **collects** them via `tools/release-collect.sh` as `inspecto-deploy-<edition>-<platform>.zip`, failing when the runner's own platform is missing.
+There is no `-standard` artifact at all and no `-advanced` classifier — the two names this line used
+are exactly the pair the pipeline does not produce.
+
+## Status — core is auth-free (2026-06-16)
+
+The hand-rolled bearer-token control plane that earlier versions baked into `ControlApi`
+(per-route `Scope` + `Tokens` + `requireAuth`, `-Dcontrol.token` / `-Dassist.*.token` (removed), the
+Angular token-paste `/connect` screen + `authInterceptor` + route guard) has been **removed
+from the common core / `master`**. The Basic edition is now genuinely auth-free: every
+ControlApi route is open and the SPA boots straight to the dashboard with no login.
+
+Authentication is no longer a core concern — it becomes an **edition** concern. The
+Standard/Advanced editions re-introduce it out-of-band (see below) behind an `Authenticator`
+SPI seam, so the engine keeps no auth code and fixes/features land once in common. This realigns
+the code with the model already described here: editions add modules; they are never branches.
+
+**Status (2026-07-06, W6):** the `Authenticator` SPI (`com.gamma.spi.auth.Authenticator`/`Subject`)
+and the AuthN/AuthZ gate in `ControlApi.dispatch` are shipped in the core (edition-neutral — a no-op
+when no implementation is on the classpath). The `inspecto-oidc` module ships the Standard
+implementation (`OidcAuthenticator`, Nimbus JOSE+JWT + JWKS) and is reactor-gated behind the
+`edition-standard` Maven profile, so it is never built or resolved by a routine Basic build.
+`package.ps1 -Edition Standard` builds and bundles it; see `docs/okf/product/module/processor/plan-control-api.md` (design of record; the 2026-07-06 design is archived)
+§10 W6 for the full slice and `docs/api/deployment/` for WSO2/Keycloak blueprints.
+
+## Security direction (Standard)
+
+Authentication is **delegated to an external IAM** — the app validates IAM-issued JWTs (Nimbus + JWKS:
+issuer/audience/expiry) and enforces authorization from claims. The IAM owns user management, AD/LDAP
+federation, and SAML brokering, so none of that lives in the Java core. The Angular UI uses OIDC
+Authorization Code + PKCE (public client, no shipped secret).
+
+This is **incremental hardening on the existing framework-free core** — *not* a Spring Boot / Quarkus
+migration. At 5–15 users with a capabilities-based RFP, a framework buys nothing the IAM + small libraries
+don't, and a lean dependency tree is a FedRAMP asset (small SBOM, fewer CVEs to attest). The full
+assessment + 7-phase hardening roadmap is maintained alongside this repo's planning notes.
+
+## Advanced (partially shipped 2026-07-23) — keep the seams open
+
+**Shipped — the ABAC policy engine (rbac-abac-plan §4):** the `edition-advanced` Maven profile
+(= `edition-standard` + `inspecto-policy`). The module registers a `PolicyEngine` on the core's
+`com.gamma.spi.auth.AccessDecider` ServiceLoader seam; authored per-space Access Policies
+(`access-policies.toon`, the shared `Conditions` grammar) then evaluate at the route-level authorize
+stage (deny = 403) and the row-level `RowScope` filter (deny = the SEC-7d 404/filtered contract).
+Basic and Standard never bundle the module and behave byte-identically. Build/test:
+`mvn -o clean test -Pedition-advanced`.
+
+**Shipped 2026-07-25 — the packaging flavor.** `package.ps1 -Edition Advanced` now emits a deployable
+Advanced bundle, closing the last gap between "the profile builds" and "an operator can ship it". It is
+a **superset of Standard** (mirroring the profile relation), so it builds `inspecto-oidc` *and*
+`inspecto-policy` under `-Pedition-advanced` and bundles both `inspecto-oidc.jar` and
+`inspecto-policy.jar`. The generated `bin/serve.sh`/`bin\serve.bat` read the edition from the bundle's
+`lib/edition.properties` (P3d, 2026-10-08 — they used to sniff jar presence: security jar ⇒ `Standard`,
+plus policy jar ⇒ `Advanced`; that heuristic survives only as the fallback for a hand-assembled directory)
+and every edition above Basic gets `-Dauth.mode=oidc`; the classpath is the bundle's `lib/modules.list`,
+written by `tools/offering-classpath.mjs` from the Offering. **No new runtime flag exists or is needed** — `inspecto-policy` is found
+solely through `META-INF/services/com.gamma.spi.auth.AccessDecider`, so the classpath entry *is* the
+switch. Basic bundles remain byte-for-byte unchanged. Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`)
+Advanced also stages `inspecto-intelligence.jar` (CP-14 `/agent/*`), found the same way through
+`META-INF/services/com.gamma.intelligence.spi.IntelligenceAgent` and loaded through `OptionalSpi`, so a host
+whose Java cannot link it boots without it and `/agent/*` answers 503.
+
+**Shipped 2026-07-24 — per-tenant space isolation (A4 = SPC-5):** `PolicyEngine.SEED` carries two
+engine-resident seeded policies (`space-isolation`, `space-isolation-rows`) denying access outside
+the subject's home space; they engage only once a `space` claim is mapped via `roles.toon`
+`identity: {attributeClaims}`, exempt `canConfigureAccess` holders, and are tailorable/disableable
+by authoring a policy of the same name in `access-policies.toon`.
+
+Already fits: stateless stage-1 engine, **stateless JWT auth** (no server session ⇒ horizontal scale),
+pluggable `DbStatusStore` (Postgres) / `ObjectStore` db backend / `ParquetEventStore`, `SecretsProvider`.
+Will need later (don't preclude now): distributed scheduler coordination, all state on shared backends
+(Postgres + object store for Parquet + shared secrets), work distribution.
+
+## Feature × edition matrix (working board, opened 2026-09-02)
+
+**How to read and work this board.** One row per product feature, one cell per edition. A cell is
+addressed as `<row-id>/<P|S|E>` (e.g. `SEC-03/S`) so we can decide, build and deliver **cell-wise** — the letters
+predate LA-EDITIONS-1 and are kept so existing references stay valid: **P = Basic, S = Standard, E = Advanced**.
+Rows are grouped by the FEATURE_INVENTORY §1 areas plus the control-plane / security / compliance — ⚠ **there is deliberately no `UI` row group** (corrected 2026-09-08: this note claimed one). The SPA shell ships in every edition and adapts to what registered; a gated pane rides its module's row (`CP-09`, `CP-11`, `CP-13`). Shell requirement-of-record: [`okf/product/layer/product/plan-surfaces.md`](../product/plan-surfaces.md). Legacy wording:
+surfaces EDITIONS.md §Matrix already splits. **Editions are build flavors of one codebase** — a core
+feature is in every edition by construction, so most Basic/Standard/Advanced cells agree; the
+board exists for the cells that *differ* or are *undecided*.
+
+| Cell | Meaning |
+|---|---|
+| ✅ | shipped in this edition (the feature is in the bundle and exercised) |
+| 🟡 | partial — shipped with a stated gap (see Notes) |
+| 🔲 | planned for this edition, not built |
+| — | deliberately not in this edition (a decision, not a gap) |
+| ❓ | undecided — needs an operator call before anyone builds |
+| *not stated* | the product deliberately states nothing either way (DATA-TIERS-1 DT-16, operator 2026-11-05: "no promise, keep silent") |
+
+🔴 **A ✅ means the capability is PRESENT AND USABLE on that edition. It does NOT mean "gated to this
+tier and above."** (Convention stated 2026-09-15, `SPEC-GREENCELL-1`.) The distinction is load-bearing
+because **Basic is auth-free by design and enforces no capability gate at all**:
+`ApiContext.requireCapability` is a deliberate no-op when no `Subject` is attached, so a route carrying a
+capability check is still open there. Read the wrong way, every gated row looks like an overclaim on
+Basic — which is exactly how `BI-4`/`BI-6`/`BI-7` were first filed as a security hole and then
+**corrected to a documentation defect**. ⛔ Do **not** "fix" that by adding refusals to the routes: it
+would break an edition's designed posture to satisfy a table. Where a capability is *enforced*, and by
+what, is owned by [`okf/product/module/access/plan-security.md`](../../module/access/plan-security.md)
+§capability-vocabulary — not by this matrix.
+
+⚠ Keep the row IDs stable once referenced; append new rows at the end of their area. A cell that
+changes state carries the date in Notes. Source of truth for *what* a feature is stays
+[`FEATURE_INVENTORY.md`](../../../../FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
+
+### Core engine — platform capabilities (identical across editions by construction) [`ING` · `MET` · `PIP`]
+
+> ⚠ **Two rows in this table have no capability owner** (measured 2026-09-09, step 8): **`XFM-04`** (Decision Rules) and **`OUT-04`** (auto-chunking + DuckDB scratch/memory tuning) are cited by **no** capability spec, while `XFM-01..03`/`OUT-01..03` moved to the Step Processors table as `SP-XFM-*`. They were left behind by that split. `XFM-04`'s subject (Decision Rule) belongs to `INC` by [`GLOSSARY.md` §14](../../../../GLOSSARY.md#14-capability-areas-the-functional-spine) and `OUT-04`'s to `PIP` execution — ⛔ but neither spec claims them yet, so this note records the gap rather than asserting an owner.
+
+> Split 2026-09-02: the per-processor rows (parsers, transforms, sinks, acquisition adapters — the former
+> ING-03/04, PRS-*, XFM-01..03, OUT-01..03) moved to the **Step Processors** table below; this table keeps
+> the platform capabilities no single processor owns.
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | *not stated* | ✅ | ✅ | FEATURE_INVENTORY §A. P cell *not stated* since 2026-11-06 (DATA-TIERS-1 DT-16 / §5.3): Basic runs any configuration it is given, and the product makes no promise either way about Pipelines that run on their own there. What Basic offers is Add data's own arrival: *Run now*, and *Watch this folder* (a fixed 30 s poll of an import inbox, `InboxWatch`, not a Pipeline trigger) — *Data layer by edition* above |
+| ING-02 | Consignment formation (`collector.consignment: max_files / max_bytes / order`) | ✅ | ✅ | ✅ | moved to the Collector 2026-09-02 (CONSIGNMENT-HOME-1); legacy `processing.batch` dual-read |
+| ING-05 | Unpack stage (zip/tar/gz/bz2/Z) | ✅ | ✅ | ✅ | ⚠ **nested archives are refused by design** (`UnpackLimits.depth` = 1, any other value refused by name) — this row promised them until 2026-09-08; xz/zstd have no codec (BACKLOG §3) |
+| SCH-01 | Schema registry: field types (all DuckDB scalars, fail-closed), rules (`DIRECT`/`EXPR`/`CONCAT_DT`/`FILENAME_DATE`), multi-format dates | ✅ | ✅ | ✅ | fail-closed types = `SchemaFieldTypes` (2026-08-22); the `rules[]` spelling now *loads by conversion* — the engine reads `fields[]` first (`MAPPING-SPELLING-1`, BACKLOG §1). *(This cell pointed at a §C that does not exist until 2026-09-08.)* |
+| SCH-02 | Quarantine / reject routing | ✅ | ✅ | ✅ | |
+| SCH-03 | Field classification metadata (PII / INTERNAL) | ✅ | ✅ | ✅ | metadata; Link Analysis masks entity ids by it (`maskingMode`, editions that ship `inspecto-geo-link`); no other surface masks on it (see SEC-08) |
+| XFM-04 | Decision Rules (space-registry, rule-routed outputs) | ✅ | ✅ | ✅ | keep a pipeline on the flat lane when they route rows |
+| OUT-04 | Auto-chunking of huge files, DuckDB scratch/memory tuning | ✅ | ✅ | ✅ | |
+| JOB-01 | Job framework (`enrich`, `report`, `maintenance`, `pipeline`, `sql.template`, `consignment.process`, `objectstore.export`, `recon.run`, `risk.score`, `caserule.evaluate`, `objects.analytics`, `mail.send`) | ✅ | ✅ | ✅ | §F. ⚠ **`caserule.evaluate` and `objects.analytics` are `inspecto-ops` Job Types (EDG-01 cell 7) — unknown on Basic; `recon.run` is an `inspecto-reconciliation` Job Type and `risk.score` an `inspecto-scoring` Job Type (MODULE-REORG-1 P7) — also unknown on Basic**; the framework cell stays ✅ (corrected 2026-09-08, `okf/product/addon/incidents/plan-incidents.md` §2). `objectstore.export` is planned Standard and up as outbound delivery (DATA-TIERS-1 P5, locked in Basic's screens; not built 2026-11-06): today it registers on Basic as before |
+| JOB-02 | Triggers: cron, `on_pipeline`, `on_signal` + `when` guards, `catch_up`, manual | *not stated* | ✅ | ✅ | P cell *not stated* since 2026-11-06: DT-16's Jobs gate was dropped (operator 2026-11-05, "no promise, keep silent"), so a Basic install arms the Jobs its Spaces define and the product states nothing either way. An import's own follow-on work (its link index, its Expectations) runs inside the person's run in every edition, never as a Job |
+| JOB-03 | Maintenance task library (cleanup, ledger/runlog/notification/receipt/dedup/event prune, incident_purge, backup/restore/verify, storage report/trend, compact, materialize, db_maintenance) | 🟡 | ✅ | ✅ | P is 🟡 (corrected 2026-09-08): four of the listed tasks are not on Basic. `event_prune` added 2026-09-02 (COMPLY-3). ⚠ **`incident_purge` is an `inspecto-ops` task (EDG-01 cell 7) — unknown on Basic**; backup/restore/verify are `inspecto-backup` (cell 2), also not Basic (corrected 2026-09-08) |
+| JOB-04 | Consignment concurrency broker (priority shares, intake caps) | ✅ | ✅ | ✅ | Intake file cap ON by default — `ingest.maxFilesPerCycle` = 500 (`IntakeGovernor.DEFAULT_MAX_FILES_PER_CYCLE`; operator, 2026-10-06, soak waived); `0` = unbounded. The byte cap stays off by default |
+| JOB-06 | BI publication — `publish.postgres` Job: curated Datasets to a Postgres schema, full refresh (atomic swap) or partition-incremental, Catalog column comments (ASSURE-BI-PUBLICATION-1) | ⚠ | ✅ | ✅ | The Job Type is core and registers everywhere, but the PostgreSQL JDBC driver ships only as the Standard/Advanced `postgresql.jar` sidecar (PG-1), so on Basic a run fails with `No suitable driver`. Without an authenticator (Basic) four-eyes approval can never be met, so the Job cannot be created through the API, and sensitive-classified columns are never published. [`okf/product/layer/product/plan-studio.md`](../product/plan-studio.md) §3.6. Planned Standard and up as outbound delivery (DATA-TIERS-1 P5, not built 2026-11-06). Not to be confused with Add data's *Choose a table*, which READS a Postgres table on every edition through DuckDB, with no JDBC driver |
+| JOB-05 | Risk Scores — `risk-score` model, `risk.score` Job, `GET /risk-scores/{model}/{entityKey}` + `POST /risk-scores/preview` (ASSURE-RISK-SCORE-1) | — | ✅ | ✅ | **NOT in Basic (MODULE-REORG-1 P7, 2026-10-07) — a deliberate behaviour change.** The two `/risk-scores` routes, the model/evaluator, the `risk.score` Job Type and the save-time checks of the `risk-score` kind left the core for the optional `inspecto-scoring` module (the Scoring half of the plan §8a Scoring and Lists add-on; it depends on `inspecto-entity-list` for the watch-list seam), staged from Standard up. On Basic the paths answer **503 "not installed"** (`AbsentModuleRoutes`), `/bootstrap` reports `features.scoring=false` and `risk.score` is an unknown Job Type; a `risk-score` component is accepted there as opaque config (nothing can evaluate it). The core keeps the pending Alert Rule feature (`PendingAlertRules`, over `RiskScoreOutputs`) and the `EvidenceMasker` (`com.gamma.mask`). Turning a high score into an Incident is an ordinary per-entity Alert Rule, so it follows Alert Rule authoring (Standard+, G9). The read route is `canWorkIncidents`-gated. [`okf/product/module/scoring/spec-risk-scores.md`](../../module/scoring/spec-risk-scores.md) |
+
+### Step Processors (one row per processor; the board's authoring surface) [`ING` · `PIP`]
+
+Generated from the processor catalog (`ProcessorCatalog`, served on `GET /pipelines/processor-catalog`, mirrored to
+`processor-catalog.contract.json`) — edit the catalog, regenerate this table; do not hand-edit rows. **Status**: ✅ delivered
+(maps onto an existing node type / engine capability, named in *Maps to*), 🟡 partial (a neighbour capability covers part
+of it — the gap is in Notes), 🔲 planned. Every processor is VISIBLE in the editor palettes; 🔲 and 🟡-without-node entries
+render inactive. Edition cells default to the same value in all three unless a board decision says otherwise (SEC-08 →
+E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for Basic). Row ids are `SP-<family>-<nn>`.
+
+⚠ **DATA-TIERS-1 (2026-11-06): these cells say what the build CARRIES and runs, not what Basic's screens offer.** Basic
+runs any configuration it is given (DT-9 narrowed, §5.3), so a configured Step, remote Collector or decoder runs there
+as the cell says. The planned screen locks are not built: the **SP-XFM** transforms are to be locked in Basic's step
+palette (P6; Basic's offer is Add data's no-code shaping: types, rename, choose columns, the row filter, dedupe and
+schema `expression:` columns, DT-7); the remote **SP-ACQ** rows (SFTP / FTPS, JDBC, S3, Azure, GCS) are to be locked in
+Basic's screens apart from the Postgres snapshot (P4; `inspecto-connectors` stays in the Basic Offering, and Add data
+already locks *another database or a remote system* on Basic); **SP-PRS-06** (ASN.1) is to move from Standard to
+Advanced (P4, DT-12; still Standard). See *Data layer by edition* above.
+
+| ID | Processor | Family | P | S | E | Maps to | Notes |
+|---|---|---|---|---|---|---|---|
+| SP-ACQ-01 | 📁 Local / NFS directory watcher (`acquisition.file.local`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | LocalFileSystemConnector — the default collector |
+| SP-ACQ-02 | 🔒 SFTP / FTPS remote ingest (`acquisition.file.sftp`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | inspecto-connectors (sftp, ftps; key auth, bastion tunnel, host-key pinning) |
+| SP-ACQ-03 | 🗄️ JDBC / SQL query batch reader (`acquisition.db.jdbc`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | the db-export connector (`connector: db`, watermark column) |
+| SP-ACQ-04 | 🧱 Dataset entry (re-ingest a registered Dataset) (`acquisition.dataset`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | UI-S7: `connector: dataset` + `on:dataset` trigger |
+| SP-ACQ-05 | 📑 Multi-sheet Excel workbook ingest (`acquisition.file.excel`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `parser.xlsx` | the xlsx PARSER is delivered; per-sheet workbook fan-out as an acquisition is not |
+| SP-ACQ-06 | ☁️ AWS S3 object ingest (`acquisition.file.s3`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (s3 connector, SDK-free SigV4; covers MinIO / GCS-interop); no proven end-to-end acquisition-node run |
+| SP-ACQ-07 | 🌐 Azure Blob & ADLS Gen2 ingest (`acquisition.file.azure`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven |
+| SP-ACQ-08 | 🪣 Google Cloud Storage ingest (`acquisition.file.gcs`) | Collectors & Ingestion | 🟡 | 🟡 | 🟡 | `acquisition` | Connection kind exists (gcs connector, native JSON API + service-account OAuth2); no proven end-to-end acquisition-node run |
+| SP-ACQ-09 | 📤 Apache Kafka consumer (`acquisition.stream.kafka`) | Collectors & Ingestion | — | 🟡 | 🟡 | `acquisition` | **Premium connector, NOT in Basic (MODULE-REORG-1 P7, 2026-10-07): its own module `inspecto-connectors-kafka` (kafka-clients 3.9.x), staged from Standard up — a deliberate behaviour change; Basic's `inspecto-connectors.jar` registers seven factories.** Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker |
+| SP-ACQ-10 | 📨 Apache Pulsar consumer (`acquisition.stream.pulsar`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-11 | 📬 AWS Kinesis / SQS ingest (`acquisition.stream.kinesis`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-12 | 🐰 RabbitMQ AMQP subscriber (`acquisition.stream.rabbitmq`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-13 | 📡 MQTT IoT telemetry ingest (`acquisition.stream.mqtt`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-14 | 🔄 Change Data Capture (Debezium) (`acquisition.cdc.debezium`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-15 | 💾 Delta Lake table reader (`acquisition.lake.delta`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-16 | 🧊 Apache Iceberg table ingest (`acquisition.lake.iceberg`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-17 | ❄️ Snowflake / BigQuery ingest (`acquisition.db.cloud`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-18 | 🌐 REST API poller & paged ingest (`acquisition.api.rest`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-19 | 🪝 HTTP webhook listener endpoint (`acquisition.api.webhook`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-20 | 🔌 gRPC stream receiver (`acquisition.api.grpc`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-01 | 📄 Delimited / CSV / TSV / PSV parser (`parser.delimited`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.delimited` |  |
+| SP-PRS-02 | 📦 Fixed-width column slicer (`parser.fixedwidth`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.fixedwidth` | text (`record: line`) and fixed-length binary (`record: bytes`) |
+| SP-PRS-03 | 🧬 JSON object & JSON Lines (NDJSON) parser (`parser.json`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.json` |  |
+| SP-PRS-04 | 📑 Excel workbook parser (`parser.excel`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.xlsx` | needs the DuckDB `excel` extension in the bundle (multiformat X1) |
+| SP-PRS-05 | 📑 XML / XPath / DOM unpacker (`parser.xml`) | Extraction & Format Parsers | 🟡 | 🟡 | 🟡 | `parser.plugin` | tree→segments bridge ships XML ingests; no XPath selector grammar yet |
+| SP-PRS-06 | 📡 ASN.1 BER telecom CDR decoder (`parser.asn1.ber`) | Extraction & Format Parsers | — | ✅ | ✅ | `parser.asn1` | Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Standard and above |
+| SP-PRS-07 | 🔎 Named-group regex extractor (`parser.pattern.regex`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.text_regex` |  |
+| SP-PRS-08 | 🧩 Custom ingester plugin (segments, multi-event) (`parser.plugin`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.plugin` | ParserPlugin SPI; `segments: {CALL, SMS}` |
+| SP-PRS-09 | 🏷️ Key-value / logfmt parser (`parser.keyvalue`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-10 | 📜 YAML document slicer (`parser.yaml`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-11 | 📜 ASN.1 PER / XER / DER decoder (`parser.asn1.per`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-12 | 📠 Mainframe EBCDIC & COBOL copybook (`parser.mainframe.ebcdic`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-13 | ⚡ Protocol Buffers decoder (`parser.binary.protobuf`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-14 | 🦅 Apache Avro binary decoder (`parser.binary.avro`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-15 | 🌐 PCAP network packet slicer (`parser.binary.pcap`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-16 | 📜 Grok / Logstash expression matcher (`parser.pattern.grok`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-PRS-17 | 🖥️ Syslog RFC 5424 / RFC 3164 parser (`parser.pattern.syslog`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-01 | 🛡️ Schema registry & structural rejects (`quality.schema.validator`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `parser` | the declared schema on the Parse Step: typed fields, TRY_CAST at ingest, structural rejects → quarantine. ⛔ Only HALF of the old "Schema validator & type coercion" — coercion as an AUTHORING act folded into `transform.record` (2026-09-04). What cannot fold is the schema CONTRACT: the declared source column + target type are the cast-failure audit's denominator, and `SchemaCompatibility` gates edits to them BACKWARD |
+| SP-DQ-02 | ⚠️ Constraint & range checker (Expectations) (`quality.constraint.check`) | Data Quality, Validation & Cleansing | 🟡 | 🟡 | 🟡 | `expectation` | Expectations evaluated per Dataset (`ExpectationEvaluator`), authored in the Expectations pane — not a Step: never on the canvas, so no workbench preview / lift / lower |
+| SP-DQ-03 | 🧼 Exact-key deduplicator (within a Consignment) (`quality.dedup.exact`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.dedup` | `scope: consignment` (default) |
+| SP-DQ-04 | ⏱️ Sliding time-window deduplicator (`quality.dedup.windowed`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.dedup` | D-9: `scope: window(P4D)` + the durable dedup ledger |
+| SP-DQ-05 | 🗂️ File-grain duplicate guard (path / checksum / metadata / marker) (`quality.dedup.file`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `acquisition` | Collector `duplicate:` policy + marker dedup — a Guarantee, rides the Collector |
+| SP-DQ-06 | 🧬 Schema drift & new-field detector (`quality.schema.drift`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `parser` | the header each file carries vs `raw.fields[]` — width always, names when the schema was authored from the header; one `quality.schema_drift` WARN Signal per batch |
+| SP-DQ-07 | 🔍 Cluster & edit value normalizer (`quality.cluster.edit`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-08 | 🔍 Fuzzy string (Jaro-Winkler) matcher (`quality.match.fuzzy`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.similarity` | `transform.similarity` — a 0..1 score of two columns (Jaro-Winkler, Jaro, Levenshtein, token Jaccard; normalized first by default) on the Analytics Kernel, plus an optional candidate flag at a threshold; proposes candidates, never asserts identity (D-M1) (2026-10-17) |
+| SP-DQ-09 | 🧮 Inline stream profiler & statistics (`quality.profiler.inline`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.profile` | per-column row/null/distinct counts and min/max, as a Step (2026-09-15) |
+| SP-DQ-10 | 📊 Statistical & reservoir sampler (`quality.sample.reservoir`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sample` | `transform.sample` — a fixed size or a fraction per group, chosen by an MD5 hash of a seed and a row key on the Analytics Kernel (`Sampler`): the same rows every run and in the JVM twin; never `USING SAMPLE` / `random()` (2026-10-17) |
+| SP-DQ-11 | 🔤 Character map & code page transcoder (`quality.cleanse.transcode`) | Data Quality, Validation & Cleansing | 🔲 | 🔲 | 🔲 | — |  |
+| SP-DQ-12 | 🔒 PII masking & tokenization (`quality.pii.mask`) | Data Quality, Validation & Cleansing | — | — | ✅ | `transform.mask` | board SEC-08 — Advanced only; by classification (strictest-wins) or name, full / partial / hash, no reversible vault (2026-10-06) |
+| SP-DQ-13 | 🔑 One-way salted cryptographic hasher (`quality.crypto.hash`) | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.hash` | Space-keyed HMAC-SHA-256 token per value, joinable within the Space; the key never leaves the Space's secrets (2026-10-06) |
+| SP-DQ-14 | 🛡️ GDPR / CCPA field redactor (`quality.compliance.redact`) | Data Quality, Validation & Cleansing | — | — | 🔲 | — | board SEC-08 — Advanced only |
+| SP-XFM-01 | 🧮 Record Transformer (`transform.record`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | ONE Step that shapes a record: sanitize (trim/pad/replace/case), cast, rename and computed columns — one row per output field over a typed function catalog, generating the SELECT it saves. Folded 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim`, which were three catalog labels over this one grid. `transform.map` was deleted 2026-09-05: a stored `mapping.rules[]` is read as `fields[]` (EXPR → custom, CONCAT_DT → date.concat_parts, FILENAME_DATE → date.from_filename) |
+| SP-XFM-02 | 🔽 Row filter (pre-parse regex / post-map predicate) (`transform.filter`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.filter` |  |
+| SP-XFM-03 | 🔀 Router — case / clone branches with mid-branch steps (`transform.route`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.route` |  |
+| SP-XFM-04 | ∑ Group-by summarizer (measures grammar) (`transform.summarize`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.summarize` |  |
+| SP-XFM-05 | 🤝 Reference-store join (versioned references) (`transform.join`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.join` | at rest only — refused mid-branch (no reference resolver on the ingest lane) |
+| SP-XFM-06 | 🗺️ Lookup & static map transcoder (`transform.lookup`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.lookup` | inline key=value map over one column (2026-09-06); a versioned reference is transform.join |
+| SP-XFM-07 | 🔀 Dynamic pivot / transpose (`transform.matrix.pivot`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.matrix.pivot` | rows to columns over DECLARED values only (at most 200; a dynamic pivot is refused), one Measure-grammar aggregate per value (2026-10-17) |
+| SP-XFM-08 | 🔄 Unpivot / column flattener (`transform.matrix.unpivot`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.matrix.unpivot` | wide columns to (name, value) rows by list or name pattern, cast to one value type (2026-10-06) |
+| SP-XFM-09 | 🏆 Rank & Top-N pruner (`transform.analytics.rank`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.analytics.rank` | row_number / rank / dense_rank per group by a stated order, ties broken deterministically; keeps the top N or adds the rank (2026-10-17) |
+| SP-XFM-10 | 💥 Array / object exploder & flattener (`transform.explode`) | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.explode` | one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor |
+| SP-XFM-11 | 🤝 Presorted stream merge joiner (`transform.join.merge`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — | the grandfathered `transform.merge` node type is the read-only ancestor |
+| SP-XFM-12 | 🏛️ Slowly changing dimension (SCD Type 2) (`transform.dim.scd2`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-13 | 🔑 Monotonic surrogate key generator (`transform.key.surrogate`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-14 | 🏷️ DML row-action strategy flagger (`transform.dml.strategy`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-15 | ⚖️ Dataset differ & change compare (`transform.diff.compare`) | Transformers & Dimensional Modeling | 🟡 | 🟡 | 🟡 | `recon` | Reconciliation boards compare Datasets; not a chain step |
+| SP-XFM-16 | 🏗️ Hierarchical XML / JSON document builder (`transform.builder.xml`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-17 | 📊 IFRS 15 / IFRS 9 revenue recognition engine (`transform.fintech.ifrs`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-18 | 📱 SIM box & bypass fraud detector (`transform.telecom.simbox`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-19 | 💵 Tariff, rating & usage billing engine (`transform.telecom.rating`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-20 | 🌍 Roaming TAP3 / CIBER surcharger (`transform.telecom.roaming`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-XFM-21 | 🚨 Velocity & impossible-travel anomaly (`transform.fintech.velocity`) | Transformers & Dimensional Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-01 | 🏛️ Level-of-detail (LOD) fixed aggregator (`transform.analytics.lod`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-02 | 🏛️ LOD include / exclude context aggregator (`transform.analytics.lod_context`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-03 | ⏱️ Time-grain resampler & gap imputer (`transform.timeseries.resample`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.timeseries.resample` | one row per key per bucket (second..year, ISO weeks), every bucket present - count/sum fill 0, the rest empty; an explicit time zone for TIMESTAMPTZ (2026-10-17, ANALYTICS-CORE-1 M5) |
+| SP-BI-04 | 📈 Period-over-period (YoY / MoM / WoW) shift (`transform.timeseries.shift`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.timeseries.shift` | the value a key had N buckets earlier, matched by bucket so a gap gives empty, not the wrong period (2026-10-17, ANALYTICS-CORE-1 M5) |
+| SP-BI-05 | 📊 Running calculations & moving averages (`transform.analytics.running`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.running` | count/sum/avg/min/max per key over a time (60m) or row (5 rows) window, as a Step (2026-10-06); state is per run — cross-batch velocity stays a SQL-over-sink Job |
+| SP-BI-06 | 🔮 Time-series forecaster (Holt-Winters) (`transform.timeseries.forecast`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.timeseries.forecast` | seasonal naive or Holt-Winters additive over a regular series, point forecast plus a prediction band per level (2026-10-17, ANALYTICS-CORE-1 S5) |
+| SP-BI-07 | 📐 Semantic KPI calculator & Measure formulas (`transform.semantic.metric`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `measure-grammar` | the Measure grammar (`count | agg(field)`) serves Studio + summarize; no named-KPI layer |
+| SP-BI-08 | 🏷️ Template & runtime parameter injector (`transform.param.jinja`) | Analytics, Time-Series & Semantic Modeling | 🟡 | 🟡 | 🟡 | `sql.template` | the `sql.template` job resolves `$name` tokens; no Jinja |
+| SP-BI-09 | 📦 Histogram & quantile binner (`transform.data.binning`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.data.binning` | `transform.data.binning` — equal-width or quantile (equal-frequency) bins of a number column, per group, with a bin number and label; a histogram is binning then summarize (count by bin), and the profiler's histogram shares the equal-width bin (2026-10-17, ANALYTICS-CORE-1 S3) |
+| SP-BI-10 | ✂️ Smart custom string splitter (`transform.string.smart_split`) | Analytics, Time-Series & Semantic Modeling | 🔲 | 🔲 | 🔲 | — |  |
+| SP-BI-11 | 🗺️ H3 hexagonal & geohash grid indexer (`transform.geo.h3`) | Analytics, Time-Series & Semantic Modeling | — | 🔲 | 🔲 | — | needs the DuckDB `spatial`/`h3` extension — board CP-09 gate |
+| SP-BI-12 | 📍 Spatial polygon & point-in-polygon intersect (`transform.geo.spatial_join`) | Analytics, Time-Series & Semantic Modeling | — | 🔲 | 🔲 | — | needs the DuckDB `spatial` extension — deliberately not loaded (SqlSandbox) |
+| SP-BI-13 | 🚨 Outlier detector & IQR boxplot fencer (`transform.stats.outlier`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.stats.outlier` | `transform.stats.outlier` — Tukey's fences (k, quantile mode) or a robust z (median and MAD) per group; every row kept with its fences or score and a flag (2026-10-17, ANALYTICS-CORE-1 S3) |
+| SP-BI-14 | 🧮 Pearson & Spearman correlation matrix (`transform.stats.correlation`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.stats.correlation` | `transform.stats.correlation` — Pearson (default) or Spearman (`method: spearman`: Pearson of the within-group average ranks, ties share their average rank) plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows (2026-10-17 Pearson, 2026-10-18 Spearman, ANALYTICS-CORE-1 S3) |
+| SP-BI-15 | 📉 Change-point, regime & drift detector (`transform.timeseries.changepoint`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.timeseries.changepoint` | `transform.timeseries.changepoint` — over a residual series (actual minus expected) and its scale sigma: band breaches, regime changes (a run of K outside points) and drift (two-sided CUSUM), every row kept with 0/1 flags; the Business Assurance forecast template's rule (2026-11-01, ANALYTICS-STEPS-TS-1) |
+| SP-BI-16 | 👥 Cohort retention matrix (`transform.cohort.retention`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.cohort.retention` | `transform.cohort.retention` — acquisition cohorts by hour..year on a stated clock, exact or on-or-after retention per period as of a stated date; a period not yet observable is absent, never 0 (2026-11-01, ANALYTICS-STEPS-TS-1) |
+| SP-BI-17 | 🪜 Ordered conversion funnel (`transform.cohort.funnel`) | Analytics, Time-Series & Semantic Modeling | ✅ | ✅ | ✅ | `transform.cohort.funnel` | `transform.cohort.funnel` — 2..12 ordered steps per entity, earliest-first from the first step-1 event, with an optional window; entities per step and conversion from the previous and the first step (2026-11-01, ANALYTICS-STEPS-TS-1) |
+| SP-ENR-01 | 📚 Reference-table enrichment (`*_enrich.toon`, Stage-2) (`enrichment.reference`) | Enrichment, Entity Resolution & AI/ML | ✅ | ✅ | ✅ | `enrichment` | the shipped enrichment job + versioned references |
+| SP-ENR-02 | 🌍 GeoIP & ISP geolocation enricher (`enrichment.geoip`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-03 | ⚡ Redis / in-memory cache lookup (`enrichment.redis`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-04 | 🌐 Dynamic microservice REST enricher (`enrichment.rest`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-05 | 🗄️ Parameterized stored-procedure caller (`transform.db.procedure`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ENR-06 | 🔗 Master entity resolution & record linkage (`enrichment.entity.link`) | Enrichment, Entity Resolution & AI/ML | ✅ | ✅ | ✅ | `transform.entity.link` | `transform.entity.link` — every row gets a resolution group: blocking keys + exact match keys (normalised as text, digits or as written) + union-find on the Analytics Kernel, caps fail closed; similarity only flags look-alikes for review, never merges (D-M1) (2026-10-17) |
+| SP-ENR-07 | 🕸️ Graph cluster & connected-component tagger (`enrichment.graph.cluster`) | Enrichment, Entity Resolution & AI/ML | — | 🟡 | 🟡 | `link-analysis` | link-analysis VIEW ships (projection); no tagging step |
+| SP-ENR-08 | 🤖 ONNX Runtime embedded inference (`ml.inference.onnx`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — | onnxruntime ships in the Advanced bundle inside `inspecto-intelligence` (its embeddings, ASSURE-INTELLIGENCE-BUNDLE-1); this Step Processor is not built |
+| SP-ENR-09 | 🏷️ LLM zero-shot classifier & tagging (`ml.llm.classify`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — | still unbuilt; the assist agent now ships Standard+ (CP-14, `PKG-5` 2026-09-12) but this step kind does not exist |
+| SP-ENR-10 | 📐 Text embeddings & vector generator (`ml.embedding.vector`) | Enrichment, Entity Resolution & AI/ML | 🔲 | 🔲 | 🔲 | — |  |
+| SP-CTL-01 | 🕳️ File sequence & gap integrity analyzer (`control.file.sequence_analyzer`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `gap` | Collector `gap_detection: {sequence}` → the gap node + SEQUENCE_GAP events |
+| SP-CTL-02 | 🕳️ Sequence-gap & data-loss watchdog (`control.gap.detector`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `gap` | same detector; a gap raises the `SEQUENCE_GAP` event in EVERY edition, and `EventAlertBridge` raises it as a stored Alert on every edition, Basic included (P7 ALERT residue retirement 2026-10-08; it was an ALERT object only where the optional `inspecto-ops` module was present) |
+| SP-CTL-03 | 🏷️ Audit metadata & lineage stamper (`control.audit.stamp`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `sink.persistent` | `filename_column` + the per-file/batch/lineage ledgers + `__batch_id` provenance |
+| SP-CTL-04 | ⏳ Throttle & rate limiter (`control.throttle`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `acquisition` | Collector `fetch.rate_limit` + intake caps + the concurrency broker |
+| SP-CTL-05 | 🚦 Circuit breaker & fallback switch (`control.circuitbreaker`) | Control, Governance & Sequence Integrity | ✅ | ✅ | ✅ | `acquisition` | Collector `circuit_breaker` + `retry` |
+| SP-CTL-06 | 🏁 Transaction & commit controller (`control.transaction.commit`) | Control, Governance & Sequence Integrity | 🟡 | 🟡 | 🟡 | `engine` | the BranchCommitCoordinator ledger + bounded COMMIT retry are engine-internal, not authorable |
+| SP-CTL-07 | 🚨 Alert rule dispatcher (`control.alert.dispatch`) | Control, Governance & Sequence Integrity | — | 🟡 | 🟡 | `alert-rule` | Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower. Standard+ (G9): `inspecto-ops` declares it through `EditionFeatureProvider`; Basic refuses every authoring door with `ERR_EDITION_FEATURE` and arms no rule copied onto disk |
+| SP-CTL-08 | ⏱️ SLA timeout & heartbeat monitor (`control.sla.monitor`) | Control, Governance & Sequence Integrity | 🟡 | 🟡 | 🟡 | `completeness-kpi` | completeness KPI + `heartbeat` maintenance task; no SLA object |
+| SP-SNK-01 | 📁 Parquet (snappy / zstd / gzip) partitioned store (`sink.file.parquet`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | Hive `year=/month=/day=` partitions |
+| SP-SNK-02 | 📄 CSV partitioned store (`sink.file.csv`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.persistent` | `output.format: CSV` |
+| SP-SNK-03 | 🦆 DuckLake catalog (PostgreSQL) sink (`sink.ducklake`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.persistent` | `output.ducklake` / `sinks[].ducklake` — needs the postgresql sidecar. Standard+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Basic refuses `ducklake.enabled: true` at save (`ERR_EDITION_FEATURE`), at pipeline load and in `DuckLakeRegistrar` |
+| SP-SNK-04 | 👁️ Derived view (no bytes, registered SQL) (`sink.view`) | Sinks, Storage & Destinations | 🟡 | 🟡 | 🟡 | `sink.view` | grandfathered node type; the Dataset/View surface replaced it |
+| SP-SNK-05 | ☣️ Quarantine error-log store (`sink.quarantine`) | Sinks, Storage & Destinations | 🟡 | 🟡 | 🟡 | `sink.quarantine` | structural rejects + `errors/<base>_errors.csv` on every pipeline — not a Step you add: a quarantine node is lifted only for selector / segments pipelines, so there is no workbench preview / lift / lower of its own |
+| SP-SNK-06 | 📜 Long-term compliance archive (`sink.archive`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `acquisition` | Collector `post_action: MOVE archive_path` + the `backup` maintenance task. Standard+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Basic refuses `post_action.on_success: MOVE` (`ERR_EDITION_FEATURE`) at save, at pipeline load and before a remote acquisition — `RETAIN`/`DELETE`/`RENAME`/`TAG` and the local `dirs.backup` move stay in every edition |
+| SP-SNK-07 | 🗄️ Delta Lake persistent table sink (`sink.lake.delta`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-08 | 🧊 Apache Iceberg append / upsert sink (`sink.lake.iceberg`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-09 | 📊 ClickHouse / StarRocks analytical sink (`sink.db.clickhouse`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-10 | 📑 Excel multi-tab report sink (`sink.file.excel`) | Sinks, Storage & Destinations | ✅ | ✅ | ✅ | `sink.excel` | top-level `excel:` — named sheets of one .xlsx under the data root, a read-only SELECT per sheet, at-rest lane |
+| SP-SNK-11 | 📤 Apache Kafka topic producer (`sink.stream.kafka`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-12 | 📨 AWS SQS / SNS event publisher (`sink.stream.aws`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+| SP-SNK-13 | 📧 Email & report dispatcher (`sink.notify.email`) | Sinks, Storage & Destinations | — | 🟡 | 🟡 | `mail.send` | the `mail.send` JOB + mail channels; not a chain sink |
+| SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.webhook` | top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Standard+ |
+| SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
+
+**Count:** 122 processors — 54 delivered, 17 partial, 51 planned.
+
+**SP-CTL-07 behaviour change 2026-10-07 (operator, MODULE-REORG-P7-INCIDENTS slice 2): Alert records are durable on EVERY edition, Basic included.** Fired Alerts live in an Alert-owned store (`ALERTS` family, the Space's own `duckdb/inspecto-alerts.db`, `-Dalerts.backend=db` default), not in operational objects: wherever an Alert does fire on Basic (rule authoring is Standard+, so this is the rules a Basic Space was handed), it now remembers its Alerts across a restart — `GET /alerts` history survives and an open Alert is not re-fired. Basic still has NO Incidents, Cases or operational objects (CP-11 unchanged); only the Incident escalation is skipped there. A Basic operator works a stored Alert with `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`, a no-op without a Subject). (Narrative kept here, outside the generated rows: the catalog `note` stays short.)
+
+| ~~SP-DQ-09~~ | ~~🧹 Whitespace & string sanitizer (`quality.cleanse.trim`)~~ | Data Quality, Validation & Cleansing | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 (Record Transformer) 2026-09-04** — it is the `text.trim` / `text.pad_left` / `text.replace` rows of that grid, no longer a separate catalog entry |
+| ~~SP-XFM-02~~ | ~~🔄 Field type cast & renamer matrix (`transform.cast`)~~ | Transformers & Dimensional Modeling | ✅ | ✅ | ✅ | `transform.sql` | **FOLDED into SP-XFM-01 2026-09-04** — cast is the `convert.type` row, rename is the Field-name alias |
+
+
+### Control plane & authoring [`API` · `PIP` · `BI` · `INV` · `INC` · `OPS`]
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| CP-01 | Control API v1 (JDK HttpServer, envelope, ETag/If-Match, idempotency keys) | ✅ | ✅ | ✅ | |
+| CP-02 | Pipeline authoring: graph editor + Recipe view (insert-between, insert-into-branch, undo/redo, snapshots, save-as-template) | ✅ | ✅ | ✅ | insert-into-branch 2026-09-02 |
+| CP-03 | Pipeline lifecycle: validate → save → arm/activate → test-run → run → replay; run-level ledgers | ✅ | ✅ | ✅ | ⚠ **`replay` is BOUNDED and this cell said nothing about it** (added 2026-09-09): `POST /jobs/runs/{runId}/replay` resolves the original run through `JobService.runById` → `liveRuns`, an **in-memory** insertion-ordered map with an eviction hook capped at `LIVE_RUN_CAP`. So replay of a run that has been evicted — or of **any** run after a restart — is a `404`. Everything else in this row is durable; replay is not. Persisting the lookup is a design call, filed. Owner: [`okf/product/module/engine/plan-pipeline-execution.md`](../../module/engine/plan-pipeline-execution.md) §2.3 |
+| CP-04 | Pipeline bundle export/import (server-side, dependency closure) | ✅ | ✅ | ✅ | selective pipeline export/import for the canonical file is a BACKLOG design item |
+| CP-05 | Onboarding wizard (Collection → Parse → Schema → Sink) | ✅ | ✅ | ✅ | |
+| CP-06 | Component registry (schemas, grammars, mappings, connections, enrichments, findings-spec, policies…) with `.history/` | ✅ | ✅ | ✅ | |
+| CP-07 | Spaces: per-tenant isolation of config, stores, scheduler, event log | ✅ | ✅ | ✅ | isolation is a *layout* in P/S; **enforced** by seeded policies only in E (SEC-06) |
+| CP-08 | Studio: Datasets, Queries, Widgets, Dashboards, Viz Library, curated templates | ✅ | ✅ | ✅ | `trend-monitor` template 2026-09-02 |
+| CP-09 | Geo map + link analysis views | ✅ explorer (2026-10-17) | ✅ | ✅ | ✅ **LA-EDITIONS-1 phase 3 (2026-10-17): the P cell is now ✅ for the EXPLORER — the five Link Analysis modules ship in Basic and only the Investigation surface is withheld (§ *Basic — the Link Analysis explorer*).** History: **GATED 2026-09-07 (EDG-01 cell 3b).** `GeoRoutes` + `InvRoutes` moved out of the core into `inspecto-geo-link`, a Standard+/Advanced-only module discovered through the **public `RouteModule` SPI** (cell 3a) and registered AFTER the built-in list. On Basic the five paths answer **503 "not installed"** from the core's `AbsentModuleRoutes` stub — never 404 — and `/bootstrap` reports `features.geoLink=false`, derived from what actually registered (`ApiContext.hasRoute`), on which the SPA **hides** the two nav entries and the two widget offers rather than offering a page that errors. Pinned by `NoGeoLinkShipsInThePersonalBuildTest` over real HTTP in the DEFAULT build. DuckDB `spatial` is still deliberately not loaded (SqlSandbox lockdown). ✅ **Who may evaluate an Investigation's Working Set relation (LA-20, decision D-E7, 2026-09-23)** — `GET /inv/investigations/{id}/working-set`: **S (Standard/Standard) = OWNER-ONLY, fail closed** — a non-owner reads 404, and there is deliberately **no fallback to `ComponentAccess` Dataset sharing**; **E = owner-only AND the `PolicyEngine` row verdict** (`resourceKind: investigation`; a DENY hides it even from its owner, an ALLOW never widens owner-only — the `AccessDecider` contract). The relation is not a Dataset or DuckDB view, so no `/bi` or `/db` path can reach it. |
+| CP-10 | Reconciliation (recon boards, break sets) | — | ✅ | ✅ | **NOT in Basic (MODULE-REORG-1 P7, 2026-10-07) — a deliberate behaviour change.** The ten `/recon` routes, the comparison engine, the Break state store and the `recon.run` Job Type left the core for the optional `inspecto-reconciliation` module (the plan §8a Reconciliation add-on), staged from Standard up. On Basic the paths answer **503 "not installed"** (`AbsentModuleRoutes`), `/bootstrap` reports `features.reconciliation=false` and `recon.run` is an unknown Job Type; the `reconciliation` config component kind stays core (authoring is generic component CRUD). Explicit non-goals: N>3, non-additive aggs, fuzzy keys |
+| CP-11 | Operational objects: Alerts → Incidents → Cases → Tasks, notes/links/tags, findings, RCA, postmortems | — | ✅ | ✅ | ✅ **GATED 2026-09-08 (EDG-01 cell 7) — the P cell is now true of the build, and it was the largest cell by far.** The whole `com.gamma.ops` domain, the `/objects`, `/notes` and `/tags` route families (⛔ `/queues` was in this cell until `RETIRE-HALVES-1` retired it, 2026-09-14), the `caserule.evaluate` and `objects.analytics` Job Types and the `incident_purge` maintenance task are the optional `inspecto-ops` module. Basic answers **503 naming the module** on ~50 paths (`AbsentModuleRoutes`, catch-alls ordered last), reports `features.ops=false`, hides the Incidents / Case Manager / Tags nav entries, and explains itself on those three panes plus six cross-entity tag/comment menus. Baselines: Basic 23 modules / **3777** tests, Standard 31 / **4106**, Advanced 32 / **4126**, all zero failures; `inspecto-ops` contributes 228. 🔴 **Unlike every earlier cell this one was never a leaf**: mandatory core CONSTRUCTED the feature (`ServiceStores` opened four stores, `ServiceBootstrap` loaded six config kinds, `CollectorService` built the `ObjectService` and its event bridge). Core reaches it through `com.gamma.objects.ObjectAccess` plus a host-declared `ObjectEngineProvider` handle — the provider could NOT live beside the seam in the engine, because opening the stores needs `SpaceRoot` and `OperationalDb` from the module above it. ⚠ **It also forced two other rows to change**, which is the durable lesson: `OPS-01` promised Basic an `objects` store and `SP-CTL-02` promised a gap watchdog that raises ALERT objects. Both are amended above (operator-approved 2026-09-08) rather than left to contradict the build. ⛔ **`/alerts*` is NOT in this cell.** The Alerts pane is `AlertsService` over config-authored alert RULES, which every edition serves; an `OperationalObject` of type `ALERT` is a different concept that merely shares the word. The nav spec asserts `alerts` survives the filter, because it is the adjacent id an over-wide one would take. ⛔ Event RECORDING and the audit read stay ungated — see CP-13 and §Audit. ⚠ **SPLIT 2026-10-08 (MODULE-REORG-P7):** the Case-management half (Case Rules `/cases/rules*` + `*_caserule.toon` + `caserule.evaluate`, merge / split, `POST /cases/from-entities`) is the separate optional `inspecto-case-management` module (feature `cases`, requires `inspecto-ops`; Standard/Standard/Advanced/Preview, not Basic). An install with ops but without it still raises and works Incidents and lists/moves Case rows; those routes answer 503.
+| CP-12 | In-app notifications | ✅ | ✅ | ✅ | split 2026-09-02 — the feed stays in every edition; delivery channels are CP-15 |
+| CP-13 | Metrics (`/metrics` Prometheus), events feed, audit CSV export | — | ✅ | ✅ | ✅ **FULLY GATED — cell 5 (2026-09-07) + cell 6 (2026-09-08).** Both halves are now optional modules. **(a) The `/metrics` exposition** is `inspecto-observability`: on Basic the path answers **503 naming the module** and leaks no exposition. 🔴 This is the half that made EDG-01 P1 — `/metrics` is a `PUBLIC_PATH` and Basic ships no authenticator while binding every interface, so a Basic install served its full operational telemetry to anything that could reach the port while this cell read `—`. ⚠ Only the exposition moved: `MetricRegistry` is called by nine classes across three modules and stays core, so the counters still run — nothing reads them out over HTTP. **(b) The events feed + audit CSV export** is `inspecto-observability` (cell 6): the whole `/events*` surface — feed, search, by-id, export, saved views — moved as a unit, and `AbsentModuleRoutes` 503s each path. ⚠ Moved **whole** by operator decision, because the audit CSV is not a route but a `?format=csv&type=AUDIT` branch inside `GET /events/export`; gating it alone would have meant an `if` inside a core route, the one mechanism §Assembly bans. ⚠ **This half is a visible product change**, unlike (a): Basic loses the Events **screen**. The UI hides the nav entry, falls the Ops lens home back to `pipelines` (else `/` landed on a dead pane), and renders an explained `<inspecto-alert>` on the Events, Dashboard and Incident-detail panes. ⛔ **Recording is NOT gated** — `EventStore`/`EventLog` stay core, every edition writes the audit trail, and `NoExchangeShipsInThePersonalBuildTest.eventsAreStillRecordedOnPersonal…` pins exactly that. ⛔ **The audit READ is not gated either**: cell 6 found that gating the feed would remove Basic's Audit-log screen, which §Audit (row above) promises it — so the new core `AuditLogRoutes` keeps `/audit/search` + `/audit/export` in every edition, fail-closed to the AUDIT/ACCESS_DENIED types so it cannot serve as the feed. ⛔ `/metrics/acquisition` is NOT this cell: it is Data-Acquisition telemetry on `AcquisitionRoutes`, a core capability.
+| CP-14 | Assist / Intelligence agents (`/assist/*`, `/agent/*`) | — | ✅ | ✅ | ✅ **CHANGED 2026-09-12 — `PKG-5` shipped.** The **assist** agent (`inspecto-agent`) is now staged as `inspecto-agent.jar` in **Standard and Advanced** bundles and discovered by jar presence like every other optional module; `/assist/*` answers 503 only on Basic. Operator decision: assistant Standard and above, optional. **CHANGED 2026-09-29 — `ASSURE-INTELLIGENCE-BUNDLE-1` (D-P2).** The **intelligence** agent (`inspecto-intelligence`, `/agent/*`) is staged as `inspecto-intelligence.jar` (its shaded sidecar, onnxruntime natives inside) in the **Advanced** bundle only; `/agent/*` answers 503 on Basic and Standard, where the jar is absent. ⛔ `inspecto-agent-hosted` still ships in nothing. ⚠ Absence is also the outcome on a host whose Java is older than the module needs (§3.6): `OptionalSpi` skips it and the product starts normally. Requirement-of-record is [`okf/product/module/agent/plan-assistant.md`](../../module/agent/plan-assistant.md) §3.10; `REQUIREMENTS.md` §3.13 said `All` for every `AGT` row until 2026-09-08 |
+| CP-15 | Delivery channels (mail, webhooks, delivery-status receipts) | — | 🟡 | 🟡 | ✅ **GATED 2026-09-07 (EDG-01 cell 1) — the P cell is now true of the build.** Both transports moved into `inspecto-notify-channels`, a Standard+/Advanced-only module: `WebhookChannel` came out of `inspecto-engine` (an unconditional dependency, so it shipped everywhere) and `SmtpEmailChannel` out of `inspecto-connectors` (whose sidecar `package.ps1` copies into EVERY edition by explicit decision). Basic now registers **zero** `NotificationChannel` providers — pinned by `NoChannelShipsInThePersonalBuildTest`, which runs in the DEFAULT build and asserts the SPI is empty. In-app delivery is intrinsic to `NotificationService` and is unaffected. ⚠ Still 🟡 for S/E: soft-bounce retry and the SES/SNS adapter remain deferred (D8) — bounce suppression itself SHIPPED 2026-09-07. ⛔ The inbound `DeliveryStatusAdapter`s stay in `inspecto-connectors`: they are inert without a configured signing key and `DeliveryStatusRoutes` 404s an unconfigured adapter. |
+| CP-17 | Incident governance — authored Workflow, SLA policy per (object type, priority) with a business calendar, Escalation Rules (`ASSURE-WORKFLOW-SLA-1`) | — | ✅ | ✅ | `inspecto-ops` applies them (hot-reloaded from `registry/workflows|sla-policies|escalation-rules/`, the SLA sweep); the `/components/workflow|sla-policy|escalation-rule` write routes are core and `canAdminister`-gated, so Basic can store a document nothing runs. Refused by every import. As-built: [`okf/product/addon/incidents/plan-incidents.md`](../../addon/incidents/plan-incidents.md) §3 *Incident governance* |
+| CP-16 | Action Requests — four-eyes approved outbound API calls from Incidents / Cases and the Decision Rule `invoke-api` consequence | — | ✅ | ✅ | **SHIPPED 2026-09-27** (`ASSURE-ACTION-REQUESTS-1`); **an optional module since 2026-10-08** (`MODULE-REORG-P7`: `inspecto-action-requests`, feature `actionRequests`, Standard and above, `requires` `notify-channels` for the wire). The routes, the store, the dispatcher and the `invoke-api` consequence are the module; the base approver-eligibility check, the approver roster and the Pending Change hold stay core. It reaches its Incident / Case through the `LinkedSubjectProvider` seam (`inspecto-ops` contributes both) and the wire is `inspecto-notify-channels` (`HttpWebhookSinkTransport.exchange`), so a bundle without the module - **Basic** - answers **503** on EVERY `/action-requests*` route naming it (it used to serve a read-only empty list and 503 only on create), `/bootstrap` reports `features.actionRequests=false`, and `invoke-api` reports *unavailable* naming the module (it used to report *skipped*/*unavailable* without objects). Without ops the module still answers 503 on create (no subject provider). Egress = the `sink.webhook` Connection rules plus a deny-by-default address policy with a per-Space **Egress Allowlist** (`/settings/egress`) and a pinned connect; redirects never followed. As-built: [`okf/product/module/action-requests/spec.md`](../../module/action-requests/spec.md) |
+| CP-18 | Regulatory Reporting — regulator-format reports (SAR / STR shaped) from a Case or Incident and its evidence, rendered from a Report Template (XML / CSV / JSON), four-eyes approved, submitted to a jailed file drop | — | ✅ | ✅ | **SHIPPED 2026-10-09** (`REGULATORY-REPORTING-1`) as the optional module `inspecto-regulatory-reporting` (feature `regulatoryReporting`, Standard and above, `requires` `ops`); on Basic every `/regulatory-reports*` path answers 503 naming the module. File drop only — no live regulator API. As built: `okf/product/module/regulatory-reporting/spec.md`. |
+
+### Security & identity [`SEC`]
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| SEC-01 | Transport: HTTPS (keystore; FIPS provider option) | — | ✅ | ✅ | P is plain HTTP; `-Dcontrol.bind` restricts the listen address in every edition |
+| SEC-02 | Authentication — OIDC resource server (`inspecto-oidc`, Nimbus JWKS) | — | ✅ | ✅ | P is auth-free by design |
+| SEC-03 | Authorization — RBAC from token claims (`roles.toon` seed) | — | ✅ | ✅ | |
+| SEC-04 | Authorization — ABAC policy engine (`inspecto-policy`, `access-policies.toon`, route + row scope) | — | — | ✅ | |
+| SEC-05 | Policy authoring UX (matrix/create editor beyond hand-authored TOON) | — | — | ✅ | **SHIPPED 2026-09-25** — save-time guards in the shared `AccessPolicies.validate` grammar (422s + warnings, self-lockout refused), `POST /access/policies/preview` impact matrix, and the Policies tab as an editor. ⚠ Upgrade: an on-disk doc with a stray key or an un-allowlisted claim becomes unreadable ⇒ deny-all. Evaluation stays Advanced-only (SEC-04). Owed: a browser pass over the editor. As-built: [`okf/product/module/access/admin-guide-auth-security.md`](../../module/access/admin-guide-auth-security.md) §"Policy authoring guards" |
+| SEC-06 | Per-tenant space isolation enforced by seeded policies | — | — | ✅ | engages once a `space` claim is mapped |
+| SEC-07 | Secrets: `${ENV}` / `${SYS}` references in every edition; `${FILE}` / `${KEYSTORE}` Standard + Advanced; Vault / cloud KMS Advanced-only, gated on a client policy (D4) | ✅ ENV/SYS | ✅ +FILE/KEYSTORE | ✅ +Vault/KMS when a client requires it | **SHIPPED 2026-09-06** — `SecretsProvider` SPI in the core (`inspecto-acquire`); `FileKeystoreSecretsProvider` lives in `inspecto-oidc` (the Standard/Advanced profile module) and is found by ServiceLoader; a Basic bundle refuses `${FILE}`/`${KEYSTORE}` with a message naming the edition and pointing at `${ENV}`/`${SYS}` — loud in a connection test, never a silent null |
+| SEC-08 | Data masking / row scoping driven by field classification | — | — | 🟡 | **decided 2026-09-02 (operator): Advanced only.** Classification exists (SCH-03), row scope exists (SEC-04). ✅ The `quality.pii.mask` Step (`transform.mask`, 2026-10-06) masks pipeline columns by classification, strictest-wins. It is gated to Advanced by `inspecto-policy`'s `EditionFeatureProvider` and refused elsewhere with `ERR_EDITION_FEATURE`. 🔲 Dataset-wide masking at read time and the classification-to-row-scope join are still unbuilt. ⚠ Partly built outside this gate: Link Analysis entity-id masking by classification ships with `inspecto-geo-link` (Standard, Standard, Preview), not Advanced-only; the Dataset-wide join remains unbuilt |
+| SEC-09 | Actor-attributed, **append-only** audit log (⚠ *not* tamper-evident — no hash chain or signature exists, `compliance/controls-matrix.md` AU-9; this row said "tamper-evident" until 2026-09-08) | 🟡 | ✅ | ✅ | P has no actor (auth-free) — events carry the default actor **`appUser`** (`ApiContext.actor`; corrected 2026-09-08 — no `anonymous` string exists) |
+| SEC-10 | Exchange / sharing grants between spaces | — | ✅ | ✅ | ✅ **GATED 2026-09-07 (EDG-01 cell 4) — the P cell is now true of the build.** The `com.gamma.exchange` domain + `ExchangeRoutes` + `ExchangeRefResolver` moved into `inspecto-exchange`, discovered through the public `RouteModule` SPI. On Basic the 11 paths answer **503 "not installed"**, `features.exchange` is false (it now requires the module to have registered, not merely `-Dspaces.root` — the old check made a Basic install advertise a Share button that 404'd), and both seams stay fail-closed: `SharedRefResolver.NONE` resolves no `shared/` ref, `SharedItemConsumers.NONE` fences no delete. ⛔ The six exchange capabilities REMAIN grantable on every edition by decision — a per-edition validator would break role-file portability, and dead vocabulary has no route behind it. Attributes remain private by default, not by guarantee (SEC-EXCHANGE-ATTRS). The `signal` kind (cross-Space Signal delivery, `canOfferSignals`, 2026-09-28) ships in this cell: its forwarder is installed by `inspecto-exchange`, so Basic has none (`NoExchangeShipsInThePersonalBuildTest`). |
+| SEC-11 | X-Actor header removal | 🔲 | 🔲 | 🔲 | already **rejected** on S/E when an `Authenticator` is active; full removal gated on **the next MAJOR tag** (restated 2026-09-07, `BACKLOG.md` §2 — the API-v1 sunset it used to cite was deleted 2026-07-25) |
+| SEC-12 | OIDC end-session redirect (`bootstrap.auth.endSessionUrl`) | — | 🟡 | 🟡 | **SPA half shipped 2026-07-26** (RP-Initiated Logout via `endSessionUrl`, `SessionService.logout()`); the server publishes **no** `auth` block, so the value comes from the UI build's `environment.ts` — configured at build time, not deployment. Server-published OIDC config refused as scoped (`BACKLOG.md` §6). `okf/product/module/access/plan-security.md` §2 |
+
+### State, scale & operations [`OPS` · `DAT`]
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| OPS-01 | Operational stores on DuckDB (status, jobs, dedup ledger, outputs, provenance) | ✅ | ✅ | ✅ | ⚠ **AMENDED 2026-09-08 (EDG-01 cell 7, operator-approved): `objects` left this list for Basic.** The object/link/note/tag-assignment stores are opened by the optional `inspecto-ops` module now (`ObjectEngineProvider`), so a Basic bundle has none of the four — the row previously promised Basic a store that CP-11 was gating away, which is the contradiction this cell had to resolve one way or the other. Standard and Advanced are unchanged. ⚠ Each of the four is still its OWN DuckDB file (a file-based DuckDB holds a single-writer lock) and still degrades to in-memory rather than blocking startup. ✅ **Durable by default since 2026-09-25 (`OBJECTS-BACKEND-DEFAULT-MEMORY-1`, operator decision):** `-Dobjects.backend` defaults to `db` — each Space's `duckdb/` — on Standard, Preview and the `-DemoAuth` build (whose `serve-demo.*` states `-Dobjects.backend=db` explicitly); `memory` is an explicit opt-in only (the test reactor pins it). Advanced is OPS-02. |
+| OPS-02 | Operational stores on PostgreSQL (`-Dinspecto.db=postgres`, shared roster) | — | ✅ | ✅ | driver sidecar Standard+. ⛔ **Advanced: MANDATORY for the operational objects (Incidents, Cases, notes, links, tags) since 2026-09-25** (`OBJECTS-BACKEND-DEFAULT-MEMORY-1`, operator decision). The Advanced `serve.*` passes `-Dobjects.backend=postgres`, and `OperationalDb.verifyObjectsBackend()` refuses the boot unless all four families resolve to a `jdbc:postgresql:` URL (`INSPECTO_DB_URL` → `-Dinspecto.db=postgres -Dinspecto.db.url=…`, or a per-family `-Dobjects*.db.url`) with the driver present; a store that then will not open stops its Space instead of degrading to memory. Never a fallback to DuckDB or memory. Standard/Preview keep PostgreSQL optional; a Preview bundle carries Advanced's jars, so `package.ps1` names it in the launcher text to keep it on DuckDB. The `-DemoAuth` build runs `serve-demo.*` on `db` (a one-folder hand-over has no PostgreSQL). |
+| OPS-03 | Multi-user Postgres deployment (shared state, several operators) | — | 🟡 | 🟡 | plan exists (`archived-documents/plans-archive/postgres-multi-user-plan.md`), **PARKED** by BACKLOG §6 2026-09-06 until a multi-operator install exists |
+| OPS-04 | Distributed scheduler coordination (leader election / locks) | — | — | 🔲 | EDITIONS §Advanced "will need later" |
+| OPS-05 | Shared object store for Parquet | — | — | 🔲 | EDITIONS §Advanced "will need later"; **P: decided 2026-09-02, not for Basic** |
+| OPS-06 | Backup / restore (zip + sidecar manifest, hash-verified) | — | ✅ | ✅ | ✅ **GATED 2026-09-07 (EDG-01 cell 2) — the P cell is now true of the build.** `BackupTask` moved out of `inspecto-engine` into `inspecto-backup`, a Standard+/Advanced-only module that contributes `backup`/`backup_verify`/`restore` through the new `MaintenanceTaskProvider` ServiceLoader seam on `MaintenanceJob`. On Basic the three are **unknown maintenance tasks, refused loudly** (`NoBackupTaskShipsInThePersonalBuildTest` pins it in the DEFAULT build) — never a silent SKIPPED, which would read as a successful no-op to a chained job. ⚠ **Consequence for the bundled `spaces/demo`:** its nightly chain `runlog_retention → db_maintenance → config_backup → backup_verify → maintenance_report` stops at `config_backup` on a Basic install with a FAILED run whose message names the cause; the chain's halt-on-failure guard does the rest. That is the edition boundary working, not a defect. 🔴 **`backup` covers files only, never the operational database** (`DB-BACKUP-POSTGRES-1`, filed 2026-09-15, closed doc-only 2026-09-17): its one DB reference (`BackupTask.catalogRow`) opens a throwaway in-memory DuckDB scratch just to write its own catalog Parquet row — it never reads the operational stores themselves. On a Standard/Advanced deployment pointed at Postgres (`OPS-02`, `-Dinspecto.db=postgres`), **job runs, the dedup and acquisition ledgers, status, and the run lease have no backup path from this product at all.** A real leg would mean a JDBC `COPY`/dump per `OperationalDb.Family` — each with its own URL and credential grain (see `OperationalDb.java`'s roster) — which is infrastructure-plumbing scope disproportionate to a maintenance task; no `pg_dump`-shelling precedent exists in this codebase (the runtime is deliberately JDBC-driver-free, §OPS-02) and adding one would cut against that. **Operator must arrange an external DBA backup (`pg_dump`/WAL archiving/managed-service snapshot) for the Postgres operational database** — this product's `backup` task does not, and is not planned to, cover it. |
+| OPS-07 | Embedded trimmed JVM runtime in the bundle (jlink) | 🟡 | 🟡 | 🟡 | 🟡 **BLOCKER FIXED 2026-09-14; turns ✅ on the first tagged release.** ⚠ Deliberately NOT green yet: no published artifact contains a runtime until a `v*` tag runs `release.yml`, and a cell green over an artifact that does not exist is exactly `SPEC-GREENCELL-1`. What changed is that the packaging step can now run at all — `release.yml` passed `-NoRuntime` on all three steps, so the old ✅✅✅ described a capability of the script and the 🟡 that replaced it described a bundle with no runtime. 🔴 **Its recorded cause was wrong on both counts.** The blocker was never "the runner has no GraalVM jmods cache": `package.ps1` hardcoded **`jlink.exe`** in all three probes (plus a Windows path separator), which cannot exist on the `ubuntu-latest` runner, so the step could only ever throw. Measured inside `eclipse-temurin:25-jdk` — exactly what `setup-java` installs there — `jlink` lives at `$JAVA_HOME/bin/jlink`, the image ships **zero** jmods, and jlink still links a working ~64 MB runtime **from the run-time image itself** (JEP 493). ⚠ So a jmods cache was not what was missing; ⛛ do not provision one. Both launchers are conditional (`serve.sh` takes `runtime/bin/java` only when executable, `serve.bat` only when the Windows `java.exe` is present under `runtime/bin`), so a Linux-built runtime serves Linux targets while Windows targets fall back to system java as before. ✅ **Verified end-to-end 2026-09-14** by a real `package.ps1 -Edition Basic` run: jlink ran, `runtime/bin/java.exe` reports 25.0.3, and the staged bundle passed its own boot smoke. ⚠ **Cost, measured:** the embedded runtime is ~68 MB on disk and the Basic `inspecto-deploy.zip` is **205 MB** with it — operators who already supply Java can still pass `-NoRuntime`. Owner: [`okf/product/layer/platform/plan-editions.md`](plan-editions.md) §2 |
+| OPS-08 | Timezones: `-Dops.timezone` + per-source `parsing.source_timezone` | ✅ | ✅ | ✅ | |
+
+### Compliance & supply chain [`CMP`]
+
+| ID | Feature | P | S | E | Notes |
+|---|---|---|---|---|---|
+| CMP-01 | SBOM per bundle (CycloneDX + SPDX inside the zip) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-1) |
+| CMP-02 | Signed releases (CI-held key, `.sha256` + `.asc`, fail-closed `-Sign`) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-2); workflow unexercised until the first `v*` tag |
+| CMP-03 | Dependency-review guard (`tools/dependencies.lock` in CI) | ✅ | ✅ | ✅ | reactor-wide, not per bundle — a review baseline, not an SBOM |
+| CMP-04 | Audit retention (`event_prune`, one-year window) | ✅ | ✅ | ✅ | 2026-09-02 (COMPLY-3); operator-scheduled |
+| CMP-05 | Control matrix + auditor evidence (`compliance/`) | — | ✅ | ✅ | P has no compliance scope by definition — ⚠ **that is a product stance, not a build fact** (clarified 2026-09-08): the matrix and the seven evidence files are plain repo files, so nothing withholds them from a Basic deployment; the gating is about who is *promised* the posture. Requirement-of-record: [`okf/product/layer/platform/plan-compliance.md`](plan-compliance.md) |
+| CMP-06 | FIPS mode (G9) | — | 🔲 | 🔲 | matrix gap G9, open |
+| CMP-07 | RBAC R5 residual (G8) | — | ✅ | ✅ | 🔴 **Cell corrected 2026-09-07 — it was STALE.** It read `🔲 planned` citing "matrix gap G8, open", but `compliance/controls-matrix.md` records **G8 CLOSED 2026-08-28** → `evidence/access-review.md`, grounded against the shipped R5 view (the Roles tab renders role-level effective grants with the profile-deny overlay). The work was done six weeks before this board was opened; only the cell was behind. ⚠ A cell that cites another file's gap ID inherits that file's state — re-read it before trusting the cell. |
+| CMP-08 | Certifications (SOC 2 Type II, ISO 27001, FedRAMP…) | — | — | 🔲 | **decided 2026-09-02 (operator): Advanced only.** Org-paced (NFR-7); C1 scope statement is org-gated |
+
+**No open ❓ cell** — SEC-07 decided 2026-09-06 (see its row). SEC-08 and CMP-08 were
+decided Advanced-only on 2026-09-02. Everything 🔲 already has a BACKLOG home; a 🔲 cell that gets
+scheduled should cite its row here.
+
+### Edition-gating debt (opened by the 2026-09-02 decisions) [`PKG`]
+
+| ID | Work | Cells | Notes |
+|---|---|---|---|
+| EDG-01 | Gate the "not for Basic" features out of the Basic bundle: ✅ **delivery channels (CP-15) DONE 2026-09-07 — cell 1**; ✅ **backup/restore tasks (OPS-06) DONE 2026-09-07 — cell 2**; ✅ **geo map + link analysis (CP-09) DONE 2026-09-07 — cell 3**; ✅ **exchange/sharing (SEC-10) DONE 2026-09-07 — cell 4**; ✅ **the `/metrics` exposition (CP-13) DONE 2026-09-07 — cell 5**; ✅ **the events feed + audit CSV export (CP-13) DONE 2026-09-08 — cell 6**; ✅ **operational objects (CP-11) DONE 2026-09-08 — cell 7**, the largest piece: 31 domain files (not 37 — `AbstractJdbcStore` was shared infrastructure and was relocated to `com.gamma.util` first) and 27 code dependants (the grep census said 23; the compiler found four more, incl. `WidgetTags` calling through type INFERENCE and a whole module, `inspecto-intelligence`, that was never censused). ✅ **EDG-01 IS COMPLETE — all **seven** cells are now true of the build** *(the count said “six” until 2026-09-09; the row enumerates 1–7 because `CP-13` is two halves)* | the — cells those rows carry under P | ✅ **MECHANISM DECIDED 2026-09-07 (operator): ServiceLoader modules for every cell** — the house mechanism, matching `inspecto-oidc` / `inspecto-policy` exactly, and the one §Assembly names first. ⛔ NOT `-D` capability switches: a switch leaves the code in the Basic bundle, so it is a policy boundary rather than a packaging one, and Basic ships **no authenticator at all** and binds every interface by default — a mis-set flag there re-exposes an unauthenticated surface. A module Basic never bundles cannot be re-enabled by misconfiguration. ⚠ Accept what that costs: four of the six are core code today (metrics is `MetricRegistry` in the core, objects is `ObjectService` — 37 files, 27 dependants (measured 2026-09-08), exchange and geo are `ControlApi` routes), so each is a real extraction — new module, SPI seam, tests moved — not a gating pass. Deliver cell-wise; the ServiceLoader no-op-when-absent contract is the same one the assist agent already proves. 🔴 Grounded 2026-09-07: `/metrics` is in `ControlApi.PUBLIC_PATHS`, so on Basic it is served **unauthenticated** today despite CP-13 reading `—`. **Plan + ranked census: `archived-documents/plans-archive/edg-01-edition-gating-plan.md`.** 🔴 That census established **CP-13's registry cannot be a module** — `MetricRegistry` has dependants all over core — so cell 5 gated the HTTP **exposition** instead, which is the whole of the exposure. | ⚠ All of these are CORE code today, reachable in every bundle. The house mechanism for an edition difference is a ServiceLoader module or a `-D` flag decided by the BUILD, never `if (edition == …)` (EDITIONS §Assembly). So this is a design slice first: which of the six become optional modules the Basic profile omits, which become a `-D` capability switch `serve.*` sets per edition, and what the UI shows for an absent capability (the 503-panel convention, never a toast). Until it ships, the P cells are a **stated product decision the code does not apply** — say so, do not describe them as absent. |

@@ -574,7 +574,7 @@ Hard invariants: narrow only (a refusal is EMPTY, never a value); aggregate outp
 
 ## Demos, showcases, edition placement and upload - what is still open (folded 2026-10-22)
 
-Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture.md`](../okf/product/module/la-core/architecture.md) §6.6 (upload) and §8 (editions), [`EDITIONS.md`](../EDITIONS.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
+Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture.md`](../okf/product/module/la-core/architecture.md) §6.6 (upload) and §8 (editions), [`spec-editions.md`](../okf/product/layer/platform/spec-editions.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
 
 ### D1. Demo readiness (`la-demo-readiness-plan`) - nothing open
 

@@ -81,7 +81,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 | Branch-aware ingest executor (armed `route:`, engagement) | [`branch-aware-ingest.md`](okf/product/module/engine/spec-branch-aware-ingest.md) |
 | Data acquisition framework (Phases A–F, connectors, dedup, watermarks) | [`data-acquisition-framework.md`](okf/product/module/acquire/spec-framework-design.md) |
 | All TOON config keys | [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md) |
-| Editions (Personal/Professional/Enterprise = build flavors); feature × edition board; Step Processor catalog table | [`EDITIONS.md`](EDITIONS.md) |
+| Editions (Personal/Professional/Enterprise = build flavors); feature × edition board; Step Processor catalog table | [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) |
 | Branch & release policy (versions=branches; merge-forward; SemVer+CC) | [`BRANCHING.md`](BRANCHING.md) |
 | Parsing/grammar | [`parsing-options-reference.md`](okf/product/module/engine/spec-parsing-options.md), [`delimited-grammar-design.md`](archived-documents/plans-archive/delimited-grammar-design.md) |
 | Perf benchmarks & tuning | [`performance.md`](okf/product/layer/platform/tests-performance.md) |
@@ -97,7 +97,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
 - **Editions are build flavors, never git branches.** One source tree (`master` = auth-free common core);
   edition-only code in its own Maven module (`inspecto-oidc` for Professional/Enterprise), assembled via
   `-Pedition-*` profiles + `ServiceLoader` + `-D` flags. A fix lands once in core; all editions inherit it
-  at build. Rationale: branches would force perpetual cross-line cherry-picking. → [`EDITIONS.md`](EDITIONS.md).
+  at build. Rationale: branches would force perpetual cross-line cherry-picking. → [`spec-editions.md`](okf/product/layer/platform/spec-editions.md).
 - **All auth removed from `master`/common core (2026-06-16).** Personal is genuinely auth-free (every
   ControlApi route open; SPA boots to `/dashboard`; no token paste/guards). Professional re-adds auth out-of-band
   via the **`inspecto-oidc` module (BUILT, W6 2026-07-06** — `OidcAuthenticator` Nimbus+JWKS, `RoleMapper`,

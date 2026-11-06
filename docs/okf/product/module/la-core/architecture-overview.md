@@ -67,7 +67,7 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
 - **Edition gates D-LAE1, D-LAE2, D-LAE5** (Standard and up). Case history moved to its own route module
   (`CaseHistoryRoutes`) and answers 503 on Basic; the Geo map, routes and co-location sit behind their own feature
   `geoMap`; the Link Analysis and Geo map dashboard Widget Types are hidden on Basic by the `/bootstrap` flag `laWidgets`
-  (a UI flag only, not access control). See [`docs/EDITIONS.md`](../../../../EDITIONS.md).
+  (a UI flag only, not access control). See [`spec-editions.md`](../../layer/platform/spec-editions.md).
 - **Grow, Held tray and Exclude** (`LA-GROW-EXCLUDE-1`). Grow previews what the next step adds
   (`POST /inv/investigations/{id}/expand/preview`, `POST /inv/projection/neighbors/preview`), busy nodes are held in a
   tray, Exclude removes from this Investigation or adds to a list, and every recorded change is an existing op

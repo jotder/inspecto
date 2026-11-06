@@ -339,7 +339,7 @@ the UI renders a bare text input, and `SchemaProjection`'s own javadoc says the 
 by the ETL. Its single consumer copies it to a Catalog node **display** attribute. The two steps that would
 enforce it are `quality.pii.mask` (the Advanced-only `mask` Step, built 2026-10-06; it acts only where a
 pipeline authors it) and `quality.compliance.redact` (`PLANNED`). Dataset-wide masking stays unbuilt
-(`EDITIONS.md` SEC-08). ⛔ So a label alone is a **statement of intent, never a control**. Do not describe it as
+(`okf/product/layer/platform/spec-editions.md` SEC-08). ⛔ So a label alone is a **statement of intent, never a control**. Do not describe it as
 protection unless a `mask` Step reads it. ⛔ And `INTERNAL` here is not the API error code
 `INTERNAL` (`ErrorCodes`): one word, two concepts, one layer apart.
 
@@ -1324,7 +1324,7 @@ When a rename lands, mark its row ✅ and record the commit.
 ## 14. Capability areas (the functional spine) *(added 2026-09-08 — docs consolidation step 2)*
 
 The **fifteen capability areas** are the one subject axis every other view keys to: `REQUIREMENTS.md` §3's
-requirement IDs, `BACKLOG.md` rows, `EDITIONS.md` gating debt and commit messages all cite them, and each
+requirement IDs, `BACKLOG.md` rows, `okf/product/layer/platform/spec-editions.md` gating debt and commit messages all cite them, and each
 area owns exactly one **capability spec**, the `plan-<area>.md` file of the product hub it belongs to (`docs/okf/product/…`, see `docs/INDEX.md`) (template:
 `archived-documents/plans-archive/docs-consolidation-plan.md` §5.2). The **ID prefixes are stable traceability handles and never
 change**; the *names* below are the canonical ones and replace the headings `REQUIREMENTS.md` §3 used
@@ -1363,7 +1363,7 @@ the Java embedding API's stability policy (`@PublicApi`). *Control* distinguishe
 `LA-EDITIONS-1` ED-2, 2026-10-17; formerly Personal · Professional · Enterprise), plus **Preview** (everything, demo
 sign-in, never sold) — assembled by `package.ps1` from Maven profiles and `ServiceLoader` modules. ⛔ Never a branch (versions are
 branches; see `BRANCHING.md`) and never a runtime flag: a feature an edition lacks is a module that edition
-does not bundle. The per-feature table is `EDITIONS.md`.
+does not bundle. The per-feature table is `okf/product/layer/platform/spec-editions.md` (the customer summary is `EDITIONS.md`).
 
 **Compliance** — The controls, evidence and packaging obligations that let a deployment pass an external
 audit (SOC 2 / ISO 27001 / HIPAA / PCI scope): SBOM per bundle, signed releases, the dependency-review
@@ -1375,7 +1375,7 @@ obligation stated by an external framework, mapped to what this product does abo
 (`product` / `org` / `customer` / `IdP`) and which evidence file attests to it. 🔴 **Its identifiers are
 externally owned and there is no product-side control id** — the matrix is keyed on SOC 2 TSC, ISO 27001:2022
 Annex A and NIST 800-53 identifiers, and `controlId` appears nowhere in the code. ⛔ **`CMP-01…08` are NOT
-control ids** — they are edition-board *feature* rows in `EDITIONS.md`, and the matrix contains no `CMP-nn`
+control ids** — they are edition-board *feature* rows in `okf/product/layer/platform/spec-editions.md`, and the matrix contains no `CMP-nn`
 anywhere. ⛔ Also not the **Control API** (§14), not the **`CTL` Step family** (`control.*` processors — the
 `gap` / `alert` / `event` trio), and not a form **control type** (the `NodeAttribute` widget vocabulary:
 `string` · `identifier` · `number` · `boolean` · `select` · `autocomplete` · `multiline` · `list`). ⛔ Never

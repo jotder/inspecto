@@ -158,7 +158,7 @@ the Maven [edition](architecture-editions-model.md) profile + assembles the per-
 launch scripts embed the native-access flag and the key [`-D` flags](admin-guide-launch-flags.md).
 
 **`-Ui gamma|la-app` (D-5 step 7, 2026-10-02; default `gamma`) picks WHICH single-page application `ui/` holds** - a UI flavor,
-not an edition ([`EDITIONS.md`](../../../../EDITIONS.md)): any `-Edition` ships either. `gamma` is the Inspecto console and the bundle
+not an edition ([`spec-editions.md`](spec-editions.md)): any `-Edition` ships either. `gamma` is the Inspecto console and the bundle
 exactly as it always was; `la-app` is the Link Analysis application (`inspecto-ui/projects/la-app`). The script builds the chosen one
 (`npm run build -- <name>`) and copies `inspecto-ui/dist/<name>/` **by name**, never "the first `index.html` under `dist/`" (two
 applications mean two `index.html` files; "first" is whichever sorts first). A bundle's `ui/` never holds both, and `ControlApi` still

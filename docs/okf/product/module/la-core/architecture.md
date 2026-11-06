@@ -2273,7 +2273,7 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 ## 8. Editions and packaging
 
 Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professional / Enterprise). Feature placement:
-[`EDITIONS.md`](../../../../EDITIONS.md) (*Inspecto LA feature placement*).
+[`spec-editions.md`](../../layer/platform/spec-editions.md) (*Inspecto LA feature placement*).
 
 | | Basic | Standard | Advanced | Preview |
 |---|---|---|---|---|

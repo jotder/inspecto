@@ -399,7 +399,7 @@ Pinned by `TrustedProxiesTest` + `ControlApiClientIpTest`.
 edition every route is open — no token, guard, or login (the old `CONTROL`/`assist.*` token scopes were
 removed). The **Standard** edition re-adds authentication out-of-band via the `Authenticator` / `Subject` /
 `TokenRelay` SPIs (`com.gamma.control`), implemented by the `inspecto-oidc` module (OIDC resource
-server, HTTPS, BFF `/auth/*` routes) — see [`EDITIONS.md`](../../../../EDITIONS.md). Separate from auth and always on:
+server, HTTPS, BFF `/auth/*` routes) — see [`spec-editions.md`](spec-editions.md). Separate from auth and always on:
 **write routes are fail-closed** behind the `-Dassist.write.root` gate (`503` when unset).
 
 **Versioned contract.** Every business route below is served **only** under the versioned **`/api/v1`**

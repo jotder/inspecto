@@ -51,7 +51,7 @@ section: nothing is in production after 3.x.)*
 modules get assembled* from the same commit, plus the capability gates those modules bring; Preview is a fourth,
 never-sold build flavour carrying everything. The names Basic / Standard / Advanced replaced Personal / Professional /
 Enterprise on 2026-10-17 (`LA-EDITIONS-1` ED-2) as a rename of flavours — no branch was created or retired. See
-[`EDITIONS.md`](EDITIONS.md) for the assembly detail.
+[`spec-editions.md`](okf/product/layer/platform/spec-editions.md) for the assembly detail.
 
 ---
 

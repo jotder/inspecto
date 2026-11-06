@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Renders the OFFERINGS MATRIX block of docs/EDITIONS.md - everything about editions that is a pure function of
+// Renders the OFFERINGS MATRIX block of docs/okf/product/layer/platform/spec-editions.md - everything about editions that is a pure function of
 // offerings/*.toon + the module manifests + tools/bundle-modules.mjs / tools/offering-classpath.mjs (docs/okf/product/layer/platform/architecture-module-taxonomy.md; was: module-architecture plan
 // §2.3 "the bundle generator, the EDITIONS matrix and the SBOM are generated from Offerings", §6 P6b).
 //
@@ -95,21 +95,21 @@ export function splice(doc, body) {
     const eol = doc.includes('\r\n') ? '\r\n' : '\n';
     const lf = doc.replace(/\r\n/g, '\n');
     const b = lf.indexOf(BEGIN), e = lf.indexOf(END);
-    if (b < 0 || e < b || lf.indexOf(BEGIN, b + 1) >= 0 || lf.indexOf(END, e + 1) >= 0) throw new Error(`docs/EDITIONS.md must carry exactly one ${BEGIN} ... ${END} pair`);
+    if (b < 0 || e < b || lf.indexOf(BEGIN, b + 1) >= 0 || lf.indexOf(END, e + 1) >= 0) throw new Error(`docs/okf/product/layer/platform/spec-editions.md must carry exactly one ${BEGIN} ... ${END} pair`);
     return (lf.slice(0, b + BEGIN.length) + '\n' + body + '\n' + lf.slice(e)).replace(/\n/g, eol);
 }
 
 function main() {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-    const file = join(root, 'docs/EDITIONS.md');
+    const file = join(root, 'docs/okf/product/layer/platform/spec-editions.md');
     const a = process.argv.slice(2);
     if (!a.includes('--check') && !a.includes('--write')) { console.error('usage: render-offerings-matrix.mjs --check | --write'); process.exit(2); }
     const doc = readFileSync(file, 'utf8');
     let next;
     try { next = splice(doc, render(root)); } catch (e) { console.error(`render-offerings-matrix: ${e.message}`); process.exit(2); }
-    if (next === doc) { console.log('render-offerings-matrix: docs/EDITIONS.md is current'); return; }
-    if (a.includes('--write')) { writeFileSync(file, next); console.log('render-offerings-matrix: rewrote the block in docs/EDITIONS.md'); return; }
-    console.error('render-offerings-matrix: the offerings-matrix block in docs/EDITIONS.md is stale - run: node tools/render-offerings-matrix.mjs --write');
+    if (next === doc) { console.log('render-offerings-matrix: docs/okf/product/layer/platform/spec-editions.md is current'); return; }
+    if (a.includes('--write')) { writeFileSync(file, next); console.log('render-offerings-matrix: rewrote the block in docs/okf/product/layer/platform/spec-editions.md'); return; }
+    console.error('render-offerings-matrix: the offerings-matrix block in docs/okf/product/layer/platform/spec-editions.md is stale - run: node tools/render-offerings-matrix.mjs --write');
     process.exit(1);
 }
 

@@ -393,7 +393,7 @@ gated on **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset appar
 `package.ps1 -Edition Advanced` **shipped 2026-07-25** — a superset of Standard (both the `security` and
 `policy` jars are bundled), with `serve.sh`/`serve.bat` deriving the edition from bundle contents. No
 runtime flag was added: `inspecto-policy` is discovered solely via its `AccessDecider` service file, so the
-classpath entry is the switch. Detail in [EDITIONS.md](../../../../EDITIONS.md).
+classpath entry is the switch. Detail in [spec-editions.md](../../layer/platform/spec-editions.md).
 
 **The write-gate is separate from auth and stays in all editions.** `-Dassist.write.root` is a path-jailed
 filesystem gate on mutation routes (config writes, connection writes, authored-Pipeline CRUD): absent →

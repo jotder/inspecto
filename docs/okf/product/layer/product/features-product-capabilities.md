@@ -2,7 +2,7 @@
 
 > Audience: product owners & business analysts · Status date: **2026-09-23** (was 2026-07-07)
 > Requirement of record: the capability specs indexed by [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3 ·
-> edition per capability: [`../../../../EDITIONS.md`](../../../../EDITIONS.md) · forward plan:
+> edition per capability: [`spec-editions.md`](../platform/spec-editions.md) · forward plan:
 > [`../platform/plan-roadmap.md`](../platform/plan-roadmap.md).
 
 ## Personas — one console, three Lenses
@@ -24,7 +24,7 @@ item, not a shipped artifact (corrected 2026-09-08).
 ## Capability map (status as of 2026-09-23)
 
 Each status traces to its capability spec's §2 (via [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3); the
-edition column is the lowest edition that bundles it, per [`../../../../EDITIONS.md`](../../../../EDITIONS.md).
+edition column is the lowest edition that bundles it, per [`spec-editions.md`](../platform/spec-editions.md).
 
 | Area | What the user gets | Status | From edition |
 |---|---|---|---|
