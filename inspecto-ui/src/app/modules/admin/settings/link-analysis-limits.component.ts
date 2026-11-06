@@ -149,10 +149,12 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
             } @else {
                 @if (shows('analysis')) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-limits-analysis">
-                    <h2 id="la-limits-analysis" class="text-lg font-semibold">Analysis</h2>
-                    <p class="text-secondary text-sm">
-                        Limits for this Space, enforced by the server. Blank = the shipped default.
-                    </p>
+                    <h2 id="la-limits-analysis" class="text-lg font-semibold" [class.sr-only]="single()">Analysis</h2>
+                    @if (!single()) {
+                        <p class="text-secondary text-sm">
+                            Limits for this Space, enforced by the server. Blank = the shipped default.
+                        </p>
+                    }
                     @if (spaceItems().length) {
                         <form
                             class="flex flex-col gap-3"
@@ -160,7 +162,7 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                             (ngSubmit)="save('space')"
                             data-section="space"
                         >
-                            <mat-accordion multi class="flex flex-col gap-2">
+                            <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
                                 @for (g of spaceGroups(); track g.group; let first = $first) {
                                     <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
                                         <mat-expansion-panel-header>
@@ -216,13 +218,17 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
 
                 @if (shows('host')) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-limits-host">
-                    <h2 id="la-limits-host" class="text-lg font-semibold">Host resources</h2>
-                    <p class="text-secondary text-sm">
-                        Install-wide limits shared by every Space on this server.
-                        @if (limits.podScoped()) {
-                            In a cluster they apply to this server (pod) only.
-                        }
-                    </p>
+                    <h2 id="la-limits-host" class="text-lg font-semibold" [class.sr-only]="single()">Host resources</h2>
+                    @if (!single() || limits.podScoped()) {
+                        <p class="text-secondary text-sm">
+                            @if (!single()) {
+                                Install-wide limits shared by every Space on this server.
+                            }
+                            @if (limits.podScoped()) {
+                                In a cluster they apply to this server (pod) only.
+                            }
+                        </p>
+                    }
                     @if (installItems().length) {
                         <form
                             class="flex flex-col gap-3"
@@ -230,7 +236,7 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                             (ngSubmit)="save('install')"
                             data-section="install"
                         >
-                            <mat-accordion multi class="flex flex-col gap-2">
+                            <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
                                 @for (g of installGroups(); track g.group; let first = $first) {
                                     <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
                                         <mat-expansion-panel-header>
@@ -286,10 +292,12 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
 
                 @if (shows('browser')) {
                 <section class="flex flex-col gap-3" aria-labelledby="la-limits-browser">
-                    <h2 id="la-limits-browser" class="text-lg font-semibold">My browser</h2>
-                    <p class="text-secondary text-sm">
-                        Your own values for this browser only, at most the Space value. Blank = the Space value.
-                    </p>
+                    <h2 id="la-limits-browser" class="text-lg font-semibold" [class.sr-only]="single()">My browser</h2>
+                    @if (!single()) {
+                        <p class="text-secondary text-sm">
+                            Your own values for this browser only, at most the Space value. Blank = the Space value.
+                        </p>
+                    }
                     @if (browserItems().length) {
                         <form
                             class="flex flex-col gap-3"
@@ -297,7 +305,7 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                             (ngSubmit)="keepPersonal()"
                             data-section="browser"
                         >
-                            <mat-accordion multi class="flex flex-col gap-2">
+                            <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
                                 @for (g of browserGroups(); track g.group; let first = $first) {
                                     <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
                                         <mat-expansion-panel-header>
@@ -355,6 +363,8 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
 export class LinkAnalysisLimitsComponent {
     /** Which of the three sections to draw. All three by default (the console's Settings); the Link Analysis app shows one per page. */
     readonly sections = input<readonly LimitsSection[]>(ALL_LIMITS_SECTIONS);
+    /** One section on its own page: the host's page header already names it, so the section's own heading and intro are not repeated. */
+    protected readonly single = computed(() => this.sections().length === 1);
     readonly limits = inject(LaLimitsService);
     private readonly toastr = inject(ToastrService);
 

@@ -29,7 +29,7 @@ import { LinkAnalysisSettingsComponent } from 'app/modules/admin/settings/link-a
         <div class="flex flex-col gap-6 p-6">
             <inspecto-page-header
                 title="My browser"
-                subtitle="Your own values for this browser only, at most the Space value. Nobody else sees them."
+                subtitle="Your own values for this browser only, at most the Space value. Blank is the Space value. Nobody else sees them."
                 [inset]="false"
             />
             <inspecto-link-analysis-limits [sections]="['browser']" />
