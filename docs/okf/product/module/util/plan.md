@@ -22,7 +22,7 @@ scale-out (topology, shared lakehouse catalog, operations zone).
 
 - DuckDB access and global caps: `DuckDbUtil`, `ConnectionSource` (borrow-scoped), `JdbcDrivers` (shared
   PostgreSQL pool), `StoreHealth`.
-- Files: `AtomicFiles`, `FileBackup`, `FileWalker`, the tar helpers, `CsvLedger`.
+- Files: `AtomicFiles`, `CsvLedger`. (`FileBackup`, `FileWalker` and the tar helpers were retired with the `ura` suite, 2026-11-06.)
 - Config: `ToonHelper`, `CanonicalHash`, `DottedPath`, `CronExpression`.
 - Security helpers: `SqlIdent`, `egress/EgressPolicy` (from `ASSURE-ACTION-REQUESTS-1`), `SpaceSecretKeys`.
 - Module system: `ModuleManifest(s)`, `ModuleActivator`, `KnownModules`, `ModuleStatus`.

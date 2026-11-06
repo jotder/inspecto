@@ -41,8 +41,8 @@ java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-
 .\inspecto-deploy\bin\serve.bat                                # then http://localhost:8080/
 
 # One-shot config converter (com.gamma.inspector.MainApp; the ura pre-ETL utilities were retired 2026-11-06)
-java --enable-native-access=ALL-UNNAMED -cp inspecto\target\inspecto-processor-*.jar `
-     com.gamma.inspector.MainApp help
+# MainApp is in the thin inspecto-engine jar, so use the bundle's whole classpath, from the bundle root:
+cd inspecto-deploy; runtime\bin\java -cp ((Get-Content lib\modules.list) -join ';') com.gamma.inspector.MainApp help
 ```
 
 ---

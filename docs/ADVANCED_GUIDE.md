@@ -364,7 +364,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 |---|---|---|
 | `poll` | input drop zone / remote materialisation | CollectorProcessor |
 | `database` | partitioned Parquet/CSV output (`year=/month=/day=`) | PartitionWriter |
-| `backup` | copies of originals after commit | FileBackup |
+| `backup` | copies of originals after commit | ConsignmentIngestor |
 | `temp` | streaming scratch + DuckDB temp | CsvIngestStrategy |
 | `errors` | per-file field-validation error CSVs | CsvIngester |
 | `quarantine` | rejects under reason subdirs `field_mismatch/`, `unreadable/`, `empty/`, `corrupt_download/` (mirrors poll rel-path) | QuarantineManager |

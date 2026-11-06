@@ -787,9 +787,12 @@ against a **committed** schema, not a fixture.
 `--dry-run` only, so `--apply` falls into the positional list and becomes `outRoot`. The tool's own usage text
 prints this form; it still reports success and still archives the originals.
 
-✅ **The entry point, for the record:** there is no `inspecto` launcher — the fat jar's `Main-Class` is
-`CollectorProcessor`, so it is reached as
-`java -cp inspecto-processor-*.jar com.gamma.inspector.MainApp migrate-configs <config_root> [<registry_root>] [--apply]`.
+✅ **The entry point, for the record:** there is no launcher script (the `ura` scripts were retired 2026-11-06), and
+`MainApp` lives in the thin `inspecto-engine` jar, not in `inspecto.jar`, so the classpath must be the bundle's
+`lib/modules.list`. From the bundle root:
+
+- Linux: `runtime/bin/java -cp "$(tr '\n' ':' < lib/modules.list)" com.gamma.inspector.MainApp migrate-configs <config_root> [<registry_root>] [--apply]`
+- Windows (PowerShell): `runtime\bin\java -cp ((Get-Content lib\modules.list) -join ';') com.gamma.inspector.MainApp migrate-configs <config_root> [<registry_root>] [--apply]`
 
 ✅ Separately settled by the same drive (`MIGRATE-ENRICH-DRIVE-1`, closed): the post-`ea5a9225` enrich SKIP is
 real — 9 conversions / 0 refusals, the enrich config byte-identical and unarchived. ⚠ But `archived-config/`

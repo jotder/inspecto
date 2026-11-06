@@ -40,7 +40,7 @@ stored**, and that **the store is federated per kind** — deliberately not one 
 Exchange consumers) and `ComponentIntegrity`; the single ref derivation (`refsForComponent`) and its
 consumers; the Catalog read model (`com.gamma.catalog`: `MetadataGraph`, `MetadataGraphService`, `NodeKind`,
 `EdgeKind`, `IdScheme`, `OperationalOverlay`) and `GET /catalog/*`; the four graph planes; the Schema and
-Mapping registry, `SchemaFieldTypes`, `SchemaExtractor`, `resolveSchemaRef`, the `rules[]` → `fields[]`
+Mapping registry, `SchemaFieldTypes`, `SchemaExtractor` (retired with `ura`, 2026-11-06), `resolveSchemaRef`, the `rules[]` → `fields[]`
 spelling state; field classification; Stream / Reference onboarding as a composed flow; the Catalog and
 Components SPA.
 
