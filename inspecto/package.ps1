@@ -1646,7 +1646,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
 PORT="${PORT:-8080}"
 SPACES_ROOT="${SPACES_ROOT:-spaces}"
-ls -d "${SPACES_ROOT}"/*/config >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
+# A Space is a folder with config/ or a <id>.ref file pointing at one kept elsewhere (SpaceManager.REF_SUFFIX).
+{ ls -d "${SPACES_ROOT}"/*/config || ls "${SPACES_ROOT}"/*.ref; } >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces.root=${SPACES_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
@@ -1765,6 +1766,8 @@ if "%PORT%"=="" set "PORT=8080"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
 set "ANY_SPACE="
 for /d %%S in ("%SPACES_ROOT%\*") do if exist "%%~S\config\" set "ANY_SPACE=1"
+rem A Space may also be a <id>.ref file pointing at a folder kept elsewhere (SpaceManager.REF_SUFFIX).
+if exist "%SPACES_ROOT%\*.ref" set "ANY_SPACE=1"
 if not defined ANY_SPACE echo [serve.bat] no Space attached under .\%SPACES_ROOT% -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -^> Spaces
 set "OPTS=--enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
