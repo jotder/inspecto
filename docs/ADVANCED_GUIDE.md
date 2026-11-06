@@ -60,7 +60,7 @@ SPI; editions are build flavors, never branches (see [`EDITIONS.md`](EDITIONS.md
 
 ### Editions
 One SemVer version spans all editions; artifacts differ by classifier/build profile. The master/common core is
-**auth-free**; Professional/Enterprise add an `Authenticator` SPI etc. as build flavors. Do not branch on edition in code.
+**auth-free**; Standard/Advanced add an `Authenticator` SPI etc. as build flavors. Do not branch on edition in code.
 
 ---
 
@@ -400,7 +400,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | `events.backend` | `memory` | `parquet` → durable rolling Parquet |
 | `events.dir` | `inspecto-events` | Parquet event root |
 | `events.views.file` | (unset) | persisted saved-views JSON; null = in-memory |
-| `objects.backend` | `db` | object/link/note/tag stores in the Space's DuckDB files; `postgres` (Enterprise launcher) requires PostgreSQL and fails the boot without it; `memory` is an explicit, non-durable opt-in |
+| `objects.backend` | `db` | object/link/note/tag stores in the Space's DuckDB files; `postgres` (Advanced launcher) requires PostgreSQL and fails the boot without it; `memory` is an explicit, non-durable opt-in |
 | `objects.db.url` | `inspecto-ops.db` | object store URL |
 | `objects.links.db.url` / `objects.notes.db.url` | `…-ops-links.db` / `…-ops-notes.db` | separate (single-writer) |
 | `objects.db.user` / `objects.db.password` | (unset) | object-tier creds |
@@ -444,7 +444,7 @@ The superseded list is kept in git history (`git log -p -- docs/ADVANCED_GUIDE.m
 ## 11. Troubleshooting playbooks (symptom → investigate → fix)
 
 > General first move: `GET /events/search?pipeline=<p>&from=…` for the timeline (Standard and above — on
-> Personal use `GET /audit/search?type=AUDIT` for the audited actions), `GET /metrics` for rates,
+> Basic use `GET /audit/search?type=AUDIT` for the audited actions), `GET /metrics` for rates,
 > and the pipeline's audit CSVs / `GET /pipelines/{n}/batches|files|quarantine` for per-file detail.
 
 **Files not being picked up.**
