@@ -1,497 +1,214 @@
 # Inspecto
 
-A small, high-throughput, **configuration-driven ETL platform** built on an embedded DuckDB
-engine. Its core is an **M..N multiplexer**: it ingests **M** input files, applies light per-record transformations, and demultiplexes them into **N** Hive-partitioned
-(Parquet or CSV) output files (not one-to-one). On top of that engine sit a **Stage-2 enrichment engine** (joins/aggregations over the partitioned output). A **control plane** (HTTP API, scheduler, metrics, audit), a machine-readable **Smart Config** model, a queryable **Metadata Graph**, an **optional embedded AI assist agent**, and an **optional operator web console** (*Inspector*) served from the same process.
+Inspecto takes data from files, folders, feeds and databases, checks it, keeps it as Datasets you can query,
+and shows it on Dashboards and in Inspecto LA (Link Analysis). In Standard and Advanced it also turns what it
+finds into Incidents and Cases that someone owns. It is one server with a web console, run from this folder.
 
-Onboard a new CSV source with a single config file; plug in a custom Java parser for proprietary or binary formats that emit multiple event types. Stage-1 ingest deliberately does **not** do
-heavy joins, lookups, or cross-record aggregation — those run in Stage-2, downstream over the Parquet output.
+This README is for the person who installs and runs Inspecto. To use it, read the [User guide](../docs/USER_GUIDE.md).
 
-- **Current line:** v4.x · repo at `4.0.0-SNAPSHOT` (targeting the 4.0.0 release)
-- **Runtime:** Java 25+, zero external runtime dependencies (everything bundled in the fat-JAR)
-
----
-
-## Table of contents
-
-- [What it does (full functionality)](#what-it-does-full-functionality)
-- [Repository layout](#repository-layout)
-- [Design philosophy in one paragraph](#design-philosophy-in-one-paragraph)
-- [Feature matrix](#feature-matrix)
-- [**User guide**](#user-guide)
-  - [1. Install & build](#1-install--build)
-  - [2. Onboard a new source](#2-onboard-a-new-source)
-  - [3. Run a pipeline](#3-run-a-pipeline)
-  - [4. Drop files & run (the steady state)](#4-drop-files--run-the-steady-state)
-  - [5. Run many sources at once](#5-run-many-sources-at-once)
-  - [6. Pre-ETL utilities](#6-pre-etl-utilities)
-  - [7. Stage-2 enrichment (joins & aggregation)](#7-stage-2-enrichment-joins--aggregation)
-  - [8. Schedule jobs](#8-schedule-jobs)
-  - [9. Operate via the Control API](#9-operate-via-the-control-api)
-  - [9b. Operate via the Inspector web console](#9b-operate-via-the-inspector-web-console)
-  - [9c. Run it as an OS service](#9c-run-it-as-an-os-service)
-  - [10. Explore the Metadata Catalog](#10-explore-the-metadata-catalog)
-  - [11. The optional AI assist agent](#11-the-optional-ai-assist-agent)
-  - [12. Output, audit & troubleshooting](#12-output-audit--troubleshooting)
-- [Requirements](#requirements)
-- [Documentation index](#documentation-index)
-
----
-
-## What it does (full functionality)
-
-The platform is organized into two **data stages** under one **control plane**, with three
-**optional layers** (Smart Config, Metadata Graph, Assist Agent) that ship in the same build.
-
-| Layer | What it gives you                                                                                                                                                                                                                                                                                                                         |
-|---|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Stage-1 ingest** (`com.gamma.etl`, `com.gamma.inspector`) | Poll an inbox → plan batches → ingest files (native DuckDB or Java parser) or a custom binary plugin → type-coerce & derive partition keys → write Hive-partitioned Parquet/CSV with atomic rename → markers/quarantine → fsync'd commit log + audit CSVs → emit a `ConsignmentEvent`.                                                          |
-| **Stage-2 enrichment** (`com.gamma.enrich`) | Register reference + Stage-1 partitions as views on an ephemeral DuckDB, run a `transform` SQL (joins / aggregations / derivations), write an idempotent partitioned result. Event- and schedule-driven, per-job locked, self-chaining via the event bus.                                                                                 |
-| **Control plane** (`com.gamma.service` / `.control` / `.report` / `.job` / `.metrics`) | `SourceService` hub, `ConsignmentEventBus` pub/sub, cron + fixed-delay `Scheduler`, `ControlApi` (JDK `HttpServer`, ~30 routes, bearer auth), dependency-free Prometheus metrics, job runner, reporting, and a pluggable `StatusStore` (file or DuckDB).                                                                                        |
-| **Smart Config** (`com.gamma.config.spec` / `.io` / `.safety`) | A machine-readable `ConfigSpec` per config type (one source of truth for the loader, the AI, and a future UI), a pure parse→validate→prepare pipeline, structured `Finding`s, a canonical `.toon` serializer, a stable-id `ConfigRegistry`, and a hard-fail config **safety validator** (path jail / numeric bounds / output allow-list). |
-| **Metadata Graph** (`com.gamma.catalog`) | A typed, traversable graph: sources → schemas → columns → emitted event tables → Stage-2 transforms → KPIs/reports, with a lazy operational overlay (status/lineage/completeness). Fed by `description`/`unit`/`classification` columns in the schema `.toon` plus a `*_meta.toon` KPI catalog. Served at `/catalog*`.                    |
-| **Assist Agent** (optional `inspecto-agent` module) | An in-JVM, scoped **Assist API** backed by a skill registry over local Ollama (or, in connected builds, a hosted model). Seven skills turn a sentence into a *validated, confirm-first draft*. Built on the reusable **agent-kernel** library since v4.0 (shared `SyncOrchestrator` / capability / confidence-escalation / audit primitives). All AI deps live in this module only — the core fat-JAR stays zero-new-dependency.                                                         |
-
-### The assist skill catalog (all shipped, all draft-only / confirm-first)
-
-| Skill | Since | Does | Replaces |
-|---|---|---|---|
-| `explain-entity` | v3.3.0 | Explain any entity (pipeline/batch/run/report/error) grounded on the catalog + Control API reads + docs. Read-only. | Multi-screen drill-down to diagnose. |
-| `nl-to-schedule` | v3.4.0 | "every weekday 6am after voucher_etl" → a validated JobConfig draft with `nextRuns[]`. | The cron-builder widget. |
-| `suggest-config` | v3.5.0 | Sample + partial config → pre-filled fields with rationale, validated by loader + safety validator. | A long config form + docs hunt. |
-| `kpi-to-sql` *(the hero)* | v3.6.0 | A KPI in business terms → Stage-2 transformation SQL, validated in a **sandboxed** DuckDB (EXPLAIN/LIMIT-0), surfacing chosen join keys & interpretation. | Hand-writing transform SQL. |
-| `diagnose-and-alert` | v3.7.0 | Event-driven: on a FAILED batch → severity + root-cause draft; and NL → alert-rule draft. | Manual log triage + alert config. |
-| `report-sql` | v3.8.0 | NL → a read-only query over the operational ledgers (batches/files/lineage/runs), sandbox-validated. | A report-builder UI. |
-| `report-narrative` | v3.8.0 | A report JSON → a short, strictly-extractive plain-language narrative (abstain-safe). | Reading dense report JSON by hand. |
-
-The agent **proposes; tested endpoints dispose** — every state-changing suggestion is a draft
-applied with the human's credential, confirm-first. Generated SQL is validated in a locked-down
-sandbox (no filesystem/extension access, statement allow-list). Air-gapped builds omit hosted
-SDKs entirely, so "local-only" is a packaging guarantee, not a flag. Full design rationale:
-[Assistant capability spec](../docs/okf/product/module/agent/plan-assistant.md).
-
----
-
-## Repository layout
-
-A two-module Maven reactor (parent POM at the repo root) plus a standalone web UI:
-
-| Module | Role |
-|---|---|
-| `inspecto/` | The lean, deployable ETL engine + control plane (this README). The fat-JAR; **stays zero-new-dependency**. |
-| `features/inspecto-agent/` | **Optional** embedded assist agent. All AI/LLM dependencies (LangChain4j, Ollama, hosted SDKs) live here only. Loaded in-process by `SourceService` via `ServiceLoader` when present. |
-| `inspecto-ui/` | **Optional** operator web console — *Inspector* (Angular + Material/Tailwind SPA: ag-Grid, Chart.js, AntV G6). Its Node/npm toolchain is **not** part of the Maven reactor; `package.ps1` builds it and bundles `dist/` next to the JAR, served by `ControlApi` from `-Dui.dir`. See the [User Guide](../docs/USER_GUIDE.md) (screen by screen) and [`inspecto-ui/README.md`](../inspecto-ui/README.md). |
-
-```powershell
-cd inspecto && mvn clean package   # builds just the lean core (parent resolved by relativePath)
-mvn clean package                        # at repo root: builds the whole reactor (core + agent)
-```
-
----
-
-## Design philosophy in one paragraph
-
-Stage-1 is an **M..N multiplexer**: a batch of **M** input files is demultiplexed and routed into
-**N** partitioned output files — decoupled from the input file count. Records are routed by
-**partition key** (e.g. `year/month/day`) and, on the plugin path, by **segment type** (one file →
-many typed streams). Stage-1 transformations are **stateless and per-record** — type coercion,
-column selection, partition-key derivation, light date composition — which keeps every batch an
-embarrassingly parallel, crash-isolated unit. Heavy work (joins, aggregation, cross-record logic)
-is the job of **Stage-2 enrichment**, which runs over the committed Parquet output. Full rationale:
-[Architecture & Design](../docs/okf/product/module/engine/architecture-stage1.md#design-philosophy--scope).
-
----
-
-## Feature matrix
-
-| Feature | Detail |
-|---|---|
-| **Generic onboarding** | Onboard any source with one hand-authored generation config |
-| **Three-tier config** | Generation → Schema → Pipeline; each layer has a single responsibility |
-| **Smart Config model** | Machine-readable `ConfigSpec` per type; structured validation findings; canonical `.toon` serializer; stable-id registry — one source of truth for loader, AI, and UI |
-| **Config safety validator** | Hard-fail path jail, numeric bounds, output-format/codec allow-list (R6) |
-| **Pre-ETL utilities** | 6 independent commands to search, stage, extract, and archive raw deliveries |
-| **Vectorized delimited-text ingest** | `csv_settings.engine: auto` uses DuckDB's native `read_csv` for clean files faster; falls back to the Java parser for messy dumps |
-| **Adaptive junk detection** | Skips SQL\*Plus preamble lines (fixed + variable, e.g. ORA-28002 password expiry) |
-| **Multi-format dates** | `COALESCE(TRY_STRPTIME(...))` chains handle multiple Oracle date formats per column |
-| **Typed output** | DATE, TIMESTAMP, DOUBLE, VARCHAR — all cast safely; bad values land as NULL, not crashes |
-| **Hive partitioning** | `year=YYYY/month=MM/day=DD` directory structure, partition key from config |
-| **CSV or Parquet output** | Switched per pipeline via `output.format`; Snappy/zstd/gzip compression for Parquet |
-| **Controllable parallelism** | Virtual-thread executors with semaphore caps at both the batch and multi-source levels; per-connection DuckDB thread cap |
-| **Large-file handling** | Engine scratch (temp DB + DuckDB spill) lives on the data volume (`dirs.temp`), never the system `/tmp`; single-pass streaming ingest (no 2–3× materialization); optional `processing.chunking` streams oversized files in bounded chunks so peak scratch stays small regardless of file size |
-| **Multi-source orchestration** | `MultiCollectorProcessor` runs many sources concurrently in one JVM, failure-isolated |
-| **Idempotency** | Marker files (`.processed`) prevent re-ingestion; stale markers pruned by `retention_days` |
-| **Multi-schema dispatch** | `schemas[]` routes files to schemas by filename pattern or column-count probe |
-| **Plugin ingester** | `processing.ingester:` loads a custom `StreamingFileIngester`; one input file can emit multiple event-type segments into separate partitioned tables. Emit records and the framework owns tables/transform/write/lineage and bounds heap/scratch automatically — running the same ingester in *union mode* (many small files) or *generation mode* (one huge file), chosen per batch by file size |
-| **Stage-2 enrichment** | DuckDB-backed joins/aggregations over Stage-1 output; event- and schedule-driven, idempotent, self-chaining |
-| **Scheduler & jobs** | Cron + fixed-delay job runner with per-job locking and run history |
-| **Control API** | ~30-route JDK HTTP server: lifecycle, audit, reports, enrichment, catalog, config-spec, validate, assist; also serves the operator SPA as static files and supports prop-gated CORS for dev |
-| **Operator console (Inspector)** | Optional Angular web UI (Material/Tailwind, ag-Grid, Chart.js, AntV G6) over every Control API route + all 7 assist skills: dashboard, pipelines + detail (batches/files/lineage/quarantine), inbox-pending status, jobs, enrichment, catalog graph, spec-driven config authoring, diagnoses, AI assist. Served same-origin by `ControlApi`; token-based connect |
-| **Metadata Graph** | Queryable catalog of sources → tables → columns → KPIs with a lazy operational overlay (`/catalog*`) |
-| **Embedded AI assist** | Optional in-JVM agent with 7 skills (NL→cron, NL→SQL, config suggest, diagnose, explain, report) — local-first, confirm-first, sandboxed |
-| **Full audit log** | Per-file status CSV, per-batch summary, and an input→output lineage matrix |
-| **Quarantine** | Wrong-schema and unreadable files are automatically isolated — never retried |
-| **Metrics** | Dependency-free Prometheus exposition at `/metrics` |
-| **DuckLake registration** | Optional: registers written Parquet files into a DuckLake catalog backed by PostgreSQL |
-| **Scoped security** | Separate `control` / `assist.read` / `assist.write` token tiers; fail-closed (no open-by-default) |
-| **Fat JAR deployment** | Single `mvn clean package` produces a fully self-contained deployable JAR |
-
----
-
-# User guide
-
-This guide walks from a clean checkout to a running, observable pipeline — then into the optional
-layers. Each step links to the deep-dive doc when you need more.
-
-## 1. Install & build
-
-**Prerequisites:** Java 25+ (built/tested on JDK 25; local dev on 26) and Maven 3.9+. No other
-runtime dependencies — the fat JAR bundles DuckDB, univocity, JToon, and the rest.
-
-```powershell
-cd inspecto
-mvn clean package
-# Produces: target/inspecto-processor-<version>.jar  (~90 MB, all deps bundled)
-```
-
-To build the whole reactor (core **plus** the optional assist agent), run `mvn clean package`
-from the repository root instead.
-
-> **Toolchain note (this workstation):** JDK at `C:\.jdks\openjdk-26.0.1`, Maven at
-> `C:\maven\apache-maven-3.9.16\bin`. Neither is on `PATH` — set them per shell:
-> ```powershell
-> $env:JAVA_HOME='C:\.jdks\openjdk-26.0.1'
-> $env:PATH="$env:JAVA_HOME\bin;C:\maven\apache-maven-3.9.16\bin;$env:PATH"
-> ```
-
-## 2. Onboard a new source
-
-A source is described by **two config files** under a space's `config/<source>/` directory
-(e.g. `spaces/<id>/config/<source>/` — see [Spaces](../docs/okf/product/module/config/admin-guide-configuration-reference.md#spaces-multi-project-layout)).
-**Add data** in the web console generates both from a sample file; you then tune them.
-
-| File | Purpose |
-|---|---|
-| `<source>_schema.toon` | Source of truth for the transformation: field selectors, types, partition keys, mapping rules. |
-| `<source>_pipeline.toon` | Runtime settings: directories, output format, threads, dedup. |
-
-Then review the generated files. The full field reference — every `csv_settings` knob,
-`transformType` (`DIRECT` / `CONCAT_DT` / `FILENAME_DATE`), multi-schema dispatch, and the type
-mapping — is in the [Configuration Reference](../docs/okf/product/module/config/admin-guide-configuration-reference.md). For proprietary/binary
-formats, write a `StreamingFileIngester` plugin instead of a schema; see [Plugin Ingester](../docs/okf/product/module/engine/spec-plugin-ingester.md).
-
-> **`.toon` gotchas:** no `#` comments (parsing stops at the first one); quote any value
-> containing `:` (Windows paths, JDBC URLs); the map-vs-tabular array choice is load-bearing.
-> The Smart Config serializer handles these for you when configs are written programmatically.
-
-## 3. Run a pipeline
-
-From the **repository root**, run any pipeline config end-to-end:
-
-```powershell
-java --enable-native-access=ALL-UNNAMED ^
-     -jar inspecto/target/inspecto-processor-<version>.jar <pipeline.toon>
-```
-
-A working sample: `spaces/ucc/config/voucher/voucher_pipeline.toon`.
-
-> The `run-voucher` / `run-adjustment` `.sh` and `.bat` wrappers were removed 2026-08-26. They were
-> thin wrappers around exactly the line above, and three of the four had gone stale — pointing at
-> config paths that no longer existed, so they could only fail. `--enable-native-access=ALL-UNNAMED`
-> is required (DuckDB JNI) and is easy to lose when copying the shorter form.
-
-> The deploy bundle produced by `package.ps1` ships a generic `bin/run.sh <adapter>` /
-> `bin\run.bat <adapter>` that resolves `spaces/*/config/<adapter>/*_pipeline.toon` automatically.
-
-### The deploy bundle's layout
-
-An unzipped bundle holds `README.md` and folders only. Every launcher in `bin/` changes to the bundle
-root (the parent of `bin/`) before it starts Java, so it works from any directory.
+## What is in this bundle
 
 | Folder | Holds |
 |---|---|
-| `bin/` | `serve.bat` / `serve.sh`, `run.bat` / `run.sh`, `install-service.ps1` / `install-service.sh` |
-| `lib/` | every jar, `modules.list` (the classpath, as `lib/<jar>` lines), `edition.properties`, `duckdb/<platform>/` extensions |
-| `deploy/` | `Dockerfile` + `Dockerfile.dockerignore` (build from the root: `docker build -f deploy/Dockerfile -t inspecto .`), `inspecto.service` (systemd) |
-| `logs/` | captured launcher output (the Windows service writes `logs/service.log`) |
-| `runtime/` `ui/` `spaces/` `docs/` `sbom/` `licenses/` | the embedded JVM, the web console, your Spaces, the operator docs, the SBOMs, third-party licence texts |
+| `README.md` | this file |
+| `bin/` | the launchers: `serve.bat` / `serve.sh` (the server and web console), `run.bat` / `run.sh` (run one Pipeline once), `install-service.ps1` / `install-service.sh` (run as an OS service) |
+| `lib/` | every jar; `modules.list` (the classpath the launchers read); `edition.properties` (your edition); `duckdb/<platform>/` (DuckDB extensions, so no download is needed) |
+| `deploy/` | `Dockerfile` and `Dockerfile.dockerignore`; `inspecto.service` (the systemd unit) |
+| `logs/` | output captured by the Windows service (`logs/service.log`) |
+| `docs/` | the [User guide](../docs/USER_GUIDE.md), the [Advanced guide](../docs/ADVANCED_GUIDE.md), [Editions](../docs/EDITIONS.md) and the [API documentation](../docs/api/) |
+| `runtime/` | the bundled Java runtime; every launcher uses it before any `java` on the machine |
+| `sbom/` | software bills of materials (CycloneDX and SPDX) |
+| `spaces/` | your Spaces, plus `_templates/` (the Space templates offered in the console) |
+| `ui/` | the web console |
 
-The worked examples are not in the bundle: they live in the repository under `inspecto/examples/`.
+An Advanced bundle also carries `licenses/`, the licence texts of its bundled native libraries.
 
-## 4. Drop files & run (the steady state)
+Every launcher changes to the bundle folder before it starts, so you can run it from any directory.
 
-Place your input files (`.csv` / `.csv.gz`, or whatever format your plugin ingester reads) under `inbox/<adapter>/` (in date sub-folders) and run the
-pipeline. Already-processed files are skipped automatically via `.processed` markers in
-`markers/<adapter>/`; markers older than `retention_days` (default 90) are pruned at each poll
-start. Wrong-schema or unreadable files are moved to `quarantine/<adapter>/` and never retried.
+**Spaces.** A Space is one area of work: its configuration, Pipelines, Datasets and Dashboards. The bundle ships
+no Spaces. Create one in the console (below), or put an existing one under `spaces/` in either form:
 
-## 5. Run many sources at once
+- a folder, `spaces/<id>/`, holding the Space's `config/` folder; or
+- a file, `spaces/<id>.ref`, holding the absolute path of a Space folder kept elsewhere. That folder's name must
+  be `<id>`, and it must not be inside `spaces/`.
 
-```bash
-java -cp target/inspecto-processor-<version>.jar com.gamma.inspector.MultiCollectorProcessor \
-     -Dsources.max=4 config/
+## Requirements
+
+- Windows x64 or Linux x64. Each bundle is built for one of them; the zip's name says which
+  (`inspecto-deploy-windows_amd64.zip`, `inspecto-deploy-linux_amd64.zip`).
+- Java comes with the bundle in `runtime/`. A bundle without `runtime/` needs Java 27 or later as `java` on the
+  `PATH`.
+- Standard and Advanced: an OpenID Connect identity provider (see [Sign-in](#sign-in-standard-and-advanced)).
+- Advanced: a PostgreSQL database (see [PostgreSQL](#postgresql)).
+
+## Start it
+
+```
+bin\serve.bat          (Windows)
+bin/serve.sh           (Linux)
 ```
 
-`MultiCollectorProcessor` runs every `*_pipeline.toon` it finds (files or directories), bounded by
-`-Dsources.max`, with each source failure-isolated in its own virtual-thread lane. See
-[Operations → Multiple sources in one process](../docs/okf/product/layer/platform/admin-guide-operations-reference.md#multiple-sources-in-one-process).
+Then open `http://localhost:8080/`. The server runs in the foreground and logs to the console; stop it with
+Ctrl+C. To keep it running, install it as a service (below).
 
-## 6. Pre-ETL utilities
+The launchers read these environment variables:
 
-The `ura` pre-ETL utility CLI (`ura.bat` / `ura.sh`) was retired on 2026-11-06 and is no longer shipped.
-Bring files in through **Add data** or a Collector. To reprocess a batch, call `POST /runs/{pipeline}/reprocess`
-(see [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md#reprocessing-a-batch)).
+| Variable | Default | Meaning |
+|---|---|---|
+| `PORT` | `8080` | the port the server and web console listen on |
+| `SPACES_ROOT` | `spaces` | the folder that holds your Spaces |
+| `INSPECTO_JAVA_OPTS` | (none) | extra Java options, separated by spaces, for example `-Xmx4g` or `-Dcontrol.bind=127.0.0.1`. They are added after the launcher's own options. `JAVA_OPTS` is **not** read. |
 
-## 7. Stage-2 enrichment (joins & aggregation)
+For example, on Linux: `PORT=9090 INSPECTO_JAVA_OPTS="-Xmx4g" bin/serve.sh`. On Windows:
+`set "PORT=9090"` and `set "INSPECTO_JAVA_OPTS=-Xmx4g"`, then `bin\serve.bat`.
 
-Stage-1 deliberately avoids joins and aggregation. When you need them, define an **enrichment job**
-(`*_enrich.toon`): it registers reference tables and Stage-1 partitions as DuckDB views, runs a
-`transform` SQL, and writes an idempotent partitioned result. Jobs are **event-driven** (fire when
-an upstream batch commits) or **schedule-driven**, hold a per-job lock, and can self-chain. Inspect
-runs and lineage via `/enrichment*` (below). Reference: [Architecture](../docs/okf/product/module/engine/architecture-stage1.md)
-and [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md).
+> **Listen address.** The server listens on every network interface by default. Basic has no sign-in, so anyone
+> who can reach the port can use it, including the screens that change configuration. Read the *Listen address*
+> section of [Editions](../docs/EDITIONS.md) before running Basic on a shared network.
 
-If you don't want to hand-write the SQL, the optional `kpi-to-sql` skill (step 11) drafts and
-sandbox-validates it from a business description.
+## First steps in the console
 
-## 8. Schedule jobs
+In the Inspecto console (the web console a bundle ships unless it was built with the Inspecto LA application):
 
-Config-driven jobs run on **cron** or **fixed-delay** schedules via the built-in `Scheduler`, with
-per-job locking and run history. Define a `JobConfig` (`.toon`), then list/trigger via `/jobs*`.
-The `nl-to-schedule` skill (step 11) turns "every weekday 6am after voucher_etl" into a
-validated JobConfig draft with a preview of the next run times.
+1. **Create a Space.** On **Home**, *Getting started* offers *Try it with sample data*, which creates a sample
+   Space, loads its files and opens its Dashboard. To start from a template instead, go to **Settings → Spaces**
+   and choose **New from template**, pick a template, and name the Space. The Space menu in the top bar also has
+   **New Space…** and **New from sample…**.
+2. **Add data.** In your Space, choose **Add data** and drop a CSV, Parquet or JSON file. Inspecto detects its
+   columns, lets you review them, and makes a Dataset you can query.
 
-## 9. Operate via the Control API
+The [User guide](../docs/USER_GUIDE.md) describes every screen.
 
-When run as a service, the control plane exposes a JDK-`HttpServer` (Jackson JSON, bearer auth).
-Routes by scope:
+## Which edition you have
 
-**Open (no token):**
+`lib/edition.properties` names it: `edition=Basic`, `Standard` or `Advanced` (`Preview` in a preview build). The
+launchers read it and set the edition's sign-in mode for you. [Editions](../docs/EDITIONS.md) explains what each
+edition includes.
+
+## Run a Pipeline once from the command line
+
 ```
-GET  /health                              liveness
-GET  /ready                               readiness
-GET  /metrics                             Prometheus exposition
-```
-
-**`control` scope (bearer token):**
-```
-GET  /pipelines                           list pipelines + state
-POST /pipelines                           body {"configPath":…} — register a new pipeline live (v4.1, needs -Dassist.write.root)
-POST /pipelines/{name}/trigger            run one pipeline once
-POST /pipelines/{name}/pause | /resume    pause/resume in the poll cycle
-GET  /pipelines/{name}/commits            committed batch ids
-GET  /pipelines/{name}/batches            batch audit rows
-GET  /pipelines/{name}/files              per-file audit rows
-GET  /pipelines/{name}/lineage[?batchId=] input→output lineage rows
-GET  /pipelines/{name}/quarantine         quarantined inputs + reason
-GET  /pipelines/{name}/pending            inbox scan: files awaiting processing + under-processing flag
-POST /pipelines/{name}/reprocess          body {"batchId":"…"} — replay a batch
-POST /trigger                             run all pipelines once
-POST /validate                            body {"configPath":…} or {"type":…,"config":{…}}
-GET  /status                              live status snapshot (all pipelines)
-GET  /report[?from=&to=]                  service-wide batch-audit report
-GET  /jobs · /jobs/{name}/runs            jobs + run history
-POST /jobs/{name}/trigger                 run a job once now
-GET  /enrichment · /enrichment/{job}/runs · /lineage · /report   Stage-2 audit
+bin\run.bat <name>     (Windows)
+bin/run.sh <name>      (Linux)
 ```
 
-**`assist.read` scope (satisfied by `control`):**
+`<name>` is the Pipeline's folder in a Space: the launcher runs the first `spaces/*/config/<name>/*_pipeline.toon`
+it finds, then exits. It uses the same `INSPECTO_JAVA_OPTS` as `serve`. Its limits:
+
+- it looks only in Space folders directly under `spaces/`. It does not read `SPACES_ROOT`, and it does not follow
+  `<id>.ref` files;
+- if two Spaces have a Pipeline folder of the same name, the first one found runs;
+- it is not the server: nothing is scheduled, and the console is not started.
+
+For everyday work, run Pipelines from the console instead.
+
+## Run as an OS service
+
+The service restarts the server if it stops, and starts it when the machine starts.
+
+**Linux (systemd):**
+
 ```
-GET  /catalog · /catalog/tables/{id} · /catalog/kpis · /catalog/graph   metadata graph
-GET  /config/spec/{type}                  declarative spec for a config type (UI form-render)
-GET  /assist/diagnoses                    recent event-driven failure diagnoses
-POST /assist/{intent}                     run an assist skill (delegates to the agent module)
-```
-
-**`assist.write` scope (satisfied by `control`):**
-```
-POST /config/write                        body {type, config, subdir?, overwrite?} — persist a
-                                          validated draft as .toon under -Dassist.write.root (v4.1)
-```
-
-Security is **fail-closed**: a scope with no configured token returns `401` (locked) rather than
-running open. `/assist/*` returns `503` if the optional agent module isn't on the classpath,
-leaving the core unchanged. Token tiers are `control` (superuser) / `assist.read` / `assist.write`.
-Config writes and live pipeline registration are additionally gated on `-Dassist.write.root=<dir>`
-(unset ⇒ `503`); all written/registered paths are jailed under that root.
-
-The same host also **serves the operator web console** (below): point `-Dui.dir` at a built SPA
-bundle and `ControlApi` serves it as static files with an `index.html` deep-link fallback (API
-routes always win, so unknown API paths return JSON, not HTML). For a separately-hosted dev SPA,
-`-Dcontrol.cors=<origin>` enables CORS + `OPTIONS` preflight. Both are **off by default** — when
-unset, behaviour is byte-for-byte identical to a headless control plane.
-
-## 9b. Operate via the Inspector web console
-
-**Inspector** is an optional web console (Angular + Material/Tailwind, with ag-Grid, Chart.js and
-AntV G6) that drives every Control API route
-and all 7 assist skills from a browser — no `curl` required. It lives in `inspecto-ui/` and is
-served same-origin by `ControlApi`, so one process hosts both the API and the UI.
-
-> 🔴 **`CONTROL_TOKEN` is a DEAD flag and these examples used to set it.** It has **zero** readers in
-> the Java tree, so `CONTROL_TOKEN=secret bash serve.sh` authenticated nothing while reading exactly like
-> it did — anyone following it would have believed they had secured an auth-free service. `SCR-9` removed
-> it from the generated launchers on 2026-09-09; **this README, which ships inside the bundle, still
-> carried it until 2026-09-11**. Real authentication is the `inspecto-oidc` module (Standard+, OIDC):
-> see [EDITIONS](../docs/EDITIONS.md). ✅ The sweep is complete as of 2026-09-14 — every remaining mention
-in the tree describes the flag as *removed*, which is true and deliberately left in place.
-
-```bash
-# Prod: serve the bundled SPA from the deploy bundle (package.ps1 puts it in ./ui)
-bash bin/serve.sh        # → http://localhost:8080/  (Linux; from any directory)
-bin\serve.bat            # Windows
-
-# Extra JVM flags for a packaged bundle: INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS).
-# Whitespace-separated, appended AFTER the launcher's own flags, so the mandatory ones
-# (--enable-native-access=ALL-UNNAMED, -Dcontrol.port, -Dspaces.root, auth) can't be clobbered.
-# Do NOT use JAVA_OPTS: the launchers ASSIGN that name, so it is silently discarded.
-INSPECTO_JAVA_OPTS="-Xmx4g" bash bin/serve.sh
-
-# Dev: run the SPA on :4204 with a live backend (CORS + proxy)
-java -Dcontrol.cors=http://localhost:4204 \
-     -cp inspecto.jar com.gamma.control.ControlApi config/
-cd inspecto-ui && npm install && npm start  # ng serve, /api proxied to :8080
-```
-
-There is **no login endpoint** — on the *Connect* screen the operator pastes their scoped bearer
-token(s); an interceptor attaches them and the UI disables `CONTROL`-only actions when only an
-assist token is held. Screens cover monitoring (dashboard, pipelines + detail with batches / files /
-lineage / quarantine / inbox-pending status), scheduling & enrichment, the catalog graph,
-spec-driven config authoring, failure diagnoses, and a reusable AI-assist console (which degrades
-gracefully when the agent module is absent). Full screen-by-screen walkthrough:
-**[User Guide](../docs/USER_GUIDE.md)**. Build/dev details:
-[`inspecto-ui/README.md`](../inspecto-ui/README.md).
-
-## 9c. Run it as an OS service
-
-`bin/serve.sh` / `bin\serve.bat` run in the foreground (their output goes to the console, not to a file): close the shell and the service stops, and **nothing
-brings it back if the process dies**. Recovery from process death in this product is *restart*, not
-failover, so the service wrapper **is** the recovery mechanism. Every bundle carries one per platform
-(`SCR-3`).
-
-```bash
-# Linux (systemd) — installs /etc/systemd/system/inspecto.service, enables it, starts it
-sudo bin/install-service.sh               # --user <account>  --name <service>  --uninstall
+sudo bin/install-service.sh            # options: --user <account>  --name <service>  --uninstall
 systemctl status inspecto
 journalctl -u inspecto -f
 ```
 
-```powershell
-# Windows — from an ELEVATED PowerShell, inside the bundle
-.\bin\install-service.ps1                 # -Name Inspecto   -Uninstall
+The installer writes `/etc/systemd/system/inspecto.service` from `deploy/inspecto.service`, enables and starts
+it. On first install it creates `inspecto.env` in the bundle folder (mode 600). Put the service's settings there
+(`PORT`, `SPACES_ROOT`, `AUTH_OIDC_*`, `INSPECTO_JAVA_OPTS` and the others in this README) and restart the service.
+
+**Windows**, from an elevated PowerShell in the bundle folder:
+
+```
+.\bin\install-service.ps1              # options: -Name Inspecto  -Uninstall
 Get-ScheduledTask -TaskName Inspecto | Get-ScheduledTaskInfo
-Get-Content .\logs\service.log -Tail 50    # a task has no console: serve.bat output lands here
+Get-Content .\logs\service.log -Tail 50
 ```
 
-Configuration stays where it already was: the systemd unit (`deploy/inspecto.service`) reads `inspecto.env` at the
-bundle root (seeded on first install, mode 600), which carries the same `PORT` / `SPACES_ROOT` / `AUTH_OIDC_*` /
-`INSPECTO_JAVA_OPTS` variables a shell launch uses. The unit adds no configuration surface of its own.
+On Windows the service is a Scheduled Task that runs `bin\serve.bat` as SYSTEM at start-up and restarts it within
+about a minute if it stops. Its output goes to `logs\service.log`.
 
-**Verify recovery rather than assuming it** — a wrapper that was never exercised is not a recovery
-mechanism:
+## Docker
 
-```bash
-sudo kill -9 $(systemctl show -p MainPID --value inspecto)
-sleep 10 && curl -fsS http://localhost:8080/health
+The Dockerfile works in the Linux bundle only (it uses the bundled Linux runtime). From the bundle folder:
+
+```
+docker build -f deploy/Dockerfile -t inspecto .
+docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
-⚠ **On Windows the wrapper is a Scheduled Task, not an `sc.exe` service**, and deliberately so: a
-Windows service binary must connect to the service control dispatcher shortly after starting, and
-`java.exe` never does — an `sc.exe`-created service fails every start with error 1053. A task needs no
-third-party binary, survives reboot, and restarts after a kill. Its restart interval is one minute, so
-allow ~70s before concluding recovery failed. If you specifically need an entry in `services.msc`,
-[WinSW](https://github.com/winsw/winsw) wraps any executable as a real service; it is third-party,
-which is why it is not the default.
+Pass settings with `-e` (`PORT`, `SPACES_ROOT`, `AUTH_OIDC_*`, `INSPECTO_JAVA_OPTS` and the others). Mount your
+Spaces at `/app/spaces` so they outlive the container. The container runs as user 10001, logs to `docker logs`,
+and checks its own health at `/health`.
 
-## 10. Explore the Metadata Catalog
+## Sign-in (Standard and Advanced)
 
-The Metadata Graph is a typed, queryable map of your data estate: sources → raw schemas → columns →
-emitted event tables → Stage-2 transforms → KPIs/reports, with a **lazy operational overlay** that
-pulls live status/lineage/completeness from the audit reads. Populate the business layer by adding
-`description` / `unit` / `classification` columns to your schema `.toon` and a `*_meta.toon`
-(KPI catalog + domain notes) alongside the enrichment config. Query it at `/catalog`,
-`/catalog/tables/{id}`, `/catalog/kpis`, and `/catalog/graph`. This is what the `explain-entity`
-and `kpi-to-sql` skills ground on.
+Standard and Advanced sign people in through your OpenID Connect identity provider (for example Keycloak or
+WSO2); Basic has no sign-in. Set these before you start the server:
 
-## 11. The optional AI assist agent
-
-The agent is a separate module loaded in-process when present — it never bloats the lean core.
-
-**Enable it:**
-1. Build the whole reactor (`mvn clean package` at the repo root) so `inspecto-agent` is on
-   the classpath.
-2. Provide a model: a local **Ollama** server (default; air-gapped-safe) or, in connected builds,
-   a hosted provider (Gemini/Claude/ChatGPT). For Ollama you **declare** which built-in bundle to
-   use — `-Dagentkernel.profile=cpu-only|dev-laptop|production` (default `cpu-only`; `cpu-only` and
-   `dev-laptop` currently map to the same models, since neither can host a 14B) — and that
-   bundle maps every model tier to a concrete model for you. Nothing probes the machine, so pick
-   the bundle that matches your hardware.
-3. Configure the `assist.read` / `assist.write` tokens.
-
-**Call a skill** (everything is confirm-first; state-changing skills return a *draft* `.toon`):
-```bash
-curl -X POST localhost:<port>/assist/nl-to-schedule \
-     -H "Authorization: Bearer <assist-token>" \
-     -d '{"userText":"every weekday 6am after voucher_etl","knownPipelines":["voucher_etl"]}'
-```
-
-The response carries `{ suggestions, rationale, confidence, validated, data, applyVia? }`. Drafts
-pass a deterministic oracle (config parser / **sandboxed DuckDB**) + repair loop before you ever
-see them — so they're crash-safe and parse-safe. "Valid" ≠ "correct", though: review the surfaced
-interpretation (chosen join keys, KPI definition, sample rows) before applying. See the
-[skill catalog](#the-assist-skill-catalog-all-shipped-all-draft-only--confirm-first) above and the
-[security guardrails](../docs/okf/product/module/agent/plan-assistant.md#36-the-gated-write-path).
-
-## 12. Output, audit & troubleshooting
-
-**Output** lands as Hive-partitioned Parquet/CSV under `database/<source>/` (e.g.
-`.../year=2020/month=04/day=03/<table>_out.parquet`). Optionally registered into a DuckLake
-catalog — see [Integrations](../docs/okf/product/layer/platform/api-integrations-ducklake.md).
-
-**Audit** is three-layered: a per-file status CSV (`status/<source>/`), a per-batch summary, and an
-input→output **lineage matrix** — all also queryable via the Control API (`/pipelines/{name}/files`,
-`/batches`, `/lineage`). Per-run logs land in `logs/<source>/` when `dirs.log_dir` is set.
-
-**When something fails:** check the quarantine directory and reason, the status CSV, and
-[Troubleshooting](../docs/okf/product/layer/platform/admin-guide-troubleshooting.md) for common failures and fixes. The `explain-entity`
-and `diagnose-and-alert` skills can synthesize a root-cause from the same audit data if the agent
-is enabled.
-
-**Very large files / `No space left on device`:** the engine writes its scratch (the per-batch temp
-DB + DuckDB spill) to `dirs.temp` on your data volume, not the system `/tmp`. If a huge file still
-exhausts that volume, set `processing.duckdb.temp_directory` to a roomier disk and/or enable
-`processing.chunking` to stream the file in bounded chunks — see
-[Configuration → Large files](../docs/okf/product/module/config/admin-guide-configuration-reference.md#large-files-scratch-location--auto-chunking).
-For a huge **custom** (binary/ASN.1/proprietary) file, the CSV chunker doesn't apply — implement a
-[`StreamingFileIngester`](../docs/okf/product/module/engine/spec-plugin-ingester.md#the-streamingfileingester-spi) so the framework bounds heap/scratch.
-
----
-
-## Requirements
-
-- **Java 25+** (built and tested on JDK 25; CI pins 25, local dev on 26)
-- **Maven 3.9+** to build
-- No other runtime dependencies for the core — the fat JAR bundles DuckDB, univocity, JToon, and
-  the rest. The optional assist agent additionally needs a reachable model (local Ollama or a
-  hosted provider) and ships its own isolated dependency tree.
-
----
-
-## Documentation index
-
-This README is the overview + user guide. Detailed topics live under [`../docs/`](../docs/):
-
-| Doc | Covers |
+| Variable | Meaning |
 |---|---|
-| [Architecture & Design](../docs/okf/product/module/engine/architecture-stage1.md) | The two-stage engine (M..N multiplexer + enrichment), behavior-injection seams, directory layout, deliberate non-goals |
-| [Configuration Reference](../docs/okf/product/module/config/admin-guide-configuration-reference.md) | The three config files, configuration by source format, multi-schema dispatch, type mapping |
-| [Plugin Ingester](../docs/okf/product/module/engine/spec-plugin-ingester.md) | The `StreamingFileIngester` interface, segment schemas, the `TypedRecordIngester` reference plugin |
-| [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md) | Pre-ETL utilities, batch processing & concurrency, multi-source orchestration, output structure, audit logs, deployment |
-| [Operator Console (Inspector)](../docs/USER_GUIDE.md) | The web UI: connecting with tokens, every screen, common operator tasks, dev vs. prod serving, troubleshooting |
-| [Integrations](../docs/okf/product/layer/platform/api-integrations-ducklake.md) | DuckLake registration and the pg_duckdb warehouse query layer |
-| [Troubleshooting](../docs/okf/product/layer/platform/admin-guide-troubleshooting.md) | Common failures and fixes |
-| [Assistant](../docs/okf/product/module/agent/plan-assistant.md) | The assist-agent design: skills, model tiering, oracles, security guardrails |
+| `AUTH_OIDC_DISCOVERY_URL` | your provider's discovery document (`.../.well-known/openid-configuration`). With it, the issuer and key set are read from the provider. |
+| `AUTH_OIDC_ISSUER`, `AUTH_OIDC_JWKS_URI` | the issuer and its key set, if you do not use discovery (or to override it) |
+| `AUTH_OIDC_AUDIENCE` | the audience Inspecto expects in a token |
+| `AUTH_OIDC_CLIENT_ID` | the console's client id at the provider (default `inspecto-spa`) |
+| `AUTH_OIDC_PROVIDER` | `generic` (default), `keycloak` or `wso2` |
+| `AUTH_OIDC_CLIENT_SECRET` | only for a confidential client. The launcher passes a reference to the variable, not its value. |
 
-Engineering notes (not user-facing): [design decisions & ADRs](../docs/PROJECT_NOTES.md) ·
-[performance & bottleneck analysis](../docs/okf/product/layer/platform/tests-performance.md) · [test coverage](../docs/okf/product/layer/platform/tests-guard-coverage.md) ·
-[API stability policy](../docs/okf/product/module/api/plan-api-stability.md).
+A Standard or Advanced server does not start without its identity provider settings. Example Keycloak and WSO2
+configurations are in [`docs/api/deployment/`](../docs/api/deployment/README.md).
+
+## PostgreSQL
+
+Advanced keeps Incidents, Cases, notes, links and tags in PostgreSQL and does not start until you set
+`INSPECTO_DB_URL` (for example `jdbc:postgresql://dbhost:5432/inspecto`), with `INSPECTO_DB_USER` and
+`INSPECTO_DB_PASSWORD`. On Standard these variables are optional; when set, the server's processing records (file
+status, batches and lineage) move to PostgreSQL. Basic always uses its local files.
+
+## HTTPS
+
+The server speaks plain HTTP by default. To serve HTTPS, set `HTTPS_KEYSTORE` to a PKCS12 file holding the
+certificate and key, and `HTTPS_KEYSTORE_PASSWORD` to its password. You can also end TLS at a load balancer.
+
+## Upgrading
+
+1. Stop the server or the service.
+2. Unzip the new bundle and replace everything **except** `spaces/` (your Spaces), `inspecto.env` (if you created
+   it) and any scripts of your own.
+3. Start it again. If the new bundle is in a different folder and you run Inspecto as a service, run the
+   installer again from the new folder.
+
+Read the *Upgrading* section of [Editions](../docs/EDITIONS.md) first: it lists what changed between versions
+for each edition.
+
+## Logs and troubleshooting
+
+The server writes its log to standard output. Where it ends up depends on how you run it:
+
+| Run as | Log |
+|---|---|
+| `bin/serve.sh`, `bin\serve.bat` | the console |
+| Linux service | `journalctl -u inspecto` |
+| Windows service | `logs\service.log` |
+| Docker | `docker logs <container>` |
+
+`http://localhost:8080/health` answers without sign-in and tells you whether the server is up.
+
+Common start-up messages:
+
+- *no Space attached under ./spaces*: the server started with no Space. Create one in the console, or add one to
+  `spaces/` and restart.
+- *no pipeline file found* (from `run`): no Space folder under `spaces/` holds `config/<name>/*_pipeline.toon`.
+- *lib/edition.properties names an unknown edition*: the file was edited; restore it from the bundle.
+- A Standard or Advanced server stops at start-up: check the `AUTH_OIDC_*` settings and, on Advanced,
+  `INSPECTO_DB_URL`. The log names what is missing.
+
+The [Advanced guide](../docs/ADVANCED_GUIDE.md) has troubleshooting playbooks and every start-up setting.
+
+## Read more
+
+- [User guide](../docs/USER_GUIDE.md): how to use Inspecto, screen by screen.
+- [Advanced guide](../docs/ADVANCED_GUIDE.md): operations, start-up settings and troubleshooting.
+- [Editions](../docs/EDITIONS.md): what Basic, Standard and Advanced include, and upgrade notes.
+- [API documentation](../docs/api/): the HTTP contract and identity provider examples.

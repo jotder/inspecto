@@ -6,7 +6,8 @@
 This is the engineering front door. It points; the linked documents are the source of truth. The product itself
 is described in the [Executive Brief](docs/okf/product/layer/product/brochure-executive-brief.md) and the
 [User Guide](docs/USER_GUIDE.md); every concept's name is fixed by the [Glossary](docs/GLOSSARY.md) (binding).
-The customer bundle's first page is [`inspecto/README.md`](inspecto/README.md), not this file.
+The customer bundle's first page is [`inspecto/README.md`](inspecto/README.md), not this file: it is written for the
+operator who installs and runs a bundle, and carries no developer material.
 
 ## Repo layout
 
@@ -65,3 +66,13 @@ Work lands on `master` — see [`docs/BRANCHING.md`](docs/BRANCHING.md) and the 
 - [`docs/okf/product/`](docs/okf/product/index.md) — one hub per Product Map Item (plan, spec, guides, api, tests).
 - [`docs/BACKLOG.md`](docs/BACKLOG.md) — the one board of open work.
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — the canonical vocabulary.
+
+## Developer docs
+
+- Build, test and packaging: [`spec-build-test.md`](docs/okf/product/layer/platform/spec-build-test.md); what a bundle
+  contains, logging and deployment: [operations reference](docs/okf/product/layer/platform/admin-guide-operations-reference.md).
+- Architecture: [platform layers](docs/okf/product/layer/platform/architecture-layers.md) and the
+  [Stage-1 ingest design](docs/okf/product/module/engine/architecture-stage1.md); configuration:
+  [configuration reference](docs/okf/product/module/config/admin-guide-configuration-reference.md).
+- The Assistant and its skill catalog: [`spec-assist-agent.md`](docs/okf/product/module/agent/spec-assist-agent.md).
+- The HTTP API: [`docs/api/`](docs/api/README.md); the web app's dev server: [`inspecto-ui/README.md`](inspecto-ui/README.md).
