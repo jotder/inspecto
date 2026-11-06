@@ -2608,6 +2608,11 @@ if (-not $SkipBootCheck) {
     $argList = @('--enable-native-access=ALL-UNNAMED', "-Dcontrol.port=$port", '-Dspaces.root=spaces') +
                $oidcArgs + $demoArgs +
                @('-cp', ($cp -join $sep), 'com.gamma.control.ControlApi')
+    # The smoke boots the REAL server on the bundle's own spaces root, and a running server writes install state there
+    # (spaces/onboarding-counters.tsv shipped in every zip until 2026-11-06). Snapshot the tree; after the boot, anything
+    # new is the smoke's own residue and is removed, so the zip carries only what packaging staged.
+    $preBoot = @{}
+    Get-ChildItem $bundleDir -Recurse -Force | ForEach-Object { $preBoot[$_.FullName] = $true }
     $proc = Start-Process -FilePath $java -WorkingDirectory $bundleDir -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError "$out.err" -ArgumentList $argList
     $healthy = $false
     foreach ($i in 1..60) {
@@ -2625,6 +2630,13 @@ if (-not $SkipBootCheck) {
         Get-CimInstance Win32_Process -Filter "Name = 'java.exe'" |
             Where-Object { $_.CommandLine -like "*-Dcontrol.port=$port *" } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+    # Deepest first, so a new folder is emptied before it is removed.
+    $residue = @(Get-ChildItem $bundleDir -Recurse -Force | Where-Object { -not $preBoot.ContainsKey($_.FullName) } |
+                 Sort-Object { $_.FullName.Length } -Descending)
+    foreach ($item in $residue) {
+        Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction Stop
+        Write-Host "  boot smoke residue removed: $($item.FullName.Substring($bundleDir.Length + 1))" -ForegroundColor DarkGray
     }
     if (-not $healthy) {
         Write-Host "---- boot output ----" -ForegroundColor Yellow
