@@ -58,6 +58,7 @@ The launchers read these environment variables:
 | `PORT` | `8080` | the port the server and web console listen on |
 | `SPACES_ROOT` | `spaces` | the folder that holds your Spaces |
 | `INSPECTO_JAVA_OPTS` | (none) | extra Java options, separated by spaces, for example `-Xmx4g` or `-Dcontrol.bind=127.0.0.1`. They are added after the launcher's own options. `JAVA_OPTS` is **not** read. |
+| `CORS_ORIGIN` | (none) | an origin allowed to call the API from a web page served elsewhere, for example `https://portal.example.com`. Not needed for the bundled console. |
 
 For example, on Linux: `PORT=9090 INSPECTO_JAVA_OPTS="-Xmx4g" bin/serve.sh`. On Windows:
 `set "PORT=9090"` and `set "INSPECTO_JAVA_OPTS=-Xmx4g"`, then `bin\serve.bat`.
@@ -139,8 +140,8 @@ docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
 Pass settings with `-e` (`PORT`, `SPACES_ROOT`, `AUTH_OIDC_*`, `INSPECTO_JAVA_OPTS` and the others). Mount your
-Spaces at `/app/spaces` so they outlive the container. The container runs as user 10001, logs to `docker logs`,
-and checks its own health at `/health`.
+Spaces at `/app/spaces` so they outlive the container; the mounted folder must be writable by user 10001, which
+the container runs as. It logs to `docker logs` and checks its own health at `/health`.
 
 ## Sign-in (Standard and Advanced)
 
@@ -150,7 +151,7 @@ WSO2); Basic has no sign-in. Set these before you start the server:
 | Variable | Meaning |
 |---|---|
 | `AUTH_OIDC_DISCOVERY_URL` | your provider's discovery document (`.../.well-known/openid-configuration`). With it, the issuer and key set are read from the provider. |
-| `AUTH_OIDC_ISSUER`, `AUTH_OIDC_JWKS_URI` | the issuer and its key set, if you do not use discovery (or to override it) |
+| `AUTH_OIDC_ISSUER`, `AUTH_OIDC_JWKS_URI` | the issuer and its key set, if you do not use discovery. With discovery, `AUTH_OIDC_JWKS_URI` may override the key set, but an `AUTH_OIDC_ISSUER` that differs from the provider's stops the server from starting. |
 | `AUTH_OIDC_AUDIENCE` | the audience Inspecto expects in a token |
 | `AUTH_OIDC_CLIENT_ID` | the console's client id at the provider (default `inspecto-spa`) |
 | `AUTH_OIDC_PROVIDER` | `generic` (default), `keycloak` or `wso2` |
