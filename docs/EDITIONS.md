@@ -70,8 +70,9 @@ an Investigation.
 
 **The locks above are in the screens, not the engine.** None of them makes Basic refuse a Pipeline or Collector
 you bring. Steps whose module Basic does not include (for example e-mail and webhook delivery) are not available
-there, and three things are refused on Basic when the configuration loads: the PII masking Step, DuckLake
-registration and the compliance archive. Alert Rules on Basic are kept but not armed.
+there, and some are refused when the configuration loads: DuckLake registration and the compliance archive on
+Basic (they start in Standard), and the PII masking Step on Basic and Standard (it is Advanced only). Alert Rules
+on Basic are kept but not armed.
 
 ## Security and deployment by edition
 
@@ -85,8 +86,9 @@ registration and the compliance archive. Alert Rules on Basic are kept but not a
 | State | DuckDB files on the local disk | Local disk, or PostgreSQL (the driver is in the bundle) | Incidents, Cases, notes, links and tags on PostgreSQL (required); Investigations on PostgreSQL when you choose it |
 | Scheduler | Inside the server | Inside the server | Inside each server |
 
-The launchers in `bin/` set the edition's sign-in mode for you. The [Advanced guide](ADVANCED_GUIDE.md) lists every
-start-up setting, and [the API documentation](api/) describes the deployment blueprints for an identity provider.
+The launchers in `bin/` set the edition's sign-in mode for you. Pass other start-up settings as `-D` flags in
+`INSPECTO_JAVA_OPTS` (for example `-Dcontrol.bind=127.0.0.1`, below). [The API documentation](api/) describes the
+deployment blueprints for an identity provider.
 
 > ### Listen address: read this before running Basic on a shared network
 >
@@ -135,14 +137,13 @@ There is no migration; to keep them, move to Standard.
 **The data layer (2026-11-06):**
 
 - **New in every edition:** the three ways into *Add data* (upload, an import inbox with *Watch this folder*, a
-  PostgreSQL table snapshot with *Refresh now*), column roles, row filtering and *Edit filter*, the arrivals list
+  PostgreSQL table snapshot updated with *Refresh now* only, never automatically), column roles, row filtering and *Edit filter*, the arrivals list
   with compaction, a later file's new columns kept as details, and Discover, the entity summary and the query
   builder in Inspecto LA.
 - **Standard and above:** *Keep this up to date* and a retention policy now work on a Standard install (before
   this release they were refused). An import's link index is still built in the person's own run.
 - **Basic:** *Keep this up to date* is locked with a reason, and so are another database or a remote system in
   *Add data* and enrichment on the Dataset page. The retention form is not shown: every file is kept, compacted.
-  A PostgreSQL snapshot is updated with *Refresh now* only; the 30-second refresh it had briefly is gone.
 - **Nothing breaks on load.** A Basic install keeps running the configuration it has. The earlier refusals (PII
   masking, DuckLake, the compliance archive) are unchanged.
 

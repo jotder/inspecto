@@ -281,7 +281,7 @@ pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must
 session's. Stop it first; never kill a server you did not start. (2026-10-11: a rebuild wiped a live demo bundle.)
 
 Editions are build flavors (Basic HTTP/no-auth · Standard HTTPS/OIDC · Advanced = Standard + ABAC
-policy) — see [docs/EDITIONS.md](../../../docs/okf/product/layer/platform/spec-editions.md). All three flavors exist today:
+policy) — see [spec-editions.md](../../../docs/okf/product/layer/platform/spec-editions.md). All three flavors exist today:
 
 ```powershell
 pwsh -File inspecto\package.ps1 -Edition Standard    # + inspecto-oidc.jar (OIDC)
