@@ -159,7 +159,7 @@ keeps it honest:
 - **As a workbook (D-8):** `GET /pipelines/{name}/document?format=xlsx` renders the same model through
   DuckDB's `excel` extension (`PipelineDocumentXlsx`, `COPY … (FORMAT xlsx)`) — ⛔ no POI. The extension is not
   linked into duckdb_jdbc, so a bundle must carry it: `package.ps1` step 6d stages
-  `duckdb-extensions/<platform>/excel.duckdb_extension`, matched to the shipped DuckDB's ABI directory
+  `lib/duckdb/<platform>/excel.duckdb_extension` (BUNDLE-LAYOUT-1; was `duckdb-extensions/`), matched to the shipped DuckDB's ABI directory
   (`duckdb.version` 1.5.2.1 → `v1.5.2`, now 1.5.6.0 → `v1.5.6`, derived not listed — no manifest to update; before 2026-09-24 it took the first file of that name in the cache,
   and this desk's cache holds a v1.5.5 one too), and every launcher points `-Dduckdb.extension.dir` at it.
   🔴 **In that STAGED mode `DuckDbExtension` loads `LOAD '<dir>/excel.duckdb_extension'` and nothing else** —

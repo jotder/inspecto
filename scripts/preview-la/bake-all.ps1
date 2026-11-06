@@ -106,7 +106,7 @@ try {
     foreach ($sp in Get-ChildItem $root -Directory) {
         Remove-Item (Join-Path $sp.FullName 'data\events'), (Join-Path $sp.FullName 'data\.duckdb_tmp') -Recurse -Force -ErrorAction SilentlyContinue
         foreach ($f in Get-ChildItem -Path $sp.FullName -Recurse -File | Where-Object { $_.Extension -in '.db', '.duckdb' }) {
-            & (Join-Path $Bundle 'runtime\bin\java.exe') --enable-native-access=ALL-UNNAMED -cp (Join-Path $Bundle 'inspecto.jar') $rebase $f.FullName @pairArgs | Out-Null
+            & (Join-Path $Bundle 'runtime\bin\java.exe') --enable-native-access=ALL-UNNAMED -cp (Join-Path $Bundle 'lib\inspecto.jar') $rebase $f.FullName @pairArgs | Out-Null
             if ($LASTEXITCODE -ne 0) { $keep = $true; throw ("rebasing " + $f.Name + " failed") }
         }
         foreach ($f in @(& $findHits $sp.FullName)) {

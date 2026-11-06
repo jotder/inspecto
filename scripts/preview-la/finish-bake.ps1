@@ -22,7 +22,7 @@ $pairArgs = $pairs | ForEach-Object { $_[0]; $_[1] }
 foreach ($sp in Get-ChildItem $root -Directory) {
     Remove-Item (Join-Path $sp.FullName 'data\events'), (Join-Path $sp.FullName 'data\.duckdb_tmp') -Recurse -Force -ErrorAction SilentlyContinue
     foreach ($f in Get-ChildItem -Path $sp.FullName -Recurse -File | Where-Object { $_.Extension -in '.db', '.duckdb' }) {
-        & java --enable-native-access=ALL-UNNAMED -cp (Join-Path $Bundle 'inspecto.jar') $rebase $f.FullName @pairArgs | Out-Null
+        & java --enable-native-access=ALL-UNNAMED -cp (Join-Path $Bundle 'lib\inspecto.jar') $rebase $f.FullName @pairArgs | Out-Null
         if ($LASTEXITCODE -ne 0) { throw ("rebasing " + $f.Name + " failed") }
     }
     foreach ($f in @(& $findHits $sp.FullName)) {
