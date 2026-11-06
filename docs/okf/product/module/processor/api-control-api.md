@@ -18,7 +18,7 @@ single catch-all `dispatch` context on `/`.
 
 `ControlApi.main` is the server entry: if `-Dspaces.root` is set it `SpaceManager.discover(...)`s, else it
 builds a single `CollectorService` wrapped via `SpaceManager.single(...)`. Port from `-Dcontrol.port` (default
-8080); a shutdown hook closes the API + spaces. (`com.gamma.inspector.MainApp` is a **separate** CLI pre-ETL tool
+8080); a shutdown hook closes the API + spaces. (`com.gamma.inspector.MainApp` is a **separate** one-shot CLI (`migrate-configs` only)
 suite, not the server — see [build & run](../../layer/platform/admin-guide-launch-flags.md).)
 
 ## `dispatch`

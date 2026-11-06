@@ -179,7 +179,9 @@ enrichment**: a separate `*_enrich.toon` with hand-written SQL over the committe
 
 ### 1. Generation Config (`<source>_gen.toon`)
 
-**Hand-authored.** Tells SchemaExtractor how to read the sample file and which columns to force-type.
+**Read by nothing since 2026-11-06** — it was the input of the retired `create-schema` CLI (the `ura` utilities);
+**Add data** now infers the schema. The `csv_settings` knobs below are the same keys the engine reads from a
+pipeline's `csv_settings`, so their reference stays here; `type_patterns` is read by nothing.
 
 ```yaml
 csv_settings:
@@ -221,7 +223,7 @@ performance lever — output is identical for clean files (proven by parity test
 
 ### 2. Schema Config (`<source>_schema.toon`)
 
-**Machine-generated** by `create-schema`; edit manually if needed. This is the source of truth for the ETL transformation.
+**Machine-generated** by **Add data**; edit manually if needed. This is the source of truth for the ETL transformation.
 
 ```yaml
 # Option A — legacy single-key shorthand (CSV path)
@@ -257,7 +259,7 @@ raw:
 mapping:
   canonicalName: reversals
   rawName: reversals
-  fields[3]:                     # the Record Transformer field list — what create-schema emits
+  fields[3]:                     # the Record Transformer field list — what the generators emit
     - name: ACCOUNT_NUMBER
       from: ACCOUNT_NUMBER
       fn: keep                   # pass-through; the type cast comes from raw.fields[].type
@@ -326,7 +328,7 @@ Pinned end to end by `DemoCorpusIngestTest.asn1ExamplePartitionsByImsiNotUnderTh
 ⚠ `served_imsi` is one folder per subscriber — right for a three-record example, the wrong partition for
 a production CDR store.
 
-`create-schema` generates one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; it wrote the
+The generators write one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; they wrote the
 legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that
 marker, not the key name, is what `RecordTransform.isFieldList` keys on, so a row without one is not a field list.
 The **23**<!--count:sql-mapping-functions--> verbs are the served catalog (`GET /components/transform/describe`,
@@ -342,7 +344,7 @@ verbatim). Arguments ride an `args` map; the editor's Fields | SQL views and the
 Schemas written before 2026-09-05 may still carry `rules[{targetColumn, sourceExpression, transformType}]`. The
 engine keeps reading them through **`RecordTransform.fromMappingRules`** — one branch, deliberately retained — so
 nothing needs migrating (the committed corpus is already all `fields[]`). ⛔ **No generator writes this shape any
-more**: not `create-schema`, not `POST /config/suggest/schema`, and not the editor's Parse pane (which wrote it until
+more**: not `POST /config/suggest/schema`, and not the editor's Parse pane (which wrote it until
 2026-09-10). The mapping below is kept only so an old file can
 be read, and so its `transformType` values are understood when met:
 
@@ -404,10 +406,10 @@ enrichment** (`*_enrich.toon`, hand-written SQL over the partitioned output).
 
 ### 3. Pipeline Config (`<source>_pipeline.toon`)
 
-**Machine-generated** by `create-schema` (and by the UI's create scaffold); edit to adjust runtime
+**Machine-generated** by the UI's create scaffold (Add data); edit to adjust runtime
 settings. One file configures everything for a source: the `dirs`, `output`, `parsing` and `processing`
-sections drive the ETL runtime, while the `search`, `copy_tars` and `backup` sections are read
-exclusively by the pre-ETL utility commands in `MainApp` — all sections coexist by design.
+sections drive the ETL runtime. The top-level `search`, `copy_tars` and `backup` sections of the retired
+`ura` pre-ETL CLI (2026-11-06) are read by nothing.
 
 **The block-by-block reference lives in one place:**
 [Pipeline config keys — the single block census](spec-pipeline-config-keys.md).

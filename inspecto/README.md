@@ -166,25 +166,14 @@ from the repository root instead.
 
 ## 2. Onboard a new source
 
-A source is described by **three config files** under a space's `config/<source>/` directory
+A source is described by **two config files** under a space's `config/<source>/` directory
 (e.g. `spaces/<id>/config/<source>/` — see [Spaces](../docs/okf/product/module/config/admin-guide-configuration-reference.md#spaces-multi-project-layout)).
-Only the first is hand-authored; the other two are generated and then tuned.
+**Add data** in the web console generates both from a sample file; you then tune them.
 
-| File | Authored | Purpose |
-|---|---|---|
-| `<source>_gen.toon` | by hand | Tells `SchemaExtractor` how to read the sample (delimiter, junk/tail skipping, which columns are dates/timestamps). |
-| `<source>_schema.toon` | generated | Source of truth for the transformation: field selectors, types, partition keys, mapping rules. |
-| `<source>_pipeline.toon` | generated | Runtime settings: directories, output format, threads, dedup, and the pre-ETL utility sections. |
-
-Generate the schema + pipeline from a sample file:
-
-```powershell
-# Windows (from inspecto/)
-ura.bat create-schema <source> path\to\sample.csv config\<source>\<source>_gen.toon
-
-# Linux / Mac
-./ura.sh create-schema <source> path/to/sample.csv config/<source>/<source>_gen.toon
-```
+| File | Purpose |
+|---|---|
+| `<source>_schema.toon` | Source of truth for the transformation: field selectors, types, partition keys, mapping rules. |
+| `<source>_pipeline.toon` | Runtime settings: directories, output format, threads, dedup. |
 
 Then review the generated files. The full field reference — every `csv_settings` knob,
 `transformType` (`DIRECT` / `CONCAT_DT` / `FILENAME_DATE`), multi-schema dispatch, and the type
@@ -221,8 +210,8 @@ root (the parent of `bin/`) before it starts Java, so it works from any director
 
 | Folder | Holds |
 |---|---|
-| `bin/` | `serve.bat` / `serve.sh`, `run.bat` / `run.sh`, `ura.bat` / `ura.sh`, `install-service.ps1` / `install-service.sh` |
-| `lib/` | every jar, `modules.list` / `core.list` (the classpath, as `lib/<jar>` lines), `edition.properties`, `duckdb/<platform>/` extensions |
+| `bin/` | `serve.bat` / `serve.sh`, `run.bat` / `run.sh`, `install-service.ps1` / `install-service.sh` |
+| `lib/` | every jar, `modules.list` (the classpath, as `lib/<jar>` lines), `edition.properties`, `duckdb/<platform>/` extensions |
 | `deploy/` | `Dockerfile` + `Dockerfile.dockerignore` (build from the root: `docker build -f deploy/Dockerfile -t inspecto .`), `inspecto.service` (systemd) |
 | `logs/` | captured launcher output (the Windows service writes `logs/service.log`) |
 | `runtime/` `ui/` `spaces/` `docs/` `sbom/` `licenses/` | the embedded JVM, the web console, your Spaces, the operator docs, the SBOMs, third-party licence texts |
@@ -249,10 +238,9 @@ java -cp target/inspecto-processor-<version>.jar com.gamma.inspector.MultiCollec
 
 ## 6. Pre-ETL utilities
 
-`MainApp` exposes a suite of independent commands for sourcing, staging, extracting, and archiving
-raw deliveries *before* the pipeline picks them up — driven by the `search`, `copy_tars`, and
-`backup` sections of the same pipeline `.toon`. Run `ura.bat` / `ura.sh` with no arguments to list
-them. Details: [Operations → Pre-ETL utilities](../docs/okf/product/layer/platform/admin-guide-operations-reference.md).
+The `ura` pre-ETL utility CLI (`ura.bat` / `ura.sh`) was retired on 2026-11-06 and is no longer shipped.
+Bring files in through **Add data** or a Collector. To reprocess a batch, call `POST /runs/{pipeline}/reprocess`
+(see [Operations](../docs/okf/product/layer/platform/admin-guide-operations-reference.md#reprocessing-a-batch)).
 
 ## 7. Stage-2 enrichment (joins & aggregation)
 

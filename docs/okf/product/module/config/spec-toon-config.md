@@ -17,10 +17,10 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `ToonHelper.decode` (`platform/inspecto-util/src/main/java/com/gamma/util/ToonHelper.java`); `ConfigCodec.toMap`
   delegates to it and `ToonHelper.load(path)` wraps it, prefixing the path to any decode refusal
   (`<path>: line N: …`). It lives in `inspecto-util`, not `inspecto-config`, because util is the
-  documented `com.gamma` leaf ([reactor](../../layer/platform/architecture-reactor.md)) and `ToonHelper`/`SchemaExtractor` read
+  documented `com.gamma` leaf ([reactor](../../layer/platform/architecture-reactor.md)) and `ToonHelper` reads
   TOON too; so the edge runs `inspecto-config → inspecto-util` (every consumer of config already had util).
-  Every former direct `JToon.decode` reader — `ToonHelper.load`, `SchemaExtractor`, `MainApp` (`ura`
-  CLI), `inspecto-exchange`'s `Ledger`/`ExchangeSnapshots` — now goes through it. `toMapStrict` and
+  Every former direct `JToon.decode` reader — `ToonHelper.load`, `SchemaExtractor` and `MainApp.loadToon` (both deleted with the `ura`
+  CLI, 2026-11-06), `inspecto-exchange`'s `Ledger`/`ExchangeSnapshots` — now goes through it. `toMapStrict` and
   `isStrictDecodable` were **deleted**: `toMap` was documented "lenient, tolerates `#` comments" but
   JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is `strict=true` — the two methods
   had always decoded identically, so no caller ever had leniency to rely on. It was **not** made lenient

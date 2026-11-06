@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Serializable record of everything a batch produced, used by
- * {@code ura reprocess <consignment_id>} to delete outputs/markers and restore members.
+ * {@code ReprocessCommand} ({@code POST /runs/{pipeline}/reprocess}) to delete outputs/markers and restore members.
  *
  * <p>Plain mutable fields (not a record) for straightforward Gson (de)serialization.
  */

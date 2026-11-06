@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -178,14 +178,12 @@ test('--list-core prints artifactId<TAB>dir for every core jar, no edition neede
     assert.ok(out.every((l) => l.split('\t').length === 2));
 });
 
-test('--bundle writes core.list = inspecto.jar + the core thin jars only (the one-shot tools\' classpath: no optional module, no sidecar)', () => {
+test('--bundle writes modules.list and no core.list (its only reader, the retired ura CLI, is gone)', () => {
     const dir = tempBundle('oc-core-');
     try {
         for (const j of classpath('Standard', { g: g() })) writeFileSync(join(dir, 'lib', j), '');
         execFileSync(process.execPath, [SCRIPT, '--edition', 'standard', '--bundle', dir], { encoding: 'utf8' });
-        const core = readFileSync(join(dir, 'lib', 'core.list'), 'utf8');
-        assert.equal(core, ['inspecto.jar', ...CORE_JARS].map((j) => `lib/${j}`).join('\n') + '\n');
-        assert.ok(!core.includes('oidc') && !core.includes('connectors') && !core.includes('postgresql'));
+        assert.ok(!existsSync(join(dir, 'lib', 'core.list')));
         assert.equal(readFileSync(join(dir, 'lib', 'modules.list'), 'utf8').split('\n')[0], 'lib/inspecto.jar');
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });

@@ -280,9 +280,8 @@ screen*, and the glossary's Catalog definition ("Schemas and Datasets") predates
   `registry/grammars/<id>.toon`, `mapping/<id>` → `registry/mappings/<id>.csv`; `ConfigSafetyValidator` and
   `ConfigRoutes` call the same resolver. ⚠ **No `registry/schemas/` directory exists in any committed
   Space** — every shipped schema is pipeline-owned.
-- **Generation.** `SchemaExtractor` (`platform/inspecto-util/src/main/java/com/gamma/util/SchemaExtractor.java`, CLI
-  `create-schema`) infers `<source>_schema.toon` + `<source>_pipeline.toon` from a sample by DuckDB type
-  inference; `ConfigPreviewRoutes` serves `/config/preview/schema` (TRY_CAST a draft against sample rows),
+- **Generation.** `SchemaExtractor` (CLI `create-schema`, deleted 2026-11-06 with the `ura` utilities) inferred
+  `<source>_schema.toon` + `<source>_pipeline.toon` from a sample by DuckDB type inference; `ConfigPreviewRoutes` serves `/config/preview/schema` (TRY_CAST a draft against sample rows),
   `/config/suggest/schema` and `/config/schema/derived` (DESCRIBE over a saved pipeline's output). Both
   generators emit **`mapping.rules[]` + `transformType`** (§2 note 1).
 - **Mapping** is a CSV component kind (`registry/mappings/<id>.csv`, `MappingRules.validate`,
@@ -533,7 +532,7 @@ About 43 test classes reference the store, registry, catalog or schema generator
 
 ### 8.3 Schema generation and types — `inspecto-util` · `inspecto-etl`
 
-`SchemaExtractorMergeTest` · `StructureCsvTest` (generation, classification column, merge), `PipelineValidatorTest`
+`StructureCsvTest` (generation, classification column, merge), `PipelineValidatorTest`
 and `PipelineDryRunTest` (the fail-closed field-type refusal at load), `RecordTransformContractTest`
 (`sql-functions.contract.json` — both sides compile SQL).
 

@@ -72,7 +72,7 @@ Direct files / lines, role, and outbound `com.gamma` dependencies (import counts
 
 | Layer | Package | Files/Lines | Role | Outbound deps |
 |---|---|---|---|---|
-| L0 | `util` | 27/4024 | Generic helpers: `DuckDbUtil`, `ToonHelper`, tar/CSV tools, `MainApp` CLI | — |
+| L0 | `util` | 27/4024 | Generic helpers: `DuckDbUtil`, `ToonHelper`, CSV tools | — |
 | L0 | `api` | 1/35 | `@PublicApi` marker annotation | — |
 | L0 | `config.spec` | 8/698 | Config schema spec model (`ConfigSpecs`, `RawConfig`, `FieldSpec`) | — |
 | L0 | `intelligence` | 5/83 | Agent ask/session value types + `AgentAnswerSink` port | — |

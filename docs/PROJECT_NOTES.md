@@ -1656,9 +1656,9 @@ one command, and it would have saved a signing and two implementations.
   `IllegalState … missing: timeline, cause analysis, corrective actions, SLA` until the postmortem is
   complete (`ObjectService.java:1292`). A test that wants a *terminal* Incident should `archive` (legal
   straight from `IDENTIFIED`), not `resolve`. `ALERT` is the one that starts `OPEN` with `RESOLVED` terminal.
-- **`com.gamma.util` CLI cluster** (~11 `main()` tools: `MainApp`, `TarExtractor`, …) sits at low coverage and is
-  **kept by decision** (self-contained; `MainApp` is wired into `package.ps1`/ops). Tested engine+control-plane
-  is ~86%. Long-term: extract the CLI cluster to its own module. → [`performance.md`](okf/product/layer/platform/tests-performance.md).
+- **`com.gamma.util` CLI cluster** (~11 `main()` tools: `MainApp`, `TarExtractor`, …) sat at low coverage; it was
+  **deleted 2026-11-06** with the `ura` CLI (only `MainApp migrate-configs` remains). Tested engine+control-plane
+  is ~86%. → [`performance.md`](okf/product/layer/platform/tests-performance.md).
 
 ---
 

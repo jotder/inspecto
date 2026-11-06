@@ -115,6 +115,3 @@ rm markers/<data_source>/20200403/adj_DATE_20200403.csv.gz.processed
 
 Stale markers are pruned automatically at each poll start based on `processing.duplicate_check.retention_days`. You only need manual deletion to reprocess files within the retention window.
 
-### Tar extraction: file already exists in target
-
-The `extract` and `prepare-inbox` commands skip CSV files that already exist at the destination path (`[SKIP] Already exists: ...`). This is intentional — re-running after a partial failure is safe. Delete the destination file manually to force re-extraction.

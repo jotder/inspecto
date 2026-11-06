@@ -10,7 +10,7 @@ timestamp: 2026-06-28T00:00:00Z
 # Operations & Launch Flags
 
 The server entry is [`ControlApi.main`](../../module/processor/api-control-api.md) (the `com.gamma.inspector.MainApp` CLI is a
-separate pre-ETL tool suite — search/copy/extract/backup/prepare-inbox/create-schema/reprocess).
+separate one-shot tool that holds only `migrate-configs`; the `ura` pre-ETL utilities were retired 2026-11-06).
 
 ## Key `-D` launch flags
 

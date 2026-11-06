@@ -26,7 +26,7 @@
 export const PG_SIDECAR = 'postgresql.jar';
 
 /**
- * BUNDLE-LAYOUT-1 (operator 2026-11-06): every jar of a bundle - and modules.list / core.list / edition.properties - lives in
+ * BUNDLE-LAYOUT-1 (operator 2026-11-06): every jar of a bundle - and modules.list / edition.properties - lives in
  * `<bundle>/lib/`. A jar's identity (bundleFile, the SBOM names) stays the bare file name; only paths join this directory.
  */
 export const LIB_DIR = 'lib';

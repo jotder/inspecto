@@ -371,9 +371,8 @@ final class ConfigPreviewRoutes implements RouteModule {
                 // The strptime pattern a DATE was proven with — without it a non-ISO date lands NULL.
                 if (f.format() != null) field.put("format", f.format());
                 fields.add(field);
-                // MAPPING-GEN-1: the same field-list spelling the CLI generator writes (SchemaExtractor) —
-                // this route used to say `transformType: DIRECT` where the CLI omitted it; now neither
-                // generator speaks `rules[]` at all, so there is nothing left to disagree about.
+                // MAPPING-GEN-1: the field-list spelling (`name`/`from`/`fn`) — this route
+                // used to say `transformType: DIRECT`; it no longer speaks `rules[]` at all.
                 Map<String, Object> mf = new LinkedHashMap<>();
                 mf.put("name", f.name());
                 mf.put("from", f.name());

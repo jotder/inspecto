@@ -15,10 +15,6 @@ EX="${1:-}"; CLEAN="${2:-}"
 resolve_jar() {
   if [ -n "${INSPECTO_JAR:-}" ] && [ -f "$INSPECTO_JAR" ]; then echo "$INSPECTO_JAR"; return; fi
   # P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars. This prints a CLASSPATH (callers use -cp).
-  if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ] && [ -f "$EXAMPLES_ROOT/../core.list" ]; then
-    local root; root="$(cd "$EXAMPLES_ROOT/.." && pwd)"
-    tr -d '\r' < "$EXAMPLES_ROOT/../core.list" | sed "s#^#$root/#" | tr '\n' ':' | sed 's/:$//'; echo; return
-  fi
   if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ]; then echo "$EXAMPLES_ROOT/../inspecto.jar"; return; fi
   local j; j="$(ls "$EXAMPLES_ROOT"/../target/inspecto-processor-*.jar 2>/dev/null | grep -vE 'sources|javadoc' | head -1 || true)"
   if [ -n "$j" ]; then

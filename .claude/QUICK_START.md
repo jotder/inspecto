@@ -40,9 +40,7 @@ java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-
 # Long-running control plane + operator UI (ControlApi, default :8080)
 .\inspecto-deploy\bin\serve.bat                                # then http://localhost:8080/
 
-# Pre-ETL utility CLI (com.gamma.inspector.MainApp)
-#   commands: search, copy, copy-tars, extract, backup, prepare-inbox,
-#             create-schema, move-by-date, extract-unknown, extract-move, help
+# One-shot config converter (com.gamma.inspector.MainApp; the ura pre-ETL utilities were retired 2026-11-06)
 java --enable-native-access=ALL-UNNAMED -cp inspecto\target\inspecto-processor-*.jar `
      com.gamma.inspector.MainApp help
 ```

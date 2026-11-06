@@ -16,9 +16,7 @@ import java.util.regex.Pattern;
  * Shared helpers for reading pipeline {@code .toon} configuration files.
  *
  * <p>These tiny methods were previously copy-pasted independently into every class
- * that loaded or validated a toon — {@link FileOrganizer}, {@link FileBackup},
- * {@link TarArranger}, {@link TarInboxPreparer}, and others.  This class is the
- * single canonical home.
+ * that loaded or validated a toon.  This class is the single canonical home.
  */
 public final class ToonHelper {
 
@@ -218,38 +216,5 @@ public final class ToonHelper {
     public static String opt(Map<String, Object> section, String key, String defaultVal) {
         Object val = section.get(key);
         return (val != null && !val.toString().isBlank()) ? val.toString() : defaultVal;
-    }
-
-    // ── base_dirs ─────────────────────────────────────────────────────────────
-
-    /**
-     * Parse {@code base_dirs} from a toon section into an unmodifiable list of
-     * absolute, normalised {@link Path}s.
-     *
-     * <p>{@code base_dirs} may be a JToon array ({@code List<String>}) or a
-     * comma-separated scalar string — both forms are accepted.
-     *
-     * @throws IllegalArgumentException if the key is absent or resolves to an empty list
-     */
-    @SuppressWarnings("unchecked")
-    public static List<Path> parseBaseDirs(Map<String, Object> section) {
-        Object val = section.get("base_dirs");
-        if (val == null)
-            throw new IllegalArgumentException("Missing 'base_dirs' in toon section");
-
-        List<Path> result = new ArrayList<>();
-        Iterable<?> items = (val instanceof List)
-                ? (List<?>) val
-                : Arrays.asList(val.toString().split(","));
-
-        for (Object item : items) {
-            String s = item.toString().trim();
-            if (!s.isEmpty())
-                result.add(Paths.get(s).toAbsolutePath().normalize());
-        }
-        if (result.isEmpty())
-            throw new IllegalArgumentException("'base_dirs' is empty");
-
-        return Collections.unmodifiableList(result);
     }
 }

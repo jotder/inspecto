@@ -13,7 +13,7 @@ import java.nio.file.*;
 import java.util.List;
 
 /**
- * Implements {@code ura reprocess <pipeline.toon> <batch_id>}: deletes the
+ * Implements {@code POST /runs/{pipeline}/reprocess} ({@code RunRoutes}): deletes the
  * batch's output files and markers, restores its member files from backup into
  * the inbox, supersedes the manifest, and triggers a fresh poll.
  *

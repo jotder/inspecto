@@ -33,8 +33,8 @@ no item-schema facility and `ConfigJsonSchema` maps `LIST` to a bare `"array"`, 
 remove the allow-list entry while *"no generated form can show it"* stayed true. Remove an entry only
 when an author can actually see the block.
 
-There is also a **third, utility-only reader family** outside both authorities: the pre-ETL tools in
-`inspecto-util` read their own top-level sections (below) from the same file.
+The top-level `search`, `copy_tars` and `backup` sections once had a third, utility-only reader family (the
+`ura` pre-ETL tools); that CLI was retired 2026-11-06, so they are read by nothing (below).
 
 ## The census (2026-09-01)
 
@@ -181,16 +181,11 @@ three — the drift recorded in `pipeline-authoring.md` §2 (that mirror was del
 “hand edit LOCKS the Step” rule was superseded 2026-09-05 by the peer Fields|SQL views. Details:
 [`catalog-vs-executors.md`](../engine/spec-catalog-vs-executors.md).
 
-## Utility-only sections (neither authority)
+## Retired utility-only sections
 
-Read by the pre-ETL tools in `inspecto-util`, never by the parser or the spec — they coexist in the same
-file by design:
-
-| Section | Reader |
-|---|---|
-| `search` | `FileOrganizer` |
-| `copy_tars` | `TarArranger` / `TarInboxPreparer` |
-| `backup` (top-level section, not `dirs.backup`) | `FileBackup` |
+`search`, `copy_tars` and `backup` (the top-level section, not `dirs.backup`) were read only by the `ura`
+pre-ETL CLI (`FileOrganizer`, `TarArranger` / `TarInboxPreparer`, `FileBackup`), retired 2026-11-06. Nothing
+reads them now, and the graph lift drops them.
 
 ## Keys that appear in docs and examples but nothing reads
 

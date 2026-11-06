@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-375 test class(es): 375 unit, 0 real-HTTP control-plane, 0 IT.
+374 test class(es): 374 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -128,7 +128,6 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `KillBeforeAckDuplicateTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/KillBeforeAckDuplicateTest.java` | HA-KILL9-DOUBLE-INGEST-1 reproduction: a node killed after a Consignment's OUTPUT is durable but before its |
 | `LaDailyIngestAcceptanceTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/LaDailyIngestAcceptanceTest.java` | LA-DAILY-INGEST-1 T9 - the end-to-end acceptance run on a synthetic corpus, through the REAL ingest path |
 | `MainAppMigrateConfigsArgsTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MainAppMigrateConfigsArgsTest.java` | 🔴 <b>CONFIG-MIGRATOR-LOSES-MAPPINGS-1 (b)</b> — {@code migrate-configs <config_root> --apply}, the form |
-| `MainAppPrepareInboxDirsTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MainAppPrepareInboxDirsTest.java` | {@code DATA-PATH-RESIDUALS-1} (b): the tar → inbox preparer reads its {@code dirs.*} ONLY through the engine |
 | `MultiCollectorProcessorTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MultiCollectorProcessorTest.java` | Tests for {@link MultiCollectorProcessor} — the multi-source orchestrator. <!-- vocab-allow: quoted Javadoc --> |
 | `ObjectStoreIngestTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/ObjectStoreIngestTest.java` | SCALEOUT-OBJSTORE-DATABASE-DIR-1: the ingest lane writes an allow-listed {@code s3://} {@code dirs.database} |
 | `OutputPerMemberEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputPerMemberEndToEndTest.java` | {@code processing.output_per_member} end to end through {@link CollectorProcessor#run} over the delimited-CSV |

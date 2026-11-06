@@ -139,21 +139,10 @@ formats use a plugin `ingester` plus `ingester_config`. See
 ## Architecture
 
 ```
-┌──────────── PRE-ETL: staging (MainApp utility commands) ──────────────────────┐
-│                                                                               │
-│  base.dirs/  ──search────►  available_files.csv      (file manifest audit)    │
-│  base.dirs/  ──copy──────►  dirs.poll/<date>/        (CSVs arranged by date)  │
-│  base.dirs/  ──copy-tars──► dirs.poll/               (tar.gz staged flat)     │
-│  dirs.poll/  ──extract───►  dirs.poll/<date>/        (tars unpacked, arranged)│
-│  available files(csv|csv.gz) ─backup──► dirs.backup  (originals archived)     │
-│                                                                               │
-└───────────────────────────────────────────────────────────────────────────────┘
-
 ┌──────────────── STEP 1: Bootstrap (once per source) ──────────────────────────┐
 │                                                                               │
-│   <source>_gen.toon ───┐                                                      │
-│                        ├──►  create-schema ──► <source>_schema.toon           │
-│   sample.csv  ─────────┘                  └──► <source>_pipeline.toon         │
+│   sample file ──►  Add data ──► <source>_schema.toon                          │
+│                             └──► <source>_pipeline.toon                       │
 │                                                                               │
 └───────────────────────────────────────────────────────────────────────────────┘
 
@@ -177,9 +166,8 @@ formats use a plugin `ingester` plus `ingester_config`. See
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The **Pre ETL utilities** (`MainApp`) handle the movement and unpacking of raw deliveries into the inbox layout that `CollectorProcessor` expects.
-
-**SchemaExtractor** (`create-schema` command) is a one-time bootstrap tool — it reads a generation profile and a sample file and produces the schema and pipeline configs.
+**Add data** is the one-time bootstrap — it infers the schema from a sample file and writes the schema and pipeline configs.
+(The `ura` pre-ETL staging utilities and their `create-schema` command were retired 2026-11-06; Collectors bring files in.)
 
 **CollectorProcessor** is the runtime engine — it reads the generated configs, polls the inbox directory, and processes every file it finds.
 
@@ -205,7 +193,7 @@ com.gamma
                                row budget, or (union mode) leaves raw tables for the strategy to union
     IngestOutcome            — record: status, survivors, outputs, lineage, per-member audit, totals (commit/audit input)
     MemberAudit              — record: per-input-file audit row accumulated during ingest
-    ReprocessCommand         — `ura reprocess <batch_id>`: delete outputs/markers, restore members, re-run
+    ReprocessCommand         — `POST /runs/{pipeline}/reprocess`: delete outputs/markers, restore members, re-run
   etl/
     PipelineConfig           — immutable config object; static factory loads and validates .toon
     SchemaSelector           — two-pass schema dispatch (file-pattern fast path + column-count probe)
@@ -230,24 +218,14 @@ com.gamma
   ingester/
     TypedRecordIngester      — reference StreamingFileIngester for type-tagged text records; multi-segment dispatch
   util/
-    ToonHelper               — load/validate .toon files; require/opt section helpers; parseBaseDirs
-    TarUtil                  — isTar/isCsv/isGzipped predicates; extractTar; peekTar; deleteTree
-    VirtualThreadRunner      — Phaser + VirtualThreadPerTaskExecutor fan-out helper
+    ToonHelper               — load/validate .toon files; require/opt section helpers
+    TarUtil                  — deleteTree
     SqlBuilder               — typed DuckDB SELECT expressions (COALESCE/TRY_STRPTIME chains)
     LogSetup                 — TeeOutputStream; per-run timestamped log file wired to stdout/stderr
     DuckDbUtil               — JDBC URL builder; temp DB file lifecycle; datetime formatter
-    FileOrganizer            — search base_dirs for manifest files; optionally copy to poll dir
-    FileBackup               — move found_path originals to dirs.backup after a search/copy run
-    TarArranger              — copy-tars (collect archives) + extract (unpack + arrange by date)
-    TarInboxPreparer         — toon-native alias for the extract workflow
-    TarExtractor             — recursive walk for 'unknown/' tar archives; sentinel-based skip
-    IntegratedProcessor      — extract + move for CBS CDR adjustment archives
-    SchemaExtractor          — DuckDB-powered type inference; generates _schema.toon + _pipeline.toon
-    MainApp                  — CLI dispatcher for all pre-ETL utility commands
-    FileMoverByDate          — date-partition files from a flat directory into year/month/day tree
 ```
 
-**Design principle:** `CollectorProcessor` is a pure orchestrator — it creates the thread pool and drives the per-batch lifecycle, but contains zero business logic itself.  Every concern is owned by a focused single-responsibility class: batch planning (`ConsignmentPlanner`), parsing (`CsvIngester`), transformation (`DataTransformer`), deduplication (`MarkerManager`), quarantine (`QuarantineManager`), registration (`DuckLakeRegistrar`), and auditing (`ConsignmentAuditWriter`, `ManifestStore`, `LineageCollector`).  All shared low-level helpers live in `com.gamma.util` and are reused by both the ETL and the pre-ETL utilities.
+**Design principle:** `CollectorProcessor` is a pure orchestrator — it creates the thread pool and drives the per-batch lifecycle, but contains zero business logic itself.  Every concern is owned by a focused single-responsibility class: batch planning (`ConsignmentPlanner`), parsing (`CsvIngester`), transformation (`DataTransformer`), deduplication (`MarkerManager`), quarantine (`QuarantineManager`), registration (`DuckLakeRegistrar`), and auditing (`ConsignmentAuditWriter`, `ManifestStore`, `LineageCollector`).  All shared low-level helpers live in `com.gamma.util` and are reused across the engine.
 
 **Behavior-injection seams.** Variant behavior is injected into the engine rather than branched inline, so the orchestration code stays thin and a new variant is a closed-set edit:
 
@@ -318,15 +296,11 @@ write it Space-relative (`data/<pipeline>/database`); a config ref sits beside i
 
 ### Step 1 — Schema bootstrapping (run once)
 
-```
-create-schema  <source_name>  <sample_file.csv>  <gen_config.toon>
-```
-
-Reads the generation profile, auto-infers column types from the sample, and writes:
+Onboard a sample file with **Add data**: it auto-infers column types from the sample and writes:
 - `<source>_schema.toon` — field definitions and mapping rules (the ETL source of truth)
 - `<source>_pipeline.toon` — runtime directories, threading, output format
 
-These generated files are committed to version control and edited as needed. **SchemaExtractor is never involved in production processing.**
+These generated files are committed to version control and edited as needed. **Schema inference is never involved in production processing.**
 
 ### Step 2 — ETL processing (continuous)
 

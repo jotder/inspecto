@@ -149,7 +149,7 @@ are date expressions; the two mapping `custom` expressions are `DOUBLE`.
   `ConsignmentProcessJobType`, `RiskScoreEvaluator` (their `dataDir`/`dataRoot`), and `PartitionCompactor`, `ReferenceCompactor`,
   `StorageSeries`, `ObjectsAnalyticsJob` via `SpaceConfigRoot.currentDataRoot()` (the compactors deliberately
   NOT under the store dir they walk). No Space context ⇒ `spillDir = null` ⇒ `java.io.tmpdir`:
-  `ParquetEventStore`, `ExchangeSnapshotWriter`, `PipelineDocumentXlsx`, `TypeFlow`, `SchemaExtractor`,
+  `ParquetEventStore`, `ExchangeSnapshotWriter`, `PipelineDocumentXlsx`, `TypeFlow`,
   `SqlGuard`. ⚠ Data-root walks must skip the spill dir: `BackupTask` and `StorageReportTask` use
   `DuckDbUtil.regularFilesSkippingSpill` (no descent into `.duckdb_tmp`, vanished entries tolerated) so
   concurrent spill is never archived/counted and cannot fail the walk. Test: `DuckDbSettingsTest.openInMemory*`,

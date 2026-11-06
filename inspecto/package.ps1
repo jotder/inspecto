@@ -47,7 +47,7 @@
 # when a local DuckDB extension cache is found — none is statically linked into duckdb_jdbc, so an
 # air-gapped deployment needs the files shipped (multiformat X1 for `excel`/frontend: xlsx;
 # AIRGAP-EXTENSIONS-1 for `ducklake`/output.ducklake.enabled). See DuckDbExtension.tryLoad and
-# -DuckdbExtensionCache below. Missing = a warning, never a build failure — serve/run/ura auto-detect
+# -DuckdbExtensionCache below. Missing = a warning, never a build failure — serve/run auto-detect
 # the directory and set -Dduckdb.extension.dir to it, and from then on (D-8, 2026-09-24) the loader
 # reads ONLY that directory: a missing binary fails its feature loudly, naming the file, and never
 # falls back to a networked INSTALL. A bundle staging nothing for a platform keeps the INSTALL path.
@@ -161,7 +161,7 @@ $ErrorActionPreference = 'Stop'
 # ── LF/CRLF-safe writers for the bundled launcher scripts ──────────────────────
 # This file is itself CRLF on disk (.gitattributes: *.ps1 text eol=crlf), and a PowerShell
 # here-string (@'...'@) carries the EXACT bytes between its delimiters — so every "bash" heredoc
-# below (run.sh/ura.sh/serve.sh) already contains embedded \r\n, not \n, before it is ever
+# below (run.sh/serve.sh) already contains embedded \r\n, not \n, before it is ever
 # touched. Two bugs followed from that, both fixed by writing through these helpers instead of
 # `Set-Content -NoNewline` / `.Replace("`n","`r`n")` directly:
 #   1. The *.sh scripts were written CRLF — `#!/usr/bin/env bash\r` fails on Linux with
@@ -646,11 +646,11 @@ if (Test-Path $bundleDir) {
 # BUNDLE-LAYOUT-1 (operator 2026-11-06): the bundle root holds README.md and FOLDERS only:
 #   bin/     the launchers and service installers - each cd's to the bundle ROOT (the parent of bin/) before starting Java,
 #            because the server resolves docs/api/, spaces/, ui/ and logs/ relative to its working directory
-#   lib/     every jar, modules.list / core.list / edition.properties, and duckdb/<platform>/*.duckdb_extension
+#   lib/     every jar, modules.list / edition.properties, and duckdb/<platform>/*.duckdb_extension
 #   deploy/  Dockerfile (+ Dockerfile.dockerignore) and the systemd unit
 #   logs/    where the launchers' captured output goes (the service wrappers); shipped empty with a .keep
 #   runtime/ ui/ spaces/ docs/ sbom/ licenses/
-# modules.list / core.list name every jar as a ROOT-relative `lib/<jar>` path (tools/offering-classpath.mjs writes them), so a
+# modules.list names every jar as a ROOT-relative `lib/<jar>` path (tools/offering-classpath.mjs writes them), so a
 # launcher that has cd'ed to the root puts the list on -cp as it stands - the one seam between the layout and the classpath.
 $binDir    = Join-Path $bundleDir 'bin'
 $libDir    = Join-Path $bundleDir 'lib'
@@ -1545,86 +1545,6 @@ if exist lib\inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -D
 '@
 Write-CrlfScript -Path "$binDir\run.bat" -Content $runBatContent
 
-# ── step 6: bundle ura scripts (pre-ETL utility CLI, Linux + Windows) ─────────
-$uraShContent = @'
-#!/usr/bin/env bash
-# URA File Management Suite — utility CLI runner
-#
-# Usage: [INSPECTO_JAVA_OPTS="-Xmx4g"] bin/ura.sh [--dry-run] <command> <pipeline.toon> [args...]
-# Relative pipeline paths resolve against the bundle ROOT (this script cd's there).
-#
-# Examples:
-#   bin/ura.sh help
-#   bin/ura.sh search           spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   bin/ura.sh copy             spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   bin/ura.sh --dry-run backup spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   bin/ura.sh prepare-inbox    spaces/<your-space>/config/voucher/voucher_pipeline.toon
-#   bin/ura.sh create-schema    voucher  samples/voucher_sample.csv  spaces/<your-space>/config/voucher/voucher_gen.toon
-# Bundles ship no Spaces: drop your Space folder(s) into spaces/ first (or pass any pipeline path).
-set -euo pipefail
-cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
-JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
-# Extra JVM flags from the operator, same contract as serve.sh: INSPECTO_JAVA_OPTS (fallback
-# EXTRA_JAVA_OPTS), whitespace-separated, appended AFTER the mandatory
-# --enable-native-access=ALL-UNNAMED and BEFORE -cp (a JVM flag after it would be parsed as a
-# program argument). Not read from JAVA_OPTS: that name is assigned, so it is silently discarded.
-JAVA_OPTS=(--enable-native-access=ALL-UNNAMED)
-[ -d lib/duckdb/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=lib/duckdb/linux_amd64")
-EXTRA_OPTS="${INSPECTO_JAVA_OPTS:-${EXTRA_JAVA_OPTS:-}}"
-if [ -n "${EXTRA_OPTS}" ]; then
-    read -r -a _extra_opts <<< "${EXTRA_OPTS}"
-    JAVA_OPTS+=("${_extra_opts[@]}")
-    echo "[ura.sh] extra JVM opts: ${EXTRA_OPTS}"
-fi
-# MODULE-REORG-P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars beside it. The classpath is
-# READ from core.list (written at package time by tools/offering-classpath.mjs): inspecto.jar + the core thin jars only (no optional module or sidecar: the pre-ETL utilities never carried them).
-if [ -f lib/core.list ]; then
-    CP="$(tr -d '\r' < lib/core.list | tr '\n' ':')"; CP="${CP%:}"
-else
-    CP="lib/inspecto.jar"; for _jar in lib/*.jar; do [ "$_jar" = "lib/inspecto.jar" ] || CP="${CP}:${_jar}"; done
-fi
-exec "$JAVA" "${JAVA_OPTS[@]}" \
-          -cp "$CP" \
-          com.gamma.inspector.MainApp "$@"
-'@
-Write-LfScript -Path "$binDir\ura.sh" -Content $uraShContent
-
-$uraBatContent = @'
-@echo off
-rem URA File Management Suite - utility CLI runner
-rem Usage: [set "INSPECTO_JAVA_OPTS=-Xmx4g"] bin\ura.bat [--dry-run] COMMAND pipeline.toon [args...]
-rem   Relative pipeline paths resolve against the bundle ROOT (this script cd's there).
-rem   Commands: search, copy, copy-tars, extract, backup, prepare-inbox,
-rem             create-schema, move-by-date, extract-unknown, extract-move, help
-rem   Run 'bin\ura.bat help' for full command reference.
-setlocal
-cd /d "%~dp0.."
-rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
-set "JAVA=java"
-if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
-rem Extra JVM flags from the operator, same contract as serve.bat: INSPECTO_JAVA_OPTS (fallback
-rem EXTRA_JAVA_OPTS), appended AFTER the mandatory --enable-native-access=ALL-UNNAMED and BEFORE
-rem -cp (a JVM flag after it would be parsed as a program argument). Not read from JAVA_OPTS:
-rem that name is assigned, so it is silently discarded.
-set "OPTS=--enable-native-access=ALL-UNNAMED"
-if exist "lib\duckdb\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=lib\duckdb\windows_amd64"
-set "EXTRA_OPTS=%INSPECTO_JAVA_OPTS%"
-if "%EXTRA_OPTS%"=="" set "EXTRA_OPTS=%EXTRA_JAVA_OPTS%"
-if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
-if not "%EXTRA_OPTS%"=="" echo [ura.bat] extra JVM opts: %EXTRA_OPTS%
-rem MODULE-REORG-P3d stage 2: inspecto.jar is the product jar only; the core libraries are thin jars beside it. The classpath is
-rem READ from core.list (written at package time by tools/offering-classpath.mjs): inspecto.jar + the core thin jars only (no optional module or sidecar). No delayed expansion.
-set "CP="
-if exist lib\core.list for /f "usebackq delims=" %%J in ("lib\core.list") do call set "CP=%%CP%%;%%J"
-if not exist lib\core.list set "CP=;lib\inspecto.jar"
-if not exist lib\core.list for %%J in (lib\*.jar) do if /i not "%%J"=="lib\inspecto.jar" call set "CP=%%CP%%;%%J"
-set "CP=%CP:~1%"
-"%JAVA%" %OPTS% ^
-     -cp "%CP%" ^
-     com.gamma.inspector.MainApp %*
-'@
-Write-CrlfScript -Path "$binDir\ura.bat" -Content $uraBatContent
-
 # ── step 6b: bundle serve scripts (run the control plane + operator UI) ─────────
 # Unlike run.sh (one-shot ETL), serve.sh launches the long-running ControlApi service with the
 # HTTP control plane + operator UI. It serves the bundled SPA from ./ui via -Dui.dir.
@@ -2129,7 +2049,7 @@ Write-Host "[install-service]       ~70s before concluding that recovery failed.
 Write-CrlfScript -Path "$binDir\install-service.ps1" -Content $installServicePs1Content
 
 # -- step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained --
-# Produces bundle/runtime/ — the run/serve/ura scripts auto-prefer it over system java.
+# Produces bundle/runtime/ — the run/serve scripts auto-prefer it over system java.
 # jlink is itself a JVM tool: the platform of the jlink *executable* need not match the platform
 # being targeted, because --module-path selects which jmods (which carry the platform-native code)
 # get assembled into the output image. We always invoke the Windows jlink.exe (host-executable) and
@@ -2412,7 +2332,7 @@ omits inspecto-demo-auth (shipped here).
 # LOAD from -Dduckdb.extension.dir (THIS step's whole purpose — an air-gapped deployment ships the
 # file so frontend: xlsx works out of the box) -> INSTALL (networked fallback). Both platforms'
 # binaries are bundled into the SAME $bundleDir (harmless — like run.sh sitting unused in the
-# Windows zip): serve.bat/run.bat/ura.bat auto-detect windows_amd64, serve.sh/run.sh/ura.sh
+# Windows zip): serve.bat/run.bat auto-detect windows_amd64, serve.sh/run.sh
 # auto-detect linux_amd64, each only on its own OS. Best-effort: a platform whose binary isn't
 # cached locally is a yellow warning, never a build failure — the fail-closed INSTALL fallback in
 # ExcelExtension still covers a networked deployment.
@@ -2776,7 +2696,7 @@ function Compress-BundleForPlatform {
             # RELEASE-LAUNCHERS-NOT-EXECUTABLE-1: Compress-Archive stores NO POSIX mode bits, and on a
             # Windows host there are none to store — NTFS has no exec bit. A linux_amd64 zip cross-built here
             # therefore unzips with 0644 launchers; install-service.sh chmods serve.sh itself (its own
-            # `[ -x bin/serve.sh ] || chmod +x bin/serve.sh`), run.sh/ura.sh need a by-hand `chmod +x` on that path.
+            # `[ -x bin/serve.sh ] || chmod +x bin/serve.sh`), run.sh needs a by-hand `chmod +x` on that path.
             Compress-Archive -Path $bundleDir -DestinationPath $DestinationPath
         } else {
             # On a POSIX host (ubuntu-latest) modes CAN be preserved: Info-ZIP `zip` records them in the
@@ -2906,11 +2826,6 @@ Write-Host "       .\bin\install-service.ps1    (Windows, ELEVATED PowerShell; o
 Write-Host "       sudo bin/install-service.sh  (Linux, systemd; output -> journalctl -u inspecto)"
 Write-Host "       verify recovery: kill the process, then curl /health -- do not assume it"
 Write-Host "  4d. Container: docker build -f deploy/Dockerfile -t inspecto .   (from the bundle root, linux_amd64 bundle)"
-Write-Host "  5. Pre-ETL utilities:"
-Write-Host "       bin\ura.bat help            (Windows)"
-Write-Host "       bash bin/ura.sh help        (Linux)"
-Write-Host "       bash bin/ura.sh search  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
-Write-Host "       bash bin/ura.sh backup  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
 Write-Host ""
 if (-not $NoRuntime) {
     Write-Host "Embedded Java runtime included (bundle\runtime\) — no JVM needed on the target."
@@ -2919,7 +2834,7 @@ if (-not $NoRuntime) {
         Write-Host "  (no Linux GraalVM jmods cache found — inspecto-deploy-linux_amd64.zip not built;" -ForegroundColor Yellow
         Write-Host "   the bundled *.sh launchers fall back to system java on Linux instead.)" -ForegroundColor Yellow
     }
-    Write-Host "The run/serve/ura launchers auto-prefer the embedded runtime when present."
+    Write-Host "The run/serve launchers auto-prefer the embedded runtime when present."
 } else {
     Write-Host "Java 27+ required on the target server.  No other dependencies needed."
 }

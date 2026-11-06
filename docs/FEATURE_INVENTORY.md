@@ -239,7 +239,6 @@ inspecto-deploy/
   examples/                   the runnable example suite (run-example.ps1|sh + catalog)   ← added 2026-06-20
   run.(bat|sh)                one-shot ETL launcher
   serve.(bat|sh)              long-running ControlApi + UI
-  ura.(bat|sh)                utility CLI (com.gamma.inspector.MainApp)
   ui/                         Angular SPA (if built)
   runtime/                    trimmed jlink JVM (Windows; unless -NoRuntime)
   docs/  README.md            docs tree (../docs/ links rewritten)
@@ -255,8 +254,8 @@ pwsh examples/run-example.ps1 01-ingest/hello-csv                   |  bash exam
 
 The launchers bake in `--enable-native-access=ALL-UNNAMED` (mandatory; DuckDB JNI). `-Dassist.write.root`
 is **not** set by default → write APIs (connections/pipelines/registry) return 503 until the user adds it.
-Extra JVM flags go in **`INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`) — honored by all six
-launchers (`serve`/`run`/`ura` × `.sh`/`.bat`), whitespace-separated, appended after the script's own
+Extra JVM flags go in **`INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`) — honored by all four
+launchers (`serve`/`run` × `.sh`/`.bat`), whitespace-separated, appended after the script's own
 flags so the mandatory ones can't be clobbered, and echoed at launch so an inert flag is visible.
 `JAVA_OPTS` is *assigned* by the scripts and is silently discarded — do not use it.
 
@@ -344,6 +343,5 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
 - ~~`package.ps1` pre-creates inbox/database dirs only for `adjustment` + `voucher`~~ **stale, corrected
   2026-07-20**: `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own
   comment (line 21) tells the operator to create `inspecto-deploy/inbox/<adapter>/` manually;
-  dir creation is the `ura` CLI's `prepare-inbox` command (adapter-agnostic, not adjustment/voucher-
-  specific). The example suite sidesteps all of this by being self-contained (each example owns its
+  dir creation was the `ura` CLI's `prepare-inbox` command (retired 2026-11-06). The example suite sidesteps all of this by being self-contained (each example owns its
   `out/`).

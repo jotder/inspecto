@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: Operations reference — utilities, batching, output, deployment
-description: The long-form operations manual — the pre-ETL `ura` utility suite, output structure, the status log and auditing, batch processing, remote-server deployment, and onboarding a new Collector. The largest reference in the bundle.
+description: The long-form operations manual — output structure, the status log and auditing, batch processing, remote-server deployment, and onboarding a new Collector. The largest reference in the bundle.
 resource: inspecto/package.ps1
 tags: [operations, utilities, deployment, batching, output, onboarding]
 timestamp: 2026-07-16T00:00:00Z
@@ -11,8 +11,8 @@ timestamp: 2026-07-16T00:00:00Z
 > **Deep reference — the detail tier.** Start at [Operations](admin-guide-launch-flags.md) for the summary; this page is the long form it points to.
 
 > 🔴 **NOT the authority on `-D` flags, auth headers, launchers, or the Java floor.** This page is 66 KB
-> moved wholesale from the retired root-level `admin-guide-launch-flags.md` on 2026-07-16 and its long tail is still sound — the `ura`
-> utility suite, output structure, the status log, batch processing, deployment and Collector onboarding.
+> moved wholesale from the retired root-level `admin-guide-launch-flags.md` on 2026-07-16 and its long tail is still sound — output
+> structure, the status log, batch processing, deployment and Collector onboarding.
 > Its *cross-cutting* material has drifted, and a 2026-09-08 sweep verified four defects against source:
 >
 > - ✅ **`-Dcontrol.token` — the dead flag is GONE from this page (2026-09-14, `DOC-DEADTOKEN-1`).** It has
@@ -36,109 +36,13 @@ timestamp: 2026-07-16T00:00:00Z
 
 > Part of the [Inspecto](../../../../../inspecto/README.md) documentation. See the [docs index](../../../../INDEX.md).
 
-## Pre-ETL Utility Suite
+## Pre-ETL file staging — retired
 
-All pre-ETL utilities are invoked through the `ura` script (shipped alongside the JAR). Configuration is read directly from the pipeline `.toon` file — no separate properties file is needed.
-
-```bash
-# Deployed bundle
-bash ura.sh [--dry-run] <command> <pipeline.toon>   # Linux / Mac
-ura.bat     [--dry-run] <command> <pipeline.toon>   # Windows
-
-# Local development (from inspecto/ directory)
-./ura.sh    [--dry-run] <command> <pipeline.toon>   # Linux / Mac
-ura.bat     [--dry-run] <command> <pipeline.toon>   # Windows (uses target/ JAR)
-```
-
-Run `ura.bat help` (or `bash ura.sh help`) for the full command reference.
-
-### Pipeline toon sections for utilities
-
-Each pre-ETL command has a dedicated top-level section in the pipeline `.toon` file alongside the existing `dirs`, `output`, and `processing` sections. Add only the sections relevant to the commands you will run.
-
-**`search` section** — used by `search` and `copy` commands:
-```yaml
-search:
-  base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-  csv_input:     GSM_RESUBMISSION.csv
-  log_available: available_files.csv
-  log_missing:   missing_files.csv
-  log_error:     error_log.csv
-```
-
-**`copy_tars` section** — used by `copy-tars` command:
-```yaml
-copy_tars:
-  base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-```
-
-**`backup` section** — used by `backup` command:
-```yaml
-backup:
-  base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-  log_available: available_files.csv
-```
-
-The `extract` and `prepare-inbox` commands need no extra section — they use only the existing `dirs.poll`, `dirs.temp`, and `dirs.backup` keys.
-
-> **Note:** JToon does not support `#` comments. Do not add comment lines to `.toon` files — parsing stops at the first unrecognised line.
-
-**Safety constraint:** `dirs.poll` must not be nested inside any `base_dirs` entry. The command validates this at startup.
-
-### Commands
-
-| Command | Reads from toon | Description |
-|---|---|---|
-| `search` | `search.*`, `dirs.poll` | Scan base_dirs for files in csv_input. Log found/missing. No copy. |
-| `copy` | `search.*`, `dirs.poll` | Scan base_dirs, copy matching files to `dirs.poll/<date>/`. |
-| `copy-tars` | `copy_tars.base_dirs`, `dirs.poll` | Find `*.tar.gz` in base_dirs, copy flat to `dirs.poll`. |
-| `extract` | `dirs.poll`, `dirs.temp`, `dirs.backup` | Unpack `*.tar.gz` in `dirs.poll`, arrange CSVs by date, backup archives. |
-| `backup` | `backup.*`, `dirs.backup` | Move originals listed in available_files.csv to `dirs.backup`. |
-| `prepare-inbox` | `dirs.poll`, `dirs.temp`, `dirs.backup` | Same as `extract` — toon-native alias for pipeline-level use. |
-| `create-schema` | *(gen config toon, not pipeline)* | Generate `<source>_schema.toon` + `<source>_pipeline.toon`. Args: `<source_name> <sample_csv> <gen_config.toon>` |
-
-**`--dry-run`** is honoured by all commands — prints intended actions without modifying any files.
-
-#### Date detection
-
-The `copy`, `extract`, and `prepare-inbox` commands arrange files into date-named sub-folders. The date is extracted from the filename using the pattern `((?:19|20)\d{6})` — the first 8-digit token in the range 1900–2099. Files with no matching token land in `obscure/`.
-
-### Typical pre-ETL workflow
-
-```bash
-TOON="config/<data_source>/<data_source>_pipeline.toon"
-
-# 1. Audit: find which files from the manifest exist in the source dirs
-bash ura.sh search    $TOON
-
-# 2. Copy matching CSVs to dirs.poll, arranged by date
-bash ura.sh copy      $TOON
-
-# 3. Copy any .tar.gz deliveries flat to dirs.poll
-bash ura.sh copy-tars $TOON
-
-# 4. Extract tar archives; arrange CSVs by date; backup archives
-bash ura.sh extract   $TOON
-
-# 5. Move all original source files to dirs.backup
-bash ura.sh backup    $TOON
-
-# 6. Run the ETL pipeline
-bash run.sh <data_source>
-```
-
-Add `--dry-run` to any `ura.sh` step to preview actions without touching files.
-
-**Windows equivalent** (from the bundle root):
-```bat
-set TOON=config\<data_source>\<data_source>_pipeline.toon
-ura.bat search    %TOON%
-ura.bat copy      %TOON%
-ura.bat copy-tars %TOON%
-ura.bat extract   %TOON%
-ura.bat backup    %TOON%
-run.bat <data_source>
-```
+The `ura` utility CLI (`bin/ura.sh` / `bin/ura.bat`, the "URA File Management Suite": `search`, `copy`,
+`copy-tars`, `extract`, `backup`, `prepare-inbox`, `create-schema`, `move-by-date`, `extract-unknown`,
+`extract-move`) was **retired 2026-11-06** and no bundle ships it. Its pipeline sections `search:`,
+`copy_tars:` and `backup:` (the CLI's, not the engine's `backup` Guarantee) are read by nothing. Bring files in
+through **Add data** or a Collector; reprocess a batch with `POST /runs/{pipeline}/reprocess` (below).
 
 ---
 
@@ -955,11 +859,11 @@ Manifests are used by the reprocess command to reconstruct exactly what a batch 
 ### Reprocessing a batch
 
 ```bash
-ura.sh reprocess config/<source>/<source>_pipeline.toon <batch_id>
-ura.bat reprocess config\<source>\<source>_pipeline.toon <batch_id>
+curl -X POST http://localhost:8080/runs/<pipeline>/reprocess -H 'Content-Type: application/json' \
+     -d '{"batchId":"<batch_id>"}'
 ```
 
-`reprocess` performs the following atomically:
+The route needs the `canOperateRuns` capability. `reprocess` performs the following atomically:
 
 1. Reads the manifest for `<batch_id>`.
 2. Deletes all output files and partition directories the batch created.
@@ -967,8 +871,6 @@ ura.bat reprocess config\<source>\<source>_pipeline.toon <batch_id>
 4. Restores each member file from `dirs.backup` back into its original inbox path.
 5. Supersedes the manifest with a `REPROCESSED` status entry so the audit trail is preserved.
 6. On the next poll cycle the files are picked up and processed fresh.
-
-`--dry-run` is honoured — prints the intended actions without modifying anything.
 
 ### Backward compatibility
 
@@ -979,7 +881,7 @@ When a batch contains exactly one member file, the output retains the legacy `<b
 `ConsignmentIngestor.commit` writes durable state in a specific order so a process crash mid-commit is idempotent on rerun:
 
 1. **DuckLake register** (optional, non-fatal — log and continue if catalog is unreachable).
-2. **Manifest write** — required for reprocess; this is what `ura reprocess` reads.
+2. **Manifest write** — required for reprocess; this is what `POST /runs/{pipeline}/reprocess` reads.
 3. **Backup originals** — moves files out of the inbox into `dirs.backup`.
 4. **Marker files** — last. A marker means "this file is fully durable, skip on next poll."
 
@@ -1033,14 +935,13 @@ inspecto-deploy/
   bin/                        ← every launcher; each cd's to the bundle ROOT (the parent of bin/) first, so it runs from any directory
     serve.sh  serve.bat       ← control plane + UI (ControlApi; reads PORT/SPACES_ROOT/CORS_ORIGIN/AUTH_OIDC_*/INSPECTO_JAVA_OPTS)
     run.sh    run.bat         ← one-shot ETL (CollectorProcessor) for spaces/*/config/<adapter>/*_pipeline.toon
-    ura.sh    ura.bat         ← pre-ETL utility CLI (MainApp); a relative pipeline path resolves against the bundle root
     install-service.sh  install-service.ps1   ← systemd unit / Windows boot Scheduled Task (SCR-3)
     serve-demo.sh serve-demo.bat               ← -DemoAuth builds only (they replace serve.* and the installers)
   lib/
     inspecto.jar              ← the product jar: processor classes + ALL third-party dependencies
     inspecto-api.jar … inspecto-engine.jar     ← the first-party CORE libraries as thin jars
     inspecto-*.jar, postgresql.jar             ← the edition's optional modules and sidecars
-    modules.list / core.list  ← the classpath the launchers read, one ROOT-relative `lib/<jar>` per line, in order
+    modules.list              ← the classpath the launchers read, one ROOT-relative `lib/<jar>` per line, in order
                                 (written by tools/offering-classpath.mjs - the one seam between layout and classpath)
     edition.properties        ← edition=Basic|Standard|Advanced|Preview
     duckdb/<platform>/*.duckdb_extension       ← air-gap DuckDB extensions; -Dduckdb.extension.dir=lib/duckdb/<platform>
@@ -1076,15 +977,11 @@ cd inspecto-deploy
 
 # 2. Attach your Space(s): drop each Space folder into spaces/ (or set SPACES_ROOT)
 
-# 3. Stage files (optional — pre-ETL utilities, if the source is on a network share or in tarballs)
-bash bin/ura.sh copy-tars spaces/<space>/config/<data_source>/<data_source>_pipeline.toon
-bash bin/ura.sh extract   spaces/<space>/config/<data_source>/<data_source>_pipeline.toon
-
-# 4. Run the ETL once
+# 3. Run the ETL once
 bash bin/run.sh <data_source>          # Linux
 bin\run.bat <data_source>              # Windows
 
-# 5. OR run the always-on control plane + operator console
+# 4. OR run the always-on control plane + operator console
 bash bin/serve.sh                      # Linux/Mac → http://localhost:8080/
 bin\serve.bat                          # Windows
 # Auth is an edition feature: Basic serves unauthenticated, Standard/Advanced take AUTH_OIDC_*.
@@ -1136,9 +1033,9 @@ As-built decisions:
 - Verified end-to-end 2026-08-28: build (713 MB), run, `/health` + `/ready` 200, healthcheck
   reaches `healthy`; the emitted file is byte-identical to the packer's here-string.
 
-**Extra JVM flags — `INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), honored by all six launchers
+**Extra JVM flags — `INSPECTO_JAVA_OPTS`** (fallback `EXTRA_JAVA_OPTS`), honored by all four launchers
 since `1768978f`, and by `serve-demo.sh`/`.bat` (demo bundles). Whitespace-separated, appended **after** each script's own flags (and, in
-`run`/`ura`, before `-jar`/`-cp`), so the mandatory `--enable-native-access=ALL-UNNAMED`, the port,
+`run`, before `-jar`/`-cp`), so the mandatory `--enable-native-access=ALL-UNNAMED`, the port,
 the spaces root and the auth wiring cannot be clobbered from the environment. The launch banner
 echoes whatever was passed, so a flag that did not land is visible rather than silent.
 
@@ -1162,9 +1059,6 @@ space an invocation runs out of is allowed, never the whole `spaces/` tree.
 
 - An operator `INSPECTO_JAVA_OPTS="-Dassist.safety.roots=…"` still **wins**: it is appended after,
   and a later `-D` of the same key overrides an earlier one.
-- ⚠ **`ura.sh`/`ura.bat` are NOT covered** — they *receive* the pipeline path as a pass-through arg
-  rather than resolving it, so there is nothing to derive from; pass the env var for a `ura` command
-  that needs a schema ref.
 - The posture rule this follows (and why the engine CLI deliberately does *not* run discovery) is in
   [Config safety](../../module/config/spec-config-safety.md).
 
@@ -1206,42 +1100,15 @@ Note: the 20200117 <data_source> file is ~4.3 GB uncompressed (~2.97 M rows) due
 
 ## Onboarding a New Collector
 
-1. **Write a generation config** — copy `config/<data_source>/adj_gen.toon` and adapt:
-   - Set the correct `delimiter`, skip counts, and date formats
-   - List column names that should be forced to `DATE` or `TIMESTAMP` in `type_patterns`
+1. **Onboard a sample file with Add data** — it infers the schema and writes the Pipeline (the `create-schema`
+   CLI that used to do this from a generation config was retired with the `ura` utilities, 2026-11-06).
+   See [Onboarding](../product/user-guide-onboarding.md).
 
-2. **Run `create-schema`** against a representative sample file:
-   ```bash
-   # From the inspecto/ directory
-   ./ura.sh create-schema mySource path/to/sample.csv config/mysource/mysource_gen.toon
-   # Windows:
-   ura.bat create-schema mySource path\to\sample.csv config\mysource\mysource_gen.toon
-   ```
-   This generates `mysource_schema.toon` and `mysource_pipeline.toon` under `config/mysource/`. The generated pipeline includes all required ETL `dirs.*` keys.
+2. **Review the generated schema** — check that types are correct, adjust `partitionKey` if needed.
 
-3. **Add the pre-ETL utility sections** to the generated pipeline toon (edit `mysource_pipeline.toon`):
-   ```yaml
-   search:
-     base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-     csv_input:     GSM_RESUBMISSION.csv
-     log_available: available_files.csv
-     log_missing:   missing_files.csv
-     log_error:     error_log.csv
+3. **Edit the pipeline config** if required — adjust `output.format`, thread count, or the DuckLake section.
 
-   copy_tars:
-     base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-
-   backup:
-     base_dirs[2]: /mnt/rawdata/feed1, /mnt/rawdata/feed2
-     log_available: available_files.csv
-   ```
-   Omit any section for commands you won't use.
-
-4. **Review the generated schema** — check that types are correct, adjust `partitionKey` if needed.
-
-5. **Edit the pipeline config** if required — adjust `output.format`, thread count, or the DuckLake section.
-
-6. **Run the ETL:**
+4. **Run the ETL:**
    ```bash
    bash run.sh mysource      # after adding mysource to run.sh
    # or directly:

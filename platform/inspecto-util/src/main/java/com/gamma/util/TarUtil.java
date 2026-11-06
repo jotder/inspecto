@@ -1,202 +1,20 @@
 package com.gamma.util;
 
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-
-import java.io.*;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Shared utilities for tar/gzip archives and CSV file identification.
+ * Recursive directory cleanup.
  *
- * <p>These helpers were previously duplicated across {@link TarExtractor},
- * {@link TarArranger}, {@link TarInboxPreparer}, and {@link IntegratedProcessor}.
- * This class is the single canonical home.
+ * <p>This class once held the tar/gzip helpers of the retired URA pre-ETL CLI (2026-11-06); only
+ * {@link #deleteTree} still has callers.
  */
 public final class TarUtil {
 
-    private static final List<String> TAR_SUFFIXES = List.of(".tar.gz", ".tgz", ".tar");
-    private static final List<String> CSV_SUFFIXES = List.of(".csv.gz", ".csv");
-
-    /** YYYYMMDD date pattern covering years 1900–2099. */
-    private static final Pattern DATE_RE = Pattern.compile("((?:19|20)\\d{6})");
-
     private TarUtil() {}
-
-    // ── file-type predicates ──────────────────────────────────────────────────
-
-    /** Returns {@code true} if {@code p}'s filename ends with a recognised tar suffix. */
-    public static boolean isTar(Path p) {
-        String n = p.getFileName().toString().toLowerCase();
-        return TAR_SUFFIXES.stream().anyMatch(n::endsWith);
-    }
-
-    /** Returns {@code true} if {@code name} ends with a recognised CSV suffix. */
-    public static boolean isCsv(String name) {
-        String low = name.toLowerCase();
-        return CSV_SUFFIXES.stream().anyMatch(low::endsWith);
-    }
-
-    /** Returns {@code true} if {@code p} is a gzipped archive ({@code .tar.gz} or {@code .tgz}). */
-    public static boolean isGzipped(Path p) {
-        String n = p.getFileName().toString().toLowerCase();
-        return n.endsWith(".tar.gz") || n.endsWith(".tgz");
-    }
-
-    /**
-     * Strip the recognised tar suffix from a filename and return the stem.
-     * If no suffix matches, the original name is returned unchanged.
-     */
-    public static String stripTarSuffix(String name) {
-        String low = name.toLowerCase();
-        for (String suf : TAR_SUFFIXES)
-            if (low.endsWith(suf)) return name.substring(0, name.length() - suf.length());
-        return name;
-    }
-
-    /**
-     * Extract the first YYYYMMDD token (years 1900–2099) from a filename.
-     * Returns {@code "obscure"} when no date token is found.
-     *
-     * <p>Examples:
-     * <pre>
-     *   "adj_export_20200403_v2.csv.gz" → "20200403"
-     *   "backup_snapshot.csv"           → "obscure"
-     * </pre>
-     */
-    public static String extractDate(String filename) {
-        Matcher m = DATE_RE.matcher(filename);
-        return m.find() ? m.group(1) : "obscure";
-    }
-
-    // ── archive operations ────────────────────────────────────────────────────
-
-    /**
-     * Extract all members of a tar or tar.gz archive to {@code destDir}.
-     *
-     * <p>Guards against path-traversal attacks: any entry whose resolved path
-     * escapes {@code destDir} causes an {@link IOException} to be thrown.
-     *
-     * @param archive  source archive ({@code .tar}, {@code .tar.gz}, or {@code .tgz})
-     * @param destDir  target directory (must already exist or be created by the caller)
-     * @return number of regular files extracted
-     * @throws IOException on I/O failure or an unsafe path inside the archive
-     */
-    public static int extractTar(Path archive, Path destDir) throws IOException {
-        int count = 0;
-        // Compare both sides in ONE frame. The entry side was always normalized and this side never was,
-        // so a destDir carrying a redundant component ("work/./out") made a perfectly safe entry fail
-        // startsWith. That direction is fail-closed — a normalized candidate cannot match a longer,
-        // un-normalized prefix — so it refused good archives rather than admitting bad ones.
-        Path dest = destDir.toAbsolutePath().normalize();
-        try (InputStream fi  = Files.newInputStream(archive);
-             InputStream bi  = new BufferedInputStream(fi);
-             InputStream ci  = isGzipped(archive) ? new GzipCompressorInputStream(bi) : bi;
-             TarArchiveInputStream tar = new TarArchiveInputStream(ci)) {
-
-            TarArchiveEntry entry;
-            while ((entry = tar.getNextEntry()) != null) {
-                if (!tar.canReadEntryData(entry)) continue;
-                Path out = dest.resolve(entry.getName()).normalize();
-                if (!out.startsWith(dest))
-                    throw new IOException("Unsafe path in archive: " + entry.getName());
-                if (entry.isDirectory()) {
-                    Files.createDirectories(out);
-                } else {
-                    Files.createDirectories(out.getParent());
-                    try (OutputStream os = Files.newOutputStream(out)) {
-                        tar.transferTo(os);
-                    }
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-    /**
-     * Count the number of entries in a tar/tar.gz archive without extracting them.
-     * Useful for dry-run reporting.
-     *
-     * @return total entry count (directories and files)
-     */
-    public static int peekTar(Path archive) throws IOException {
-        int[] count = {0};
-        forEachEntry(archive, entry -> count[0]++);
-        return count[0];
-    }
-
-    /** What {@link #forEachEntry} hands each entry; may throw, and the throw aborts the walk. */
-    @FunctionalInterface
-    public interface EntryVisitor {
-        void visit(TarArchiveEntry entry) throws IOException;
-    }
-
-    /**
-     * Walk every entry of a tar/tar.gz archive without extracting anything (JAVA-5).
-     *
-     * <p>Opening the archive is four nested streams whose middle link depends on {@link #isGzipped} —
-     * a preamble three dry-run peeks each carried verbatim, differing only in what they printed per
-     * entry. A copy that forgets the gzip branch does not fail to compile; it fails to see any entry
-     * in a {@code .tar.gz} and reports an empty archive, which is exactly the kind of silence a
-     * dry-run must not produce.
-     *
-     * <p>The visitor gets the entry, not the stream: this is a peek, so entry <em>data</em> is
-     * deliberately out of reach — {@link #extractTar} owns reading it.
-     */
-    public static void forEachEntry(Path archive, EntryVisitor visitor) throws IOException {
-        try (InputStream fi  = Files.newInputStream(archive);
-             InputStream bi  = new BufferedInputStream(fi);
-             InputStream ci  = isGzipped(archive) ? new GzipCompressorInputStream(bi) : bi;
-             TarArchiveInputStream tar = new TarArchiveInputStream(ci)) {
-            TarArchiveEntry entry;
-            while ((entry = tar.getNextEntry()) != null) visitor.visit(entry);
-        }
-    }
-
-    // ── extraction sentinel (.extracted.json) ─────────────────────────────────
-
-    /** Sentinel file marking a completed extraction (idempotency across reruns). */
-    public static final String SENTINEL = ".extracted.json";
-
-    private static final com.google.gson.Gson GSON =
-            new com.google.gson.GsonBuilder().setPrettyPrinting().create();
-
-    /**
-     * True when {@code target} holds a {@link #SENTINEL} whose recorded {@code src_size}
-     * matches {@code currentSrcSize} — i.e. this archive was already fully extracted and
-     * has not changed since. Any unreadable/contentless sentinel reads as "not done".
-     */
-    public static boolean isAlreadyExtracted(Path target, long currentSrcSize) {
-        Path sentinel = target.resolve(SENTINEL);
-        if (!Files.exists(sentinel)) return false;
-        try {
-            @SuppressWarnings("rawtypes")
-            java.util.Map data = GSON.fromJson(Files.readString(sentinel), java.util.Map.class);
-            return data != null && ((Double) data.get("src_size")).longValue() == currentSrcSize;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Write the {@link #SENTINEL} under {@code target}. {@code data} must include
-     * {@code src_size} (what {@link #isAlreadyExtracted} matches on); callers add their
-     * own extra keys (members, source path, timestamp).
-     */
-    public static void writeExtractedSentinel(Path target, java.util.Map<String, Object> data)
-            throws IOException {
-        Files.writeString(target.resolve(SENTINEL), GSON.toJson(data));
-    }
-
-    // ── directory cleanup ─────────────────────────────────────────────────────
 
     /**
      * Recursively delete {@code dir} and all its contents (bottom-up walk).

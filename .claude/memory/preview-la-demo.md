@@ -40,8 +40,8 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
   (~15 min); stop :8080; back up to `inspecto-preview\backup\predeploy-<stamp>`; robocopy over with `/XD spaces`;
   refresh only `spaces\_templates`; keep `serve-preview-la.bat`, the WSO2 setup script, `runtime-natives`, all Spaces.
 - **BUNDLE-LAYOUT-1 (2026-11-06) changed the install layout:** the root now holds `README.md` + folders only — launchers in
-  `bin\` (`bin\serve.bat`, `bin\serve-demo.bat`, `bin\run.bat`, `bin\ura.bat`, `bin\install-service.ps1`; each `cd`s to the root
-  itself), every jar + `modules.list`/`core.list`/`edition.properties` in `lib\`, DuckDB extensions in `lib\duckdb\<platform>\`
+  `bin\` (`bin\serve.bat`, `bin\serve-demo.bat`, `bin\run.bat`, `bin\install-service.ps1`; each `cd`s to the root
+  itself), every jar + `modules.list`/`edition.properties` in `lib\`, DuckDB extensions in `lib\duckdb\<platform>\`
   (was `duckdb-extensions\`), Dockerfile/systemd unit in `deploy\`, captured output in `logs\`; no `examples\`, and `docs\`
   holds only USER_GUIDE/ADVANCED_GUIDE/EDITIONS + `api\`. The first redeploy onto an OLD-layout install: the `/MIR` swap deletes the
   root jars/scripts/lists (wanted); every local wrapper (`serve-preview-la.bat`, `start-la-basic.ps1`, `serve-ims.bat`) must call

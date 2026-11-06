@@ -33,7 +33,7 @@ import java.util.Locale;
  *
  * <h3>Zip-slip</h3>
  * Flattening already removes the traversal vector, and the resolved path is still asserted to stay
- * under {@code workDir} (the {@code TarUtil.extractTar} guard idiom) — belt and braces, because this
+ * under {@code workDir} (normalize, then {@code startsWith}) — belt and braces, because this
  * is the class of bug that writes outside the workspace.
  */
 public abstract class ArchiveDecompressorPlugin implements DecompressorPlugin {

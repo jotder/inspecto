@@ -276,7 +276,6 @@ carried as an absolute string, so the ~100 typed readers of `dirs()` / `sinks()`
 | a **`local`** connection's `base_path` (a remote connector's is a path on the remote system — untouched) | `ConnectionProfile.load` / `resolvedBeside` (and `ConnectionRoutes.persistConnection` registers it resolved). ⚠ Resolution is INTERNAL: `basePath()` (what a connector reads) is resolved, `authoredBasePath()` keeps the value as written, and `toMap()` (`GET /connections`), `toBundleMap()` and the persisted `*_connection.toon` all carry the AUTHORED value — so a UI GET → PUT round trip stores `data/…` again (`DATA-PATH-RESIDUALS-1` (c), 2026-09-23) |
 | the same keys at the 422 gate | `ConfigSafetyValidator.check(…, configDir)` — every caller that knows the config's location passes it |
 | a pipeline's owned dirs at deletion | `PipelineDataDirs` (conflicts, removal, the sharing scan) |
-| the `ura` CLI's `dirs.*` (`search` / `copy` / `copy-tars` / `extract` / `backup` / `prepare-inbox`) | `MainApp.loadToon`. `TarInboxPreparer` has no `main` and no path-taking constructor any more (both read `dirs.*` from the CWD) — `ura prepare-inbox` is its only entry (`DATA-PATH-RESIDUALS-1` (b)) |
 | a job's `data_dir` | `SpaceConfigRoot.jobPathBase("data_dir")` — the Space DIR (`PathJail.spaceDirOf` of the config read root) in a Space, the read root unchanged when it has no `config/` ancestor (single-tenant); `PipelineJobRunner` then RUNS on the resolved path whenever it differs from the value's CWD reading (`DATA-PATH-RESIDUALS-1` (d)) |
 | a store-authored graph's join path `reference` | `PipelineJobRunner.references()`, against `SpaceConfigRoot.current()` |
 
@@ -319,9 +318,9 @@ Pinned by `ShippedPipelinesWriteUnderTheirSpaceDirectoryTest` (inspecto-engine: 
 Pipeline / Enrichment / local Connection's data paths resolve under their Space; nothing appears under the
 CWD) and `DataPathResolutionTest` (inspecto-config: the resolver, `spaceDirOf`, the refusal, the gate, the
 repeated-Space-path refusal). The five residuals shipped 2026-09-23 (`DATA-PATH-RESIDUALS-1`), each pinned:
-(a) `DataPathResolutionTest`, (b) `MainAppPrepareInboxDirsTest`, (c) `ControlApiConnectionsTest` (the GET →
+(a) `DataPathResolutionTest`, (b) the `ura` CLI's `dirs.*` (its test went with the CLI, retired 2026-11-06), (c) `ControlApiConnectionsTest` (the GET →
 PUT round trip), (d) `SpaceConfigRootTest` + `PipelineJobRunnerTest` (a Space job's `data_dir` runs under the
-Space dir), (e) `SchemaExtractorFieldListTest` — `create-schema` emits `data/inbox/<x>` and `data/<x>/<kind>`.
+Space dir), (e) `create-schema`'s generated dirs (retired with the `ura` CLI, 2026-11-06).
 
 ## A Space's allowed roots: declared + its OWN base (tier 3 2026-08-14, narrowed 2026-09-24)
 

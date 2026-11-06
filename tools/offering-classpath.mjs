@@ -10,7 +10,7 @@
 //   node tools/offering-classpath.mjs --edition standard [--demo] --print          modules.list to stdout
 //   node tools/offering-classpath.mjs --edition standard --list-mvn                the `-pl` string for package.ps1
 //   node tools/offering-classpath.mjs --list-core                                      the core thin jars (artifactId<TAB>dir) package.ps1 stages
-//   node tools/offering-classpath.mjs --edition standard [--demo] --bundle <dir>   write modules.list + core.list +
+//   node tools/offering-classpath.mjs --edition standard [--demo] --bundle <dir>   write modules.list +
 //                                                                                      edition.properties into <dir>/lib
 //                                                                                      after verifying the staged jars
 //
@@ -43,8 +43,6 @@ import { gather, idOf } from './check-offerings.mjs';
 export { LIB_DIR };
 export const MODULES_LIST = 'modules.list';
 export const EDITION_FILE = 'edition.properties';
-/** P3d stage 2: the product jar + the core thin jars ONLY (no optional module, no sidecar) - for the one-shot tools (ura.*, the examples), which never carried the optional modules. */
-export const CORE_LIST = 'core.list';
 
 /** The demo build's replacement jar (the build-time check lives in package.ps1's `if ($DemoAuth)` block); defined in bundle-modules.mjs. */
 export { DEMO_JAR };
@@ -137,8 +135,6 @@ export function mvnModules(edition, g) {
 /** `--list-core`: one `artifactId<TAB>dir` per core thin jar, for package.ps1's staging loop (the one place that names them is bundle-modules.mjs). */
 export const coreList = () => coreModules().map((m) => `${m.artifactId}\t${m.dir}`).join('\n') + '\n';
 
-/** The core-only classpath: inspecto.jar then the core thin jars (CORE_MODULES order). */
-export const coreClasspath = () => ['inspecto.jar', ...coreModules().map((m) => m.bundleFile)];
 
 /**
  * The classpath for a STAGED bundle: the sidecar `postgresql.jar` is optional on a bundle that needs no driver (needsPostgresDriver), so
@@ -185,8 +181,7 @@ function main() {
             const lib = join(bundle, LIB_DIR);
             writeFileSync(join(lib, MODULES_LIST), renderList(listEntries(jars)));
             writeFileSync(join(lib, EDITION_FILE), renderEdition(edition, demo));
-            writeFileSync(join(lib, CORE_LIST), renderList(listEntries(coreClasspath())));
-            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} + ${CORE_LIST} in ${lib}`);
+            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} in ${lib}`);
         } else process.stdout.write(renderList(jars));
     } catch (e) {
         console.error(`offering-classpath: ${e.message}`);

@@ -349,7 +349,7 @@ export function staticFindings(ps1src) {
     if (open < 0) { out.push(`$${n} (the demo launcher here-string) was not found in package.ps1 — renamed? fix this guard.`); continue; }
     const body = ps1.slice(open, ps1.indexOf('\n"@\n', open));
     if (!body.includes('modules.list')) out.push(`${n} never reads modules.list — the demo launcher keeps its own jar list.`);
-    // LAUNCHER-SERVE-DEMO-JAVA-OPTS-1: the demo launcher honours INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS) like serve/run/ura,
+    // LAUNCHER-SERVE-DEMO-JAVA-OPTS-1: the demo launcher honours INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS) like serve/run,
     // appended before -cp (a JVM flag after it is a program argument).
     const optsAt = body.indexOf('INSPECTO_JAVA_OPTS');
     const cpAt = body.indexOf('-cp "');
@@ -453,7 +453,7 @@ function main() {
         ? `  scope: serve.sh + serve.bat both executed (Windows runner).`
         : `  scope: serve.sh executed; serve.bat NOT executed on ${process.platform} — it is covered here by ` +
           `the static rules only, and is proved by execution on a Windows runner.`) +
-      ` ura.sh/ura.bat (no sidecars at all) and serve-demo.* (static rules only) are not executed.`
+      ` serve-demo.* (static rules only) are not executed.`
     );
   } catch (e) {
     if (e instanceof Abort) { console.error(`✗ Launcher guard could not run: ${e.message}`); process.exit(2); }

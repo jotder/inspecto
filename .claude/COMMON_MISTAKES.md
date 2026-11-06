@@ -27,7 +27,7 @@ own output/scratch/marker space.
 **Symptom**: Native-access warnings/failure launching the JAR (DuckDB).
 **Check**: The `java` command line.
 **Fix**: Always launch with `java --enable-native-access=ALL-UNNAMED ...`. The bundled
-run/serve/ura scripts already include it.
+run/serve scripts already include it.
 
 ### 4. All output lands in `year=NULL/month=NULL/day=NULL`
 

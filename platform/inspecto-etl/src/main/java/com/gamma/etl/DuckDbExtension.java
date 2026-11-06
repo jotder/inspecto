@@ -18,7 +18,7 @@ import java.sql.Statement;
  *
  * <p>Two modes, chosen by whether {@code -Dduckdb.extension.dir} is set — and the split is the whole point:
  * <ul>
- *   <li><b>Staged (the bundle).</b> Every generated launcher ({@code serve}/{@code run}/{@code ura}) sets the
+ *   <li><b>Staged (the bundle).</b> Every generated launcher ({@code serve}/{@code run}) sets the
  *       flag to {@code duckdb-extensions/<platform>/}, which {@code inspecto/package.ps1} fills with the
  *       platform's binaries. The loader then issues exactly one statement,
  *       {@code LOAD '<dir>/<name>.duckdb_extension'}, and <b>nothing else</b>: not a bare {@code LOAD <name>}
