@@ -135,7 +135,7 @@ it), one `ReadWriteOnce` PVC mounted at `/app/spaces`, liveness on `GET /health`
 `GET /ready`, secret-backed environment via `envFrom` (an existing Secret, or one the chart creates from
 `secrets.values` for tests), and JVM-terminated TLS (`tls.enabled` mounts a keystore Secret and sets
 `HTTPS_KEYSTORE` / `HTTPS_KEYSTORE_PASSWORD`; probes switch to HTTPS). The image is the bundle's own
-Dockerfile, built and pushed by the operator.
+`deploy/Dockerfile`, built from the bundle root (`docker build -f deploy/Dockerfile .`) and pushed by the operator.
 
 **Security posture (operator 2026-09-29: non-root):** the pod runs as uid/gid **10001** (`runAsNonRoot`,
 `runAsUser`/`runAsGroup`/`fsGroup` 10001, `RuntimeDefault` seccomp), the container drops **ALL** capabilities,

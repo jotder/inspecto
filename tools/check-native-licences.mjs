@@ -95,7 +95,8 @@ const NATIVE = /.(dll|so|dylib|jnilib)$/i;
 const args = process.argv.slice(2);
 const jarArg = args.indexOf('--jar') >= 0 ? args[args.indexOf('--jar') + 1] : null;
 const bundleArg = args.indexOf('--bundle') >= 0 ? args[args.indexOf('--bundle') + 1] : null;
-const jar = jarArg ?? (bundleArg ? join(bundleArg, 'inspecto-intelligence.jar') : null);
+// BUNDLE-LAYOUT-1: a bundle's jars live in <bundle>/lib; its licence texts stay at <bundle>/licenses.
+const jar = jarArg ?? (bundleArg ? join(bundleArg, 'lib', 'inspecto-intelligence.jar') : null);
 if (jar) {
   if (!existsSync(jar)) { console.error(`check-native-licences: ${jar} not found`); process.exit(2); }
   const { entries, read } = zipEntries(jar);

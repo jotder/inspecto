@@ -187,16 +187,17 @@ jobs:
           INSPECTO_SIGNING_KEY: ${{ secrets.INSPECTO_SIGNING_KEY_ID }}
           INSPECTO_JARSIGN_STOREPASS: ${{ secrets.INSPECTO_JARSIGN_STOREPASS }}
         run: pwsh -NoProfile -File inspecto/package.ps1 -Edition Basic ${{ github.event_name == 'push' && '-Sign' || '' }} -RequireExtensions -DuckdbExtensionCache "$RUNNER_TEMP/duckdb-extensions" $SIGN_ARGS
-      # Examples smoke (EXAMPLES-STEPS-1): run one bundled example through the bundle's OWN runner against the
-      # packaged jar, so a runner that stops declaring -Dassist.safety.roots ("no allowed roots configured")
-      # fails the release instead of shipping. hello-csv is the minimum pipeline: CSV -> Parquet, 4 typed columns.
-      - name: Smoke - the bundled examples run against the packaged jar
+      # Examples smoke (EXAMPLES-STEPS-1): run one example through its runner against the jars this release built,
+      # so a runner that stops declaring -Dassist.safety.roots ("no allowed roots configured") fails the release.
+      # hello-csv is the minimum pipeline: CSV -> Parquet, 4 typed columns. BUNDLE-LAYOUT-1 (2026-11-06): examples no
+      # longer ship in the bundle; they stay in the repo (inspecto/examples/), whose runner resolves the build tree's jars.
+      - name: Smoke - the repo examples run against this build's jars
         run: |
           set -euo pipefail
-          bash inspecto-deploy/examples/run-example.sh 01-ingest/hello-csv --clean
-          n=$(find inspecto-deploy/examples/01-ingest/hello-csv/out/database -type f -name '*.parquet' | wc -l)
+          bash inspecto/examples/run-example.sh 01-ingest/hello-csv --clean
+          n=$(find inspecto/examples/01-ingest/hello-csv/out/database -type f -name '*.parquet' | wc -l)
           [ "$n" -gt 0 ] || { echo "::error::hello-csv ran but produced no parquet under out/database"; exit 1; }
-          rm -rf inspecto-deploy/examples/01-ingest/hello-csv/out
+          rm -rf inspecto/examples/01-ingest/hello-csv/out
       # EXAMPLES-JOBS-SMOKE-1 (2026-09-17). 🔴 The smoke above carries NO job config, and until this step
       # NOTHING automated — here or in ci.yml — ever ran one. That is how 06-serve/maintenance-library
       # shipped broken for part of 2026-09-16: `compact_job.toon` still said `dir: out/database` after
@@ -218,8 +219,8 @@ jobs:
       # ubuntu-latest; the runner is plain POSIX (curl + background java + kill), but if this step is
       # the one that goes red on the first tag, read out/logs/serve.err.log in the job output before
       # assuming the examples regressed.
-      - name: Smoke - a job-bearing example runs its jobs against the packaged jar
-        run: bash inspecto-deploy/examples/serve-example.sh 06-serve/maintenance-library --check-jobs --clean
+      - name: Smoke - a job-bearing example runs its jobs against this build's jars
+        run: bash inspecto/examples/serve-example.sh 06-serve/maintenance-library --check-jobs --clean
       # RELEASE-BUNDLE-PLATFORM-MISMATCH-1 / RELEASE-LINUX-ZIP-NEVER-PUBLISHED-1 (2026-09-17): package.ps1 now
       # emits one `inspecto-deploy-<platform>.zip` per target platform, named for the runtime it embeds.
       # These steps used to name only the `inspecto-deploy.zip*` trio — a HOST (Linux) image zipped with the
@@ -284,24 +285,28 @@ jobs:
               windows_amd64) grep -qx 'inspecto-deploy/runtime/bin/java.exe' <<<"$entries" || { echo "::error::$zip: no runtime/bin/java.exe"; exit 1; } ;;
               *) echo "::error::$zip: unknown platform suffix '$plat'"; exit 1 ;;
             esac
-            grep -q "^inspecto-deploy/duckdb-extensions/$plat/" <<<"$entries" || { echo "::error::$zip: no duckdb-extensions/$plat/"; exit 1; }
-            if grep '^inspecto-deploy/duckdb-extensions/' <<<"$entries" | grep -qv "^inspecto-deploy/duckdb-extensions/$plat/"; then
+            grep -q "^inspecto-deploy/lib/duckdb/$plat/" <<<"$entries" || { echo "::error::$zip: no lib/duckdb/$plat/"; exit 1; }
+            if grep '^inspecto-deploy/lib/duckdb/' <<<"$entries" | grep -qv "^inspecto-deploy/lib/duckdb/$plat/"; then
               echo "::error::$zip carries another platform's DuckDB extensions"; exit 1
             fi
             # RELEASE-LAUNCHERS-NOT-EXECUTABLE-1: a Linux zip built on this POSIX runner goes through Info-ZIP,
-            # which records POSIX modes; a customer's unzip must yield an executable serve.sh.
+            # which records POSIX modes; a customer's unzip must yield an executable bin/serve.sh.
             if [ "$plat" = linux_amd64 ]; then
-              unzip -Z "$zip" inspecto-deploy/serve.sh | grep -q '^-rwx' || { echo "::error::$zip: serve.sh is not executable in the archive"; exit 1; }
+              unzip -Z "$zip" inspecto-deploy/bin/serve.sh | grep -q '^-rwx' || { echo "::error::$zip: bin/serve.sh is not executable in the archive"; exit 1; }
               # package.ps1 chmods EVERY *.sh it stages (run.sh, serve.sh, serve-demo.sh, ura.sh, install-service.sh, ...);
               # assert each one present in this zip carries an executable mode, not just serve.sh.
               nonexec=$(unzip -Z "$zip" | awk '$NF ~ /\.sh$/ && substr($1,4,1) != "x" { print $NF }')
               [ -z "$nonexec" ] || { echo "::error::$zip: launcher(s) not executable in the archive: $nonexec"; exit 1; }
             fi
-            # The classpath/edition markers every launcher reads, and the per-module SBOMs, must be in the zip.
-            for need in modules.list core.list edition.properties; do
+            # The classpath/edition markers every launcher reads, and the per-module SBOMs, must be in the zip (BUNDLE-LAYOUT-1: in lib/,
+            # with the launchers in bin/ and nothing but README.md and folders at the root).
+            for need in lib/modules.list lib/core.list lib/edition.properties lib/inspecto.jar bin/serve.sh bin/serve.bat README.md; do
               grep -qx "inspecto-deploy/$need" <<<"$entries" || { echo "::error::$zip: no $need"; exit 1; }
             done
             grep -Eq '^inspecto-deploy/sbom/[^/]+\.sbom\.cdx\.json$' <<<"$entries" || { echo "::error::$zip: no sbom/*.sbom.cdx.json"; exit 1; }
+            stray=$(grep -E '^inspecto-deploy/[^/]+$' <<<"$entries" | grep -vx 'inspecto-deploy/README.md' || true)
+            [ -z "$stray" ] || { echo "::error::$zip: files at the bundle root besides README.md: $stray"; exit 1; }
+            ! grep -q '^inspecto-deploy/examples/' <<<"$entries" || { echo "::error::$zip: ships examples/ (they stay in the repo)"; exit 1; }
           done
           ls -la
 
@@ -325,7 +330,7 @@ jobs:
           for z in release/*.zip; do
             d=$(mktemp -d)
             unzip -q "$z" -d "$d"
-            node tools/check-jar-signatures.mjs "$d/inspecto-deploy"
+            node tools/check-jar-signatures.mjs "$d/inspecto-deploy/lib"
             rm -rf "$d"
           done
 

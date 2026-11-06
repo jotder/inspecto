@@ -146,9 +146,9 @@ jobs:
         run: node tools/check-doc-links.mjs
 
       # Bundle-doc-link guard (2026-09-25, BUNDLE-DANGLING-LINKS-1). The guard above proves links resolve
-      # IN THE REPO; this one proves they resolve in the BUNDLE the customer unzips, which withholds two doc
-      # trees + two files and carries no source tree. Simulated mode (no pwsh, no build): the bundle's file
-      # set from git ls-files + the exclusion lists parsed out of package.ps1, with the package-time rewrite
+      # IN THE REPO; this one proves they resolve in the BUNDLE the customer unzips, which ships only step 7's
+      # allow-list of docs (BUNDLE-LAYOUT-1) and carries no source tree. Simulated mode (no pwsh, no build): the bundle's
+      # file set from git ls-files + the $docsShipped allow-list parsed out of package.ps1, with the package-time rewrite
       # (tools/bundle-doc-rewrite.mjs, the one step 7 runs) applied. Wired once that rewrite covered every
       # class it can decide; what still fails is a link whose target exists nowhere — real rot.
       - name: Guard — every link in a shipped doc resolves inside the bundle

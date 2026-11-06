@@ -471,10 +471,10 @@ Basic and Standard never bundle the module and behave byte-identically. Build/te
 Advanced bundle, closing the last gap between "the profile builds" and "an operator can ship it". It is
 a **superset of Standard** (mirroring the profile relation), so it builds `inspecto-oidc` *and*
 `inspecto-policy` under `-Pedition-advanced` and bundles both `inspecto-oidc.jar` and
-`inspecto-policy.jar`. The generated `serve.sh`/`serve.bat` read the edition from the bundle's
-`edition.properties` (P3d, 2026-10-08 — they used to sniff jar presence: security jar ⇒ `Standard`,
+`inspecto-policy.jar`. The generated `bin/serve.sh`/`bin\serve.bat` read the edition from the bundle's
+`lib/edition.properties` (P3d, 2026-10-08 — they used to sniff jar presence: security jar ⇒ `Standard`,
 plus policy jar ⇒ `Advanced`; that heuristic survives only as the fallback for a hand-assembled directory)
-and every edition above Basic gets `-Dauth.mode=oidc`; the classpath is the bundle's `modules.list`,
+and every edition above Basic gets `-Dauth.mode=oidc`; the classpath is the bundle's `lib/modules.list`,
 written by `tools/offering-classpath.mjs` from the Offering. **No new runtime flag exists or is needed** — `inspecto-policy` is found
 solely through `META-INF/services/com.gamma.spi.auth.AccessDecider`, so the classpath entry *is* the
 switch. Basic bundles remain byte-for-byte unchanged. Since 2026-09-29 (`ASSURE-INTELLIGENCE-BUNDLE-1`)

@@ -47,10 +47,10 @@
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, chmodSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { classpath, renderList, renderEdition } from './offering-classpath.mjs';
+import { classpath, listEntries, renderList, renderEdition } from './offering-classpath.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PACKAGE_PS1 = join(ROOT, 'inspecto', 'package.ps1');
@@ -82,15 +82,23 @@ const toLf = (s) => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 const asBatBytes = (s) => Buffer.from(
   toLf(s).replace(/\n/g, '\r\n').replace(/[^\x00-\x7F]/g, '?'), 'latin1');
 
+// BUNDLE-LAYOUT-1: the launchers live in <bundle>/bin and cd to the bundle root; jars, the lists and the marker live in <bundle>/lib.
+// The stub java gets a directory of its own (`.stub`), so it can never be mistaken for a shipped bin/ entry.
 function makeBundle(dir, scenario) {
   rmSync(dir, { recursive: true, force: true });
-  mkdirSync(join(dir, 'bin'), { recursive: true });
-  for (const jar of scenario.jars) writeFileSync(join(dir, jar), '');
-  // Exactly what package.ps1 step 3a-ter has the generator write: LF-only list, one jar per line, plus the edition marker.
-  if (!scenario.noList) writeFileSync(join(dir, 'modules.list'), renderList(scenario.list));
-  if (!scenario.noMarker) writeFileSync(join(dir, 'edition.properties'), scenario.markerText ?? renderEdition(scenario.edition));
+  for (const d of ['bin', 'lib', '.stub']) mkdirSync(join(dir, d), { recursive: true });
+  for (const jar of scenario.jars) writeFileSync(join(dir, 'lib', jar), '');
+  // Exactly what package.ps1 step 3a-ter has the generator write: LF-only list of root-relative lib/<jar> entries, plus the edition marker.
+  if (!scenario.noList) writeFileSync(join(dir, 'lib', 'modules.list'), renderList(listEntries(scenario.list)));
+  if (!scenario.noMarker) writeFileSync(join(dir, 'lib', 'edition.properties'), scenario.markerText ?? renderEdition(scenario.edition));
   return dir;
 }
+
+// Launchers are started from the PARENT of the bundle by a relative path (`<bundle>/bin/serve.sh`), never from the root:
+// what is proved is that a launcher finds lib/, spaces/ and ui/ whatever the caller's working directory.
+const launch = (kind, dir, script, args = []) => kind === 'sh'
+  ? ['bash', [`${basename(dir)}/bin/${script}.sh`, ...args]]
+  : ['cmd', ['/c', `.\\${basename(dir)}\\bin\\${script}.bat`, ...args]];
 
 // The stub `java`. serve.sh builds a real argv ARRAY, so its stub prints one entry per line.
 // serve.bat cannot: cmd.exe builds ONE command line and the JVM's own tokenizer splits it on
@@ -101,16 +109,16 @@ function installStubJava(dir) {
   if (IS_WINDOWS) {
     // cmd.exe resolves a bare `java` per PATH directory across PATHEXT, so `java.bat` in a directory
     // that holds no java.exe wins.
-    writeFileSync(join(dir, 'bin', 'java.bat'), '@echo off\r\necho ARGVLINE:%*\r\n', 'latin1');
+    writeFileSync(join(dir, '.stub', 'java.bat'), '@echo off\r\necho ARGVLINE:%*\r\n', 'latin1');
   }
   const sh = '#!/usr/bin/env bash\nfor a in "$@"; do printf "ARGV:%s\\n" "$a"; done\n';
-  writeFileSync(join(dir, 'bin', 'java'), sh);
-  chmodSync(join(dir, 'bin', 'java'), 0o755);
+  writeFileSync(join(dir, '.stub', 'java'), sh);
+  chmodSync(join(dir, '.stub', 'java'), 0o755);
 }
 
 function runLauncher(kind, dir, env, allowFail) {
   const pathSep = IS_WINDOWS ? ';' : ':';
-  const childEnv = { ...process.env, ...env, PATH: join(dir, 'bin') + pathSep + process.env.PATH };
+  const childEnv = { ...process.env, ...env, PATH: join(dir, '.stub') + pathSep + process.env.PATH };
   // Never inherit the operator's own OIDC/JVM settings into a scenario that must NOT see them.
   for (const k of ['AUTH_OIDC_ISSUER', 'AUTH_OIDC_JWKS_URI', 'AUTH_OIDC_AUDIENCE', 'AUTH_OIDC_CLIENT_ID',
     'AUTH_OIDC_PROVIDER', 'AUTH_OIDC_DISCOVERY_URL', 'AUTH_OIDC_CLIENT_SECRET', 'INSPECTO_JAVA_OPTS', 'EXTRA_JAVA_OPTS', 'INSPECTO_DB_URL', 'PORT',
@@ -119,9 +127,9 @@ function runLauncher(kind, dir, env, allowFail) {
   }
   // `.\serve.bat`, not `serve.bat`: a machine with NoDefaultCurrentDirectoryInExePath set does not
   // search the working directory, and the failure reads as "not recognized as an internal command".
-  const [cmd, args] = kind === 'sh' ? ['bash', ['serve.sh']] : ['cmd', ['/c', '.\\serve.bat']];
+  const [cmd, args] = launch(kind, dir, 'serve');
   try {
-    return { status: 0, out: execFileSync(cmd, args, { cwd: dir, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) };
+    return { status: 0, out: execFileSync(cmd, args, { cwd: dirname(dir), env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) {
     if (e.code === 'ENOENT') abort(`\`${cmd}\` is not on PATH. serve.sh must be EXECUTED, not skipped.`);
     if (allowFail && typeof e.status === 'number') return { status: e.status, out: `${e.stdout || ''}${e.stderr || ''}` };
@@ -139,7 +147,8 @@ function observe(out) {
   const cpAt = argv.indexOf('-cp');
   const edition = (out.match(/edition: (\w+)/) || [])[1] || '(none printed)';
   if (cpAt < 0 || cpAt === argv.length - 1) return { argv, jars: null, edition, raw: out };
-  return { argv, jars: argv[cpAt + 1].replace(/^"|"$/g, '').split(/[;:]/).filter(Boolean), edition, raw: out };
+  // `\` -> `/`: a bat fallback globs lib\*.jar, the generated list says lib/<jar>; both are the same path to the JVM.
+  return { argv, jars: argv[cpAt + 1].replace(/^"|"$/g, '').split(/[;:]/).filter(Boolean).map((j) => j.replace(/\\/g, '/')), edition, raw: out };
 }
 
 // ── scenarios ─────────────────────────────────────────────────────────────────────────────────
@@ -160,7 +169,7 @@ const OIDC_ENV = {
   AUTH_OIDC_CLIENT_SECRET: 'example-value-that-must-never-be-passed',
 };
 const ALWAYS = ['--enable-native-access=ALL-UNNAMED', '-Dcontrol.port=8080', '-Dspaces.root=spaces'];
-const ed = (edition, extra) => ({ edition, jars: CP[edition], list: CP[edition], jarsOnCp: CP[edition], ...extra });
+const ed = (edition, extra) => ({ edition, jars: CP[edition], list: CP[edition], jarsOnCp: listEntries(CP[edition]), ...extra });
 
 export const SCENARIOS = [
   ed('Basic', {
@@ -269,8 +278,9 @@ function check(kind, scenario, got, status) {
     if (got.jars) {
       if (scenario.jarsOnCpSet) {
         // fallback: inspecto.jar first, then exactly the jars present (any order)
-        if (got.jars[0] !== 'inspecto.jar') problems.push(`fallback classpath must start with inspecto.jar, got [${got.jars.join(' ')}]`);
-        if ([...got.jars].sort().join(' ') !== [...scenario.jars].sort().join(' ')) problems.push(`fallback classpath is [${[...got.jars].sort().join(' ')}], expected every staged jar [${[...scenario.jars].sort().join(' ')}]`);
+        const staged = listEntries(scenario.jars);
+        if (got.jars[0] !== 'lib/inspecto.jar') problems.push(`fallback classpath must start with lib/inspecto.jar, got [${got.jars.join(' ')}]`);
+        if ([...got.jars].sort().join(' ') !== [...staged].sort().join(' ')) problems.push(`fallback classpath is [${[...got.jars].sort().join(' ')}], expected every staged jar [${[...staged].sort().join(' ')}]`);
       } else if (got.jars.join(' ') !== scenario.jarsOnCp.join(' ')) {
         // ORDER-SENSITIVE: the launcher's classpath must BE modules.list, which is the generator's list for the edition.
         problems.push(`classpath is\n      [${got.jars.join(' ')}]\n    expected exactly the Offering's modules.list\n      [${scenario.jarsOnCp.join(' ')}]`);
@@ -326,7 +336,7 @@ export function staticFindings(ps1src) {
     const handKept = [
       ...body.matchAll(/^.*\[ -f \S+\.jar \]\s*&&\s*CP="\$\{CP\}:\S+\.jar".*$/gm),
       ...body.matchAll(/^.*if exist \S+\.jar set "CP=%CP%;\S+\.jar".*$/gm),
-      ...body.matchAll(/^.*CP="inspecto\.jar:inspecto-\S+\.jar".*$/gm),
+      ...body.matchAll(/^.*CP="(?:lib\/)?inspecto\.jar:(?:lib\/)?inspecto-\S+\.jar".*$/gm),
     ];
     if (handKept.length) out.push(`${label} appends a NAMED jar to CP (${handKept[0][0].trim().slice(0, 90)}) — read modules.list instead.`);
   }
@@ -363,8 +373,8 @@ export function runScenarios(ps1src, scenarios = SCENARIOS) {
       scenarios.forEach((scenario, i) => {
         const dir = makeBundle(join(work, `${kind}-${i}`), scenario);
         installStubJava(dir);
-        if (kind === 'sh') writeFileSync(join(dir, 'serve.sh'), toLf(serveSh));
-        else writeFileSync(join(dir, 'serve.bat'), asBatBytes(serveBat));
+        if (kind === 'sh') writeFileSync(join(dir, 'bin', 'serve.sh'), toLf(serveSh));
+        else writeFileSync(join(dir, 'bin', 'serve.bat'), asBatBytes(serveBat));
         const r = runLauncher(kind, dir, scenario.env, !!scenario.refuses);
         const problem = check(kind, scenario, scenario.refuses && r.status !== 0 && !r.out.includes('ARGV') ? { argv: [], jars: null, edition: '', raw: r.out } : observe(r.out), r.status);
         if (problem) findings.push(problem);
@@ -397,13 +407,13 @@ export function runOneShot(ps1src, editions = ['Basic', 'Standard', 'Advanced'])
         installStubJava(dir);
         mkdirSync(join(dir, 'spaces', 's', 'config', 'a'), { recursive: true });
         writeFileSync(join(dir, 'spaces', 's', 'config', 'a', 'a_pipeline.toon'), 'id: a\n');
-        if (kind === 'sh') writeFileSync(join(dir, 'run.sh'), toLf(runSh));
-        else writeFileSync(join(dir, 'run.bat'), asBatBytes(runBat));
-        const [cmd, args] = kind === 'sh' ? ['bash', ['run.sh', 'a']] : ['cmd', ['/c', '.\\run.bat', 'a']];
+        if (kind === 'sh') writeFileSync(join(dir, 'bin', 'run.sh'), toLf(runSh));
+        else writeFileSync(join(dir, 'bin', 'run.bat'), asBatBytes(runBat));
+        const [cmd, args] = launch(kind, dir, 'run', ['a']);
         const pathSep = IS_WINDOWS ? ';' : ':';
         let out;
         try {
-          out = execFileSync(cmd, args, { cwd: dir, env: { ...process.env, PATH: join(dir, 'bin') + pathSep + process.env.PATH }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+          out = execFileSync(cmd, args, { cwd: dirname(dir), env: { ...process.env, PATH: join(dir, '.stub') + pathSep + process.env.PATH }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
         } catch (e) {
           if (e.code === 'ENOENT') abort(`\`${cmd}\` is not on PATH. run.sh must be EXECUTED, not skipped.`);
           abort(`run.${kind} exited ${e.status}:\n${e.stdout || ''}${e.stderr || ''}`);
@@ -411,7 +421,7 @@ export function runOneShot(ps1src, editions = ['Basic', 'Standard', 'Advanced'])
         const got = observe(out);
         const where = `run.${kind} · ${edition}`;
         if (!got.jars) findings.push(`${where}: the launcher passed no \`-cp\``);
-        else if (got.jars.join(' ') !== CP[edition].join(' ')) findings.push(`${where}: classpath is\n      [${got.jars.join(' ')}]\n    expected exactly the Offering's modules.list\n      [${CP[edition].join(' ')}]`);
+        else if (got.jars.join(' ') !== listEntries(CP[edition]).join(' ')) findings.push(`${where}: classpath is\n      [${got.jars.join(' ')}]\n    expected exactly the Offering's modules.list\n      [${listEntries(CP[edition]).join(' ')}]`);
         if (!got.argv.includes('com.gamma.inspector.CollectorProcessor')) findings.push(`${where}: CollectorProcessor was not the main class`);
       }
     }

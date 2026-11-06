@@ -146,7 +146,7 @@ class ObjectsBackendEditionBootTest {
     @Test
     void demoLauncherJars_areReadFromTheGeneratedModulesList() throws Exception {
         String ps1 = Files.readString(Path.of("..", "..", "inspecto", "package.ps1"));
-        assertTrue(ps1.contains("$demoJars = @(Get-Content (Join-Path $bundleDir 'modules.list')"),
+        assertTrue(ps1.contains("$demoJars = @(Get-Content (Join-Path $libDir 'modules.list')"),
                 "package.ps1 must derive the demo jars from the generated modules.list, not a literal");
         assertTrue(ps1.contains("--demo") && ps1.contains("offering-classpath.mjs"),
                 "the demo bundle's modules.list must come from offering-classpath.mjs --demo");

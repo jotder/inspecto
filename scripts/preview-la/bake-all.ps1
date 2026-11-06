@@ -54,10 +54,11 @@ try {
 
     # 2. boot the demo bundle against that one spaces root
     $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0); $l.Start(); $Port = $l.LocalEndpoint.Port; $l.Stop()
-    $mods = @(Get-Content (Join-Path $Bundle 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    # BUNDLE-LAYOUT-1: the list lives in lib\ and names each jar as a root-relative lib/<jar> path.
+    $mods = @(Get-Content (Join-Path $Bundle 'lib\modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     $cp = ($mods | ForEach-Object { Join-Path $Bundle $_ }) -join ';'
     $jvm = @('--enable-native-access=ALL-UNNAMED', '-Dcontrol.bind=127.0.0.1', '-Dauth.mode=demo', '-Dobjects.backend=db', '-Devents.backend=parquet', '-Djobs.backend=duckdb', '-Dla.embed.enabled=true', "-Dcontrol.port=$Port", '-Dspaces.root=spaces')
-    $ext = Join-Path $Bundle 'duckdb-extensions\windows_amd64'; if (Test-Path $ext) { $jvm += "-Dduckdb.extension.dir=$ext" }
+    $ext = Join-Path $Bundle 'lib\duckdb\windows_amd64'; if (Test-Path $ext) { $jvm += "-Dduckdb.extension.dir=$ext" }
     $java = Join-Path $Bundle 'runtime\bin\java.exe'
     $log = Join-Path $work 'server.log'
     $proc = Start-BakeServer -Java $java -JvmArgs ($jvm + @('-cp', $cp, 'com.gamma.control.ControlApi')) -WorkDir $work -Log $log

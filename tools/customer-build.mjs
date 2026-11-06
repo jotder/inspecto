@@ -135,7 +135,8 @@ export function templateNeeds(root, manifests) {
 
 /** Copy an Edition bundle and trim it to the resolution. Returns a summary; throws on a bundle that does not match. */
 export function trimBundle(src, dest, customer, r) {
-    const props = readFileSync(join(src, 'edition.properties'), 'utf8');
+    // BUNDLE-LAYOUT-1: jars, modules.list and edition.properties live in <bundle>/lib; list entries are root-relative lib/<jar>.
+    const props = readFileSync(join(src, 'lib', 'edition.properties'), 'utf8');
     const ed = /^edition=(.+)$/m.exec(props)?.[1].trim().toLowerCase();
     if (ed !== customer.edition) throw new Error(`bundle ${src} is edition '${ed}', the customer's Edition is '${customer.edition}'`);
     rmSync(dest, { recursive: true, force: true });
@@ -143,18 +144,18 @@ export function trimBundle(src, dest, customer, r) {
     const jars = [];
     for (const m of r.removed) {
         const jar = `inspecto-${m}.jar`;
-        if (!existsSync(join(dest, jar))) throw new Error(`bundle has no ${jar} for removed module '${m}'`);
-        rmSync(join(dest, jar)); rmSync(join(dest, 'sbom', `inspecto-${m}.sbom.cdx.json`), { force: true }); jars.push(jar);
+        if (!existsSync(join(dest, 'lib', jar))) throw new Error(`bundle has no lib/${jar} for removed module '${m}'`);
+        rmSync(join(dest, 'lib', jar)); rmSync(join(dest, 'sbom', `inspecto-${m}.sbom.cdx.json`), { force: true }); jars.push(jar);
     }
-    const ml = join(dest, 'modules.list');
-    writeFileSync(ml, readFileSync(ml, 'utf8').split(/\r?\n/).filter((l) => l && !jars.includes(l.trim())).join('\n') + '\n');
+    const ml = join(dest, 'lib', 'modules.list');
+    writeFileSync(ml, readFileSync(ml, 'utf8').split(/\r?\n/).filter((l) => l && !jars.includes(l.trim().replace(/^lib\//, ''))).join('\n') + '\n');
     const tdir = join(dest, 'spaces', '_templates');
     const templates = [];
     if (existsSync(tdir)) for (const t of listDirs(tdir)) {
         if (r.packs.includes(t) || !existsSync(join(tdir, t))) continue;
         rmSync(join(tdir, t), { recursive: true }); templates.push(t);
     }
-    writeFileSync(join(dest, 'edition.properties'), props.trimEnd() + `\ncustomer=${customer.id}\noffering=customer-${customer.id}\n`);
+    writeFileSync(join(dest, 'lib', 'edition.properties'), props.trimEnd() + `\ncustomer=${customer.id}\noffering=customer-${customer.id}\n`);
     writeFileSync(join(dest, `customer-${customer.id}.toon`), r.offering);
     writeFileSync(join(dest, 'customer-bom.csv'), bomCsv(r.bom, { prices: false }));
     return { jars, templates };

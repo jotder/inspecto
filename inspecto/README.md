@@ -211,8 +211,23 @@ A working sample: `spaces/ucc/config/voucher/voucher_pipeline.toon`.
 > config paths that no longer existed, so they could only fail. `--enable-native-access=ALL-UNNAMED`
 > is required (DuckDB JNI) and is easy to lose when copying the shorter form.
 
-> The deploy bundle produced by `package.ps1` ships a generic `run.sh <adapter>` /
-> `run.bat <adapter>` that resolves `config/<adapter>/*_pipeline.toon` automatically.
+> The deploy bundle produced by `package.ps1` ships a generic `bin/run.sh <adapter>` /
+> `bin\run.bat <adapter>` that resolves `spaces/*/config/<adapter>/*_pipeline.toon` automatically.
+
+### The deploy bundle's layout
+
+An unzipped bundle holds `README.md` and folders only. Every launcher in `bin/` changes to the bundle
+root (the parent of `bin/`) before it starts Java, so it works from any directory.
+
+| Folder | Holds |
+|---|---|
+| `bin/` | `serve.bat` / `serve.sh`, `run.bat` / `run.sh`, `ura.bat` / `ura.sh`, `install-service.ps1` / `install-service.sh` |
+| `lib/` | every jar, `modules.list` / `core.list` (the classpath, as `lib/<jar>` lines), `edition.properties`, `duckdb/<platform>/` extensions |
+| `deploy/` | `Dockerfile` + `Dockerfile.dockerignore` (build from the root: `docker build -f deploy/Dockerfile -t inspecto .`), `inspecto.service` (systemd) |
+| `logs/` | captured launcher output (the Windows service writes `logs/service.log`) |
+| `runtime/` `ui/` `spaces/` `docs/` `sbom/` `licenses/` | the embedded JVM, the web console, your Spaces, the operator docs, the SBOMs, third-party licence texts |
+
+The worked examples are not in the bundle: they live in the repository under `inspecto/examples/`.
 
 ## 4. Drop files & run (the steady state)
 
@@ -335,14 +350,14 @@ in the tree describes the flag as *removed*, which is true and deliberately left
 
 ```bash
 # Prod: serve the bundled SPA from the deploy bundle (package.ps1 puts it in ./ui)
-bash serve.sh            # → http://localhost:8080/  (Linux)
-serve.bat                # Windows
+bash bin/serve.sh        # → http://localhost:8080/  (Linux; from any directory)
+bin\serve.bat            # Windows
 
 # Extra JVM flags for a packaged bundle: INSPECTO_JAVA_OPTS (fallback EXTRA_JAVA_OPTS).
 # Whitespace-separated, appended AFTER the launcher's own flags, so the mandatory ones
 # (--enable-native-access=ALL-UNNAMED, -Dcontrol.port, -Dspaces.root, auth) can't be clobbered.
 # Do NOT use JAVA_OPTS: the launchers ASSIGN that name, so it is silently discarded.
-INSPECTO_JAVA_OPTS="-Xmx4g" bash serve.sh
+INSPECTO_JAVA_OPTS="-Xmx4g" bash bin/serve.sh
 
 # Dev: run the SPA on :4204 with a live backend (CORS + proxy)
 java -Dcontrol.cors=http://localhost:4204 \
@@ -361,27 +376,27 @@ gracefully when the agent module is absent). Full screen-by-screen walkthrough:
 
 ## 9c. Run it as an OS service
 
-`serve.sh` / `serve.bat` run in the foreground: close the shell and the service stops, and **nothing
+`bin/serve.sh` / `bin\serve.bat` run in the foreground (their output goes to the console, not to a file): close the shell and the service stops, and **nothing
 brings it back if the process dies**. Recovery from process death in this product is *restart*, not
 failover, so the service wrapper **is** the recovery mechanism. Every bundle carries one per platform
 (`SCR-3`).
 
 ```bash
 # Linux (systemd) — installs /etc/systemd/system/inspecto.service, enables it, starts it
-sudo ./install-service.sh                 # --user <account>  --name <service>  --uninstall
+sudo bin/install-service.sh               # --user <account>  --name <service>  --uninstall
 systemctl status inspecto
 journalctl -u inspecto -f
 ```
 
 ```powershell
 # Windows — from an ELEVATED PowerShell, inside the bundle
-.\install-service.ps1                     # -Name Inspecto   -Uninstall
+.\bin\install-service.ps1                 # -Name Inspecto   -Uninstall
 Get-ScheduledTask -TaskName Inspecto | Get-ScheduledTaskInfo
 Get-Content .\logs\service.log -Tail 50    # a task has no console: serve.bat output lands here
 ```
 
-Configuration stays where it already was: the systemd unit reads `inspecto.env` beside the launcher
-(seeded on first install, mode 600), which carries the same `PORT` / `SPACES_ROOT` / `AUTH_OIDC_*` /
+Configuration stays where it already was: the systemd unit (`deploy/inspecto.service`) reads `inspecto.env` at the
+bundle root (seeded on first install, mode 600), which carries the same `PORT` / `SPACES_ROOT` / `AUTH_OIDC_*` /
 `INSPECTO_JAVA_OPTS` variables a shell launch uses. The unit adds no configuration surface of its own.
 
 **Verify recovery rather than assuming it** — a wrapper that was never exercised is not a recovery

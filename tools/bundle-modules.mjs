@@ -25,6 +25,12 @@
 /** The third-party JDBC sidecar package.ps1 stages for Standard and Advanced (PG-1). */
 export const PG_SIDECAR = 'postgresql.jar';
 
+/**
+ * BUNDLE-LAYOUT-1 (operator 2026-11-06): every jar of a bundle - and modules.list / core.list / edition.properties - lives in
+ * `<bundle>/lib/`. A jar's identity (bundleFile, the SBOM names) stays the bare file name; only paths join this directory.
+ */
+export const LIB_DIR = 'lib';
+
 // Preview is not a customer-facing tier (operator decision 2026-09-21): it exists for testing/
 // incubation and bundles EVERY optional module unconditionally — see bundleModules() below, which
 // gives it a dedicated branch instead of a 'from' floor so a brand-new module needs no edit here to

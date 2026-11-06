@@ -16,10 +16,11 @@ const FIRST = (a) => `pkg:maven/com.gamma.inspector/${a}@9.9.9`;
 /** A fake staged bundle: a thin core jar (one dep), a shaded sidecar (two deps), the processor, postgresql.jar; + the combined SBOM. */
 function fixture() {
     const dir = mkdtempSync(join(tmpdir(), 'sbom-modules-'));
+    mkdirSync(join(dir, 'lib'));   // BUNDLE-LAYOUT-1: jars + lists live in <bundle>/lib; list entries are root-relative lib/<jar>
     const jars = { 'inspecto.jar': 'proc', 'inspecto-util.jar': 'util', 'inspecto-connectors.jar': 'conn', 'postgresql.jar': 'pg' };
-    for (const [f, body] of Object.entries(jars)) writeFileSync(join(dir, f), body);
-    writeFileSync(join(dir, 'modules.list'), Object.keys(jars).join('\n') + '\n');
-    writeFileSync(join(dir, 'edition.properties'), 'edition=Standard\n');
+    for (const [f, body] of Object.entries(jars)) writeFileSync(join(dir, 'lib', f), body);
+    writeFileSync(join(dir, 'lib', 'modules.list'), Object.keys(jars).map((j) => `lib/${j}`).join('\n') + '\n');
+    writeFileSync(join(dir, 'lib', 'edition.properties'), 'edition=Standard\n');
     const a = comp('a'), b = comp('b'), c = comp('c');
     const pg = comp('postgresql', { group: 'org.postgresql', purl: 'pkg:maven/org.postgresql/postgresql@42.0' , version: '42.0', sha256: sha('pg') });
     const byPurl = new Map([a, b, c, pg].map((x) => [x.purl, x]));
@@ -68,8 +69,8 @@ test('RED: a jar on modules.list without a per-module SBOM', () => withFixture((
 }));
 
 test('RED: a hash mismatch (the jar changed after its SBOM was written)', () => withFixture(({ dir }) => {
-    writeFileSync(join(dir, 'inspecto-util.jar'), 'tampered');
-    assert.match(verifyPerModule(dir).join('\n'), /inspecto-util\.sbom\.cdx\.json: root SHA-256 .* is not the staged inspecto-util\.jar's/);
+    writeFileSync(join(dir, 'lib', 'inspecto-util.jar'), 'tampered');
+    assert.match(verifyPerModule(dir).join('\n'), /inspecto-util\.sbom\.cdx\.json: root SHA-256 .* is not the staged lib\/inspecto-util\.jar's/);
 }));
 
 test('RED: a third-party component that the combined SBOM does not carry', () => withFixture(({ dir }) => {
@@ -101,16 +102,16 @@ test('RED: a dependencies entry that does not match the components', () => withF
 }));
 
 test('the demo variant needs no SBOM for the swapped-in demo jar', () => withFixture(({ dir }) => {
-    writeFileSync(join(dir, 'inspecto-demo-auth.jar'), 'demo');
-    writeFileSync(join(dir, 'modules.list'), readFileSync(join(dir, 'modules.list'), 'utf8') + 'inspecto-demo-auth.jar\n');
+    writeFileSync(join(dir, 'lib', 'inspecto-demo-auth.jar'), 'demo');
+    writeFileSync(join(dir, 'lib', 'modules.list'), readFileSync(join(dir, 'lib', 'modules.list'), 'utf8') + 'lib/inspecto-demo-auth.jar\n');
     assert.match(verifyPerModule(dir).join('\n'), /inspecto-demo-auth\.jar is on modules\.list but has no per-module SBOM/);
-    writeFileSync(join(dir, 'edition.properties'), 'edition=Standard\nvariant=demo\n');
+    writeFileSync(join(dir, 'lib', 'edition.properties'), 'edition=Standard\nvariant=demo\n');
     assert.deepEqual(verifyPerModule(dir), []);
 }));
 
 test('RED: modules.list or the combined SBOM is missing', () => withFixture(({ dir }) => {
     rmSync(join(dir, 'sbom', 'inspecto-standard.cdx.json'));
     assert.match(verifyPerModule(dir).join('\n'), /combined SBOM .* is missing/);
-    rmSync(join(dir, 'modules.list'));
+    rmSync(join(dir, 'lib', 'modules.list'));
     assert.match(verifyPerModule(dir).join('\n'), /modules\.list is missing/);
 }));

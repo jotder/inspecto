@@ -289,7 +289,8 @@ pwsh -File inspecto\package.ps1 -Edition Advanced  # + security AND inspecto-pol
 ```
 
 Advanced is a **superset** of Standard, matching `-Pedition-advanced` = `edition-standard` + policy;
-`serve.sh`/`serve.bat` auto-detect the edition from which jars are in the bundle. Default build (no
+`bin/serve.sh`/`bin/serve.bat` read the edition from the bundle's `lib/edition.properties` (BUNDLE-LAYOUT-1: launchers in `bin/`,
+jars + lists in `lib/`, root = README.md + folders). Default build (no
 `-Edition`) is Basic-equivalent.
 
 ### Two-target (Windows + Linux) embedded runtime — GraalVM cache location matters
@@ -327,7 +328,7 @@ java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=<abs path to spac
      inspecto\config\voucher\voucher_unknown_pipeline.toon
 
 # Long-running control plane + UI (ControlApi, default :8080)
-.\inspecto-deploy\serve.bat               # then http://localhost:8080/
+.\inspecto-deploy\bin\serve.bat               # then http://localhost:8080/
 ```
 
 ## UI (Angular SPA — inspecto-ui/)

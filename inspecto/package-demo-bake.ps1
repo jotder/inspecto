@@ -77,7 +77,7 @@ function Invoke-DemoSpaceBake {
         [Parameter(Mandatory)][string]$RepoRoot,      # holds tools/seed-la-showcase.mjs
         [Parameter(Mandatory)][string]$BundleDir,     # the staged bundle (spaces/ is written here)
         [Parameter(Mandatory)][string]$Java,          # the bundle's java (embedded runtime when present)
-        [Parameter(Mandatory)][string[]]$ModuleJars,  # modules.list entries, classpath order
+        [Parameter(Mandatory)][string[]]$ModuleJars,  # modules.list entries (root-relative lib/<jar>), classpath order
         [Parameter(Mandatory)][string[]]$DemoFlags,   # the serve-demo JVM flags
         [int]$Port = 0                                # 0 = any free loopback port
     )
@@ -104,7 +104,7 @@ function Invoke-DemoSpaceBake {
         $plat = if ($sep -eq ';') { 'windows_amd64' } else { 'linux_amd64' }
         $cp = ($ModuleJars | ForEach-Object { Join-Path $BundleDir $_ }) -join $sep
         $jvm = @($DemoFlags) + @("-Dcontrol.port=$Port", "-Dspaces.root=spaces")
-        $ext = Join-Path $BundleDir "duckdb-extensions/$plat"
+        $ext = Join-Path $BundleDir "lib/duckdb/$plat"
         if (Test-Path $ext) { $jvm += "-Dduckdb.extension.dir=$ext" }
         $log = Join-Path $work 'server.log'
         Write-Host "Demo bake: booting the staged bundle on 127.0.0.1:$Port with a scaffolded la-showcase ..." -ForegroundColor Cyan
@@ -155,7 +155,7 @@ function Invoke-DemoSpaceBake {
         # EVERY DuckDB file goes through the rebase (their strings are compressed, so a byte scan cannot decide which ones need it).
         $pairArgs = $pairs | ForEach-Object { $_[0]; $_[1] }
         foreach ($f in Get-ChildItem -Path $baked -Recurse -File | Where-Object { $_.Extension -in '.db', '.duckdb' }) {
-            & java --enable-native-access=ALL-UNNAMED -cp (Join-Path $BundleDir 'inspecto.jar') $rebaseJava $f.FullName @pairArgs | Out-Host
+            & java --enable-native-access=ALL-UNNAMED -cp (Join-Path $BundleDir 'lib/inspecto.jar') $rebaseJava $f.FullName @pairArgs | Out-Host
             if ($LASTEXITCODE -ne 0) { $keep = $true; throw "demo bake: rebasing $($f.Name) failed (exit $LASTEXITCODE); temp root kept: $work" }
         }
         foreach ($f in @(& $findHits $baked)) {

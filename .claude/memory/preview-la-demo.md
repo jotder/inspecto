@@ -39,6 +39,14 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
 - **Full redeploy:** worktree at origin/master, `npm ci --offline`, `package.ps1 -Edition Preview -Ui la-app`
   (~15 min); stop :8080; back up to `inspecto-preview\backup\predeploy-<stamp>`; robocopy over with `/XD spaces`;
   refresh only `spaces\_templates`; keep `serve-preview-la.bat`, the WSO2 setup script, `runtime-natives`, all Spaces.
+- **BUNDLE-LAYOUT-1 (2026-11-06) changed the install layout:** the root now holds `README.md` + folders only — launchers in
+  `bin\` (`bin\serve.bat`, `bin\serve-demo.bat`, `bin\run.bat`, `bin\ura.bat`, `bin\install-service.ps1`; each `cd`s to the root
+  itself), every jar + `modules.list`/`core.list`/`edition.properties` in `lib\`, DuckDB extensions in `lib\duckdb\<platform>\`
+  (was `duckdb-extensions\`), Dockerfile/systemd unit in `deploy\`, captured output in `logs\`; no `examples\`, and `docs\`
+  holds only USER_GUIDE/ADVANCED_GUIDE/EDITIONS + `api\`. The first redeploy onto an OLD-layout install: the `/MIR` swap deletes the
+  root jars/scripts/lists (wanted); every local wrapper (`serve-preview-la.bat`, `start-la-basic.ps1`, `serve-ims.bat`) must call
+  `bin\serve.bat` (or `bin\serve-demo.bat`), put `lib\modules.list` entries (already `lib/<jar>`, root-relative) on `-cp` from the
+  ROOT, point `-Dduckdb.extension.dir` at `lib\duckdb\windows_amd64`, and redirect stdout/stderr into `logs\` instead of the root.
 - **Restore `runtime\lib\security\cacerts`** from the backup (or exclude it): the fresh jlinked runtime lacks the
   imported WSO2 cert and boot dies with `SSLHandshakeException` on OIDC discovery.
 - **Redeploy as actually run 2026-10-25 (worked first time, ~15 min build + ~10 min swap):** (1) build with NO downtime in
