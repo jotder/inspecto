@@ -127,7 +127,10 @@ test('colluding merchant: M-221 refunds 12 cards it never sold to, chargebacks a
   const peers = new Set(Object.values(merchant).filter((m) => m.mcc === '5732' && m.merchant_id !== 'M-221').map((m) => m.merchant_id));
   const ratio = rate(new Set(['M-221'])) / rate(peers);
   assert.ok(ratio >= 7 && ratio <= 12, `M-221 is ${ratio.toFixed(1)}x its category`);
-  const months221 = new Set(chargebacks.filter((c) => c.auth.merchant_id === 'M-221').map((c) => c.filed_at.slice(0, 7)));
+  const cb221 = chargebacks.filter((c) => c.auth.merchant_id === 'M-221');
+  assert.deepEqual([...new Set(cb221.map((c) => c.auth.card_id))].sort(), [...t.chargeback_cards].sort());
+  assert.ok(cb221.every((c) => c.filed_at <= '2026-09-30'), 'every planted chargeback lands with the 12 months, not the staged one');
+  const months221 = new Set(cb221.map((c) => c.filed_at.slice(0, 7)));
   assert.ok(months221.size >= 5, `M-221 chargebacks over ${months221.size} months`);
   const cb140 = chargebacks.filter((c) => c.auth.merchant_id === 'M-140');
   assert.ok(cb140.length >= 30);

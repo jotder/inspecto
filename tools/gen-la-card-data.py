@@ -326,7 +326,7 @@ m221_buyers = sorted(fresh[:240]) + m221_cb_cards
 m221_sales = []
 for cid in m221_buyers:
     for _ in range(1 if rng.random() < 0.75 else 2):
-        last = date(2026, 8, 31) if cid in m221_cb_cards else END
+        last = date(2026, 7, 31) if cid in m221_cb_cards else END   # every planted chargeback lands by September
         t = at(day_between(max(START, card[cid]["issued"]), last), hour_of("ecom"))
         device, ip = ecom_where(cid, t)
         m221_sales.append(auth(cid, M221, amount("5732"), t, device, ip))
