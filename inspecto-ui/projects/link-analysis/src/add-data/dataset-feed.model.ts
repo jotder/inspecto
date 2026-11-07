@@ -118,7 +118,8 @@ export type FeedSummary = Feed & {
 };
 
 /** *Watch this folder* in words: one interval, fixed (BASIC-ONBOARD-1 P2). */
-export const WATCH_WORDS = 'Inbox watched, checked every 30 seconds';
+export const WATCH_EVERY = 'watched, checked every 30 seconds';
+export const WATCH_WORDS = `Inbox ${WATCH_EVERY}`;
 
 /**
  * The ONE *Data status* line about the feed (D-1): on a kept-up-to-date Dataset how and how often, else only the files
@@ -136,6 +137,23 @@ export function feedSummaryLine(f: FeedSummary | null): string | null {
     if (f.kind === 'uploads') return waiting ? `Inbox: ${waiting}` : null;
     const how = `Kept up to date: ${feedWords(f)}${f.every ? `, ${everyWords(f.every)}` : ''}`;
     return waiting ? `${how} · ${waiting}` : how;
+}
+
+/**
+ * {@link feedSummaryLine} as a labelled fact (LA-STREAM-FACTS-1): **Inbox** (watched, or the files waiting in it) or
+ * **Kept up to date** (how and how often, and what waits); null when there is nothing to say.
+ */
+export function feedFact(f: FeedSummary | null): { label: string; value: string } | null {
+    if (!f) return null;
+    const waiting = f.waiting ? waitingWords(f.waiting, f.alreadyImported) : '';
+    if (f.kind === 'uploads') {
+        const parts = f.watch ? [WATCH_EVERY] : [];
+        if (waiting) parts.push(waiting);
+        if (f.watch && f.watchError) parts.push(`the last import failed: ${f.watchError}`);
+        return parts.length ? { label: 'Inbox', value: parts.join(' · ') } : null;
+    }
+    const how = `${feedWords(f)}${f.every ? `, ${everyWords(f.every)}` : ''}`;
+    return { label: 'Kept up to date', value: waiting ? `${how} · ${waiting}` : how };
 }
 
 /** {@link feedSummaryLine} over the feed route's own answer. */

@@ -16,10 +16,11 @@ import { OnboardService } from './onboard.service';
 
 /**
  * A Dataset's **Data status** (LA-ARRIVAL-LEDGER-1, plan `la-data-arrival-plan.md` §4): *Received · covers · graph*, then
- * any further line `dataStatusLines` adds. One component wherever a Dataset is named - the Add data / Data page Dataset
- * card, the Link Analysis Start box and the Rows dock - so the words are the same everywhere.
+ * any further line `dataStatusLines` adds. One component wherever a Dataset is named in passing - the Link Analysis Start
+ * box and the Rows dock - so the words are the same everywhere. (The Dataset card says the same facts under their own
+ * labels, `datasetFacts`, LA-STREAM-FACTS-1.)
  *
- * Pass `[arrivals]` when the host already read `GET /datasets/{id}/arrivals` (the card, which re-reads after every run);
+ * Pass `[arrivals]` when the host already read `GET /datasets/{id}/arrivals`;
  * otherwise it reads them for `[dataset]` itself. A Dataset no import made has no arrivals and shows nothing; so does a
  * failed read (the status is a help, never a blocker).
  *

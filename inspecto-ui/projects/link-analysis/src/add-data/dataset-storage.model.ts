@@ -66,6 +66,20 @@ export function storageWords(s: DatasetStorageState): string {
 }
 
 /**
+ * {@link storageStatusLine} as two labelled facts (LA-STREAM-FACTS-1): **Storage** (`3 files · 1.2 MB`, and on Standard
+ * what the policy keeps) and **Compacted** (`2026-11-05 10:02 (21 arrivals)`, null until compacted); null while unread.
+ */
+export function storageFacts(s: DatasetStorageState | null): { storage: string; compacted: string | null } | null {
+    if (!s) return null;
+    const files = `${plural(s.files, 'file', 'files')} · ${formatSize(s.bytes)}`;
+    const at = s.compactedAt ? ledgerTime(s.compactedAt) : null;
+    return {
+        storage: s.retentionAvailable ? `${files} · ${retentionWords(s.retention)}` : files,
+        compacted: at && s.compactedArrivals ? `${at} (${plural(s.compactedArrivals, 'arrival', 'arrivals')})` : at,
+    };
+}
+
+/**
  * The ONE *Data status* line about storage (D-7, D-9): how many files and, on Standard, what the policy keeps; null
  * while nothing was read.
  */

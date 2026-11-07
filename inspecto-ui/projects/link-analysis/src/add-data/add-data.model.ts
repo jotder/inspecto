@@ -1,6 +1,7 @@
-import { FeedSummary, feedSummaryLine } from './dataset-feed.model';
-import { DatasetStorageState, storageStatusLine } from './dataset-storage.model';
+import { FeedSummary, feedFact, feedSummaryLine } from './dataset-feed.model';
+import { DatasetStorageState, storageFacts, storageStatusLine } from './dataset-storage.model';
 import { formatNumber } from '@inspecto/core/viz/number-format';
+import type { ColDef } from 'ag-grid-community';
 import { type ColumnRole, ROLE_LABELS, hintedRole, recordPhrase } from '@inspecto/link-analysis/api/column-roles';
 import type { RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
 
@@ -1078,10 +1079,19 @@ function graphClock(list: readonly Arrival[]): string {
  * part only when the runs recorded an index outcome.
  */
 export function dataStatusLine(all: readonly Arrival[]): string | null {
+    const c = dataClocks(all);
+    if (!c) return null;
+    const parts = [`Received ${c.received}`];
+    if (c.covers) parts.push(`covers ${c.covers}`);
+    if (c.graph) parts.push(c.graph);
+    return parts.join(' · ');
+}
+
+/** The three clocks of {@link dataStatusLine}, each on its own ('' when not known); null when nothing arrived. */
+function dataClocks(all: readonly Arrival[]): { received: string; covers: string; graph: string } | null {
     const list = all.filter((a) => a.status !== 'REFUSED'); // a refused file never arrived in the data
     const newest = list[0];
     if (!newest) return null;
-    const parts = [`Received ${ledgerTime(newest.received)}`];
     const kept = list.filter((a) => a.kept);
     const froms = kept.map((a) => a.coversFrom).filter((v): v is string => !!v);
     const tos = kept.map((a) => a.coversTo).filter((v): v is string => !!v);
@@ -1092,34 +1102,100 @@ export function dataStatusLine(all: readonly Arrival[]): string | null {
                   tos.reduce((x, y) => (y > x ? y : x)),
               )
             : '';
-    if (covers) parts.push(`covers ${covers}`);
-    const graph = graphClock(list);
-    if (graph) parts.push(graph);
-    return parts.join(' · ');
+    return { received: ledgerTime(newest.received), covers, graph: graphClock(list) };
 }
 
-/** One arrival in words: who sent it, what it did, its rows and period, and whether its rows are still kept. */
-export function arrivalLine(a: Arrival): string {
-    const parts = [a.sender === 'upload' ? 'uploaded' : 'from a system'];
+/** One labelled fact of an imported Dataset's card (LA-STREAM-FACTS-1). */
+export interface DatasetFact {
+    label: string;
+    value: string;
+    /** The `data-testid` of its value. */
+    id: string;
+}
+
+/**
+ * An imported Dataset's facts as labelled rows (LA-STREAM-FACTS-1, operator 2026-11-07), in this order: Origin (its
+ * description), Filter, Received, Covers, Graph, the Inbox or how it is kept up to date, Storage, Compacted. A fact
+ * not known is left out. The same words as the one-line *Data status*, split by what each one is.
+ */
+export function datasetFacts(read: Arrivals | null, description: string, keeps: string): DatasetFact[] {
+    const facts: DatasetFact[] = [];
+    const add = (label: string, value: string | null | undefined, id: string) => {
+        if (value) facts.push({ label, value, id });
+    };
+    add('Origin', description, 'fact-origin');
+    add('Filter', keeps, 'keeps-rows');
+    const c = dataClocks(read?.arrivals ?? []);
+    add('Received', c?.received, 'fact-received');
+    add('Covers', c?.covers, 'fact-covers');
+    // under the label Graph: "up to date", "2 files behind", "not updated"
+    add('Graph', c?.graph.replace(/^(the )?graph (was )?/, ''), 'fact-graph');
+    const feed = feedFact(read?.feed ?? null); // LA-ARRIVAL-FEEDS-1
+    add(feed?.label ?? '', feed?.value, 'fact-feed');
+    const storage = storageFacts(read?.storage ?? null); // LA-DATASET-COMPACT-1
+    add('Storage', storage?.storage, 'fact-storage');
+    add('Compacted', storage?.compacted, 'fact-compacted');
+    return facts;
+}
+
+/** One row of the **Arrivals** table (LA-STREAM-FACTS-1): one file the import took, newest first. */
+export interface ArrivalRow {
+    file: string;
+    arrived: string;
+    /** `uploaded` or `from a system`. */
+    how: string;
+    /** What it did to the data (or why it was refused), and whether its rows are still kept. */
+    result: string;
+    rows: number | null;
+    /** Rows the import's row filter left out; null = no filter, or not counted. */
+    leftOut: number | null;
+    covers: string;
+    /** New columns it carried: kept as details, or not kept. */
+    columns: string;
+    kept: boolean;
+}
+
+/** The **Arrivals** table's columns; *Arrived* sorts newest first. */
+export function arrivalColumns(): ColDef<ArrivalRow>[] {
+    const count = (p: { value: unknown }) =>
+        typeof p.value === 'number' ? formatNumber(p.value, { decimals: 0 }) : '';
+    return [
+        { field: 'file', headerName: 'File', minWidth: 140 },
+        { field: 'arrived', headerName: 'Arrived', sort: 'desc', minWidth: 160 },
+        { field: 'how', headerName: 'How', minWidth: 110 },
+        { field: 'result', headerName: 'Result', minWidth: 160, wrapText: true, autoHeight: true },
+        { field: 'rows', headerName: 'Rows', type: 'rightAligned', minWidth: 80, valueFormatter: count },
+        { field: 'leftOut', headerName: 'Left out', type: 'rightAligned', minWidth: 90, valueFormatter: count },
+        { field: 'covers', headerName: 'Covers', minWidth: 130 },
+        { field: 'columns', headerName: 'Columns', minWidth: 130, wrapText: true, autoHeight: true },
+    ];
+}
+
+/** One arrival as an {@link ArrivalRow}: who sent it, what it did, its rows, period and new columns. */
+export function arrivalRow(a: Arrival): ArrivalRow {
+    const result: string[] = [];
     if (a.status === 'REFUSED') {
-        parts.push(`refused: ${a.reason ?? 'its columns do not match'}`);
-        if (a.setAside) parts.push(`set aside in ${a.setAside}`);
-        return parts.join(' · ');
+        result.push(`refused: ${a.reason ?? 'its columns do not match'}`);
+        if (a.setAside) result.push(`set aside in ${a.setAside}`);
+    } else {
+        if (a.mode === 'replace') result.push('replaced the data');
+        else if (a.mode === 'append') result.push('added its rows');
+        else if (a.mode === 'period') result.push('replaced the days it covers');
+        if (a.rowsRejected) result.push(`${plural(a.rowsRejected, 'row', 'rows')} rejected`);
+        if (!a.kept) result.push('set aside by a later replace');
     }
-    if (a.mode === 'replace') parts.push('replaced the data');
-    else if (a.mode === 'append') parts.push('added its rows');
-    else if (a.mode === 'period') parts.push('replaced the days it covers');
-    if (typeof a.rowsRead === 'number')
-        parts.push(
-            a.rowsRejected
-                ? `${plural(a.rowsRead, 'row', 'rows')} (${a.rowsRejected} rejected)`
-                : plural(a.rowsRead, 'row', 'rows'),
-        );
-    if (a.rowsFilteredOut) parts.push(`${plural(a.rowsFilteredOut, 'row', 'rows')} left out by the filter`);
-    const covers = coversText(a.coversFrom, a.coversTo);
-    if (covers) parts.push(`covers ${covers}`);
-    if (a.keptColumns?.length) parts.push(`kept new: ${a.keptColumns.join(', ')}`);
-    if (a.newColumns?.length) parts.push(`not kept: ${a.newColumns.join(', ')}`);
-    if (!a.kept) parts.push('set aside by a later replace');
-    return parts.join(' · ');
+    const columns: string[] = [];
+    if (a.keptColumns?.length) columns.push(`kept new: ${a.keptColumns.join(', ')}`);
+    if (a.newColumns?.length) columns.push(`not kept: ${a.newColumns.join(', ')}`);
+    return {
+        file: a.file,
+        arrived: ledgerTime(a.received),
+        how: a.sender === 'upload' ? 'uploaded' : 'from a system',
+        result: result.join(' · '),
+        rows: typeof a.rowsRead === 'number' ? a.rowsRead : null,
+        leftOut: a.rowsFilteredOut ?? null,
+        covers: coversText(a.coversFrom, a.coversTo),
+        columns: columns.join(' · '),
+        kept: a.kept,
+    };
 }

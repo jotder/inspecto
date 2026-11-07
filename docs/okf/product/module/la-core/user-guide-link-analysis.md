@@ -216,8 +216,11 @@ up to date, grouped as **Streams** and **References**. Each group folds from its
 line (where its data comes from, how many columns and Mappings it has) until you open it; a Space with a single Dataset
 shows it open. Opened, each one shows:
 
-- its card: for a Dataset you added, the **Data status** line (when data last arrived, the period it covers, whether the
-  graph has it), the **Arrivals** (every file it took, uploaded or put in its inbox by another system), *Add a file* and
+- its card: for a Dataset you added, its facts under their own labels - **Origin**, **Filter**, **Received** (when data
+  last arrived), **Covers** (the period it covers), **Graph** (whether the graph has it), **Inbox** or **Kept up to date**,
+  **Storage** and **Compacted**, each only when known - then the **Arrivals** table (every file it took, uploaded or put
+  in its inbox by another system: File, Arrived, How, Result, Rows, Left out, Covers, Columns; newest first, ten to a
+  page; a file a later replace set aside reads muted and its Result says so), *Add a file* and
   *Run now*; under **Inbox**, *Watch this folder* imports what another system writes there on its own, checked every
   30 seconds, once the files have stopped changing (every edition); a Postgres table snapshot shows *Refresh now*
   instead, and is copied again only when you press it; for one a Pipeline or a Job keeps up to date, *Kept up to date by a Pipeline or a Job* - its data is

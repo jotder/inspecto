@@ -1,7 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DebugElement, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { of } from 'rxjs';
+import { GammaConfigService } from '@gamma/services/config';
+import { DataTableComponent } from '@inspecto/core/data-table';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -11,11 +15,13 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { AddDataAccess } from './add-data-access';
 import {
     Arrival,
+    ArrivalRow,
     AUTOMATION_FALLBACK,
     ImportDataset,
     ImportSummary,
     SELF_IMPORT_OFF,
-    arrivalLine,
+    arrivalRow,
+    datasetFacts,
     dataStatusLine,
 } from './add-data.model';
 import { summary } from './add-data.testing';
@@ -58,6 +64,11 @@ function create(o: Opts = {}) {
             provideHttpClient(),
             provideHttpClientTesting(),
             provideRouter([]),
+            // the Arrivals table's grid theme reads the scheme
+            {
+                provide: GammaConfigService,
+                useValue: { config$: of({ scheme: 'light' }), config: { scheme: 'light' } },
+            },
             {
                 provide: LA_FEATURES,
                 useValue: {
@@ -97,6 +108,12 @@ const FEED_STATE = {
 };
 
 const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+
+/** LA-STREAM-FACTS-1: the Arrivals table, read from its inputs (ag-Grid lays its cells out lazily in jsdom). */
+function arrivalTable(fixture: { debugElement: DebugElement }): DataTableComponent {
+    return fixture.debugElement.query(By.directive(DataTableComponent)).componentInstance as DataTableComponent;
+}
+const tableRows = (fixture: { debugElement: DebugElement }) => arrivalTable(fixture).rows() as ArrivalRow[];
 
 describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-14, DT-14)', () => {
     afterEach(() => {
@@ -259,7 +276,9 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         choose('taxed.csv');
         const left = http.expectOne((r) => r.url === apiUrl('/datasets/transfers/files'));
         expect(left.request.params.get('newColumns')).toBe('leave');
-        left.flush(summary({ file: 'taxed.csv', newColumns: ['tax'], newColumnsReason: 'you chose to leave new columns out' }));
+        left.flush(
+            summary({ file: 'taxed.csv', newColumns: ['tax'], newColumnsReason: 'you chose to leave new columns out' }),
+        );
         fixture.detectChanges();
         expect(el.textContent).toContain('New column not kept: tax (you chose to leave new columns out).');
         await expectNoA11yViolations(el);
@@ -298,7 +317,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
             importFilter: [{ column: 'channel', op: 'eq', value: 'mobile' }],
         });
         fixture.detectChanges();
-        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe('Keeps rows where channel is mobile.');
+        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe('Keeps rows where channel is mobile');
         q(el, 'edit-filter')!.click();
         http.expectOne(apiUrl('/datasets/transfers/filter')).flush({
             dataset: 'transfers',
@@ -321,7 +340,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
             importFilter: [{ column: 'channel', op: 'ne', value: 'branch' }],
         });
         fixture.detectChanges();
-        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe('Keeps rows where channel is not branch.');
+        expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe('Keeps rows where channel is not branch');
     });
 
     it('ADD-DATA-ROW-FILTER-1: an import that keeps only some rows says which, and the arrivals how many were left out (no violations)', async () => {
@@ -340,7 +359,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         });
         fixture.detectChanges();
         expect(q(el, 'keeps-rows')!.textContent!.trim()).toBe(
-            "Keeps rows where channel is mobile and amount is 100 or more and booked_on is between 2026-01-01 and 2026-03-31 and note contains 'REFUND' (exact case).",
+            "Keeps rows where channel is mobile and amount is 100 or more and booked_on is between 2026-01-01 and 2026-03-31 and note contains 'REFUND' (exact case)",
         );
         const reads = http.match((r) => r.url.endsWith('/arrivals')).filter((r) => !r.cancelled);
         expect(reads.length).toBeGreaterThan(0);
@@ -371,7 +390,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
             }),
         );
         fixture.detectChanges();
-        expect(q(el, 'arrivals')!.textContent).toContain('60 rows left out by the filter');
+        expect(tableRows(fixture)[0]).toMatchObject({ file: 'october.csv', rows: 40, leftOut: 60 });
         await expectNoA11yViolations(el);
     });
 
@@ -441,7 +460,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(TestBed.inject(AddDataAccess).lockReason()).toBe(SELF_IMPORT_OFF);
     });
 
-    it('LA-ARRIVAL-LEDGER-1: shows the Data status and the newest arrivals, five at first, a set-aside one marked (no violations)', async () => {
+    it('LA-STREAM-FACTS-1: the Data status as labelled facts and every arrival in a table, newest first, ten a page, a set-aside one marked (no violations)', async () => {
         const { fixture, el } = create();
         const a = (i: number, over: Partial<Arrival> = {}): Arrival => ({
             file: `f${i}.csv`,
@@ -476,19 +495,40 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
             reason: null,
         });
         fixture.detectChanges();
-        const status = q(el, 'data-status')!.textContent ?? '';
-        expect(status).toContain('Received 2026-11-07 09:17');
-        expect(status).toContain('covers 2026-09-03 – 2026-09-17'); // the kept arrivals only
-        const items = () => Array.from(q(el, 'arrivals')!.querySelectorAll('li')).map((li) => li.textContent ?? '');
-        expect(items().length).toBe(5);
-        expect(items()[0]).toContain('drop.csv');
-        expect(items()[0]).toContain('from a system');
-        expect(items()[1]).toContain('uploaded · added its rows · 60 rows');
-        (q(el, 'arrivals-more') as HTMLButtonElement).click();
-        fixture.detectChanges();
-        expect(items().length).toBe(7);
-        expect(items()[6]).toContain('replaced the data');
-        expect(items()[6]).toContain('set aside by a later replace');
+        // each fact under its own label, in a definition list
+        const facts = q(el, 'dataset-facts')!;
+        expect(facts.tagName).toBe('DL');
+        // no Graph: the newest file's index outcome was not recorded, and nothing is guessed
+        expect(Array.from(facts.querySelectorAll('dt')).map((d) => d.textContent!.trim())).toEqual([
+            'Received',
+            'Covers',
+        ]);
+        expect(q(el, 'fact-received')!.textContent!.trim()).toBe('2026-11-07 09:17');
+        expect(q(el, 'fact-covers')!.textContent!.trim()).toBe('2026-09-03 – 2026-09-17'); // the kept arrivals only
+        // every arrival in the shared table, which pages ten at a time, newest first by Arrived
+        const table = arrivalTable(fixture);
+        expect(table.pageSize()).toBe(10);
+        const cols = table.columns()!;
+        expect(cols.map((c) => c.headerName)).toEqual([
+            'File',
+            'Arrived',
+            'How',
+            'Result',
+            'Rows',
+            'Left out',
+            'Covers',
+            'Columns',
+        ]);
+        expect(cols[1].sort).toBe('desc');
+        const rows = tableRows(fixture);
+        expect(rows.length).toBe(7);
+        expect(rows[0]).toMatchObject({ file: 'drop.csv', arrived: '2026-11-07 09:17', how: 'from a system' });
+        expect(rows[1]).toMatchObject({ how: 'uploaded', result: 'added its rows', rows: 60 });
+        expect(rows[6].result).toBe('replaced the data · set aside by a later replace');
+        // a set-aside file reads muted, and its Result says why (not colour alone)
+        const rowClass = table.rowClass()!;
+        expect(rowClass(rows[6])).toBe('text-secondary');
+        expect(rowClass(rows[0])).toBeUndefined();
         await expectNoA11yViolations(el);
     });
 
@@ -530,10 +570,14 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
         expect(dataStatusLine([{ ...base, index: 'SKIPPED' }])).toBe('Received 2026-11-02 08:00');
         // LA-ARRIVAL-MODES-1: a period arrival, a file's new columns, and a refused drop (never in the Data status)
         // LA-ARRIVAL-NEW-COLUMNS-1: a column the run kept
-        expect(arrivalLine({ ...base, keptColumns: ['fee'] })).toContain('kept new: fee');
-        expect(arrivalLine({ ...base, mode: 'period', newColumns: ['fee'] })).toBe(
-            'uploaded · replaced the days it covers · 1 row · not kept: fee',
-        );
+        expect(arrivalRow({ ...base, keptColumns: ['fee'] }).columns).toBe('kept new: fee');
+        expect(arrivalRow({ ...base, mode: 'period', newColumns: ['fee'] })).toMatchObject({
+            how: 'uploaded',
+            result: 'replaced the days it covers',
+            rows: 1,
+            leftOut: null,
+            columns: 'not kept: fee',
+        });
         const refused: Arrival = {
             ...base,
             sender: 'system',
@@ -544,14 +588,79 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
             reason: "'x.csv' does not have the columns of 't': 'fee' is missing.",
             setAside: 'refused/x.csv',
         };
-        expect(arrivalLine(refused)).toBe(
-            "from a system · refused: 'x.csv' does not have the columns of 't': 'fee' is missing. · set aside in refused/x.csv",
-        );
+        expect(arrivalRow(refused)).toMatchObject({
+            how: 'from a system',
+            result: "refused: 'x.csv' does not have the columns of 't': 'fee' is missing. · set aside in refused/x.csv",
+            rows: null,
+        });
         expect(dataStatusLine([refused, { ...base, index: 'BUILT' }])).toBe(
             'Received 2026-11-02 08:00 · graph up to date',
         );
-        expect(arrivalLine({ ...base, rowsRead: 5, rowsRejected: 2 })).toBe(
-            'uploaded · added its rows · 5 rows (2 rejected)',
+        expect(arrivalRow({ ...base, rowsRead: 5, rowsRejected: 2 })).toMatchObject({
+            result: 'added its rows · 2 rows rejected',
+            rows: 5,
+        });
+    });
+
+    it('LA-STREAM-FACTS-1: an imported Dataset says its origin, filter, status, inbox, storage and compaction as labelled facts, in that order', () => {
+        const arrival: Arrival = {
+            file: 'live-day01.csv',
+            sender: 'upload',
+            received: '2026-11-06 02:03:00',
+            status: 'SUCCESS',
+            rowsRead: 8,
+            rowsRejected: 0,
+            mode: 'append',
+            sha256: null,
+            index: 'BUILT',
+            consignment: 'c',
+            kept: true,
+            coversFrom: '2026-10-01 00:00:00',
+            coversTo: '2026-10-28 00:00:00',
+        };
+        const facts = datasetFacts(
+            {
+                dataset: 'mm',
+                eventDateColumn: 'ts',
+                truncated: false,
+                reason: null,
+                arrivals: [arrival],
+                feed: { kind: 'uploads', watch: true },
+                storage: {
+                    files: 6,
+                    bytes: 10650,
+                    threshold: 20,
+                    compactedAt: '2026-11-06 02:03:00',
+                    compactedArrivals: 21,
+                    retentionAvailable: false,
+                    retention: null,
+                },
+            } as never,
+            'Imported from live-day01.csv with Add data',
+            "Keeps rows where txn_type contains 'CASH'",
         );
+        expect(facts.map((f) => [f.label, f.value])).toEqual([
+            ['Origin', 'Imported from live-day01.csv with Add data'],
+            ['Filter', "Keeps rows where txn_type contains 'CASH'"],
+            ['Received', '2026-11-06 02:03'],
+            ['Covers', '2026-10-01 – 2026-10-28'],
+            ['Graph', 'up to date'],
+            ['Inbox', 'watched, checked every 30 seconds'],
+            ['Storage', '6 files · 10.4 KB'],
+            ['Compacted', '2026-11-06 02:03 (21 arrivals)'],
+        ]);
+        // the Graph fact reads on its own under its label
+        const graph = (index: string) =>
+            datasetFacts({ arrivals: [{ ...arrival, index }] } as never, '', '').find((f) => f.label === 'Graph')
+                ?.value;
+        expect(graph('FAILED')).toBe('not updated');
+        // nothing read yet: only what the entry itself says
+        expect(datasetFacts(null, '', '')).toEqual([]);
+        // a Dataset kept up to date by a feed says how, not "Inbox"
+        expect(
+            datasetFacts({ arrivals: [], feed: { kind: 'folder', every: '1h', waiting: 2 } } as never, '', '').map(
+                (f) => f.label,
+            ),
+        ).toEqual(['Kept up to date']);
     });
 });

@@ -35,11 +35,13 @@ import {
     isSnapshot,
     keepsRowsLine,
     RowCondition,
-    arrivalLine,
+    ArrivalRow,
+    arrivalColumns,
+    arrivalRow,
+    datasetFacts,
     fileProblem,
-    ledgerTime,
 } from './add-data.model';
-import { DataStatusComponent } from './data-status.component';
+import { DataTableComponent } from '@inspecto/core/data-table';
 import { ImportSummaryComponent } from './import-summary.component';
 import { ImportFilterEditComponent } from './import-filter-edit.component';
 import { DatasetFeedComponent } from './dataset-feed.component';
@@ -74,7 +76,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
         ChipComponent,
         LockedActionComponent,
         ImportSummaryComponent,
-        DataStatusComponent,
+        DataTableComponent,
         DatasetFeedComponent,
         DatasetStorageComponent,
         ImportFilterEditComponent,
@@ -94,14 +96,18 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 <span class="text-secondary text-sm">{{ kindWords() }}</span>
                 <span class="ml-auto flex items-center gap-1"><ng-content select="[cardActions]"></ng-content></span>
             </header>
-            @if (dataset().description) {
-                <p class="text-secondary m-0 text-sm">{{ dataset().description }}</p>
-            }
-            @if (keepsRows(); as keeps) {
-                <p class="m-0 text-sm" data-testid="keeps-rows">{{ keeps }}.</p>
+            <!-- LA-STREAM-FACTS-1: the Dataset's facts as labelled rows, not sentences -->
+            @if (facts().length) {
+                <dl class="m-0 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2" data-testid="dataset-facts">
+                    @for (f of facts(); track f.id) {
+                        <div class="flex min-w-0 flex-col">
+                            <dt class="text-secondary text-xs font-semibold uppercase tracking-wider">{{ f.label }}</dt>
+                            <dd class="m-0 break-words" [attr.data-testid]="f.id">{{ f.value }}</dd>
+                        </div>
+                    }
+                </dl>
             }
             <ng-content select="[cardSummary]"></ng-content>
-            <inspecto-la-data-status [arrivals]="arrivalsAnswer()"></inspecto-la-data-status>
             @if (dataset().kind === 'reference') {
                 <inspecto-la-reference-coverage [dataset]="dataset().id" [refresh]="arrivalsAnswer()" />
             }
@@ -118,27 +124,14 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                     data-testid="arrivals"
                 >
                     <h4 class="m-0 text-sm font-semibold" [id]="titleId + '-arrivals'">Arrivals</h4>
-                    <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-                        @for (a of shownArrivals(); track a.consignment + a.file) {
-                            <li [class.text-secondary]="!a.kept">
-                                <span class="font-medium">{{ a.file }}</span>
-                                <span class="text-secondary"> · {{ received(a) }}</span>
-                                <span class="block text-xs">{{ line(a) }}</span>
-                            </li>
-                        }
-                    </ul>
-                    @if (arrivals().length > arrivalsShown) {
-                        <button
-                            mat-button
-                            type="button"
-                            class="self-start"
-                            data-testid="arrivals-more"
-                            [attr.aria-expanded]="allArrivals()"
-                            (click)="allArrivals.set(!allArrivals())"
-                        >
-                            {{ allArrivals() ? 'Show fewer' : 'Show all ' + arrivals().length }}
-                        </button>
-                    }
+                    <!-- LA-STREAM-FACTS-1: one row per file, newest first, ten to a page -->
+                    <inspecto-data-table
+                        tier="mini"
+                        [rows]="arrivalRows()"
+                        [columns]="arrivalColumns"
+                        [rowClass]="arrivalRowClass"
+                        noRowsTitle="No file arrived yet"
+                    ></inspecto-data-table>
                 </section>
             }
 
@@ -313,13 +306,15 @@ export class ImportDatasetCardComponent {
     protected readonly arrivalsAnswer = signal<Arrivals | null>(null);
     /** Every file the import took, newest first. */
     protected readonly arrivals = computed<Arrival[]>(() => this.arrivalsAnswer()?.arrivals ?? []);
-    protected readonly arrivalsShown = 5;
-    protected readonly allArrivals = signal(false);
-    protected readonly shownArrivals = computed(() =>
-        this.allArrivals() ? this.arrivals() : this.arrivals().slice(0, this.arrivalsShown),
+    /** LA-STREAM-FACTS-1: the arrivals as table rows; a file whose rows a later replace set aside reads muted. */
+    protected readonly arrivalRows = computed<ArrivalRow[]>(() => this.arrivals().map(arrivalRow));
+    protected readonly arrivalColumns = arrivalColumns();
+    protected readonly arrivalRowClass = (row: unknown): string | undefined =>
+        (row as ArrivalRow | undefined)?.kept === false ? 'text-secondary' : undefined;
+    /** LA-STREAM-FACTS-1: Origin, Filter, the Data status, the Inbox and Storage as labelled rows. */
+    protected readonly facts = computed(() =>
+        datasetFacts(this.arrivalsAnswer(), this.dataset().description ?? '', this.keepsRows()),
     );
-    protected readonly line = arrivalLine;
-    protected readonly received = (a: Arrival): string => ledgerTime(a.received);
 
     constructor() {
         effect(() => {
@@ -368,7 +363,13 @@ export class ImportDatasetCardComponent {
         }
         const mode = this.dataset().kind === 'stream' ? this.mode.value : 'replace';
         this.start(
-            this.onboard.addFile(this.dataset().id, file, mode, () => this.following.set(true), this.keepNewColumns.value),
+            this.onboard.addFile(
+                this.dataset().id,
+                file,
+                mode,
+                () => this.following.set(true),
+                this.keepNewColumns.value,
+            ),
         );
     }
 

@@ -1949,8 +1949,14 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   system's. A refused
   waiting file has only its sidecar line (`status: REFUSED`, `reason`, `setAside`) and is merged in by time.
 - **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`),
-  on the Dataset card, under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up
-  to date / N files behind*. A refused arrival is left out. Extension point: `dataStatusLines()` in `add-data.model.ts`.
+  under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up to date / N files
+  behind*. A refused arrival is left out. Extension point: `dataStatusLines()` in `add-data.model.ts`.
+- **The Dataset card** (LA-STREAM-FACTS-1, 2026-11-07) says the same facts under their own labels in a `<dl>`:
+  `datasetFacts()` (Origin, Filter, Received, Covers, Graph, Inbox / Kept up to date, Storage, Compacted; each only when
+  known), built from the same parts as the one line (`dataClocks`, `feedFact`, `storageFacts`), so the words cannot
+  drift. Its **Arrivals** are the shared `inspecto-data-table` (`arrivalRow` / `arrivalColumns`: File, Arrived newest
+  first, How, Result, Rows, Left out, Covers, Columns; ten a page); a row a later replace set aside is muted and its
+  Result says so.
 - **V4:** on Basic every append (Add a file, or a drop Run now takes) builds the link index in mode `append`; only the
   first build is `full`. About 7 to 11 s per 10,000-row append at 1 M rows, end to end
   (`ControlApiOnboardLinkAnalysisTest#v4MeasuredAtScale`).
