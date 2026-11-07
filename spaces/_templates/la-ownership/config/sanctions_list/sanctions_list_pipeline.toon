@@ -1,0 +1,36 @@
+name: sanctions_list
+active: true
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per listed person on an INVENTED sanctions list (no real names): name, aliases separated by |, birth year, nationality and listing date. One extract (SANCTIONS_LIST_20260930.csv). Synthetic; regenerate with tools/gen-la-ownership-data.py."
+
+dirs:
+  poll:       data/inbox/sanctions_list
+  database:   data/sanctions_list/database
+  backup:     data/sanctions_list/backup
+  temp:       data/sanctions_list/temp
+  errors:     data/sanctions_list/errors
+  quarantine: data/sanctions_list/quarantine
+  markers:    data/sanctions_list/markers
+  status_dir: data/sanctions_list/status
+  log_dir:    data/sanctions_list/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: sanctions_list_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

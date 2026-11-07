@@ -1,0 +1,28 @@
+raw:
+  name: FIELD_VISIT
+  format: CSV
+  fields[5]{name,selector,type}:
+    visit_id,"0",VARCHAR
+    premise_id,"1",VARCHAR
+    contractor_id,"2",VARCHAR
+    visit_at,"3",TIMESTAMP
+    visit_type,"4",VARCHAR
+mapping:
+  canonicalName: field_visit
+  rawName: FIELD_VISIT
+  fields[5]:
+    - name: visit_id
+      from: visit_id
+      fn: keep
+    - name: premise_id
+      from: premise_id
+      fn: keep
+    - name: contractor_id
+      from: contractor_id
+      fn: keep
+    - name: visit_at
+      from: visit_at
+      fn: keep
+    - name: visit_type
+      from: visit_type
+      fn: keep

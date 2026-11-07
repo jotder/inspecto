@@ -1,0 +1,20 @@
+raw:
+  name: CUSTOMER
+  format: CSV
+  fields[3]{name,selector,type}:
+    customer_id,"0",VARCHAR
+    company_id,"1",VARCHAR
+    onboarded_at,"2",DATE
+mapping:
+  canonicalName: customer
+  rawName: CUSTOMER
+  fields[3]:
+    - name: customer_id
+      from: customer_id
+      fn: keep
+    - name: company_id
+      from: company_id
+      fn: keep
+    - name: onboarded_at
+      from: onboarded_at
+      fn: keep

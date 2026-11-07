@@ -1,0 +1,7 @@
+id: solution-pack.la-police
+kind: solution-pack
+title: Link Analysis police showcase
+template: la-police
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-police/index.md

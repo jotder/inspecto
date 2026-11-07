@@ -1,0 +1,32 @@
+raw:
+  name: SERVICE_ORDER
+  format: CSV
+  fields[6]{name,selector,type}:
+    order_id,"0",VARCHAR
+    premise_id,"1",VARCHAR
+    order_type,"2",VARCHAR
+    raised_at,"3",TIMESTAMP
+    closed_by,"4",VARCHAR
+    closed_at,"5",TIMESTAMP
+mapping:
+  canonicalName: service_order
+  rawName: SERVICE_ORDER
+  fields[6]:
+    - name: order_id
+      from: order_id
+      fn: keep
+    - name: premise_id
+      from: premise_id
+      fn: keep
+    - name: order_type
+      from: order_type
+      fn: keep
+    - name: raised_at
+      from: raised_at
+      fn: keep
+    - name: closed_by
+      from: closed_by
+      fn: keep
+    - name: closed_at
+      from: closed_at
+      fn: keep

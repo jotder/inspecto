@@ -1,0 +1,44 @@
+raw:
+  name: INCIDENT_REPORT
+  format: CSV
+  fields[9]{name,selector,type}:
+    incident_id,"0",VARCHAR
+    offence_type,"1",VARCHAR
+    start_at,"2",TIMESTAMP
+    end_at,"3",TIMESTAMP
+    district,"4",VARCHAR
+    city,"5",VARCHAR
+    lat,"6",DOUBLE
+    lon,"7",DOUBLE
+    reporting_person_id,"8",VARCHAR
+mapping:
+  canonicalName: incident_report
+  rawName: INCIDENT_REPORT
+  fields[9]:
+    - name: incident_id
+      from: incident_id
+      fn: keep
+    - name: offence_type
+      from: offence_type
+      fn: keep
+    - name: start_at
+      from: start_at
+      fn: keep
+    - name: end_at
+      from: end_at
+      fn: keep
+    - name: district
+      from: district
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep
+    - name: reporting_person_id
+      from: reporting_person_id
+      fn: keep

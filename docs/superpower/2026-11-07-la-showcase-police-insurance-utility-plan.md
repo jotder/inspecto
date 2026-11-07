@@ -237,6 +237,43 @@ stolen property and a dealer sale).
 `police.sio` (second approver), `police.reviewer` (read-only), `police.outsider`; an Alert Rule on new serial
 matches; seed script `tools/seed-la-police.mjs` creating the Investigation and a Case.
 
+#### `la-police` Basic tier as built (step 2, 2026-11-07)
+
+- **Template** `spaces/_templates/la-police/` (`minEdition: basic`): eleven Collectors, Pipelines and Datasets
+  (`config/police/`), files in `data/inbox/<feed>` (12 months, 2025-11-01..2026-10-31) and `data/staged/<feed>` (November
+  2026 for the seven event feeds, including one more serial match by a series seller). The `police_links` Job (cron every
+  5 minutes) folds them into one link Dataset of nine kinds, about 25 000 rows; three Jobs fire on its
+  `job.dataset.produced` signal and derive one Dataset per saved view: `police_property_links` (the stolen-property
+  circle), `police_call_links` (the busy handsets), `police_witness_links` (repeat witnesses). No
+  `link-analysis.toon`: masking and the link index are Standard and above.
+- **Generator** `tools/gen-la-police-data.py` (seed 20261107, standard library, byte-identical on a re-run) writes the
+  data and `tools/la-police-ground-truth.json` (story → entity ids; not in the data download). Coordinates are rounded
+  to the 5 decimals the CSV carries before any distance is measured, so the generator's 2 km / 30 minute test and the
+  Job's SQL agree at the border.
+- **Golden tests:** `tools/gen-la-police-data.test.mjs` (determinism; the planted facts on the files) and
+  `LaPoliceLinksJobTest` (inspecto-engine: the real Pipelines land every row with nothing quarantined, the real Jobs run;
+  every story's entities form one connected piece of its saved view's Dataset; no look-alike holds a link of any kind
+  to a story entity; each saved view's Dataset stays under 4 000 rows).
+- **Figures as generated:** series 18 burglaries, 53 items, 21 resurfaced (40 %), 13 serial matches (62 %) on 13
+  scenes, the vehicle seen near 11 scenes, so every scene has a match or a read; controllers carry over 75–80 % of
+  their customers; the taxi is seen near 54 scenes, none in the series; the delivery driver calls 208 numbers in the
+  landed months.
+- **Decided while building:**
+  - A ninth link kind, `uses_number` (a person to the handset number attributed to them): without it numbers and
+    people are two separate graphs and the drug bases cannot reach an address.
+  - `incident_report` carries a `district` column for the two-district series.
+  - Drug-base "visits" are not modelled (no feed records a visit); the runner calls carry the story.
+  - Links with no time of their own (`keeper_of`, `lives_at`, `uses_number`) carry 2025-11-01; `amount` is the
+    number of records behind a link.
+  - A saved view draws its whole Dataset, and the canvas shows at most 1 000 nodes (`projection_node_cap`) from at
+    most 4 000 rows by default (`traversal.rows_default`); past either it says "Result cut short" and a story may be
+    off screen. The first handset view (every call pair) had 5 350 rows, then 2 110 nodes; now background handsets
+    have fewer contacts (about 2 600 call pairs) and `police_call_links` keeps only the calls of numbers with 6 or
+    more call partners (about 740 nodes). The golden test pins both limits for every view.
+  - The saved Geo View is incident markers only; plate-read routes need a legs Dataset and wait for step 5. The Geo
+    map is Standard and above, so the view is inert on Basic.
+- **Live proof on Basic:** recorded at step 2 under Steps.
+
 ### 2. `la-claims` — insurance fraud (exists; additions)
 
 The existing template and `tools/gen-la-claims-data.py` stay. Changes:
@@ -285,6 +322,45 @@ The link Dataset uses aggregated `meter_read`, so link rows stay inside the 20�
 **Saved views:** contractor C-14 network; churn by bank account; vendor V-08. **Geo Views:** loss by
 transformer area. **Advanced tier:** personas `rp.analyst`, `rp.manager`, `rp.reviewer`, `rp.outsider`; an Alert
 Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility.mjs`.
+
+#### `la-utility` Basic tier as built (step 3, 2026-11-07)
+
+- **Template** `spaces/_templates/la-utility/` (`minEdition: basic`): eight Collectors, Pipelines and Datasets, files in
+  `data/inbox/<feed>` (12 months, 2025-10-01..2026-09-30; `meter_read` and `transformer_read` as one file per month,
+  the other feeds as one extract) and `data/staged/<feed>` (October 2026 for the six event feeds). Two `sql.template`
+  Jobs fire on `pipeline.commit`: `utility_links` folds the feeds into one link Dataset of the six specced kinds, one
+  row per pair (4 301 rows), with an extra `kwh` column; `transformer_loss` balances each metered transformer against
+  its premises' meter reads per month (144 rows, `loss_band` over 15 % / over 9 % / normal). Three saved views
+  (`utility_contractor_network`, `utility_churn_by_bank`, `utility_vendor_network`) filter the link Dataset by kind; one
+  saved Geo View (`utility_transformer_loss_map`), inert on Basic. No `link-analysis.toon`. Ships
+  `config/examples/sla-escalation-examples.md` like every template (`TemplateGovernanceExamplesTest`).
+- **Generator** `tools/gen-la-utility-data.py` (seed 20261107, standard library, byte-identical on a re-run) writes the
+  data and `tools/gen-la-utility-data.ground-truth.json` (story → entity ids and look-alike ids; not in the data
+  download).
+- **Golden tests:** `tools/gen-la-utility-data.test.mjs` (determinism; each story's facts in the files, e.g. the 40–70 %
+  drop after the C-14 visit, reads of zero for a genuine disconnection) and `UtilityLinksJobGoldenTest` (inspecto-engine:
+  the real Pipelines land every row with nothing quarantined, the real Jobs run; every story's entities form one
+  connected piece of the link Dataset; no look-alike holds a link to a story entity; loss goes over 15 % on TX-007 and
+  TX-019 only). A mutant ground truth (a premise C-14 really visited listed as a look-alike) turns the test red.
+- **Figures as generated:** 1 000 premises on 40 transformers, 12 of them metered; 1 112 accounts, 365 000 meter
+  reads, 551 visits, 473 service orders, 10 577 token sales, 7 368 payments landed. Loss on TX-007 goes from 6.2 % to
+  17.9 %, on TX-019 from 5.1 % to 24.7 %; the other ten metered transformers stay at or under 6.7 %.
+- **Deviations from the spec above:**
+  - **1 000 premises instead of 8 000** (feeds scaled with them). Daily reads of 8 000 premises would put about 80 MB of
+    CSV in git; 1 000 keep the committed corpus at about 12 MB (the data download is 2.1 MB zipped). In consequence the
+    link Dataset has about 4.3 k rows, not 20–60 k, and the story premises are 89 of 1 000 (about 9 %), not "a few
+    percent".
+  - **Churn** is 6 premises that each closed two accounts with arrears and reopened within 30 days (12 closed
+    accounts), all 18 accounts on one bank account, so the story is one connected group, not 12 separate pairs.
+  - C-22 is tied to C-14 by three joint visits at tampered premises ("C-14's colleague").
+  - `tamper_flag` is VARCHAR (0, 1 or blank): a declared INTEGER lands as VARCHAR anyway.
+- **Known gaps (open):**
+  - `utility_churn_by_bank` projects 1 954 rows but 2 932 nodes, over the 1 000-node canvas cap, so in the UI it
+    will likely say "Result cut short". The fix is a derived Dataset per view, as `la-police` does. The other two views
+    project 679 and 310 nodes.
+  - The prepaid look-alike V-01 sells in another city, so its "no look-alike joins" check cannot fail.
+  - Look-alikes are kept free of direct links only; some sit two hops from a story through a shared contractor.
+- **Live proof on Basic:** recorded at step 3 under Steps.
 
 ### Specs 4–13: the wave C Spaces
 
@@ -363,6 +439,23 @@ with a score).
   the top.
 
 **Alert Rule:** a new ownership path that reaches a listed person within 3 hops.
+
+**Basic tier BUILT 2026-11-07** (hub `okf/product/solution-pack/la-ownership/`, `OwnershipLinksJobGoldenTest`,
+`tools/gen-la-ownership-data.test.mjs`). As built, where it differs from the spec above:
+- **`name_match` uses the engine, not the generator.** The pipeline `similarity` step compares two columns of one
+  row, so it cannot match a register against a list; the `ownership_links` Job calls DuckDB `jaro_winkler_similarity`
+  directly (the same function the step uses) on lower-case letters of the name and every alias, threshold
+  `min_name_score` 0.90, AND the same birth year AND nationality. The generator re-runs that rule on its corpus and
+  refuses to write if anything but the planted pair matches.
+- **61 % is 24 + 24 + 13.** Stakes of 24 % cannot multiply up to 61 %, so every stake on the 5-layer chain is 24 % and
+  three vehicles at its foot hold 24 + 24 + 13 % of each of the 4 customers. The sanctioned path is customer ← 50 %
+  owner ← 60 % by the matched person.
+- **Columns added:** `payment.payment_id` (one row per payment) and `sanctions_list.listed_at` (the link's time).
+  `birth_year` is VARCHAR (a declared INTEGER lands VARCHAR under DIRECT).
+- **Scale:** 8 807 stakes, 8 085 officers, 40 061 landed payments, 44 321 link rows; data 1.8 MB unzipped.
+  Background directorships are capped at 12 so nobody but the nominee stands out; background company ownership is
+  acyclic, so the planted circle is the only one.
+- **Staged month:** October payments plus 8 newly onboarded customers.
 
 #### 6. `la-trade` — trade-based money laundering
 
@@ -579,8 +672,28 @@ with a score).
 **Wave A: the first new Spaces (in flight)**
 
 2. **`la-police`:** generator, golden tests, template (Basic tier) → verify: loads on a Basic build; every story
-   is visible from its saved view; no look-alike joins a story.
-3. **`la-utility`:** same as step 2.
+   is visible from its saved view; no look-alike joins a story. **BUILT 2026-11-07** (as built under `la-police`
+   above). Live proof on a Basic build with the Link Analysis UI (`package.ps1 -Edition Basic -Ui la-app`):
+   `node tools/package-la-showcase.mjs la-police` (47 Space files, 18 data files), product, Space and data unzipped
+   side by side, started with `SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data` and nothing
+   else. All eleven Pipelines landed their files with 0 rejected (4 001 incidents, 6 000 people, 40 004 plate reads,
+   30 168 calls); the cron fired `police_links` (22 434 links) and its signal fired the three derived Jobs (66, 1 287
+   and 684 rows); all state was written under `inspecto-la-data\la-police`, the Space folder held only `space.toon`
+   and `config\`. In the UI the three saved views are listed and draw without "Result cut short" (61, 736 and 751
+   nodes); over the same projection each story is one connected piece from its seed (series 26 of 26 entities,
+   drug network and bases 78 of 78, witness 3 of 3) and no look-alike holds a link to a story entity. Not checked:
+   the staged month, the saved Geo View (Standard and above).
+3. **`la-utility`:** same as step 2. **BUILT 2026-11-07 (`2eb7a0e45`)** (as built under `la-utility` above). Live
+   proof on a Basic build with no UI (`package.ps1 -Edition Basic -NoUi`): `node tools/package-la-showcase.mjs
+   la-utility` (35 Space files, 36 data files), product, Space and data unzipped side by side, started with
+   `SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data` and nothing else. All eight Pipelines landed
+   their 30 files in 30 batches with 0 rejected files or rows (390 461 rows); `pipeline.commit` fired `utility_links`
+   (4 301 links) and `transformer_loss` (144 rows); all state was written under `inspecto-la-data\la-utility`, the Space
+   folder held only `space.toon` and `config\`. Over each saved view's projection (`POST /inv/projection` with the
+   view's filter, none truncated), every story's entities are present: contractor view 23 of 23 tampering (the
+   transformers are not in that view) and 16 of 16 reconnection; churn view 25 of 25 churn and 13 of 13 commercial
+   load; vendor view 41 of 41 prepaid. Not checked: the Link Analysis UI (no UI in the bundle; see the canvas-cap gap
+   above), the staged month, the saved Geo View (Standard and above).
 4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check.
 
 **Wave B: the existing five ship in the new layout**

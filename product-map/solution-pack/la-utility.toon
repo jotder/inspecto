@@ -1,0 +1,7 @@
+id: solution-pack.la-utility
+kind: solution-pack
+title: Link Analysis utility showcase
+template: la-utility
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-utility/index.md

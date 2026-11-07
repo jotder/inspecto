@@ -1,0 +1,6 @@
+physicalRef: officer/database
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per officer appointment: company, person and role (director or secretary). Landed by the officer Pipeline. Synthetic."
+columns[3]{name,type,classification}:
+  company_id,string,
+  person_id,string,
+  role,string,

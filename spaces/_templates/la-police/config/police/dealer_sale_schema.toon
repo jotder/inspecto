@@ -1,0 +1,32 @@
+raw:
+  name: DEALER_SALE
+  format: CSV
+  fields[6]{name,selector,type}:
+    sale_id,"0",VARCHAR
+    dealer_id,"1",VARCHAR
+    seller_person_id,"2",VARCHAR
+    item_desc,"3",VARCHAR
+    serial,"4",VARCHAR
+    sold_at,"5",TIMESTAMP
+mapping:
+  canonicalName: dealer_sale
+  rawName: DEALER_SALE
+  fields[6]:
+    - name: sale_id
+      from: sale_id
+      fn: keep
+    - name: dealer_id
+      from: dealer_id
+      fn: keep
+    - name: seller_person_id
+      from: seller_person_id
+      fn: keep
+    - name: item_desc
+      from: item_desc
+      fn: keep
+    - name: serial
+      from: serial
+      fn: keep
+    - name: sold_at
+      from: sold_at
+      fn: keep

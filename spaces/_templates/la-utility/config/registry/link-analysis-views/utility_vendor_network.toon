@@ -1,0 +1,23 @@
+name: utility_vendor_network
+description: "Vendor V-08 - prepaid premises linked to the vending points that sold them tokens (amount = money, kwh = credited). V-08 credits 40 premises 2.5-4x the kWh their money buys, mostly at night (via shows kWh per unit of money and night sales). The supermarket V-01 sells more, at a constant price, in the daytime, and shares no premise with V-08."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: utility_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,kwh,via
+  filter:
+    kind: group
+    op: OR
+    items[1]{kind,field,operator,value}:
+      condition,kind,"=","vended_by"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

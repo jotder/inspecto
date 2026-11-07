@@ -1,0 +1,6 @@
+entity_types[1]:
+  - id: party
+    label: Party
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PARTY

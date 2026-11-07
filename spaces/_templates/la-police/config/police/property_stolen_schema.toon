@@ -1,0 +1,20 @@
+raw:
+  name: PROPERTY_STOLEN
+  format: CSV
+  fields[3]{name,selector,type}:
+    incident_id,"0",VARCHAR
+    item_desc,"1",VARCHAR
+    serial,"2",VARCHAR
+mapping:
+  canonicalName: property_stolen
+  rawName: PROPERTY_STOLEN
+  fields[3]:
+    - name: incident_id
+      from: incident_id
+      fn: keep
+    - name: item_desc
+      from: item_desc
+      fn: keep
+    - name: serial
+      from: serial
+      fn: keep

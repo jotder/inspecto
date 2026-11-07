@@ -1,0 +1,36 @@
+raw:
+  name: CUSTOMER_ACCOUNT
+  format: CSV
+  fields[7]{name,selector,type}:
+    account_id,"0",VARCHAR
+    premise_id,"1",VARCHAR
+    holder_name,"2",VARCHAR
+    opened_at,"3",DATE
+    closed_at,"4",DATE
+    bank_account,"5",VARCHAR
+    arrears,"6",DOUBLE
+mapping:
+  canonicalName: customer_account
+  rawName: CUSTOMER_ACCOUNT
+  fields[7]:
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: premise_id
+      from: premise_id
+      fn: keep
+    - name: holder_name
+      from: holder_name
+      fn: keep
+    - name: opened_at
+      from: opened_at
+      fn: keep
+    - name: closed_at
+      from: closed_at
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep
+    - name: arrears
+      from: arrears
+      fn: keep

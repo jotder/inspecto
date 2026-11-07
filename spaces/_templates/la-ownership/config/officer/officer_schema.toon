@@ -1,0 +1,20 @@
+raw:
+  name: OFFICER
+  format: CSV
+  fields[3]{name,selector,type}:
+    company_id,"0",VARCHAR
+    person_id,"1",VARCHAR
+    role,"2",VARCHAR
+mapping:
+  canonicalName: officer
+  rawName: OFFICER
+  fields[3]:
+    - name: company_id
+      from: company_id
+      fn: keep
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: role
+      from: role
+      fn: keep

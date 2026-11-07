@@ -1,0 +1,20 @@
+raw:
+  name: OWNERSHIP
+  format: CSV
+  fields[3]{name,selector,type}:
+    owner_id,"0",VARCHAR
+    owned_id,"1",VARCHAR
+    percent,"2",DOUBLE
+mapping:
+  canonicalName: ownership
+  rawName: OWNERSHIP
+  fields[3]:
+    - name: owner_id
+      from: owner_id
+      fn: keep
+    - name: owned_id
+      from: owned_id
+      fn: keep
+    - name: percent
+      from: percent
+      fn: keep

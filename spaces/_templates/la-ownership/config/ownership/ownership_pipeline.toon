@@ -1,0 +1,36 @@
+name: ownership
+active: true
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per shareholding: the owner (a PER- person or a CO- company), the company owned and the percent held. One extract (OWNERSHIP_20260930.csv). Synthetic; regenerate with tools/gen-la-ownership-data.py."
+
+dirs:
+  poll:       data/inbox/ownership
+  database:   data/ownership/database
+  backup:     data/ownership/backup
+  temp:       data/ownership/temp
+  errors:     data/ownership/errors
+  quarantine: data/ownership/quarantine
+  markers:    data/ownership/markers
+  status_dir: data/ownership/status
+  log_dir:    data/ownership/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: ownership_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

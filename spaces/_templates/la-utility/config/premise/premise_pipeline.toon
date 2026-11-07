@@ -1,0 +1,36 @@
+name: premise
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per supplied premise: invented address, city, coordinates, tariff (residential or commercial), meter type (smart or prepaid) and the transformer that supplies it. One extract (PREMISE_20260930.csv). Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/premise
+  database:   data/premise/database
+  backup:     data/premise/backup
+  temp:       data/premise/temp
+  errors:     data/premise/errors
+  quarantine: data/premise/quarantine
+  markers:    data/premise/markers
+  status_dir: data/premise/status
+  log_dir:    data/premise/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: premise_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

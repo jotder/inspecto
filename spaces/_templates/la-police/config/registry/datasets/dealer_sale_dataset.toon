@@ -1,0 +1,9 @@
+physicalRef: dealer_sale/database
+description: "Police Link Analysis showcase - One row per item sold to a second-hand dealer: dealer, seller, item and serial (blank when not recorded). Landed by the dealer_sale Pipeline. Synthetic."
+columns[6]{name,type,classification}:
+  sale_id,string,
+  dealer_id,string,
+  seller_person_id,string,
+  item_desc,string,
+  serial,string,
+  sold_at,timestamp,

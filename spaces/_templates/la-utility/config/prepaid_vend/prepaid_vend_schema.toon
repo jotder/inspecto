@@ -1,0 +1,32 @@
+raw:
+  name: PREPAID_VEND
+  format: CSV
+  fields[6]{name,selector,type}:
+    vend_id,"0",VARCHAR
+    premise_id,"1",VARCHAR
+    vendor_id,"2",VARCHAR
+    amount,"3",DOUBLE
+    kwh,"4",DOUBLE
+    vend_at,"5",TIMESTAMP
+mapping:
+  canonicalName: prepaid_vend
+  rawName: PREPAID_VEND
+  fields[6]:
+    - name: vend_id
+      from: vend_id
+      fn: keep
+    - name: premise_id
+      from: premise_id
+      fn: keep
+    - name: vendor_id
+      from: vendor_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: kwh
+      from: kwh
+      fn: keep
+    - name: vend_at
+      from: vend_at
+      fn: keep

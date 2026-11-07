@@ -1,0 +1,9 @@
+physicalRef: payment/database
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per outgoing payment from a customer to a company: amount and time. Landed by the payment Pipeline. Synthetic."
+eventDate: paid_at
+columns[5]{name,type,classification}:
+  payment_id,string,
+  from_customer,string,
+  to_company,string,
+  amount,number,
+  paid_at,timestamp,

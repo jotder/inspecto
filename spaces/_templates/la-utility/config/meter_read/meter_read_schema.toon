@@ -1,0 +1,24 @@
+raw:
+  name: METER_READ
+  format: CSV
+  fields[4]{name,selector,type}:
+    premise_id,"0",VARCHAR
+    read_date,"1",DATE
+    kwh,"2",DOUBLE
+    tamper_flag,"3",VARCHAR
+mapping:
+  canonicalName: meter_read
+  rawName: METER_READ
+  fields[4]:
+    - name: premise_id
+      from: premise_id
+      fn: keep
+    - name: read_date
+      from: read_date
+      fn: keep
+    - name: kwh
+      from: kwh
+      fn: keep
+    - name: tamper_flag
+      from: tamper_flag
+      fn: keep
