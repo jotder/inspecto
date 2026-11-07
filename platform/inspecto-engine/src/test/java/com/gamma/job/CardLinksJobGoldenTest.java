@@ -98,6 +98,8 @@ class CardLinksJobGoldenTest {
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
         for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
             assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/card_links_job.toon").toString()).cron(),
+                "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
     }
 
     @Test

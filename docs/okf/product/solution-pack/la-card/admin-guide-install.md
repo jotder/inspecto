@@ -21,7 +21,8 @@ and the [configuration reference](../../module/config/admin-guide-configuration-
 
 ## Install and start
 
-1. Unzip the product so that `<parent>/inspecto-la/serve.bat` (or `serve.sh`) exists.
+1. Unzip the product so that `<parent>/inspecto-la/bin/serve.bat` (or `serve.sh`) exists (the zip holds one
+   `inspecto-deploy/` folder: its contents are what goes into `inspecto-la/`).
 2. Unzip the Space zip into `<parent>/inspecto-la-spaces/` — it creates `la-card/` with `space.toon` and `config/`.
 3. Unzip the data zip into `<parent>/inspecto-la-data/` — it creates `la-card/data/inbox/` and `la-card/data/staged/`.
 4. Start the product from its folder with both roots set, relative to the bundle:
@@ -32,14 +33,17 @@ and the [configuration reference](../../module/config/admin-guide-configuration-
    cd <parent>\inspecto-la
    set SPACES_ROOT=..\inspecto-la-spaces
    set SPACES_DATA_ROOT=..\inspecto-la-data
-   serve.bat
+   bin\serve.bat
    ```
 
    Linux or macOS:
 
    ```bash
-   cd <parent>/inspecto-la && SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data ./serve.sh
+   cd <parent>/inspecto-la && SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data bin/serve.sh
    ```
+
+   The launcher changes to the bundle folder first, so both paths are relative to `inspecto-la/`. `PORT` picks
+   another port than 8080.
 
    Keep `<parent>` free of spaces when you use absolute paths on Windows.
 
