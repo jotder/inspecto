@@ -37,8 +37,10 @@ Prove the built artifact actually serves, not just that tests pass.
    business path answers 404, not the resource (e.g. `/api/v1/spaces`, `/api/v1/spaces/demo/jobs`,
    `/api/v1/spaces/demo/views`). Use `curl -s` and capture status + body. Success bodies are
    envelope-wrapped (`{data, metadata, links, …}`), so read the resource under `.data`.
-5. **Optional e2e** — `E2E_BASE_URL=http://localhost:8080 npm run test:ci -- --include src/e2e/**`
-   in `inspecto-ui/` when the focus is UI-visible.
+5. **Optional e2e** — `E2E_BASE_URL=http://localhost:8080 npm run test:ci -- --include src/e2e/backend-smoke.spec.ts`
+   in `inspecto-ui/` when the focus is UI-visible. It probes `/api/v1` and arms its 401 checks only when
+   `/api/v1/bootstrap` reports a signed-in edition, so it fits any edition — but its SPA-shell check needs a
+   server that serves the UI: a bundle (`bin\serve.bat`) or step 3 plus `-Dui.dir=<built dist>`.
 6. **Always stop the server** — even on failure.
 7. **Report evidence** — endpoint → status → one-line body summary. "Smoke passed" without the
    probe table doesn't count.
