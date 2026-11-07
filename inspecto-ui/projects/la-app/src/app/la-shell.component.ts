@@ -27,7 +27,9 @@ function readExpanded(): boolean {
 /**
  * The signed-in frame: a LEFT navigation rail (product mark, the three areas, Space switcher, user menu) beside the
  * routed page, so the page gets the full window height. The rail is slim (icons) by default and expands to show
- * labels; below the md breakpoint (960px) the same markup lays out as a compact top bar with icons only.
+ * labels; below the sm breakpoint (600px) the same markup lays out as a compact top bar with icons only, pinned
+ * to the top while the page scrolls. The rail stays down to 600px so a laptop at 125-150% scaling keeps the
+ * side-by-side Link Analysis layout.
  * Smaller than the gamma host's classic layout on purpose: no sidebar tree, no Lens switcher, no search.
  *
  * The shell has no header or footer of its own, so it provides `--shell-chrome-height` (read by the Link Analysis
@@ -48,14 +50,14 @@ function readExpanded(): boolean {
         UserComponent,
     ],
     host: {
-        class: 'flex h-full min-h-screen w-full flex-col [--shell-chrome-height:3rem] md:flex-row md:[--shell-chrome-height:0rem]',
+        class: 'flex h-full min-h-screen w-full flex-col [--shell-chrome-height:3rem] sm:flex-row sm:[--shell-chrome-height:0rem]',
         '(document:keydown)': 'onKeydown($event)',
     },
     template: `
         <aside
-            class="bg-card flex min-h-12 flex-0 flex-row items-center gap-1 border-b px-2 max-md:flex-wrap md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:gap-2 md:border-r md:border-b-0 md:py-3"
-            [class.md:w-16]="!expanded()"
-            [class.md:w-56]="expanded()"
+            class="bg-card flex min-h-12 flex-0 flex-row items-center gap-1 border-b px-2 max-sm:flex-wrap sticky top-0 z-10 sm:h-screen sm:flex-col sm:items-stretch sm:gap-2 sm:border-r sm:border-b-0 sm:py-3"
+            [class.sm:w-16]="!expanded()"
+            [class.sm:w-56]="expanded()"
         >
             <a
                 routerLink="/"
@@ -66,10 +68,10 @@ function readExpanded(): boolean {
             >
                 <img class="h-6 w-6 flex-0 object-contain" [src]="logo" alt="" />
                 @if (expanded()) {
-                    <span class="truncate font-semibold max-md:hidden">{{ product }}</span>
+                    <span class="truncate font-semibold max-sm:hidden">{{ product }}</span>
                 }
             </a>
-            <nav class="flex flex-1 flex-row items-center gap-1 md:mt-2 md:flex-col md:items-stretch" aria-label="Areas">
+            <nav class="flex flex-1 flex-row items-center gap-1 sm:mt-2 sm:flex-col sm:items-stretch" aria-label="Areas">
                 @for (item of nav(); track item.path) {
                     <a
                         [routerLink]="'/' + item.path"
@@ -80,11 +82,11 @@ function readExpanded(): boolean {
                         matTooltipPosition="right"
                     >
                         <mat-icon class="icon-size-5 flex-0" [svgIcon]="item.icon"></mat-icon>
-                        <span [class]="expanded() ? 'max-md:sr-only' : 'sr-only'">{{ item.label }}</span>
+                        <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'">{{ item.label }}</span>
                     </a>
                 }
             </nav>
-            <div class="flex flex-row items-center gap-1 md:flex-col md:items-stretch">
+            <div class="flex flex-row items-center gap-1 sm:flex-col sm:items-stretch">
                 <!-- UC-15 rule 4: always one click away, on every screen. -->
                 <button
                     type="button"
@@ -96,7 +98,7 @@ function readExpanded(): boolean {
                     (click)="openNextSteps()"
                 >
                     <mat-icon class="icon-size-5 flex-0" svgIcon="heroicons_outline:light-bulb"></mat-icon>
-                    <span [class]="expanded() ? 'max-md:sr-only' : 'sr-only'" aria-hidden="true"
+                    <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'" aria-hidden="true"
                         >What can I do next?</span
                     >
                 </button>
@@ -106,7 +108,7 @@ function readExpanded(): boolean {
                 <user [showAvatar]="false"></user>
                 <button
                     type="button"
-                    class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm max-md:hidden focus-visible:outline-2"
+                    class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm max-sm:hidden focus-visible:outline-2"
                     [attr.aria-expanded]="expanded()"
                     [attr.aria-label]="expanded() ? 'Collapse navigation' : 'Expand navigation'"
                     [matTooltip]="expanded() ? '' : 'Expand navigation'"
@@ -124,7 +126,7 @@ function readExpanded(): boolean {
                     }
                 </button>
                 @if (expanded()) {
-                    <p class="text-secondary m-0 px-2 text-xs max-md:hidden">{{ footer }}</p>
+                    <p class="text-secondary m-0 px-2 text-xs max-sm:hidden">{{ footer }}</p>
                 }
             </div>
         </aside>

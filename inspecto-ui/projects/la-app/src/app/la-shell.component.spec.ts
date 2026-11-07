@@ -129,14 +129,14 @@ describe('la-app shell and landing page', () => {
     it('provides the chrome height variable the Link Analysis page reads: 0 beside the rail, 3rem top bar when narrow', async () => {
         const el = await render();
         const host = el.matches('la-app-shell') ? el : (el.querySelector('la-app-shell') as HTMLElement);
-        expect(host.className).toContain('md:[--shell-chrome-height:0rem]');
+        expect(host.className).toContain('sm:[--shell-chrome-height:0rem]');
         expect(host.className).toContain('[--shell-chrome-height:3rem]');
     });
 
     it('lets the narrow top bar wrap instead of scrolling the page sideways (320 px reflow)', async () => {
         const el = await render();
         const bar = el.querySelector('aside') as HTMLElement;
-        expect(bar.classList).toContain('max-md:flex-wrap');
+        expect(bar.classList).toContain('max-sm:flex-wrap');
         expect(bar.classList).toContain('min-h-12');
         expect(bar.classList).not.toContain('h-12');
     });
@@ -159,7 +159,7 @@ describe('la-app shell and landing page', () => {
         harness.detectChanges();
         expect(toggle().getAttribute('aria-expanded')).toBe('true');
         expect(localStorage.getItem(LA_RAIL_EXPANDED_KEY)).toBe('1');
-        expect(el.querySelector('aside')?.className).toContain('md:w-56');
+        expect(el.querySelector('aside')?.className).toContain('sm:w-56');
         expect(el.textContent).toContain(TestBed.inject(APP_ENVIRONMENT).footerText);
     });
 

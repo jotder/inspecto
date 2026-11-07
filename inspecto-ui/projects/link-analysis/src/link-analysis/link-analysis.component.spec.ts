@@ -2717,13 +2717,13 @@ describe('LinkAnalysisComponent', () => {
         it('stacks the three docks below md so 400% zoom / 320 px reflows (live-proven 2026-10-05: a row of two fixed-width docks left the canvas 0 px wide)', () => {
             const { el } = open();
             const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
-            expect(workspace.classList).toContain('max-md:flex-col');
-            expect(el.querySelector('aside[aria-label="Toolbox"]')!.classList).toContain('max-md:!w-full'); // beats the inline px width
+            expect(workspace.classList).toContain('max-sm:flex-col');
+            expect(el.querySelector('aside[aria-label="Toolbox"]')!.classList).toContain('max-sm:!w-full'); // beats the inline px width
             // the drag handle has nothing to drag once the docks stack
             const handles = Array.from(el.querySelectorAll('[aria-label^="Resize the"]'));
             expect(handles).toHaveLength(1);
             for (const handle of handles) {
-                expect(handle.classList).toContain('max-md:hidden');
+                expect(handle.classList).toContain('max-sm:hidden');
             }
         });
 
@@ -3158,7 +3158,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
             .parentElement as HTMLElement;
         expect(wrapper.classList).toContain('flex');
         expect(wrapper.classList).toContain('flex-col');
-        expect(wrapper.classList).toContain('max-md:min-h-[480px]'); // stacked layout keeps the old canvas height
+        expect(wrapper.classList).toContain('max-sm:min-h-[480px]'); // stacked layout keeps the old canvas height
     });
 
     it('bounds the page to the viewport at md+ (no page scroll): root height, row min-h-0, strip shrink-0; stacked keeps page scroll', async () => {
@@ -3170,10 +3170,10 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         const root = el.firstElementChild as HTMLElement;
         // header 4rem + footer 3.5rem; floored at 35rem so a short window scrolls the PAGE instead of crushing the canvas
         expect(root.classList).toContain('h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)]');
-        expect(root.classList).toContain('max-md:h-auto');
+        expect(root.classList).toContain('max-sm:h-auto');
         expect(root.classList).not.toContain('h-full');
         const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
-        for (const c of ['min-h-[26.25rem]', 'flex-auto', 'overflow-hidden', 'max-md:min-h-[28rem]']) {
+        for (const c of ['min-h-[26.25rem]', 'flex-auto', 'overflow-hidden', 'max-sm:min-h-[28rem]']) {
             expect(workspace.classList).toContain(c);
         }
         for (const dock of ['Toolbox']) {
