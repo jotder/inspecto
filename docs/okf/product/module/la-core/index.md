@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-SHOWCASE-POLICE-UTILITY-1` | P2 | feature | two new Link Analysis showcase Spaces, la-police (criminal investigation) and la-utility (electricity revenue protection), each a templat… | — |
+| `LA-SHOWCASE-CATALOGUE-1` | P2 | feature | ten more showcase Spaces, one lane each: la-card, la-ownership, la-trade, la-procurement, la-benefits, la-health, la-telco-ra, la-logisti… | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
