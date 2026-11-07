@@ -1,0 +1,12 @@
+physicalRef: incident_report/database
+description: "Police Link Analysis showcase - One row per reported incident: offence type, the start and end of the window it happened in, district, city, a city-level invented location and the reporting person (blank when the police raised it). Landed by the incident_report Pipeline. Synthetic."
+columns[9]{name,type,classification}:
+  incident_id,string,
+  offence_type,string,
+  start_at,timestamp,
+  end_at,timestamp,
+  district,string,
+  city,string,
+  lat,number,
+  lon,number,
+  reporting_person_id,string,

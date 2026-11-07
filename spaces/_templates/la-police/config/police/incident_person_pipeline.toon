@@ -1,0 +1,36 @@
+name: incident_person
+active: true
+description: "Police Link Analysis showcase - One row per person recorded on an incident, with their role (suspect, victim, witness). One extract (INCIDENT_PERSON_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/incident_person
+  database:   data/incident_person/database
+  backup:     data/incident_person/backup
+  temp:       data/incident_person/temp
+  errors:     data/incident_person/errors
+  quarantine: data/incident_person/quarantine
+  markers:    data/incident_person/markers
+  status_dir: data/incident_person/status
+  log_dir:    data/incident_person/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: incident_person_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

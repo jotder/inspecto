@@ -1,0 +1,24 @@
+raw:
+  name: VEHICLE
+  format: CSV
+  fields[4]{name,selector,type}:
+    plate,"0",VARCHAR
+    make,"1",VARCHAR
+    colour,"2",VARCHAR
+    keeper_person_id,"3",VARCHAR
+mapping:
+  canonicalName: vehicle
+  rawName: VEHICLE
+  fields[4]:
+    - name: plate
+      from: plate
+      fn: keep
+    - name: make
+      from: make
+      fn: keep
+    - name: colour
+      from: colour
+      fn: keep
+    - name: keeper_person_id
+      from: keeper_person_id
+      fn: keep

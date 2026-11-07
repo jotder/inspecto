@@ -1,0 +1,36 @@
+name: vehicle
+active: true
+description: "Police Link Analysis showcase - One row per registered vehicle: invented plate, make, colour and keeper. One extract (VEHICLE_20261031.csv). Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/vehicle
+  database:   data/vehicle/database
+  backup:     data/vehicle/backup
+  temp:       data/vehicle/temp
+  errors:     data/vehicle/errors
+  quarantine: data/vehicle/quarantine
+  markers:    data/vehicle/markers
+  status_dir: data/vehicle/status
+  log_dir:    data/vehicle/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: vehicle_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

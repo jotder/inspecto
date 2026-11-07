@@ -1,0 +1,36 @@
+name: dealer_sale
+active: true
+description: "Police Link Analysis showcase - One row per item sold to a second-hand dealer: dealer, seller, item and serial (blank when not recorded). One extract (DEALER_SALE_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/dealer_sale
+  database:   data/dealer_sale/database
+  backup:     data/dealer_sale/backup
+  temp:       data/dealer_sale/temp
+  errors:     data/dealer_sale/errors
+  quarantine: data/dealer_sale/quarantine
+  markers:    data/dealer_sale/markers
+  status_dir: data/dealer_sale/status
+  log_dir:    data/dealer_sale/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: dealer_sale_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

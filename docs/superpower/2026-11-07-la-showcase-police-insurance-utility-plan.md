@@ -202,6 +202,43 @@ stolen property and a dealer sale).
 `police.sio` (second approver), `police.reviewer` (read-only), `police.outsider`; an Alert Rule on new serial
 matches; seed script `tools/seed-la-police.mjs` creating the Investigation and a Case.
 
+#### `la-police` Basic tier as built (step 2, 2026-11-07)
+
+- **Template** `spaces/_templates/la-police/` (`minEdition: basic`): eleven Collectors, Pipelines and Datasets
+  (`config/police/`), files in `data/inbox/<feed>` (12 months, 2025-11-01..2026-10-31) and `data/staged/<feed>` (November
+  2026 for the seven event feeds, including one more serial match by a series seller). The `police_links` Job (cron every
+  5 minutes) folds them into one link Dataset of nine kinds, about 25 000 rows; three Jobs fire on its
+  `job.dataset.produced` signal and derive one Dataset per saved view: `police_property_links` (the stolen-property
+  circle), `police_call_links` (the busy handsets), `police_witness_links` (repeat witnesses). No
+  `link-analysis.toon`: masking and the link index are Standard and above.
+- **Generator** `tools/gen-la-police-data.py` (seed 20261107, standard library, byte-identical on a re-run) writes the
+  data and `tools/la-police-ground-truth.json` (story → entity ids; not in the data download). Coordinates are rounded
+  to the 5 decimals the CSV carries before any distance is measured, so the generator's 2 km / 30 minute test and the
+  Job's SQL agree at the border.
+- **Golden tests:** `tools/gen-la-police-data.test.mjs` (determinism; the planted facts on the files) and
+  `LaPoliceLinksJobTest` (inspecto-engine: the real Pipelines land every row with nothing quarantined, the real Jobs run;
+  every story's entities form one connected piece of its saved view's Dataset; no look-alike holds a link of any kind
+  to a story entity; each saved view's Dataset stays under 4 000 rows).
+- **Figures as generated:** series 18 burglaries, 53 items, 21 resurfaced (40 %), 13 serial matches (62 %) on 13
+  scenes, the vehicle seen near 11 scenes, so every scene has a match or a read; controllers carry over 75–80 % of
+  their customers; the taxi is seen near 54 scenes, none in the series; the delivery driver calls 208 numbers in the
+  landed months.
+- **Decided while building:**
+  - A ninth link kind, `uses_number` (a person to the handset number attributed to them): without it numbers and
+    people are two separate graphs and the drug bases cannot reach an address.
+  - `incident_report` carries a `district` column for the two-district series.
+  - Drug-base "visits" are not modelled (no feed records a visit); the runner calls carry the story.
+  - Links with no time of their own (`keeper_of`, `lives_at`, `uses_number`) carry 2025-11-01; `amount` is the
+    number of records behind a link.
+  - A saved view draws its whole Dataset, and the canvas shows at most 1 000 nodes (`projection_node_cap`) from at
+    most 4 000 rows by default (`traversal.rows_default`); past either it says "Result cut short" and a story may be
+    off screen. The first handset view (every call pair) had 5 350 rows, then 2 110 nodes; now background handsets
+    have fewer contacts (about 2 600 call pairs) and `police_call_links` keeps only the calls of numbers with 6 or
+    more call partners (about 740 nodes). The golden test pins both limits for every view.
+  - The saved Geo View is incident markers only; plate-read routes need a legs Dataset and wait for step 5. The Geo
+    map is Standard and above, so the view is inert on Basic.
+- **Live proof on Basic:** recorded at step 2 under Steps.
+
 ### 2. `la-claims` — insurance fraud (exists; additions)
 
 The existing template and `tools/gen-la-claims-data.py` stay. Changes:
@@ -258,7 +295,17 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
    verify: unzip the product, Space and data into one parent folder, start Basic, the Space loads and its
    Pipelines land the data.
 2. **`la-police`:** generator, golden tests, template (Basic tier) → verify: loads on a Basic build; every story
-   is visible from its saved view; no look-alike joins a story.
+   is visible from its saved view; no look-alike joins a story. **BUILT 2026-11-07** (as built under `la-police`
+   above). Live proof on a Basic build with the Link Analysis UI (`package.ps1 -Edition Basic -Ui la-app`):
+   `node tools/package-la-showcase.mjs la-police` (47 Space files, 18 data files), product, Space and data unzipped
+   side by side, started with `SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data` and nothing
+   else. All eleven Pipelines landed their files with 0 rejected (4 001 incidents, 6 000 people, 40 004 plate reads,
+   30 168 calls); the cron fired `police_links` (22 434 links) and its signal fired the three derived Jobs (66, 1 287
+   and 684 rows); all state was written under `inspecto-la-data\la-police`, the Space folder held only `space.toon`
+   and `config\`. In the UI the three saved views are listed and draw without "Result cut short" (61, 736 and 751
+   nodes); over the same projection each story is one connected piece from its seed (series 26 of 26 entities,
+   drug network and bases 78 of 78, witness 3 of 3) and no look-alike holds a link to a story entity. Not checked:
+   the staged month, the saved Geo View (Standard and above).
 3. **`la-utility`:** same as step 2.
 4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check.
 5. **Advanced tier** for `la-police` and `la-utility` (personas, Alert Rules, seed scripts) → verify on a

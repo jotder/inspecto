@@ -1,0 +1,36 @@
+name: custody
+active: true
+description: "Police Link Analysis showcase - One row per person per arrest; people arrested together share a co_arrest_group. One extract (CUSTODY_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/custody
+  database:   data/custody/database
+  backup:     data/custody/backup
+  temp:       data/custody/temp
+  errors:     data/custody/errors
+  quarantine: data/custody/quarantine
+  markers:    data/custody/markers
+  status_dir: data/custody/status
+  log_dir:    data/custody/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: custody_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

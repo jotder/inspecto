@@ -1,0 +1,20 @@
+raw:
+  name: HANDSET
+  format: CSV
+  fields[3]{name,selector,type}:
+    number,"0",VARCHAR
+    imei,"1",VARCHAR
+    attributed_person_id,"2",VARCHAR
+mapping:
+  canonicalName: handset
+  rawName: HANDSET
+  fields[3]:
+    - name: number
+      from: number
+      fn: keep
+    - name: imei
+      from: imei
+      fn: keep
+    - name: attributed_person_id
+      from: attributed_person_id
+      fn: keep

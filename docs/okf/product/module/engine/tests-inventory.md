@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-374 test class(es): 374 unit, 0 real-HTTP control-plane, 0 IT.
+375 test class(es): 375 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -200,6 +200,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `KpiCompletenessJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/KpiCompletenessJobTest.java` | The {@code kpi.completeness} Job Type (completeness KPI K1/K4): refuse first, read second, and carry |
 | `LaClaimsLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaClaimsLinksJobTest.java` | The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the six Pipelines |
 | `LaIndexBuildJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaIndexBuildJobTest.java` | la.index.build (LA-DAILY-INGEST-1, T5): a clock over a build the Link Analysis side decides - fails closed, |
+| `LaPoliceLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaPoliceLinksJobTest.java` | The {@code la-police} Space Template RUN end to end from a verbatim copy: the eleven Pipelines ingest the shipped extracts |
 | `MailSendJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTest.java` | The {@code mail.send} reference Job (job-parameter-contract §9, step 15). |
 | `MailSendJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTypeTckTest.java` | {@link MailSendJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `MailSendJobTypeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTypeTest.java` | {@code mail.send}'s DECLARATION, pinned against the job-parameter-contract worked example (§9). |
