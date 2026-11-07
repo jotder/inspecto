@@ -548,7 +548,7 @@ describe('DataTableComponent', () => {
         expect(f.componentInstance.suppressHScroll()).toBe(true);
     });
 
-    it('registers every module the shared table binds (no ag-Grid error #200, e.g. Locale for localeText)', async () => {
+    it('registers every module the shared table binds (no ag-Grid error 200, e.g. Locale for localeText)', async () => {
         const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         try {
@@ -556,7 +556,7 @@ describe('DataTableComponent', () => {
             const missing = [...err.mock.calls, ...warn.mock.calls]
                 .flat()
                 .map(String)
-                .filter((m) => /#200\b|moduleName=/.test(m));
+                .filter((m) => /#200\b|moduleName=/.test(m)); // ds-allow: ag-Grid error number, not a colour
             expect(missing).toEqual([]);
         } finally {
             err.mockRestore();
