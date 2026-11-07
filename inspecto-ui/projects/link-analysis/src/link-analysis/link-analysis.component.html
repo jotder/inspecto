@@ -1,4 +1,4 @@
-<div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-md:h-auto">
+<div #studioRoot class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-sm:h-auto">
     <!-- ── header = File ▾, the title, then both toolbars side by side on ONE row of compact icon buttons (operator 2026-10-28) ── -->
     <header #laHeader class="la-compact-bar flex min-w-0 flex-nowrap items-center gap-1" data-testid="la-header">
         <!-- LA-STUDIO-UI-REORG-1 §5.1 / §5.11: File ▾ - New, Open…, Save view, Save view as…, Snapshot, Import / export, Close, Delete -->
@@ -1229,17 +1229,17 @@
         }
 
         <!-- ══ row: [tool rail] │ workspace — the rail is a labelled nav docked on the LEFT edge (canvas height);
-             under the md breakpoint it wraps back into a row above the stacked workspace ══ -->
-        <div class="flex min-h-0 flex-auto gap-2 max-md:flex-col" [class]="dockShown() && bottomOpen() ? 'h-[28rem] flex-none' : ''" data-testid="la-workspace-row">
+             under the sm breakpoint it wraps back into a row above the stacked workspace ══ -->
+        <div class="flex min-h-0 flex-auto gap-2 max-sm:flex-col" [class]="dockShown() && bottomOpen() ? 'h-[28rem] flex-none' : ''" data-testid="la-workspace-row">
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            class="relative flex min-h-[26.25rem] min-w-0 flex-auto overflow-hidden max-md:min-h-[28rem] rounded-lg border max-md:!h-auto max-md:flex-col"
+            class="relative flex min-h-[26.25rem] min-w-0 flex-auto overflow-hidden max-sm:min-h-[28rem] rounded-lg border max-sm:!h-auto max-sm:flex-col"
         >
             <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
             <div
                 #canvasZone
-                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-1 max-md:min-h-[24rem]"
+                class="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-1 max-sm:min-h-[24rem]"
                 [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
             >
                 @if (graph() || workingSetCanvas()) {
@@ -1258,7 +1258,7 @@
 
                     <div
                         #graphRegion
-                        class="relative flex min-h-0 flex-auto flex-col max-md:min-h-[480px]"
+                        class="relative flex min-h-0 flex-auto flex-col max-sm:min-h-[480px]"
                         role="region"
                         aria-label="Link graph"
                         tabindex="-1"
@@ -1584,13 +1584,13 @@
                 [min]="260"
                 [max]="560"
                 [defaultWidth]="340"
-                class="max-md:hidden"
+                class="max-sm:hidden"
                 [class.hidden]="!toolboxDockOpen()"
                 aria-label="Resize the toolbox (arrow keys or drag)"
             ></div>
             <!-- right dock — On screen | Whole Dataset | Investigation toolbox (LA-PANELS-REDESIGN-1); collapses to an icon rail -->
             <aside
-                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-md:!w-full max-md:border-l-0 max-md:border-t"
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l max-sm:!w-full max-sm:border-l-0 max-sm:border-t"
                 [class.w-10]="!toolboxDockOpen()"
                 [style.width.px]="toolboxDockOpen() ? toolboxSplit.width() : null"
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"

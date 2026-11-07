@@ -821,7 +821,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private overlaysStated: { legend?: boolean; workingSet?: boolean } = {};
     /**
      * Keep the canvas usable on a narrow page that has not stacked yet (the stack breakpoint is the VIEWPORT's
-     * 960px, so a ~800px page beside an open nav stayed side-by-side and squeezed the canvas to ~15px): when the
+     * sm breakpoint, 600px, so a ~800px page beside an open nav stays side-by-side and squeezed the canvas to ~15px): when the
      * canvas zone drops below {@link CANVAS_MIN_PX}, collapse the Toolbox dock, then the Query dock, to their rails.
      */
     private readonly watchCanvasWidth = afterNextRender(() => {
@@ -884,7 +884,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** Collapse one dock when the canvas zone is narrower than {@link CANVAS_MIN_PX} (side-by-side layout only). */
     fitDocksToWidth(zoneWidth: number): void {
         if (zoneWidth <= 0 || zoneWidth >= CANVAS_MIN_PX) return;
-        if (window.matchMedia?.('(max-width: 959px)').matches) return; // stacked: the canvas has the full width
+        if (window.matchMedia?.('(max-width: 599px)').matches) return; // stacked (below sm): the canvas has the full width
         if (this.toolboxDockOpen()) this.toolboxDockOpen.set(false);
     }
 
