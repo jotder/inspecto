@@ -1,0 +1,28 @@
+raw:
+  name: PAYMENT
+  format: CSV
+  fields[5]{name,selector,type}:
+    payment_id,"0",VARCHAR
+    account_id,"1",VARCHAR
+    paid_at,"2",TIMESTAMP
+    amount,"3",DOUBLE
+    bank_account,"4",VARCHAR
+mapping:
+  canonicalName: payment
+  rawName: PAYMENT
+  fields[5]:
+    - name: payment_id
+      from: payment_id
+      fn: keep
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: paid_at
+      from: paid_at
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep

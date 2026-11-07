@@ -1,0 +1,20 @@
+raw:
+  name: TRANSFORMER_READ
+  format: CSV
+  fields[3]{name,selector,type}:
+    transformer_id,"0",VARCHAR
+    read_date,"1",DATE
+    kwh_supplied,"2",DOUBLE
+mapping:
+  canonicalName: transformer_read
+  rawName: TRANSFORMER_READ
+  fields[3]:
+    - name: transformer_id
+      from: transformer_id
+      fn: keep
+    - name: read_date
+      from: read_date
+      fn: keep
+    - name: kwh_supplied
+      from: kwh_supplied
+      fn: keep

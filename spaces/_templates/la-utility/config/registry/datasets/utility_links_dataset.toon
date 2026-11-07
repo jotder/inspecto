@@ -1,0 +1,12 @@
+physicalRef: utility_links
+description: "Electricity revenue-protection Link Analysis showcase - ONE link Dataset built by the utility_links Job from premise, customer_account, meter_read, payment, field_visit, service_order and prepaid_vend. kind is one of supplied_by, account_at, paid_from, visited_by, order_closed_by, vended_by; one row per pair; via names the evidence. Ids say what an endpoint is: PRM- premise, TX- transformer, ACC- account, BA- bank account, C- contractor, V- vending point. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  kwh,number,
+  event_date,date,
+  via,string,

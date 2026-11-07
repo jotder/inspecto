@@ -1,0 +1,36 @@
+name: prepaid_vend
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per prepaid token sale: the premise, the vending point, the money received and the kWh credited, and the instant. One landed extract; the next month is in data/staged. Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/prepaid_vend
+  database:   data/prepaid_vend/database
+  backup:     data/prepaid_vend/backup
+  temp:       data/prepaid_vend/temp
+  errors:     data/prepaid_vend/errors
+  quarantine: data/prepaid_vend/quarantine
+  markers:    data/prepaid_vend/markers
+  status_dir: data/prepaid_vend/status
+  log_dir:    data/prepaid_vend/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: prepaid_vend_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
