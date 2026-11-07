@@ -24,7 +24,7 @@ tags: [product-item, module]
 | admin-guide | current | [Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)](admin-guide-demo.md) · [Inspecto LA - the Link Analysis level, the Investigations add-on and the masking default](admin-guide-la-level.md) · [Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)](admin-guide-real-signin.md) |
 | api | current | [Link Analysis — API](api-link-analysis.md) |
 | tests | current | [Link Analysis analyst coverage test (UI-only, impersonated analyst)](tests-analyst-coverage.md) · [Link Analysis data trust: live drive (S10 of `LA-DATA-TRUST-1`)](tests-data-trust-live-drive.md) · [Link analysis core and ports — tests inventory](tests-inventory.md) · [Investigation tab - live re-measure of the undriven workflows (2026-11-02)](tests-investigation-tab-live-drive.md) · [Inspecto LA onboarding - acceptance live drive (`LA-ONBOARD-1` §1)](tests-onboarding-live-drive.md) · [Link Analysis stakeholder Q&A (presenter prep and leave-behind)](tests-stakeholder-qa.md) · [D6 think-aloud session script — a real Case-desk lead](tests-think-aloud-script.md) |
-| brochure | current | [Inspecto LA whitepaper](brochure-inspecto-la-whitepaper.md) |
+| brochure | current | [Inspecto LA whitepaper](brochure-inspecto-la-whitepaper.md) · [Inspecto LA short videos — scripts and agency briefs](brochure-video-scripts.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 
@@ -34,6 +34,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-SHOWCASE-POLICE-UTILITY-1` | P2 | feature | two new Link Analysis showcase Spaces, la-police (criminal investigation) and la-utility (electricity revenue protection), each a templat… | — |
+| `LA-SHOWCASE-CATALOGUE-1` | P2 | feature | ten more showcase Spaces, one lane each: la-card, la-ownership, la-trade, la-procurement, la-benefits, la-health, la-telco-ra, la-logisti… | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

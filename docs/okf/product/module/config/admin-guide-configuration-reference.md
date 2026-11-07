@@ -50,6 +50,22 @@ Example (all configs in `C:\sandbox\spaces`, all data in `C:\data`):
 C:\sandbox\spaces\demo\{space.toon, config\}      C:\data\demo\{data\, audit\, duckdb\, .inspecto-space}
 ```
 
+The launchers (`serve.bat`, `serve.sh`, `serve-demo.*`) pass `SPACES_DATA_ROOT` as `-Dspaces.data.root`; unset leaves
+the flag off. Both `SPACES_ROOT` and `SPACES_DATA_ROOT` may be relative to the bundle root, which is how a showcase
+attached from separate downloads runs (LA-SHOWCASE-DIST-1; `tools/package-la-showcase.mjs`):
+
+```
+<parent>\inspecto-la\                  the product download
+<parent>\inspecto-la-spaces\<id>\      the Space download: space.toon + config\
+<parent>\inspecto-la-data\<id>\        the data download: data\ (then the Space's audit\ and duckdb\)
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+inspecto-la\bin\serve.bat
+```
+
+`space.toon` may name `min_product_version: "<x.y.z>"`; at boot each Space asking for a newer product than the running
+one is named in a WARN (it still boots). A `dev` run checks nothing.
+
 Moving an existing Space: stop the server, move its `data/`, `audit/`, `duckdb/` into `<data root>/` (nothing else
 may be in that folder), set the flag or `data_root`, start. A Space whose folder still holds files in those dirs,
 or whose data root is stamped (`.inspecto-space`) by another Space folder, or whose mount is missing, is not booted

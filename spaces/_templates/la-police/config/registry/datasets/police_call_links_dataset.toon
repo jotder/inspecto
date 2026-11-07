@@ -1,0 +1,11 @@
+physicalRef: police_call_links
+description: "Police Link Analysis showcase - The busy handsets of police_links: every called link touching a number with 6 or more distinct call partners, uses_number for those numbers, and lives_at of the people they are attributed to. Built by the police_call_links Job. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,

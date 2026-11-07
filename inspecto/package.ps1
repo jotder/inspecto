@@ -1556,7 +1556,9 @@ Write-CrlfScript -Path "$binDir\run.bat" -Content $runBatContent
 # Real authentication is the inspecto-oidc module (Standard+, OIDC); see docs/EDITIONS.md.
 $serveShContent = @'
 #!/usr/bin/env bash
-# Usage: [PORT=8080] [SPACES_ROOT=spaces] bin/serve.sh   (from any directory: it cd's to the bundle root)
+# Usage: [PORT=8080] [SPACES_ROOT=spaces] [SPACES_DATA_ROOT=<dir>] bin/serve.sh   (from any directory: it cd's to the bundle root)
+# SPACES_DATA_ROOT: each Space's data/, audit/ and duckdb/ go to <dir>/<space id> (-Dspaces.data.root); unset = inside the Space
+# folder. Both roots may be relative to the bundle root, e.g. SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data.
 # The core is AUTH-FREE by design. Real authentication is the `inspecto-oidc` module (Standard+, OIDC) — see docs/EDITIONS.md.
 # Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" bin/serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
@@ -1569,6 +1571,7 @@ SPACES_ROOT="${SPACES_ROOT:-spaces}"
 # A Space is a folder with config/ or a <id>.ref file pointing at one kept elsewhere (SpaceManager.REF_SUFFIX).
 { ls -d "${SPACES_ROOT}"/*/config || ls "${SPACES_ROOT}"/*.ref; } >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces.root=${SPACES_ROOT}")
+[ -n "${SPACES_DATA_ROOT:-}" ] && JAVA_OPTS+=("-Dspaces.data.root=${SPACES_DATA_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
 # binary; a networked deployment without it still falls back to INSTALL inside ExcelExtension.
@@ -1673,7 +1676,9 @@ Write-LfScript -Path "$binDir\serve.sh" -Content $serveShContent
 $serveBatContent = @'
 @echo off
 rem Usage: bin\serve.bat   (from any directory: it cd's to the bundle root)
-rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces).
+rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces), SPACES_DATA_ROOT (default unset).
+rem SPACES_DATA_ROOT: each Space's data\, audit\ and duckdb\ go to <dir>\<space id> (-Dspaces.data.root); unset = inside the
+rem Space folder. Both roots may be relative to the bundle root, e.g. ..\inspecto-la-spaces and ..\inspecto-la-data.
 rem The core is AUTH-FREE by design; real auth is the inspecto-oidc module (Standard+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
@@ -1690,6 +1695,7 @@ rem A Space may also be a <id>.ref file pointing at a folder kept elsewhere (Spa
 if exist "%SPACES_ROOT%\*.ref" set "ANY_SPACE=1"
 if not defined ANY_SPACE echo [serve.bat] no Space attached under .\%SPACES_ROOT% -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -^> Spaces
 set "OPTS=--enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
+if not "%SPACES_DATA_ROOT%"=="" set "OPTS=%OPTS% -Dspaces.data.root=%SPACES_DATA_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
 rem per-platform binary; a networked deployment without it still falls back to INSTALL
@@ -2215,6 +2221,8 @@ rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relati
 if "%PORT%"=="" set "PORT=8080"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
 set "OPTS=$demoFlags -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
+rem SPACES_DATA_ROOT: same contract as serve.bat.
+if not "%SPACES_DATA_ROOT%"=="" set "OPTS=%OPTS% -Dspaces.data.root=%SPACES_DATA_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 if exist "lib\duckdb\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=lib\duckdb\windows_amd64"
 rem Extra JVM flags from the operator, same contract as serve.bat (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1): INSPECTO_JAVA_OPTS (fallback
@@ -2250,6 +2258,8 @@ PORT="`${PORT:-8080}"
 SPACES_ROOT="`${SPACES_ROOT:-spaces}"
 # An ARRAY, like serve.sh: a SPACES_ROOT (or cwd) containing a space must stay one argument.
 JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}" "-Dspaces.root=`${SPACES_ROOT}")
+# SPACES_DATA_ROOT: same contract as serve.sh.
+[ -n "`${SPACES_DATA_ROOT:-}" ] && JAVA_OPTS+=("-Dspaces.data.root=`${SPACES_DATA_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 [ -d lib/duckdb/linux_amd64 ] && JAVA_OPTS+=("-Dduckdb.extension.dir=lib/duckdb/linux_amd64")
 # Extra JVM flags from the operator, same contract as serve.sh (LAUNCHER-SERVE-DEMO-JAVA-OPTS-1): INSPECTO_JAVA_OPTS (fallback

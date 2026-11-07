@@ -1,0 +1,15 @@
+name: police_incident_map
+description: "Every reported incident as a point, coloured by offence type; the burglary series sits in Leeds North and Leeds East in Feb-Apr 2026. Synthetic placements, city-level. Needs the Geo map (Standard and above); inert on Basic."
+sourceId: dataset
+display: markers
+query:
+  projection:
+    datasetId: incident_report_dataset
+    latCol: lat
+    lonCol: lon
+    entityCol: incident_id
+    entityIdCol: incident_id
+    kindCol: offence_type
+camera:
+  center[2]: -1.55,53.65
+  zoom: 9
