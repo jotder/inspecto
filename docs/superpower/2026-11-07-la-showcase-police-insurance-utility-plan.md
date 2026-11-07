@@ -358,7 +358,7 @@ with a score).
   owner ← 60 % by the matched person.
 - **Columns added:** `payment.payment_id` (one row per payment) and `sanctions_list.listed_at` (the link's time).
   `birth_year` is VARCHAR (a declared INTEGER lands VARCHAR under DIRECT).
-- **Scale:** 8 807 stakes, 8 085 officers, 40 061 landed payments, about 33 k link rows; data 1.8 MB unzipped.
+- **Scale:** 8 807 stakes, 8 085 officers, 40 061 landed payments, 44 321 link rows; data 1.8 MB unzipped.
   Background directorships are capped at 12 so nobody but the nominee stands out; background company ownership is
   acyclic, so the planted circle is the only one.
 - **Staged month:** October payments plus 8 newly onboarded customers.

@@ -41,17 +41,19 @@ never matched.
 
 ## Five-minute tour
 
-1. Open **Link Analysis**. In **Start a graph**, pick the Dataset `ownership_links_dataset`, start from **One entity**
-   and type `CUS-00528`. Choose **Start**. The customer appears with the company it is.
-2. **Expand** (**G**) two or three degrees. A 50 % owner appears, then a person who owns 60 % of that owner, then a
-   list entry `SL-…` joined by a `name_match`. Open the link: its `score` and `via` show the listed name it matched.
-   This is the story *Sanctions two hops away*.
-3. **File ▸ Open… ▸ Saved views** lists one view per story: `ownership_hidden_owner`, `ownership_sanctions_path`,
-   `ownership_nominee_director`, `ownership_circular`. Each keeps only the kinds of link its story needs, and its
-   description says what to look for. Open `ownership_nominee_director`.
-4. Under **Preset queries**, ask **Reached by many** or **Reaching many** on the Dataset: one person stands far above
-   everyone else. Choose **Draw these**.
-5. Open `ownership_circular` and ask the preset **Short loops**: three companies own each other in a circle.
+1. The **Inspecto LA** home page lists the four saved views, one per story: `ownership_hidden_owner`,
+   `ownership_sanctions_path`, `ownership_nominee_director` and `ownership_circular`. Each keeps only the kinds of link
+   its story needs, and its description says what to look for. Opening one draws the whole Dataset through that filter,
+   cut to the busiest 1 000 nodes: a picture of the register, not yet of a story. To find a story, start small.
+2. **File ▸ New** shows **Start a graph**: Dataset `ownership_links_dataset`, start from **One entity**, Entity Type
+   **Party**. Type `SL-0137` and choose **Draw**: a list entry and the one person it name-matches. Open the link: its
+   `score` and `via` show the listed name it matched.
+3. **Expand** (**G**), set **Degrees** to 3 and choose **Expand**. The person's 60 % stake, that company's 50 % stake
+   and the bank customer it reaches appear: six nodes, the story *Sanctions two hops away*. (Drawing from a customer
+   instead also shows the suppliers it paid; a supplier with more than 500 links is *held* and not expanded.)
+4. Back on **Start a graph**, under **Preset queries**, ask **Reaching many** with *Only these kinds of link*
+   `officer_of`: one person stands far above everyone else. Choose **Draw these**.
+5. Ask the preset **Short loops**: exactly one loop, three companies that own each other in a circle.
 
 The exercises below take each story in turn. Try them blind first; the answers follow each hint.
 
@@ -98,7 +100,8 @@ shareholders and no person above 25 %. Who really stands behind them, and how mu
 - **Answer:** `PER-01592` (Dora Upton) is director of **120** companies, all incorporated in 2023–2024 and all
   registered at one formation-agent address, *Suite 4, 18 Quayside Lane, London*, written three ways (*Ste 4, 18
   Quayside Ln, London* and *Suite 4 18 Quayside Lane London*). Eight of them are the bank's customers. No other person
-  directs more than 12 companies.
+  directs more than 12 companies; **Reaching many** on `officer_of` shows her at 120 and the next person at 14
+  appointments (director and secretary roles together).
 - **Not the answer:** `PER-00305` (Rosa Hartley), an accountant, directs four family firms, the Hartley companies
   `CO-01557`, `CO-02658`, `CO-03724` and `CO-05478`, each at its own address. Ordinary, and not linked to the nominee.
 

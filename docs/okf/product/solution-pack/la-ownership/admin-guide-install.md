@@ -16,7 +16,7 @@ The showcase runs on every edition, Basic included. It needs no sign-in, databas
 |---|---|---|
 | Product | `inspecto-deploy-<platform>.zip` | `<parent>\inspecto-la\` |
 | Space | `inspecto-la-space-la-ownership-<version>.zip` | `<parent>\inspecto-la-spaces\` |
-| Data | `inspecto-la-data-la-ownership-<version>.zip` (about 0.6 MB) | `<parent>\inspecto-la-data\` |
+| Data | `inspecto-la-data-la-ownership-<version>.zip` (about 1 MB) | `<parent>\inspecto-la-data\` |
 
 `<parent>` is any folder you choose. Keep the three folders side by side:
 
@@ -57,7 +57,7 @@ the link Dataset. Within a minute or two:
 | `payment` (12 files) | 40 061 | 0 |
 | `sanctions_list` | 400 | 0 |
 
-The `ownership_links` Dataset then holds about 33 000 links in five kinds: `owns`, `officer_of`, `customer_is`,
+The `ownership_links` Dataset then holds about 44 000 links in five kinds: `owns`, `officer_of`, `customer_is`,
 `paid` and exactly one `name_match`.
 
 ## 4. New data arrives (optional demo step)
