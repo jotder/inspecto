@@ -123,7 +123,8 @@ shareholders and no person above 25 %. Who really stands behind them, and how mu
 The answers above are the checklist. The generator's ground truth, `tools/gen-la-ownership-data.ground-truth.json`,
 lists each story's entities and look-alikes; `tools/gen-la-ownership-data.test.mjs` checks the facts in the files and
 `OwnershipLinksJobGoldenTest` checks that, in the link Dataset the Job builds, each story is one connected group and no
-look-alike has a link to it.
+look-alike has a link to it. Without `paid` links each look-alike is fully apart from its story; with them, a look-alike
+customer and a story customer may have paid the same busy supplier, two hops apart, which is ordinary business.
 
 ## References
 

@@ -160,7 +160,7 @@ class OwnershipLinksJobGoldenTest {
     }
 
     @Test
-    void theCircleOwnsAndPaysRoundAndNoOtherOwnershipCycleExists() throws Exception {
+    void theCircleOwnsAndPaysRoundAndIsTheOnlyThreeCycle() throws Exception {
         JsonNode cyc = truth.get("stories").get("circular_ownership").get("facts").get("cycle");
         String l = parquet("ownership_links");
         assertEquals(3, count("WITH o AS (SELECT src, dst FROM " + l + " WHERE kind = 'owns') SELECT count(*) FROM o a JOIN o b ON b.src = a.dst"
