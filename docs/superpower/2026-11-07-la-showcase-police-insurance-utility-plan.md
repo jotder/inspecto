@@ -325,10 +325,17 @@ template `spaces/_templates/la-card/` (`minEdition: basic`; in `offerings/basic.
 `docs/okf/product/solution-pack/la-card/`. Deliberate deviations: the feed is `card_auth`, not `authorization` (a SQL
 keyword); `merchant` gains `channel` (pos/ecom) and `chargeback` a `chargeback_id`; `online_account` is a change log that
 also carries `card_id` (the card on file, for `account_card`); scale is 5 030 cardholders, 6 500 cards, 900 merchants,
-4 000 accounts and about 77 000 authorisations (3 MB of CSV, about 38 000 link rows) rather than 150 000; links are one row
+4 000 accounts, about 77 000 authorisations and 690 chargebacks (3 MB of CSV, about 38 600 link rows) rather than
+150 000 and 1 800; links are one row
 per pair, not per day; two link kinds were added, `refunded` (the colluding merchant's refunds, `via` = sales there) and
 `visited_before_fraud` (each defrauded card to the merchants it paid in the 45 days before), which is the common-point
-view; `from_ip` links a card to its /24 network.
+view; `from_ip` links a card to its /24 network; `card_links` also runs on `cron: "*/5 * * * *"` because a commit landing
+while it runs is skipped (`JOB-SIGNAL-OVERLAP-SKIP-1`). **Proved live 2026-11-08** on a Basic `-NoUi` build with the product,
+Space and data downloads unzipped side by side (`SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data`):
+17 landings, 0 rejected; after the cron run 38 598 links; through `POST /inv/projection/neighbors` with each saved view's
+own filter every story is reachable from its hub (300 tested cards, 140 taken-over accounts, M-221's 35 cards, M-317's 60)
+and no look-alike neighbours a story member; the staged October month landed with 0 rejected. Not checked: the Link
+Analysis UI on that build.
 
 #### 5. `la-ownership` — beneficial ownership and sanctions
 

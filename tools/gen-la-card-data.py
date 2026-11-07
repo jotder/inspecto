@@ -11,15 +11,15 @@ Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-u
 tools/gen-la-card-data.test.mjs over the files and CardLinksJobGoldenTest over the link Dataset):
   1 CARD TESTING           one device and one /24 (203.0.113.0/24) try 300 cards with 1.00 authorisations at 3 small online shops
                            in one night, 85 % declined
-                           look-alike: a corporate proxy (198.51.100.0/24) used by about 200 genuine cards, office hours, few declines
+                           look-alike: a corporate proxy (198.51.100.0/24) used by about 185 genuine cards, office hours, few declines
   2 ACCOUNT TAKEOVER       8 devices change the ship-to address of 140 online accounts to 5 drop addresses, then buy on their cards
                            look-alike: a family of four sharing one tablet across 4 accounts at one address
   3 COLLUDING MERCHANT     M-221 refunds 12 cards it never sold to; its chargebacks run about 9x its category (electronics)
                            look-alike: travel merchant M-140 with a chargeback spike in one strike month (2026-07)
   4 COMMON POINT OF        60 cards defrauded 1-6 weeks after using fuel station M-317 in a 3-week window (2026-03-02..22)
     PURCHASE               look-alike: the busy supermarket M-052 used by about 900 cards, none of them later defrauded
-Scale: 5 000 cardholders, 6 500 cards, 900 merchants, 4 000 online accounts, about 90 000 authorisations (the plan's 150 000
-scaled down so the committed corpus stays under 10 MB). Card ids are invented (CRD-nnnnnn), never card numbers; phones are in
+Scale: 5 000 cardholders, 6 500 cards, 900 merchants, 4 000 online accounts, about 77 000 authorisations and 690 chargebacks (the plan's 150 000
+and 1 800 scaled down so the committed corpus stays under 10 MB). Card ids are invented (CRD-nnnnnn), never card numbers; phones are in
 Ofcom's drama ranges; e-mail domains are example.com/.net/.org; IPs are documentation (RFC 5737) and shared-address (RFC 6598)
 ranges; names and streets are invented, cities are real only at city level. Nothing derives from a real source.
 """
