@@ -563,6 +563,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 log.warn("No Space attached under -Dspaces.root={} - drop a Space folder (a dir with a config/ "
                         + "subtree) there and restart, or create one in Settings -> Spaces", spacesRoot);
             }
+            SpaceVersionCheck.warnNewer(spaces.all(), ProductVersion.current());
         } else {
             try {
                 spaces = SpaceManager.single(CollectorService.fromArgs(args));

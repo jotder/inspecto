@@ -122,7 +122,7 @@ function runLauncher(kind, dir, env, allowFail) {
   // Never inherit the operator's own OIDC/JVM settings into a scenario that must NOT see them.
   for (const k of ['AUTH_OIDC_ISSUER', 'AUTH_OIDC_JWKS_URI', 'AUTH_OIDC_AUDIENCE', 'AUTH_OIDC_CLIENT_ID',
     'AUTH_OIDC_PROVIDER', 'AUTH_OIDC_DISCOVERY_URL', 'AUTH_OIDC_CLIENT_SECRET', 'INSPECTO_JAVA_OPTS', 'EXTRA_JAVA_OPTS', 'INSPECTO_DB_URL', 'PORT',
-    'SPACES_ROOT', 'CORS_ORIGIN', 'HTTPS_KEYSTORE', 'HTTPS_KEYSTORE_PASSWORD']) {
+    'SPACES_ROOT', 'SPACES_DATA_ROOT', 'CORS_ORIGIN', 'HTTPS_KEYSTORE', 'HTTPS_KEYSTORE_PASSWORD']) {
     if (!(k in env)) delete childEnv[k];
   }
   // `.\serve.bat`, not `serve.bat`: a machine with NoDefaultCurrentDirectoryInExePath set does not
@@ -177,7 +177,13 @@ export const SCENARIOS = [
     env: {},
     // BASIC-EVENTS-DURABLE-1 (2026-11-06): Basic keeps its audit events on disk like every edition; it stays auth-free.
     expect: [...ALWAYS, '-Devents.backend=parquet'],
-    rejectPrefix: ['-Dauth.mode', '-Dauth.oidc.', '-Dobjects.backend'],
+    rejectPrefix: ['-Dauth.mode', '-Dauth.oidc.', '-Dobjects.backend', '-Dspaces.data.root'],
+  }),
+  // Showcase downloads (product, Space and data unzipped side by side): both roots are relative to the bundle root.
+  ed('Basic', {
+    name: 'Basic — SPACES_ROOT and SPACES_DATA_ROOT beside the bundle',
+    env: { SPACES_ROOT: '../inspecto-la-spaces', SPACES_DATA_ROOT: '../inspecto-la-data' },
+    expect: ['-Dspaces.root=../inspecto-la-spaces', '-Dspaces.data.root=../inspecto-la-data'],
   }),
   ed('Standard', {
     name: 'Standard — OIDC + secrets + geo jars, no OIDC env',

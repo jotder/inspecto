@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-58 test file(s). Run one, or all:
+59 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -60,6 +60,7 @@ node --test tools/
 | `tools/la-mm-smoke.test.mjs` | node --test tools/la-mm-smoke.test.mjs  -  the pure verdicts of the mobile-money smoke runner, plus a dry run (no server). |
 | `tools/maven-repo.test.mjs` | Run: node --test tools/maven-repo.test.mjs |
 | `tools/offering-classpath.test.mjs` | Fixture test for tools/offering-classpath.mjs. Run: node --test tools/offering-classpath.test.mjs |
+| `tools/package-la-showcase.test.mjs` | Unit tests for tools/package-la-showcase.mjs (LA-SHOWCASE-DIST-1): the Space / data split and the space.toon it writes. |
 | `tools/precommit.test.mjs` | Fixture test for tools/precommit.mjs. Run: node --test tools/precommit.test.mjs |
 | `tools/product-map-import.test.mjs` | Fixture test for tools/product-map-import.mjs. Run: node --test tools/product-map-import.test.mjs |
 | `tools/regroup-modules.test.mjs` | Fixture-based tests for tools/regroup-modules.mjs: a tiny synthetic git repo in a temp dir, never the real tree. |
