@@ -1,0 +1,10 @@
+job:
+  name: trade_circular_trade_links
+  type: sql.template
+  description: "Derived from trade_links each time it is produced: the containers. shipped_in links of boxes flagged relayed (each leg's consignee ships the box on) or many_shippers, and the traded_with links between their shippers. Read by the saved view trade_circular_trade."
+  sql: "WITH l AS (SELECT * FROM trade_links), boxes AS (SELECT * FROM l WHERE kind = 'shipped_in' AND flag IN ('relayed', 'many_shippers')), cos AS (SELECT DISTINCT src AS c FROM boxes) SELECT src, dst, kind, ts, amount, event_date, via, flag FROM boxes UNION ALL SELECT src, dst, kind, ts, amount, event_date, via, flag FROM l WHERE kind = 'traded_with' AND src IN (SELECT c FROM cos) AND dst IN (SELECT c FROM cos) ORDER BY kind, src, dst"
+  sources: trade_links
+  sink_dataset: trade_circular_trade_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == trade_links"
+  enabled: true

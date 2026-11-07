@@ -1,0 +1,32 @@
+raw:
+  name: COMPANY
+  format: CSV
+  fields[6]{name,selector,type}:
+    company_id,"0",VARCHAR
+    name,"1",VARCHAR
+    country,"2",VARCHAR
+    reg_address,"3",VARCHAR
+    incorporated_at,"4",DATE
+    account_id,"5",VARCHAR
+mapping:
+  canonicalName: company
+  rawName: COMPANY
+  fields[6]:
+    - name: company_id
+      from: company_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: country
+      from: country
+      fn: keep
+    - name: reg_address
+      from: reg_address
+      fn: keep
+    - name: incorporated_at
+      from: incorporated_at
+      fn: keep
+    - name: account_id
+      from: account_id
+      fn: keep

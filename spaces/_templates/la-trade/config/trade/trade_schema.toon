@@ -1,0 +1,56 @@
+raw:
+  name: TRADE
+  format: CSV
+  fields[12]{name,selector,type}:
+    trade_id,"0",VARCHAR
+    instrument,"1",VARCHAR
+    applicant,"2",VARCHAR
+    beneficiary,"3",VARCHAR
+    hs_code,"4",VARCHAR
+    qty,"5",DOUBLE
+    unit_price,"6",DOUBLE
+    value,"7",DOUBLE
+    port_load,"8",VARCHAR
+    port_discharge,"9",VARCHAR
+    vessel,"10",VARCHAR
+    ship_date,"11",DATE
+mapping:
+  canonicalName: trade
+  rawName: TRADE
+  fields[12]:
+    - name: trade_id
+      from: trade_id
+      fn: keep
+    - name: instrument
+      from: instrument
+      fn: keep
+    - name: applicant
+      from: applicant
+      fn: keep
+    - name: beneficiary
+      from: beneficiary
+      fn: keep
+    - name: hs_code
+      from: hs_code
+      fn: keep
+    - name: qty
+      from: qty
+      fn: keep
+    - name: unit_price
+      from: unit_price
+      fn: keep
+    - name: value
+      from: value
+      fn: keep
+    - name: port_load
+      from: port_load
+      fn: keep
+    - name: port_discharge
+      from: port_discharge
+      fn: keep
+    - name: vessel
+      from: vessel
+      fn: keep
+    - name: ship_date
+      from: ship_date
+      fn: keep

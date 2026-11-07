@@ -1,0 +1,12 @@
+physicalRef: trade_over_invoicing_links
+description: "Trade-based money-laundering Link Analysis showcase - The link Dataset of the saved view trade_over_invoicing, derived from trade_links by the trade_over_invoicing_links Job: the price anomalies. Every traded_with pair with a trade priced over price_ratio_alert times the month's reference median, and the directors of the companies in those pairs. Same columns as trade_links. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,TRADE_ENTITY
+  dst,string,TRADE_ENTITY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+  flag,string,

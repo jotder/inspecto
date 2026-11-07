@@ -1,0 +1,36 @@
+name: trade
+active: true
+description: "Trade-based money-laundering Link Analysis showcase - One row per trade financed by the bank (letter of credit or documentary collection): applicant (importer), beneficiary (exporter), HS code, quantity, unit price, value, ports, the vessel named on the trade (blank on about 4 % of collections) and the ship date. One file per month (TRADE_YYYYMM.csv), October 2026 staged. Synthetic; regenerate with tools/gen-la-trade-data.py."
+
+dirs:
+  poll:       data/inbox/trade
+  database:   data/trade/database
+  backup:     data/trade/backup
+  temp:       data/trade/temp
+  errors:     data/trade/errors
+  quarantine: data/trade/quarantine
+  markers:    data/trade/markers
+  status_dir: data/trade/status
+  log_dir:    data/trade/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: trade_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,10 @@
+job:
+  name: trade_shell_importers_links
+  type: sql.template
+  description: "Derived from trade_links each time it is produced: the shared addresses. registered_at links flagged shared_address (min_shared_address or more companies at one address), the directors and outgoing payments of those companies, and the trades into them. Read by the saved view trade_shell_importers."
+  sql: "WITH l AS (SELECT * FROM trade_links), ra AS (SELECT * FROM l WHERE kind = 'registered_at' AND flag = 'shared_address'), cos AS (SELECT DISTINCT src AS c FROM ra) SELECT src, dst, kind, ts, amount, event_date, via, flag FROM ra UNION ALL SELECT src, dst, kind, ts, amount, event_date, via, flag FROM l WHERE (kind IN ('directed_by', 'paid') AND src IN (SELECT c FROM cos)) OR (kind = 'traded_with' AND dst IN (SELECT c FROM cos)) ORDER BY kind, src, dst"
+  sources: trade_links
+  sink_dataset: trade_shell_importers_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == trade_links"
+  enabled: true

@@ -467,6 +467,26 @@ with a score).
 
 **Alert Rule:** a unit price over 3× the reference.
 
+**Basic tier BUILT 2026-11-07** (hub `okf/product/solution-pack/la-trade/`, `TradeLinksJobGoldenTest`,
+`tools/gen-la-trade-data.test.mjs`). As built, where it differs from the spec above:
+- **The phantom-shipment check is engine SQL, not a precomputed flag.** The `trade_links` Job LEFT JOINs each bill of
+  lading to `vessel_position` on vessel and `pos_date = bl_date` and flags `vessel_elsewhere` when the vessel was in
+  another port or at sea. Checking each B/L against its own vessel lets a transhipment's two legs pass; a check of the
+  trade's named vessel on the ship date would flag all five look-alikes. Price ratio, relayed boxes and shared
+  addresses are SQL too; the generator only re-runs every rule and refuses to write if a flag fires off-story.
+- **A real world, not random positions:** 300 vessels on 30 liner services sail their loops day by day over 25 invented
+  ports in 24 real countries; every genuine B/L is dated on a day its vessel is in its port of loading.
+- **Trades are not nodes.** `shipped_in` and `on_vessel` run from the shipper, not the trade (trade nodes would need a
+  seventh kind to reach a company and push the links past 60 000). Columns added: `company.account_id`,
+  `trade.instrument`, `payment.payment_id`, `payment.trade_ref`, a `flag` column on the link Dataset.
+- **62 real HS codes**, not 400, with invented prices. Staged month: October 2026 for the five monthly feeds.
+- **One derived Dataset per saved view** (as `la-police`), fired on `job.dataset.produced`: 23, 90, 102 and 199 rows,
+  each with its story's look-alike beside it. The link Job also has a 5-minute cron (`JOB-SIGNAL-OVERLAP-SKIP-1`).
+- **SQL guard gotcha:** the word `from` inside a string literal of a `sql.template` Job is read as a FROM clause naming a
+  file and the Job is refused; keep it out of `via` text.
+- **Scale:** 2 500 companies, 3 514 directors, 11 896 landed trades, 11 955 B/Ls, 109 500 positions, 28 993 payments,
+  49 964 link rows; data 11 MB unzipped.
+
 #### 7. `la-procurement` — bid rigging and procurement fraud
 
 **Audience:** public-procurement integrity units and internal audit.

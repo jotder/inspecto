@@ -1,0 +1,10 @@
+job:
+  name: trade_phantom_shipment_links
+  type: sql.template
+  description: "Derived from trade_links each time it is produced: the bills of lading. Every on_vessel and traded_with link flagged vessel_elsewhere (a B/L whose vessel was not in the port of loading on the B/L date) or transhipment (a trade carried on two vessels). Read by the saved view trade_phantom_shipment."
+  sql: "SELECT src, dst, kind, ts, amount, event_date, via, flag FROM trade_links WHERE kind IN ('on_vessel', 'traded_with') AND (flag LIKE '%vessel_elsewhere%' OR flag LIKE '%transhipment%') ORDER BY kind, src, dst"
+  sources: trade_links
+  sink_dataset: trade_phantom_shipment_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == trade_links"
+  enabled: true

@@ -1,0 +1,20 @@
+raw:
+  name: VESSEL_POSITION
+  format: CSV
+  fields[3]{name,selector,type}:
+    vessel,"0",VARCHAR
+    pos_date,"1",DATE
+    port_or_area,"2",VARCHAR
+mapping:
+  canonicalName: vessel_position
+  rawName: VESSEL_POSITION
+  fields[3]:
+    - name: vessel
+      from: vessel
+      fn: keep
+    - name: pos_date
+      from: pos_date
+      fn: keep
+    - name: port_or_area
+      from: port_or_area
+      fn: keep

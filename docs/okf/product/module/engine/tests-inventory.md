@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-377 test class(es): 377 unit, 0 real-HTTP control-plane, 0 IT.
+378 test class(es): 378 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -244,6 +244,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `SqlTemplateJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlTemplateJobTest.java` | P3b end-to-end: the {@code sql.template} Job Type runs an authored template (its {@code $event_date} |
 | `SqlTemplateJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlTemplateJobTypeTckTest.java` | {@link SqlTemplateJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `TelecomLinksGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TelecomLinksGoldenTest.java` | The {@code la-showcase} Space Template's TELECOM corpus RUN end to end from a verbatim copy: the eight telecom |
+| `TradeLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TradeLinksJobGoldenTest.java` | The {@code la-trade} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped |
 | `TriggerVocabularyContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TriggerVocabularyContractTest.java` | The last of Sprint 3's five failure classes: <b>a served descriptor drifts from its own |
 | `UtilityLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/UtilityLinksJobGoldenTest.java` | The {@code la-utility} Space Template (Basic tier) RUN end to end from a verbatim copy: the eight Pipelines land the shipped |
 | `WhenGuardTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/WhenGuardTest.java` | {@code when:} guard evaluation — flat {@code $signal.<field>} (backward-compatible) and nested |

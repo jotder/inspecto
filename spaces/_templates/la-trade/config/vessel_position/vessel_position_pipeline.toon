@@ -1,0 +1,36 @@
+name: vessel_position
+active: true
+description: "Trade-based money-laundering Link Analysis showcase - One row per vessel per day: the port it was in, or 'At sea - <area>' (300 invented vessels on 30 liner services). One file per month (VESSEL_POSITION_YYYYMM.csv), October 2026 staged. Synthetic; regenerate with tools/gen-la-trade-data.py."
+
+dirs:
+  poll:       data/inbox/vessel_position
+  database:   data/vessel_position/database
+  backup:     data/vessel_position/backup
+  temp:       data/vessel_position/temp
+  errors:     data/vessel_position/errors
+  quarantine: data/vessel_position/quarantine
+  markers:    data/vessel_position/markers
+  status_dir: data/vessel_position/status
+  log_dir:    data/vessel_position/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: vessel_position_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

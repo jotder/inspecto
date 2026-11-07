@@ -1,0 +1,6 @@
+physicalRef: director/database
+description: "Trade-based money-laundering Link Analysis showcase - One row per company and director: the person's id and invented name (a few people are registered twice with a spelling variant). Landed by the director Pipeline. Synthetic."
+columns[3]{name,type,classification}:
+  company_id,string,
+  person_id,string,
+  person_name,string,
