@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-374 test class(es): 374 unit, 0 real-HTTP control-plane, 0 IT.
+375 test class(es): 375 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -211,6 +211,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `MmLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MmLinksJobGoldenTest.java` | The {@code la-mobile-money} Space Template RUN end to end from a verbatim copy: the three Pipelines ingest the shipped |
 | `NoBackupTaskShipsInThePersonalBuildTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/NoBackupTaskShipsInThePersonalBuildTest.java` | EDG-01 cell 2 — the assertion that makes the OPS-06 gating REAL rather than claimed. |
 | `ObjectStoreExportJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ObjectStoreExportJobTypeTckTest.java` | {@link ObjectStoreExportJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
+| `OwnershipLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/OwnershipLinksJobGoldenTest.java` | The {@code la-ownership} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped |
 | `PackTestHarnessTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PackTestHarnessTest.java` | The harness a scaffolded pack tests against (S1-8). What is pinned here is that it is not a |
 | `ParameterDeclContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ParameterDeclContractTest.java` | The declaration's rendering + validation contract (job-parameter-contract §7.2): defaults preserve |
 | `ParameterResolverTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ParameterResolverTest.java` | P3a parameter resolution (§7): layer order (config → deduce → default), the $-context, and fail-closed |

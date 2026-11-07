@@ -1,0 +1,7 @@
+physicalRef: person/database
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per natural person in the register: invented name, birth year and nationality (either blank on about 5 %). Some people are registered twice under a one-letter spelling variant. Landed by the person Pipeline. Synthetic."
+columns[4]{name,type,classification}:
+  person_id,string,
+  name,string,
+  birth_year,string,
+  nationality,string,

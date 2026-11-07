@@ -1,0 +1,6 @@
+physicalRef: customer/database
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per bank customer: the customer id, the company it is and the onboarding date. Landed by the customer Pipeline. Synthetic."
+columns[3]{name,type,classification}:
+  customer_id,string,
+  company_id,string,
+  onboarded_at,date,

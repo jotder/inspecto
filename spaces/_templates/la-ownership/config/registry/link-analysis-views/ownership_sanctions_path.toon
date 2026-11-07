@@ -1,0 +1,25 @@
+name: ownership_sanctions_path
+description: "Sanctions path - Sanctions exposure - ownership, customers and name matches against the invented sanctions list (score = name similarity with the same birth year and nationality). Start from a list entry (SL-) with a name_match and walk down the stakes to the bank customer it reaches. A near-namesake with a different birth year and nationality makes no name_match and must not be treated as a hit."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: ownership_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[5]: ts,amount,percent,score,via
+  filter:
+    kind: group
+    op: OR
+    items[3]{kind,field,operator,value}:
+      condition,kind,"=","owns"
+      condition,kind,"=","customer_is"
+      condition,kind,"=","name_match"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

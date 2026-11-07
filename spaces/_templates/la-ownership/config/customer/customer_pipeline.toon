@@ -1,0 +1,36 @@
+name: customer
+active: true
+description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per bank customer: the customer id, the company it is and the onboarding date. One extract (CUSTOMER_20260930.csv); a delta of new customers is staged for October. Synthetic; regenerate with tools/gen-la-ownership-data.py."
+
+dirs:
+  poll:       data/inbox/customer
+  database:   data/customer/database
+  backup:     data/customer/backup
+  temp:       data/customer/temp
+  errors:     data/customer/errors
+  quarantine: data/customer/quarantine
+  markers:    data/customer/markers
+  status_dir: data/customer/status
+  log_dir:    data/customer/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: customer_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

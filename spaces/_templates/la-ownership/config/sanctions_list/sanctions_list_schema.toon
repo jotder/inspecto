@@ -1,0 +1,32 @@
+raw:
+  name: SANCTIONS_LIST
+  format: CSV
+  fields[6]{name,selector,type}:
+    list_id,"0",VARCHAR
+    name,"1",VARCHAR
+    aliases,"2",VARCHAR
+    birth_year,"3",VARCHAR
+    nationality,"4",VARCHAR
+    listed_at,"5",DATE
+mapping:
+  canonicalName: sanctions_list
+  rawName: SANCTIONS_LIST
+  fields[6]:
+    - name: list_id
+      from: list_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: aliases
+      from: aliases
+      fn: keep
+    - name: birth_year
+      from: birth_year
+      fn: keep
+    - name: nationality
+      from: nationality
+      fn: keep
+    - name: listed_at
+      from: listed_at
+      fn: keep

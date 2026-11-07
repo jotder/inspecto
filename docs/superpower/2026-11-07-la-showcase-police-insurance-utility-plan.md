@@ -346,6 +346,23 @@ with a score).
 
 **Alert Rule:** a new ownership path that reaches a listed person within 3 hops.
 
+**Basic tier BUILT 2026-11-07** (hub `okf/product/solution-pack/la-ownership/`, `OwnershipLinksJobGoldenTest`,
+`tools/gen-la-ownership-data.test.mjs`). As built, where it differs from the spec above:
+- **`name_match` uses the engine, not the generator.** The pipeline `similarity` step compares two columns of one
+  row, so it cannot match a register against a list; the `ownership_links` Job calls DuckDB `jaro_winkler_similarity`
+  directly (the same function the step uses) on lower-case letters of the name and every alias, threshold
+  `min_name_score` 0.90, AND the same birth year AND nationality. The generator re-runs that rule on its corpus and
+  refuses to write if anything but the planted pair matches.
+- **61 % is 24 + 24 + 13.** Stakes of 24 % cannot multiply up to 61 %, so every stake on the 5-layer chain is 24 % and
+  three vehicles at its foot hold 24 + 24 + 13 % of each of the 4 customers. The sanctioned path is customer ← 50 %
+  owner ← 60 % by the matched person.
+- **Columns added:** `payment.payment_id` (one row per payment) and `sanctions_list.listed_at` (the link's time).
+  `birth_year` is VARCHAR (a declared INTEGER lands VARCHAR under DIRECT).
+- **Scale:** 8 807 stakes, 8 085 officers, 40 061 landed payments, about 33 k link rows; data 1.8 MB unzipped.
+  Background directorships are capped at 12 so nobody but the nominee stands out; background company ownership is
+  acyclic, so the planted circle is the only one.
+- **Staged month:** October payments plus 8 newly onboarded customers.
+
 #### 6. `la-trade` — trade-based money laundering
 
 **Audience:** trade-finance compliance at a bank.

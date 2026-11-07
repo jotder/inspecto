@@ -1,0 +1,7 @@
+id: solution-pack.la-ownership
+kind: solution-pack
+title: Link Analysis ownership showcase
+template: la-ownership
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-ownership/index.md
