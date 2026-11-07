@@ -1,13 +1,14 @@
-# Link Analysis showcase catalogue — police, insurance, utility and fourteen more (plan)
+# Link Analysis showcase catalogue — police, insurance, utility and fifteen more (plan)
 
 Status: draft, 2026-11-07; scope widened the same day to the **full catalogue** (operator: "ship the full
-Showcase catalogue for users to play, learn and test"). Product Map Items: existing `solution-pack.la-claims`,
+Showcase catalogue for users to play, learn and test"); 2026-11-08 the catalogue is grouped by industry and
+`la-mfs` added. Product Map Items: existing `solution-pack.la-claims`,
 `solution-pack.la-showcase`, `solution-pack.la-mobile-money`, `solution-pack.la-audit`; one new
 `solution-pack.la-<id>` per new Space, added when its template lands.
 
 ## Goal
 
-**Ship every Space in the catalogue below: 17 showcase Spaces**, each with synthetic data and planted stories, so
+**Ship every Space in the catalogue below: 18 showcase Spaces in 9 industries**, each with synthetic data and planted stories, so
 a user can **play** with Link Analysis on realistic data, **learn** it through exercises with answers, and
 **test** it (and their own understanding) against known ground truth. Each showcase ships as **three separate
 downloads**: the product, the Space (configuration) and the Space's data. A user installs the product once,
@@ -21,28 +22,79 @@ waves under *Steps*. Every story has a benign look-alike that must not join it (
 Realism notes come from the review in the next section. `la-daily-feed` and `la-showcase-off` are test fixtures,
 not showcases, and are not in the catalogue.
 
-| Template | Industry | Use case | Stories | Status |
-|---|---|---|---|---|
-| `la-sample` | Banking | First-run sample (Basic) | 12 smurf accounts structure cash into MULE-HUB-01 → RELAY-01/02 → OFFSHORE-77; SHELL-A..D money loop | exists |
-| `la-showcase` | Banking + telecom | Financial crime and telecom fraud tour | Mule ring and shell loop; TILL-06 takes 80 % of cash-out; SKIMMER-01 skims benefit payments; telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode; geo route of the ring | exists |
-| `la-mobile-money` | Mobile money | Anti-money-laundering | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
-| `la-claims` | Insurance | Claims fraud (Special Investigations Unit) | 12 claimants sharing 4 phones, 3 addresses, one garage, clinic and lawyer; a passenger on 6 claims with 6 drivers; 11 night-time accidents near one junction; ring clinic bills 3× peers; 7 claims within 20 days of inception via one broker; duplicate claimant identity | exists |
-| `la-claims` (additions) | Insurance | Claims fraud | Parts-supplier ring (one supplier on invoices from many garages, parts never fitted); ghost broker (policies sold with false details, all paying from 2 bank accounts) | planned |
-| `la-audit` | Finance / audit | Internal audit, accounts payable | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
-| `la-police` | Law enforcement | Criminal investigation | Burglary series traced through second-hand-dealer sales and one vehicle; drug-supply handset network with a rotating controller phone; addresses taken over as drug bases; a "witness" who was arrested with the suspect | planned |
-| `la-utility` | Electricity | Revenue protection (non-technical loss) | Meter tampering linked to one contractor's visits, seen as loss on two transformers; illegal reconnections closed by one contractor; debt-dodging account churn; commercial load on a residential tariff; prepaid token fraud from one vending point | planned |
-| `la-card` | Payments / e-commerce | Card and e-commerce fraud | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | planned |
-| `la-ownership` | Banking / compliance | Beneficial ownership and sanctions | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | planned |
-| `la-trade` | Trade finance | Trade-based money laundering | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
-| `la-procurement` | Public sector / enterprise | Bid rigging and procurement fraud | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | planned |
-| `la-benefits` | Government | Benefits and tax fraud | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | planned |
-| `la-health` | Healthcare (payer) | Provider billing fraud | Referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for admitted or deceased patients; pill mill; upcoding clinics under one owner | planned |
-| `la-telco-ra` | Telecom | Revenue assurance | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night (SIM box, Wangiri and IRSF stay in `la-showcase`) | planned |
-| `la-logistics` | Logistics | Cargo theft | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | planned |
-| `la-insider` | Enterprise / HR | Insider threat | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
-| `la-crypto` | Crypto | Laundering | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | planned |
+The catalogue is grouped by **industry**, then by **use case** inside it. A template that covers two industries
+is listed under both (`la-showcase`: its banking stories under Banking and finance, its telecom rings under
+Telecom), with the same template id.
 
-**Count: 17 Spaces** (5 exist, 12 new); the `la-claims` additions land inside `la-claims`.
+### Telecom
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Mobile money (anti-money-laundering) | `la-mobile-money` | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
+| MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | planned |
+| Telco fraud | `la-showcase` | Telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode | exists |
+| Revenue assurance | `la-telco-ra` | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | planned |
+
+### Banking and finance
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| First-run sample (Basic) | `la-sample` | 12 smurf accounts structure cash into MULE-HUB-01 → RELAY-01/02 → OFFSHORE-77; SHELL-A..D money loop | exists |
+| Financial crime tour | `la-showcase` | Mule ring and shell loop; TILL-06 takes 80 % of cash-out; SKIMMER-01 skims benefit payments; geo route of the ring | exists |
+| Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
+| Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
+| Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
+| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | planned |
+
+### Insurance
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Claims fraud (Special Investigations Unit) | `la-claims` | 12 claimants sharing 4 phones, 3 addresses, one garage, clinic and lawyer; a passenger on 6 claims with 6 drivers; 11 night-time accidents near one junction; ring clinic bills 3× peers; 7 claims within 20 days of inception via one broker; duplicate claimant identity | exists |
+| Claims fraud (additions) | `la-claims` | Parts-supplier ring (one supplier on invoices from many garages, parts never fitted); ghost broker (policies sold with false details, all paying from 2 bank accounts) | planned |
+
+### Utilities
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Electricity revenue protection (non-technical loss) | `la-utility` | Meter tampering linked to one contractor's visits, seen as loss on two transformers; illegal reconnections closed by one contractor; debt-dodging account churn; commercial load on a residential tariff; prepaid token fraud from one vending point | exists |
+
+### Law enforcement
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Criminal investigation | `la-police` | Burglary series traced through second-hand-dealer sales and one vehicle; drug-supply handset network with a rotating controller phone; addresses taken over as drug bases; a "witness" who was arrested with the suspect | exists |
+
+### Public sector
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Bid rigging and procurement fraud | `la-procurement` | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | planned |
+| Benefits and tax fraud | `la-benefits` | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | planned |
+
+### Healthcare
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Provider billing fraud (payer) | `la-health` | Referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for admitted or deceased patients; pill mill; upcoding clinics under one owner | planned |
+
+### Logistics
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Cargo theft | `la-logistics` | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | planned |
+
+### Enterprise
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
+| Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
+
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 9 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+`la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`) and 9 are planned; the `la-claims`
+additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
+2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
 ## Realism review
 
@@ -362,7 +414,7 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
   - Look-alikes are kept free of direct links only; some sit two hops from a story through a shared contractor.
 - **Live proof on Basic:** recorded at step 3 under Steps.
 
-### Specs 4–13: the wave C Spaces
+### Specs 4–14: the wave C Spaces
 
 These follow the same rules as specs 1–3: the shared data-generation plan, a Basic tier first, 20–60 k link rows,
 12 landed months plus 1 staged month. Row counts are approximate. The Advanced tier of each is personas
@@ -661,6 +713,38 @@ with a score).
 
 **Alert Rule:** a deposit whose funds trace to a labelled hack within 5 hops.
 
+#### 14. `la-mfs` — mobile financial services fraud (added 2026-11-08)
+
+**Audience:** fraud and risk teams at a mobile operator's mobile financial services (MFS) business, and at the
+agent networks and merchants it serves. **Not the same as `la-mobile-money`**, which covers wallet
+anti-money-laundering (structuring, mule chains, a device farm); this Space covers fraud *against* the MFS
+business and its customers. All data is invented. It shares no data, names or ids with any customer MFS Space.
+**Feeds:**
+- `wallet` (20 000): wallet_id, msisdn, kyc_level, opened_at, registered_by_agent;
+- `agent` (600): agent_id, name, area, super_agent_id, float_account;
+- `merchant` (800): merchant_id, name, category, opened_at, settlement_account;
+- `wallet_txn` (200 000, aggregated per pair and day for links): txn_id, from_id, to_id, type (cash_in,
+  cash_out, p2p, merchant_pay), amount, at, device_id;
+- `sim_event` (8 000): msisdn, event (sim_swap, port_out), at, channel (store, call_centre), staff_login;
+- `device_login` (60 000): wallet_id, device_id, at;
+- `agent_commission` (600 × 12): agent_id, month, transactions, commission.
+
+**Link kinds:** `registered_by` (wallet → agent), `paid` (wallet → wallet or merchant), `cashed_in_at`,
+`cashed_out_at`, `logged_in_on` (wallet → device), `swapped_by` (msisdn → staff login), `settles_to`.
+
+**Stories:**
+- **SIM-swap wallet takeover:** 30 subscribers have their SIM swapped through one call-centre login (`S-41`) in
+  10 days; each wallet is logged into from a new device and drained within 2 hours to 5 mule wallets, which cash
+  out at 2 agents — a busy store that performs many genuine SIM swaps for customers who keep their balances.
+- **Agent split-deposit commission fraud:** agent `A-52` splits customers' cash-ins into many small deposits across
+  120 wallets it registered itself, earning a commission on each; the wallets are rarely used for anything else —
+  a busy market agent with many small cash-ins from distinct customers who also pay merchants and each other.
+- **Merchant cash-out collusion:** merchant `MR-77`, opened 3 weeks ago, receives "payments" from 60 wallets
+  minutes after each was funded at one of 3 agents, and settles every day to one bank account — a popular grocery
+  with steady payments from many wallets over months.
+
+**Alert Rule:** a wallet drained within 2 hours of a SIM swap.
+
 ## Steps
 
 1. **Distribution seams:** `SPACES_DATA_ROOT` in the launchers; the packer
@@ -705,8 +789,9 @@ with a score).
 6. **Pack and boot-test all five** with `tools/package-la-showcase.mjs`. `la-sample` keeps its files in
    `data/samples` for the in-app *Load samples*; check that this still works from a data root.
 
-**Wave C: ten new Spaces** (specs 4–13), one lane each, in this order: `la-card`, `la-ownership`, `la-trade`,
-`la-procurement`, `la-benefits`, `la-health`, `la-telco-ra`, `la-logistics`, `la-insider`, `la-crypto`.
+**Wave C: eleven new Spaces** (specs 4–14), one lane each, in this order: `la-card`, `la-ownership`, `la-trade`,
+`la-procurement`, `la-benefits`, `la-health`, `la-telco-ra`, `la-mfs`, `la-logistics`, `la-insider`, `la-crypto`.
+`la-mfs` (added 2026-11-08) sits beside `la-telco-ra` so the Telecom industry is complete together.
 
 7. **Each Space:** generator, golden tests, template (Basic tier), packed downloads → same check as step 2.
 
@@ -721,7 +806,7 @@ with a score).
    admin guide (install steps). Each lands in the same lane as its Space. Also: the catalogue page
    (`solution-pack/la-showcase/user-guide-showcase-catalogue.md`), a Product Map Item per new Space, BACKLOG
    rows closed, `docs/INDEX.md`, and `node tools/render-product-docs.mjs`.
-10. **Release:** build all 17 Space and 17 data downloads from one commit and publish them with the product.
+10. **Release:** build all 18 Space and 18 data downloads from one commit and publish them with the product.
 
 ## Open questions
 
@@ -730,6 +815,6 @@ with a score).
 - Police wording for the target market (UK, US, India)? Default is neutral wording with local terms only in the
   user guide.
 - Water-utility variant later?
-- One combined "all showcases" download (up to about 850 MB of data at the 50 MB cap per Space) as well as
+- One combined "all showcases" download (up to about 900 MB of data at the 50 MB cap per Space) as well as
   per-Space downloads?
 - Wave C order follows likely customer demand (cards and KYC first); change it if a deal needs a vertical sooner.
