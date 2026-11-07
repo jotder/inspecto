@@ -130,6 +130,8 @@ export class SettingsPageComponent {
             component: InvestigationAccessPageComponent,
             // the server decides each revoke (lead + capability); the page shows Revoke only where it would succeed
             canChange: () => true,
+            // Investigations are Standard and up: on Basic every read here 503s, so the section is not offered (as la-nav.ts)
+            visible: () => this.session.features()['investigations'] === true,
         },
         {
             id: 'link-analysis',
@@ -190,20 +192,31 @@ export class SettingsPageComponent {
         },
     ];
 
+    /** The sections listed for THIS user; a computed, because `features` arrives with `/bootstrap`. */
+    private readonly listed = computed(() => this.drawers.filter((d) => d.visible?.() ?? true));
+
     readonly groups = computed(() =>
         AUDIENCES.map((a) => ({
             ...a,
-            drawers: this.drawers.filter((d) => d.audience === a.id && (d.visible?.() ?? true)),
+            drawers: this.listed().filter((d) => d.audience === a.id),
         })).filter((g) => g.drawers.length > 0),
     );
 
-    /** From the `:section` route param (deep-linkable, Back works); the first section when none or an unknown one is named. */
-    readonly selected = signal<SettingsDrawer>(this.drawers[0]);
+    private readonly sectionId = signal<string | null>(null);
+
+    /**
+     * From the `:section` route param (deep-linkable, Back works); the first listed section when none, an unknown one
+     * or one not listed for this user is named, so a deep link never opens a section the menu hides.
+     */
+    readonly selected = computed(() => {
+        const listed = this.listed();
+        return listed.find((d) => d.id === this.sectionId()) ?? listed[0];
+    });
 
     constructor() {
-        this.route.paramMap.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((p) => {
-            this.selected.set(this.drawers.find((d) => d.id === p.get('section')) ?? this.drawers[0]);
-        });
+        this.route.paramMap
+            .pipe(takeUntilDestroyed(inject(DestroyRef)))
+            .subscribe((p) => this.sectionId.set(p.get('section')));
     }
 
     /** Selecting a section navigates; the paramMap subscription above applies it. */

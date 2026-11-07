@@ -25,6 +25,8 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
             url?: string;
             signIn?: boolean;
             admin?: boolean;
+            /** `/bootstrap` features.investigations; false = a Basic build. */
+            investigations?: boolean;
         } = {},
     ) {
         TestBed.configureTestingModule({
@@ -41,7 +43,13 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
                         canAdminister: signal(opts.admin ?? false),
                     },
                 },
-                { provide: SessionService, useValue: { authMode: signal(opts.signIn ? 'oidc' : 'none') } },
+                {
+                    provide: SessionService,
+                    useValue: {
+                        authMode: signal(opts.signIn ? 'oidc' : 'none'),
+                        features: signal({ investigations: opts.investigations ?? true }),
+                    },
+                },
                 {
                     provide: LaLimitsService,
                     useValue: {
@@ -65,6 +73,19 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
         [...el.querySelectorAll<HTMLButtonElement>('nav button')].map((b) => b.dataset['section']);
     const readOnly = (el: HTMLElement, id: string) =>
         !!el.querySelector(`nav button[data-section="${id}"] inspecto-chip`);
+
+    it('a Basic build (no Investigations) does not list Investigation access, whose every read 503s there', async () => {
+        const el = await render({ investigations: false });
+        expect(names(el)).not.toContain('investigation-access');
+        expect(names(el)).toContain('my-browser');
+    });
+
+    it('a deep link to a section the menu hides opens the first listed section instead', async () => {
+        const el = await render({ investigations: false, url: '/settings/investigation-access' });
+        const current = el.querySelector('nav button[aria-current="true"]') as HTMLButtonElement;
+        expect(current.dataset['section']).toBe('my-browser');
+        expect(el.querySelector('la-app-investigation-access-page')).toBeNull();
+    });
 
     it('groups the sections by who they are for: my settings, this Space, this server', async () => {
         const el = await render();
