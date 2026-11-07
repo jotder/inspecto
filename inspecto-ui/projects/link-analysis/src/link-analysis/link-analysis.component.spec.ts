@@ -2714,7 +2714,7 @@ describe('LinkAnalysisComponent', () => {
             expect(tabs().filter((t) => t.tabIndex === 0)).toHaveLength(1);
         });
 
-        it('stacks the three docks below md so 400% zoom / 320 px reflows (live-proven 2026-10-05: a row of two fixed-width docks left the canvas 0 px wide)', () => {
+        it('stacks the three docks below sm so 400% zoom / 320 px reflows (live-proven 2026-10-05: a row of two fixed-width docks left the canvas 0 px wide)', () => {
             const { el } = open();
             const workspace = el.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
             expect(workspace.classList).toContain('max-sm:flex-col');
@@ -3161,7 +3161,7 @@ describe('LinkAnalysisComponent - starter cards and result actions (operator 202
         expect(wrapper.classList).toContain('max-sm:min-h-[480px]'); // stacked layout keeps the old canvas height
     });
 
-    it('bounds the page to the viewport at md+ (no page scroll): root height, row min-h-0, strip shrink-0; stacked keeps page scroll', async () => {
+    it('bounds the page to the viewport at sm+ (no page scroll): root height, row min-h-0, strip shrink-0; stacked keeps page scroll', async () => {
         const { fixture } = create({ stubGraph: true });
         fixture.detectChanges();
         await runQuery(fixture);
@@ -3518,6 +3518,24 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
         expect(c.toolboxDockOpen()).toBe(true);
         c.fitDocksToWidth(15);
         expect(c.toolboxDockOpen()).toBe(false);
+    });
+
+    it('an 800 px viewport is still side by side (sm, not md), so a squeezed canvas still collapses the Toolbox dock', () => {
+        const { fixture } = create();
+        const c = fixture.componentInstance;
+        const original = window.matchMedia;
+        // An 800 px viewport: a max-width query matches only when its bound is at least 800.
+        Object.defineProperty(window, 'matchMedia', {
+            configurable: true,
+            value: (q: string) => ({ matches: Number(/max-width:\s*(\d+)px/.exec(q)?.[1] ?? 0) >= 800 }),
+        });
+        try {
+            c.toolboxDockOpen.set(true);
+            c.fitDocksToWidth(15);
+            expect(c.toolboxDockOpen()).toBe(false);
+        } finally {
+            Object.defineProperty(window, 'matchMedia', { configurable: true, value: original });
+        }
     });
 
     it('⚙ Settings: the top-bar icon opens it, editQuery opens Graph model, Refresh re-reads the last run', async () => {

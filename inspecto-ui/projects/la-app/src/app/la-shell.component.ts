@@ -55,7 +55,7 @@ function readExpanded(): boolean {
     },
     template: `
         <aside
-            class="bg-card flex min-h-12 flex-0 flex-row items-center gap-1 border-b px-2 max-sm:flex-wrap sticky top-0 z-10 sm:h-screen sm:flex-col sm:items-stretch sm:gap-2 sm:border-r sm:border-b-0 sm:py-3"
+            class="bg-card flex min-h-12 flex-0 flex-row items-center gap-1 border-b px-2 max-sm:flex-wrap sticky top-0 z-40 sm:h-screen sm:flex-col sm:items-stretch sm:gap-2 sm:border-r sm:border-b-0 sm:py-3"
             [class.sm:w-16]="!expanded()"
             [class.sm:w-56]="expanded()"
         >
