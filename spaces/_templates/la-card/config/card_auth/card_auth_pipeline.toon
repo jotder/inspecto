@@ -1,0 +1,36 @@
+name: card_auth
+active: true
+description: "Card and e-commerce fraud Link Analysis showcase - One row per card authorisation: card, merchant, amount, instant, the device and IP of an online purchase (blank at a terminal) and the result (approved, declined, or refund for money returned to the card). One file per month (CARD_AUTH_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-card-data.py."
+
+dirs:
+  poll:       data/inbox/card_auth
+  database:   data/card_auth/database
+  backup:     data/card_auth/backup
+  temp:       data/card_auth/temp
+  errors:     data/card_auth/errors
+  quarantine: data/card_auth/quarantine
+  markers:    data/card_auth/markers
+  status_dir: data/card_auth/status
+  log_dir:    data/card_auth/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: card_auth_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

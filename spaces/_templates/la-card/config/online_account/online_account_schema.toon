@@ -1,0 +1,36 @@
+raw:
+  name: ONLINE_ACCOUNT
+  format: CSV
+  fields[7]{name,selector,type}:
+    account_id,"0",VARCHAR
+    card_id,"1",VARCHAR
+    email,"2",VARCHAR
+    phone,"3",VARCHAR
+    device_id,"4",VARCHAR
+    ship_to_address,"5",VARCHAR
+    changed_at,"6",TIMESTAMP
+mapping:
+  canonicalName: online_account
+  rawName: ONLINE_ACCOUNT
+  fields[7]:
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: card_id
+      from: card_id
+      fn: keep
+    - name: email
+      from: email
+      fn: keep
+    - name: phone
+      from: phone
+      fn: keep
+    - name: device_id
+      from: device_id
+      fn: keep
+    - name: ship_to_address
+      from: ship_to_address
+      fn: keep
+    - name: changed_at
+      from: changed_at
+      fn: keep

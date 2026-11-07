@@ -1,0 +1,12 @@
+physicalRef: card_auth/database
+description: "Card and e-commerce fraud Link Analysis showcase - One row per card authorisation: card, merchant, amount, instant, the device and IP of an online purchase (blank at a terminal) and the result (approved, declined, or refund for money returned to the card). One file per month (CARD_AUTH_YYYYMM.csv); the next month is in data/staged. Landed by the card_auth Pipeline. Synthetic."
+eventDate: auth_at
+columns[8]{name,type,classification}:
+  auth_id,string,
+  card_id,string,
+  merchant_id,string,
+  amount,number,
+  auth_at,timestamp,
+  device_id,string,
+  ip,string,
+  result,string,

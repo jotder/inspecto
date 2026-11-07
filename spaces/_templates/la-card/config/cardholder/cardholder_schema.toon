@@ -1,0 +1,28 @@
+raw:
+  name: CARDHOLDER
+  format: CSV
+  fields[5]{name,selector,type}:
+    holder_id,"0",VARCHAR
+    name,"1",VARCHAR
+    email,"2",VARCHAR
+    phone,"3",VARCHAR
+    address,"4",VARCHAR
+mapping:
+  canonicalName: cardholder
+  rawName: CARDHOLDER
+  fields[5]:
+    - name: holder_id
+      from: holder_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: email
+      from: email
+      fn: keep
+    - name: phone
+      from: phone
+      fn: keep
+    - name: address
+      from: address
+      fn: keep

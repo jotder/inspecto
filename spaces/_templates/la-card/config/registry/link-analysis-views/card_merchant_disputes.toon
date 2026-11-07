@@ -1,0 +1,24 @@
+name: card_merchant_disputes
+description: "Merchant disputes - cards linked to merchants by chargebacks (via = reason@month) and refunds (via counts the sales that card made there). Look for a merchant that refunds cards it never sold to (sales:0) and whose chargebacks run through the whole year far above its category. A travel merchant whose chargebacks all arrive in one strike month is the innocent version."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: card_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[3]: ts,amount,via
+  filter:
+    kind: group
+    op: OR
+    items[2]{kind,field,operator,value}:
+      condition,kind,"=","charged_back"
+      condition,kind,"=","refunded"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

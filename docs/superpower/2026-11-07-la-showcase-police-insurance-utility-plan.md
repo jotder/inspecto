@@ -319,6 +319,17 @@ script `tools/seed-la-<id>.mjs`. Stories are listed as **story: planted facts â€
 
 **Alert Rule:** a new card seen at the compromised terminal.
 
+**Basic tier as built (2026-11-07, plan step 7).** `tools/gen-la-card-data.py` (seed 20261107; ground truth
+`tools/gen-la-card-data.ground-truth.json`), `tools/gen-la-card-data.test.mjs`, `CardLinksJobGoldenTest` (inspecto-engine),
+template `spaces/_templates/la-card/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-card/`. Deliberate deviations: the feed is `card_auth`, not `authorization` (a SQL
+keyword); `merchant` gains `channel` (pos/ecom) and `chargeback` a `chargeback_id`; `online_account` is a change log that
+also carries `card_id` (the card on file, for `account_card`); scale is 5 030 cardholders, 6 500 cards, 900 merchants,
+4 000 accounts and about 77 000 authorisations (3 MB of CSV, about 38 000 link rows) rather than 150 000; links are one row
+per pair, not per day; two link kinds were added, `refunded` (the colluding merchant's refunds, `via` = sales there) and
+`visited_before_fraud` (each defrauded card to the merchants it paid in the 45 days before), which is the common-point
+view; `from_ip` links a card to its /24 network.
+
 #### 5. `la-ownership` â€” beneficial ownership and sanctions
 
 **Audience:** KYC and sanctions compliance teams at a bank.

@@ -1,0 +1,24 @@
+raw:
+  name: CARD
+  format: CSV
+  fields[4]{name,selector,type}:
+    card_id,"0",VARCHAR
+    bin,"1",VARCHAR
+    holder_id,"2",VARCHAR
+    issued_at,"3",DATE
+mapping:
+  canonicalName: card
+  rawName: CARD
+  fields[4]:
+    - name: card_id
+      from: card_id
+      fn: keep
+    - name: bin
+      from: bin
+      fn: keep
+    - name: holder_id
+      from: holder_id
+      fn: keep
+    - name: issued_at
+      from: issued_at
+      fn: keep

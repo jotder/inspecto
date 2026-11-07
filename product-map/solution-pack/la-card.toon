@@ -1,0 +1,7 @@
+id: solution-pack.la-card
+kind: solution-pack
+title: Link Analysis card fraud showcase
+template: la-card
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-card/index.md
