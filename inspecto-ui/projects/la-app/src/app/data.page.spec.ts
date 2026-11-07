@@ -71,7 +71,8 @@ const DATASETS = [
     },
 ];
 
-function create(datasets: unknown[] = DATASETS) {
+/** Builds the page; `open` (the default) unfolds every Dataset, as the reader would before editing one. */
+function create(datasets: unknown[] = DATASETS, { open = true } = {}) {
     TestBed.configureTestingModule({
         imports: [DataPageComponent],
         providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()],
@@ -96,7 +97,17 @@ function create(datasets: unknown[] = DATASETS) {
         }),
     );
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, c: fixture.componentInstance };
+    const el = fixture.nativeElement as HTMLElement;
+    if (open) openAll(fixture);
+    return { fixture, el, c: fixture.componentInstance };
+}
+
+/** LA-DATA-GROUPS-1: unfolds every folded Dataset, from its header. */
+function openAll(fixture: { nativeElement: HTMLElement; detectChanges(): void }): void {
+    fixture.nativeElement
+        .querySelectorAll<HTMLElement>('mat-expansion-panel-header[aria-expanded="false"]')
+        .forEach((h) => h.click());
+    fixture.detectChanges();
 }
 
 const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
@@ -134,6 +145,73 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(others).toContain('computed_ds');
         expect(others).not.toContain('wallet_txn');
         await expectNoA11yViolations(el);
+    });
+
+    it('LA-DATA-GROUPS-1: groups the Datasets by kind, each folded to one line until opened, each group foldable (no violations)', async () => {
+        const reference = {
+            type: 'dataset',
+            name: 'agents',
+            ref: 'dataset/agents',
+            content: {
+                origin: 'import',
+                kind: 'reference',
+                physicalRef: 'agents/database',
+                importPipeline: 'agents',
+                columns: [
+                    { name: 'agent_id', type: 'string' },
+                    { name: 'region', type: 'string' },
+                ],
+            },
+        };
+        const { fixture, el } = create([...DATASETS, reference], { open: false });
+        const streams = q(el, 'data-group-stream')!;
+        const refs = q(el, 'data-group-reference')!;
+        expect(streams.querySelector('h2')!.textContent).toContain('Streams');
+        expect(streams.querySelector('h2')!.textContent).toContain('2 Datasets');
+        expect(q(streams, 'data-transfers')).not.toBeNull();
+        expect(q(streams, 'data-wallet_txn')).not.toBeNull();
+        expect(q(refs, 'data-agents')).not.toBeNull();
+        expect(refs.querySelector('h2')!.textContent).toContain('1 Dataset');
+
+        // folded: one line saying where its data comes from and what is set, nothing of its body rendered
+        const header = q(el, 'data-toggle-transfers')!;
+        expect(header.getAttribute('aria-expanded')).toBe('false');
+        expect(header.textContent).toContain('Added here · 3 columns · 1 Mapping');
+        expect(q(el, 'data-toggle-wallet_txn')!.textContent).toContain('Kept up to date by a Pipeline');
+        expect(el.querySelector('[data-testid="columns"]')).toBeNull();
+        expect(http.match((r) => r.url.endsWith('/arrivals'))).toHaveLength(0);
+        await expectNoA11yViolations(el);
+
+        // a Dataset opens from its header (a button, so Enter and Space work), its body only then
+        header.click();
+        fixture.detectChanges();
+        expect(header.getAttribute('aria-expanded')).toBe('true');
+        expect(q(q(el, 'data-transfers')!, 'columns')!.textContent).toContain('from_account');
+        expect(q(q(el, 'data-wallet_txn')!, 'columns')).toBeNull();
+
+        // a group folds from its heading's button, which names what it controls
+        const toggle = q(el, 'data-group-toggle-stream')!;
+        expect(toggle.tagName).toBe('BUTTON');
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
+        const body = el.querySelector('#' + toggle.getAttribute('aria-controls'))!;
+        expect(body.classList).not.toContain('hidden');
+        toggle.click();
+        fixture.detectChanges();
+        expect(toggle.getAttribute('aria-expanded')).toBe('false');
+        expect(body.classList).toContain('hidden');
+        expect(q(el, 'data-group-toggle-reference')!.getAttribute('aria-expanded')).toBe('true');
+        toggle.click();
+        fixture.detectChanges();
+        expect(body.classList).not.toContain('hidden');
+        // the Dataset opened before the fold is still open
+        expect(header.getAttribute('aria-expanded')).toBe('true');
+        await expectNoA11yViolations(el);
+    });
+
+    it('LA-DATA-GROUPS-1: a Space with one Dataset shows it open', () => {
+        const { el } = create([DATASETS[0]], { open: false });
+        expect(q(el, 'data-toggle-transfers')!.getAttribute('aria-expanded')).toBe('true');
+        expect(q(el, 'columns')).not.toBeNull();
     });
 
     it('New mapping refuses an empty name and the same From and To, then saves a Mapping of the base', () => {
@@ -465,6 +543,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             }),
         );
         fixture.detectChanges();
+        openAll(fixture);
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance as unknown as {
             holdsOptions: () => ReadonlyMap<string, { value: string; group?: string }[]>;
@@ -547,6 +626,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             columns: { from_account: [{ type: 'phone', strong: true }] },
         });
         fixture.detectChanges();
+        openAll(fixture);
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance as unknown as {
             holdsOptions: () => ReadonlyMap<string, { value: string; hint?: string }[]>;

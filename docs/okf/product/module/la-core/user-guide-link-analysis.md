@@ -212,7 +212,9 @@ These changes need the right to edit Datasets when you sign in; without it they 
 ### 3.4 The Data page: Datasets, Entities and Mappings
 
 **Data** (left navigation) lists every Dataset you added with *Add data*, then every Dataset a Pipeline or a Job keeps
-up to date. For each one:
+up to date, grouped as **Streams** and **References**. Each group folds from its heading. Each Dataset is folded to one
+line (where its data comes from, how many columns and Mappings it has) until you open it; a Space with a single Dataset
+shows it open. Opened, each one shows:
 
 - its card: for a Dataset you added, the **Data status** line (when data last arrived, the period it covers, whether the
   graph has it), the **Arrivals** (every file it took, uploaded or put in its inbox by another system), *Add a file* and
