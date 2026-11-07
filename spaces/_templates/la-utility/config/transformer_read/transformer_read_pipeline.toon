@@ -1,0 +1,36 @@
+name: transformer_read
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per metered transformer per day: the kWh it supplied (12 of the 40 transformers carry a meter). Twelve monthly files TRANSFORMER_READ_yyyyMM.csv landed; the next month is in data/staged. Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/transformer_read
+  database:   data/transformer_read/database
+  backup:     data/transformer_read/backup
+  temp:       data/transformer_read/temp
+  errors:     data/transformer_read/errors
+  quarantine: data/transformer_read/quarantine
+  markers:    data/transformer_read/markers
+  status_dir: data/transformer_read/status
+  log_dir:    data/transformer_read/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: transformer_read_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

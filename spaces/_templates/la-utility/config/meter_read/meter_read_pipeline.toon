@@ -1,0 +1,36 @@
+name: meter_read
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per premise per day: the kWh the meter registered and its tamper flag (0, 1, blank when the meter does not report one). Twelve monthly files METER_READ_yyyyMM.csv landed; the next month is in data/staged. Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/meter_read
+  database:   data/meter_read/database
+  backup:     data/meter_read/backup
+  temp:       data/meter_read/temp
+  errors:     data/meter_read/errors
+  quarantine: data/meter_read/quarantine
+  markers:    data/meter_read/markers
+  status_dir: data/meter_read/status
+  log_dir:    data/meter_read/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: meter_read_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

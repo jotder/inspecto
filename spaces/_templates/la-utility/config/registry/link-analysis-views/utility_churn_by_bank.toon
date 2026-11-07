@@ -1,0 +1,24 @@
+name: utility_churn_by_bank
+description: "Churn by bank account - accounts linked to their premise and to the bank account they pay from. One bank account pays 18 accounts at 6 premises: each premise had two accounts closed with arrears and reopened within 30 days under another name. A second bank account pays the 6 residential premises with a flat round-the-clock load at 3-5x their street median. A genuine change of tenant brings a new bank account and stays a small separate group."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: utility_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[3]: ts,amount,via
+  filter:
+    kind: group
+    op: OR
+    items[2]{kind,field,operator,value}:
+      condition,kind,"=","account_at"
+      condition,kind,"=","paid_from"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

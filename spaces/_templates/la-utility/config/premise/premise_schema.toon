@@ -1,0 +1,40 @@
+raw:
+  name: PREMISE
+  format: CSV
+  fields[8]{name,selector,type}:
+    premise_id,"0",VARCHAR
+    address,"1",VARCHAR
+    city,"2",VARCHAR
+    lat,"3",DOUBLE
+    lon,"4",DOUBLE
+    tariff,"5",VARCHAR
+    meter_type,"6",VARCHAR
+    transformer_id,"7",VARCHAR
+mapping:
+  canonicalName: premise
+  rawName: PREMISE
+  fields[8]:
+    - name: premise_id
+      from: premise_id
+      fn: keep
+    - name: address
+      from: address
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep
+    - name: tariff
+      from: tariff
+      fn: keep
+    - name: meter_type
+      from: meter_type
+      fn: keep
+    - name: transformer_id
+      from: transformer_id
+      fn: keep

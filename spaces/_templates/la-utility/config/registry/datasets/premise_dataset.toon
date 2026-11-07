@@ -1,0 +1,11 @@
+physicalRef: premise/database
+description: "Electricity revenue-protection Link Analysis showcase - One row per supplied premise: invented address, city, coordinates, tariff (residential or commercial), meter type (smart or prepaid) and the transformer that supplies it. One extract (PREMISE_20260930.csv). Landed by the premise Pipeline. Synthetic."
+columns[8]{name,type,classification}:
+  premise_id,string,
+  address,string,
+  city,string,
+  lat,number,
+  lon,number,
+  tariff,string,
+  meter_type,string,
+  transformer_id,string,

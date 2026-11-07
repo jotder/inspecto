@@ -1,0 +1,24 @@
+name: utility_contractor_network
+description: "Contractor C-14 network - premises linked to the contractors who visited them or closed their service orders. Seed C-14 and expand: 22 of its premises sit under the two metered transformers TX-007 and TX-019 and their reads drop 40-70 % within two weeks of its visit (compare meter_read, and transformer_loss for the two transformers). Three of those visits were joint with C-22, whose reconnect orders reopened 15 premises disconnected for arrears with no payment. The holiday home whose use drops every winter has no visit and is not here."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: utility_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[2]: ts,via
+  filter:
+    kind: group
+    op: OR
+    items[2]{kind,field,operator,value}:
+      condition,kind,"=","visited_by"
+      condition,kind,"=","order_closed_by"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate
