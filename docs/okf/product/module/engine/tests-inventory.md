@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-375 test class(es): 375 unit, 0 real-HTTP control-plane, 0 IT.
+377 test class(es): 377 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -200,6 +200,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `KpiCompletenessJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/KpiCompletenessJobTest.java` | The {@code kpi.completeness} Job Type (completeness KPI K1/K4): refuse first, read second, and carry |
 | `LaClaimsLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaClaimsLinksJobTest.java` | The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the six Pipelines |
 | `LaIndexBuildJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaIndexBuildJobTest.java` | la.index.build (LA-DAILY-INGEST-1, T5): a clock over a build the Link Analysis side decides - fails closed, |
+| `LaPoliceLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaPoliceLinksJobTest.java` | The {@code la-police} Space Template RUN end to end from a verbatim copy: the eleven Pipelines ingest the shipped extracts |
 | `MailSendJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTest.java` | The {@code mail.send} reference Job (job-parameter-contract §9, step 15). |
 | `MailSendJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTypeTckTest.java` | {@link MailSendJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `MailSendJobTypeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTypeTest.java` | {@code mail.send}'s DECLARATION, pinned against the job-parameter-contract worked example (§9). |
@@ -244,6 +245,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `SqlTemplateJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlTemplateJobTypeTckTest.java` | {@link SqlTemplateJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `TelecomLinksGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TelecomLinksGoldenTest.java` | The {@code la-showcase} Space Template's TELECOM corpus RUN end to end from a verbatim copy: the eight telecom |
 | `TriggerVocabularyContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TriggerVocabularyContractTest.java` | The last of Sprint 3's five failure classes: <b>a served descriptor drifts from its own |
+| `UtilityLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/UtilityLinksJobGoldenTest.java` | The {@code la-utility} Space Template (Basic tier) RUN end to end from a verbatim copy: the eight Pipelines land the shipped |
 | `WhenGuardTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/WhenGuardTest.java` | {@code when:} guard evaluation — flat {@code $signal.<field>} (backward-compatible) and nested |
 | `JobTckSelfTest` | `com.gamma.job.testkit` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/testkit/JobTckSelfTest.java` | Proves the JobTypeProvider and MaintenanceTaskProvider TCKs can fail (MODULE-REORG-1 P5b): each assertion runs against a |
 | `EvidenceMaskerTest` | `com.gamma.mask` | unit | `platform/inspecto-engine/src/test/java/com/gamma/mask/EvidenceMaskerTest.java` | The Risk Score mask key lives in the Space's secrets directory, owner-only, and masks deterministically. |

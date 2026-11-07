@@ -1,0 +1,36 @@
+name: incident_report
+active: true
+description: "Police Link Analysis showcase - One row per reported incident: offence type, the start and end of the window it happened in, district, city, a city-level invented location and the reporting person (blank when the police raised it). One extract (INCIDENT_REPORT_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/incident_report
+  database:   data/incident_report/database
+  backup:     data/incident_report/backup
+  temp:       data/incident_report/temp
+  errors:     data/incident_report/errors
+  quarantine: data/incident_report/quarantine
+  markers:    data/incident_report/markers
+  status_dir: data/incident_report/status
+  log_dir:    data/incident_report/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: incident_report_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

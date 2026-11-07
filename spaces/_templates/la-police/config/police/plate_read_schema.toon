@@ -1,0 +1,28 @@
+raw:
+  name: PLATE_READ
+  format: CSV
+  fields[5]{name,selector,type}:
+    plate,"0",VARCHAR
+    camera_id,"1",VARCHAR
+    read_at,"2",TIMESTAMP
+    lat,"3",DOUBLE
+    lon,"4",DOUBLE
+mapping:
+  canonicalName: plate_read
+  rawName: PLATE_READ
+  fields[5]:
+    - name: plate
+      from: plate
+      fn: keep
+    - name: camera_id
+      from: camera_id
+      fn: keep
+    - name: read_at
+      from: read_at
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep

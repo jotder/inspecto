@@ -1,0 +1,36 @@
+name: customer_account
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per customer account: the premise, the holder name, opened and closed dates (closed blank while open), the bank account it pays from (blank for cash payers) and the arrears at closing or today. One extract (CUSTOMER_ACCOUNT_20260930.csv). Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/customer_account
+  database:   data/customer_account/database
+  backup:     data/customer_account/backup
+  temp:       data/customer_account/temp
+  errors:     data/customer_account/errors
+  quarantine: data/customer_account/quarantine
+  markers:    data/customer_account/markers
+  status_dir: data/customer_account/status
+  log_dir:    data/customer_account/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: customer_account_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

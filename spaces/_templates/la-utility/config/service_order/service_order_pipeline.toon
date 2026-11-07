@@ -1,0 +1,36 @@
+name: service_order
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per service order (connect, disconnect, reconnect, meter_swap): when it was raised, the contractor who closed it and when (both blank while open). One landed extract; the next month is in data/staged. Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/service_order
+  database:   data/service_order/database
+  backup:     data/service_order/backup
+  temp:       data/service_order/temp
+  errors:     data/service_order/errors
+  quarantine: data/service_order/quarantine
+  markers:    data/service_order/markers
+  status_dir: data/service_order/status
+  log_dir:    data/service_order/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: service_order_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

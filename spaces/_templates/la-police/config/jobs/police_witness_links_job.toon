@@ -1,0 +1,10 @@
+job:
+  name: police_witness_links
+  type: sql.template
+  description: "Derived from police_links each time it is produced: repeat witnesses. People recorded as a witness on two or more incidents, every involved_in link of those incidents (all roles), and every co_arrested link of those witnesses. Read by the saved view police_witness_link."
+  sql: "WITH l AS (SELECT * FROM police_links), w AS (SELECT src AS p FROM l WHERE kind = 'involved_in' AND via LIKE '%role:witness%' GROUP BY src HAVING count(*) >= 2), inc AS (SELECT DISTINCT dst AS i FROM l WHERE kind = 'involved_in' AND via LIKE '%role:witness%' AND src IN (SELECT p FROM w)) SELECT src, dst, kind, ts, amount, event_date, via FROM l WHERE (kind = 'involved_in' AND dst IN (SELECT i FROM inc)) OR (kind = 'co_arrested' AND (src IN (SELECT p FROM w) OR dst IN (SELECT p FROM w))) ORDER BY kind, src, dst"
+  sources: police_links
+  sink_dataset: police_witness_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == police_links"
+  enabled: true

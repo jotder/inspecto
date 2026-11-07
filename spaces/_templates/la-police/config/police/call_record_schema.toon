@@ -1,0 +1,24 @@
+raw:
+  name: CALL_RECORD
+  format: CSV
+  fields[4]{name,selector,type}:
+    caller,"0",VARCHAR
+    callee,"1",VARCHAR
+    start_at,"2",TIMESTAMP
+    duration_s,"3",INTEGER
+mapping:
+  canonicalName: call_record
+  rawName: CALL_RECORD
+  fields[4]:
+    - name: caller
+      from: caller
+      fn: keep
+    - name: callee
+      from: callee
+      fn: keep
+    - name: start_at
+      from: start_at
+      fn: keep
+    - name: duration_s
+      from: duration_s
+      fn: keep

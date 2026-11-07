@@ -1,0 +1,36 @@
+name: plate_read
+active: true
+description: "Police Link Analysis showcase - One row per number-plate camera read: plate, camera, time and the camera's location on a main road. One extract (PLATE_READ_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/plate_read
+  database:   data/plate_read/database
+  backup:     data/plate_read/backup
+  temp:       data/plate_read/temp
+  errors:     data/plate_read/errors
+  quarantine: data/plate_read/quarantine
+  markers:    data/plate_read/markers
+  status_dir: data/plate_read/status
+  log_dir:    data/plate_read/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: plate_read_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

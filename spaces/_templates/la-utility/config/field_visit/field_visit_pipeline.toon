@@ -1,0 +1,36 @@
+name: field_visit
+active: true
+description: "Electricity revenue-protection Link Analysis showcase - One row per field visit: the premise, the contractor, the instant and the visit type (blank when not recorded). One landed extract; the next month is in data/staged. Synthetic; regenerate with tools/gen-la-utility-data.py."
+
+dirs:
+  poll:       data/inbox/field_visit
+  database:   data/field_visit/database
+  backup:     data/field_visit/backup
+  temp:       data/field_visit/temp
+  errors:     data/field_visit/errors
+  quarantine: data/field_visit/quarantine
+  markers:    data/field_visit/markers
+  status_dir: data/field_visit/status
+  log_dir:    data/field_visit/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: field_visit_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,36 @@
+name: handset
+active: true
+description: "Police Link Analysis showcase - One row per handset number: IMEI and the person it is attributed to (often blank). One extract (HANDSET_20261031.csv). Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/handset
+  database:   data/handset/database
+  backup:     data/handset/backup
+  temp:       data/handset/temp
+  errors:     data/handset/errors
+  quarantine: data/handset/quarantine
+  markers:    data/handset/markers
+  status_dir: data/handset/status
+  log_dir:    data/handset/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: handset_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,36 @@
+name: call_record
+active: true
+description: "Police Link Analysis showcase - One row per call from seized or lawfully obtained handsets: caller, callee, start and duration. One extract (CALL_RECORD_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/call_record
+  database:   data/call_record/database
+  backup:     data/call_record/backup
+  temp:       data/call_record/temp
+  errors:     data/call_record/errors
+  quarantine: data/call_record/quarantine
+  markers:    data/call_record/markers
+  status_dir: data/call_record/status
+  log_dir:    data/call_record/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: call_record_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

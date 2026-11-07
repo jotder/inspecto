@@ -1,0 +1,6 @@
+physicalRef: property_stolen/database
+description: "Police Link Analysis showcase - One row per item reported stolen on an incident, with its serial when known. Landed by the property_stolen Pipeline. Synthetic."
+columns[3]{name,type,classification}:
+  incident_id,string,
+  item_desc,string,
+  serial,string,

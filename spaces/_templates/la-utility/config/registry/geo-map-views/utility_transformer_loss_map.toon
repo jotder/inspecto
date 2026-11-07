@@ -1,0 +1,15 @@
+name: utility_transformer_loss_map
+description: "Loss by transformer area - each metered transformer at the centre of the premises it supplies, one point per month, coloured by loss_band. TX-007 (Leicester) and TX-019 (Coventry) move over the 15 % threshold after the tampering visits. Synthetic placements, city-level. The Geo map needs Standard or above; on Basic open transformer_loss in Discover instead."
+sourceId: dataset
+display: markers
+query:
+  projection:
+    datasetId: transformer_loss_dataset
+    latCol: lat
+    lonCol: lon
+    entityCol: transformer_id
+    entityIdCol: transformer_id
+    kindCol: loss_band
+camera:
+  center[2]: -1.3,52.67
+  zoom: 8.5

@@ -1,0 +1,36 @@
+name: property_stolen
+active: true
+description: "Police Link Analysis showcase - One row per item reported stolen on an incident, with its serial when known. One extract (PROPERTY_STOLEN_20261031.csv); the next month waits in data/staged. Synthetic; regenerate with tools/gen-la-police-data.py."
+
+dirs:
+  poll:       data/inbox/property_stolen
+  database:   data/property_stolen/database
+  backup:     data/property_stolen/backup
+  temp:       data/property_stolen/temp
+  errors:     data/property_stolen/errors
+  quarantine: data/property_stolen/quarantine
+  markers:    data/property_stolen/markers
+  status_dir: data/property_stolen/status
+  log_dir:    data/property_stolen/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: property_stolen_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
