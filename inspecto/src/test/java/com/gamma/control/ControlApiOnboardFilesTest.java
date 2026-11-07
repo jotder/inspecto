@@ -431,6 +431,63 @@ class ControlApiOnboardFilesTest {
         }
     }
 
+    /** A Stream with no Entity column: {@code rows} payments over October, so no link can be proposed. */
+    static String payments(int rows) {
+        StringBuilder sb = new StringBuilder("txn_id,memo,amount,txn_date\n");
+        String[] memos = {"coffee", "rent", "groceries"};
+        for (int i = 1; i <= rows; i++)
+            sb.append(String.format("T%04d,%s,%d.50,2026-10-%02d\n", i, memos[i % 3], 10 + i, 2 + i % 28));
+        return sb.toString();
+    }
+
+    /**
+     * ADD-DATA-STREAM-TIME-1: a Stream's Time is the Dataset's own (its eventDate: what an arrival covers, how fresh it is),
+     * so it is kept when the file has no link - the draft's proposal, or the commit's stated eventDate.
+     */
+    @Test
+    void aStreamWithNoLinkKeepsItsTime(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            // the body says nothing: the draft's proposed Time stands, and an arrival says what it covers
+            String id = uniqueId("nolink");
+            JsonNode d = draft(c, "payments.csv", "stream", payments(30), null);
+            assertTrue(d.at("/entityTypes/link/from/value").isNull(), "no link is proposed: " + d.get("entityTypes"));
+            assertEquals("txn_date", d.at("/entityTypes/link/primaryTime/value").asText(), d.get("entityTypes").toString());
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            JsonNode ds = data(json(c, "GET", "/components/dataset/" + id, null, null), 200).get("content");
+            assertEquals("txn_date", ds.path("eventDate").asText(), ds.toString());
+            assertFalse(ds.has("defaultLinkMapping"), ds.toString());
+            JsonNode arrival = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).at("/arrivals/0");
+            assertEquals("2026-10-02", arrival.get("coversFrom").asText(), arrival.toString());
+            assertEquals("2026-10-29", arrival.get("coversTo").asText(), arrival.toString());
+
+            // the wizard's commit: no link, and the Time the person confirmed, renamed
+            String stated = uniqueId("stated");
+            JsonNode d2 = draft(c, "payments.csv", "stream", payments(30), null);
+            data(json(c, "POST", "/onboard/files/" + d2.get("draftId").asText() + "/commit", "{\"name\":\"" + stated
+                    + "\",\"columns\":[{\"name\":\"txn_date\",\"rename\":\"paid_on\"}],\"link\":null,\"eventDate\":\"txn_date\"}", null), 200);
+            JsonNode ds2 = data(json(c, "GET", "/components/dataset/" + stated, null, null), 200).get("content");
+            assertEquals("paid_on", ds2.path("eventDate").asText(), ds2.toString());
+            assertEquals("temporal", stored(ds2, "paid_on").get("role").asText());
+
+            // a stated null leaves the Stream without a Time; a column that is not kept, or a second Time, is refused
+            String none = uniqueId("none");
+            JsonNode d3 = draft(c, "payments.csv", "stream", payments(30), null);
+            data(json(c, "POST", "/onboard/files/" + d3.get("draftId").asText() + "/commit", "{\"name\":\"" + none
+                    + "\",\"link\":null,\"eventDate\":null}", null), 200);
+            assertFalse(data(json(c, "GET", "/components/dataset/" + none, null, null), 200).get("content").has("eventDate"));
+            JsonNode d4 = draft(c, "payments.csv", "stream", payments(30), null);
+            HttpResponse<String> r = json(c, "POST", "/onboard/files/" + d4.get("draftId").asText() + "/commit", "{\"name\":\""
+                    + uniqueId("dropped") + "\",\"columns\":[{\"name\":\"txn_date\",\"drop\":true}],\"link\":null,\"eventDate\":\"txn_date\"}", null);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(error(r).contains("eventDate 'txn_date' is not a kept column"), r.body());
+            JsonNode d5 = draft(c, "transfers.csv", "stream", transfers(60), null);
+            r = json(c, "POST", "/onboard/files/" + d5.get("draftId").asText() + "/commit", "{\"name\":\"" + uniqueId("two")
+                    + "\",\"link\":{\"from\":\"from_account\",\"to\":\"to_account\",\"primaryTime\":\"booked_at\"},\"eventDate\":\"transfer_id\"}", null);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(error(r).contains("eventDate 'transfer_id' differs from link.primaryTime 'booked_at'"), r.body());
+        }
+    }
+
     private static JsonNode columnRow(JsonNode draft, String column) {
         for (JsonNode c : draft.get("entityTypes").get("columns")) if (column.equals(c.get("column").asText())) return c;
         throw new AssertionError("no column " + column + " in " + draft.get("entityTypes"));

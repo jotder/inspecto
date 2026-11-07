@@ -521,7 +521,9 @@ re-draft with `?delimiter=…`), because the columns were read with it. Order:
    `rowsBefore`, `rowsAfter`, `rowsChanged`, `replaced`. A run that quarantined the file or loaded no row **fails**
    (422 "nothing was imported … nothing was kept").
 4. The Dataset entry: `{physicalRef: <id>/database, description, origin: import, kind, importPipeline, importFormat,
-   eventDate (= the link's time), columns:[{name, type: string|number|date|timestamp|boolean, classification?}],
+   eventDate (a Stream's Time: the link's time, else the body's `eventDate`, else - body silent on both - the draft's
+   proposed Time; kept with no link, since it is what each arrival covers and how fresh the Dataset is -
+   `ADD-DATA-STREAM-TIME-1`, 2026-11-07), columns:[{name, type: string|number|date|timestamp|boolean, classification?}],
    primaryEntityType, defaultLinkMapping, identifyingColumn}`; with sign-in `owner` is the importer, as provenance:
    no `shares` key, so the Dataset is shared with its Space like every other Dataset in it (`LA-ONBOARD-DEFECTS-1`,
    2026-10-23; it was `shares: []`, private to the importer, and no screen could share it).

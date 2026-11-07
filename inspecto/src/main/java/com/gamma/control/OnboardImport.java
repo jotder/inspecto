@@ -285,7 +285,7 @@ final class OnboardImport {
                    boolean keep, String role, String decimal) {}
 
     record Plan(List<PlanCol> cols, Map<String, Object> format, String primaryEntityType, Map<String, Object> link,
-                String identifying, String description, String frontendType, ImportRowFilter.Result filter) {
+                String eventDate, String identifying, String description, String frontendType, ImportRowFilter.Result filter) {
 
         @SuppressWarnings("unchecked")
         static Plan of(Map<String, Object> draft, Map<String, Object> body, List<EntityTypes.EntityType> types, String kind) {
@@ -377,6 +377,7 @@ final class OnboardImport {
             if (primary != null && cols.stream().noneMatch(c -> c.keep() && primary.equals(c.entityType())))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "primaryEntityType '" + primary + "' is held by no column");
             Map<String, Object> link = null;
+            String eventDate = null;
             String identifying = null;
             if ("reference".equals(kind)) {
                 String idc = body.containsKey("identifyingColumn") ? stringOrNull(body, "identifyingColumn") : proposed(et.get("identifying"));
@@ -410,8 +411,21 @@ final class OnboardImport {
                     if (l.containsKey("from") && l.containsKey("to")) link = l;
                     else if (given != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "link needs a from and a to column");
                 }
+                // ADD-DATA-STREAM-TIME-1: the Time is the Stream's own (what an arrival covers), kept with no link too - the
+                // stated eventDate, else the link's primaryTime, else (nothing stated) the draft's proposed Time
+                eventDate = link == null ? null : (String) link.get(DatasetEntryRules.PRIMARY_TIME);
+                String ed = body.containsKey("eventDate") ? stringOrNull(body, "eventDate") : null;
+                if (ed != null) {
+                    String out = renamed.get(ed);
+                    if (out == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "eventDate '" + ed + "' is not a kept column");
+                    if (eventDate != null && !eventDate.equals(out))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "eventDate '" + ed + "' differs from link.primaryTime '" + eventDate + "'");
+                    eventDate = out;
+                } else if (eventDate == null && !stated && !body.containsKey("eventDate"))
+                    eventDate = renamed.get(proposed(proposedLink.get(DatasetEntryRules.PRIMARY_TIME)));
             }
             if (link != null) cols = linkRoles(cols, overrides, link);
+            else if (eventDate != null) cols = linkRoles(cols, overrides, Map.of(DatasetEntryRules.PRIMARY_TIME, eventDate));
             String description = body.get("description") instanceof String s && !s.isBlank() ? s.trim() : null;
             // ADD-DATA-ROW-FILTER-1: the rows to keep, over the kept columns as they will be typed and named
             List<ImportRowFilter.Column> filterable = new ArrayList<>();
@@ -420,7 +434,7 @@ final class OnboardImport {
                 if (c.keep()) filterable.add(new ImportRowFilter.Column(c.source(), c.name(), c.type()));
                 else left.add(c.source());
             ImportRowFilter.Result filter = ImportRowFilter.of(body.get("filter"), filterable, left);
-            return new Plan(cols, draftFormat, primary, link, identifying, description, String.valueOf(draft.get("type")), filter);
+            return new Plan(cols, draftFormat, primary, link, eventDate, identifying, description, String.valueOf(draft.get("type")), filter);
         }
 
         /**
@@ -615,8 +629,7 @@ final class OnboardImport {
             d.put("kind", kind);
             d.put("importPipeline", id);
             d.put("importFormat", type);
-            String time = link == null ? null : (String) link.get(DatasetEntryRules.PRIMARY_TIME);
-            if (time != null) d.put("eventDate", time);
+            if (eventDate != null) d.put("eventDate", eventDate);
             List<Map<String, Object>> columns = new ArrayList<>();
             for (PlanCol c : cols) {
                 if (!c.keep()) continue;

@@ -133,6 +133,13 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
             const body = buildCommit(d, 'x', '', initialColumns(d), roles, { withEntityTypes: true });
             expect(body.link).toBeNull();
             expect(body.primaryEntityType).toBeNull();
+            // ADD-DATA-STREAM-TIME-1: the confirmed Time is the Stream's own, link or not (what each arrival covers)
+            expect(body.eventDate).toBe('ts');
+            const noTime = buildCommit(d, 'x', '', initialColumns(d), { ...roles, primaryTime: '' }, { withEntityTypes: true });
+            expect(noTime.eventDate).toBeNull();
+            const linked = buildCommit(d, 'x', '', initialColumns(d), initialRoles(d), { withEntityTypes: true });
+            expect(linked.link?.primaryTime).toBe('ts');
+            expect('eventDate' in linked).toBe(false); // the link's Time is the Stream's
         });
 
         it('the closed optional step (console): sure detections stand, guesses are NOT applied', () => {
@@ -142,6 +149,10 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
             expect(body.columns.find((c) => c.name === 'from_account')!.entityType).toBeNull();
             expect(body.columns.find((c) => c.name === 'to_account')!.entityType).toBe('account');
             expect(body.link).toBeNull(); // the from/to pair was a guess
+            expect(body.eventDate).toBe('ts'); // a sure Time stands without the link (ADD-DATA-STREAM-TIME-1)
+            // a Time column the person left out is no Time
+            const left = initialColumns(d).map((c) => (c.name === 'ts' ? { ...c, drop: true } : c));
+            expect(buildCommit(d, 'x', '', left, initialRoles(d), { withEntityTypes: false }).eventDate).toBeNull();
             expect(body.primaryEntityType).toBe('account');
         });
 

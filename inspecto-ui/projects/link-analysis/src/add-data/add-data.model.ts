@@ -246,6 +246,8 @@ export interface CommitBody {
     columns: CommitColumn[];
     primaryEntityType?: string | null;
     link?: CommitLink | null;
+    /** A Stream with no link: its Time column (what each arrival covers); null = none. A link's primaryTime is it otherwise. */
+    eventDate?: string | null;
     identifyingColumn?: string | null;
     recordType?: string | null;
     /** ADD-DATA-ROW-FILTER-1: keep only the rows that meet every condition; absent = every row. */
@@ -694,7 +696,8 @@ export interface RolesState {
 /**
  * The commit body from what the screen holds. Columns are named by their DRAFT name; a type is sent only when changed (the
  * draft's date format then stays), an Entity Type always (so an unconfirmed low guess in the console's closed optional step
- * is sent as none rather than applied silently). A link needs both ends, else `link: null` (no graph from this Dataset).
+ * is sent as none rather than applied silently). A link needs both ends, else `link: null` (no graph from this Dataset)
+ * and the Time goes as `eventDate`.
  */
 export function buildCommit(
     d: OnboardDraft,
@@ -746,6 +749,8 @@ export function buildCommit(
                       primaryMeasure: high(l.primaryMeasure),
                   })
                 : null;
+            const time = l ? high(l.primaryTime) : '';
+            if (!out.link) out.eventDate = time && kept.has(time) ? time : null;
         } else {
             const id = d.entityTypes.identifying;
             out.identifyingColumn = id?.value && id.confidence === 'high' ? id.value : null;
@@ -775,6 +780,8 @@ export function buildCommit(
                       primaryMeasure: keepAs(roles.primaryMeasure, 'measure'),
                   })
                 : null;
+        // ADD-DATA-STREAM-TIME-1: the Time is the Stream's own, so it is sent without a link too
+        if (!out.link) out.eventDate = keepAs(roles.primaryTime, 'temporal') || null;
     } else {
         out.identifyingColumn = keep(roles.identifying) || null;
     }
