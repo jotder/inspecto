@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-381 test class(es): 140 unit, 241 real-HTTP control-plane, 0 IT.
+382 test class(es): 141 unit, 241 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -323,6 +323,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SchemaFileFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SchemaFileFindingsTest.java` | {@link ConfigRoutes#schemaFileFindings}: the pre-flight check that a pipeline draft's |
 | `ServerFaultsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ServerFaultsTest.java` | ERR-5XX-ROUTE-BODIES (operator, 2026-09-28), over real HTTP: a route-built 500/502/503 names a curated |
 | `ShippedExamplesPassTheSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ShippedExamplesPassTheSaveGateTest.java` | Every shipped example Pipeline under {@code inspecto/examples/} passes the authoring gate and loads |
+| `SpaceVersionCheckTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceVersionCheckTest.java` | LA-SHOWCASE-DIST-1: a Space naming a newer {@code min_product_version} than the running product is flagged. |
 | `SpiSlotFailClosedTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotFailClosedTest.java` | {@link SpiSlot}'s two discovery postures, exercised through real {@code ServiceLoader} registrations |
 | `SpiSlotTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotTest.java` | Pins the edition-seam slot semantics the three facades (Authenticators / AccessDeciders / |
 | `SqlAstContractTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SqlAstContractTest.java` | Q5 (operator 2026-09-23): the DuckDB parse tree is a surface we CONSUME but do not own, so the |

@@ -52,6 +52,9 @@
 /inspecto-deploy-linux.zip
 # Since 2026-09-17 package.ps1 names the zip after the EMBEDDED runtime's platform (RELEASE-BUNDLE-PLATFORM-MISMATCH-1)
 /inspecto-deploy-*.zip
+# Showcase downloads written by tools/package-la-showcase.mjs (LA-SHOWCASE-DIST-1)
+/inspecto-la-space-*.zip
+/inspecto-la-data-*.zip
 # Release-integrity sidecars package.ps1 always emits beside each artifact (SOC 2 CC8-04)
 /inspecto-deploy*.zip.sha256
 /inspecto-deploy*.zip.asc
