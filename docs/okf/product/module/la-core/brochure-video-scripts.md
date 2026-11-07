@@ -1,22 +1,52 @@
 # Inspecto LA short videos — scripts and agency briefs
 
-> **Six short videos, each filmed on the real product over synthetic data: a one-page brief for the agency, then a shot-by-shot script with voice-over.**
+> **Five concept videos and an industry series of seventeen, each filmed on the real product over synthetic data: a one-page brief for the agency, then a shot-by-shot script with voice-over.**
 
-*Audience: marketing, presales and the video agency. Product Map Item `module.la-core`. Draft of 2026-11-07, not
+*Audience: marketing, presales and the video agency. Product Map Item `module.la-core`. Draft of 2026-11-08, not
 yet reviewed by product or legal. Every product claim below is taken from the
-[Link Analysis user guide](user-guide-link-analysis.md); the [whitepaper](brochure-inspecto-la-whitepaper.md) is
-the reference for anything wider.*
+[Link Analysis user guide](user-guide-link-analysis.md); every story, id and figure in the industry series is
+taken from the showcase plan (`docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md`) and,
+for a built Space, its generator's ground truth file. The [whitepaper](brochure-inspecto-la-whitepaper.md) is the
+reference for anything wider.*
 
-| # | Title | Length | Edition shown | Data | Ready to film |
-|---|---|---|---|---|---|
-| 1 | The ring nobody saw | 45 s | Basic | `la-mobile-money` | Yes |
-| 2 | Zero to graph in 60 seconds | 60 s | Basic | *Try the sample* | Yes, after the timing check |
-| 3a | Follow the claim (insurance) | 30 s | Basic | `la-claims` | Yes |
-| 3b | Follow the caller (police) | 30 s | Basic | `la-police` | No: the Space is planned |
-| 3c | Follow the meter (utility) | 30 s | Basic | `la-utility` | No: the Space is planned |
-| 4 | Retire the red string | 30 s | Basic | `la-mobile-money` | Yes |
-| 5 | It stays current | 45 s | Basic, plus one Standard shot | `la-mobile-money` + one prepared file | After data preparation |
-| 6 | The analyst (dramatization) | 60 s | Standard | `la-mobile-money` | Yes, after casting |
+## Contents
+
+**Concept videos** — one idea each, cross-industry.
+
+| # | Title | Length | Features shown | Film on | Data | Ready to film |
+|---|---|---|---|---|---|---|
+| 1 | The ring nobody saw | 45 s | Basic | Advanced install | `la-mobile-money` | Yes |
+| 2 | Zero to graph in 60 seconds | 60 s | Basic | Basic install | *Try the sample* | After the timing check |
+| 4 | Retire the red string | 30 s | Basic | Advanced install | `la-mobile-money` | Yes |
+| 5 | It stays current | 45 s | Basic, plus one Advanced shot | Basic install | `la-police` + its staged month | Yes (shot 7 later) |
+| 6 | The analyst (dramatization) | 60 s | Standard | Standard or Advanced install | `la-mobile-money` | After casting |
+
+**Industry series (video 3)** — one 30-second video per showcase Space, seventeen in all, one template.
+
+| # | Industry | Space | Film on | Ready to film |
+|---|---|---|---|---|
+| 3.1 | Banking — first look | `la-sample` | Basic | Yes |
+| 3.2 | Banking and telecom | `la-showcase` | Advanced | Yes |
+| 3.3 | Mobile money | `la-mobile-money` | Advanced | Yes |
+| 3.4 | Insurance | `la-claims` | Advanced | Yes |
+| 3.5 | Internal audit | `la-audit` | Advanced | Yes |
+| 3.6 | Beneficial ownership and sanctions | `la-ownership` | Basic | Yes |
+| 3.7 | Police | `la-police` | Basic | Yes |
+| 3.8 | Electricity | `la-utility` | Basic | Yes |
+| 3.9 | Card fraud | `la-card` | Basic (planned) | No: Space planned |
+| 3.10 | Trade finance | `la-trade` | Basic (planned) | No: Space planned |
+| 3.11 | Procurement | `la-procurement` | Basic (planned) | No: Space planned |
+| 3.12 | Benefits and tax | `la-benefits` | Basic (planned) | No: Space planned |
+| 3.13 | Healthcare billing | `la-health` | Basic (planned) | No: Space planned |
+| 3.14 | Telecom revenue assurance | `la-telco-ra` | Basic (planned) | No: Space planned |
+| 3.15 | Logistics | `la-logistics` | Basic (planned) | No: Space planned |
+| 3.16 | Insider threat | `la-insider` | Basic (planned) | No: Space planned |
+| 3.17 | Crypto | `la-crypto` | Basic (planned) | No: Space planned |
+
+*Features shown* is the lowest edition that has every feature on screen. *Film on* is the install the video must be
+captured on: `la-mobile-money`, `la-claims`, `la-showcase` and `la-audit` are templates that need an Advanced install
+(`minEdition: advanced`), even where every feature shown is in Basic. The planned Spaces are specified with a Basic tier
+first.
 
 ---
 
@@ -30,14 +60,17 @@ what it set aside. The videos should sound the same. No thriller music, no hacke
 hooded figures), no "AI magic" language.
 
 **Filming rules (binding).**
-- Film **only synthetic Spaces**: `la-mobile-money`, `la-claims`, *Try the sample*, and the police and utility
-  showcases once they exist. Never film any other Space on the demo machine. Some hold real customer data.
+- Film **only the synthetic showcase Spaces** named in this document. Never film any other Space on the demo
+  machine. Some hold real customer data.
 - Before every capture session, set the browser's current Space explicitly to the Space being filmed, and check
   the Space name in the left rail in the first frame.
-- Numbers on screen must be the numbers the product shows. Do not edit a count, a name or a timing in post.
+- Numbers and ids on screen must be the ones the product shows. Do not edit a count, a name or a timing in post.
   If a shot needs a different number, change the data and re-film it.
-- A feature tagged **Standard** must carry the on-screen label *Inspecto LA Standard* while it is visible.
-  Untagged shots are on Basic, the entry edition.
+- Every story has a **benign look-alike** (named in each brief). It must never appear on screen as part of the
+  story or as suspicious; that is the honest half of the demo.
+- A shot showing a feature above Basic carries an on-screen edition label (*Inspecto LA Standard* or *Inspecto LA
+  Advanced*) while it is visible. Geo Views are among them: they are inert on Basic. Untagged shots show features
+  every edition has.
 
 **Capture.** 1920 × 1080 screen capture at 60 fps, browser at 100 % zoom, light theme, a clean browser profile
 with no bookmarks bar or extensions. Hide the mouse pointer except where a shot calls for a click. Slow,
@@ -52,7 +85,8 @@ series.
 
 **Audio.** One music bed for the series, understated, with a single soft accent on each reveal shot.
 
-**End card (every video).** Inspecto LA logo · the line *See who is connected.* · `[CTA URL — to be supplied]`.
+**End card (every video).** Inspecto LA logo · the line *See who is connected.* (the industry series adds its
+industry line) · `[CTA URL — to be supplied]`.
 
 **Approvals.** Product signs off each script's claims before filming, and the final cut before release.
 
@@ -70,7 +104,7 @@ series.
 | Message | A ring that can't be seen in a table is obvious as a graph, in a few clicks. |
 | Must show | The table first, then the graph; *Busiest nodes* and excluding the busy merchant; *Tight groups* finding the device farm. |
 | Must not | Claim the product "detects fraud on its own". The analyst finds it, and the product points at it. |
-| Data | `la-mobile-money` (14 days of synthetic wallet transfers). The busy merchant is `MER-ELECTRIC` (a benign biller), and the planted ring is the nine-wallet device farm. |
+| Data | `la-mobile-money` (14 days of synthetic wallet transfers) on an Advanced install. The busy merchant is `MER-ELECTRIC` (a benign biller, the look-alike), and the planted ring is the nine-wallet device farm. Every feature shown is in Basic. |
 
 **Script**
 
@@ -101,7 +135,7 @@ series.
 | Message | Unzip, start, and you're looking at a graph in under a minute. No cluster, no cloud, no consultants. |
 | Must show | A real on-screen stopwatch running the whole time, with no cuts while it runs. |
 | Must not | Cut time out while the stopwatch runs. If the real run takes longer than 60 s, re-title the video with the real time. |
-| Data | *Try the sample* on a fresh Basic install with no Spaces. The sample graph has 112 entities and 224 links (measured on a Basic bundle on 2026-11-07). |
+| Data | *Try the sample* (`la-sample`) on a fresh Basic install with no Spaces. The sample graph has 112 entities and 224 links (measured on a Basic bundle on 2026-11-07). |
 | Before filming | Time the full run three times on the filming laptop with the final build; use the median in the title. |
 
 **Script**
@@ -121,63 +155,329 @@ series.
 
 ---
 
-## 3 · Follow the claim / the caller / the meter (3 × 30 s)
+## 3 · Industry series — one per showcase Space (17 × 30 s)
 
-One template filmed three times, one industry each. The edit, the music and the voice-over structure stay the
-same, so the agency builds it once.
+One template, filmed once per showcase Space. The edit, the music and the voice-over shape stay the same, so the
+agency builds it once and swaps the footage and the lines.
 
 **Brief (shared)**
 
 | | |
 |---|---|
 | Objective | One video per industry, so sales can send the one that fits the prospect. |
-| Audience | Special Investigations Units (insurance), police intelligence analysts, utility revenue-protection teams. |
+| Audience | Named per video below. |
 | Channel | Sales email, LinkedIn targeted by industry, trade-show loop per stand. |
 | Message | Different industry, same move: the link you were missing is one click away. |
 | Template | Hook (the industry's problem in one line) → the graph → one click → the reveal → end card with the industry line. |
-| Must not | Use real place, company or person names. Every name on screen comes from the synthetic data. |
+| Must show | The story's reveal exactly as the Space's ground truth file lists it: the same entities, nothing added. |
+| Must not | Use real place, company or person names. Show the story's look-alike as suspicious. |
+| Before filming | Check each reveal shot against the Space's ground truth file. For a planned Space, re-read this script against the Space as built: ids and figures can move during the build. |
 
-**Template (fill per industry)**
+**Template**
 
 | # | Time | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
-| 1 | 0–5 | Industry establishing shot: documents or records on screen, never stock footage of people. | [Industry] | [Hook line] |
-| 2 | 5–11 | The graph of the Space, wide. | — | [What the data is] |
-| 3 | 11–18 | One click: the analysis named in the row below. | [Analysis name] | [What the click asks] |
+| 1 | 0–5 | Industry establishing shot: the records on screen, never stock footage of people. | [Industry] | [Hook] |
+| 2 | 5–11 | The graph of the Space (or its saved view), wide. | — | [What the data is] |
+| 3 | 11–18 | One click: the analysis named in the script. | [Analysis name] | [What the click asks] |
 | 4 | 18–25 | The reveal, held. | — | [What it shows] |
 | 5 | 25–30 | End card with the industry line. | [Industry line] | Inspecto LA. |
 
-### 3a · Insurance — Follow the claim (`la-claims`, ready)
+Each video below gives its brief (audience, story, reveal, look-alike) and its five lines. *Voice-over: about 30
+words each.*
 
-| # | Voice-over | Picture detail |
-|---|---|---|
-| 1 | Twelve claims. Twelve different claimants. Nothing in common. | Claims list. |
-| 2 | Draw them as links: people, phones, addresses, garages. | The claims graph, wide. |
-| 3 | Ask which of them belong together. | *Tight groups*. |
-| 4 | Four phones. Three addresses. One garage, one clinic, one lawyer. | The planted ring: 12 claimants sharing 4 phones, 3 addresses, one garage, clinic and lawyer. |
-| 5 | Inspecto LA. | End card line: *For Special Investigations Units.* |
+### 3.1 · Banking — first look (`la-sample`, built, Basic)
 
-### 3b · Police — Follow the caller (`la-police`, planned)
+| | |
+|---|---|
+| Audience | Anyone trying the product for the first time; companion to video 2. |
+| Story | 12 smurf accounts structure cash into `MULE-HUB-01`, which passes it on through `RELAY-01` and `RELAY-02` to `OFFSHORE-77`. |
+| Reveal | *Route from A to B* from one smurf account to `OFFSHORE-77`, the route lit through the hub and a relay. |
+| Look-alike | — (the sample has none; do not imply other accounts are suspect). |
 
-| # | Voice-over | Picture detail |
-|---|---|---|
-| 1 | The handset changes every few weeks. The customers don't. | Call records. |
-| 2 | Draw the calls as links. | The handset network over time (saved view). |
-| 3 | Line up the numbers, period by period. | Time filter stepping through periods. |
-| 4 | New handset, same sixty customers. One controller. | The controller handset rotation, with 70 % of customers carried over. |
-| 5 | Inspecto LA. | End card line: *For intelligence analysts.* |
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Deposit rows, every amount just under the limit. | Banking | Twelve accounts. Every deposit just under the limit. |
+| 2 | *Try the sample* graph, wide. | — | Draw who pays whom. |
+| 3 | *Busiest nodes*: `MULE-HUB-01` first. | *Busiest nodes* | Ask who sits in the middle. |
+| 4 | *Route from A to B* ▸ *Find route* to `OFFSHORE-77`. | *Route from A to B* | One hub, two relays, one offshore account. |
+| 5 | End card. | *Try it on your own data.* | Inspecto LA. |
 
-### 3c · Utility — Follow the meter (`la-utility`, planned)
+### 3.2 · Banking and telecom (`la-showcase`, built, Advanced install)
 
-| # | Voice-over | Picture detail |
-|---|---|---|
-| 1 | Twenty-two meters started reading low. The transformer didn't. | Consumption table. |
-| 2 | Draw premises, visits and contractors as links. | Contractor C-14 network (saved view). |
-| 3 | Ask who they have in common. | *Busiest nodes* on the selection. |
-| 4 | One contractor visited them all, two weeks before the drop. | Contractor C-14 at the centre of the 22 premises; optionally the Geo view of loss by transformer area. |
-| 5 | Inspecto LA. | End card line: *For revenue protection.* |
+| | |
+|---|---|
+| Audience | Fraud teams at banks and mobile operators. |
+| Story | Agent till `TILL-06` takes 80 % of the cash-out. |
+| Reveal | *Busiest nodes* over the cash-out links: `TILL-06` first, its share in the result sentence. |
+| Look-alike | — (none listed for this story; show no other till as suspect). |
 
-*Voice-over: about 30 words each.*
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Cash-out records scrolling. | Banking and telecom | Hundreds of payments in. Where does the cash come out? |
+| 2 | The cash-out graph, wide. | — | Draw payers and tills as links. |
+| 3 | *Busiest nodes*. | *Busiest nodes* | Ask which till does the most. |
+| 4 | `TILL-06` highlighted with its share. | — | One till. Eighty percent of the cash-out. |
+| 5 | End card. | *For fraud and revenue assurance.* | Inspecto LA. |
+
+### 3.3 · Mobile money (`la-mobile-money`, built, Advanced install)
+
+| | |
+|---|---|
+| Audience | AML teams at mobile-money operators. |
+| Story | Agent-assisted structuring: 25 wallets top up through agent `AG-18`. |
+| Reveal | After excluding `MER-ELECTRIC`, *Busiest nodes* puts `AG-18` at the centre of the 25 wallets. |
+| Look-alike | `MER-ELECTRIC`, a biller everyone pays: shown only as the noise that is set aside. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Wallet top-ups, all just under the limit. | Mobile money | Twenty-five wallets. Every top-up just under the limit. |
+| 2 | The graph; `MER-ELECTRIC` excluded. | *Exclude* | Draw the transfers. Set the biller aside. |
+| 3 | *Busiest nodes*. | *Busiest nodes* | Ask what the wallets have in common. |
+| 4 | `AG-18` and its 25 wallets. | — | One agent, AG-18, behind all of them. |
+| 5 | End card. | *For anti-money-laundering.* | Inspecto LA. |
+
+### 3.4 · Insurance (`la-claims`, built, Advanced install)
+
+| | |
+|---|---|
+| Audience | Special Investigations Units at insurers. |
+| Story | 12 claimants sharing 4 phones, 3 addresses, one garage, one clinic and one lawyer. |
+| Reveal | *Tight groups*: the 12 claimants and the 9 shared contacts and parties as one group. |
+| Look-alike | — (none listed for this story; show no other claimant as suspect). |
+| Later cut | When the planned additions land, a second cut on the parts-supplier ring (one supplier on invoices from 9 garages; parts never fitted). Its look-alike is a high-volume supplier whose parts are all fitted. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Claims list. | Insurance | Twelve claims. Twelve different claimants. Nothing in common. |
+| 2 | The claims graph, wide. | — | Draw them as links: people, phones, addresses, garages. |
+| 3 | *Tight groups*. | *Tight groups* | Ask which of them belong together. |
+| 4 | The ring. | — | Four phones. Three addresses. One garage, one clinic, one lawyer. |
+| 5 | End card. | *For Special Investigations Units.* | Inspecto LA. |
+
+### 3.5 · Internal audit (`la-audit`, built, Advanced install)
+
+| | |
+|---|---|
+| Audience | Internal audit and accounts-payable control teams. |
+| Story | Vendor `V-117` shares a bank account and an address with employee `E-31`. |
+| Reveal | *Expand* from `V-117`: the bank account and address, and `E-31` on the other side of both. |
+| Look-alike | — (none listed for this story). Do not film the unlinked sixth vendor of the shared-account story as part of it. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Paid invoices from vendor `V-117`. | Internal audit | A new vendor. Invoices approved. Payments made. |
+| 2 | Vendors, employees, bank accounts and addresses as a graph. | — | Draw who is paid, and where the money lands. |
+| 3 | *Expand* from `V-117`. | *Expand* | Ask what this vendor is linked to. |
+| 4 | `E-31` on the shared bank account and address. | — | The same bank account. The same address. One of your own employees. |
+| 5 | End card. | *For internal audit.* | Inspecto LA. |
+
+### 3.6 · Beneficial ownership and sanctions (`la-ownership`, built, Basic)
+
+| | |
+|---|---|
+| Audience | KYC and sanctions compliance teams at banks. |
+| Story | Sanctions two hops away: a customer's 50 % owner is 60 % owned by a person on the (invented) sanctions list. |
+| Reveal | *Route from A to B* from the customer to the listed person: customer ← 50 % owner ← 60 % listed person. |
+| Look-alike | A near-namesake of the listed person with a different birth year and nationality. It must not appear as a match. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | The customer record, all checks green. | Ownership and sanctions | Your customer is clean. So is its owner. |
+| 2 | Companies, people and stakes as a graph. | — | Draw who owns whom. |
+| 3 | *Route from A to B* to the listed person. | *Route from A to B* | Follow the ownership up. |
+| 4 | The route lit, the stakes on the links. | — | Two hops up: a person on the sanctions list. |
+| 5 | End card. | *For KYC and sanctions.* | Inspecto LA. |
+
+### 3.7 · Police (`la-police`, built, Basic)
+
+| | |
+|---|---|
+| Audience | Police intelligence analysts. |
+| Story | A burglary series: 18 burglaries in 3 months across 2 districts; 40 % of the stolen items resurface at 2 dealers through 3 sellers; a vehicle kept by one seller's partner is seen near 11 scenes. |
+| Reveal | The stolen-property saved view: scenes, items, dealers and sellers as one connected piece, with the vehicle joining it. |
+| Look-alike | A taxi seen near 54 scenes across the year and the city, none of them in the series. It must not appear in the reveal. |
+| Alternative cut | The drug-supply handset network: one controller number per period, its handset changing every 3–5 weeks, with 75–80 % of about 60 customers carried over (look-alike: a delivery driver's phone with many short calls and no carry-over). |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Incident reports, two districts. | Police | Eighteen burglaries. Two districts. No suspect. |
+| 2 | The stolen-property saved view, wide. | — | Draw what was taken, and where it was sold. |
+| 3 | *Tight groups*. | *Tight groups* | Ask what connects the scenes. |
+| 4 | Two dealers, three sellers, one vehicle near eleven scenes. | — | Two dealers. Three sellers. One car seen near eleven of the scenes. |
+| 5 | End card. | *For intelligence analysts.* | Inspecto LA. |
+
+### 3.8 · Electricity (`la-utility`, built, Basic)
+
+| | |
+|---|---|
+| Audience | Revenue-protection teams at electricity utilities. |
+| Story | Meter tampering: 22 premises under 2 metered transformers (`TX-007`, `TX-019`) drop 40–70 % within 2 weeks of a visit by contractor `C-14`, while transformer supply stays flat. |
+| Reveal | The contractor-network saved view: `C-14` at the centre of the 22 premises. |
+| Look-alike | A holiday home whose use drops every winter, with no visit. |
+| Optional shot | The loss-by-transformer Geo View, with `TX-007` and `TX-019` over 15 %: label it *Inspecto LA Standard*, because Geo Views are inert on Basic. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Consumption table, the drops visible. | Electricity | Twenty-two meters started reading low. The transformers didn't. |
+| 2 | The contractor-network saved view, wide. | — | Draw premises, visits and contractors as links. |
+| 3 | *Busiest nodes*. | *Busiest nodes* | Ask who they have in common. |
+| 4 | `C-14` and the 22 premises. | — | One contractor visited them all, two weeks before the drop. |
+| 5 | End card. | *For revenue protection.* | Inspecto LA. |
+
+### 3.9 · Card fraud (`la-card`, planned)
+
+| | |
+|---|---|
+| Audience | Card fraud operations at issuers and payment service providers. |
+| Story | Common point of purchase: 60 cards defrauded 1–6 weeks after using one fuel-station terminal in a 3-week window. |
+| Reveal | *Busiest nodes* over the defrauded cards' merchants: the one terminal, linked to all 60. |
+| Look-alike | A busy supermarket used by many cards with no later fraud. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Sixty fraud reports, different cardholders. | Card fraud | Sixty cards. Sixty fraud claims. No connection. |
+| 2 | Cards and merchants as a graph. | — | Draw where each card was used. |
+| 3 | *Busiest nodes*. | *Busiest nodes* | Ask what they have in common. |
+| 4 | The fuel-station terminal and the 60 cards. | — | One fuel-station terminal, weeks before the fraud began. |
+| 5 | End card. | *For card fraud teams.* | Inspecto LA. |
+
+### 3.10 · Trade finance (`la-trade`, planned)
+
+| | |
+|---|---|
+| Audience | Trade-finance compliance at banks. |
+| Story | Circular trade: the same 6 containers go A → B → C → A in 4 months, the declared value rising each leg. |
+| Reveal | *Pattern match* for a cycle: the three companies and the 6 containers in a loop. |
+| Look-alike | A container-leasing firm's boxes moving between many unrelated shippers. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Bills of lading for 6 containers. | Trade finance | Six containers. Four months. Three countries. |
+| 2 | Companies, trades and containers as a graph. | — | Draw who shipped what to whom. |
+| 3 | *Pattern match*. | *Pattern match* | Ask where the containers went. |
+| 4 | The loop A → B → C → A, values rising. | — | Round in a circle, and worth more on every leg. |
+| 5 | End card. | *For trade finance.* | Inspecto LA. |
+
+### 3.11 · Procurement (`la-procurement`, planned)
+
+| | |
+|---|---|
+| Audience | Public-procurement integrity units and internal audit. |
+| Story | Bid rotation: 4 firms win 24 tenders in one category in turn; losing bids are 5–12 % higher; 2 of the firms share a director. |
+| Reveal | *Tight groups* over bids and directors: the 4 firms, with the shared director between two of them. |
+| Look-alike | 3 large firms that win often but bid independently. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Tender awards, four names repeating. | Procurement | Twenty-four tenders. Four winners. Taking turns. |
+| 2 | Bidders, tenders and directors as a graph. | — | Draw who bid, who won, and who runs them. |
+| 3 | *Tight groups*. | *Tight groups* | Ask who links the winners. |
+| 4 | The 4 firms and the shared director. | — | Two of them share a director. |
+| 5 | End card. | *For procurement integrity.* | Inspecto LA. |
+
+### 3.12 · Benefits and tax (`la-benefits`, planned)
+
+| | |
+|---|---|
+| Audience | Government benefits-integrity and tax-compliance teams. |
+| Story | Address farm: 14 claimants under 5 surnames at one address, each declaring a single-person household, paid into 3 accounts. |
+| Reveal | *Busiest nodes* over addresses: the one address, its 14 claimants, and the 3 bank accounts they are paid into. |
+| Look-alike | A care home with many genuine residents and their own accounts. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Claims, each "single-person household". | Benefits | Fourteen claimants. Each one says they live alone. |
+| 2 | Claimants, addresses and bank accounts as a graph. | — | Draw where they live and where they're paid. |
+| 3 | *Busiest nodes*. | *Busiest nodes* | Ask what they share. |
+| 4 | One address, 14 claimants, 3 accounts. | — | One address. Three bank accounts. |
+| 5 | End card. | *For benefits integrity.* | Inspecto LA. |
+
+### 3.13 · Healthcare billing (`la-health`, planned)
+
+| | |
+|---|---|
+| Audience | Program-integrity teams at health insurers and public payers. |
+| Story | Referral kickbacks: 2 general practitioners send 85 % of their referrals to one imaging centre owned by one doctor's spouse. |
+| Reveal | *Expand* from the imaging centre to its owner: the spouse, and the doctor beside them. |
+| Look-alike | A practice that refers to the only hospital nearby. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Referral counts, one centre far ahead. | Healthcare | Two doctors. Most of their referrals go to one place. |
+| 2 | Doctors, referrals, providers and owners as a graph. | — | Draw who refers to whom, and who owns what. |
+| 3 | *Expand* from the imaging centre. | *Expand* | Ask who owns the imaging centre. |
+| 4 | The owner: one doctor's spouse. | — | One doctor's spouse. |
+| 5 | End card. | *For program integrity.* | Inspecto LA. |
+
+### 3.14 · Telecom revenue assurance (`la-telco-ra`, planned)
+
+| | |
+|---|---|
+| Audience | Revenue-assurance and fraud teams at mobile operators. |
+| Story | Dealer commission fraud: a dealer activates 400 SIMs on 3 devices; each makes one top-up and goes dormant. |
+| Reveal | *Busiest nodes* over activations: the dealer and the 3 devices behind the 400 SIMs. |
+| Look-alike | A dealer near a university whose term-start spike stays active. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | New subscribers, one top-up each, then nothing. | Telecom | Four hundred new subscribers. One top-up each. Then silence. |
+| 2 | SIMs, dealers and devices as a graph. | — | Draw where each SIM was activated. |
+| 3 | *Busiest nodes*. | *Busiest nodes* | Ask who sold them. |
+| 4 | One dealer, three devices, 400 SIMs. | — | One dealer. Three devices. Paid a commission on every one. |
+| 5 | End card. | *For revenue assurance.* | Inspecto LA. |
+
+### 3.15 · Logistics (`la-logistics`, planned)
+
+| | |
+|---|---|
+| Audience | Logistics security teams and cargo insurers. |
+| Story | Inside job: 12 losses share one driver pair, and one night-shift scanner is on 10 of them. |
+| Reveal | *Tight groups* over trips, drivers and scanners: the 12 losses joined by the 2 drivers and the scanner. |
+| Look-alike | A high-volume driver on the busiest route with 2 losses in a year. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Loss reports, different routes and months. | Logistics | Twelve loads lost. Different routes. Different months. |
+| 2 | Trips, drivers and scanners as a graph. | — | Draw who drove, and who scanned. |
+| 3 | *Tight groups*. | *Tight groups* | Ask what the losses share. |
+| 4 | The 2 drivers and the night-shift scanner. | — | The same two drivers. The same night-shift scanner. |
+| 5 | End card. | *For cargo security.* | Inspecto LA. |
+
+### 3.16 · Insider threat (`la-insider`, planned)
+
+| | |
+|---|---|
+| Audience | Security, HR and internal investigations. All people and systems are invented. |
+| Story | Access creep: manager `M-7` grants payroll and treasury access to 4 reports outside their role, with no ticket; one of them later edits a vendor's bank details. |
+| Reveal | *Route from A to B* from the vendor bank-detail edit back to `M-7`, through the grant with no ticket. |
+| Look-alike | A role change with an HR record and a ticket. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Audit log: a vendor's bank details changed. | Insider threat | A vendor's bank details changed. By someone who shouldn't have access. |
+| 2 | People, grants and systems as a graph. | — | Draw who has access, and who gave it. |
+| 3 | *Route from A to B* to `M-7`. | *Route from A to B* | Ask where the access came from. |
+| 4 | `M-7`, 4 grants, no ticket. | — | One manager. Four grants. No ticket. |
+| 5 | End card. | *For internal investigations.* | Inspecto LA. |
+
+### 3.17 · Crypto (`la-crypto`, planned)
+
+| | |
+|---|---|
+| Audience | Compliance at virtual-asset service providers, and investigators. All addresses are invented. |
+| Story | Converging cash-out: 40 KYC accounts at 2 exchanges, with unrelated names, deposit from one cluster and cash out to 3 bank accounts. |
+| Reveal | *Tight groups* over deposits and withdrawals: the one cluster in, the 40 accounts, the 3 bank accounts out. |
+| Look-alike | An over-the-counter desk whose many customers deposit their own funds. |
+| Note | The peel chain story (80 hops) is the more dramatic shot, but check the Space's path-depth limit before scripting it. |
+
+| # | Picture | On-screen text | Voice-over |
+|---|---|---|---|
+| 1 | Forty customer profiles, unrelated names. | Crypto | Forty customers. Two exchanges. Forty different names. |
+| 2 | Deposits and withdrawals as a graph. | — | Draw where the coins came from, and where the cash went. |
+| 3 | *Tight groups*. | *Tight groups* | Ask what they share. |
+| 4 | One cluster in, 3 bank accounts out. | — | One pool of funds in. Three bank accounts out. |
+| 5 | End card. | *For crypto compliance.* | Inspecto LA. |
 
 ---
 
@@ -192,7 +492,7 @@ same, so the agency builds it once.
 | Channel | Social (9:16 first), conference screens. |
 | Message | The corkboard is how investigators used to think. Inspecto LA is how they think now. |
 | Must show | Split screen. Left: a real, physical corkboard with printouts, sticky notes and red string, shot practically (not CGI). Right: the same people as a graph. |
-| Data | `la-mobile-money`. The route is the planted 98 % pass-through mule chain that ends at agent `AG-39`; take its first wallet from the Space's ground truth. |
+| Data | `la-mobile-money` on an Advanced install. The route is the planted 98 % pass-through mule chain that ends at agent `AG-39`; take its first wallet from the Space's ground truth. Every feature shown is in Basic. |
 | Casting | Hands only, no faces. |
 
 **Script**
@@ -216,25 +516,25 @@ same, so the agency builds it once.
 | | |
 |---|---|
 | Objective | Show that a view is a question about the data, not a frozen picture. |
-| Audience | Fraud operations leads who run the same checks every week. |
+| Audience | Analysts who run the same checks every week or month. |
 | Channel | Website, sales follow-up email. |
-| Message | Drop next month's file in a folder; your saved view shows what changed when you open it. |
-| Must show | *Watch this folder*; *What changed in your data*; reopening a saved view. The Alert shot only with its edition label. |
+| Message | Next month's files land in a folder; your saved view shows what changed when you open it. |
+| Must show | Files landing in the watched folder; *What changed in your data*; reopening a saved view. The Alert shot only with its edition label. |
 | Must not | Say the graph redraws by itself while it is open. It re-reads the data when the view is opened. |
-| Edition | Shots 1–6 Basic. Shot 7 (the Alert) **Standard**. Cut shot 7 for a Basic-only version. |
-| Data preparation | A second `la-mobile-money` file in which a new wallet joins the planted ring. Prepare it from the generator, check it in a dry run, and keep it with the filming kit. **Product must confirm shot 7's Alert set-up before filming.** |
+| Data | `la-police` on a Basic install. It lands 12 months, 2025-11-01 to 2026-10-31; its staged month (November 2026, in `data/staged/<feed>`) adds one more serial match by a seller in the burglary series. The `police_links` Job folds new files in every 5 minutes: cut the wait in the edit, never fake the result. |
+| Edition | Shots 1–6 Basic. Shot 7 (the Alert) **Advanced**: the police Advanced tier specifies an Alert Rule on new serial matches but is not built yet. Cut shot 7 until it is, and for a Basic-only version. |
 
 **Script**
 
 | # | Time | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
-| 1 | 0–6 | The saved view *Mule ring* open on the ring. | *Mule ring* | Last week you found the ring and saved the view. |
-| 2 | 6–12 | A file explorer: a new month's file is dropped into the watched folder. | *Watch this folder* | This week's transfers land in a folder. |
-| 3 | 12–18 | *Getting started*: *What changed in your data* shows the new file was brought in. | *What changed in your data* | Inspecto LA picks them up and tells you what it brought in. |
-| 4 | 18–25 | *My work* ▸ open *Mule ring*. The graph redraws over the new data. | *My work* | Open the same view… |
-| 5 | 25–32 | A new wallet now sits inside the ring. Highlight it. | — | …and there's a wallet that wasn't there last week. |
+| 1 | 0–6 | The stolen-property saved view open on the burglary series. | — | Last month you linked the series and saved the view. |
+| 2 | 6–12 | A file explorer: November's files are copied into the inbox folders. | — | This month's records land in a folder. |
+| 3 | 12–18 | *Getting started*: *What changed in your data* shows the new files were brought in. | *What changed in your data* | Inspecto LA picks them up and tells you what it brought in. |
+| 4 | 18–25 | *My work* ▸ open the saved view. The graph redraws over the new data. | *My work* | Open the same view… |
+| 5 | 25–32 | The new serial match: a stolen item, sold by one of the series sellers. Highlight it. | — | …and another stolen item turns up, sold by the same seller. |
 | 6 | 32–37 | Click it: the node detail dialog. | — | Same question. Fresh answer. |
-| 7 | 37–41 | **Standard:** an Alert in the Alerts list, opened from the Measure that watches the ring. | *Inspecto LA Standard* | Or let an Alert Rule ask it for you. |
+| 7 | 37–41 | **Advanced, when built:** an Alert raised by the Alert Rule on new serial matches. | *Inspecto LA Advanced* | Or let an Alert Rule ask it for you. |
 | 8 | 41–45 | End card. | *See who is connected.* | Inspecto LA. |
 
 *Voice-over: 75 words.*
@@ -251,7 +551,7 @@ same, so the agency builds it once.
 | Audience | Heads of financial crime; the analysts who will use it. |
 | Channel | LinkedIn, booth loop, top of a webinar. |
 | Message | Investigators need to find the link *and* defend it. Inspecto LA records the steps and hands them over as evidence. |
-| Edition | **Standard**: Investigations, the step log and the Dossier are not in Basic. |
+| Edition | **Standard**: Investigations, the step log and the Dossier are not in Basic. Film on an Advanced install (`la-mobile-money` needs one). |
 | Casting | One actor, mid-career analyst, plain office clothes. The actor plays a role: no real person, company or customer is named or implied. |
 | Required label | *Dramatization. Product footage is real; all data is synthetic.* on screen for at least 3 s at the start. |
 | Must not | Present the actor as a customer, or quote a customer without signed approval. |
@@ -276,7 +576,11 @@ same, so the agency builds it once.
 
 - Supply the CTA URL for the end card.
 - Video 2: time the run on the final build and the filming laptop; set the title from the median.
-- Video 3b and 3c: film after `la-police` and `la-utility` are built (see the showcase plan in
-  `docs/superpower/`). Check each reveal shot against the Space's ground truth file.
-- Video 5: prepare the second data file; product confirms the Alert set-up for shot 7.
+- Industry series: check every reveal against the Space's ground truth file before filming. Film 3.9–3.17 only
+  after their Spaces are built, and re-read each script against the Space as built.
+- Videos 3.2–3.5 have no look-alike listed in the showcase plan for the story filmed; confirm with the Space's
+  owner that nothing else on screen reads as suspect.
+- Video 5, shot 7: waits for the `la-police` Advanced tier (its Alert Rule).
+- Filming needs both a Basic install (videos 2, 5, 3.1, 3.6–3.8) and an Advanced install (videos 1, 4, 6,
+  3.2–3.5); the planned Spaces are specified with a Basic tier first.
 - Product and legal sign-off on every script before the agency starts.
