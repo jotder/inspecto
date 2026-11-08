@@ -1376,6 +1376,11 @@ deviations:
    admin guide (install steps). Each lands in the same lane as its Space. Also: the catalogue page
    (`solution-pack/la-showcase/user-guide-showcase-catalogue.md`), a Product Map Item per new Space, BACKLOG
    rows closed, `docs/INDEX.md`, and `node tools/render-product-docs.mjs`.
+   **Catalogue page BUILT 2026-11-08:** all 18 Spaces by industry, with what each teaches, its stories, its edition
+   tiers (Advanced tier: built for the existing four, planned for the other thirteen until wave D lands), its zipped
+   data-download size (packed from master the same day; every Space zip is under 40 KB) and a link to its user guide
+   and install guide; plus install, where to start, and the planned industry Spaces. Linked from the la-showcase user
+   guide.
 10. **Release:** build all 18 Space and 18 data downloads from one commit and publish them with the product.
 
 ## Open questions
