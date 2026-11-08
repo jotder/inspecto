@@ -1,16 +1,23 @@
 physicalRef: trade/database
 description: "Trade-based money-laundering Link Analysis showcase - One row per trade financed by the bank (letter of credit or documentary collection): applicant (importer), beneficiary (exporter), HS code, quantity, unit price, value, ports, the vessel named on the trade (blank on about 4 % of trades) and the ship date. Landed by the trade Pipeline. Synthetic."
 eventDate: ship_date
+primaryEntityType: trade
 columns[12]{name,type,classification}:
-  trade_id,string,
+  trade_id,string,TRADE_ID
   instrument,string,
-  applicant,string,
-  beneficiary,string,
+  applicant,string,COMPANY
+  beneficiary,string,COMPANY
   hs_code,string,
   qty,number,
   unit_price,number,
   value,number,
   port_load,string,
   port_discharge,string,
-  vessel,string,
+  vessel,string,VESSEL
   ship_date,date,
+defaultLinkMapping:
+  from: applicant
+  to: beneficiary
+  kind: instrument
+  primaryTime: ship_date
+  primaryMeasure: value

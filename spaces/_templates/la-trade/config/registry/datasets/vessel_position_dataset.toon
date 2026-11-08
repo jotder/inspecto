@@ -1,7 +1,8 @@
 physicalRef: vessel_position/database
 description: "Trade-based money-laundering Link Analysis showcase - One row per vessel per day: the port it was in, or 'At sea - <area>' (300 invented vessels on 30 liner services). Landed by the vessel_position Pipeline. Synthetic."
 eventDate: pos_date
+primaryEntityType: vessel
 columns[3]{name,type,classification}:
-  vessel,string,
+  vessel,string,VESSEL
   pos_date,date,
   port_or_area,string,

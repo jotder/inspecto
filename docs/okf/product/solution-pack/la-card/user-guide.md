@@ -46,11 +46,11 @@ address.
 1. **File ▸ Open… ▸ Saved views ▸ `card_testing`.** Two nodes carry hundreds of cards each. Hover one: a single
    device whose cards were each tried once or twice, almost all declined. The other big network carries as many
    cards, each from its own device and with hardly any declines.
-2. **Open `card_takeover_ring`.** Most accounts are a pair (one device, one address). One cluster is not: a few
+2. **Open `account_takeover_ring`.** Most accounts are a pair (one device, one address). One cluster is not: a few
    devices fan out to many accounts, and those accounts meet again at a handful of addresses.
-3. **Open `card_merchant_disputes`.** Two merchants stand out by chargebacks. Look at `via`: one has disputes in
+3. **Open `colluding_merchant_refunds`.** Two merchants stand out by chargebacks. Look at `via`: one has disputes in
    one month only; the other has them all year, and also refunds to cards marked `sales:0`.
-4. **Open `card_common_point`.** Each defrauded card points at the shops it used in the six weeks before. One
+4. **Open `common_point_of_purchase`.** Each defrauded card points at the shops it used in the six weeks before. One
    merchant collects most of them.
 5. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (admin guide, step 6).
    The Pipelines land October 2026 and the Job rebuilds the links; reopen a view to see them.
@@ -72,7 +72,7 @@ declined; it shares no card with the testers.
 
 ### 2. Account takeover — how many devices, how many accounts, which drop addresses?
 
-*Hint:* in `card_takeover_ring`, seed an address shared by more than ten accounts and expand twice.
+*Hint:* in `account_takeover_ring`, seed an address shared by more than ten accounts and expand twice.
 
 **Answer:** **8 devices** (`DEV-00618`, `DEV-01583`, `DEV-04568`, `DEV-06083`, `DEV-07080`, `DEV-07746`,
 `DEV-08714`, `DEV-08781`) changed **140 online accounts** between 2026-01-12 and 2026-02-28, most at night, and
@@ -84,7 +84,7 @@ accounts at `27 LARCH GROVE LEEDS` all year; no account outside the family uses 
 
 ### 3. Colluding merchant — which merchant pays out to cards it never sold to?
 
-*Hint:* in `card_merchant_disputes`, look for `refunded` links whose `via` says `sales:0`.
+*Hint:* in `colluding_merchant_refunds`, look for `refunded` links whose `via` says `sales:0`.
 
 **Answer:** **`M-221` (Voltbay Direct, electronics)** refunded **12 cards** that never bought there, 420 to 940
 each, between April and August 2026, and its chargebacks (`merchandise_not_received`, spread over the year) run
@@ -94,7 +94,7 @@ month, and no refunds; none of its customers is one of `M-221`'s disputed or ref
 
 ### 4. Common point of purchase — where were the cards compromised?
 
-*Hint:* in `card_common_point`, which merchant has by far the most links? Check the dates in `via` and in
+*Hint:* in `common_point_of_purchase`, which merchant has by far the most links? Check the dates in `via` and in
 `used_at`.
 
 **Answer:** **`M-317` (Kestrel Fuel Parkway, Sheffield)**: **60 cards** that paid there between **2026-03-02 and

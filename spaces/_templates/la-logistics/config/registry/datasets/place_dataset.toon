@@ -1,7 +1,8 @@
 physicalRef: place/database
 description: "Logistics cargo theft Link Analysis showcase - One row per place: the twelve warehouses (WH-) and the places along the roads where GPS records trucks standing (PL-): services, truck parks, fuel stations and unofficial lay-bys, with the nearest city and a position. One extract (PLACE_20260930.csv). Landed by the place Pipeline. Synthetic."
+primaryEntityType: place
 columns[6]{name,type,classification}:
-  place_id,string,
+  place_id,string,PLACE
   name,string,
   place_type,string,
   area,string,

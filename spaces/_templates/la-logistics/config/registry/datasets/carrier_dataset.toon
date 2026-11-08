@@ -1,8 +1,9 @@
 physicalRef: carrier/database
 description: "Logistics cargo theft Link Analysis showcase - One row per haulage carrier on the shipper's approved register: name, phone (as the carrier gave it, so the same number can be written several ways), when it registered and whether it showed insurance (Y or N). One extract (CARRIER_20260930.csv). Landed by the carrier Pipeline. Synthetic."
 eventDate: registered_at
+primaryEntityType: carrier
 columns[5]{name,type,classification}:
-  carrier_id,string,
+  carrier_id,string,CARRIER
   name,string,
   phone,string,
   registered_at,timestamp,

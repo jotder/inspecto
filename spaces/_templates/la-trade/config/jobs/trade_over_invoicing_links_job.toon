@@ -1,7 +1,7 @@
 job:
   name: trade_over_invoicing_links
   type: sql.template
-  description: "Derived from trade_links each time it is produced: the price anomalies. Every traded_with pair with a trade priced over price_ratio_alert times the month's reference median, and the directors of the companies in those pairs. Read by the saved view trade_over_invoicing."
+  description: "Derived from trade_links each time it is produced: the price anomalies. Every traded_with pair with a trade priced over price_ratio_alert times the month's reference median, and the directors of the companies in those pairs. Read by the saved view over_invoicing."
   sql: "WITH l AS (SELECT * FROM trade_links), pairs AS (SELECT * FROM l WHERE kind = 'traded_with' AND flag LIKE '%price_over_reference%'), cos AS (SELECT src AS c FROM pairs UNION SELECT dst FROM pairs) SELECT src, dst, kind, ts, amount, event_date, via, flag FROM pairs UNION ALL SELECT src, dst, kind, ts, amount, event_date, via, flag FROM l WHERE kind = 'directed_by' AND src IN (SELECT c FROM cos) ORDER BY kind, src, dst"
   sources: trade_links
   sink_dataset: trade_over_invoicing_links

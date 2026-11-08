@@ -1,7 +1,12 @@
 physicalRef: device_login/database
 description: "Mobile financial services fraud Link Analysis showcase - One row per wallet, handset and day the wallet app was used on it: the first login of the day. One file per month (DEVICE_LOGIN_YYYYMM.csv); the next month is in data/staged. Landed by the device_login Pipeline. Synthetic."
 eventDate: login_at
+primaryEntityType: wallet
 columns[3]{name,type,classification}:
-  wallet_id,string,
-  device_id,string,
+  wallet_id,string,WALLET_ID
+  device_id,string,DEVICE
   login_at,timestamp,
+defaultLinkMapping:
+  from: wallet_id
+  to: device_id
+  primaryTime: login_at

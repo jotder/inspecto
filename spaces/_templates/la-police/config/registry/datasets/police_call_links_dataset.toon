@@ -1,11 +1,18 @@
 physicalRef: police_call_links
 description: "Police Link Analysis showcase - The busy handsets of police_links: every called link touching a number with 6 or more distinct call partners, uses_number for those numbers, and lives_at of the people they are attributed to. Built by the police_call_links Job. Synthetic."
 eventDate: event_date
+primaryEntityType: police_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,POLICE_ENTITY
+  dst,string,POLICE_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

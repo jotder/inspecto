@@ -1,8 +1,9 @@
 physicalRef: loss_report/database
 description: "Logistics cargo theft Link Analysis showcase - One row per loss reported on a shipment: when, and the type - theft (the load did not arrive), shortage (it arrived with goods missing) or non_delivery (the carrier never delivered). One landed file (LOSS_REPORT_20260930.csv); the reports filed in October are in data/staged. Landed by the loss_report Pipeline. Synthetic."
 eventDate: reported_at
+primaryEntityType: shipment
 columns[4]{name,type,classification}:
   loss_id,string,
-  shipment_id,string,
+  shipment_id,string,SHIPMENT
   reported_at,timestamp,
   loss_type,string,

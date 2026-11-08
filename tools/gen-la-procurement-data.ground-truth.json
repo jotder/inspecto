@@ -208,7 +208,7 @@
     "CO-0055",
     "CO-0090"
    ],
-   "view": "procurement_bid_rotation"
+   "view": "bid_rotation"
   },
   "conflict_of_interest": {
    "entities": [
@@ -221,7 +221,7 @@
    "lookalikes": [
     "P-00008"
    ],
-   "view": "procurement_change_approvals"
+   "view": "official_approving_relative_firm"
   },
   "cover_bids": {
    "entities": [
@@ -236,7 +236,7 @@
    "lookalikes": [
     "198.51.100.20"
    ],
-   "view": "procurement_cover_bids"
+   "view": "cover_bids_shared_ip"
   },
   "phoenix_firm": {
    "entities": [
@@ -251,7 +251,7 @@
     "CO-0233",
     "P-00007"
    ],
-   "view": "procurement_debarred_directors"
+   "view": "debarred_firm_reborn"
   }
  },
  "window": {

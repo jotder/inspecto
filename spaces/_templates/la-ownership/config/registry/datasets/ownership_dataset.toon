@@ -1,6 +1,11 @@
 physicalRef: ownership/database
 description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per shareholding: the owner (a PER- person or a CO- company), the company owned and the percent held. Landed by the ownership Pipeline. Synthetic."
+primaryEntityType: party
 columns[3]{name,type,classification}:
-  owner_id,string,
-  owned_id,string,
+  owner_id,string,PARTY
+  owned_id,string,COMPANY
   percent,number,
+defaultLinkMapping:
+  from: owner_id
+  to: owned_id
+  primaryMeasure: percent

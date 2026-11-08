@@ -3,7 +3,7 @@
 
 Writes spaces/_templates/la-trade/data/inbox/<feed>/ (12 months landed, 2025-10-01 .. 2026-09-30) and
 spaces/_templates/la-trade/data/staged/<feed>/ (October 2026, copied in during the demo) for seven feeds:
-  company, director (register snapshots), trade, bill_of_lading, vessel_position, price_reference, payment (one file per month)
+  trade_company, director (register snapshots), trade, bill_of_lading, vessel_position, price_reference, trade_payment (one file per month)
 and tools/gen-la-trade-data.ground-truth.json (story -> entity ids and look-alike ids; NOT part of the data download).
 
 The world: 300 vessels on 30 liner services that call 25 invented ports in 24 real countries. Each vessel sails its service
@@ -682,7 +682,7 @@ def ts(v: datetime) -> str:
 
 for old in DATA.glob("*/*/*.csv"):
     old.unlink()
-write("inbox/company/COMPANY_20260930.csv", ["company_id", "name", "country", "reg_address", "incorporated_at", "account_id"],
+write("inbox/trade_company/COMPANY_20260930.csv", ["company_id", "name", "country", "reg_address", "incorporated_at", "account_id"],
       [(c, v["name"], v["country"], v["reg_address"], v["incorporated_at"].isoformat(), v["account_id"]) for c, v in sorted(companies.items())])
 write("inbox/director/DIRECTOR_20260930.csv", ["company_id", "person_id", "person_name"],
       [(c, p, persons[p]) for c, p in sorted(set(directors))])
@@ -707,7 +707,7 @@ for m0, m1 in months(START, STAGED_END):
         if m0 <= p[3].date() <= m1:
             pay_seq += 1
             rows.append((f"PAY-{pay_seq:06d}", acct[p[0]], acct[p[1]], f"{p[2]:.2f}", ts(p[3]), p[4]))
-    write(f"{where}/payment/PAYMENT_{tag}.csv", ["payment_id", "from_account", "to_account", "amount", "paid_at", "trade_ref"], rows)
+    write(f"{where}/trade_payment/PAYMENT_{tag}.csv", ["payment_id", "from_account", "to_account", "amount", "paid_at", "trade_ref"], rows)
     pos = []
     d = m0
     while d <= m1:

@@ -1,7 +1,8 @@
 physicalRef: sanctions_list/database
 description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per listed person on an INVENTED sanctions list (no real names): name, aliases separated by |, birth year, nationality and listing date. Landed by the sanctions_list Pipeline. Synthetic."
+primaryEntityType: sanctions_entry
 columns[6]{name,type,classification}:
-  list_id,string,
+  list_id,string,SANCTIONS_ENTRY
   name,string,
   aliases,string,
   birth_year,string,

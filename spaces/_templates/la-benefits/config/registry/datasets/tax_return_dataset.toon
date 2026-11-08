@@ -1,10 +1,16 @@
 physicalRef: tax_return/database
 description: "Benefits and tax fraud Link Analysis showcase - One row per income tax return: the taxpayer, the preparer who filed it (blank when the taxpayer filed it alone), the refund (0 when tax was owed) and the account it is paid into, and the day it was filed. One file per month filed (TAX_RETURN_YYYYMM.csv); the next month is in data/staged. Landed by the tax_return Pipeline. Synthetic."
 eventDate: filed_at
+primaryEntityType: person
 columns[6]{name,type,classification}:
   return_id,string,
-  taxpayer_id,string,
-  preparer_id,string,
+  taxpayer_id,string,PERSON
+  preparer_id,string,TAX_PREPARER
   refund,number,
-  bank_account,string,
+  bank_account,string,BANK_ACCOUNT
   filed_at,date,
+defaultLinkMapping:
+  from: taxpayer_id
+  to: preparer_id
+  primaryTime: filed_at
+  primaryMeasure: refund

@@ -51,19 +51,19 @@ link. Each saved view reads one screen, so every view draws whole, under the can
 
 | `screen` | Picks | Saved view |
 |---|---|---|
-| `unbilled_usage` | every subscriber whose usage reached no billing record in 2 or more months, its dealer and activation device | `telco_ra_unbilled_usage` |
-| `commission_spike` | every SIM that earned its dealer a commission (activated and topped up at least once) in a week when that dealer earned 50 or more, with the dealer, the device and the points of sale where the SIM was topped up | `telco_ra_commission_spikes` |
-| `pbx_off_hours` | every trunk's calls to a destination with 300 or more off-hours minutes, and the customer the trunk belongs to | `telco_ra_pbx_off_hours` |
+| `unbilled_usage` | every subscriber whose usage reached no billing record in 2 or more months, its dealer and activation device | `unbilled_usage` |
+| `commission_spike` | every SIM that earned its dealer a commission (activated and topped up at least once) in a week when that dealer earned 50 or more, with the dealer, the device and the points of sale where the SIM was topped up | `dealer_commission_fraud` |
+| `pbx_off_hours` | every trunk's calls to a destination with 300 or more off-hours minutes, and the customer the trunk belongs to | `pbx_hacking_off_hours` |
 
 ## Five-minute tour
 
-1. **File ▸ Open… ▸ Saved views ▸ `telco_ra_unbilled_usage`.** About a dozen small pieces: one subscriber, its
+1. **File ▸ Open… ▸ Saved views ▸ `unbilled_usage`.** About a dozen small pieces: one subscriber, its
    dealer and device. Each is a SIM whose first two months reached billing late. Two large stars stand apart. One is
    the network test team, `DL-000`, with 40 SIMs on its two devices. The other is a high-street dealer with 300 SIMs
    on one device.
-2. **Open `telco_ra_commission_spikes`.** Two dealers each had weeks with 50 or more commission-earning SIMs. Look at
+2. **Open `dealer_commission_fraud`.** Two dealers each had weeks with 50 or more commission-earning SIMs. Look at
    how each one's SIMs were topped up: one dealer's SIMs fan out to ten shops, the other's all converge on one.
-3. **Open `telco_ra_pbx_off_hours`.** A small view of about 20 nodes. Two firms call North America in the evening, and
+3. **Open `pbx_hacking_off_hours`.** A small view of about 20 nodes. Two firms call North America in the evening, and
    one calls Singapore every working night. Four firms that have nothing to do with each other all call the same
    premium-rate ranges, `CTRY-…-PRN`, in three countries.
 4. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (see the admin guide). The
@@ -75,7 +75,7 @@ Work blind first: each exercise has a hint, then the answer. The answers are not
 
 ### 1. Unbilled usage — whose SIMs are using the network for free?
 
-*Hint:* in `telco_ra_unbilled_usage`, read `unbilled_months:` and `usage_months:` on the `activated_by` links, then
+*Hint:* in `unbilled_usage`, read `unbilled_months:` and `usage_months:` on the `activated_by` links, then
 look at `plan:` and at when each dealer's SIMs were activated (`ts`).
 
 **Answer:** dealer **`DL-047` (Lantern Wireless, Manchester)** activated **300 SIMs on one device, `DEV-00086`, on
@@ -88,7 +88,7 @@ billing for their first two months late (`unbilled_months:2`) and have been bill
 
 ### 2. Dealer commission fraud — which dealer is activating SIMs nobody uses?
 
-*Hint:* in `telco_ra_commission_spikes`, compare the two dealers' SIMs: `topups:`, `usage_months:` and
+*Hint:* in `dealer_commission_fraud`, compare the two dealers' SIMs: `topups:`, `usage_months:` and
 `last_usage:` on `activated_by`, and where the `topped_up` links lead.
 
 **Answer:** dealer **`DL-112` (Copperfield Talk, Leeds)** activated **400 SIMs on its three devices `DEV-00204`,
@@ -101,7 +101,7 @@ at ten shops near the campus, and use their SIMs every month (`usage_months:12`,
 
 ### 3. PBX hacking — whose phone systems are calling premium numbers at night?
 
-*Hint:* in `telco_ra_pbx_off_hours`, look at the destination nodes: which number type do they have, and what do
+*Hint:* in `pbx_hacking_off_hours`, look at the destination nodes: which number type do they have, and what do
 `night_minutes:` and `weekend_minutes:` say about when those calls happen?
 
 **Answer:** four trunks of four unrelated firms, **`TRK-025` (`ENT-0087`), `TRK-040` (`ENT-0040`), `TRK-087`
@@ -127,5 +127,5 @@ golden tests are `tools/gen-la-telco-ra-data.test.mjs` and `TelcoRaLinksJobGolde
       their four customers and the three `-PRN` destinations.
 - [ ] No look-alike links to its story: `DL-000`; `DL-163`; `TRK-027`.
 - [ ] Each saved view holds its story whole, with its look-alike beside it, and draws without "Result cut short".
-      The largest view, `telco_ra_commission_spikes`, is about 2 400 rows and 770 nodes. October adds no SIMs to it:
+      The largest view, `dealer_commission_fraud`, is about 2 400 rows and 770 nodes. October adds no SIMs to it:
       both spikes are in the landed months.

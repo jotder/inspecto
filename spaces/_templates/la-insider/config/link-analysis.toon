@@ -1,0 +1,31 @@
+entity_types[6]:
+  - id: employee
+    label: Employee
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: EMPLOYEE
+  - id: system
+    label: System
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SYSTEM
+  - id: email_domain
+    label: Email domain
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: EMAIL_DOMAIN
+  - id: vendor
+    label: Vendor
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: VENDOR
+  - id: ticket
+    label: Ticket
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TICKET
+  - id: insider_entity
+    label: Insider entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: INSIDER_ENTITY

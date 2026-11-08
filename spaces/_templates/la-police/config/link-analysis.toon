@@ -1,0 +1,46 @@
+entity_types[9]:
+  - id: person
+    label: Person
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PERSON
+  - id: address
+    label: Address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ADDRESS
+  - id: incident
+    label: Incident
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: INCIDENT
+  - id: dealer
+    label: Dealer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DEALER
+  - id: item_serial
+    label: Item serial
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SERIAL
+  - id: phone
+    label: Phone number
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PHONE
+  - id: handset
+    label: Handset
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: HANDSET_ID
+  - id: vehicle
+    label: Vehicle
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PLATE
+  - id: police_entity
+    label: Police entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: POLICE_ENTITY

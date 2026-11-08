@@ -1,0 +1,16 @@
+physicalRef: trade_payment/database
+description: "Trade-based money-laundering Link Analysis showcase - One row per payment between company accounts: amount, time and the trade it settles (trade_ref, blank for payments that settle no trade). Landed by the trade_payment Pipeline. Synthetic."
+eventDate: paid_at
+primaryEntityType: account
+columns[6]{name,type,classification}:
+  payment_id,string,
+  from_account,string,ACCOUNT
+  to_account,string,ACCOUNT
+  amount,number,
+  paid_at,timestamp,
+  trade_ref,string,
+defaultLinkMapping:
+  from: from_account
+  to: to_account
+  primaryTime: paid_at
+  primaryMeasure: amount

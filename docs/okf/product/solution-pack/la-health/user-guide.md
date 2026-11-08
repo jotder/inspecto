@@ -50,25 +50,25 @@ reads one screen, so every view draws whole, far under the canvas's 1 000 nodes:
 
 | `screen` | Picks | Saved view |
 |---|---|---|
-| `referral_concentration` | every practice that sends 60 % or more of 20 or more referrals to one provider (that link only), the owners of both ends, and any home two of those owners share | `health_referral_concentration` |
-| `phantom_billing` | every provider–member link with a line dated inside a stay at another hospital or after the member's death, open or reversed | `health_phantom_billing` |
-| `pill_mill` | every prescriber with 40 or more strong-opioid patients, those patients, and the pharmacies where they filled strong opioids | `health_pill_mill` |
-| `upcoding` | every provider with 150 or more office visits billed at level 5 at least 1.75 times as often as all providers, its owner, and everything that owner owns | `health_upcoding` |
+| `referral_concentration` | every practice that sends 60 % or more of 20 or more referrals to one provider (that link only), the owners of both ends, and any home two of those owners share | `referral_kickbacks` |
+| `phantom_billing` | every provider–member link with a line dated inside a stay at another hospital or after the member's death, open or reversed | `phantom_billing` |
+| `pill_mill` | every prescriber with 40 or more strong-opioid patients, those patients, and the pharmacies where they filled strong opioids | `pill_mill` |
+| `upcoding` | every provider with 150 or more office visits billed at level 5 at least 1.75 times as often as all providers, its owner, and everything that owner owns | `upcoding_clinics` |
 
 ## Five-minute tour
 
-1. **File ▸ Open… ▸ Saved views ▸ `health_referral_concentration`.** Nine practices. Seven sit in Scarborough and
+1. **File ▸ Open… ▸ Saved views ▸ `referral_kickbacks`.** Nine practices. Seven sit in Scarborough and
    all point at **Saltmere Bay Hospital**, the only hospital in town, owned by a public trust. Two York practices
    point at **Emberlea Imaging Centre** instead, and the owner of the centre and the owner of one practice meet again
    at one home.
-2. **Open `health_phantom_billing`.** Seventeen providers. Fifteen bill one patient each, and one clinic bills
+2. **Open `phantom_billing`.** Seventeen providers. Fifteen bill one patient each, and one clinic bills
    fifteen: each of those lines was dated inside a hospital stay by mistake and reversed within days
    (`corrected:1`). One more clinic bills forty patients with nothing reversed: `in_admission:` and `after_death:`
    are open on every link.
-3. **Open `health_pill_mill`.** Two prescribers with as many strong-opioid patients. One centre's patients live
+3. **Open `pill_mill`.** Two prescribers with as many strong-opioid patients. One centre's patients live
    within 12 km, are insured and fill at a pharmacy near home. The other prescriber's patients live 61–127 km
    away, pay cash, take large quantities and all fill at the same two pharmacies.
-4. **Open `health_upcoding`.** Every provider that bills level 5 far more often than the rest. The elderly-care
+4. **Open `upcoding_clinics`.** Every provider that bills level 5 far more often than the rest. The elderly-care
    clinics are here because all their patients are over 80: their `ratio_to_same_age_mix:` is about 1. Three
    urgent-care clinics in Hull, Lincoln and York bill about four times what their patients' ages predict, and they
    share one owner.
@@ -81,7 +81,7 @@ Work blind first: each has a hint, then the answer. The answers are not in the d
 
 ### 1. Referral kickbacks — whose referrals are bought?
 
-*Hint:* in `health_referral_concentration`, every practice sends most of its referrals to one place. Look at who
+*Hint:* in `referral_kickbacks`, every practice sends most of its referrals to one place. Look at who
 owns each end of the link, and where those owners live.
 
 **Answer:** **`PR-1426` Brackenmoor Surgery** (68 of 79 referrals, `share:0.86`) and **`PR-1392` Kilnworth Medical
@@ -96,7 +96,7 @@ shared home is.
 
 ### 2. Phantom billing — who bills patients who could not have been there?
 
-*Hint:* in `health_phantom_billing`, read `in_admission:`, `after_death:` and `corrected:` on the `treated` links of
+*Hint:* in `phantom_billing`, read `in_admission:`, `after_death:` and `corrected:` on the `treated` links of
 each provider.
 
 **Answer:** **`PR-1241` Sedgefold Physiotherapy** (Hull) bills **40 patients**: **89 sessions** for **28 patients**
@@ -110,7 +110,7 @@ it the same way.
 
 ### 3. Pill mill — whose strong-opioid patients are not what they seem?
 
-*Hint:* in `health_pill_mill`, compare the two prescribers' patients: `distance_km:`, `cash_scripts:` and
+*Hint:* in `pill_mill`, compare the two prescribers' patients: `distance_km:`, `cash_scripts:` and
 `strong_opioid_qty:` on `prescribed`, then the pharmacies they fill at.
 
 **Answer:** **`PR-1150` Flintcross Pain Clinic** (Sheffield) prescribes strong opioids to **70 patients** who live
@@ -122,7 +122,7 @@ Oncology Centre** (Leeds) has **60 strong-opioid patients**, all within 12 km, i
 
 ### 4. Upcoding — which clinics bill above their patients?
 
-*Hint:* in `health_upcoding`, compare `top_level_share:` with `same_age_mix_share:` (read
+*Hint:* in `upcoding_clinics`, compare `top_level_share:` with `same_age_mix_share:` (read
 `ratio_to_same_age_mix:`), then look at the owners.
 
 **Answer:** **`PR-0173` Lark Field Walk-in Clinic** (Hull), **`PR-1117` Brook Grove Walk-in Clinic** (Lincoln) and
@@ -146,4 +146,4 @@ tests are `tools/gen-la-health-data.test.mjs` and `HealthLinksJobGoldenTest`.
       and the 70 patients; `OW-0441` and its three clinics.
 - [ ] No look-alike links to its story: `PR-0828`; `PR-0632`; `PR-0031`; `PR-0277`.
 - [ ] Each saved view holds its story whole and its look-alike beside it but apart, and draws without "Result cut
-      short" (the largest, `health_pill_mill`, is about 390 rows and 150 nodes).
+      short" (the largest, `pill_mill`, is about 390 rows and 150 nodes).

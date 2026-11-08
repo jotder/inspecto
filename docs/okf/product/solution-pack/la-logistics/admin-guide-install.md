@@ -88,3 +88,15 @@ node tools/package-la-showcase.mjs la-logistics
 The generator is deterministic (seed 20261111) and writes the ground truth to
 `tools/gen-la-logistics-data.ground-truth.json`, which is not part of any download. The packer reads committed
 content only, so commit first.
+
+## As the *Logistics* industry Space
+
+The same use case also ships as the industry Space *Logistics*, under the id `la-logistics-industry`. That id
+cannot be `la-logistics`: a recipe of that name would make the packer compose instead of packing this template's own
+downloads. The recipe is `spaces/_industries/la-logistics-industry.toon`, and `node tools/package-la-showcase.mjs
+la-logistics-industry` composes it.
+
+Every Dataset says what its id columns hold: *Shipment*, *Trip*, *Driver*, *Carrier*, *Place*, *Warehouse*,
+*Employee* and *Vehicle*. The link Datasets' mixed ends hold *Logistics entity*. Each Dataset of events has its own
+Mapping: a driver to the shipment (`trip_dataset`), a scanner employee to the shipment (`warehouse_scan_dataset`, kind
+`scan_type`), a trip to the place it stopped (`stop_dataset`), and a driver to the carrier (`driver_dataset`).

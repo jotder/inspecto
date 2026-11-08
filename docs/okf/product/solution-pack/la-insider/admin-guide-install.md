@@ -88,3 +88,15 @@ node tools/package-la-showcase.mjs la-insider
 The generator is deterministic (seed 20261112) and writes the ground truth to
 `tools/gen-la-insider-data.ground-truth.json`, which is not part of any download. The packer reads committed
 content only, so commit first.
+
+## As the *Enterprise* industry Space
+
+This use case also ships as the industry Space *Enterprise* (`la-enterprise`). The recipe is
+`spaces/_industries/la-enterprise.toon`, and `node tools/package-la-showcase.mjs la-enterprise` composes it. `la-audit`
+joins when the plan's wave B gives it a Basic tier.
+
+Every Dataset says what its id columns hold: *Employee*, *System*, *Email domain*, *Vendor* and *Ticket*. The link
+Datasets' mixed ends hold *Insider entity*. Each Dataset of events has its own Mapping: a granting manager to the
+employee (`access_grant_dataset`, kind `system`), an employee to the system they read (`access_daily_dataset`), an
+employee to an external mail domain (`email_external_dataset`), an approver to a requester (`expense_dataset`), the
+changer to the vendor (`vendor_change_dataset`), and a manager to their report (`employee_dataset`).

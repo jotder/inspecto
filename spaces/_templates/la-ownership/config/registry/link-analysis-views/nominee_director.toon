@@ -1,0 +1,23 @@
+name: nominee_director
+description: "Nominee director - Officers - people linked to the companies they are director or secretary of (role and registered address in via). Look for one person who directs far more companies than anyone else, all at one formation-agent address written in more than one way. An accountant who directs a handful of family firms at their own addresses is ordinary."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: ownership_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[5]: ts,amount,percent,score,via
+  filter:
+    kind: group
+    op: OR
+    items[1]{kind,field,operator,value}:
+      condition,kind,"=","officer_of"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

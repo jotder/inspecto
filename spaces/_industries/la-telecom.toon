@@ -1,0 +1,5 @@
+name: Telecom
+tagline: "Telecom fraud and revenue assurance on synthetic data - unbilled usage, dealer commission fraud and PBX hacking, plus mobile financial services: SIM-swap wallet takeovers, agent split deposits and merchant cash-out collusion, every Dataset mapped. Mobile money and telco fraud join when their packs get a Basic tier."
+minEdition: basic
+icon: heroicons_outline:signal
+useCases[2]: la-telco-ra,la-mfs

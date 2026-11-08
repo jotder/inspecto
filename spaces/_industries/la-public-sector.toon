@@ -1,0 +1,5 @@
+name: Public sector
+tagline: "Public-money integrity on synthetic data - bid rotation, cover bids, an official approving a relative's firm, a debarred firm reborn, an address farm, pensions paid to the dead, undeclared work and a tax-preparer refund ring, every Dataset mapped."
+minEdition: basic
+icon: heroicons_outline:building-library
+useCases[2]: la-procurement,la-benefits

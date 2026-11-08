@@ -1,8 +1,14 @@
 physicalRef: access_daily/database
 description: "Insider threat Link Analysis showcase - DAILY COUNTS, never record-level: one row per employee, record-holding system (AP, CRM, CUSTARCH, HRIS, PAYROLL, TREASURY) and day with the number of records read that day; days with no reads have no row. One file per month (ACCESS_DAILY_YYYYMM.csv); the next month is in data/staged. Landed by the access_daily Pipeline. Synthetic."
 eventDate: read_date
+primaryEntityType: employee
 columns[4]{name,type,classification}:
-  employee_id,string,
-  system,string,
+  employee_id,string,EMPLOYEE
+  system,string,SYSTEM
   read_date,date,
   records_read,number,
+defaultLinkMapping:
+  from: employee_id
+  to: system
+  primaryTime: read_date
+  primaryMeasure: records_read

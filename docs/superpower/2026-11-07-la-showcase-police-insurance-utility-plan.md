@@ -367,7 +367,7 @@ The existing template and `tools/gen-la-claims-data.py` stay. Changes:
   more for every genuine policy) to holders on no claim, on four streets found on no other record, paid from `BA-93000017`
   (13) and `BA-93000029` (12). Look-alike: story 7's family pays its four policies from `BA-71000001` at the address on its claims.
 - **Job and views:** `claims_links` reads `repair_invoice` and `policy` too; nine kinds, 2 637 rows (`supplied_parts` 34,
-  `paid_by` 29). Saved views `claims_parts_suppliers` and `claims_premium_payers`; `claims_shared_identity` excludes
+  `paid_by` 29). Saved views `parts_supplier_ring` and `ghost_broker_premium_payers`; `claimant_ring_shared_identity` excludes
   `supplied_parts`.
 - **Decided while building:**
   - `policy` also gains `holder_address`: "an address that does not exist" needs an address on the policy. There is no
@@ -665,7 +665,7 @@ with a score).
   (approvals, plus only the homes shared by two or more of those officials and directors) and `procurement_debarment_links`
   (directors of debarred firms, all their directorships, their firms' wins). `procurement_links` also runs on
   `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows
-  and 1 000 nodes, the story whole and connected, and the look-alike on the canvas: `procurement_bid_rotation` 1 291 rows, 512 nodes; `procurement_change_approvals` 700 rows, 556 nodes; `procurement_cover_bids` 20 rows, 19 nodes; `procurement_debarred_directors` 27 rows, 36 nodes.
+  and 1 000 nodes, the story whole and connected, and the look-alike on the canvas: `bid_rotation` 1 291 rows, 512 nodes; `official_approving_relative_firm` 700 rows, 556 nodes; `cover_bids_shared_ip` 20 rows, 19 nodes; `debarred_firm_reborn` 27 rows, 36 nodes.
 - **Stories as built:** rotation tenders are Highways North (24, two a month), the look-alike big three win 74 % of Highways South
   in the same market view; cover bids are 27 on 10 IT tenders, 16 (60 %) from the winner's IP 2-25 minutes after it, 20 with its
   estimator as author; the kiosk is `198.51.100.20` (14 firms, bids on one tender at least an hour apart); the conflict is
@@ -719,9 +719,9 @@ with a score).
   accounts paid a claim 30 or more days after a death (or still paid); payroll while on Jobseeker benefit; the clients of preparers
   with 60 or more returns plus refund accounts shared by 3 or more taxpayers. `benefits_links` also runs on `cron: "*/5 * * * *"`
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the
-  story whole and connected, and the look-alike on the canvas: `benefits_shared_addresses` 366 rows, 320 nodes;
-  `benefits_paid_after_death` 132 rows, 148 nodes; `benefits_work_while_claiming` 166 rows, 208 nodes;
-  `benefits_refund_concentration` 592 rows, 520 nodes.
+  story whole and connected, and the look-alike on the canvas: `address_farm` 366 rows, 320 nodes;
+  `paid_after_death` 132 rows, 148 nodes; `undeclared_work` 166 rows, 208 nodes;
+  `tax_preparer_refund_ring` 592 rows, 520 nodes.
 - **Stories as built:** the farm is `AD-03141` (14 claimants, 5 surnames, 14 declarations of one, accounts `SYN-57707034`,
   `SYN-19642862`, `SYN-47766627`); the look-alikes are care homes `AD-00412`, `AD-02718`, `AD-05077` (31, 24, 27 residents, one
   declaration each). The deceased are 9 pensioners who died 2025-11..2026-04, notified within 14 days, pensions never stopped, into
@@ -795,8 +795,8 @@ with a score).
   specialties, which would join the look-alike to the story. `health_links` also runs on `cron: "*/5 * * * *"`
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000
   nodes, the story whole and connected, and the look-alike on the canvas but in another component:
-  `health_referral_concentration` 22 rows, 23 nodes; `health_phantom_billing` 70 rows, 87 nodes; `health_pill_mill` 385
-  rows, 149 nodes; `health_upcoding` 8 rows, 12 nodes.
+  `referral_kickbacks` 22 rows, 23 nodes; `phantom_billing` 70 rows, 87 nodes; `pill_mill` 385
+  rows, 149 nodes; `upcoding_clinics` 8 rows, 12 nodes.
 - **Stories as built:** kickbacks: `PR-1426` Brackenmoor Surgery (68 of 79 referrals) and `PR-1392` Kilnworth Medical
   Practice (182 of 216) to `PR-1170` Emberlea Imaging Centre, York; its owner `OW-0434` shares home `AD-05150` with
   `OW-1270`, owner of `PR-1426`; look-alike `PR-0828` (38 of 44 to `PR-1129` Saltmere Bay Hospital, Scarborough's only
@@ -818,7 +818,7 @@ with a score).
   after a death.
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (the screens were recomputed over landed plus staged files outside the engine with DuckDB: stories and
-  look-alikes unchanged, `health_upcoding` gains a few elderly-care clinics).
+  look-alikes unchanged, `upcoding_clinics` gains a few elderly-care clinics).
 
 #### 10. `la-telco-ra` — telecom revenue assurance
 
@@ -869,8 +869,8 @@ Deliberate deviations:
   activated and topped up in a dealer-week of 50 or more) and `pbx_off_hours` (300 or more off-hours minutes to one destination).
   `telco_ra_links` also runs on `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own
   filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the look-alike on the canvas but in another
-  component: `telco_ra_unbilled_usage` 704 rows, 380 nodes; `telco_ra_commission_spikes` 2 404 rows, 768 nodes;
-  `telco_ra_pbx_off_hours` 20 rows, 19 nodes.
+  component: `unbilled_usage` 704 rows, 380 nodes; `dealer_commission_fraud` 2 404 rows, 768 nodes;
+  `pbx_hacking_off_hours` 20 rows, 19 nodes.
 - **Stories as built:** unbilled usage is `DL-047` (Manchester), 300 SIMs on `DEV-00086` on 2026-03-17, 800-2 500 minutes and
   20-60 GB in each full month from April (less in March), no billing record and no top-up; the look-alike is `DL-000`'s 40 SIMs on `DEV-00001`/`DEV-00002`
   with plan `Internal test` (the known list), plus 12 ordinary SIMs whose first two months reached billing late (`unbilled_months:2`)

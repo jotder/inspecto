@@ -58,8 +58,8 @@ runs. Within a minute or two:
   `<feed>/quarantine` or `<feed>/errors`.
 - `inspecto-la-data/la-health/data/health_links/` holds the link Dataset (about 55 000 rows, six kinds);
   `health_screen_links/` holds the four program-integrity screens the saved views read (about 500 rows).
-- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `health_referral_concentration`,
-  `health_phantom_billing`, `health_pill_mill` and `health_upcoding`. The [user guide](user-guide.md) has the tour
+- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `referral_kickbacks`,
+  `phantom_billing`, `pill_mill` and `upcoding_clinics`. The [user guide](user-guide.md) has the tour
   and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
@@ -72,7 +72,7 @@ Copy every file of `inspecto-la-data/la-health/data/staged/<feed>/` into
 Pipelines land them and the Jobs rebuild the links. October brings about 6 500 claim lines, about 190 hospital
 stays, about 1 100 referrals and about 2 400 prescriptions. The member, provider and owner extracts are not
 re-sent, and nothing in October bills inside a stay or after a death: the planted stories stay as they are (the
-`health_upcoding` view gains a few elderly-care clinics as their visit counts pass 150).
+`upcoding_clinics` view gains a few elderly-care clinics as their visit counts pass 150).
 
 ## Reset
 
@@ -90,3 +90,27 @@ node tools/package-la-showcase.mjs la-health
 The generator is deterministic (seed 20261110) and writes the ground truth to
 `tools/gen-la-health-data.ground-truth.json`, which is not part of any download. The packer reads committed content
 only, so commit first.
+
+## As the *Healthcare* industry Space
+
+The same use case also ships as the industry Space *Healthcare* (`la-healthcare`). Its recipe is
+`spaces/_industries/la-healthcare.toon` (use case `la-health`). `node tools/package-la-showcase.mjs la-healthcare`
+composes it into `inspecto-la-space-la-healthcare-<version>.zip` and its data zip. Install them as above, with
+`la-healthcare` in place of `la-health`.
+
+Every Dataset says what its id columns hold: *Provider*, *Member*, *Owner*, *Address*, *Claim* and *Bank account*.
+The two link Datasets mix kinds in one `src` and one `dst` column, so their ends hold the generic *Health entity*. Each
+Dataset of events has its own Mapping:
+
+| Dataset | Mapping |
+|---|---|
+| `referral_dataset` | Provider → Provider (when `referred_on`) |
+| `claim_line_dataset` | Provider → Member (kind `procedure_code`, when `service_date`, measure `billed`) |
+| `prescription_dataset` | Provider (prescriber) → Member (kind `drug_class`, when `filled_on`, measure `qty`) |
+| `admission_dataset` | Member → Provider (hospital) (when `from_date`) |
+| `provider_owner_dataset` | Provider → Owner |
+| `provider_dataset` | Provider → Bank account |
+| `member_dataset`, `owner_dataset` | Member or Owner → Address |
+| `health_links_dataset`, `health_screen_links_dataset` | Health entity → Health entity (kind `kind`, when `ts`, measure `amount`) |
+
+The views carry use-case names: `referral_kickbacks`, `phantom_billing`, `pill_mill` and `upcoding_clinics`.

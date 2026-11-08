@@ -1,5 +1,9 @@
 physicalRef: cluster_hint/database
 description: "Crypto laundering Link Analysis showcase - One row per address the common-input heuristic puts in a cluster (addresses spent together in one transaction are taken to have one owner); addresses never spent together have no row. One extract (CLUSTER_HINT_20260930.csv); October's new addresses are in data/staged. Landed by the cluster_hint Pipeline. Synthetic."
+primaryEntityType: crypto_address
 columns[2]{name,type,classification}:
-  address,string,
-  cluster_id,string,
+  address,string,CRYPTO_ADDRESS
+  cluster_id,string,CLUSTER
+defaultLinkMapping:
+  from: address
+  to: cluster_id
