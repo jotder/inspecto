@@ -131,7 +131,7 @@ Telecom and under Banking and finance.
 
 | Template | What it teaches | Stories | Edition | Data | Guide |
 |---|---|---|---|---|---|
-| `la-health` | Provider billing fraud for a payer: referrals, patients and clinics | A referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for patients who could not have been there; a pill mill; upcoding clinics | Basic; Advanced tier: planned | 2.5 MB | [user guide, 4 exercises](../la-health/user-guide.md#exercises) · [install](../la-health/admin-guide-install.md) |
+| `la-health` | Provider billing fraud for a payer: referrals, patients and clinics | A referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for patients who could not have been there; a pill mill; upcoding clinics | Basic; **Advanced tier:** five Demo Users, Investigations, four-eyes, Drafts, an Alert Rule on services billed during a hospital stay elsewhere or after death (unarmed on Basic), and a seed script for the Investigation, an Entity List of the patients billed and a Case | 2.5 MB | [user guide, 4 exercises](../la-health/user-guide.md#exercises) · [install](../la-health/admin-guide-install.md) |
 
 ### Logistics
 

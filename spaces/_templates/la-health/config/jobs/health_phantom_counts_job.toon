@@ -1,0 +1,10 @@
+job:
+  name: health_phantom_counts
+  type: sql.template
+  description: "Runs each time the health_links Job produces its Dataset. One row of counts over the treated links: lines_in_admission (open claim lines dated inside the member's stay at another hospital), lines_after_death (open lines dated after the member's death), lines_in_admission_or_after_death (the two together: the services billed during an admission or after death), members_billed and providers_billing (the members and providers on those lines) and corrected_lines (lines in a stay or after a death that were reversed: date errors put right, never counted). The admitting hospital's own lines are not in a stay elsewhere, so a busy hospital is never counted. The Alert Rule health_billed_in_admission_or_after_death reads it; no member or provider id leaves this Job, they are found in the Investigation."
+  sql: "WITH t AS (SELECT src, dst, coalesce(TRY_CAST(regexp_extract(via, 'in_admission:([0-9]+)', 1) AS INTEGER), 0) AS ia, coalesce(TRY_CAST(regexp_extract(via, 'after_death:([0-9]+)', 1) AS INTEGER), 0) AS ad, coalesce(TRY_CAST(regexp_extract(via, '[|]corrected:([0-9]+)', 1) AS INTEGER), 0) AS co FROM health_links WHERE kind = 'treated') SELECT CAST(coalesce(sum(ia), 0) AS BIGINT) AS lines_in_admission, CAST(coalesce(sum(ad), 0) AS BIGINT) AS lines_after_death, CAST(coalesce(sum(ia + ad), 0) AS BIGINT) AS lines_in_admission_or_after_death, count(DISTINCT dst) FILTER (WHERE ia + ad > 0) AS members_billed, count(DISTINCT src) FILTER (WHERE ia + ad > 0) AS providers_billing, CAST(coalesce(sum(co), 0) AS BIGINT) AS corrected_lines FROM t"
+  sources: health_links
+  sink_dataset: health_phantom_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == health_links"
+  enabled: true

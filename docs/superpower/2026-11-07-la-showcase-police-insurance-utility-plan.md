@@ -1510,6 +1510,69 @@ deviations:
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
 
+   **`la-health` BUILT 2026-11-09** (the `la-card` pattern). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`health.analyst` lead, `health.manager`
+     second approver, `health.reviewer` read-only, `health.outsider` not a member, and `admin` exactly as in
+     `la-showcase`), `config/roles.toon` (`health-analyst`, `health-manager`, and `fraud-analyst`, `la-viewer`,
+     `la-settings` byte-identical to `la-card`'s, although `la-health` is the only use case of *Healthcare*),
+     `four_eyes_fan_out_above: 2000` plus the same Drafts limits in `link-analysis.toon` (no `masking_mode`; no Entity
+     Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `health_phantom_counts` (`sql.template` on `health_links`'
+     `job.dataset.produced`, reading only `health_links`) writes one row from the `treated` links' `via`:
+     `lines_in_admission`, `lines_after_death`, `lines_in_admission_or_after_death`, `members_billed`,
+     `providers_billing` and `corrected_lines`; `health_phantom_alerts` (`alert.evaluate`) runs after it;
+     `health_billed_in_admission_or_after_death` is `max(lines_in_admission_or_after_death) gte 1`, WARNING, not grouped
+     (a Job output). It is the spec's rule as written: one service billed in a stay or after a death is enough.
+   - **Real figures on the shipped data** (the Job's SQL over the real `health_links`; pinned by
+     `HealthLinksJobGoldenTest`): lines_in_admission **89**, lines_after_death **70**, lines_in_admission_or_after_death
+     **159**, members_billed **40**, providers_billing **1** (`PR-1241`), corrected_lines **30** (15 at the look-alike
+     `PR-0632`, 15 single errors elsewhere, all reversed). With `PR-1241` taken out: 0 / 0 / 0 / 0 / 0 / 30. Only
+     `PR-0632`'s links: 0 open, 15 corrected.
+   - **Decided while building:**
+     - **The measure counts open lines, not corrected ones.** `health_links` already reads a line as `in_admission` only
+       when the stay is at ANOTHER hospital (`ad.hospital_id <> o.provider_id`) and not reversed; the counts Job reads
+       that, so the look-alike's date errors (reversed in 2-6 days) never count.
+     - **The busy look-alike hospital.** `PR-1129` (Saltmere Bay Hospital) is the first node on *Busiest nodes* in
+       `referral_kickbacks` (degree 8 in the screen). It also bills 2 unreversed lines inside its OWN stays, so a naive
+       "any line dated inside a stay" count would name it. The rule leaves the admitting hospital out, and the golden test
+       pins it: `PR-1129` is the referral view's busiest node, a naive in-a-stay count of its lines is above 0, and the
+       counts Job over its links (and over the kickback ring's `PR-1426`, `PR-1392`, `PR-1170`) counts 0. The lane brief
+       asked that the measure separate the kickback ring from that hospital; the spec's named rule is about phantom
+       billing, not kickbacks, so neither the ring nor the hospital is counted; a kickback Alert Rule was not added (one
+       rule per Space). If a kickback rule is wanted, the separating fact is the shared home (`lives_at` to `AD-05150`),
+       which the trust-owned hospital lacks.
+     - **Running total**, as in `la-police` and `la-card`: `health_links` is rebuilt over everything landed, so the rule
+       stays met after every build and an open Alert is not raised again. The staged October bills nothing in a stay or
+       after a death, so the figures do not move.
+   - **Seed** `tools/seed-la-health.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `phantom-billing` (seed `PR-1241`; a bounded expand over `treated`, `maxFanOut` 80, to its 53
+     patients, the 40 among them; annotate, threshold, window, resolve, snapshot), members (`health.reviewer` and
+     `health.manager` reviewers, `admin` lead; not `health.outsider`), Entity List
+     `billed-in-hospital-or-after-death` (the 40), a Case from `PR-1241` assigned to `health.manager` and linked, an
+     Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `PR-1241` (the admitting
+     hospitals are two hops out, hospital to member to clinic).
+   - **Tests:** `LaHealthTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000; Drafts; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst` equal to `la-utility`'s and `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the
+     shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs' signals); `HealthLinksJobGoldenTest` (runs
+     the counts Job after `health_links`; `theTemplateIsBasicTierOnly` became
+     `theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts`; plus
+     `withoutThePhantomBillingClinicTheRuleWouldNotFire` and
+     `theLookAlikeClinicTheBusyHospitalAndTheKickbackRingAreNeverCounted`); the gallery test pins `la-health` creatable
+     with no missing feature and no Demo Auth; `tools/seed-la-health.test.mjs` (mocked fetch, 11 tests).
+     Falsified, each then restored: the without-`PR-1241` filter dropped (fails: 1 provider); reversed lines counted
+     in the measure (189, the look-alike 15, without `PR-1241` 30: three tests fail); the admitting-hospital exclusion
+     removed from `health_links` (`PR-1129` counts 2: four tests fail, the busy-hospital pin among them);
+     `masking_mode: typed`; `la-settings` given a second capability (differs from `la-card`); `health-analyst` given
+     the approve capability; `admin`'s title changed; `la-health` out of the gallery's Basic-tier set; and in the seed:
+     the outsider made a member, the Draft annotating an admitting hospital (`PR-0199`), the look-alike `PR-0632` added
+     to the seed.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 159, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `health_phantom_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Healthcare* industry Space (`la-healthcare`) with this tier, an OIDC
+     build, the full reactor gate.
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),
