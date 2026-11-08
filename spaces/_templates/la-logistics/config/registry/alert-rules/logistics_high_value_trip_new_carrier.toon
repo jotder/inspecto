@@ -1,0 +1,7 @@
+name: logistics_high_value_trip_new_carrier
+dataset: logistics_new_carrier_counts_dataset
+measure: max(uninsured_new_carrier_high_value_trips)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A high-value trip assigned to a carrier under 60 days old that is not insured: a load worth 100 000 or more given to a carrier registered under 60 days before departure whose insured flag is N. Read at assignment: no loss report is used, so background losses do not raise it. The Alert carries how many such trips there are; no carrier, driver or trip id leaves logistics_new_carrier_counts, so open the fictitious_carrier view to find the carrier. A new insured carrier on high-value loads is not counted (new_carrier_high_value_trips counts every high-value trip of a carrier under 60 days old). Not grouped by carrier: logistics_new_carrier_counts is a Job output, so a by column cannot be checked when the Space is created."

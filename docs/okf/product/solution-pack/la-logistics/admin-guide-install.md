@@ -77,6 +77,58 @@ driver changes, and the planted stories stay as they are.
 Stop the product, delete `inspecto-la-data/la-logistics/`, and unzip the data download again. The Space
 configuration is untouched.
 
+## Advanced tier: personas, the new-carrier Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `logistics_high_value_trip_new_carrier` is loaded but not armed, and the
+`logistics_new_carrier_counts` and `logistics_new_carrier_alerts` Jobs run after each `logistics_links` build; the
+second finds no armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs
+people in by name with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the eight Pipelines have landed and `logistics_links` has run (a minute or two), create the runtime state from a
+checkout of the repository:
+
+```bash
+node tools/seed-la-logistics.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `fictitious-carrier`
+(seeded with the carrier `CAR-022`, expanded once over `carried_by` and `same_phone` to its 5 high-value loads and to
+`DRV-0895`, the driver whose phone it gives as its own; annotated, snapshotted), its members, the Entity List
+`suspect-carriers` (`CAR-022`, `DRV-0895`), a Case assigned to `logistics.manager` and linked to the Investigation, an
+Investigation template, one unbounded expand held for a second person, and one open Draft. To lay the Space out
+offline instead of unzipping the downloads, `node tools/seed-la-logistics.mjs --scaffold <bundle>\spaces` does it
+before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `logistics.analyst` | `logistics-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `logistics.manager` | `logistics-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `logistics.reviewer` | `la-viewer`, member as reviewer | reads `fictitious-carrier`; any change is refused (403) |
+| `logistics.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `logistics_high_value_trip_new_carrier` (WARNING) reads the one row of
+`logistics_new_carrier_counts` and fires when one or more trips worth **100 000** or more are given to a carrier
+registered **under 60 days** before departure **that is not insured**. On the shipped data **16** high-value trips go
+to a carrier under 60 days old, and the Alert carries **5**: the loads of `CAR-022`, the only uninsured one. The new
+owner-operator `CAR-057`'s 9 and the 2 of `CAR-091` and `CAR-115` are insured and not counted, and the 11 established
+uninsured carriers are not new. The spec's rule read literally ("a high-value trip assigned to a carrier under 60 days
+old") would have fired on the 11 insured loads as well, so the rule adds the one fact the look-alike story sets apart,
+insurance. It reads the carrier register when the load is given, never a loss report: the background losses (about
+one trip in 400) cannot raise it. The count is a running total over every landed trip, so the rule stays met after
+every build (one open Alert, not one per build). It names no carrier; `fictitious_carrier` shows it. The rule is not
+grouped by carrier, because `logistics_new_carrier_counts` is a Job output: a `by` column cannot be checked against
+its Schema when the Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash

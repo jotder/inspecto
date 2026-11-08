@@ -1,0 +1,10 @@
+job:
+  name: logistics_new_carrier_counts
+  type: sql.template
+  description: "Runs each time the logistics_links Job produces its Dataset. One row of counts over the carried_by links of every landed trip: new_carrier_high_value_trips (trips worth 100 000 or more given to a carrier under 60 days old at departure, the new_carrier screen's loads), uninsured_new_carrier_high_value_trips (those of them whose carrier is not insured, insured N on the carrier register: the fictitious-carrier pattern) and uninsured_new_carriers (how many such carriers). A new insured carrier on high-value loads counts in the first column only. Read at assignment, not after a loss: no loss report is used, so the one-in-400 background losses cannot raise it. The Alert Rule logistics_high_value_trip_new_carrier reads the second column; no carrier, driver or trip id leaves this Job, they are found in the fictitious_carrier view."
+  sql: "WITH nc AS (SELECT src AS trip_id, dst AS carrier_id, via FROM logistics_links WHERE kind = 'carried_by' AND via LIKE '%|high_value:Y|%' AND TRY_CAST(regexp_extract(via, 'carrier_age_days:([0-9]+)', 1) AS INTEGER) < 60), un AS (SELECT * FROM nc WHERE via LIKE '%|insured:N|%') SELECT (SELECT count(DISTINCT trip_id) FROM nc) AS new_carrier_high_value_trips, (SELECT count(DISTINCT trip_id) FROM un) AS uninsured_new_carrier_high_value_trips, (SELECT count(DISTINCT carrier_id) FROM un) AS uninsured_new_carriers"
+  sources: logistics_links
+  sink_dataset: logistics_new_carrier_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == logistics_links"
+  enabled: true

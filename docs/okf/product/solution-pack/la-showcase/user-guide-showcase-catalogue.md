@@ -137,7 +137,7 @@ Telecom and under Banking and finance.
 
 | Template | What it teaches | Stories | Edition | Data | Guide |
 |---|---|---|---|---|---|
-| `la-logistics` | Cargo theft: trips, drivers, stops, scanners and carriers | An inside job (losses recurring with one driver pair and one night-shift scanner); an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | Basic; Advanced tier: planned | 1.3 MB | [user guide, 3 exercises](../la-logistics/user-guide.md#exercises) · [install](../la-logistics/admin-guide-install.md) |
+| `la-logistics` | Cargo theft: trips, drivers, stops, scanners and carriers | An inside job (losses recurring with one driver pair and one night-shift scanner); an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | Basic; **Advanced tier:** five Demo Users, Investigations, four-eyes, Drafts, an Alert Rule on a high-value trip given to an uninsured carrier under 60 days old (unarmed on Basic), and a seed script for the Investigation, an Entity List of suspect carriers and a Case | 1.3 MB | [user guide, 3 exercises](../la-logistics/user-guide.md#exercises) · [install](../la-logistics/admin-guide-install.md) |
 
 ### Enterprise
 

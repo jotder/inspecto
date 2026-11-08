@@ -962,6 +962,8 @@ later). Deliberate deviations:
   Space or industry prefix. The template id `la-logistics` is the one this spec gives; D2 of that plan gives the same id to the
   *Logistics* industry Space, so the operator decides whether that Space is this template or takes another id.
 
+**Advanced tier BUILT 2026-11-09:** see step 8, "`la-logistics` BUILT 2026-11-09".
+
 #### 12. `la-insider` — insider threat
 
 **Audience:** security, HR and internal investigations. All people and systems are invented.
@@ -1631,6 +1633,68 @@ deviations:
      the expand's `linkKinds`, the window and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build, and
      the packed downloads of a commit holding this tier (the packer reads HEAD).
+
+   **`la-logistics` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job; spec 11's "a high-value
+   trip assigned to a carrier under 60 days old"). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`logistics.analyst` lead,
+     `logistics.manager` second approver, `logistics.reviewer` read-only, `logistics.outsider` not a member, and `admin`
+     byte-identical to every other showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon`
+     (`logistics-analyst`, `fraud-analyst`, `la-viewer` and `la-settings` exactly as in `la-card`, `logistics-manager`
+     with `canApproveLinkExpansions`), `four_eyes_fan_out_above: 2000` plus the same Drafts block (10 / 60 min / 14 days)
+     in `link-analysis.toon`. `la-logistics` is the only use case of the *Logistics* industry Space
+     (`la-logistics-industry`), but the shared values are kept identical so any later composition merges cleanly. No
+     `masking_mode`; no Entity Type masked.
+   - **The Alert Rule is the spec's rule plus the carrier's insurance.** Read literally, "a high-value trip assigned to a
+     carrier under 60 days old" fires on the look-alike: the new insured owner-operator `CAR-057` took 9 high-value loads
+     in its first 60 days. What spec 11 itself sets the look-alike apart by is "a new, *insured* carrier that delivers";
+     "delivers" is an outcome known only after the loss, insurance is on the carrier register when the load is given. So
+     `logistics_new_carrier_counts` (`sql.template` on `logistics_links`' `job.dataset.produced`, sources
+     `logistics_links` only) reads the `carried_by` links (the very high-value and under-60-days test of the
+     `new_carrier` screen) and writes one row: `new_carrier_high_value_trips`, `uninsured_new_carrier_high_value_trips`
+     (`insured:N`), `uninsured_new_carriers`. `logistics_new_carrier_alerts` (`alert.evaluate`) runs after it;
+     `logistics_high_value_trip_new_carrier` is `max(uninsured_new_carrier_high_value_trips) gte 1`, WARNING, not
+     grouped (a Job output). The Job sends no carrier, driver or trip id; the Alert carries a count.
+   - **Separated from the background without loss reports.** Background losses are about 1 in 400 trips (31 of the 12 872
+     landed trips; the ground truth's 34 include 3 in the staged month). A rule on a new carrier's *lost* high-value loads would also count `TR-01415` (`CAR-091`, 49 days old,
+     insured, short-delivered), so the rule reads no loss report at all. The shared phone (`same_phone` to `DRV-0895`, a
+     driver of another carrier who left after a theft) also separates the story, but owner-operators share their own
+     driver's phone and 5 of the 14 have a driver with a background loss, so insurance is the steadier separator.
+   - **Running total, not "new".** The count covers every landed trip, so the rule stays met after every build. A
+     `sql.template` Job keeps no watermark of what it counted last time, and the Alert stays one open Alert while the
+     breach lasts, so a running total gives one Alert for the story, not one per build.
+   - **Real figures on the shipped data** (the counts Job over the real `logistics_links`; pinned by
+     `LogisticsLinksJobGoldenTest`, first computed with DuckDB over the CSV files): new_carrier_high_value_trips **16**
+     (`CAR-022` 5, `CAR-057` 9, `CAR-091` 1, `CAR-115` 1; equal to the `new_carrier` screen's `carried_by` rows);
+     uninsured_new_carrier_high_value_trips **5** (exactly the ground truth's 5 trips of `CAR-022`);
+     uninsured_new_carriers **1**. Without `CAR-022`: 11 / 0 / 0. `CAR-057` alone: 9 / 0 / 0. Without the age test, 56
+     high-value trips are uninsured (12 uninsured carriers; 51 of those trips are the 11 established ones'). The staged
+     month adds no carrier, so it cannot change the figures (not run through the Pipelines).
+   - **Seed** `tools/seed-la-logistics.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `fictitious-carrier` (seed `CAR-022`; one bounded expand over `carried_by` and `same_phone`,
+     `maxFanOut` 20, to its 5 loads and `DRV-0895`; annotate, threshold, window 2025-10-01 to 2026-10-01, resolve,
+     snapshot), members (`logistics.reviewer` and `logistics.manager` reviewers, `admin` lead; not `logistics.outsider`),
+     Entity List `suspect-carriers` (`CAR-022`, `DRV-0895`), a Case from `CAR-022` assigned to `logistics.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `DRV-0895` (in
+     the Working Set after the expand; his old theft trip `TR-09616` is two hops out). `CAR-057` is in no step.
+   - **Tests:** `LaLogisticsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined and
+     `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals; the counts Job and the `new_carrier` screen share the age test and the
+     counts Job reads no loss); `LogisticsLinksJobGoldenTest` (the counts Job fired by the `logistics_links` signal with
+     the screen Job; the figures above and the rule's own measure and threshold fire; the Job's own SQL without `CAR-022`
+     would not fire; the one background loss a loss-based rule would catch; `CAR-057` has 9 high-value loads yet is never
+     counted; the old "Basic tier only" test replaced); the gallery test pins `la-logistics` creatable with no missing
+     feature and no Demo Auth; `tools/seed-la-logistics.test.mjs` (mocked fetch, 11 tests). Falsified, each then
+     restored: the counts Job without the insured test (16 counted; the positive, the no-`CAR-022` and the owner-operator
+     tests all go red), `masking_mode: typed`, `logistics-analyst` given the approve capability, `admin` given
+     `logistics-analyst`, `la-logistics` out of the gallery's Basic-tier set, `fraud-analyst` removed, `la-viewer` given a
+     capability; in the seed the outsider made a member, the Draft annotating `TR-09616` (two hops out), `CAR-057` added
+     to the Entity List, the first expand unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 5, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `logistics_new_carrier_alerts` reporting no breach,
+     0 rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not
+     observed. Also not checked: the Link Analysis UI, the composed *Logistics* industry Space with this tier, the staged
+     month, an OIDC build, and the packed downloads of a commit holding this tier (the packer reads HEAD).
 
 **Docs, with each Space**
 

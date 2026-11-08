@@ -1,0 +1,6 @@
+physicalRef: logistics_new_carrier_counts
+description: "Logistics cargo theft Link Analysis showcase - one row of counts built by the logistics_new_carrier_counts Job: new_carrier_high_value_trips (landed trips worth 100 000 or more given to a carrier under 60 days old), uninsured_new_carrier_high_value_trips (those whose carrier is not insured) and uninsured_new_carriers (how many such carriers). Read by the Alert Rule logistics_high_value_trip_new_carrier. Names no carrier, driver or trip. Synthetic."
+columns[3]{name,type,classification}:
+  new_carrier_high_value_trips,number,
+  uninsured_new_carrier_high_value_trips,number,
+  uninsured_new_carriers,number,
