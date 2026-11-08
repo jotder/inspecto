@@ -1,0 +1,28 @@
+raw:
+  name: MERCHANT
+  format: CSV
+  fields[5]{name,selector,type}:
+    merchant_id,"0",VARCHAR
+    name,"1",VARCHAR
+    category,"2",VARCHAR
+    opened_at,"3",DATE
+    settlement_account,"4",VARCHAR
+mapping:
+  canonicalName: merchant
+  rawName: MERCHANT
+  fields[5]:
+    - name: merchant_id
+      from: merchant_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: category
+      from: category
+      fn: keep
+    - name: opened_at
+      from: opened_at
+      fn: keep
+    - name: settlement_account
+      from: settlement_account
+      fn: keep

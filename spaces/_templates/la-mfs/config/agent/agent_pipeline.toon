@@ -1,0 +1,36 @@
+name: agent
+active: true
+description: "Mobile financial services fraud Link Analysis showcase - One row per agent (the shops that cash customers in and out and register wallets): name, area, the super agent it reports to and its float account. One extract (AGENT_20260930.csv). Synthetic; regenerate with tools/gen-la-mfs-data.py."
+
+dirs:
+  poll:       data/inbox/agent
+  database:   data/agent/database
+  backup:     data/agent/backup
+  temp:       data/agent/temp
+  errors:     data/agent/errors
+  quarantine: data/agent/quarantine
+  markers:    data/agent/markers
+  status_dir: data/agent/status
+  log_dir:    data/agent/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: agent_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

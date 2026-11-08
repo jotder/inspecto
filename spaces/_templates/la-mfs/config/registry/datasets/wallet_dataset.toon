@@ -1,0 +1,9 @@
+physicalRef: wallet/database
+description: "Mobile financial services fraud Link Analysis showcase - One row per wallet: its MSISDN, KYC level (1-3), when it was opened and the agent that registered it (blank when the customer registered in the app). One extract of every wallet opened by 2026-09-30 (WALLET_20260930.csv); the October openings are in data/staged. Landed by the wallet Pipeline. Synthetic."
+eventDate: opened_at
+columns[5]{name,type,classification}:
+  wallet_id,string,
+  msisdn,string,
+  kyc_level,number,
+  opened_at,timestamp,
+  registered_by_agent,string,

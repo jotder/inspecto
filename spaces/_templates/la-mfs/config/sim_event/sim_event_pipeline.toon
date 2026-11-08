@@ -1,0 +1,36 @@
+name: sim_event
+active: true
+description: "Mobile financial services fraud Link Analysis showcase - One row per SIM event on a wallet's number from the operator's SIM register: sim_swap (a new SIM for the same number) or port_out, when, the channel (store or call_centre) and the staff login that did it. One file per month (SIM_EVENT_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-mfs-data.py."
+
+dirs:
+  poll:       data/inbox/sim_event
+  database:   data/sim_event/database
+  backup:     data/sim_event/backup
+  temp:       data/sim_event/temp
+  errors:     data/sim_event/errors
+  quarantine: data/sim_event/quarantine
+  markers:    data/sim_event/markers
+  status_dir: data/sim_event/status
+  log_dir:    data/sim_event/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: sim_event_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

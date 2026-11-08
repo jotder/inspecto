@@ -1,0 +1,24 @@
+raw:
+  name: AGENT_COMMISSION
+  format: CSV
+  fields[4]{name,selector,type}:
+    agent_id,"0",VARCHAR
+    month,"1",DATE
+    transactions,"2",INTEGER
+    commission,"3",DOUBLE
+mapping:
+  canonicalName: agent_commission
+  rawName: AGENT_COMMISSION
+  fields[4]:
+    - name: agent_id
+      from: agent_id
+      fn: keep
+    - name: month
+      from: month
+      fn: keep
+    - name: transactions
+      from: transactions
+      fn: keep
+    - name: commission
+      from: commission
+      fn: keep

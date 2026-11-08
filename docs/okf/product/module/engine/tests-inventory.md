@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-384 test class(es): 384 unit, 0 real-HTTP control-plane, 0 IT.
+387 test class(es): 387 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -172,12 +172,14 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ConsignmentProcessJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTckTest.java` | {@link ConsignmentProcessJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `ConsignmentProcessJobTypeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTest.java` | §14.4 step 3 — the adapter. Proves the "author doesn't think about it" promise from the <em>processor's</em> |
 | `ConsignmentProcessParameterTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessParameterTest.java` | §14.4 step 3's acceptance criterion, at the layer that actually decides it: <b>"a third-party processor gets |
+| `CryptoLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/CryptoLinksJobGoldenTest.java` | The {@code la-crypto} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped extracts |
 | `DbJobRunStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DbJobRunStoreTest.java` | {@link DbJobRunStore} (T27): the DuckDB projection of job runs that backs the reporting endpoints. |
 | `DemoRetireSupersededJobShipsDisabledTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DemoRetireSupersededJobShipsDisabledTest.java` | Pins the committed {@code spaces/demo} {@code retire_superseded} maintenance job — the example the |
 | `DryRunServicesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DryRunServicesTest.java` | The dry-run contract for Platform Services (§3.4): mutating services record instead of act — the |
 | `ExpressionRegistryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ExpressionRegistryTest.java` | The Expression SPI seam (job-parameter-contract §4): the built-in vocabulary is discoverable, a plugin |
 | `FreshnessSweepTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/FreshnessSweepTest.java` | DUCKLE-C1 residual (1): the freshness sweep is a SYSTEM job — armed and disarmed by the platform, |
 | `HealthLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/HealthLinksJobGoldenTest.java` | The {@code la-health} Space Template (Basic tier) RUN end to end from a verbatim copy: the nine Pipelines land the shipped |
+| `InsiderLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/InsiderLinksJobGoldenTest.java` | The {@code la-insider} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped |
 | `JobConfigTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobConfigTest.java` | Tests for parsing a {@code *_job.toon} into a {@link JobConfig}. |
 | `JobDeadlineTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobDeadlineTest.java` | The generic Job Run deadline (platform-services R1, operator 2026-10-06): a hung Run is FAILED at its |
 | `JobPackManagerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackManagerTest.java` | P2c Job Packs (§12): a pack jar dropped in the watched dir is loaded through its own isolated |
@@ -213,6 +215,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `MaintenanceTaskContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MaintenanceTaskContractTest.java` | Pins {@link MaintenanceJob#BUILT_IN_TASKS} against the {@code switch} it claims to describe, and pins |
 | `MaterializeColumnMergeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MaterializeColumnMergeTest.java` | The merge rule for derived dataset columns (`TYPEFLOW-DATASET-COLUMNS-1` step 4, design §5). |
 | `MaterializeTaskTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MaterializeTaskTest.java` | DAT-4 Matrix materialization, end-to-end on real DuckDB: the {@code materialize} task compiles a |
+| `MfsLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MfsLinksJobGoldenTest.java` | The {@code la-mfs} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped extracts |
 | `MmLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MmLinksJobGoldenTest.java` | The {@code la-mobile-money} Space Template RUN end to end from a verbatim copy: the three Pipelines ingest the shipped |
 | `NoBackupTaskShipsInThePersonalBuildTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/NoBackupTaskShipsInThePersonalBuildTest.java` | EDG-01 cell 2 — the assertion that makes the OPS-06 gating REAL rather than claimed. |
 | `ObjectStoreExportJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ObjectStoreExportJobTypeTckTest.java` | {@link ObjectStoreExportJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |

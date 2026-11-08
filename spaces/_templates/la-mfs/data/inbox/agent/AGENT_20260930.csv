@@ -1,0 +1,301 @@
+agent_id,name,area,super_agent_id,float_account
+A-001,Redwing Pay Point,Eastfield,SA-12,FA-100007
+A-002,Greystone Money Point,Riverside,SA-09,FA-100014
+A-003,Lantern Cash Hub,Riverside,SA-04,FA-100021
+A-004,Copperfield Pay Corner,Brickfield,SA-08,FA-100028
+A-005,Redwing Pay Corner,Station Road,SA-06,FA-100035
+A-006,Kingfisher Express,Brickfield,SA-12,FA-100042
+A-007,Willow Money Point,Eastfield,SA-05,FA-100049
+A-008,Driftwood Kiosk,Lakeside,SA-07,FA-100056
+A-009,Millstone Cash Point,Ferry Point,SA-07,FA-100063
+A-010,Bramble Cash Hub,Old Market,SA-10,FA-100070
+A-011,Harbour Agency,Cedar Heights,SA-01,FA-100077
+A-012,Juniper Traders,Eastfield,SA-11,FA-100084
+A-013,Thistle Kiosk,Westbrook,SA-01,FA-100091
+A-014,Thistle Express,Brickfield,SA-06,FA-100098
+A-015,Greystone Mobile Agent,Westbrook,SA-01,FA-100105
+A-016,Copperfield Mobile Agent,Riverside,SA-08,FA-100112
+A-017,Hawthorn Traders,Station Road,SA-05,FA-100119
+A-018,Meadow Pay Point,Station Road,SA-12,FA-100126
+A-019,Millstone Pay Point,Brickfield,SA-08,FA-100133
+A-020,Saffron Wallet Corner,Brickfield,SA-09,FA-100140
+A-021,Greystone Till,Westbrook,SA-08,FA-100147
+A-022,Cobalt Kiosk,Brickfield,SA-08,FA-100154
+A-023,Ashdown Mobile Agent,Eastfield,SA-11,FA-100161
+A-024,Harbour Pay Corner,Station Road,SA-07,FA-100168
+A-025,Willow Mobile Agent,Northgate,SA-06,FA-100175
+A-026,Ashdown Pay Point,Cedar Heights,SA-08,FA-100182
+A-027,Harbour Till,Hillcrest,SA-02,FA-100189
+A-028,Juniper Mobile Cash,Westbrook,SA-02,FA-100196
+A-029,Thistle Pay Point,Northgate,SA-01,FA-100203
+A-030,Kingfisher Traders,Old Market,SA-06,FA-100210
+A-031,Larkspur Mobile Agent,Northgate,SA-07,FA-100217
+A-032,Amberly Wallet Corner,Riverside,SA-11,FA-100224
+A-033,Willow Pay Corner,Mill Lane,SA-07,FA-100231
+A-034,Pebble Traders,Mill Lane,SA-01,FA-100238
+A-035,Foxglove Agency,Westbrook,SA-12,FA-100245
+A-036,Willow Till,Ferry Point,SA-05,FA-100252
+A-037,Kingfisher Money Shop,Cedar Heights,SA-11,FA-100259
+A-038,Thistle Pay Corner,Old Market,SA-04,FA-100266
+A-039,Thistle Money Shop,Old Market,SA-01,FA-100273
+A-040,Thistle Cash Point,Eastfield,SA-10,FA-100280
+A-041,Millstone Money Point,Riverside,SA-09,FA-100287
+A-042,Ashdown Wallet Corner,Station Road,SA-06,FA-100294
+A-043,Bramble Money Shop,Mill Lane,SA-01,FA-100301
+A-044,Driftwood Till,Riverside,SA-05,FA-100308
+A-045,Pebble Mobile Agent,Ferry Point,SA-04,FA-100315
+A-046,Lantern Till,Westbrook,SA-05,FA-100322
+A-047,Bramble Money Point,Cedar Heights,SA-05,FA-100329
+A-048,Saffron Till,Hillcrest,SA-11,FA-100336
+A-049,Thistle Till,Eastfield,SA-04,FA-100343
+A-050,Bramble Till,Mill Lane,SA-07,FA-100350
+A-051,Pebble Cash Point,Riverside,SA-02,FA-100357
+A-052,Hawthorn Express,Brickfield,SA-10,FA-100364
+A-053,Juniper Pay Point,Hillcrest,SA-12,FA-100371
+A-054,Copperfield Cash Point,Cedar Heights,SA-07,FA-100378
+A-055,Amberly Mobile Cash,Eastfield,SA-12,FA-100385
+A-056,Redwing Express,Riverside,SA-06,FA-100392
+A-057,Oakridge Pay Corner,Lakeside,SA-01,FA-100399
+A-058,Copperfield Kiosk,Mill Lane,SA-03,FA-100406
+A-059,Millstone Traders,Westbrook,SA-01,FA-100413
+A-060,Greystone Pay Corner,Brickfield,SA-04,FA-100420
+A-061,Juniper Money Shop,Cedar Heights,SA-03,FA-100427
+A-062,Oakridge Express,Station Road,SA-05,FA-100434
+A-063,Meadow Mobile Cash,Cedar Heights,SA-08,FA-100441
+A-064,Harbour Wallet Corner,Brickfield,SA-01,FA-100448
+A-065,Lantern Mobile Agent,Mill Lane,SA-05,FA-100455
+A-066,Zephyr Mobile Cash,Eastfield,SA-01,FA-100462
+A-067,Ashdown Money Point,Westbrook,SA-08,FA-100469
+A-068,Valley Cash Point,Brickfield,SA-12,FA-100476
+A-069,Ashdown Money Shop,Northgate,SA-07,FA-100483
+A-070,Redwing Kiosk,Brickfield,SA-12,FA-100490
+A-071,Amberly Money Point,Old Market,SA-03,FA-100497
+A-072,Valley Pay Point,Mill Lane,SA-05,FA-100504
+A-073,Pebble Money Shop,Hillcrest,SA-07,FA-100511
+A-074,Amberly Express,Eastfield,SA-02,FA-100518
+A-075,Foxglove Cash Point,Westbrook,SA-02,FA-100525
+A-076,Kestrel Cash Hub,Northgate,SA-01,FA-100532
+A-077,Greystone Money Shop,Ferry Point,SA-02,FA-100539
+A-078,Lantern Agency,Ferry Point,SA-05,FA-100546
+A-079,Amberly Cash Point,Mill Lane,SA-12,FA-100553
+A-080,Driftwood Money Shop,Lakeside,SA-05,FA-100560
+A-081,Kestrel Pay Point,Cedar Heights,SA-12,FA-100567
+A-082,Ashdown Cash Hub,Old Market,SA-11,FA-100574
+A-083,Amberly Pay Corner,Eastfield,SA-03,FA-100581
+A-084,Oakridge Money Point,Old Market,SA-07,FA-100588
+A-085,Bramble Express,Lakeside,SA-12,FA-100595
+A-086,Valley Agency,Hillcrest,SA-08,FA-100602
+A-087,Kingfisher Mobile Agent,Westbrook,SA-09,FA-100609
+A-088,Willow Agency,Eastfield,SA-02,FA-100616
+A-089,Cobalt Traders,Ferry Point,SA-11,FA-100623
+A-090,Greystone Wallet Corner,Lakeside,SA-10,FA-100630
+A-091,Hawthorn Wallet Corner,Brickfield,SA-10,FA-100637
+A-092,Cobalt Mobile Agent,Station Road,SA-02,FA-100644
+A-093,Pebble Cash Hub,Eastfield,SA-12,FA-100651
+A-094,Harbour Money Shop,Old Market,SA-11,FA-100658
+A-095,Willow Kiosk,Brickfield,SA-02,FA-100665
+A-096,Amberly Cash Hub,Cedar Heights,SA-12,FA-100672
+A-097,Juniper Pay Corner,Hillcrest,SA-06,FA-100679
+A-098,Bramble Wallet Corner,Hillcrest,SA-06,FA-100686
+A-099,Valley Mobile Agent,Northgate,SA-01,FA-100693
+A-100,Zephyr Cash Point,Mill Lane,SA-04,FA-100700
+A-101,Driftwood Cash Point,Lakeside,SA-12,FA-100707
+A-102,Greystone Cash Hub,Mill Lane,SA-08,FA-100714
+A-103,Thistle Traders,Westbrook,SA-01,FA-100721
+A-104,Kestrel Wallet Corner,Cedar Heights,SA-05,FA-100728
+A-105,Harbour Mobile Agent,Northgate,SA-06,FA-100735
+A-106,Pebble Till,Westbrook,SA-10,FA-100742
+A-107,Oakridge Mobile Cash,Mill Lane,SA-09,FA-100749
+A-108,Kingfisher Money Point,Hillcrest,SA-04,FA-100756
+A-109,Meadow Money Shop,Riverside,SA-03,FA-100763
+A-110,Pebble Kiosk,Eastfield,SA-04,FA-100770
+A-111,Driftwood Mobile Agent,Hillcrest,SA-05,FA-100777
+A-112,Juniper Till,Northgate,SA-11,FA-100784
+A-113,Cobalt Till,Brickfield,SA-05,FA-100791
+A-114,Cobalt Cash Point,Northgate,SA-06,FA-100798
+A-115,Saffron Cash Hub,Station Road,SA-01,FA-100805
+A-116,Larkspur Wallet Corner,Northgate,SA-08,FA-100812
+A-117,Foxglove Express,Riverside,SA-09,FA-100819
+A-118,Larkspur Money Shop,Cedar Heights,SA-01,FA-100826
+A-119,Greystone Traders,Northgate,SA-02,FA-100833
+A-120,Millstone Cash Hub,Ferry Point,SA-04,FA-100840
+A-121,Driftwood Pay Point,Riverside,SA-11,FA-100847
+A-122,Redwing Mobile Cash,Lakeside,SA-06,FA-100854
+A-123,Kingfisher Agency,Brickfield,SA-12,FA-100861
+A-124,Foxglove Pay Point,Hillcrest,SA-05,FA-100868
+A-125,Cobalt Wallet Corner,Riverside,SA-11,FA-100875
+A-126,Larkspur Kiosk,Eastfield,SA-10,FA-100882
+A-127,Valley Wallet Corner,Cedar Heights,SA-10,FA-100889
+A-128,Ashdown Cash Point,Riverside,SA-06,FA-100896
+A-129,Willow Traders,Riverside,SA-03,FA-100903
+A-130,Meadow Cash Hub,Westbrook,SA-08,FA-100910
+A-131,Old Market Traders Cash Point,Old Market,SA-05,FA-100917
+A-132,Willow Mobile Cash,Brickfield,SA-10,FA-100924
+A-133,Millstone Mobile Cash,Eastfield,SA-04,FA-100931
+A-134,Saffron Mobile Agent,Station Road,SA-08,FA-100938
+A-135,Ashdown Mobile Cash,Eastfield,SA-08,FA-100945
+A-136,Driftwood Money Point,Lakeside,SA-06,FA-100952
+A-137,Saffron Express,Northgate,SA-04,FA-100959
+A-138,Amberly Traders,Riverside,SA-12,FA-100966
+A-139,Hawthorn Money Point,Westbrook,SA-01,FA-100973
+A-140,Willow Wallet Corner,Northgate,SA-11,FA-100980
+A-141,Oakridge Cash Hub,Old Market,SA-05,FA-100987
+A-142,Redwing Cash Point,Cedar Heights,SA-08,FA-100994
+A-143,Millstone Till,Hillcrest,SA-03,FA-101001
+A-144,Bramble Cash Point,Cedar Heights,SA-07,FA-101008
+A-145,Redwing Money Point,Mill Lane,SA-12,FA-101015
+A-146,Millstone Wallet Corner,Hillcrest,SA-07,FA-101022
+A-147,Meadow Wallet Corner,Mill Lane,SA-04,FA-101029
+A-148,Greystone Agency,Riverside,SA-04,FA-101036
+A-149,Zephyr Money Point,Brickfield,SA-06,FA-101043
+A-150,Millstone Express,Brickfield,SA-08,FA-101050
+A-151,Larkspur Till,Westbrook,SA-11,FA-101057
+A-152,Copperfield Till,Westbrook,SA-06,FA-101064
+A-153,Kestrel Agency,Westbrook,SA-11,FA-101071
+A-154,Bramble Agency,Ferry Point,SA-05,FA-101078
+A-155,Greystone Mobile Cash,Lakeside,SA-10,FA-101085
+A-156,Kestrel Money Point,Lakeside,SA-07,FA-101092
+A-157,Amberly Agency,Westbrook,SA-01,FA-101099
+A-158,Millstone Money Shop,Hillcrest,SA-01,FA-101106
+A-159,Ashdown Express,Mill Lane,SA-08,FA-101113
+A-160,Redwing Traders,Ferry Point,SA-08,FA-101120
+A-161,Kingfisher Pay Point,Brickfield,SA-04,FA-101127
+A-162,Kestrel Traders,Mill Lane,SA-08,FA-101134
+A-163,Lantern Money Point,Lakeside,SA-04,FA-101141
+A-164,Zephyr Wallet Corner,Lakeside,SA-01,FA-101148
+A-165,Larkspur Cash Point,Westbrook,SA-07,FA-101155
+A-166,Hawthorn Kiosk,Northgate,SA-12,FA-101162
+A-167,Kingfisher Pay Corner,Station Road,SA-09,FA-101169
+A-168,Zephyr Traders,Northgate,SA-11,FA-101176
+A-169,Saffron Kiosk,Mill Lane,SA-10,FA-101183
+A-170,Redwing Wallet Corner,Westbrook,SA-02,FA-101190
+A-171,Cobalt Money Shop,Brickfield,SA-07,FA-101197
+A-172,Copperfield Cash Hub,Mill Lane,SA-07,FA-101204
+A-173,Lantern Pay Point,Eastfield,SA-02,FA-101211
+A-174,Millstone Agency,Mill Lane,SA-01,FA-101218
+A-175,Cobalt Money Point,Cedar Heights,SA-08,FA-101225
+A-176,Thistle Cash Hub,Brickfield,SA-12,FA-101232
+A-177,Hawthorn Mobile Cash,Lakeside,SA-10,FA-101239
+A-178,Valley Cash Hub,Mill Lane,SA-03,FA-101246
+A-179,Meadow Express,Old Market,SA-11,FA-101253
+A-180,Amberly Money Shop,Old Market,SA-04,FA-101260
+A-181,Millstone Mobile Agent,Northgate,SA-01,FA-101267
+A-182,Willow Cash Hub,Ferry Point,SA-06,FA-101274
+A-183,Meadow Pay Corner,Station Road,SA-02,FA-101281
+A-184,Amberly Mobile Agent,Lakeside,SA-12,FA-101288
+A-185,Amberly Till,Northgate,SA-09,FA-101295
+A-186,Bramble Mobile Agent,Westbrook,SA-09,FA-101302
+A-187,Meadow Mobile Agent,Eastfield,SA-06,FA-101309
+A-188,Foxglove Wallet Corner,Station Road,SA-11,FA-101316
+A-189,Saffron Pay Corner,Brickfield,SA-11,FA-101323
+A-190,Oakridge Wallet Corner,Lakeside,SA-02,FA-101330
+A-191,Larkspur Money Point,Westbrook,SA-05,FA-101337
+A-192,Hawthorn Pay Point,Old Market,SA-01,FA-101344
+A-193,Lantern Traders,Northgate,SA-01,FA-101351
+A-194,Copperfield Money Point,Lakeside,SA-08,FA-101358
+A-195,Harbour Money Point,Eastfield,SA-10,FA-101365
+A-196,Foxglove Till,Hillcrest,SA-05,FA-101372
+A-197,Bramble Pay Corner,Riverside,SA-10,FA-101379
+A-198,Meadow Cash Point,Old Market,SA-01,FA-101386
+A-199,Amberly Kiosk,Riverside,SA-12,FA-101393
+A-200,Hawthorn Pay Corner,Mill Lane,SA-12,FA-101400
+A-201,Driftwood Pay Corner,Mill Lane,SA-08,FA-101407
+A-202,Driftwood Traders,Lakeside,SA-09,FA-101414
+A-203,Willow Money Shop,Lakeside,SA-02,FA-101421
+A-204,Greystone Kiosk,Cedar Heights,SA-12,FA-101428
+A-205,Saffron Agency,Mill Lane,SA-08,FA-101435
+A-206,Foxglove Money Shop,Ferry Point,SA-02,FA-101442
+A-207,Kestrel Cash Point,Station Road,SA-07,FA-101449
+A-208,Bramble Mobile Cash,Station Road,SA-09,FA-101456
+A-209,Copperfield Wallet Corner,Cedar Heights,SA-11,FA-101463
+A-210,Zephyr Agency,Eastfield,SA-11,FA-101470
+A-211,Lantern Express,Mill Lane,SA-10,FA-101477
+A-212,Saffron Pay Point,Eastfield,SA-08,FA-101484
+A-213,Oakridge Kiosk,Old Market,SA-09,FA-101491
+A-214,Kestrel Express,Riverside,SA-12,FA-101498
+A-215,Millstone Kiosk,Northgate,SA-04,FA-101505
+A-216,Meadow Traders,Hillcrest,SA-10,FA-101512
+A-217,Thistle Mobile Cash,Hillcrest,SA-11,FA-101519
+A-218,Copperfield Traders,Eastfield,SA-02,FA-101526
+A-219,Kestrel Pay Corner,Station Road,SA-07,FA-101533
+A-220,Copperfield Mobile Cash,Riverside,SA-07,FA-101540
+A-221,Cobalt Pay Corner,Cedar Heights,SA-11,FA-101547
+A-222,Oakridge Cash Point,Old Market,SA-09,FA-101554
+A-223,Redwing Cash Hub,Old Market,SA-10,FA-101561
+A-224,Harbour Pay Point,Old Market,SA-05,FA-101568
+A-225,Pebble Agency,Cedar Heights,SA-08,FA-101575
+A-226,Larkspur Cash Hub,Ferry Point,SA-05,FA-101582
+A-227,Juniper Wallet Corner,Northgate,SA-03,FA-101589
+A-228,Juniper Cash Hub,Riverside,SA-09,FA-101596
+A-229,Cobalt Agency,Lakeside,SA-01,FA-101603
+A-230,Kingfisher Cash Hub,Riverside,SA-05,FA-101610
+A-231,Thistle Mobile Agent,Hillcrest,SA-09,FA-101617
+A-232,Foxglove Mobile Agent,Riverside,SA-11,FA-101624
+A-233,Zephyr Kiosk,Lakeside,SA-01,FA-101631
+A-234,Valley Kiosk,Lakeside,SA-04,FA-101638
+A-235,Juniper Agency,Eastfield,SA-11,FA-101645
+A-236,Driftwood Agency,Hillcrest,SA-12,FA-101652
+A-237,Juniper Money Point,Lakeside,SA-07,FA-101659
+A-238,Saffron Mobile Cash,Northgate,SA-04,FA-101666
+A-239,Driftwood Wallet Corner,Northgate,SA-12,FA-101673
+A-240,Willow Cash Point,Hillcrest,SA-06,FA-101680
+A-241,Cobalt Express,Northgate,SA-05,FA-101687
+A-242,Valley Mobile Cash,Ferry Point,SA-12,FA-101694
+A-243,Kingfisher Cash Point,Lakeside,SA-11,FA-101701
+A-244,Willow Pay Point,Hillcrest,SA-07,FA-101708
+A-245,Harbour Express,Mill Lane,SA-12,FA-101715
+A-246,Kingfisher Mobile Cash,Ferry Point,SA-06,FA-101722
+A-247,Hawthorn Mobile Agent,Riverside,SA-06,FA-101729
+A-248,Larkspur Traders,Westbrook,SA-10,FA-101736
+A-249,Zephyr Mobile Agent,Station Road,SA-09,FA-101743
+A-250,Kestrel Kiosk,Lakeside,SA-11,FA-101750
+A-251,Bramble Pay Point,Station Road,SA-02,FA-101757
+A-252,Greystone Cash Point,Old Market,SA-09,FA-101764
+A-253,Greystone Pay Point,Mill Lane,SA-01,FA-101771
+A-254,Valley Express,Mill Lane,SA-08,FA-101778
+A-255,Pebble Wallet Corner,Old Market,SA-02,FA-101785
+A-256,Thistle Wallet Corner,Riverside,SA-07,FA-101792
+A-257,Saffron Money Point,Hillcrest,SA-11,FA-101799
+A-258,Redwing Money Shop,Eastfield,SA-02,FA-101806
+A-259,Valley Money Point,Brickfield,SA-01,FA-101813
+A-260,Ashdown Agency,Eastfield,SA-08,FA-101820
+A-261,Foxglove Mobile Cash,Westbrook,SA-12,FA-101827
+A-262,Pebble Money Point,Riverside,SA-06,FA-101834
+A-263,Oakridge Traders,Station Road,SA-06,FA-101841
+A-264,Valley Pay Corner,Brickfield,SA-03,FA-101848
+A-265,Hawthorn Cash Point,Hillcrest,SA-11,FA-101855
+A-266,Harbour Traders,Eastfield,SA-11,FA-101862
+A-267,Valley Traders,Riverside,SA-04,FA-101869
+A-268,Thistle Money Point,Northgate,SA-10,FA-101876
+A-269,Zephyr Express,Station Road,SA-02,FA-101883
+A-270,Ashdown Pay Corner,Riverside,SA-01,FA-101890
+A-271,Copperfield Pay Point,Ferry Point,SA-12,FA-101897
+A-272,Lantern Wallet Corner,Mill Lane,SA-09,FA-101904
+A-273,Pebble Express,Mill Lane,SA-10,FA-101911
+A-274,Zephyr Money Shop,Eastfield,SA-06,FA-101918
+A-275,Zephyr Till,Brickfield,SA-04,FA-101925
+A-276,Oakridge Mobile Agent,Riverside,SA-03,FA-101932
+A-277,Valley Money Shop,Brickfield,SA-08,FA-101939
+A-278,Cobalt Pay Point,Riverside,SA-03,FA-101946
+A-279,Foxglove Pay Corner,Mill Lane,SA-09,FA-101953
+A-280,Lantern Pay Corner,Cedar Heights,SA-11,FA-101960
+A-281,Thistle Agency,Eastfield,SA-05,FA-101967
+A-282,Redwing Agency,Station Road,SA-07,FA-101974
+A-283,Redwing Mobile Agent,Hillcrest,SA-07,FA-101981
+A-284,Cobalt Cash Hub,Mill Lane,SA-09,FA-101988
+A-285,Driftwood Mobile Cash,Riverside,SA-01,FA-101995
+A-286,Harbour Cash Hub,Cedar Heights,SA-01,FA-102002
+A-287,Driftwood Cash Hub,Cedar Heights,SA-07,FA-102009
+A-288,Juniper Mobile Agent,Ferry Point,SA-04,FA-102016
+A-289,Saffron Cash Point,Mill Lane,SA-08,FA-102023
+A-290,Willow Express,Station Road,SA-03,FA-102030
+A-291,Hawthorn Till,Hillcrest,SA-05,FA-102037
+A-292,Juniper Cash Point,Station Road,SA-08,FA-102044
+A-293,Redwing Till,Riverside,SA-12,FA-102051
+A-294,Meadow Kiosk,Station Road,SA-01,FA-102058
+A-295,Kingfisher Till,Riverside,SA-06,FA-102065
+A-296,Larkspur Agency,Northgate,SA-03,FA-102072
+A-297,Larkspur Pay Point,Ferry Point,SA-03,FA-102079
+A-298,Pebble Pay Point,Old Market,SA-01,FA-102086
+A-299,Saffron Traders,Eastfield,SA-01,FA-102093
+A-300,Foxglove Money Point,Ferry Point,SA-09,FA-102100

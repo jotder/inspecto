@@ -1,0 +1,11 @@
+physicalRef: wallet_txn/database
+description: "Mobile financial services fraud Link Analysis showcase - One row per wallet transaction: cash_in (agent to wallet), cash_out (wallet to agent), p2p (wallet to wallet), merchant_pay (wallet to merchant) and settlement (a merchant's sweep to its bank account), with the amount, when, and the handset that approved it (blank for a cash-in, which the agent's till starts, and for a settlement). One file per month (WALLET_TXN_YYYYMM.csv); the next month is in data/staged. Landed by the wallet_txn Pipeline. Synthetic."
+eventDate: txn_at
+columns[7]{name,type,classification}:
+  txn_id,string,
+  from_id,string,
+  to_id,string,
+  type,string,
+  amount,number,
+  txn_at,timestamp,
+  device_id,string,

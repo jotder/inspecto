@@ -1,0 +1,36 @@
+name: kyc_person
+active: true
+description: "Crypto laundering Link Analysis showcase - One row per person the exchanges identified (KYC): invented name, birth year (blank for a few) and country. One extract (KYC_PERSON_20260930.csv); October's new people are in data/staged. Synthetic; regenerate with tools/gen-la-crypto-data.py."
+
+dirs:
+  poll:       data/inbox/kyc_person
+  database:   data/kyc_person/database
+  backup:     data/kyc_person/backup
+  temp:       data/kyc_person/temp
+  errors:     data/kyc_person/errors
+  quarantine: data/kyc_person/quarantine
+  markers:    data/kyc_person/markers
+  status_dir: data/kyc_person/status
+  log_dir:    data/kyc_person/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: kyc_person_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

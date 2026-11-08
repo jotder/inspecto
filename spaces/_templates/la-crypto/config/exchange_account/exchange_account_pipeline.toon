@@ -1,0 +1,36 @@
+name: exchange_account
+active: true
+description: "Crypto laundering Link Analysis showcase - One row per customer account at one of five invented exchanges: the KYC person who holds it, the deposit address the exchange gave it and when it was opened. One extract (EXCHANGE_ACCOUNT_20260930.csv); October's new accounts are in data/staged. Synthetic; regenerate with tools/gen-la-crypto-data.py."
+
+dirs:
+  poll:       data/inbox/exchange_account
+  database:   data/exchange_account/database
+  backup:     data/exchange_account/backup
+  temp:       data/exchange_account/temp
+  errors:     data/exchange_account/errors
+  quarantine: data/exchange_account/quarantine
+  markers:    data/exchange_account/markers
+  status_dir: data/exchange_account/status
+  log_dir:    data/exchange_account/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: exchange_account_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

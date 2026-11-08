@@ -1,0 +1,297 @@
+{
+  "seed": 20261112,
+  "landed": [
+    "2025-10-01",
+    "2026-09-30"
+  ],
+  "staged_month": "2026-10",
+  "limit": 500.0,
+  "finance_systems": [
+    "AP",
+    "PAYROLL",
+    "TREASURY"
+  ],
+  "personal_domains": [
+    "inboxly.example",
+    "mailnest.example",
+    "postmail.example"
+  ],
+  "counts": {
+    "employee": 3000,
+    "access_grant_landed": 12188,
+    "access_daily_landed": 105636,
+    "email_external_landed": 28690,
+    "expense_landed": 18097,
+    "vendor_change_landed": 569
+  },
+  "stories": {
+    "leaver_exfiltration": {
+      "view": "leaver_exfiltration",
+      "hub": "EMP-0031",
+      "entities": [
+        "EMP-0031",
+        "SYS-CRM",
+        "postmail.example"
+      ],
+      "lookalikes": [
+        "EMP-0386",
+        "SYS-CUSTARCH"
+      ]
+    },
+    "access_creep": {
+      "view": "access_creep",
+      "hub": "EMP-0007",
+      "entities": [
+        "EMP-0007",
+        "EMP-0482",
+        "EMP-0636",
+        "EMP-1059",
+        "EMP-1415",
+        "VEN-0264"
+      ],
+      "lookalikes": [
+        "EMP-0062",
+        "EMP-1802"
+      ]
+    },
+    "mutual_approvals": {
+      "view": "mutual_approvals",
+      "hub": "EMP-0022",
+      "entities": [
+        "EMP-0022",
+        "EMP-0040"
+      ],
+      "lookalikes": [
+        "EMP-1613"
+      ]
+    }
+  },
+  "leaver_exfiltration": {
+    "leaver": "EMP-0031",
+    "role": "Customer Account Specialist",
+    "notice_given_at": "2026-06-01",
+    "left_at": "2026-06-30",
+    "system": "CRM",
+    "daily_median": 43.0,
+    "peak_21d_avg": 861.3,
+    "peak_ratio": 20.0,
+    "spike_days": [
+      "2026-06-02",
+      "2026-06-03",
+      "2026-06-04",
+      "2026-06-05",
+      "2026-06-08",
+      "2026-06-09",
+      "2026-06-10",
+      "2026-06-11",
+      "2026-06-12",
+      "2026-06-15",
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-22"
+    ],
+    "domain": "postmail.example",
+    "after_notice_mb": 1228.8,
+    "mail_days": [
+      "2026-06-04",
+      "2026-06-05",
+      "2026-06-08",
+      "2026-06-09",
+      "2026-06-10",
+      "2026-06-11",
+      "2026-06-12",
+      "2026-06-15",
+      "2026-06-16"
+    ],
+    "lookalike_engineer": "EMP-0386",
+    "lookalike_role": "Data Migration Engineer",
+    "lookalike_system": "CUSTARCH",
+    "lookalike_ticket": "CHG-163782",
+    "lookalike_daily_median": 25.0,
+    "lookalike_peak_ratio": 22.1,
+    "lookalike_spike_days": [
+      "2026-04-06",
+      "2026-04-07",
+      "2026-04-08",
+      "2026-04-09",
+      "2026-04-10",
+      "2026-04-13",
+      "2026-04-14",
+      "2026-04-15",
+      "2026-04-16",
+      "2026-04-17",
+      "2026-04-20",
+      "2026-04-21",
+      "2026-04-22",
+      "2026-04-23",
+      "2026-04-24"
+    ]
+  },
+  "access_creep": {
+    "manager": "EMP-0007",
+    "manager_role": "Operations Manager",
+    "reports": [
+      "EMP-0482",
+      "EMP-0636",
+      "EMP-1059",
+      "EMP-1415"
+    ],
+    "report_roles": [
+      "Operations Analyst",
+      "Logistics Coordinator",
+      "Facilities Coordinator",
+      "Operations Analyst"
+    ],
+    "systems": [
+      "PAYROLL",
+      "TREASURY"
+    ],
+    "grants": [
+      [
+        "EMP-0482",
+        "PAYROLL",
+        "2026-01-12 10:43:31"
+      ],
+      [
+        "EMP-0482",
+        "TREASURY",
+        "2026-01-14 15:06:23"
+      ],
+      [
+        "EMP-0636",
+        "PAYROLL",
+        "2026-01-21 15:51:44"
+      ],
+      [
+        "EMP-0636",
+        "TREASURY",
+        "2026-01-23 12:00:39"
+      ],
+      [
+        "EMP-1059",
+        "PAYROLL",
+        "2026-01-30 08:54:10"
+      ],
+      [
+        "EMP-1059",
+        "TREASURY",
+        "2026-02-02 09:02:23"
+      ],
+      [
+        "EMP-1415",
+        "PAYROLL",
+        "2026-02-09 08:01:02"
+      ],
+      [
+        "EMP-1415",
+        "TREASURY",
+        "2026-02-10 15:49:30"
+      ]
+    ],
+    "vendor_editor": "EMP-0482",
+    "vendor": "VEN-0264",
+    "vendor_changed_at": "2026-05-14 10:42:17",
+    "lookalike_employee": "EMP-0062",
+    "lookalike_role": "Payroll Officer",
+    "lookalike_role_since": "2026-03-02",
+    "lookalike_manager": "EMP-1802",
+    "lookalike_ticket": "REQ-163776"
+  },
+  "mutual_approvals": {
+    "a": "EMP-0022",
+    "b": "EMP-0040",
+    "a_manager": "EMP-1526",
+    "b_manager": "EMP-2140",
+    "a_approved_b": 21,
+    "b_approved_a": 19,
+    "weekend": 32,
+    "expenses": [
+      "EXP-000929",
+      "EXP-001117",
+      "EXP-001371",
+      "EXP-001789",
+      "EXP-001790",
+      "EXP-001832",
+      "EXP-002402",
+      "EXP-002780",
+      "EXP-003113",
+      "EXP-003118",
+      "EXP-003427",
+      "EXP-003428",
+      "EXP-003769",
+      "EXP-004132",
+      "EXP-004139",
+      "EXP-004487",
+      "EXP-004850",
+      "EXP-005867",
+      "EXP-006549",
+      "EXP-006551",
+      "EXP-006896",
+      "EXP-007585",
+      "EXP-007586",
+      "EXP-008072",
+      "EXP-008469",
+      "EXP-008952",
+      "EXP-008953",
+      "EXP-009323",
+      "EXP-010969",
+      "EXP-010971",
+      "EXP-011349",
+      "EXP-012007",
+      "EXP-012509",
+      "EXP-012733",
+      "EXP-013087",
+      "EXP-013804",
+      "EXP-014143",
+      "EXP-014474",
+      "EXP-015946",
+      "EXP-016328"
+    ],
+    "lookalike_team_lead": "EMP-1613",
+    "lookalike_team": [
+      "EMP-0054",
+      "EMP-0167",
+      "EMP-0225",
+      "EMP-0633",
+      "EMP-0704",
+      "EMP-0759",
+      "EMP-1033",
+      "EMP-1257",
+      "EMP-1310",
+      "EMP-1479",
+      "EMP-1749",
+      "EMP-1830",
+      "EMP-1873",
+      "EMP-2024",
+      "EMP-2060",
+      "EMP-2210",
+      "EMP-2343",
+      "EMP-2475",
+      "EMP-2530",
+      "EMP-2583"
+    ],
+    "lookalike_heavy_reports": [
+      "EMP-0054",
+      "EMP-0167",
+      "EMP-0225",
+      "EMP-0633",
+      "EMP-0704",
+      "EMP-0759",
+      "EMP-1033",
+      "EMP-1257",
+      "EMP-1479",
+      "EMP-1749",
+      "EMP-1830",
+      "EMP-1873",
+      "EMP-2024",
+      "EMP-2060",
+      "EMP-2210",
+      "EMP-2343",
+      "EMP-2475",
+      "EMP-2530",
+      "EMP-2583"
+    ]
+  }
+}

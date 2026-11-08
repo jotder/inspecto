@@ -1,0 +1,23 @@
+name: mixer_hop_timing_match
+description: "Mixer hop matched by timing and amount - every address that paid into the mixer linked to the addresses the mixer paid within 6 hours after, 90-100 % of the input (via on mixer_exit: matched, minutes, ratio), and where a matched exit was deposited. Most mixer users have no exit near their input; a few have a near miss. One address's three lots each came out within 2 hours at 98-99 % and went to one exchange account."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: crypto_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","mixer_hop"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate
