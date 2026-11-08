@@ -1,0 +1,9 @@
+physicalRef: health_phantom_counts
+description: "Provider billing fraud Link Analysis showcase - one row of counts built by the health_phantom_counts Job from the treated links: lines_in_admission and lines_after_death (open claim lines dated inside the member's stay at another hospital, or after the member's death), lines_in_admission_or_after_death (both), members_billed, providers_billing and corrected_lines (such lines that were reversed, never counted). Read by the Alert Rule health_billed_in_admission_or_after_death. Names no member or provider. Synthetic."
+columns[6]{name,type,classification}:
+  lines_in_admission,number,
+  lines_after_death,number,
+  lines_in_admission_or_after_death,number,
+  members_billed,number,
+  providers_billing,number,
+  corrected_lines,number,

@@ -127,3 +127,22 @@ are `tools/gen-la-mfs-data.test.mjs` and `MfsLinksJobGoldenTest`.
 - [ ] No look-alike links to its story: `S-72`; `A-131`; `MR-214`.
 - [ ] Each saved view holds its story whole, with its look-alike beside it but apart, and draws without "Result cut
       short". The largest view, `mfs_split_deposits`, is about 610 rows and 370 nodes. October adds no story activity.
+
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-drained-after-a-sim-swap-alert-rule-and-the-seed)),
+after `node tools/seed-la-mfs.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`mfs.analyst` (lead):** **Alerts** lists `mfs_wallet_drained_after_sim_swap` (WARNING) with the value 30: wallets
+   that paid out 300 or more within 2 hours of a SIM swap. Open the Investigation `sim-swap-takeover`: it is seeded with
+   `S-41` and expanded once to the wallets it swapped (the 30 victims of exercise 1 and its ten ordinary swaps). The
+   Entity List `mule-wallets` holds the five mules. The Case "SIM-swap wallet takeover through S-41" is linked to it.
+2. **Four-eyes:** an unbounded expand by `mfs.analyst` is held, not run. Sign in as **`mfs.manager`**: it is in the
+   approval inbox; approve or refuse it. `mfs.analyst` cannot approve its own request.
+3. **`mfs.reviewer`:** opens `sim-swap-takeover` and reads every step; any change is refused.
+4. **`mfs.outsider`:** sees the Datasets, but `sim-swap-takeover` is not found (404).
+5. **Draft:** `mfs.analyst` has one open Draft that annotates `S-41` about the mule wallets; promote it, or leave it.
+
+**Not the story:** the store login `S-72` swapped 160 SIMs, more than `S-41`, but its customers kept their balances
+(nobody paid out more than 100 within 2 hours), so the rule never counts them; without the 30 takeover wallets it would
+not fire at all.
