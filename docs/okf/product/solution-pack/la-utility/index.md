@@ -20,11 +20,11 @@ tags: [product-item, solution-pack]
 | architecture | missing | |
 | features | missing | |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
+| user-guide | current | [Link Analysis utility showcase — user guide](user-guide.md) |
+| admin-guide | current | [Link Analysis utility showcase — install](admin-guide-install.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | missing | |
+| brochure | current | [Link Analysis utility showcase — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

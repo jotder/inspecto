@@ -1,0 +1,36 @@
+name: repair_invoice
+active: true
+description: "Insurance-claims Link Analysis showcase - One row per part a parts supplier invoiced on a claim's repair, with the garage and whether the garage fitted it (fitted Y or N); the parts-supplier ring story reads it. One extract (REPAIR_INVOICE_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+
+dirs:
+  poll:       data/inbox/repair_invoice
+  database:   data/repair_invoice/database
+  backup:     data/repair_invoice/backup
+  temp:       data/repair_invoice/temp
+  errors:     data/repair_invoice/errors
+  quarantine: data/repair_invoice/quarantine
+  markers:    data/repair_invoice/markers
+  status_dir: data/repair_invoice/status
+  log_dir:    data/repair_invoice/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: repair_invoice_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

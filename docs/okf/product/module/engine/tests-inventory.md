@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-378 test class(es): 378 unit, 0 real-HTTP control-plane, 0 IT.
+380 test class(es): 380 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -166,6 +166,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ApprovalFingerprintTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ApprovalFingerprintTest.java` | The shared approval mechanism: every fail-closed branch of {@link ApprovalFingerprint}. |
 | `ApprovalGoldenVectorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ApprovalGoldenVectorTest.java` | GOLDEN VECTORS: fingerprints of fixed inputs, recorded from the code as it stood BEFORE |
 | `AttachApprovalsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/AttachApprovalsTest.java` | ASSURE-XLSX-ATTACHMENTS-1 round 5: what the attachment fingerprint hashes. |
+| `CardLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/CardLinksJobGoldenTest.java` | The {@code la-card} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped |
 | `ConfigOnlyParametersTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConfigOnlyParametersTest.java` | "Run with parameters" offers only the parameters a Run honours. A Job that reads a key from its SAVED config |
 | `ConsignmentProcessJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTckTest.java` | {@link ConsignmentProcessJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `ConsignmentProcessJobTypeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTest.java` | §14.4 step 3 — the adapter. Proves the "author doesn't think about it" promise from the <em>processor's</em> |
@@ -198,7 +199,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobTypeCatalogTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTypeCatalogTest.java` | Proves the type catalog (§4.3, S1) catches a Job Type emitting a signal type it never declared — |
 | `JobTypeRequiresTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTypeRequiresTest.java` | The S1-2 declaration contract: a Job Type's {@code requires:} list resolves fail-closed at |
 | `KpiCompletenessJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/KpiCompletenessJobTest.java` | The {@code kpi.completeness} Job Type (completeness KPI K1/K4): refuse first, read second, and carry |
-| `LaClaimsLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaClaimsLinksJobTest.java` | The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the six Pipelines |
+| `LaClaimsLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaClaimsLinksJobTest.java` | The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the seven Pipelines |
 | `LaIndexBuildJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaIndexBuildJobTest.java` | la.index.build (LA-DAILY-INGEST-1, T5): a clock over a build the Link Analysis side decides - fails closed, |
 | `LaPoliceLinksJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/LaPoliceLinksJobTest.java` | The {@code la-police} Space Template RUN end to end from a verbatim copy: the eleven Pipelines ingest the shipped extracts |
 | `MailSendJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MailSendJobTest.java` | The {@code mail.send} reference Job (job-parameter-contract §9, step 15). |
@@ -224,6 +225,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PostgresPublishJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PostgresPublishJobTypeTckTest.java` | {@link PostgresPublishJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `PostgresPublishPgTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PostgresPublishPgTest.java` | ASSURE-BI-PUBLICATION-1 against a REAL Postgres: full refresh (with column comments read back from |
 | `ProcessorCatalogTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ProcessorCatalogTest.java` | {@code PROCESSOR-CATALOG-ROUTE-1} — {@link JobService#processorCatalog(int)}, the vocabulary behind |
+| `ProcurementLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ProcurementLinksJobGoldenTest.java` | The {@code la-procurement} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the |
 | `PublishTlsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PublishTlsTest.java` | ASSURE-BI-PUBLICATION-1 TLS fix: {@link PublishPinnedSocketFactory} dials the checked address whatever host the |
 | `RecipeExecutionParityTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RecipeExecutionParityTest.java` | The Phase-3 parity gate (S4), execution half — deferred 2026-08-06 ("lands with S3's executor |
 | `ReferenceCompactorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReferenceCompactorTest.java` | Reference Phase-2 P3 verify: {@link ReferenceCompactor} collapses an append-only versioned Reference |

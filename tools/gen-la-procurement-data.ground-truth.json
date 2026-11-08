@@ -1,0 +1,267 @@
+{
+ "bid_rotation": {
+  "firms": [
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561"
+  ],
+  "lookalike_firms": [
+   "CO-0021",
+   "CO-0055",
+   "CO-0090"
+  ],
+  "lookalike_unit": "Highways South",
+  "lookalike_win_share": 0.744,
+  "shared_by": [
+   "CO-0242",
+   "CO-0561"
+  ],
+  "shared_director": "P-00001",
+  "tenders_in_order": [
+   "T-00008",
+   "T-00104",
+   "T-00109",
+   "T-00206",
+   "T-00217",
+   "T-00309",
+   "T-00350",
+   "T-00410",
+   "T-00430",
+   "T-00513",
+   "T-00567",
+   "T-00616",
+   "T-00636",
+   "T-00716",
+   "T-00731",
+   "T-00818",
+   "T-00840",
+   "T-00913",
+   "T-00932",
+   "T-01022",
+   "T-01051",
+   "T-01122",
+   "T-01145",
+   "T-01210"
+  ],
+  "unit": "Highways North",
+  "winners_in_order": [
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561",
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561",
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561",
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561",
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561",
+   "CO-0117",
+   "CO-0242",
+   "CO-0388",
+   "CO-0561"
+  ]
+ },
+ "conflict_of_interest": {
+  "changes": 9,
+  "director": "P-00003",
+  "firm": "CO-0426",
+  "home": "AD-00002",
+  "lookalike_changes": 34,
+  "lookalike_official": "P-00008",
+  "lookalike_unit": "Facilities",
+  "official": "P-00002",
+  "official_unit": "Parks",
+  "tenders": [
+   "T-00062",
+   "T-00119",
+   "T-00185",
+   "T-00234",
+   "T-00495",
+   "T-00539"
+  ]
+ },
+ "counts": {
+  "bid_landed": 6001,
+  "company": 900,
+  "contract_change": 834,
+  "director": 1445,
+  "official": 300,
+  "person": 2000,
+  "tender_landed": 1228
+ },
+ "cover_bids": {
+  "cover_bids": 27,
+  "covers": [
+   "CO-0153",
+   "CO-0309",
+   "CO-0702"
+  ],
+  "from_winner_ip": 16,
+  "kiosk_firms": [
+   "CO-0065",
+   "CO-0099",
+   "CO-0177",
+   "CO-0359",
+   "CO-0410",
+   "CO-0503",
+   "CO-0569",
+   "CO-0689",
+   "CO-0715",
+   "CO-0762",
+   "CO-0788",
+   "CO-0832",
+   "CO-0837",
+   "CO-0856"
+  ],
+  "kiosk_ip": "198.51.100.20",
+  "tenders": [
+   "T-00017",
+   "T-00230",
+   "T-00297",
+   "T-00394",
+   "T-00404",
+   "T-00457",
+   "T-00505",
+   "T-00845",
+   "T-01039",
+   "T-01037"
+  ],
+  "winner": "CO-0074",
+  "winner_author": "y.fenwick",
+  "winner_ip": "100.64.73.61",
+  "with_winner_author": 20
+ },
+ "phoenix_firm": {
+  "awarded_at": "2026-04-08",
+  "background_debarred": [
+   "CO-0011",
+   "CO-0028",
+   "CO-0029",
+   "CO-0031",
+   "CO-0033",
+   "CO-0050",
+   "CO-0081",
+   "CO-0172"
+  ],
+  "debarred_at": "2026-01-15",
+  "directors": [
+   "P-00004",
+   "P-00005"
+  ],
+  "incorporated_at": "2026-02-02",
+  "lookalike_director": "P-00007",
+  "lookalike_new_home": "CO-0233",
+  "lookalike_old": "CO-0640",
+  "new": "CO-0899",
+  "new_director": "P-00006",
+  "old": "CO-0815",
+  "won": "T-00519"
+ },
+ "seed": 20261108,
+ "stories": {
+  "bid_rotation": {
+   "entities": [
+    "CO-0117",
+    "CO-0242",
+    "CO-0388",
+    "CO-0561",
+    "P-00001",
+    "T-00008",
+    "T-00104",
+    "T-00109",
+    "T-00206",
+    "T-00217",
+    "T-00309",
+    "T-00350",
+    "T-00410",
+    "T-00430",
+    "T-00513",
+    "T-00567",
+    "T-00616",
+    "T-00636",
+    "T-00716",
+    "T-00731",
+    "T-00818",
+    "T-00840",
+    "T-00913",
+    "T-00932",
+    "T-01022",
+    "T-01051",
+    "T-01122",
+    "T-01145",
+    "T-01210"
+   ],
+   "hub": "CO-0117",
+   "lookalikes": [
+    "CO-0021",
+    "CO-0055",
+    "CO-0090"
+   ],
+   "view": "procurement_bid_rotation"
+  },
+  "conflict_of_interest": {
+   "entities": [
+    "AD-00002",
+    "CO-0426",
+    "P-00002",
+    "P-00003"
+   ],
+   "hub": "CO-0426",
+   "lookalikes": [
+    "P-00008"
+   ],
+   "view": "procurement_change_approvals"
+  },
+  "cover_bids": {
+   "entities": [
+    "100.64.73.61",
+    "CO-0074",
+    "CO-0153",
+    "CO-0309",
+    "CO-0702",
+    "y.fenwick"
+   ],
+   "hub": "100.64.73.61",
+   "lookalikes": [
+    "198.51.100.20"
+   ],
+   "view": "procurement_cover_bids"
+  },
+  "phoenix_firm": {
+   "entities": [
+    "CO-0815",
+    "CO-0899",
+    "P-00004",
+    "P-00005",
+    "T-00519"
+   ],
+   "hub": "CO-0899",
+   "lookalikes": [
+    "CO-0233",
+    "P-00007"
+   ],
+   "view": "procurement_debarred_directors"
+  }
+ },
+ "window": {
+  "landed": [
+   "2025-10-01",
+   "2026-09-30"
+  ],
+  "staged": [
+   "2026-10-01",
+   "2026-10-31"
+  ]
+ }
+}

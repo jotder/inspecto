@@ -1,0 +1,10 @@
+job:
+  name: procurement_debarment_links
+  type: sql.template
+  description: "Derived from procurement_links each time it is produced: where the directors of debarred firms went. Every directorship (directed_by, via = the dates and any debarment day) of every person who ever directed a debarred company, and the tenders the companies they direct have won (won). Read by the saved view procurement_debarred_directors."
+  sql: "WITH db AS (SELECT * FROM procurement_links WHERE kind = 'directed_by'), ppl AS (SELECT DISTINCT dst AS p FROM db WHERE via LIKE '%company_debarred:%'), dbx AS (SELECT * FROM db WHERE dst IN (SELECT p FROM ppl)), w AS (SELECT * FROM procurement_links WHERE kind = 'won' AND src IN (SELECT src FROM dbx)), links AS (SELECT * FROM dbx UNION ALL SELECT * FROM w) SELECT src, dst, kind, ts, amount, event_date, via, market FROM links ORDER BY kind, src, dst"
+  sources: procurement_links
+  sink_dataset: procurement_debarment_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == procurement_links"
+  enabled: true

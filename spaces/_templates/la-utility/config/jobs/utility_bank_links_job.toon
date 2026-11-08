@@ -1,0 +1,10 @@
+job:
+  name: utility_bank_links
+  type: sql.template
+  description: "Derived from utility_links each time it is produced: who pays for which premise, narrowed to what a churn review needs. The account_at and paid_from links of every account that pays from a bank account shared by three or more accounts, and of every account at a premise that has had two or more accounts (a change of holder). Read by the saved view utility_churn_by_bank, so the view stays inside one canvas (1 000 nodes) where every account at every premise would not."
+  sql: "WITH l AS (SELECT * FROM utility_links), shared AS (SELECT dst AS b FROM l WHERE kind = 'paid_from' GROUP BY dst HAVING count(*) >= 3), moved AS (SELECT dst AS p FROM l WHERE kind = 'account_at' GROUP BY dst HAVING count(*) >= 2), acc AS (SELECT src AS a FROM l WHERE kind = 'paid_from' AND dst IN (SELECT b FROM shared) UNION SELECT src FROM l WHERE kind = 'account_at' AND dst IN (SELECT p FROM moved)) SELECT src, dst, kind, ts, amount, kwh, event_date, via FROM l WHERE kind IN ('account_at', 'paid_from') AND src IN (SELECT a FROM acc) ORDER BY kind, src, dst"
+  sources: utility_links
+  sink_dataset: utility_bank_links
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == utility_links"
+  enabled: true

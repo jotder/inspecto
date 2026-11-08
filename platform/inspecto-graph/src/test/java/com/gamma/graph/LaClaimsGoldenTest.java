@@ -25,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The {@code la-claims} Space Template's seven planted stories (docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md, 2.C), over the SHIPPED
+ * The {@code la-claims} Space Template's planted stories: seven from docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md, 2.C,
+ * plus the parts-supplier ring and the ghost broker (docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 2), over the SHIPPED
  * corpus ({@code spaces/_templates/la-claims/data/inbox}, read in place) folded to the same link graph the {@code claims_links} Job
  * builds (the per-kind row counts below equal those {@code LaClaimsLinksJobTest} pins over the real Pipelines and SQL). Every figure is
  * a promise a presenter may make; a regeneration that breaks one fails here.
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LaClaimsGoldenTest {
 
     static final String GAR = "GAR-03", CLI = "CLI-04", LAW = "LAW-02", GP = "CLI-01", BROKER = "BRK-05";
+    static final String RING_SUPPLIER = "SUP-07", BIG_SUPPLIER = "SUP-01", GHOST_BROKER = "BRK-07";
     static final double JUNCTION_LAT = 52.9225 + 0.031, JUNCTION_LON = -1.4746 - 0.047;
 
     static ClaimsCorpus c;
@@ -87,11 +89,12 @@ class LaClaimsGoldenTest {
     @Test
     void theCorpusIsTheDocumentedSizeAndTheLinkKindsFoldToTheirPinnedRows() {
         assertEquals(520, c.claims.size(), "claims");
-        assertEquals(380, c.policies.size(), "policies, one per claimant");
+        assertEquals(405, c.policies.size(), "policies: one per claimant, and the ghost broker's 25");
+        assertEquals(1056, c.invoices.size(), "repair invoice lines");
         assertEquals(25, c.claims.values().stream().flatMap(x -> java.util.stream.Stream.of(x.garage(), x.clinic(), x.lawyer()))
                 .filter(s -> !s.isEmpty()).distinct().count(), "the 25 providers are all used");
         assertEquals(Map.of("claimed_with", 678, "same_accident", 291, "serviced_by", 1298, "represented_by", 241, "referred_to", 22,
-                "shares_phone", 20, "shares_address", 24), c.perKind(), "link rows per kind (= LaClaimsLinksJobTest)");
+                "shares_phone", 20, "shares_address", 24, "supplied_parts", 34, "paid_by", 29), c.perKind(), "link rows per kind (= LaClaimsLinksJobTest)");
     }
 
     @Test
@@ -245,5 +248,97 @@ class LaClaimsGoldenTest {
         assertEquals(GP, top(GraphAlgorithms.triangleCount(g), 1).get(0));
         long placeholders = c.parties.stream().filter(p -> !ClaimsCorpus.usablePhone(p.phone())).map(Party::id).distinct().count();
         assertTrue(placeholders >= 14, "blank and placeholder phones exist in the data (" + placeholders + ") yet make no link (20 shares_phone rows in all)");
+    }
+
+    private static Set<String> garages() {
+        return c.claims.values().stream().map(Claim::garage).filter(x -> !x.isEmpty()).collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    private static Set<String> kindsOf(String node) {
+        return c.links.stream().filter(l -> l.src().equals(node) || l.dst().equals(node)).map(ClaimsCorpus.Link::kind).collect(Collectors.toSet());
+    }
+
+    /** "12 Quarry Road, Derby" to "quarry road, derby": the street and city, without the house number. */
+    private static String street(String address) {
+        return address.trim().toLowerCase().replaceFirst("^[0-9]+ +", "");
+    }
+
+    @Test
+    void story8OnePartsSupplierInvoicesThirtyClaimsAcrossAllNineGaragesAndNoneOfItsPartsIsFitted() {
+        Map<String, Set<String>> unfittedClaims = new TreeMap<>();
+        for (var i : c.invoices) if (!i.fitted()) unfittedClaims.computeIfAbsent(i.supplier(), k -> new TreeSet<>()).add(i.claim());
+        var heavy = unfittedClaims.entrySet().stream().filter(e -> e.getValue().size() >= 10).toList();
+        assertEquals(1, heavy.size(), "exactly one supplier has parts not fitted on ten or more claims: " + unfittedClaims);
+        assertEquals(RING_SUPPLIER, heavy.get(0).getKey());
+        assertEquals(30, heavy.get(0).getValue().size(), "thirty claims");
+        assertTrue(c.invoices.stream().filter(i -> i.supplier().equals(RING_SUPPLIER)).noneMatch(ClaimsCorpus.Invoice::fitted), "not one of its parts is fitted");
+        assertTrue(unfittedClaims.entrySet().stream().filter(e -> !e.getKey().equals(RING_SUPPLIER)).mapToInt(e -> e.getValue().size()).sum() <= 3,
+                "elsewhere a part goes unfitted only now and then (a return)");
+        assertEquals(9, garages().size());
+        assertEquals(garages(), c.neighbours(RING_SUPPLIER, "supplied_parts"), "hop 1 by supplied_parts reaches all nine garages");
+        assertEquals(Set.of("supplied_parts"), kindsOf(RING_SUPPLIER), "the supplier holds no link of another kind");
+        assertTrue(heavy.get(0).getValue().stream().noneMatch(ringClaims::contains), "a separate story: none of its claims is a staged-accident ring claim");
+    }
+
+    @Test
+    void story8LookAlikeTheLargeSupplierReachesEveryGarageTooButEveryPartItSellsIsFitted() {
+        assertEquals(garages(), c.neighbours(BIG_SUPPLIER, "supplied_parts"), "the look-alike also reaches all nine garages");
+        assertTrue(c.invoices.stream().filter(i -> i.supplier().equals(BIG_SUPPLIER)).allMatch(ClaimsCorpus.Invoice::fitted), "every part fitted");
+        long big = c.invoices.stream().filter(i -> i.supplier().equals(BIG_SUPPLIER)).map(ClaimsCorpus.Invoice::claim).distinct().count();
+        long ringSup = c.invoices.stream().filter(i -> i.supplier().equals(RING_SUPPLIER)).map(ClaimsCorpus.Invoice::claim).distinct().count();
+        assertTrue(big > 5 * ringSup, "the look-alike is far busier (" + big + " claims against " + ringSup + "): reach alone is not guilt");
+        assertEquals(Set.of(BIG_SUPPLIER, RING_SUPPLIER), c.links.stream().filter(l -> l.kind().equals("supplied_parts")).map(ClaimsCorpus.Link::src)
+                .filter(s -> c.neighbours(s, "supplied_parts").size() == garages().size()).collect(Collectors.toSet()), "exactly two suppliers reach every garage");
+        assertEquals(Set.of("supplied_parts"), kindsOf(BIG_SUPPLIER), "the look-alike holds no link of another kind, so none to the ring supplier");
+    }
+
+    @Test
+    void story9TwentyFivePoliciesThroughOneBrokerAtAddressesFoundNowhereElseArePaidFromTwoBankAccounts() {
+        List<ClaimsCorpus.Policy> ghost = c.policies.values().stream().filter(p -> p.broker().equals(GHOST_BROKER)).toList();
+        assertEquals(25, ghost.size(), "twenty-five policies");
+        Set<String> holders = ghost.stream().map(ClaimsCorpus.Policy::holder).collect(Collectors.toCollection(TreeSet::new));
+        assertEquals(25, holders.size());
+        assertTrue(c.parties.stream().noneMatch(p -> holders.contains(p.id())), "no ghost policyholder is on any claim");
+        List<String> accounts = ghost.stream().map(ClaimsCorpus.Policy::payer).distinct().sorted().toList();
+        assertEquals(2, accounts.size(), "all premiums from two bank accounts: " + accounts);
+        Set<String> realStreets = new TreeSet<>();
+        for (Party p : c.parties) if (ClaimsCorpus.usableAddress(p.address())) realStreets.add(street(p.address()));
+        for (var p : c.policies.values())
+            if (!p.broker().equals(GHOST_BROKER) && ClaimsCorpus.usableAddress(p.address())) realStreets.add(street(p.address()));
+        assertTrue(ghost.stream().noneMatch(p -> realStreets.contains(street(p.address()))), "every ghost address is on a street found on no other record");
+        assertTrue(ghost.stream().allMatch(p -> p.premium() < 380), "the false details buy premiums below every genuine policy's");
+        assertTrue(c.policies.values().stream().filter(p -> !p.broker().equals(GHOST_BROKER)).allMatch(p -> p.premium() >= 380));
+
+        for (String a : accounts) {
+            Set<String> payers = c.neighbours(a, "paid_by");
+            assertTrue(payers.size() >= 12 && holders.containsAll(payers), a + " pays a dozen ghost policyholders: " + payers);
+        }
+        assertEquals(holders, union(c.neighbours(accounts.get(0), "paid_by"), c.neighbours(accounts.get(1), "paid_by")), "the two accounts pay all 25");
+        for (String h : holders) assertEquals(Set.of("paid_by"), kindsOf(h), h + ": a ghost policyholder's only link is its premium payment");
+    }
+
+    @Test
+    void story9LookAlikeTheFamilyPaysItsFourPoliciesFromOneAccountAtItsRealAddress() {
+        Map<String, Long> shared = c.policies.values().stream().filter(p -> !p.payer().isBlank())
+                .collect(Collectors.groupingBy(ClaimsCorpus.Policy::payer, TreeMap::new, Collectors.counting()));
+        shared.values().removeIf(n -> n < 2);
+        assertEquals(3, shared.size(), "three accounts pay more than one policy, the two ghost accounts and the family's: " + shared);
+        Map<String, Set<String>> byPhone = new TreeMap<>();
+        for (Party p : c.parties)
+            if (ClaimsCorpus.usablePhone(p.phone())) byPhone.computeIfAbsent(ClaimsCorpus.digits(p.phone()), k -> new TreeSet<>()).add(p.id());
+        Set<String> family = byPhone.values().stream().filter(s -> s.size() == 4 && s.stream().noneMatch(ring::contains)).findFirst().orElseThrow();
+        String familyAccount = shared.entrySet().stream().filter(e -> e.getValue() == 4).map(Map.Entry::getKey).findFirst().orElseThrow();
+        assertEquals(family, c.neighbours(familyAccount, "paid_by"), "the four-policy account pays exactly the family (story 7's)");
+        Set<String> homes = c.policies.values().stream().filter(p -> family.contains(p.holder())).map(ClaimsCorpus.Policy::address).collect(Collectors.toSet());
+        assertEquals(1, homes.size(), "one address");
+        String home = homes.iterator().next();
+        assertTrue(c.parties.stream().anyMatch(p -> p.address().equals(home)), "a real address: the one the family gave on its claims");
+        assertTrue(c.policies.values().stream().filter(p -> family.contains(p.holder())).noneMatch(p -> p.broker().equals(GHOST_BROKER)),
+                "not sold through the ghost broker");
+        Set<String> ghostAccounts = c.policies.values().stream().filter(p -> p.broker().equals(GHOST_BROKER)).map(ClaimsCorpus.Policy::payer)
+                .collect(Collectors.toSet());
+        assertFalse(ghostAccounts.contains(familyAccount));
+        assertTrue(family.stream().noneMatch(h -> ghostAccounts.stream().anyMatch(a -> c.neighbours(a, "paid_by").contains(h))),
+                "the family is not linked to a ghost account");
     }
 }

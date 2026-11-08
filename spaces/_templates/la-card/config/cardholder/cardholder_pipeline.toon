@@ -1,0 +1,36 @@
+name: cardholder
+active: true
+description: "Card and e-commerce fraud Link Analysis showcase - One row per cardholder: invented name (a few people appear twice, spelt differently), e-mail, phone and home address. One extract (CARDHOLDER_20260930.csv). Synthetic; regenerate with tools/gen-la-card-data.py."
+
+dirs:
+  poll:       data/inbox/cardholder
+  database:   data/cardholder/database
+  backup:     data/cardholder/backup
+  temp:       data/cardholder/temp
+  errors:     data/cardholder/errors
+  quarantine: data/cardholder/quarantine
+  markers:    data/cardholder/markers
+  status_dir: data/cardholder/status
+  log_dir:    data/cardholder/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: cardholder_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

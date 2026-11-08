@@ -1,0 +1,12 @@
+physicalRef: utility_bank_links
+description: "Electricity revenue-protection Link Analysis showcase - the account_at and paid_from links of accounts on a bank account shared by three or more accounts, or at a premise that changed account holder. Built by the utility_bank_links Job from utility_links; read by the saved view utility_churn_by_bank. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  kwh,number,
+  event_date,date,
+  via,string,

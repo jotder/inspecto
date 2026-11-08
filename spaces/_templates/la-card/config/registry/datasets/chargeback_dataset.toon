@@ -1,0 +1,8 @@
+physicalRef: chargeback/database
+description: "Card and e-commerce fraud Link Analysis showcase - One row per chargeback: the authorisation disputed, the reason and the day it was filed. One landed extract; the next month is in data/staged. Landed by the chargeback Pipeline. Synthetic."
+eventDate: filed_at
+columns[4]{name,type,classification}:
+  chargeback_id,string,
+  auth_id,string,
+  reason,string,
+  filed_at,date,

@@ -1,0 +1,20 @@
+raw:
+  name: PERSON
+  format: CSV
+  fields[3]{name,selector,type}:
+    person_id,"0",VARCHAR
+    name,"1",VARCHAR
+    address_id,"2",VARCHAR
+mapping:
+  canonicalName: person
+  rawName: PERSON
+  fields[3]:
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: address_id
+      from: address_id
+      fn: keep

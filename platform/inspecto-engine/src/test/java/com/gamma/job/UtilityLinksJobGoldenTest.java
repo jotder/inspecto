@@ -70,7 +70,8 @@ class UtilityLinksJobGoldenTest {
         }
         data = space.resolve("data");
         List<JobConfig> jobs = List.of(JobConfig.load(space.resolve("config/jobs/utility_links_job.toon").toString()),
-                JobConfig.load(space.resolve("config/jobs/transformer_loss_job.toon").toString()));
+                JobConfig.load(space.resolve("config/jobs/transformer_loss_job.toon").toString()),
+                JobConfig.load(space.resolve("config/jobs/utility_bank_links_job.toon").toString()));
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
         // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
         for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
@@ -173,6 +174,45 @@ class UtilityLinksJobGoldenTest {
         }
         assertEquals(0, count("SELECT count(*) FROM " + t + " WHERE transformer_id NOT IN ('TX-007', 'TX-019') AND loss_band <> 'loss normal'"),
                 "every other metered transformer stays normal every month");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void everySavedViewFitsOneCanvasAndShowsItsStories() throws Exception {
+        // a saved view draws its whole (filtered) Dataset; past the canvas's projection_node_cap (1 000 nodes) or the explorer's
+        // default read (traversal.rows_default, 4 000 rows) it is cut short and a story may not be on screen
+        Map<String, List<String>> stories = Map.of("utility_contractor_network", List.of("meter_tampering", "illegal_reconnection"),
+                "utility_churn_by_bank", List.of("account_churn", "commercial_load"), "utility_vendor_network", List.of("prepaid_token_fraud"));
+        Path dir = TEMPLATE.resolve("config/registry/link-analysis-views");
+        try (Stream<Path> w = Files.list(dir)) {
+            assertEquals(stories.keySet(), w.map(p -> p.getFileName().toString().replace(".toon", "")).collect(java.util.stream.Collectors.toSet()));
+        }
+        for (Map.Entry<String, List<String>> v : stories.entrySet()) {
+            Map<String, Object> query = (Map<String, Object>) ToonHelper.load(dir.resolve(v.getKey() + ".toon").toString()).get("query");
+            String datasetId = (String) ((Map<String, Object>) query.get("projection")).get("datasetId");
+            String sink = (String) ToonHelper.load(TEMPLATE.resolve("config/registry/datasets/" + datasetId + ".toon").toString()).get("physicalRef");
+            Set<String> kinds = new TreeSet<>();
+            Map<String, Object> filter = (Map<String, Object>) query.get("filter");
+            if (filter != null)
+                for (Map<String, Object> c : (List<Map<String, Object>>) filter.get("items")) {
+                    assertEquals("kind", c.get("field"), v.getKey() + ": views filter by link kind only");
+                    kinds.add(String.valueOf(c.get("value")));
+                }
+            Set<String> nodes = new TreeSet<>();
+            long rows = 0;
+            for (Map<String, Object> r : rows("SELECT src, dst, kind FROM " + parquet(sink))) {
+                if (!kinds.isEmpty() && !kinds.contains((String) r.get("kind"))) continue;
+                rows++;
+                nodes.add((String) r.get("src"));
+                nodes.add((String) r.get("dst"));
+            }
+            assertTrue(rows < 4_000, v.getKey() + " fits one read: " + rows);
+            assertTrue(nodes.size() < 1_000, v.getKey() + " fits the canvas: " + nodes.size());
+            for (String s : v.getValue())
+                for (String e : ids(truth.get("stories").get(s).get("entities")))
+                    if (!(e.startsWith("TX-") && v.getKey().equals("utility_contractor_network")))   // transformers are in the loss Dataset
+                        assertTrue(nodes.contains(e), v.getKey() + " shows " + s + " entity " + e);
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

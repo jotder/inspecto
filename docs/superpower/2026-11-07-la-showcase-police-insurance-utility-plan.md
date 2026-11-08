@@ -1,13 +1,14 @@
-# Link Analysis showcase catalogue — police, insurance, utility and fourteen more (plan)
+# Link Analysis showcase catalogue — police, insurance, utility and fifteen more (plan)
 
 Status: draft, 2026-11-07; scope widened the same day to the **full catalogue** (operator: "ship the full
-Showcase catalogue for users to play, learn and test"). Product Map Items: existing `solution-pack.la-claims`,
+Showcase catalogue for users to play, learn and test"); 2026-11-08 the catalogue is grouped by industry and
+`la-mfs` added. Product Map Items: existing `solution-pack.la-claims`,
 `solution-pack.la-showcase`, `solution-pack.la-mobile-money`, `solution-pack.la-audit`; one new
 `solution-pack.la-<id>` per new Space, added when its template lands.
 
 ## Goal
 
-**Ship every Space in the catalogue below: 17 showcase Spaces**, each with synthetic data and planted stories, so
+**Ship every Space in the catalogue below: 18 showcase Spaces in 9 industries**, each with synthetic data and planted stories, so
 a user can **play** with Link Analysis on realistic data, **learn** it through exercises with answers, and
 **test** it (and their own understanding) against known ground truth. Each showcase ships as **three separate
 downloads**: the product, the Space (configuration) and the Space's data. A user installs the product once,
@@ -21,28 +22,79 @@ waves under *Steps*. Every story has a benign look-alike that must not join it (
 Realism notes come from the review in the next section. `la-daily-feed` and `la-showcase-off` are test fixtures,
 not showcases, and are not in the catalogue.
 
-| Template | Industry | Use case | Stories | Status |
-|---|---|---|---|---|
-| `la-sample` | Banking | First-run sample (Basic) | 12 smurf accounts structure cash into MULE-HUB-01 → RELAY-01/02 → OFFSHORE-77; SHELL-A..D money loop | exists |
-| `la-showcase` | Banking + telecom | Financial crime and telecom fraud tour | Mule ring and shell loop; TILL-06 takes 80 % of cash-out; SKIMMER-01 skims benefit payments; telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode; geo route of the ring | exists |
-| `la-mobile-money` | Mobile money | Anti-money-laundering | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
-| `la-claims` | Insurance | Claims fraud (Special Investigations Unit) | 12 claimants sharing 4 phones, 3 addresses, one garage, clinic and lawyer; a passenger on 6 claims with 6 drivers; 11 night-time accidents near one junction; ring clinic bills 3× peers; 7 claims within 20 days of inception via one broker; duplicate claimant identity | exists |
-| `la-claims` (additions) | Insurance | Claims fraud | Parts-supplier ring (one supplier on invoices from many garages, parts never fitted); ghost broker (policies sold with false details, all paying from 2 bank accounts) | planned |
-| `la-audit` | Finance / audit | Internal audit, accounts payable | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
-| `la-police` | Law enforcement | Criminal investigation | Burglary series traced through second-hand-dealer sales and one vehicle; drug-supply handset network with a rotating controller phone; addresses taken over as drug bases; a "witness" who was arrested with the suspect | planned |
-| `la-utility` | Electricity | Revenue protection (non-technical loss) | Meter tampering linked to one contractor's visits, seen as loss on two transformers; illegal reconnections closed by one contractor; debt-dodging account churn; commercial load on a residential tariff; prepaid token fraud from one vending point | planned |
-| `la-card` | Payments / e-commerce | Card and e-commerce fraud | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | planned |
-| `la-ownership` | Banking / compliance | Beneficial ownership and sanctions | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | planned |
-| `la-trade` | Trade finance | Trade-based money laundering | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
-| `la-procurement` | Public sector / enterprise | Bid rigging and procurement fraud | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | planned |
-| `la-benefits` | Government | Benefits and tax fraud | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | planned |
-| `la-health` | Healthcare (payer) | Provider billing fraud | Referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for admitted or deceased patients; pill mill; upcoding clinics under one owner | planned |
-| `la-telco-ra` | Telecom | Revenue assurance | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night (SIM box, Wangiri and IRSF stay in `la-showcase`) | planned |
-| `la-logistics` | Logistics | Cargo theft | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | planned |
-| `la-insider` | Enterprise / HR | Insider threat | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
-| `la-crypto` | Crypto | Laundering | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | planned |
+The catalogue is grouped by **industry**, then by **use case** inside it. A template that covers two industries
+is listed under both (`la-showcase`: its banking stories under Banking and finance, its telecom rings under
+Telecom), with the same template id.
 
-**Count: 17 Spaces** (5 exist, 12 new); the `la-claims` additions land inside `la-claims`.
+### Telecom
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Mobile money (anti-money-laundering) | `la-mobile-money` | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
+| MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | planned |
+| Telco fraud | `la-showcase` | Telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode | exists |
+| Revenue assurance | `la-telco-ra` | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | planned |
+
+### Banking and finance
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| First-run sample (Basic) | `la-sample` | 12 smurf accounts structure cash into MULE-HUB-01 → RELAY-01/02 → OFFSHORE-77; SHELL-A..D money loop | exists |
+| Financial crime tour | `la-showcase` | Mule ring and shell loop; TILL-06 takes 80 % of cash-out; SKIMMER-01 skims benefit payments; geo route of the ring | exists |
+| Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
+| Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
+| Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
+| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | planned |
+
+### Insurance
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Claims fraud (Special Investigations Unit) | `la-claims` | 12 claimants sharing 4 phones, 3 addresses, one garage, clinic and lawyer; a passenger on 6 claims with 6 drivers; 11 night-time accidents near one junction; ring clinic bills 3× peers; 7 claims within 20 days of inception via one broker; duplicate claimant identity | exists |
+| Claims fraud (additions) | `la-claims` | Parts-supplier ring (one supplier on invoices from many garages, parts never fitted); ghost broker (policies sold with false details, all paying from 2 bank accounts) | planned |
+
+### Utilities
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Electricity revenue protection (non-technical loss) | `la-utility` | Meter tampering linked to one contractor's visits, seen as loss on two transformers; illegal reconnections closed by one contractor; debt-dodging account churn; commercial load on a residential tariff; prepaid token fraud from one vending point | exists |
+
+### Law enforcement
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Criminal investigation | `la-police` | Burglary series traced through second-hand-dealer sales and one vehicle; drug-supply handset network with a rotating controller phone; addresses taken over as drug bases; a "witness" who was arrested with the suspect | exists |
+
+### Public sector
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Bid rigging and procurement fraud | `la-procurement` | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | exists |
+| Benefits and tax fraud | `la-benefits` | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | planned |
+
+### Healthcare
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Provider billing fraud (payer) | `la-health` | Referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for admitted or deceased patients; pill mill; upcoding clinics under one owner | planned |
+
+### Logistics
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Cargo theft | `la-logistics` | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | planned |
+
+### Enterprise
+
+| Use case | Template | Stories | Status |
+|---|---|---|---|
+| Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
+| Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
+
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 10 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+`la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`) and 8 are planned; the `la-claims`
+additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
+2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
 ## Realism review
 
@@ -288,6 +340,36 @@ The existing template and `tools/gen-la-claims-data.py` stay. Changes:
   Look-alike: a family paying several policies from one account at a real address.
 - Extend `LaClaimsGoldenTest` and `gen-la-claims-data.test.mjs` with both stories.
 
+#### `la-claims` additions as built (step 4, 2026-11-07)
+
+- **Generator:** `tools/gen-la-claims-data.py` draws stories 8 and 9 from a second seeded Random (`20261107`) after
+  everything else, so every row of stories 1–7 is byte-identical; `policy` gains two columns at the end (its first five
+  are unchanged) and 25 rows. Seven feeds, about 300 kB.
+- **Parts-supplier ring:** `SUP-07` invoices 61 parts (£25 906) on 30 claims across all nine garages, and none is fitted;
+  none of the 30 is a staged-ring claim. Look-alike `SUP-01`: all nine garages, 218 claims, every part fitted. Only 3 other
+  claims carry an unfitted part (returns).
+- **Ghost broker:** 25 policies `POL-0381`..`POL-0405` through `BRK-07` (January–July 2026, premiums £219–£333 against £380 or
+  more for every genuine policy) to holders on no claim, on four streets found on no other record, paid from `BA-93000017`
+  (13) and `BA-93000029` (12). Look-alike: story 7's family pays its four policies from `BA-71000001` at the address on its claims.
+- **Job and views:** `claims_links` reads `repair_invoice` and `policy` too; nine kinds, 2 637 rows (`supplied_parts` 34,
+  `paid_by` 29). Saved views `claims_parts_suppliers` and `claims_premium_payers`; `claims_shared_identity` excludes
+  `supplied_parts`.
+- **Decided while building:**
+  - `policy` also gains `holder_address`: "an address that does not exist" needs an address on the policy. There is no
+    address register, so "does not exist" means a street found on no claim and no other policy.
+  - `repair_invoice` carries an `amount` per part, so a `supplied_parts` link carries the value never fitted (0 when all fitted).
+  - `paid_by` links only an account that pays two or more policies, with no upper cap. One account per policy would add 380
+    leaves to the graph.
+  - The ring's garage `GAR-03` buys only from `SUP-01`: a small supplier shared by `GAR-03` and one other garage joined the
+    ring's Louvain community (the golden test caught it). Each small supplier serves two of the eight ordinary garages.
+  - Seeding `CL-0134` and expanding twice now also reaches `SUP-01` and `SUP-07` through `GAR-03` (about 23 entities).
+    The runbook's Working Set figures from 2026-10-24 predate this.
+  - `minEdition` stays `advanced`; the Basic tier is wave B.
+- **Tests:** `LaClaimsGoldenTest` (12, with all whole-graph figures of stories 1–7 unchanged over the nine-kind graph),
+  `LaClaimsLinksJobTest` (real Pipelines and SQL, per-kind rows, unfitted value per supplier, `paid_by` accounts),
+  `LaClaimsTemplateTest` (seven feeds, five views), `tools/gen-la-claims-data.test.mjs` (determinism, both stories on the files).
+- **Hub:** the `la-claims` user guide has one exercise and answer per story; the runbook lists stories 8 and 9.
+
 ### 3. `la-utility` — electricity revenue protection (new)
 
 **Audience:** utility revenue-protection and loss-reduction teams. **Period:** 12 months of daily reads +
@@ -330,8 +412,11 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
   the other feeds as one extract) and `data/staged/<feed>` (October 2026 for the six event feeds). Two `sql.template`
   Jobs fire on `pipeline.commit`: `utility_links` folds the feeds into one link Dataset of the six specced kinds, one
   row per pair (4 301 rows), with an extra `kwh` column; `transformer_loss` balances each metered transformer against
-  its premises' meter reads per month (144 rows, `loss_band` over 15 % / over 9 % / normal). Three saved views
-  (`utility_contractor_network`, `utility_churn_by_bank`, `utility_vendor_network`) filter the link Dataset by kind; one
+  its premises' meter reads per month (144 rows, `loss_band` over 15 % / over 9 % / normal). A third Job,
+  `utility_bank_links` (on `utility_links`' `job.dataset.produced`), keeps the account links of bank accounts shared by
+  three or more accounts and of premises that changed holder (441 rows, 531 nodes) for the churn view. Three saved
+  views: `utility_contractor_network` and `utility_vendor_network` filter the link Dataset by kind,
+  `utility_churn_by_bank` reads `utility_bank_links`; one
   saved Geo View (`utility_transformer_loss_map`), inert on Basic. No `link-analysis.toon`. Ships
   `config/examples/sla-escalation-examples.md` like every template (`TemplateGovernanceExamplesTest`).
 - **Generator** `tools/gen-la-utility-data.py` (seed 20261107, standard library, byte-identical on a re-run) writes the
@@ -354,15 +439,22 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
     accounts), all 18 accounts on one bank account, so the story is one connected group, not 12 separate pairs.
   - C-22 is tied to C-14 by three joint visits at tampered premises ("C-14's colleague").
   - `tamper_flag` is VARCHAR (0, 1 or blank): a declared INTEGER lands as VARCHAR anyway.
+- **Canvas cap (fixed 2026-11-08):** `utility_churn_by_bank` first filtered the whole link Dataset to `account_at` and
+  `paid_from`: 1 954 rows but 2 932 nodes, over the 1 000-node canvas cap. It now reads the derived
+  `utility_bank_links` (441 rows, 531 nodes): the two hub bank accounts and every premise that changed holder, so the
+  genuine tenant changes still sit beside the churn as its look-alike. The heat-pump look-alike (one account, its own
+  bank account) is not in that view; it is in `meter_read`. `UtilityLinksJobGoldenTest` now checks every saved view
+  against both limits (under 4 000 rows and 1 000 nodes) and that each shows its stories' entities; the old view fails
+  it at 2 932 nodes. The other two views project 679 and 310 nodes.
+- **Missed last landing (worked around 2026-11-08):** `utility_links` and `transformer_loss` also run on
+  `cron: "*/5 * * * *"`, as `la-card` does, because a `pipeline.commit` that lands while a run is in flight is skipped,
+  not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`).
 - **Known gaps (open):**
-  - `utility_churn_by_bank` projects 1 954 rows but 2 932 nodes, over the 1 000-node canvas cap, so in the UI it
-    will likely say "Result cut short". The fix is a derived Dataset per view, as `la-police` does. The other two views
-    project 679 and 310 nodes.
   - The prepaid look-alike V-01 sells in another city, so its "no look-alike joins" check cannot fail.
   - Look-alikes are kept free of direct links only; some sit two hops from a story through a shared contractor.
 - **Live proof on Basic:** recorded at step 3 under Steps.
 
-### Specs 4–13: the wave C Spaces
+### Specs 4–14: the wave C Spaces
 
 These follow the same rules as specs 1–3: the shared data-generation plan, a Basic tier first, 20–60 k link rows,
 12 landed months plus 1 staged month. Row counts are approximate. The Advanced tier of each is personas
@@ -394,6 +486,24 @@ script `tools/seed-la-<id>.mjs`. Stories are listed as **story: planted facts �
   window — a busy supermarket used by many cards with no later fraud.
 
 **Alert Rule:** a new card seen at the compromised terminal.
+
+**Basic tier as built (2026-11-07, plan step 7).** `tools/gen-la-card-data.py` (seed 20261107; ground truth
+`tools/gen-la-card-data.ground-truth.json`), `tools/gen-la-card-data.test.mjs`, `CardLinksJobGoldenTest` (inspecto-engine),
+template `spaces/_templates/la-card/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-card/`. Deliberate deviations: the feed is `card_auth`, not `authorization` (a SQL
+keyword); `merchant` gains `channel` (pos/ecom) and `chargeback` a `chargeback_id`; `online_account` is a change log that
+also carries `card_id` (the card on file, for `account_card`); scale is 5 030 cardholders, 6 500 cards, 900 merchants,
+4 000 accounts, about 77 000 authorisations and 690 chargebacks (3 MB of CSV, about 38 600 link rows) rather than
+150 000 and 1 800; links are one row
+per pair, not per day; two link kinds were added, `refunded` (the colluding merchant's refunds, `via` = sales there) and
+`visited_before_fraud` (each defrauded card to the merchants it paid in the 45 days before), which is the common-point
+view; `from_ip` links a card to its /24 network; `card_links` also runs on `cron: "*/5 * * * *"` because a commit landing
+while it runs is skipped (`JOB-SIGNAL-OVERLAP-SKIP-1`). **Proved live 2026-11-08** on a Basic `-NoUi` build with the product,
+Space and data downloads unzipped side by side (`SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data`):
+17 landings, 0 rejected; after the cron run 38 598 links; through `POST /inv/projection/neighbors` with each saved view's
+own filter every story is reachable from its hub (300 tested cards, 140 taken-over accounts, M-221's 35 cards, M-317's 60)
+and no look-alike neighbours a story member; the staged October month landed with 0 rejected. Not checked: the Link
+Analysis UI on that build.
 
 #### 5. `la-ownership` — beneficial ownership and sanctions
 
@@ -486,6 +596,17 @@ with a score).
   file and the Job is refused; keep it out of `via` text.
 - **Scale:** 2 500 companies, 3 514 directors, 11 896 landed trades, 11 955 B/Ls, 109 500 positions, 28 993 payments,
   49 964 link rows; data 11 MB unzipped.
+- **Live proof on Basic (2026-11-07):** a Basic build with the Link Analysis UI (`package.ps1 -Edition Basic -Ui la-app`),
+  `node tools/package-la-showcase.mjs la-trade` (39 Space files, 67 data files, data zip 1.9 MB). Product, Space and data
+  were unzipped side by side and started with `SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data`
+  and nothing else. All seven Pipelines landed 62 files in 62 batches with 0 rejected files or rows. `pipeline.commit`
+  fired `trade_links`, whose last run built 49 964 links, and its signal fired the four view Jobs (23, 90, 102 and 199
+  rows). All state was written under `inspecto-la-data\la-trade`; the Space folder held only `space.toon` and `config\`.
+  In the UI the four saved views are listed and draw without "Result cut short" (24, 112, 75 and 141 nodes). Over each
+  view's `POST /inv/projection` (not truncated), every story's entities are present and form one connected piece
+  (3 of 3, 4 of 4, 9 of 9, 10 of 10), every look-alike is present (9, 10, 6, 15), and no look-alike links to its story.
+  Not checked: the staged month on the live build (the verification review computed the views as 23/98/102/209 rows
+  with October landed, still under the cap).
 
 #### 7. `la-procurement` — bid rigging and procurement fraud
 
@@ -512,6 +633,33 @@ with a score).
   an unrelated firm years later.
 
 **Alert Rule:** a bid from an IP address already used by another bidder on the same tender.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-procurement-data.py` (seed 20261108; ground truth
+`tools/gen-la-procurement-data.ground-truth.json`), `tools/gen-la-procurement-data.test.mjs`, `ProcurementLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-procurement/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-procurement/`. Deliberate deviations:
+- **Columns:** `director.from` / `to` are `from_date` / `to_date` (SQL keywords); `bid` gains `bid_id`, `contract_change` gains
+  `change_id`, `tender` gains `awarded_at`; `director` has no role. A tender still open at the end of the staged month has a blank
+  award.
+- **Link kinds:** `same_ip` and `same_author` link a bidder to the shared IP address or author node (only when two or more bidders
+  used it), not bidder to bidder; `same_ip`'s `via` carries the fewest minutes to another bidder's bid from that address on the same
+  tender. A blank or placeholder author (`Administrator`, about 3 % of bids) never links. `approved_change` is official → winning
+  firm, one row per pair (`via` = changes and tenders). The link Dataset has an extra column, `market` (the tender category, or the
+  category a company mostly bids in), so the rotation view can filter to one market.
+- **Views and the canvas cap:** two derived Jobs on `job.dataset.produced` (as `la-police`): `procurement_approval_links`
+  (approvals, plus only the homes shared by two or more of those officials and directors) and `procurement_debarment_links`
+  (directors of debarred firms, all their directorships, their firms' wins). `procurement_links` also runs on
+  `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows
+  and 1 000 nodes, the story whole and connected, and the look-alike on the canvas: `procurement_bid_rotation` 1 291 rows, 512 nodes; `procurement_change_approvals` 700 rows, 556 nodes; `procurement_cover_bids` 20 rows, 19 nodes; `procurement_debarred_directors` 27 rows, 36 nodes.
+- **Stories as built:** rotation tenders are Highways North (24, two a month), the look-alike big three win 74 % of Highways South
+  in the same market view; cover bids are 27 on 10 IT tenders, 16 (60 %) from the winner's IP 2-25 minutes after it, 20 with its
+  estimator as author; the kiosk is `198.51.100.20` (14 firms, bids on one tender at least an hour apart); the conflict is
+  `P-00002` → `CO-0426` (9 changes; director `P-00003` at home `AD-00002`), the look-alike `P-00008` approves 34 changes (33 landed, 1 staged), at
+  most 2 per supplier; the phoenix is `CO-0815` (debarred 2026-01-15) → `CO-0899` (incorporated 2026-02-02, wins `T-00519` on
+  2026-04-08), the look-alike director `P-00007` joins `CO-0233` 3.5 years after `CO-0640`'s debarment.
+- **Scale:** 900 companies, 2 000 people (300 officials), 1 445 directorships, 1 228 landed tenders, 6 001 landed bids, 834
+  contract changes; about 11 000 link rows (the spec's row counts give far fewer than the shared plan's 20-60 k); data 0.5 MB.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing.
 
 #### 8. `la-benefits` — benefits and tax fraud
 
@@ -663,6 +811,38 @@ with a score).
 
 **Alert Rule:** a deposit whose funds trace to a labelled hack within 5 hops.
 
+#### 14. `la-mfs` — mobile financial services fraud (added 2026-11-08)
+
+**Audience:** fraud and risk teams at a mobile operator's mobile financial services (MFS) business, and at the
+agent networks and merchants it serves. **Not the same as `la-mobile-money`**, which covers wallet
+anti-money-laundering (structuring, mule chains, a device farm); this Space covers fraud *against* the MFS
+business and its customers. All data is invented. It shares no data, names or ids with any customer MFS Space.
+**Feeds:**
+- `wallet` (20 000): wallet_id, msisdn, kyc_level, opened_at, registered_by_agent;
+- `agent` (600): agent_id, name, area, super_agent_id, float_account;
+- `merchant` (800): merchant_id, name, category, opened_at, settlement_account;
+- `wallet_txn` (200 000, aggregated per pair and day for links): txn_id, from_id, to_id, type (cash_in,
+  cash_out, p2p, merchant_pay), amount, at, device_id;
+- `sim_event` (8 000): msisdn, event (sim_swap, port_out), at, channel (store, call_centre), staff_login;
+- `device_login` (60 000): wallet_id, device_id, at;
+- `agent_commission` (600 × 12): agent_id, month, transactions, commission.
+
+**Link kinds:** `registered_by` (wallet → agent), `paid` (wallet → wallet or merchant), `cashed_in_at`,
+`cashed_out_at`, `logged_in_on` (wallet → device), `swapped_by` (msisdn → staff login), `settles_to`.
+
+**Stories:**
+- **SIM-swap wallet takeover:** 30 subscribers have their SIM swapped through one call-centre login (`S-41`) in
+  10 days; each wallet is logged into from a new device and drained within 2 hours to 5 mule wallets, which cash
+  out at 2 agents — a busy store that performs many genuine SIM swaps for customers who keep their balances.
+- **Agent split-deposit commission fraud:** agent `A-52` splits customers' cash-ins into many small deposits across
+  120 wallets it registered itself, earning a commission on each; the wallets are rarely used for anything else —
+  a busy market agent with many small cash-ins from distinct customers who also pay merchants and each other.
+- **Merchant cash-out collusion:** merchant `MR-77`, opened 3 weeks ago, receives "payments" from 60 wallets
+  minutes after each was funded at one of 3 agents, and settles every day to one bank account — a popular grocery
+  with steady payments from many wallets over months.
+
+**Alert Rule:** a wallet drained within 2 hours of a SIM swap.
+
 ## Steps
 
 1. **Distribution seams:** `SPACES_DATA_ROOT` in the launchers; the packer
@@ -694,9 +874,16 @@ with a score).
    folder held only `space.toon` and `config\`. Over each saved view's projection (`POST /inv/projection` with the
    view's filter, none truncated), every story's entities are present: contractor view 23 of 23 tampering (the
    transformers are not in that view) and 16 of 16 reconnection; churn view 25 of 25 churn and 13 of 13 commercial
-   load; vendor view 41 of 41 prepaid. Not checked: the Link Analysis UI (no UI in the bundle; see the canvas-cap gap
-   above), the staged month, the saved Geo View (Standard and above).
-4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check.
+   load; vendor view 41 of 41 prepaid. Not checked: the Link Analysis UI (no UI in the bundle), the staged month, the
+   saved Geo View (Standard and above). The churn view was over the canvas cap then (2 932 nodes); it was narrowed on
+   2026-11-08 (see "Canvas cap" above) and its product hub (brochure, user guide, install) landed the same day.
+4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check. **BUILT 2026-11-08** (as built under
+   `la-claims` above). `la-claims` is still Advanced-only, so the live proof was on a Preview Demo Auth build
+   (`package.ps1 -Edition Preview -DemoAuth -NoUi`), with the Space scaffolded and seeded (`seed-la-claims.mjs --apply`:
+   every step created, none failed). `la-claims-smoke.mjs --embed` passed 32 of 32, so the seven stories' scenes still hold
+   over the nine-kind link Dataset. The affected-module tests (`node tools/affected-modules.mjs`, 35 modules, Advanced
+   profile) passed. Not checked: the two new saved views drawn in the Link Analysis UI (no UI in the bundle), and the
+   runbook's Working Set figures, which predate the additions.
 
 **Wave B: the existing five ship in the new layout**
 
@@ -707,8 +894,9 @@ with a score).
 6. **Pack and boot-test all five** with `tools/package-la-showcase.mjs`. `la-sample` keeps its files in
    `data/samples` for the in-app *Load samples*; check that this still works from a data root.
 
-**Wave C: ten new Spaces** (specs 4–13), one lane each, in this order: `la-card`, `la-ownership`, `la-trade`,
-`la-procurement`, `la-benefits`, `la-health`, `la-telco-ra`, `la-logistics`, `la-insider`, `la-crypto`.
+**Wave C: eleven new Spaces** (specs 4–14), one lane each, in this order: `la-card`, `la-ownership`, `la-trade`,
+`la-procurement`, `la-benefits`, `la-health`, `la-telco-ra`, `la-mfs`, `la-logistics`, `la-insider`, `la-crypto`.
+`la-mfs` (added 2026-11-08) sits beside `la-telco-ra` so the Telecom industry is complete together.
 
 7. **Each Space:** generator, golden tests, template (Basic tier), packed downloads → same check as step 2.
 
@@ -723,7 +911,7 @@ with a score).
    admin guide (install steps). Each lands in the same lane as its Space. Also: the catalogue page
    (`solution-pack/la-showcase/user-guide-showcase-catalogue.md`), a Product Map Item per new Space, BACKLOG
    rows closed, `docs/INDEX.md`, and `node tools/render-product-docs.mjs`.
-10. **Release:** build all 17 Space and 17 data downloads from one commit and publish them with the product.
+10. **Release:** build all 18 Space and 18 data downloads from one commit and publish them with the product.
 
 ## Open questions
 
@@ -732,6 +920,6 @@ with a score).
 - Police wording for the target market (UK, US, India)? Default is neutral wording with local terms only in the
   user guide.
 - Water-utility variant later?
-- One combined "all showcases" download (up to about 850 MB of data at the 50 MB cap per Space) as well as
+- One combined "all showcases" download (up to about 900 MB of data at the 50 MB cap per Space) as well as
   per-Space downloads?
 - Wave C order follows likely customer demand (cards and KYC first); change it if a deal needs a vertical sooner.

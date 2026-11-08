@@ -1,0 +1,32 @@
+raw:
+  name: MERCHANT
+  format: CSV
+  fields[6]{name,selector,type}:
+    merchant_id,"0",VARCHAR
+    name,"1",VARCHAR
+    mcc,"2",VARCHAR
+    channel,"3",VARCHAR
+    city,"4",VARCHAR
+    acquirer,"5",VARCHAR
+mapping:
+  canonicalName: merchant
+  rawName: MERCHANT
+  fields[6]:
+    - name: merchant_id
+      from: merchant_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: mcc
+      from: mcc
+      fn: keep
+    - name: channel
+      from: channel
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
+    - name: acquirer
+      from: acquirer
+      fn: keep

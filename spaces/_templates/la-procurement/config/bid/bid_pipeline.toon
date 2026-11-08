@@ -1,0 +1,36 @@
+name: bid
+active: true
+description: "Bid rigging and procurement fraud Link Analysis showcase - One row per bid on the e-procurement platform: tender, bidder, amount, the instant it was submitted, the IP address it came from and the author recorded in the bid document (blank or a placeholder such as Administrator when unset). One file per month of the tender's publication (BID_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-procurement-data.py."
+
+dirs:
+  poll:       data/inbox/bid
+  database:   data/bid/database
+  backup:     data/bid/backup
+  temp:       data/bid/temp
+  errors:     data/bid/errors
+  quarantine: data/bid/quarantine
+  markers:    data/bid/markers
+  status_dir: data/bid/status
+  log_dir:    data/bid/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: bid_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

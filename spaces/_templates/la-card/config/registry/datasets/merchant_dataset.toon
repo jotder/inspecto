@@ -1,0 +1,9 @@
+physicalRef: merchant/database
+description: "Card and e-commerce fraud Link Analysis showcase - One row per merchant: name, merchant category code, channel (pos or ecom), city and acquirer. One extract (MERCHANT_20260930.csv). Landed by the merchant Pipeline. Synthetic."
+columns[6]{name,type,classification}:
+  merchant_id,string,
+  name,string,
+  mcc,string,
+  channel,string,
+  city,string,
+  acquirer,string,

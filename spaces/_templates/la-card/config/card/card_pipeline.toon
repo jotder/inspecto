@@ -1,0 +1,36 @@
+name: card
+active: true
+description: "Card and e-commerce fraud Link Analysis showcase - One row per issued card: an invented card id (never a card number), its BIN group, holder and issue date. One extract (CARD_20260930.csv). Synthetic; regenerate with tools/gen-la-card-data.py."
+
+dirs:
+  poll:       data/inbox/card
+  database:   data/card/database
+  backup:     data/card/backup
+  temp:       data/card/temp
+  errors:     data/card/errors
+  quarantine: data/card/quarantine
+  markers:    data/card/markers
+  status_dir: data/card/status
+  log_dir:    data/card/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: card_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

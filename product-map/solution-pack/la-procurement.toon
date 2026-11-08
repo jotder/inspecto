@@ -1,0 +1,7 @@
+id: solution-pack.la-procurement
+kind: solution-pack
+title: Link Analysis procurement fraud showcase
+template: la-procurement
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-procurement/index.md
