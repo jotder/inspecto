@@ -1085,8 +1085,79 @@ business and its customers. All data is invented. It shares no data, names or id
      covered by `ControlApiSpaceTemplatesTest`), the Link Analysis UI on Basic (the bundle had no UI; the views were checked through their
      projections), the Geo Views on Standard, and an OIDC sign-in build (Demo Auth stands in for it: both make
      `EditionMaskingDefault` answer `typed`).
+
+   **`la-mobile-money`, `la-audit` and `la-showcase` BUILT 2026-11-08** (`d20b08632`, `3fdb6104d`, `6b52b409c`), one
+   commit per Space, the la-claims pattern. As built:
+   - **What Basic refused, per Space.**
+     - `la-mobile-money`: the stated `masking_mode: typed` (every wallet id `masked:…` with no Reveal) and the gallery's
+       roster refusal. Line removed; `minEdition: basic` lifts the roster refusal. Nothing else.
+     - `la-audit`: the same two. The `party` Entity Type stays marked masked for sign-in builds, and the committee
+       portal's embed origins stay; both are inert on Basic.
+     - `la-showcase`: already left `masking_mode` to the edition. What Basic refused were its **three telecom Alert Rules**
+       (`registry/alert-rules/telecom_{wangiri,irsf,simbox}_lines`): the gallery marked the template `creatable: false`
+       (`alert.dispatch`) and `POST /spaces` from it answered 422. The unzipped Space download already booted with each rule
+       unarmed and a WARN. **Decision (operator 2026-11-08, "A: allow, unarmed")**, recorded under the Edition rule above:
+       the rules stay in the template and ship unarmed on Basic. `SpaceManager.missingFeatures` and `TemplateSeedGate`
+       skip the `alert.dispatch` refusal for a `minEdition: basic` template's Alert Rules (registry and pending); the seed
+       gate still judges their content through `AlertRoutes.parseContent` (`parse` minus its edition door).
+   - **Inert on Basic, seen live:** `la_detect` runs and succeeds ("no Investigation rule breached"); `mule_risk_score`
+     (`risk.score`) is listed `NOT hosted` because the scoring module is not in Basic; `telecom_typology_alerts`
+     (`alert.evaluate`) is hosted and runs after `telecom_typology_counts` with "no rule breached" (no rule is armed);
+     `demo-users.toon` and `roles.toon` are ignored. `la_index_build` builds the index in all three.
+   - **Offerings:** all three moved from `offerings/preview.toon` to `offerings/basic.toon`. Preview now lists no content
+     packs of its own and carries every LA showcase through `includes: advanced` → Basic.
+   - **Tests:** `ControlApiSpaceTemplatesTest.aBasicTierTemplateShipsItsAlertRulesUnarmedOnBasic` (gallery creatable,
+     `POST /spaces` creates with the rule file in place, the same template without `minEdition: basic` still 422, a malformed
+     rule still 422; mutation-checked on each gate: removing the check in `missingFeatures` fails it and
+     `galleryCountsTheDemoUserSignInATemplateNeeds`, removing it in `TemplateSeedGate` fails it).
+     `galleryCountsTheDemoUserSignInATemplateNeeds` now copies all five shipped templates and pins `la-claims`,
+     `la-mobile-money`, `la-audit` and `la-showcase` creatable with no missing feature, with no Demo Auth installed.
+     `LaMobileMoneyTemplateTest` and `LaAuditTemplateTest` pin `masking_mode` unset (`none` without sign-in, `typed` with
+     `auth.mode=demo`). `tools/check-offerings.test.mjs` pins the placement.
+   - **Live proof on Basic** (`package.ps1 -Edition Basic -NoUi`; each Space packed with `package-la-showcase.mjs`,
+     unzipped side by side, `SPACES_ROOT` + `SPACES_DATA_ROOT`): every Pipeline landed with 0 rejected (`la-mobile-money`
+     3 Pipelines, 14 `wallet_txn` days; `la-audit` 5; `la-showcase` 11, the mule, telecom and geo feeds). Link Jobs:
+     `mm_links` 5 777 rows; `ap_links` 3 650 and its three derived subsets, `gl_links` 72, `ap_duplicate_payments` 13;
+     `telecom_links` 16 683, `telecom_msisdn_indicators` 2 423, `telecom_typology_counts` 1. `GET /settings/link-analysis`
+     answers `maskingModeInForce: none` in each. Each saved view's projection (`POST /inv/projection` with the view's
+     filter) returned 200 with 0 masked ids, and the planted entities are on the views that carry them: `mm_device_farm`
+     16 nodes, `mm_structuring_band` 31 (`HUB-01`, `AG-18`, `AG-39`), `mm_money_trail` 465; `ap_approval_graph` 175
+     (`V-117`, `E-15`, `E-07`, `V-099`), `ap_vendor_identity` 291 (`V-117`, `E-31`), `gl_intercompany` 8 (`LE-05`,
+     `LE-08`); `mule_large_transfers` 8, `mule_layering_ring` 112, `mule_structuring` 112 (`MULE-HUB-01`, `RELAY-01`,
+     `OFFSHORE-77`, `SHELL-A`), `telecom_fraud_network` 767.
+   - **Two views are cut at the 4 000-row default projection limit on every edition**, not only Basic:
+     `mm_money_trail` (`mm_links` has 5 777 rows) and `telecom_fraud_network` (16 683). The canvas reads them the same
+     way on Preview. Left as found; a narrower view is a hub decision (see "Canvas cap" above).
+   - **One ERROR on the first Basic boot of `la-mobile-money`:** its `la_index_build` cron (:45) fired before the first
+     `mm_links` run (:50). The build was refused (no Dataset yet), and `LaIndexBuildJob` then threw a
+     NullPointerException while emitting its completion signal, because the payload carried `mode: null`. Every later
+     build succeeded. It is an engine defect on every edition, not a Basic one: filed as `LA-INDEX-BUILD-REFUSED-NPE-1`
+     in the BACKLOG.
+   - **Preview still passes** (`package.ps1 -Edition Preview -DemoAuth -NoUi -NoBakeDemo`, the three Spaces scaffolded
+     from the edited templates with `seed-la-showcase` / `seed-la-mm` / `seed-la-audit --scaffold`, data Jobs triggered
+     after every file landed, then `--apply`: every stage created, none failed). The three Alert Rules are armed there.
+     `la-mm-smoke` 10/10 (including "masking typed: every Measure entity is a masked token"), `la-audit-smoke` 30/30,
+     `la-demo-smoke` 17/17 and `la-demo-smoke --telecom` 29/29 (including the typology Alerts). 0 ERROR lines in the
+     Preview server log.
+   - **Not checked:** the gallery and `POST /spaces` with the new Alert Rule rule on a live Basic bundle (the bundle was
+     built before that change; it is covered by the test above), the Link Analysis UI on Basic (no UI in the bundle), the
+     Geo Views and the dashboard Widget on Standard, and an OIDC sign-in build.
 6. **Pack and boot-test all five** with `tools/package-la-showcase.mjs`. `la-sample` keeps its files in
    `data/samples` for the in-app *Load samples*; check that this still works from a data root.
+   **BUILT 2026-11-08** (no code change). On the Basic bundle above:
+   - **Packed:** `la-sample` 7 Space files and 3 data files, `la-claims` 43 and 7, `la-showcase` 61 and 16, and
+     `la-mobile-money` and `la-audit` as packed for step 5. All five Space zips and five data zips unzipped side by side and booted
+     together on one Basic server (`SPACES_ROOT` + `SPACES_DATA_ROOT`): all five Spaces listed, `la-claims`' seven
+     Pipelines landed with 0 rejected, 0 ERROR lines.
+   - **`la-sample` attached as a download lands nothing by itself**, by design: its files are in `data/samples`, and
+     only *Load samples* (`POST /spaces {template, loadSamples: true}`) copies them into the inbox. An install that
+     attaches the `la-sample` download instead of using the in-app sample copies `data/samples/mule_transfers` into
+     `data/inbox/mule_transfers` by hand, as its `template.toon` says.
+   - **Load samples from a data root works:** with `SPACES_ROOT=spaces` (the bundle's `_templates`) and
+     `SPACES_DATA_ROOT` set, `POST /spaces {"id":"la-sample","template":"la-sample","loadSamples":true}` answered
+     `mule_transfers: loaded, 3 files, 0 quarantined`. Every state folder (`data\`, `audit\`, `duckdb\`) was written
+     under `<data root>\la-sample`, and the Space folder holds only `space.toon` and `config\`. `mule_layering_ring`
+     projects 112 nodes, not cut short, with `MULE-HUB-01`, `OFFSHORE-77` and `SHELL-A` on it.
 
 **Wave C: eleven new Spaces** (specs 4–14), one lane each, in this order: `la-card`, `la-ownership`, `la-trade`,
 `la-procurement`, `la-benefits`, `la-health`, `la-telco-ra`, `la-mfs`, `la-logistics`, `la-insider`, `la-crypto`.

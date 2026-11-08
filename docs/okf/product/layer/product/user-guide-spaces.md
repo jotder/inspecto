@@ -31,14 +31,19 @@ each gallery entry carries `creatable` and `missingFeatures[{feature, message}]`
 `SpaceManager.missingFeatures`, which covers three cases:
 - **Alert Rules:** a registry Alert Rule or a Decision Rule's `create-alert` needs `alert.dispatch`. A legacy
   per-file alert config is deliberately not counted: nothing loads one at runtime and the seed gate does not refuse
-  one.
+  one. **Exception (operator 2026-11-08, "A: allow, unarmed"):** a template whose `template.toon` says
+  `minEdition: basic` (the shipped `la-showcase`) ships its Alert Rules unarmed where `alert.dispatch` is absent. The
+  gallery lists it creatable, `POST /spaces` creates it with each rule's content still judged
+  (`AlertRoutes.parseContent`), and the boot leaves every rule unarmed with a WARN. A Decision Rule's `create-alert`
+  still counts (`ControlApiSpaceTemplatesTest.aBasicTierTemplateShipsItsAlertRulesUnarmedOnBasic`).
 - **Pipeline features:** a Pipeline's archive or DuckLake use, through `EditionFeatures.pipelineRefusals`.
 - **Demo User sign-in** (`demo-auth`, `LA-SAMPLE-GALLERY-DEMOAUTH-1`, 2026-10-23): a template carrying
-  `config/demo-users.toon` (the shipped `la-audit`, `la-mobile-money`, `la-showcase`, `la-showcase-off`) needs an installed Authenticator that names its principals from a Space's config - only Demo
+  `config/demo-users.toon` (the shipped `la-showcase-off`) needs an installed Authenticator that names its principals from a Space's config - only Demo
   Auth does; Basic has none and OIDC cannot say who exists. ⚠ Unlike the two above this is the gallery's verdict
   only: `POST /spaces` does not refuse such a template, so the API still creates it (its Demo Users are then inert).
   Pinned by `ControlApiSpaceTemplatesTest.galleryCountsTheDemoUserSignInATemplateNeeds`. **Exception (operator
-  2026-11-08):** a template whose `template.toon` says `minEdition: basic` (the shipped `la-claims`) has a Basic tier;
+  2026-11-08):** a template whose `template.toon` says `minEdition: basic` (the shipped `la-claims`, `la-mobile-money`,
+  `la-audit` and `la-showcase`) has a Basic tier;
   its roster is the inert Advanced tier and does not make it uncreatable
   (`ControlApiSpaceTemplatesTest.aBasicTierTemplateKeepsItsDemoUserRosterAsAnInertAdvancedTier`).
 
