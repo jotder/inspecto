@@ -74,6 +74,116 @@ The full list goes in this plan, one table per industry, for the operator to app
 (`inspecto-la-space-la-utilities-<version>.zip`); `tools/package-la-showcase.mjs` packs the composed template like any
 other.
 
+## Use-case view names (step 2, approved by the operator 2026-11-08)
+
+Rules:
+- A name says the use case a viewer will find, in a few words, in `snake_case`, with no Space or industry prefix: the
+  Space already says the industry.
+- A name is unique inside its industry Space, because composing refuses two use cases that ship the same file name.
+- Geo Views end in `_map`.
+- Where a view holds two stories, the name leads with the first, and its description keeps both.
+- *Utilities* is done (step 1).
+
+**Telecom** (`la-telco-ra` now; `la-mobile-money` and the telecom part of `la-showcase` after wave B)
+
+| Use case | Today | Proposed |
+|---|---|---|
+| Revenue assurance | `telco_ra_unbilled_usage` | `unbilled_usage` |
+| Revenue assurance | `telco_ra_commission_spikes` | `dealer_commission_fraud` |
+| Revenue assurance | `telco_ra_pbx_off_hours` | `pbx_hacking_off_hours` |
+| Mobile money | `mm_money_trail` | `wallet_money_trail` |
+| Mobile money | `mm_structuring_band` | `agent_structuring` |
+| Mobile money | `mm_device_farm` | `wallet_device_farm` |
+| Telco fraud | `telecom_fraud_network` | `suspect_number_to_sim_box` |
+
+**Banking and finance** (`la-sample`, `la-ownership`, `la-card`, `la-trade` now; the mule part of `la-showcase` after wave B)
+
+| Use case | Today | Proposed |
+|---|---|---|
+| First look | `mule_layering_ring` (`la-sample`) | `sample_mule_ring` |
+| Ownership and sanctions | `ownership_hidden_owner` | `hidden_beneficial_owner` |
+| Ownership and sanctions | `ownership_sanctions_path` | `sanctioned_owner_path` |
+| Ownership and sanctions | `ownership_nominee_director` | `nominee_director` |
+| Ownership and sanctions | `ownership_circular` | `circular_ownership` |
+| Card fraud | `card_testing` | `card_testing` (already a use case) |
+| Card fraud | `card_takeover_ring` | `account_takeover_ring` |
+| Card fraud | `card_merchant_disputes` | `colluding_merchant_refunds` |
+| Card fraud | `card_common_point` | `common_point_of_purchase` |
+| Trade finance | `trade_over_invoicing` | `over_invoicing` |
+| Trade finance | `trade_phantom_shipment` | `phantom_shipment` |
+| Trade finance | `trade_circular_trade` | `circular_trade` |
+| Trade finance | `trade_shell_importers` | `shell_importers` |
+| Financial crime tour | `mule_layering_ring` (`la-showcase`) | `mule_layering_ring` |
+| Financial crime tour | `mule_large_transfers` | `mule_ring_large_transfers` |
+| Financial crime tour | `mule_structuring` | `structuring_smurfing` |
+| Financial crime tour (map) | `mule_account_locations_map` | `mule_account_locations_map` |
+| Financial crime tour (map) | `mule_ring_route_map` | `mule_ring_route_map` |
+| Financial crime tour (map) | `mule_cashout_till_map` | `cash_out_till_map` |
+
+**Insurance** (`la-claims`)
+
+| Today | Proposed |
+|---|---|
+| `claims_network` | `claims_network` (the overview; kept) |
+| `claims_shared_identity` | `claimant_ring_shared_identity` |
+| `claims_provider_money` | `provider_money_trail` |
+| `claims_parts_suppliers` | `parts_supplier_ring` |
+| `claims_premium_payers` | `ghost_broker_premium_payers` |
+| `claims_accidents_map` | `accidents_map` |
+| `claims_junction_cluster_map` | `staged_accident_junction_map` |
+| `claims_providers_map` | `providers_map` |
+
+**Law enforcement** (`la-police`)
+
+| Today | Proposed |
+|---|---|
+| `police_burglary_series` | `burglary_series` |
+| `police_handset_network` | `drug_supply_handset_network` |
+| `police_witness_link` | `suspicious_witness` |
+| `police_incident_map` | `incident_map` |
+
+**Public sector** (`la-procurement`, `la-benefits`)
+
+| Use case | Today | Proposed |
+|---|---|---|
+| Procurement | `procurement_bid_rotation` | `bid_rotation` |
+| Procurement | `procurement_cover_bids` | `cover_bids_shared_ip` |
+| Procurement | `procurement_change_approvals` | `official_approving_relative_firm` |
+| Procurement | `procurement_debarred_directors` | `debarred_firm_reborn` |
+| Benefits and tax | `benefits_shared_addresses` | `address_farm` |
+| Benefits and tax | `benefits_paid_after_death` | `paid_after_death` |
+| Benefits and tax | `benefits_work_while_claiming` | `undeclared_work` |
+| Benefits and tax | `benefits_refund_concentration` | `tax_preparer_refund_ring` |
+
+**Healthcare** (`la-health`)
+
+| Today | Proposed |
+|---|---|
+| `health_referral_concentration` | `referral_kickbacks` |
+| `health_phantom_billing` | `phantom_billing` |
+| `health_pill_mill` | `pill_mill` |
+| `health_upcoding` | `upcoding_clinics` |
+
+**Enterprise** (`la-audit`, after wave B)
+
+| Today | Proposed |
+|---|---|
+| `ap_approval_graph` | `invoice_approvals` |
+| `ap_vendor_identity` | `vendor_employee_conflict` |
+| `gl_intercompany` | `intercompany_round_trip` |
+
+**Decisions this table needs:**
+
+- **`la-showcase` spans two industries.** Its telecom view (and its eight telecom feeds) belong to *Telecom*, its mule
+  views and Geo Views to *Banking and finance*. The recipe takes whole templates, so either `la-showcase` is split into
+  two use-case templates before it joins (recommended, with wave B), or it goes whole into *Banking and finance* and
+  *Telecom* points at it.
+- **`mule_layering_ring` is in two templates** (`la-sample`, `la-showcase`). Renaming the sample's view to
+  `sample_mule_ring` lets both sit in *Banking and finance*. Their Datasets (`mule_transfers_dataset`) and feeds collide
+  too, so the sample's need the same prefix.
+- **Renames touch peers' golden tests and guides:** one lane per industry renames its views, the tests that cite them,
+  the user and admin guides and the video scripts, as the *Utilities* spike did.
+
 ## Steps
 
 1. **Spike, `la-utility` to *Utilities* (one industry end to end):**
@@ -84,7 +194,7 @@ other.
    - re-record the 3.4 draft on it.
 
    Exit: the operator approves the look.
-2. **The view-name tables** for all industries in this plan; operator approval.
+2. **The view-name tables** for all industries in this plan: approved 2026-11-08 (section above).
 3. **One lane per industry,** in order *Insurance*, *Law enforcement*, *Healthcare*, *Public sector* (with the `person`
    collision), *Banking and finance* (Basic parts), *Telecom* (revenue assurance). Each lane:
    - mapping, renames and the composed template;
