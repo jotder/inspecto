@@ -1,0 +1,23 @@
+name: theft_stop_hotspot
+description: "Stop hotspots - every place where 3 or more lost trips stood 20 minutes or more before the loss, with every trip that stood there that long and the loss reports of the lost ones (via on stopped_at = minutes, place type, last stop, and the place's long stops, high-value long stops and lost trips). Busy services see a theft now and then among hundreds of breaks; a lay-by where every high-value truck that stopped was robbed is another thing."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: logistics_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","stop_hotspot"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

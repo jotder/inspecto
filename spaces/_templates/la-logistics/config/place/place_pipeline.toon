@@ -1,0 +1,36 @@
+name: place
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per place: the twelve warehouses (WH-) and the places along the roads where GPS records trucks standing (PL-): services, truck parks, fuel stations and unofficial lay-bys, with the nearest city and a position. One extract (PLACE_20260930.csv). Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/place
+  database:   data/place/database
+  backup:     data/place/backup
+  temp:       data/place/temp
+  errors:     data/place/errors
+  quarantine: data/place/quarantine
+  markers:    data/place/markers
+  status_dir: data/place/status
+  log_dir:    data/place/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: place_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,8 @@
+physicalRef: driver/database
+description: "Logistics cargo theft Link Analysis showcase - One row per driver a carrier has named: name, mobile phone (blank for a few), the carrier and, for a driver who has left, the day. One extract (DRIVER_20260930.csv). Landed by the driver Pipeline. Synthetic."
+columns[5]{name,type,classification}:
+  driver_id,string,
+  name,string,
+  phone,string,
+  carrier_id,string,
+  left_on,date,

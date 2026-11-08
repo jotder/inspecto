@@ -1,0 +1,11 @@
+physicalRef: logistics_links
+description: "Logistics cargo theft Link Analysis showcase - ONE link Dataset built by the logistics_links Job from carrier, driver, place, shipment, trip, stop, warehouse_scan and loss_report. kind is one of drove, co_drove, scanned_by, stopped_at, carried_by, lost, same_phone; one row per pair; via names the evidence. Ids say what an endpoint is: DRV- driver, TR- trip (its shipment is SH- with the same number), EMP- warehouse employee, PL- place on the road, CAR- carrier, LR- loss report. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,

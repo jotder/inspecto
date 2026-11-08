@@ -1,0 +1,28 @@
+raw:
+  name: DRIVER
+  format: CSV
+  fields[5]{name,selector,type}:
+    driver_id,"0",VARCHAR
+    name,"1",VARCHAR
+    phone,"2",VARCHAR
+    carrier_id,"3",VARCHAR
+    left_on,"4",DATE
+mapping:
+  canonicalName: driver
+  rawName: DRIVER
+  fields[5]:
+    - name: driver_id
+      from: driver_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: phone
+      from: phone
+      fn: keep
+    - name: carrier_id
+      from: carrier_id
+      fn: keep
+    - name: left_on
+      from: left_on
+      fn: keep

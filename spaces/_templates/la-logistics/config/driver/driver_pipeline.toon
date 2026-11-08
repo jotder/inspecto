@@ -1,0 +1,36 @@
+name: driver
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per driver a carrier has named: name, mobile phone (blank for a few), the carrier and, for a driver who has left, the day. One extract (DRIVER_20260930.csv). Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/driver
+  database:   data/driver/database
+  backup:     data/driver/backup
+  temp:       data/driver/temp
+  errors:     data/driver/errors
+  quarantine: data/driver/quarantine
+  markers:    data/driver/markers
+  status_dir: data/driver/status
+  log_dir:    data/driver/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: driver_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

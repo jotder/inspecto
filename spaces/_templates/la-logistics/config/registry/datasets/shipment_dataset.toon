@@ -1,0 +1,10 @@
+physicalRef: shipment/database
+description: "Logistics cargo theft Link Analysis showcase - One row per shipment (one load): shipper, consignee (blank for a few), goods, declared value and when it was booked. One file per month of departure (SHIPMENT_YYYYMM.csv); the next month is in data/staged. Landed by the shipment Pipeline. Synthetic."
+eventDate: booked_at
+columns[6]{name,type,classification}:
+  shipment_id,string,
+  shipper,string,
+  consignee,string,
+  goods,string,
+  value,number,
+  booked_at,timestamp,

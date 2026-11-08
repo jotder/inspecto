@@ -1,0 +1,36 @@
+name: trip
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per trip (one per shipment): driver, co-driver for a two-driver team, vehicle (blank for a few), carrier, route (origin-destination city), departure and arrival (blank when the truck never got there). One file per month of departure (TRIP_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/trip
+  database:   data/trip/database
+  backup:     data/trip/backup
+  temp:       data/trip/temp
+  errors:     data/trip/errors
+  quarantine: data/trip/quarantine
+  markers:    data/trip/markers
+  status_dir: data/trip/status
+  log_dir:    data/trip/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: trip_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -34,6 +34,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 * [Link Analysis claims showcase](solution-pack/la-claims/index.md) - `solution-pack.la-claims` · 5 doc(s) · 2 open row(s)
 * [Link Analysis daily feed](solution-pack/la-daily-feed/index.md) - `solution-pack.la-daily-feed` · 5 doc(s) · 1 open row(s)
 * [Link Analysis provider billing fraud showcase](solution-pack/la-health/index.md) - `solution-pack.la-health` · 3 doc(s) · 1 open row(s)
+* [Link Analysis logistics cargo theft showcase](solution-pack/la-logistics/index.md) - `solution-pack.la-logistics` · 3 doc(s) · 1 open row(s)
 * [Link Analysis mobile money](solution-pack/la-mobile-money/index.md) - `solution-pack.la-mobile-money` · 5 doc(s) · 2 open row(s)
 * [Link Analysis ownership showcase](solution-pack/la-ownership/index.md) - `solution-pack.la-ownership` · 4 doc(s) · 1 open row(s)
 * [Link Analysis police showcase](solution-pack/la-police/index.md) - `solution-pack.la-police` · 3 doc(s) · 1 open row(s)

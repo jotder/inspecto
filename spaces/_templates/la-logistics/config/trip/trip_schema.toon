@@ -1,0 +1,44 @@
+raw:
+  name: TRIP
+  format: CSV
+  fields[9]{name,selector,type}:
+    trip_id,"0",VARCHAR
+    shipment_id,"1",VARCHAR
+    driver_id,"2",VARCHAR
+    co_driver_id,"3",VARCHAR
+    vehicle,"4",VARCHAR
+    carrier_id,"5",VARCHAR
+    route,"6",VARCHAR
+    depart_at,"7",TIMESTAMP
+    arrive_at,"8",TIMESTAMP
+mapping:
+  canonicalName: trip
+  rawName: TRIP
+  fields[9]:
+    - name: trip_id
+      from: trip_id
+      fn: keep
+    - name: shipment_id
+      from: shipment_id
+      fn: keep
+    - name: driver_id
+      from: driver_id
+      fn: keep
+    - name: co_driver_id
+      from: co_driver_id
+      fn: keep
+    - name: vehicle
+      from: vehicle
+      fn: keep
+    - name: carrier_id
+      from: carrier_id
+      fn: keep
+    - name: route
+      from: route
+      fn: keep
+    - name: depart_at
+      from: depart_at
+      fn: keep
+    - name: arrive_at
+      from: arrive_at
+      fn: keep

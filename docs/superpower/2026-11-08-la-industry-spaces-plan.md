@@ -164,6 +164,17 @@ Rules:
 | `health_pill_mill` | `pill_mill` |
 | `health_upcoding` | `upcoding_clinics` |
 
+**Logistics** (`la-logistics`, built 2026-11-08 with these names)
+
+| Today | Proposed |
+|---|---|
+| `driver_team_inside_job` | `driver_team_inside_job` |
+| `theft_stop_hotspot` | `theft_stop_hotspot` |
+| `fictitious_carrier` | `fictitious_carrier` |
+
+The use-case template already has the id `la-logistics` (plan spec 11), which D2 gives the *Logistics* industry Space.
+With one use case the industry Space could be that template itself, or take another id: the operator decides.
+
 **Enterprise** (`la-audit`, after wave B)
 
 | Today | Proposed |
