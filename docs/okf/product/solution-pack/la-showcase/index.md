@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-showcase` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `LA-SHOWCASE-EXISTING-BASIC-1` | P2 | feature | the existing showcases la-showcase, la-mobile-money, la-claims and la-audit get a Basic tier (minEdition: basic, anything Basic refuses m… | — |
+_No open rows._
