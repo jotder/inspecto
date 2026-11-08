@@ -1,11 +1,17 @@
 physicalRef: employee/database
 description: "Insider threat Link Analysis showcase - One row per employee on the HR record: department, role, manager, hire date, the date the current role began (role_since; later than the hire date after an internal move), and for a leaver the day notice was given and the last day. Ids only - no names. One extract (EMPLOYEE_20260930.csv). Landed by the employee Pipeline. Synthetic."
+primaryEntityType: employee
 columns[8]{name,type,classification}:
-  employee_id,string,
+  employee_id,string,EMPLOYEE
   dept,string,
   role,string,
-  manager_id,string,
+  manager_id,string,EMPLOYEE
   hired_at,date,
   role_since,date,
   notice_given_at,date,
   left_at,date,
+defaultLinkMapping:
+  from: manager_id
+  to: employee_id
+  kind: role
+  primaryTime: hired_at

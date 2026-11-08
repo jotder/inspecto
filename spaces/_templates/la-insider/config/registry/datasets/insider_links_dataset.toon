@@ -1,11 +1,18 @@
 physicalRef: insider_links
 description: "Insider threat Link Analysis showcase - ONE link Dataset built by the insider_links Job from employee, access_grant, access_daily, email_external, expense and vendor_change. kind is one of reports_to, granted_by, accessed, mailed_domain, approved_for, changed_vendor; one row per pair; via names the evidence. Ids say what an endpoint is: EMP- employee, SYS- system, VEN- vendor, a domain name for an external mail domain. Synthetic."
 eventDate: event_date
+primaryEntityType: insider_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,INSIDER_ENTITY
+  dst,string,INSIDER_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

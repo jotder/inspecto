@@ -1,12 +1,19 @@
 physicalRef: insider_screen_links
 description: "Insider threat Link Analysis showcase - Derived from insider_links each time it is produced, for the three saved views: the links each insider-risk screen selects, tagged in screen (leaver_exfiltration, access_creep, mutual_approvals). Same columns as insider_links plus screen. Synthetic."
 eventDate: event_date
+primaryEntityType: insider_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,INSIDER_ENTITY
+  dst,string,INSIDER_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   screen,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

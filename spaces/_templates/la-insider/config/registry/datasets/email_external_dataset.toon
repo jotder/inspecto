@@ -1,9 +1,15 @@
 physicalRef: email_external/database
 description: "Insider threat Link Analysis showcase - Aggregated external mail, never message-level: one row per employee, external domain and day with the messages sent and the attachment megabytes. Every domain is invented (.example). One file per month (EMAIL_EXTERNAL_YYYYMM.csv); the next month is in data/staged. Landed by the email_external Pipeline. Synthetic."
 eventDate: sent_date
+primaryEntityType: employee
 columns[5]{name,type,classification}:
-  employee_id,string,
-  domain,string,
+  employee_id,string,EMPLOYEE
+  domain,string,EMAIL_DOMAIN
   sent_date,date,
   messages,number,
   attachment_mb,number,
+defaultLinkMapping:
+  from: employee_id
+  to: domain
+  primaryTime: sent_date
+  primaryMeasure: attachment_mb
