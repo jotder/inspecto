@@ -39,7 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * pins the generator's ground truth ({@code tools/gen-la-telco-ra-data.ground-truth.json}): every story's entities form one connected group,
  * no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole, shows the
  * look-alike beside it and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts behind each story in the files
- * themselves are pinned by {@code tools/gen-la-telco-ra-data.test.mjs}.
+ * themselves are pinned by {@code tools/gen-la-telco-ra-data.test.mjs}. The Advanced tier's {@code telco_ra_unbilled_counts} Job
+ * runs over the same landed feeds: the Alert Rule {@code telco_ra_usage_without_billing} fires on the unbilled-usage story's 300 SIMs,
+ * would not without them, and never counts the test SIMs on the known list.
  */
 class TelcoRaLinksJobGoldenTest {
 
@@ -73,17 +75,9 @@ class TelcoRaLinksJobGoldenTest {
         data = space.resolve("data");
         List<JobConfig> jobs = new ArrayList<>();
         for (String j : JOBS) jobs.add(JobConfig.load(space.resolve("config/jobs/" + j + "_job.toon").toString()));
-        PlatformServiceRegistry platform = new PlatformServiceRegistry();
-        // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
-        for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
-                "notifications", "com.gamma.notify.NotificationAccess", "incidents", "com.gamma.objects.IncidentAccess",
-                "objects", "com.gamma.objects.ObjectAccess", "datasets", "com.gamma.query.DatasetAccess",
-                "schema", "com.gamma.pipeline.SchemaAccess", "link-index", "com.gamma.linkindex.LinkIndexAccess",
-                "alerts", "com.gamma.alert.AlertAccess").entrySet())
-            unused(platform, e.getKey(), e.getValue());
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(jobs, new ConsignmentEventBus(), s, null,
-                     space.resolve("audit").toString(), null, null, data.toString(), null, platform)) {
+                     space.resolve("audit").toString(), null, null, data.toString(), null, platform())) {
             js.eventLog(com.gamma.event.EventLog.current());
             js.start();
             for (String j : JOBS) {
@@ -95,19 +89,127 @@ class TelcoRaLinksJobGoldenTest {
                 assertEquals("SUCCESS", r.status(), j + " failed: " + r.message());
             }
         }
+        // then the Advanced tier's counts Job in a service of its own, so no signal-fired run races a read
+        JobConfig counts = JobConfig.load(space.resolve("config/jobs/telco_ra_unbilled_counts_job.toon").toString());
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(counts), new ConsignmentEventBus(), s, null,
+                     space.resolve("audit").toString(), null, null, data.toString(), null, platform())) {
+            js.eventLog(com.gamma.event.EventLog.current());
+            js.start();
+            assertTrue(js.triggerRun(counts.name(), null, Map.of()).isPresent(), counts.name());
+            JobRun r = awaitRun(js, counts.name());
+            assertNotNull(r, counts.name() + " never ran");
+            assertEquals("SUCCESS", r.status(), counts.name() + " failed: " + r.message());
+        }
         truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-telco-ra-data.ground-truth.json").toFile());
         bl = parquet("telco_ra_links");
         links = triples("SELECT src, dst, kind FROM " + bl);
     }
 
+    private static PlatformServiceRegistry platform() {
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
+        for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
+                "notifications", "com.gamma.notify.NotificationAccess", "incidents", "com.gamma.objects.IncidentAccess",
+                "objects", "com.gamma.objects.ObjectAccess", "datasets", "com.gamma.query.DatasetAccess",
+                "schema", "com.gamma.pipeline.SchemaAccess", "link-index", "com.gamma.linkindex.LinkIndexAccess",
+                "alerts", "com.gamma.alert.AlertAccess").entrySet())
+            unused(platform, e.getKey(), e.getValue());
+        return platform;
+    }
+
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/telco_ra_unbilled_counts_job.toon",
+                "config/jobs/telco_ra_unbilled_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/telco_ra_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("telco_ra_unbilled_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "telco_ra_unbilled_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet("telco_ra_unbilled_counts");
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: the 300 SIMs of the unbilled-usage story; the 40 test SIMs on the known list are
+        // seen and not counted; 62 ordinary subscribers (50 with one dropped month, 12 whose first two months were never billed) neither
+        JsonNode u = truth.get("unbilled_usage");
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(300L, ((Number) row.get("unbilled_subscribers")).longValue());
+        assertEquals((long) u.get("subscribers").size(), ((Number) row.get("unbilled_subscribers")).longValue());
+        assertEquals((long) u.get("test_sims").size(), ((Number) row.get("known_list_subscribers")).longValue());
+        assertEquals((long) u.get("late_billing").size() + u.get("dropped_months").size(), ((Number) row.get("other_unbilled_subscribers")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+    }
+
+    @Test
+    void withoutTheUnbilledDealersSimsTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same feeds with the story's 300 SIMs taken out: nothing left to count. billing_record
+        // stays whole in these narrowed runs: a month is judged once its billing file has landed, and these SIMs have no billing of their own
+        JsonNode u = truth.get("unbilled_usage");
+        String notStory = "msisdn NOT IN " + in(u.get("subscribers"));
+        Map<String, Object> without = countsOver(notStory, notStory, "true");
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(0L, ((Number) without.get("unbilled_subscribers")).longValue(), "no other subscriber is counted: " + without);
+        assertTrue(((Number) without.get("unbilled_subscribers")).doubleValue() < rule.threshold(), "without the story it would not fire: " + without);
+        // and the story's SIMs alone are all counted
+        String story = "msisdn IN " + in(u.get("subscribers"));
+        assertEquals(300L, ((Number) countsOver(story, story, "true").get("unbilled_subscribers")).longValue());
+    }
+
+    @Test
+    void theTestSimsOnTheKnownListAndTheOrdinaryLeakageNeverCount() throws Exception {
+        JsonNode u = truth.get("unbilled_usage");
+        // the test SIMs are used and never billed, as the story's are: only the known list keeps them out
+        String test = "msisdn IN " + in(u.get("test_sims"));
+        Map<String, Object> only = countsOver(test, test, "true");
+        assertEquals(0L, ((Number) only.get("unbilled_subscribers")).longValue(), "the known list: " + only);
+        assertEquals((long) u.get("test_sims").size(), ((Number) only.get("known_list_subscribers")).longValue(), "seen, not counted: " + only);
+        assertEquals(0, count("SELECT count(*) FROM " + bl + " WHERE kind = 'activated_by' AND src IN " + in(u.get("test_sims"))
+                + " AND TRY_CAST(regexp_extract(via, 'unbilled_months:([0-9]+)', 1) AS INTEGER) < 2"), "every test SIM is unbilled in two months or more");
+        // a single dropped month, or a provisioning lag whose later months reached billing, is not usage that keeps escaping billing
+        List<String> noise = new ArrayList<>();
+        u.get("late_billing").forEach(n -> noise.add(n.asText()));
+        u.get("dropped_months").forEach(n -> noise.add(n.asText()));
+        String ordinary = "msisdn IN ('" + String.join("', '", noise) + "')";
+        Map<String, Object> o = countsOver(ordinary, ordinary, "true");
+        assertEquals(0L, ((Number) o.get("unbilled_subscribers")).longValue(), "ordinary leakage: " + o);
+        assertEquals((long) noise.size(), ((Number) o.get("other_unbilled_subscribers")).longValue(), o.toString());
+    }
+
+    @Test
+    void aMonthWhoseBillingFileHasNotLandedIsNotReadAsUnbilled() throws Exception {
+        // first boot: September's usage file lands before September's billing file. Read as unbilled, every subscriber used in
+        // September would have it unbilled, and the ordinary ones with one earlier unbilled month would be counted (355);
+        // judged only once that month's billing lands, the count stays the story's
+        Map<String, Object> early = countsOver("true", "true", "CAST(period AS DATE) < DATE '2026-09-01'");
+        assertEquals(300L, ((Number) early.get("unbilled_subscribers")).longValue(), early.toString());
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/telco_ra_usage_without_billing.toon").toString()));
+    }
+
+    /** The counts Job's own SQL (its params substituted as the Job does) over the real landed feeds, each narrowed by a predicate. */
+    private static Map<String, Object> countsOver(String subscriberFilter, String usageFilter, String billingFilter) throws Exception {
+        JobConfig job = JobConfig.load(TEMPLATE.resolve("config/jobs/telco_ra_unbilled_counts_job.toon").toString());
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("min_unbilled_months", job.require("min_unbilled_months")));
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW subscriber AS SELECT * FROM " + parquet("subscriber/database", "/**/*.parquet") + " WHERE " + subscriberFilter);
+            st.execute("CREATE VIEW network_usage AS SELECT * FROM " + parquet("network_usage/database", "/**/*.parquet") + " WHERE " + usageFilter);
+            st.execute("CREATE VIEW billing_record AS SELECT * FROM " + parquet("billing_record/database", "/**/*.parquet") + " WHERE " + billingFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

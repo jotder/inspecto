@@ -1,0 +1,10 @@
+job:
+  name: insider_ticketless_grant_counts
+  type: sql.template
+  description: "Runs each time the insider_links Job produces its Dataset. One row of counts over every landed access grant: grants_without_ticket (grants with no access request or change ticket, to any system), finance_grants_without_ticket (those of them to a finance system: AP, PAYROLL, TREASURY, the list the insider_links Job uses), finance_grantees_without_ticket (how many employees received one) and finance_approvers_without_ticket (how many people approved one). An employee moved into a finance role and granted access with a ticket is not counted. The Alert Rule insider_finance_grant_without_ticket reads the second; no employee id leaves this Job, they are found in the Investigation."
+  sql: "WITH g AS (SELECT employee_id, system, nullif(trim(granted_by), '') AS granter, nullif(trim(ticket_id), '') AS tk, system IN ('AP', 'PAYROLL', 'TREASURY') AS fin FROM access_grant), nt AS (SELECT * FROM g WHERE tk IS NULL), f AS (SELECT * FROM nt WHERE fin) SELECT (SELECT count(*) FROM nt) AS grants_without_ticket, (SELECT count(*) FROM f) AS finance_grants_without_ticket, (SELECT count(DISTINCT employee_id) FROM f) AS finance_grantees_without_ticket, (SELECT count(DISTINCT granter) FROM f) AS finance_approvers_without_ticket"
+  sources: access_grant
+  sink_dataset: insider_ticketless_grant_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == insider_links"
+  enabled: true

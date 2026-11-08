@@ -892,6 +892,8 @@ Deliberate deviations:
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (the screens were recomputed over landed plus staged files outside the engine: no story changes).
 
+**Advanced tier BUILT 2026-11-09:** see step 8, "`la-telco-ra` BUILT 2026-11-09".
+
 #### 11. `la-logistics` — cargo theft
 
 **Audience:** logistics security teams and cargo insurers.
@@ -959,8 +961,10 @@ later). Deliberate deviations:
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (only recomputed outside the engine).
 - **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5, approved 2026-11-08): no
-  Space or industry prefix. The template id `la-logistics` is the one this spec gives; D2 of that plan gives the same id to the
-  *Logistics* industry Space, so the operator decides whether that Space is this template or takes another id.
+  Space or industry prefix. The template id `la-logistics` is the one this spec gives; the *Logistics* industry Space took
+  the id `la-logistics-industry` (that plan, D2), so the two no longer collide.
+
+**Advanced tier BUILT 2026-11-09:** see step 8, "`la-logistics` BUILT 2026-11-09".
 
 #### 12. `la-insider` — insider threat
 
@@ -1512,6 +1516,185 @@ deviations:
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
 
+   **`la-mfs` BUILT 2026-11-09** (the `la-card` pattern: personas, four-eyes, a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`mfs.analyst` lead, `mfs.manager`
+     second approver, `mfs.reviewer` read-only, `mfs.outsider` not a member, and `admin` exactly as in `la-showcase`:
+     `admin;fraud-analyst;la-settings`), `config/roles.toon` (`mfs-analyst`, `mfs-manager`, and `fraud-analyst`,
+     `la-viewer`, `la-settings` line for line as in `la-card`), `four_eyes_fan_out_above: 2000` plus the Drafts limits in
+     `link-analysis.toon`, the same values as `la-card` (the *Telecom* industry Space composes `la-mfs` with `la-telco-ra`,
+     and the packer refuses a setting two use cases state differently). No `masking_mode`; no Entity Type masked.
+   - **Alert Rule "a wallet drained within 2 hours of a SIM swap", as a registry rule over a counts Job:**
+     `mfs_swap_drain_counts` (`sql.template` on `mfs_links`' `job.dataset.produced`, `min_out_within_2h: "300"`) reads the
+     `out_within_2h:` evidence on each `swapped_by` link (what the wallet paid out, P2P, merchant payments and cash-outs,
+     within 2 hours after the swap; the Basic tier put it there for this rule) and writes one row: `drained_after_swap`
+     (distinct wallets with 300 or more), `logins_behind_drains` (distinct staff logins that made those swaps) and
+     `largest_other_out_within_2h` (the margin); `mfs_swap_drain_alerts` (`alert.evaluate`) runs after it;
+     `mfs_wallet_drained_after_sim_swap` is `max(drained_after_swap) gte 1`, WARNING, not grouped (a Job output, as in
+     `la-utility` and `la-card`).
+   - **Decided while building:**
+     - **"Drained" means paid out 300 or more within 2 hours.** The corpus has no opening balances (Basic tier note), so no
+       share of a balance can be computed. 300 sits between the two populations with room on both sides: the 30 takeover
+       wallets paid out 463.26 to 1 837.18, every other swapped wallet 98.14 at most (`S-32`'s customer; the store's
+       largest is 76.83). A rule on how many swaps a login makes would fire on the store's upgrade drive (`S-72`, 51 in 10
+       days); the rule reads money out only, so the look-alike cannot reach it.
+     - **Running total, not "new".** The count is over every `swapped_by` link in the Dataset, so the rule stays met after
+       every build (the open Alert is not raised again). The staged October month adds 60 `swapped_by` links and leaves the figures at
+       30 / 1 / 98.14 (checked with DuckDB over landed plus staged). A per-build "new drains" count is a later refinement.
+     - The Draft step annotates `S-41` (the seed) about the mules: a mule is two hops out (`S-41` to victim wallet to mule),
+       so annotating one would be refused.
+   - **Real figures on the shipped data** (the counts Job's SQL over the real `mfs_links`; pinned by
+     `MfsLinksJobGoldenTest`): drained_after_swap **30** (exactly the ground truth's `victims`), logins_behind_drains **1**
+     (`S-41`), largest_other_out_within_2h **98.14**. With the victims' `swapped_by` links taken out: 0 / 0, no Alert. Over
+     only `S-72`'s 160 swaps: 0 / 0.
+   - **Seed** `tools/seed-la-mfs.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `sim-swap-takeover` over `mfs_links_dataset` (Entity Type `telecom_entity`; seed `S-41`; a bounded
+     expand over `swapped_by`, `maxFanOut` 80, to its 40 swapped wallets, the 30 victims and its ten ordinary swaps;
+     annotate, threshold, window, resolve, snapshot), members (`mfs.reviewer` and `mfs.manager` reviewers, `admin` lead;
+     not `mfs.outsider`), Entity List `mule-wallets` (the five mules), a Case from `S-41` assigned to `mfs.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft.
+   - **Tests:** `LaMfsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000; no masked type; persona capabilities; every persona role defined and `fraud-analyst`, `la-viewer`,
+     `la-settings` equal to `la-card`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs'
+     signals); `MfsLinksJobGoldenTest` (the counts Job runs after `mfs_links`; `theTemplateIsBasicTierOnly` became
+     `theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts`: the real figures, the rule's own measure and
+     threshold fire, the counted wallets are the victims and the login is `S-41`;
+     `withoutTheTakeoverWalletsTheRuleWouldNotFire`; `theStoresSimUpgradeDriveIsNeverCounted`); the gallery test pins
+     `la-mfs` creatable with no missing feature and no Demo Auth; `tools/seed-la-mfs.test.mjs` (mocked fetch, 11 tests).
+     Falsified, each then restored: the counts Job counting the swaps of a bursting login instead of money out (200
+     wallets, `S-72`'s 160 counted, all three engine tests fail), the "without" filter keeping the victims, `masking_mode:
+     typed`, `mfs-analyst` given the approve capability, `admin` given `mfs-analyst`, `fraud-analyst` removed, `la-mfs` out
+     of the gallery's Basic-tier set, and in the seed: the outsider made a member, the Draft annotating a mule, `S-72`
+     added to the seed.
+   - ***Telecom* composition:** the packer joins `config/demo-users.toon` (users by id) and `config/roles.toon` (roles
+     by name) since the `la-ownership` lane, so `la-telco-ra`'s roster composes with this one; `admin`, `fraud-analyst`,
+     `la-viewer` and `la-settings` are byte-identical to la-card's.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 30, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `mfs_swap_drain_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Telecom* industry Space with this tier, an OIDC build.
+
+   **`la-health` BUILT 2026-11-09** (the `la-card` pattern). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`health.analyst` lead, `health.manager`
+     second approver, `health.reviewer` read-only, `health.outsider` not a member, and `admin` exactly as in
+     `la-showcase`), `config/roles.toon` (`health-analyst`, `health-manager`, and `fraud-analyst`, `la-viewer`,
+     `la-settings` byte-identical to `la-card`'s, although `la-health` is the only use case of *Healthcare*),
+     `four_eyes_fan_out_above: 2000` plus the same Drafts limits in `link-analysis.toon` (no `masking_mode`; no Entity
+     Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `health_phantom_counts` (`sql.template` on `health_links`'
+     `job.dataset.produced`, reading only `health_links`) writes one row from the `treated` links' `via`:
+     `lines_in_admission`, `lines_after_death`, `lines_in_admission_or_after_death`, `members_billed`,
+     `providers_billing` and `corrected_lines`; `health_phantom_alerts` (`alert.evaluate`) runs after it;
+     `health_billed_in_admission_or_after_death` is `max(lines_in_admission_or_after_death) gte 1`, WARNING, not grouped
+     (a Job output). It is the spec's rule as written: one service billed in a stay or after a death is enough.
+   - **Real figures on the shipped data** (the Job's SQL over the real `health_links`; pinned by
+     `HealthLinksJobGoldenTest`): lines_in_admission **89**, lines_after_death **70**, lines_in_admission_or_after_death
+     **159**, members_billed **40**, providers_billing **1** (`PR-1241`), corrected_lines **30** (15 at the look-alike
+     `PR-0632`, 15 single errors elsewhere, all reversed). With `PR-1241` taken out: 0 / 0 / 0 / 0 / 0 / 30. Only
+     `PR-0632`'s links: 0 open, 15 corrected.
+   - **Decided while building:**
+     - **The measure counts open lines, not corrected ones.** `health_links` already reads a line as `in_admission` only
+       when the stay is at ANOTHER hospital (`ad.hospital_id <> o.provider_id`) and not reversed; the counts Job reads
+       that, so the look-alike's date errors (reversed in 2-6 days) never count.
+     - **The busy look-alike hospital.** `PR-1129` (Saltmere Bay Hospital) is the first node on *Busiest nodes* in
+       `referral_kickbacks` (degree 8 in the screen). It also bills 2 unreversed lines inside its OWN stays, so a naive
+       "any line dated inside a stay" count would name it. The rule leaves the admitting hospital out, and the golden test
+       pins it: `PR-1129` is the referral view's busiest node, a naive in-a-stay count of its lines is above 0, and the
+       counts Job over its links (and over the kickback ring's `PR-1426`, `PR-1392`, `PR-1170`) counts 0. The lane brief
+       asked that the measure separate the kickback ring from that hospital; the spec's named rule is about phantom
+       billing, not kickbacks, so neither the ring nor the hospital is counted; a kickback Alert Rule was not added (one
+       rule per Space). If a kickback rule is wanted, the separating fact is the shared home (`lives_at` to `AD-05150`),
+       which the trust-owned hospital lacks.
+     - **Running total**, as in `la-police` and `la-card`: `health_links` is rebuilt over everything landed, so the rule
+       stays met after every build and an open Alert is not raised again. The staged October bills nothing in a stay or
+       after a death, so the figures do not move.
+   - **Seed** `tools/seed-la-health.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `phantom-billing` (seed `PR-1241`; a bounded expand over `treated`, `maxFanOut` 80, to its 53
+     patients, the 40 among them; annotate, threshold, window, resolve, snapshot), members (`health.reviewer` and
+     `health.manager` reviewers, `admin` lead; not `health.outsider`), Entity List
+     `billed-in-hospital-or-after-death` (the 40), a Case from `PR-1241` assigned to `health.manager` and linked, an
+     Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `PR-1241` (the admitting
+     hospitals are two hops out, hospital to member to clinic).
+   - **Tests:** `LaHealthTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000; Drafts; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst` equal to `la-utility`'s and `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the
+     shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs' signals); `HealthLinksJobGoldenTest` (runs
+     the counts Job after `health_links`; `theTemplateIsBasicTierOnly` became
+     `theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts`; plus
+     `withoutThePhantomBillingClinicTheRuleWouldNotFire` and
+     `theLookAlikeClinicTheBusyHospitalAndTheKickbackRingAreNeverCounted`); the gallery test pins `la-health` creatable
+     with no missing feature and no Demo Auth; `tools/seed-la-health.test.mjs` (mocked fetch, 11 tests).
+     Falsified, each then restored: the without-`PR-1241` filter dropped (fails: 1 provider); reversed lines counted
+     in the measure (189, the look-alike 15, without `PR-1241` 30: three tests fail); the admitting-hospital exclusion
+     removed from `health_links` (`PR-1129` counts 2: four tests fail, the busy-hospital pin among them);
+     `masking_mode: typed`; `la-settings` given a second capability (differs from `la-card`); `health-analyst` given
+     the approve capability; `admin`'s title changed; `la-health` out of the gallery's Basic-tier set; and in the seed:
+     the outsider made a member, the Draft annotating an admitting hospital (`PR-0199`), the look-alike `PR-0632` added
+     to the seed.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 159, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `health_phantom_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Healthcare* industry Space (`la-healthcare`) with this tier, an OIDC
+     build, the full reactor gate.
+
+   **`la-benefits` BUILT 2026-11-09** (the `la-card` pattern). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`benefits.analyst` lead,
+     `benefits.manager` second approver, `benefits.reviewer` read-only, `benefits.outsider` not a member, and `admin`
+     byte-identical to `la-showcase` and `la-card`), `config/roles.toon` (`benefits-analyst`, `benefits-manager`, and
+     `fraud-analyst`, `la-viewer`, `la-settings` byte-identical to `la-card`'s, since the *Public sector* industry Space
+     composes `la-benefits` with `la-procurement` and a merge of `roles.toon` refuses a role defined twice differently),
+     `four_eyes_fan_out_above: 2000` plus the Drafts limits (10 / 60 / 14) in `link-analysis.toon` (no `masking_mode`; no
+     Entity Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `benefits_deceased_counts` (`sql.template` on `benefits_links`'
+     `job.dataset.produced`, sources `benefits_links`, `claim`, `death_register`, `grace_days_after_notice: "30"`) writes one
+     row: `deceased_claims_paid_after_notice`, `accounts_paid_after_notice` (from the `paid_into` links),
+     `living_claims_into_those_accounts`, `overpayments_stopped_after_notice`, `slowest_stop_after_notice_days`;
+     `benefits_deceased_alerts` (`alert.evaluate`) runs after it; `benefits_paid_to_the_deceased_after_notice` is
+     `max(deceased_claims_paid_after_notice) gte 1`, WARNING, not grouped (a Job output).
+   - **Decided: days are counted from the notice, not the death.** The spec's rule ("a payment to an account linked to a
+     death-register entry") taken literally fires on 259 accounts (every account a dead claimant was ever paid into; 65
+     of them also take a living person's claims, the joint accounts of widows and widowers), and "paid 30 or more days after
+     the death" (the `paid_after_death` screen) fires on 34 claims, the look-alike `CIT-05289` (42 days) among them, because
+     notices arrive 0–60 days late. Every background claim stops 0–5 days after its notice, so the faithful version is a
+     claim still paid more than 30 days after the agency was told. A running claim is measured to the latest date any feed
+     reports (`greatest(max(notified_on), max(start_date))`, 2026-09-30 on the landed data), so a death notified yesterday
+     with its claim still open does not count. The account linkage is kept in the counts (accounts, and who else is paid
+     into them) and in the Investigation, not in the measure.
+   - **Running total, not "new":** the Job recomputes one row from everything landed and holds no prior-run state; a claim
+     paid long after its notice is an overpayment to recover whether or not it has since stopped, so it keeps counting and
+     the rule stays met after every build while the claims are in the data.
+   - **Real figures on the shipped data** (the Job's SQL over the real `benefits_links`, `claim`, `death_register`; pinned by
+     `BenefitsLinksJobGoldenTest`): deceased_claims_paid_after_notice **9** (the nine pensions, 197–327 days past their
+     notices), accounts_paid_after_notice **3** (the story's accounts), living_claims_into_those_accounts **3**
+     (`CIT-08276`'s), overpayments_stopped_after_notice **314** (look-alike included), slowest_stop_after_notice_days **5**.
+     With the nine taken off the death register the Job yields 0 / 0 / 0 / 314 / 5; with only the look-alike on it, 0 / 0 /
+     0 / 1 / 2.
+   - **Seed** `tools/seed-la-benefits.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `paid-after-death` (seeded with the 3 accounts; bounded expands over `paid_into` then `claims`,
+     `maxFanOut` 20 each, to the 12 claims and 10 claimants; annotate `CIT-08276`, threshold, window, resolve, snapshot),
+     members (`benefits.reviewer` and `benefits.manager` reviewers, `admin` lead; not `benefits.outsider`), Entity List
+     `deceased-still-paid` (the 9), a Case from `CIT-08276` assigned to `benefits.manager` and linked, an Investigation
+     template, one unbounded expand held for four-eyes, one open Draft annotating `CIT-08276` (in the Working Set; the
+     expands follow no `lives_at` link, so an address is outside it). The look-alike is in no step.
+   - **Tests:** `LaBenefitsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts equal to `la-card`'s; no masked type; persona capabilities; every persona
+     role defined; `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals); `BenefitsLinksJobGoldenTest` (`theTemplateIsBasicTierOnly` replaced:
+     runs the counts Job after the two link Jobs; the real figures above and the rule fires; without the nine it would not;
+     the late notice never counts, while a count from the death would catch 34); the gallery test pins `la-benefits`
+     creatable with no missing feature and no Demo Auth; `tools/seed-la-benefits.test.mjs` (mocked fetch, 12 tests).
+     Falsified, each then restored: the counts Job counting from the death instead of the notice (38 claims; the look-alike
+     counts; 29 without the nine), the Job counting every post-death payment regardless of the grace (323; 314 without the
+     nine), `masking_mode: typed`, *Bank account* masked, `benefits-analyst` given the approve capability,
+     `benefits.outsider` given `benefits-manager`, `admin` given `benefits-analyst` instead of `fraud-analyst`,
+     `fraud-analyst` without `canRevealLinkEntities`, `la-benefits` out of the gallery's Basic-tier set, and in the seed:
+     the outsider made a member, the Draft annotating an address, the look-alike added to the Entity List.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 9, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `benefits_deceased_alerts` reporting no breach, 0 rejected);
+     the expands' `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
+     Link Analysis UI, the composed *Public sector* industry Space booted (it packs: the packer merges both rosters), the
+     staged month landing (it adds new claims only, starting 2026-10-01 to 2026-10-31, which moves the running-claim
+     cut-off to 2026-10-31 and changes no figure: re-run in DuckDB at integration, 9 / 314 / 5), an OIDC build.
+
    **`la-procurement` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`procurement.analyst` lead,
      `procurement.manager` second approver, `procurement.reviewer` read-only, `procurement.outsider` not a member, and
@@ -1762,6 +1945,193 @@ deviations:
      checked: the recursive trace's cost on data much larger than the shipped 44 559 transfers, the Link Analysis UI, the
      composed *Banking and finance* Space booted with this roster, an OIDC build, and the packed downloads of a commit
      holding this tier (the packer reads HEAD).
+
+   **`la-insider` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job; spec 12's rule as written). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`insider.analyst` lead, `insider.manager`
+     second approver, `insider.reviewer` read-only, `insider.outsider` not a member, and `admin` byte-identical to every
+     other showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`insider-analyst`, `fraud-analyst`,
+     `la-viewer` and `la-settings` as in `la-card`, `insider-manager` with `canApproveLinkExpansions`; the analyst does not
+     hold it), `four_eyes_fan_out_above: 2000` plus Drafts limits (10 / 60 min / 14 days) in `link-analysis.toon`, the
+     values every showcase states. `la-insider` is the only use case in *Enterprise* today, but `la-audit` is to join it, so
+     the shared roles and settings read as elsewhere. No `masking_mode`; no Entity Type masked.
+   - **The Alert Rule is the spec's "a grant without a ticket to a finance system", unchanged.**
+     `insider_ticketless_grant_counts` (`sql.template` on `insider_links`' `job.dataset.produced`) reads the landed
+     `access_grant` feed itself (a grant is a row there; the link Dataset folds grants into one `granted_by` row per pair)
+     and writes one row: `grants_without_ticket`, `finance_grants_without_ticket`, `finance_grantees_without_ticket`,
+     `finance_approvers_without_ticket`. A blank ticket is `nullif(trim(ticket_id), '')`, and the finance systems are
+     `system IN ('AP', 'PAYROLL', 'TREASURY')`, both written as in `insider_links` (`LaInsiderTemplateTest` pins the shared
+     list). `insider_ticketless_grant_alerts` (`alert.evaluate`) runs after it; `insider_finance_grant_without_ticket` is
+     `max(finance_grants_without_ticket) gte 1`, WARNING, not grouped (a Job output, as in `la-utility`). **Privacy:** the
+     Job sends no employee id; the Alert carries a count, and the people are found in the `access_creep` view or the
+     Investigation. The look-alike needs no extra clause: the payroll mover's grant has its ticket.
+   - **Running total, not "new".** The count covers every landed grant, so the rule stays met after every build. A
+     `sql.template` Job keeps no watermark of what it counted last time, and the Alert stays one open Alert while the
+     breach lasts (an Alert is de-duplicated while a non-terminal one exists), so a running total gives one Alert for the
+     story, not one per build. The staged October brings 22 grants, all ticketed, so the count stays 8.
+   - **Real figures on the shipped data** (the counts Job over the real landed `access_grant`; pinned by
+     `InsiderLinksJobGoldenTest`, first counted over the CSV): grants_without_ticket **258** (every one has an approver;
+     all but the 8 are to ordinary systems: `WIKI` 60, `MAIL` 59, `TICKETS` 43, `CODE` 26, `ERP` 23, `DWH` 21, `CRM` 11,
+     `CONTRACTS` 7); finance_grants_without_ticket **8** (exactly the ground truth's 8 `PAYROLL` and `TREASURY` grants to
+     `EMP-0482`, `EMP-0636`, `EMP-1059`, `EMP-1415`); finance_grantees_without_ticket **4**; finance_approvers_without_ticket
+     **1** (`EMP-0007`). Without `EMP-0007`'s grants the Job yields 249 / 0 / 0 / 0 (it also made one ordinary ticketless
+     grant, `MAIL` to `EMP-2957`); without the four reports' grants, 0 finance; the mover `EMP-0062`'s grants alone (its
+     `PAYROLL` under `REQ-163776`), 0. A rule on the ticket alone would count 258, on the finance system alone 134.
+   - **Seed** `tools/seed-la-insider.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth's
+     `access_creep`): Investigation `access-creep` (seed `EMP-0007`; one bounded expand over `granted_by`, `maxFanOut` 20, to
+     the 11 reports whose grants it approved, the four among them, and its own approver `EMP-1096`, 12 neighbours counted
+     over the CSV; annotate, threshold, window, resolve, snapshot), members (`insider.reviewer` and `insider.manager`
+     reviewers, `admin` lead; not `insider.outsider`), Entity List `finance-access-review` (the four reports), a Case from
+     `EMP-0007` assigned to `insider.manager` and linked, an Investigation template, one unbounded expand held for four-eyes,
+     one open Draft annotating `EMP-0482` (in the Working Set after the expand; `VEN-0264`, whose bank account it changed,
+     is two hops out). The mover is in no step. The access-creep story was chosen as the Investigation's because the
+     Alert Rule is about it.
+   - **Tests:** `LaInsiderTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined and `fraud-analyst`,
+     `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the
+     Jobs' signals and the finance list shared with `insider_links`); `InsiderLinksJobGoldenTest` (the counts Job loaded
+     with the link and screen Jobs and fired by the same signal; the real figures above and the rule's own measure and
+     threshold fire; the Job's own SQL without `EMP-0007`, and without the four reports, would not fire; the mover is
+     granted `PAYROLL` with its ticket yet never counted; the old "Basic tier only" test replaced); the gallery test pins
+     `la-insider` creatable with no missing feature and no Demo Auth; `tools/seed-la-insider.test.mjs` (mocked fetch, 11
+     tests). Falsified, each then restored: the counts Job counting every finance grant, ticket or not (134 counted; the
+     positive, the no-manager and the mover tests go red; the no-reports assertion sits behind the no-manager one in its
+     method), the counts Job counting ticketless grants to any system (258; the positive and no-manager tests go red),
+     `masking_mode: typed`, `insider-analyst` given the approve capability, `admin` given `insider-analyst`, `la-insider`
+     out of the gallery's Basic-tier set, `fraud-analyst` removed, and in the seed: the outsider made a member, the Draft
+     annotating `VEN-0264`, the mover added to the Entity List, the first expand unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 8, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `insider_ticketless_grant_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
+     Also not checked: the Link Analysis UI, the composed *Enterprise* industry Space booted with this tier, the staged
+     month landing through the Pipelines, an OIDC build, and the packed downloads of a commit holding this tier (the packer
+     reads HEAD).
+
+   **`la-logistics` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job; spec 11's "a high-value
+   trip assigned to a carrier under 60 days old"). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`logistics.analyst` lead,
+     `logistics.manager` second approver, `logistics.reviewer` read-only, `logistics.outsider` not a member, and `admin`
+     byte-identical to every other showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon`
+     (`logistics-analyst`, `fraud-analyst`, `la-viewer` and `la-settings` exactly as in `la-card`, `logistics-manager`
+     with `canApproveLinkExpansions`), `four_eyes_fan_out_above: 2000` plus the same Drafts block (10 / 60 min / 14 days)
+     in `link-analysis.toon`. `la-logistics` is the only use case of the *Logistics* industry Space
+     (`la-logistics-industry`), but the shared values are kept identical so any later composition merges cleanly. No
+     `masking_mode`; no Entity Type masked.
+   - **The Alert Rule is the spec's rule plus the carrier's insurance.** Read literally, "a high-value trip assigned to a
+     carrier under 60 days old" fires on the look-alike: the new insured owner-operator `CAR-057` took 9 high-value loads
+     in its first 60 days. What spec 11 itself sets the look-alike apart by is "a new, *insured* carrier that delivers";
+     "delivers" is an outcome known only after the loss, insurance is on the carrier register when the load is given. So
+     `logistics_new_carrier_counts` (`sql.template` on `logistics_links`' `job.dataset.produced`, sources
+     `logistics_links` only) reads the `carried_by` links (the very high-value and under-60-days test of the
+     `new_carrier` screen) and writes one row: `new_carrier_high_value_trips`, `uninsured_new_carrier_high_value_trips`
+     (`insured:N`), `uninsured_new_carriers`. `logistics_new_carrier_alerts` (`alert.evaluate`) runs after it;
+     `logistics_high_value_trip_new_carrier` is `max(uninsured_new_carrier_high_value_trips) gte 1`, WARNING, not
+     grouped (a Job output). The Job sends no carrier, driver or trip id; the Alert carries a count.
+   - **Separated from the background without loss reports.** Background losses are about 1 in 400 trips (31 of the 12 872
+     landed trips; the ground truth's 34 include 3 in the staged month). A rule on a new carrier's *lost* high-value loads would also count `TR-01415` (`CAR-091`, 49 days old,
+     insured, short-delivered), so the rule reads no loss report at all. The shared phone (`same_phone` to `DRV-0895`, a
+     driver of another carrier who left after a theft) also separates the story, but owner-operators share their own
+     driver's phone and 5 of the 14 have a driver with a background loss, so insurance is the steadier separator.
+   - **Running total, not "new".** The count covers every landed trip, so the rule stays met after every build. A
+     `sql.template` Job keeps no watermark of what it counted last time, and the Alert stays one open Alert while the
+     breach lasts, so a running total gives one Alert for the story, not one per build.
+   - **Real figures on the shipped data** (the counts Job over the real `logistics_links`; pinned by
+     `LogisticsLinksJobGoldenTest`, first computed with DuckDB over the CSV files): new_carrier_high_value_trips **16**
+     (`CAR-022` 5, `CAR-057` 9, `CAR-091` 1, `CAR-115` 1; equal to the `new_carrier` screen's `carried_by` rows);
+     uninsured_new_carrier_high_value_trips **5** (exactly the ground truth's 5 trips of `CAR-022`);
+     uninsured_new_carriers **1**. Without `CAR-022`: 11 / 0 / 0. `CAR-057` alone: 9 / 0 / 0. Without the age test, 56
+     high-value trips are uninsured (12 uninsured carriers; 51 of those trips are the 11 established ones'). The staged
+     month adds no carrier, so it cannot change the figures (not run through the Pipelines).
+   - **Seed** `tools/seed-la-logistics.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `fictitious-carrier` (seed `CAR-022`; one bounded expand over `carried_by` and `same_phone`,
+     `maxFanOut` 20, to its 5 loads and `DRV-0895`; annotate, threshold, window 2025-10-01 to 2026-10-01, resolve,
+     snapshot), members (`logistics.reviewer` and `logistics.manager` reviewers, `admin` lead; not `logistics.outsider`),
+     Entity List `suspect-carriers` (`CAR-022`, `DRV-0895`), a Case from `CAR-022` assigned to `logistics.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `DRV-0895` (in
+     the Working Set after the expand; his old theft trip `TR-09616` is two hops out). `CAR-057` is in no step.
+   - **Tests:** `LaLogisticsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined and
+     `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals; the counts Job and the `new_carrier` screen share the age test and the
+     counts Job reads no loss); `LogisticsLinksJobGoldenTest` (the counts Job fired by the `logistics_links` signal with
+     the screen Job; the figures above and the rule's own measure and threshold fire; the Job's own SQL without `CAR-022`
+     would not fire; the one background loss a loss-based rule would catch; `CAR-057` has 9 high-value loads yet is never
+     counted; the old "Basic tier only" test replaced); the gallery test pins `la-logistics` creatable with no missing
+     feature and no Demo Auth; `tools/seed-la-logistics.test.mjs` (mocked fetch, 11 tests). Falsified, each then
+     restored: the counts Job without the insured test (16 counted; the positive, the no-`CAR-022` and the owner-operator
+     tests all go red), `masking_mode: typed`, `logistics-analyst` given the approve capability, `admin` given
+     `logistics-analyst`, `la-logistics` out of the gallery's Basic-tier set, `fraud-analyst` removed, `la-viewer` given a
+     capability; in the seed the outsider made a member, the Draft annotating `TR-09616` (two hops out), `CAR-057` added
+     to the Entity List, the first expand unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 5, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `logistics_new_carrier_alerts` reporting no breach,
+     0 rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not
+     observed. Also not checked: the Link Analysis UI, the composed *Logistics* industry Space with this tier, the staged
+     month, an OIDC build, and the packed downloads of a commit holding this tier (the packer reads HEAD).
+
+   **`la-telco-ra` BUILT 2026-11-09** (the `la-card` pattern; spec 10's "usage without billing over 1 day for a
+   subscriber"). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`telcora.analyst` lead,
+     `telcora.manager` second approver, `telcora.reviewer` read-only, `telcora.outsider` not a member, and `admin`
+     byte-identical to `la-showcase`, `la-card` and `la-ownership`), `config/roles.toon` (`telcora-analyst`,
+     `fraud-analyst`, `telcora-manager`, `la-viewer`, `la-settings`; the three shared roles byte-identical to `la-card`'s,
+     since the packer merges roles by name and the *Telecom* industry Space composes this with `la-mfs`), and
+     `four_eyes_fan_out_above: 2000` plus `la-card`'s Drafts block in `link-analysis.toon` (no `masking_mode`; no Entity
+     Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `telco_ra_unbilled_counts` (`sql.template` on `telco_ra_links`'
+     `job.dataset.produced`; sources `subscriber`, `network_usage`, `billing_record`, not the link Dataset, so it does not
+     parse `via`; `min_unbilled_months: "2"`) writes one row: `unbilled_subscribers`, `known_list_subscribers`,
+     `other_unbilled_subscribers`; `telco_ra_unbilled_alerts` (`alert.evaluate`) runs after it;
+     `telco_ra_usage_without_billing` is `max(unbilled_subscribers) gte 1`, WARNING, not grouped (a Job output).
+   - **Real figures on the shipped data** (the Job run after `telco_ra_links` in `TelcoRaLinksJobGoldenTest`, and the same
+     SQL over the CSVs outside the engine): unbilled_subscribers **300** (exactly `DL-047`'s story SIMs), known_list_subscribers
+     **40** (`DL-000`'s test SIMs), other_unbilled_subscribers **62** (the 12 late-billed and the 50 single dropped months).
+     Landed plus staged: the same 300 / 40 / 62 (checked outside the engine, not pinned). With the story's SIMs taken out:
+     0 counted. Each guard measured by dropping it: no known-list exclusion 340, no "still unbilled" condition 312, no
+     billing-landed gate with September's billing file not yet landed 355 (with the gate: 300).
+   - **Decided while building:**
+     - **"Over 1 day" reads "over one period", and a period is a month.** The feeds were built monthly (Basic-tier
+       deviation), so a day cannot be seen. A subscriber counts when NOT on the known list (plan `Internal test`), with
+       usage and no billing record in 2 or more months (the `unbilled_usage` screen's own threshold), the latest of them
+       still unbilled. A literal "any unbilled month" would fire on the 50 single dropped months and the 12 late-billed
+       SIMs without the story (362 in all), so the rule would not tell the story from the reconciliation's ordinary noise.
+       The "still unbilled" condition is what keeps the 12 late-billed SIMs out (their first two months were never billed,
+       every later one was): leakage that stopped is not the alarm.
+     - **The known list is the plan `Internal test`**, as the generator and the Basic-tier view state it. It is a
+       literal in the SQL, not a parameter (one list, nothing asked to configure it).
+     - **A month is judged only once its billing file has landed** (`JOIN` on the billing periods present), the
+       `la-utility` lesson: on a first boot a month's usage file can land before its billing file, and every subscriber
+       used that month would read as unbilled (355 counted in the test). `telco_ra_links`' own `unbilled_months:` in `via`
+       has the same transient on a first boot; that is the Basic tier, not changed here.
+     - **A running total, not a "new" count** (as `la-police` and `la-ownership` decided): an unbilled SIM stays unbilled
+       until someone fixes billing, so the rule stays met after every build and the open Alert is not raised twice; the
+       staged month changes nothing. A per-build "new" count would need the previous build, which a `sql.template` Job
+       cannot see.
+     - The Draft annotates `DL-047` about `DEV-00086`: the bounded expand follows `activated_by` only, so the device is
+       two hops out (dealer, SIM, device) and annotating it would be refused.
+   - **Seed** `tools/seed-la-telco-ra.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `unbilled-usage` (seed `DL-047`; a bounded expand over `activated_by`, `maxFanOut` 400, to the dealer's
+     336 subscribers, the 300 among them; annotate, threshold, window, resolve, snapshot), members (`telcora.reviewer` and
+     `telcora.manager` reviewers, `admin` lead; not `telcora.outsider`), Entity List `unbilled-sims` (the 300), a Case from
+     `DL-047` assigned to `telcora.manager` and linked, an Investigation template, one unbounded expand held for four-eyes,
+     one open Draft. The test dealer and its SIMs are in no step.
+   - **Tests:** `LaTelcoRaTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000, Drafts; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst`, `la-viewer`, `la-settings` as in `la-card`; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals); `TelcoRaLinksJobGoldenTest` (runs the counts Job after the link Jobs;
+     the figures above and the rule fires; without the story's SIMs it would not; the story's SIMs alone give 300; the
+     test SIMs alone are seen and never counted; the late-billed and dropped alone are never counted; with September's
+     billing not yet landed the count stays 300); the gallery test pins `la-telco-ra` creatable with no missing feature
+     and no Demo Auth; `tools/seed-la-telco-ra.test.mjs` (mocked fetch, 12 tests, including the shared roles byte for byte
+     as in `la-card`). Falsified, each then restored: the known list not excluded, the "still unbilled" condition dropped,
+     the billing-landed gate dropped, `masking_mode: typed`, `telcora-analyst` given the approve capability,
+     `fraud-analyst` removed, `la-settings` given a second capability, `admin` given `telcora-analyst`, `la-telco-ra` out
+     of the gallery's Basic-tier set; in the seed the outsider made a member, the Draft annotating `DEV-00086`, the test
+     dealer seeded, the expand narrowed below the dealer's 336, `la-viewer` given a capability.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 300, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `telco_ra_unbilled_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Telecom* Space booted (it packs from the integration commit with
+     both rosters merged: 9 users, 7 roles, both Alert Rules), and an OIDC build.
 
 **Docs, with each Space**
 

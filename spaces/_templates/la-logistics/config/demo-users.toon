@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  logistics.analyst,Demo Cargo Security Analyst,Cargo security analyst (lead),logistics-analyst
+  logistics.manager,Demo Cargo Security Manager,Cargo security manager (second approver),logistics-manager
+  logistics.reviewer,Demo Cargo Security Reviewer,Reviewer (read-only),la-viewer
+  logistics.outsider,Demo Cargo Security Outsider,Not a member of the Investigation,la-viewer

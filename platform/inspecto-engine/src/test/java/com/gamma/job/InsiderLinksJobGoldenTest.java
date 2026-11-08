@@ -40,13 +40,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * connected group, no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its
  * story whole, shows the look-alike beside it but apart from it, and fits the canvas (under 1 000 nodes, under 4 000 rows). The
  * facts behind each story in the files themselves are pinned by {@code tools/gen-la-insider-data.test.mjs}.
+ * The Advanced tier's {@code insider_ticketless_grant_counts} Job runs on the same signal: its Alert Rule fires on the access-creep
+ * manager's ticketless payroll and treasury grants, would not without them, and never counts the employee moved into payroll
+ * with a ticket.
  */
 class InsiderLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-insider");
     private static final List<String> FEEDS = List.of("employee", "access_grant", "access_daily", "email_external", "expense", "vendor_change");
-    private static final List<String> JOBS = List.of("insider_links", "insider_screen_links");
+    private static final String COUNTS = "insider_ticketless_grant_counts";
+    // the Advanced tier's counts Job is fired by the same insider_links signal; its one row of counts is no link Dataset
+    private static final List<String> JOBS = List.of("insider_links", "insider_screen_links", COUNTS);
 
     @TempDir static Path tmp;
     private static Path data;
@@ -101,13 +106,60 @@ class InsiderLinksJobGoldenTest {
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/" + COUNTS + "_job.toon",
+                "config/jobs/insider_ticketless_grant_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(COUNTS + "_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), COUNTS + " is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet(COUNTS);
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: 258 grants with no ticket, 8 of them to a finance system - exactly the access-creep
+        // manager's payroll and treasury grants to four reports
+        JsonNode ac = truth.get("access_creep");
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(258L, ((Number) row.get("grants_without_ticket")).longValue());
+        assertEquals(8L, ((Number) row.get("finance_grants_without_ticket")).longValue());
+        assertEquals(ac.get("grants").size(), ((Number) row.get("finance_grants_without_ticket")).intValue(), "every planted grant, nothing else");
+        assertEquals(ac.get("reports").size(), ((Number) row.get("finance_grantees_without_ticket")).intValue(), "the four reports");
+        assertEquals(1L, ((Number) row.get("finance_approvers_without_ticket")).longValue(), "one manager");
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/insider_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+    }
+
+    @Test
+    void withoutTheAccessCreepManagerTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same feed with the manager's grants taken out: no finance grant without a ticket
+        String manager = truth.get("access_creep").get("manager").asText();
+        Map<String, Object> without = countsOver("coalesce(granted_by, '') <> '" + manager + "'");
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(0L, ((Number) without.get("finance_grants_without_ticket")).longValue(), "without " + manager + ": " + without);
+        assertTrue(((Number) without.get("finance_grants_without_ticket")).doubleValue() < rule.threshold(), "it would not fire");
+        // 258 less the manager's 8 finance grants and its one ordinary ticketless grant to another system
+        assertEquals(249L, ((Number) without.get("grants_without_ticket")).longValue(), "the background's ticketless grants to other systems are still there");
+        // and the four reports are the grants: with them taken out it would not fire either
+        String reports = String.join("', '", ids(truth.get("access_creep").get("reports")));
+        Map<String, Object> noReports = countsOver("employee_id NOT IN ('" + reports + "')");
+        assertEquals(0L, ((Number) noReports.get("finance_grants_without_ticket")).longValue(), noReports.toString());
+    }
+
+    @Test
+    void theEmployeeMovedIntoPayrollIsGrantedFinanceAccessButNeverCounted() throws Exception {
+        JsonNode ac = truth.get("access_creep");
+        String mover = ac.get("lookalike_employee").asText();
+        // the counts Job's own SQL over the real feed with only the mover's grants: a finance grant, but with its ticket
+        String grants = parquet("access_grant/database", "/**/*.parquet");
+        assertEquals(1, count("SELECT count(*) FROM " + grants + " WHERE employee_id = '" + mover + "' AND system = 'PAYROLL' AND ticket_id = '"
+                + ac.get("lookalike_ticket").asText() + "'"), mover + " is granted PAYROLL under its ticket");
+        Map<String, Object> only = countsOver("employee_id = '" + mover + "'");
+        assertEquals(0L, ((Number) only.get("finance_grants_without_ticket")).longValue(), mover + " " + only);
+        assertEquals(0L, ((Number) only.get("finance_grantees_without_ticket")).longValue(), mover + " " + only);
     }
 
     @Test
@@ -278,6 +330,26 @@ class InsiderLinksJobGoldenTest {
             if (Integer.parseInt(via.replaceAll("^approvals:([0-9]+)\\|.*", "$1")) >= 20) heavy++;
         }
         assertEquals(m.get("lookalike_heavy_reports").size(), heavy, "a busy field team, approved often and never approving back");
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/insider_finance_grant_without_ticket.toon").toString()));
+    }
+
+    /** The counts Job's own SQL over the real landed access grants, narrowed. */
+    private static Map<String, Object> countsOver(String grantFilter) throws Exception {
+        String sql = JobConfig.load(TEMPLATE.resolve("config/jobs/" + COUNTS + "_job.toon").toString()).require("sql");
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW access_grant AS SELECT * FROM " + parquet("access_grant/database", "/**/*.parquet") + " WHERE " + grantFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     /** Every node reachable from {@code start} over the given links (either direction). */

@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  telcora.analyst,Demo Revenue Assurance Analyst,Revenue assurance analyst (lead),telcora-analyst
+  telcora.manager,Demo Revenue Assurance Manager,Revenue assurance manager (second approver),telcora-manager
+  telcora.reviewer,Demo Revenue Assurance Reviewer,Reviewer (read-only),la-viewer
+  telcora.outsider,Demo Revenue Assurance Outsider,Not a member of the Investigation,la-viewer

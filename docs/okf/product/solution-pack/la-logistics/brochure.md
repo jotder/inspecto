@@ -25,7 +25,7 @@ Each story has an innocent look-alike that a simple count or threshold would als
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier is planned, with personas, an Alert Rule for a high-value trip given to a carrier under 60 days old, and a seeding script.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead analyst, second approver, read-only reviewer, outsider), an Alert Rule on a high-value trip given to an uninsured carrier under 60 days old, and a seeding script for the Investigation, a watch list of suspect carriers, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 

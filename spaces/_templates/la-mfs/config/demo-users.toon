@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  mfs.analyst,Demo MFS Fraud Analyst,Fraud analyst (lead),mfs-analyst
+  mfs.manager,Demo MFS Fraud Manager,Fraud operations manager (second approver),mfs-manager
+  mfs.reviewer,Demo MFS Fraud Reviewer,Reviewer (read-only),la-viewer
+  mfs.outsider,Demo MFS Fraud Outsider,Not a member of the Investigation,la-viewer

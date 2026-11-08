@@ -77,6 +77,56 @@ new HR extract, and the planted stories stay as they are.
 Stop the product, delete `inspecto-la-data/la-insider/`, and unzip the data download again. The Space
 configuration is untouched.
 
+## Advanced tier: personas, the finance-grant Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `insider_finance_grant_without_ticket` is loaded but not armed, and the
+`insider_ticketless_grant_counts` and `insider_ticketless_grant_alerts` Jobs run after each `insider_links` build; the
+second finds no armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs people
+in by name with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the six Pipelines have landed and `insider_links` has run (a minute or two), create the runtime state from a
+checkout of the repository:
+
+```bash
+node tools/seed-la-insider.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `access-creep` (seeded
+with the operations manager `EMP-0007`, expanded once over `granted_by` to the 11 people whose grants it approved, the
+four reports `EMP-0482`, `EMP-0636`, `EMP-1059` and `EMP-1415` among them, and to its own approver; annotated,
+snapshotted), its members, the Entity List `finance-access-review` (the four reports), a Case assigned to
+`insider.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
+person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
+`node tools/seed-la-insider.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `insider.analyst` | `insider-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `insider.manager` | `insider-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `insider.reviewer` | `la-viewer`, member as reviewer | reads `access-creep`; any change is refused (403) |
+| `insider.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `insider_finance_grant_without_ticket` (WARNING) reads the one row of
+`insider_ticketless_grant_counts` and fires when one or more access grants to a finance system (`AP`, `PAYROLL`,
+`TREASURY`) have no ticket. On the shipped data **258** grants have no ticket, and the Alert carries **8**: the payroll
+and treasury grants `EMP-0007` gave its four reports (one approver, four employees). Every other ticketless grant is to
+an ordinary system such as `WIKI` or `MAIL`, which a rule on the ticket alone would have counted too. The payroll officer
+`EMP-0062`, moved into payroll and granted `PAYROLL` under `REQ-163776`, is not counted, nor are the finance staff who
+pick up a second finance system with a ticket. The count is a running total over every landed grant, so the rule stays
+met after every build (one open Alert, not one per build); October brings no ticketless grant. The Alert names a count,
+never a person; `access_creep` shows who. The rule is not grouped by approver, because `insider_ticketless_grant_counts`
+is a Job output: a `by` column cannot be checked against its Schema when the Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash
