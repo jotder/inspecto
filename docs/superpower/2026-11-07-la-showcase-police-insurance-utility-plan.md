@@ -1510,6 +1510,64 @@ deviations:
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
 
+   **`la-mfs` BUILT 2026-11-09** (the `la-card` pattern: personas, four-eyes, a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`mfs.analyst` lead, `mfs.manager`
+     second approver, `mfs.reviewer` read-only, `mfs.outsider` not a member, and `admin` exactly as in `la-showcase`:
+     `admin;fraud-analyst;la-settings`), `config/roles.toon` (`mfs-analyst`, `mfs-manager`, and `fraud-analyst`,
+     `la-viewer`, `la-settings` line for line as in `la-card`), `four_eyes_fan_out_above: 2000` plus the Drafts limits in
+     `link-analysis.toon`, the same values as `la-card` (the *Telecom* industry Space composes `la-mfs` with `la-telco-ra`,
+     and the packer refuses a setting two use cases state differently). No `masking_mode`; no Entity Type masked.
+   - **Alert Rule "a wallet drained within 2 hours of a SIM swap", as a registry rule over a counts Job:**
+     `mfs_swap_drain_counts` (`sql.template` on `mfs_links`' `job.dataset.produced`, `min_out_within_2h: "300"`) reads the
+     `out_within_2h:` evidence on each `swapped_by` link (what the wallet paid out, P2P, merchant payments and cash-outs,
+     within 2 hours after the swap; the Basic tier put it there for this rule) and writes one row: `drained_after_swap`
+     (distinct wallets with 300 or more), `logins_behind_drains` (distinct staff logins that made those swaps) and
+     `largest_other_out_within_2h` (the margin); `mfs_swap_drain_alerts` (`alert.evaluate`) runs after it;
+     `mfs_wallet_drained_after_sim_swap` is `max(drained_after_swap) gte 1`, WARNING, not grouped (a Job output, as in
+     `la-utility` and `la-card`).
+   - **Decided while building:**
+     - **"Drained" means paid out 300 or more within 2 hours.** The corpus has no opening balances (Basic tier note), so no
+       share of a balance can be computed. 300 sits between the two populations with room on both sides: the 30 takeover
+       wallets paid out 463.26 to 1 837.18, every other swapped wallet 98.14 at most (`S-32`'s customer; the store's
+       largest is 76.83). A rule on how many swaps a login makes would fire on the store's upgrade drive (`S-72`, 51 in 10
+       days); the rule reads money out only, so the look-alike cannot reach it.
+     - **Running total, not "new".** The count is over every `swapped_by` link in the Dataset, so the rule stays met after
+       every build (the open Alert is not raised again). The staged October month adds 60 `swapped_by` links and leaves the figures at
+       30 / 1 / 98.14 (checked with DuckDB over landed plus staged). A per-build "new drains" count is a later refinement.
+     - The Draft step annotates `S-41` (the seed) about the mules: a mule is two hops out (`S-41` to victim wallet to mule),
+       so annotating one would be refused.
+   - **Real figures on the shipped data** (the counts Job's SQL over the real `mfs_links`; pinned by
+     `MfsLinksJobGoldenTest`): drained_after_swap **30** (exactly the ground truth's `victims`), logins_behind_drains **1**
+     (`S-41`), largest_other_out_within_2h **98.14**. With the victims' `swapped_by` links taken out: 0 / 0, no Alert. Over
+     only `S-72`'s 160 swaps: 0 / 0.
+   - **Seed** `tools/seed-la-mfs.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `sim-swap-takeover` over `mfs_links_dataset` (Entity Type `telecom_entity`; seed `S-41`; a bounded
+     expand over `swapped_by`, `maxFanOut` 80, to its 40 swapped wallets, the 30 victims and its ten ordinary swaps;
+     annotate, threshold, window, resolve, snapshot), members (`mfs.reviewer` and `mfs.manager` reviewers, `admin` lead;
+     not `mfs.outsider`), Entity List `mule-wallets` (the five mules), a Case from `S-41` assigned to `mfs.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft.
+   - **Tests:** `LaMfsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000; no masked type; persona capabilities; every persona role defined and `fraud-analyst`, `la-viewer`,
+     `la-settings` equal to `la-card`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs'
+     signals); `MfsLinksJobGoldenTest` (the counts Job runs after `mfs_links`; `theTemplateIsBasicTierOnly` became
+     `theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts`: the real figures, the rule's own measure and
+     threshold fire, the counted wallets are the victims and the login is `S-41`;
+     `withoutTheTakeoverWalletsTheRuleWouldNotFire`; `theStoresSimUpgradeDriveIsNeverCounted`); the gallery test pins
+     `la-mfs` creatable with no missing feature and no Demo Auth; `tools/seed-la-mfs.test.mjs` (mocked fetch, 11 tests).
+     Falsified, each then restored: the counts Job counting the swaps of a bursting login instead of money out (200
+     wallets, `S-72`'s 160 counted, all three engine tests fail), the "without" filter keeping the victims, `masking_mode:
+     typed`, `mfs-analyst` given the approve capability, `admin` given `mfs-analyst`, `fraud-analyst` removed, `la-mfs` out
+     of the gallery's Basic-tier set, and in the seed: the outsider made a member, the Draft annotating a mule, `S-72`
+     added to the seed.
+   - **Open for the *Telecom* composition:** the packer joins only `link-analysis.toon` and `config/examples/*.md`; any
+     other path two use cases ship with different bytes is refused. When `la-telco-ra` gains its own
+     `config/demo-users.toon` and `config/roles.toon`, composing *Telecom* will refuse both files until the packer merges
+     rosters and role tables (or the two templates ship one shared file). Not changed in this lane.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 30, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `mfs_swap_drain_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Telecom* industry Space with this tier, an OIDC build.
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),

@@ -297,7 +297,7 @@ class ControlApiSpaceTemplatesTest {
      * {@code demo-auth}; the test's own {@code starter} is such a template and {@code la-sample} has no roster.
      * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
      * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims},
-     * {@code la-mobile-money}, {@code la-audit}, {@code la-showcase}, {@code la-utility} and {@code la-card} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
+     * {@code la-mobile-money}, {@code la-audit}, {@code la-showcase}, {@code la-utility}, {@code la-card} and {@code la-mfs} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
      * none of them needing Demo Auth. With an
      * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
      * without the roster check every one of them lists {@code creatable: true}.
@@ -306,7 +306,7 @@ class ControlApiSpaceTemplatesTest {
     void galleryCountsTheDemoUserSignInATemplateNeeds(@TempDir Path root) throws Exception {
         seedTemplate(root);
         Files.writeString(root.resolve("_templates/starter/config/demo-users.toon"), "users[0]:\n");
-        for (String shipped : java.util.List.of("la-audit", "la-card", "la-claims", "la-mobile-money", "la-police", "la-sample", "la-showcase", "la-utility")) {
+        for (String shipped : java.util.List.of("la-audit", "la-card", "la-claims", "la-mfs", "la-mobile-money", "la-police", "la-sample", "la-showcase", "la-utility")) {
             Path src = Path.of("..", "spaces", "_templates", shipped);
             Path dst = root.resolve("_templates").resolve(shipped);
             Files.createDirectories(dst);
@@ -323,7 +323,7 @@ class ControlApiSpaceTemplatesTest {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
                     // la-sample has no roster; the shipped showcases with a Basic tier keep theirs inert, so it does not refuse them
-                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase", "la-police", "la-utility", "la-card");
+                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase", "la-police", "la-utility", "la-card", "la-mfs");
                     String id = t.get("id").asText();
                     boolean needsDemo = !"la-sample".equals(id) && !basicTier.contains(id);
                     boolean named = false;

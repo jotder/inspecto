@@ -25,7 +25,7 @@ Each story has an innocent look-alike that a simple threshold would also flag. A
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier is planned, with personas, an Alert Rule for a wallet drained within 2 hours of a SIM swap, and a seeding script.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead analyst, second approver, read-only reviewer, outsider), an Alert Rule for a wallet drained within 2 hours of a SIM swap, and a seeding script for the Investigation, the list of mule wallets, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 
