@@ -1,0 +1,36 @@
+name: wallet_txn
+active: true
+description: "Mobile financial services fraud Link Analysis showcase - One row per wallet transaction: cash_in (agent to wallet), cash_out (wallet to agent), p2p (wallet to wallet), merchant_pay (wallet to merchant) and settlement (a merchant's sweep to its bank account), with the amount, when, and the handset that approved it (blank for a cash-in, which the agent's till starts, and for a settlement). One file per month (WALLET_TXN_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-mfs-data.py."
+
+dirs:
+  poll:       data/inbox/wallet_txn
+  database:   data/wallet_txn/database
+  backup:     data/wallet_txn/backup
+  temp:       data/wallet_txn/temp
+  errors:     data/wallet_txn/errors
+  quarantine: data/wallet_txn/quarantine
+  markers:    data/wallet_txn/markers
+  status_dir: data/wallet_txn/status
+  log_dir:    data/wallet_txn/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: wallet_txn_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

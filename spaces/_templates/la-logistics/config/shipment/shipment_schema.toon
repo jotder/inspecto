@@ -1,0 +1,32 @@
+raw:
+  name: SHIPMENT
+  format: CSV
+  fields[6]{name,selector,type}:
+    shipment_id,"0",VARCHAR
+    shipper,"1",VARCHAR
+    consignee,"2",VARCHAR
+    goods,"3",VARCHAR
+    value,"4",DOUBLE
+    booked_at,"5",TIMESTAMP
+mapping:
+  canonicalName: shipment
+  rawName: SHIPMENT
+  fields[6]:
+    - name: shipment_id
+      from: shipment_id
+      fn: keep
+    - name: shipper
+      from: shipper
+      fn: keep
+    - name: consignee
+      from: consignee
+      fn: keep
+    - name: goods
+      from: goods
+      fn: keep
+    - name: value
+      from: value
+      fn: keep
+    - name: booked_at
+      from: booked_at
+      fn: keep

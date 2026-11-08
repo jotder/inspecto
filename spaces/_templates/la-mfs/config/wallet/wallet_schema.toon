@@ -1,0 +1,28 @@
+raw:
+  name: WALLET
+  format: CSV
+  fields[5]{name,selector,type}:
+    wallet_id,"0",VARCHAR
+    msisdn,"1",VARCHAR
+    kyc_level,"2",INTEGER
+    opened_at,"3",TIMESTAMP
+    registered_by_agent,"4",VARCHAR
+mapping:
+  canonicalName: wallet
+  rawName: WALLET
+  fields[5]:
+    - name: wallet_id
+      from: wallet_id
+      fn: keep
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: kyc_level
+      from: kyc_level
+      fn: keep
+    - name: opened_at
+      from: opened_at
+      fn: keep
+    - name: registered_by_agent
+      from: registered_by_agent
+      fn: keep

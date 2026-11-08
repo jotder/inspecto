@@ -1,0 +1,36 @@
+name: cluster_hint
+active: true
+description: "Crypto laundering Link Analysis showcase - One row per address the common-input heuristic puts in a cluster (addresses spent together in one transaction are taken to have one owner); addresses never spent together have no row. One extract (CLUSTER_HINT_20260930.csv); October's new addresses are in data/staged. Synthetic; regenerate with tools/gen-la-crypto-data.py."
+
+dirs:
+  poll:       data/inbox/cluster_hint
+  database:   data/cluster_hint/database
+  backup:     data/cluster_hint/backup
+  temp:       data/cluster_hint/temp
+  errors:     data/cluster_hint/errors
+  quarantine: data/cluster_hint/quarantine
+  markers:    data/cluster_hint/markers
+  status_dir: data/cluster_hint/status
+  log_dir:    data/cluster_hint/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: cluster_hint_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

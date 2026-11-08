@@ -1,0 +1,23 @@
+name: mfs_merchant_quick_pay
+description: "Merchant quick pay - every payment to a merchant paid by 30 or more wallets within 60 minutes after a cash-in (via on paid = payments and within_60m_of_cash_in), the merchant's settlement account (via on settles_to = when it opened, settlements, settlement days) and the agents where those quick payers were cashed in first. Shoppers often cash in next door and pay at once; a merchant fed only by freshly funded wallets is a cash-out channel."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: mfs_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","merchant_quick_pay"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

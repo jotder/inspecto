@@ -113,6 +113,9 @@ Rules:
 | Trade finance | `trade_phantom_shipment` | `phantom_shipment` |
 | Trade finance | `trade_circular_trade` | `circular_trade` |
 | Trade finance | `trade_shell_importers` | `shell_importers` |
+| Crypto laundering (`la-crypto`, built 2026-11-08 with these names) | `hack_peel_chain` | `hack_peel_chain` |
+| Crypto laundering | `mixer_hop_timing_match` | `mixer_hop_timing_match` |
+| Crypto laundering | `converging_cash_out` | `converging_cash_out` |
 | Financial crime tour | `mule_layering_ring` (`la-showcase`) | `mule_layering_ring` |
 | Financial crime tour | `mule_large_transfers` | `mule_ring_large_transfers` |
 | Financial crime tour | `mule_structuring` | `structuring_smurfing` |
@@ -164,6 +167,17 @@ Rules:
 | `health_pill_mill` | `pill_mill` |
 | `health_upcoding` | `upcoding_clinics` |
 
+**Logistics** (`la-logistics`, built 2026-11-08 with these names)
+
+| Today | Proposed |
+|---|---|
+| `driver_team_inside_job` | `driver_team_inside_job` |
+| `theft_stop_hotspot` | `theft_stop_hotspot` |
+| `fictitious_carrier` | `fictitious_carrier` |
+
+The use-case template already has the id `la-logistics` (plan spec 11), which D2 gives the *Logistics* industry Space.
+With one use case the industry Space could be that template itself, or take another id: the operator decides.
+
 **Enterprise** (`la-audit`, after wave B)
 
 | Today | Proposed |
@@ -171,6 +185,16 @@ Rules:
 | `ap_approval_graph` | `invoice_approvals` |
 | `ap_vendor_identity` | `vendor_employee_conflict` |
 | `gl_intercompany` | `intercompany_round_trip` |
+
+**Enterprise** (`la-insider`, built 2026-11-08 with these names)
+
+| Today | Proposed |
+|---|---|
+| `leaver_exfiltration` | `leaver_exfiltration` |
+| `access_creep` | `access_creep` |
+| `mutual_approvals` | `mutual_approvals` |
+
+No view, Dataset or Pipeline name collides with `la-audit` (its HR feed is `employee_master`, this one's `employee`).
 
 **Decisions this table needs:**
 

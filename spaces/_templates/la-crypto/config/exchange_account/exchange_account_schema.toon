@@ -1,0 +1,28 @@
+raw:
+  name: EXCHANGE_ACCOUNT
+  format: CSV
+  fields[5]{name,selector,type}:
+    account_id,"0",VARCHAR
+    exchange,"1",VARCHAR
+    kyc_person_id,"2",VARCHAR
+    deposit_address,"3",VARCHAR
+    opened_at,"4",TIMESTAMP
+mapping:
+  canonicalName: exchange_account
+  rawName: EXCHANGE_ACCOUNT
+  fields[5]:
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: exchange
+      from: exchange
+      fn: keep
+    - name: kyc_person_id
+      from: kyc_person_id
+      fn: keep
+    - name: deposit_address
+      from: deposit_address
+      fn: keep
+    - name: opened_at
+      from: opened_at
+      fn: keep

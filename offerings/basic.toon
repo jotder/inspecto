@@ -7,7 +7,7 @@ posture:
   objectsBackend: default
   postgresSidecar: absent
 modules[6]: connectors,entity-list,la-storage,la-core,la-api,geo-link
-contentPacks[12]: la-benefits,la-card,la-claims,la-daily-feed,la-health,la-ownership,la-procurement,la-sample,la-telco-ra,la-trade,la-utility,orders-starter
+contentPacks[16]: la-benefits,la-card,la-claims,la-crypto,la-daily-feed,la-health,la-insider,la-logistics,la-mfs,la-ownership,la-procurement,la-sample,la-telco-ra,la-trade,la-utility,orders-starter
 addons:
   linkAnalysis:
     status: built

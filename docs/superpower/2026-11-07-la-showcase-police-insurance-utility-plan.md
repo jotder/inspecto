@@ -31,7 +31,7 @@ Telecom), with the same template id.
 | Use case | Template | Stories | Status |
 |---|---|---|---|
 | Mobile money (anti-money-laundering) | `la-mobile-money` | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
-| MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | planned |
+| MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | exists |
 | Telco fraud | `la-showcase` | Telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode | exists |
 | Revenue assurance | `la-telco-ra` | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | exists |
 
@@ -44,7 +44,7 @@ Telecom), with the same template id.
 | Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
 | Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
 | Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
-| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | planned |
+| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | exists (Basic tier) |
 
 ### Insurance
 
@@ -82,18 +82,18 @@ Telecom), with the same template id.
 
 | Use case | Template | Stories | Status |
 |---|---|---|---|
-| Cargo theft | `la-logistics` | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | planned |
+| Cargo theft | `la-logistics` | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | exists |
 
 ### Enterprise
 
 | Use case | Template | Stories | Status |
 |---|---|---|---|
 | Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
-| Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
+| Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | exists |
 
-**Count: 18 Spaces in 9 industries.** On 2026-11-08, 13 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 17 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
 `la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`, `la-trade`, `la-benefits`,
-`la-telco-ra`) and 5 are planned; the `la-claims`
+`la-health`, `la-telco-ra`, `la-logistics`, `la-mfs`, `la-insider`) and 1 is planned (`la-crypto`); the `la-claims`
 additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
 2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
@@ -127,6 +127,7 @@ data such a team really holds; and it is not trivially visible without Link Anal
 | Benefits: address farms, deceased payments, undeclared work | Real; agencies match death registers and payroll data. | Death notices arrive 0–60 days late, so a short overpayment is normal (the look-alike). |
 | Health: referral kickbacks, phantom billing, pill mill, upcoding | Real (payer program-integrity patterns). Distinct from `la-claims`, which is motor-injury claims. | Upcoding is shown against peers with the same patient mix; the pill mill's patients travel over 50 km. |
 | Telecom revenue assurance | SIM box, Wangiri and IRSF are already in `la-showcase`. | `la-telco-ra` takes unbilled usage, dealer commission fraud and PBX hacking instead. |
+| MFS: SIM-swap takeover, split deposits, merchant cash-out | Real; MFS fraud teams hold the SIM register (swaps with the staff login and channel), app logins by handset, agent and merchant transactions and commission statements. Stores really do swap many SIMs in upgrade drives, and market agents really do take many small deposits. Distinct from `la-mobile-money`, which is wallet anti-money-laundering. | A takeover drains within 2 hours from a handset the wallet never used, and the customer gets the number back days later; the split deposits show as several cash-ins per visit into wallets the agent registered itself, not as small amounts alone; the colluding merchant is matched on payments within 60 minutes of a cash-in, which many genuine shoppers also make. |
 | Logistics: cargo theft | Real; shippers and carriers hold trip, GPS-stop and warehouse-scan data. Fictitious carriers (double brokering) are a known pattern. | GPS is stop-level (place, start, minutes), not every ping; losses are 1 in 400 trips in the background. |
 | Insider: leaver exfiltration, access creep, mutual approvals | Real; security and HR teams hold access logs, grants and approvals. Privacy is sensitive. | All people are invented; access logs are daily counts per system, not record-level. |
 | Crypto: peel chain, mixer hop, converging cash-out | Real (blockchain-analytics patterns). | Addresses use an invented format (`syn1…`) that cannot match a real chain; the mixer exit is matched by timing and amount with noise, not exactly. |
@@ -903,6 +904,52 @@ Deliberate deviations:
 
 **Alert Rule:** a high-value trip assigned to a carrier under 60 days old.
 
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-logistics-data.py` (seed 20261111; ground truth
+`tools/gen-la-logistics-data.ground-truth.json`), `tools/gen-la-logistics-data.test.mjs`, `LogisticsLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-logistics/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-logistics/`. No Geo View (the stories read from the graph; `place` carries `lat` / `lon` for one
+later). Deliberate deviations:
+- **Scale:** 14 000 trips and shipments over 13 months, 12 872 landed (spec: 25 000), 900 drivers, 120 carriers, 12 warehouses, 133
+  places on the road; about 13 400 landed GPS stops (spec: 90 000) and 46 000 landed scans (spec: 100 000); 63 landed loss reports
+  (spec: 80). The link budget set the scale: one `drove`, `carried_by` and `scanned_by` per trip is already 3 rows a trip, so 25 000
+  trips would pass 60 000 link rows. About 45 000 link rows; data 5.9 MB.
+- **Feeds and columns:** a ninth source, `place` (place_id, name, `place_type` warehouse / services / truck_park / fuel_station /
+  layby, `area` = nearest city, lat, lon), names the warehouses (`WH-`) and the stop places (`PL-`). `shipment` gains `booked_at`;
+  `driver` gains `left_on`; `warehouse_scan.at` is `scanned_at` and `loss_report.type` is `loss_type` (SQL keywords); `loss_report`
+  gains `loss_id`. `trip.route` is `<origin city>-<destination city>`; `arrive_at` is blank when the truck never got there. Scan types
+  are `inbound`, `putaway`, `outbound` (loaded onto the truck) and `arrived`. Phones are in the UK drama ranges, written three ways
+  (`07700 900123`, `07700900123`, `+44 7700 900123`) so `same_phone` has to normalise them.
+- **Link kinds:** one row per pair. `scanned_by` is trip → the employee of the **outbound** scan only (every scan would add
+  about 30 000 rows; the others are read into `arrived:`). `stopped_at` keeps stops of **20 minutes or more** only (shorter ones are
+  fuel and traffic), with the place's long stops, high-value long stops and lost trips in `via`. `lost` is trip → loss report
+  (`LR-`). `same_phone` is carrier → driver or driver → driver (a < b) after keeping digits and turning a leading 44 into 0;
+  background: 14 owner-operators share their driver's phone, and 3 pairs of drivers share one. High value is 100 000 or more.
+- **Views and the canvas cap:** one derived Job, `logistics_screen_links` (on `job.dataset.produced`, la-benefits style), writes
+  three screens: `inside_job` (drivers, co-drivers and outbound scanners on 2 or more lost trips), `stop_hotspot` (places where 3 or
+  more lost trips stood 20 minutes or more, with every long stop there) and `new_carrier` (high-value trips of carriers under 60
+  days old, with `same_phone` and the shared-phone driver's lost trips). `logistics_links` also runs on `cron: "*/5 * * * *"`
+  (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes,
+  the story whole and connected, and the look-alike on the canvas but in another component: `driver_team_inside_job` 88 rows, 79
+  nodes; `theft_stop_hotspot` 333 rows, 335 nodes; `fictitious_carrier` 26 rows, 30 nodes.
+- **Stories as built:** inside job: the team `DRV-0892` / `DRV-0893` (`CAR-052`) drove 12 short-delivered loads in 107 landed trips
+  (2025-10-10..2026-08-20); `EMP-0123`, night shift at `WH-06` (Nottingham), scanned 10 of them out between 00:50 and 03:30 and no
+  other lost load. Look-alike `DRV-0894` (`CAR-103`): 318 landed trips, about 300 on Southampton-Birmingham, 2 thefts. The generator
+  keeps every other driver to at most one loss and the look-alike's scanners off the team's losses. Stop hotspot: `PL-118` Lay-by at
+  Rowley Gap (near Birmingham, beside 14 roads of 2.5 hours or more): 82 long stops, 9 of them high value, all 9 stolen there
+  (26-69 minutes, last GPS stop, 2025-10-24..2026-06-01, nine drivers); background high-value loads never take their break there.
+  Look-alike `PL-087` Whitecross Services (London-Birmingham road): 239 long stops, 26 high value, 3 stolen (forced, so the
+  services reach the screen). Fictitious carrier: `CAR-022` Larkmoor Freight Services Ltd, registered 2026-05-11, uninsured, 5
+  high-value loads 2026-06-05..06-11 (24-30 days old), no GPS, `non_delivery`; its phone `+44 7700 900374` is `DRV-0895`'s
+  `07700 900374` (`CAR-020`, left 2025-11-30 after the theft `LR-0006`). Look-alike `CAR-057`, an insured owner-operator
+  registered 2026-03-02 (phone = its driver `DRV-0001`'s), 9 high-value loads in its first 60 days and every one of its 58 delivered.
+- **Staged month:** October adds 1 128 trips with shipments, stops and scans and 3 background losses; no carrier or driver
+  re-extract; the stories stay as they are (the screens recomputed over landed plus staged with DuckDB: no story changes).
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (only recomputed outside the engine).
+- **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5, approved 2026-11-08): no
+  Space or industry prefix. The template id `la-logistics` is the one this spec gives; D2 of that plan gives the same id to the
+  *Logistics* industry Space, so the operator decides whether that Space is this template or takes another id.
+
 #### 12. `la-insider` — insider threat
 
 **Audience:** security, HR and internal investigations. All people and systems are invented.
@@ -925,6 +972,57 @@ Deliberate deviations:
   weekends — a team lead approving the team's expenses in the normal way.
 
 **Alert Rule:** a grant without a ticket to a finance system.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-insider-data.py` (seed 20261112; ground truth
+`tools/gen-la-insider-data.ground-truth.json`), `tools/gen-la-insider-data.test.mjs`, `InsiderLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-insider/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-insider/`. No Geo View (nothing here has a place). Deliberate deviations:
+- **Privacy, as the realism review requires:** people are ids only (`EMP-`), with no names at all; `access_daily` holds one count
+  per employee, system and day (a day with no reads has no row), never a record; `email_external` holds one row per employee,
+  domain and day. Systems are generic upper-case names (`CRM`, `CUSTARCH`, `HRIS`, `AP`, `PAYROLL`, `TREASURY`, `ERP`, `DWH`,
+  `CODE`, `CONTRACTS`, `MAIL`, `WIKI`, `TICKETS`); vendors are `VEN-` ids; every mail domain ends in `.example`.
+- **Scale:** 3 000 employees, about 12 200 landed grants, 106 000 landed daily counts (only the record-holding systems `AP`,
+  `CRM`, `CUSTARCH`, `HRIS`, `PAYROLL`, `TREASURY` are logged), 28 700 mail-days, 18 100 landed expenses (about 19 700 with
+  October; spec: 20 000), 569 landed vendor changes (600 with October). About 26 000 link rows; data 6.8 MB.
+- **Feeds and columns:** `employee` gains `role_since` (the HR record of a role change the access-creep look-alike needs);
+  `access_daily.date` is `read_date` and `email_external` gains `sent_date` (the day it aggregates); `vendor_change.field` is
+  `field_name` and it gains `change_id`. The access-grant and vendor-change extracts are one landed file plus one staged file;
+  the other three are monthly. The finance systems are `AP`, `PAYROLL`, `TREASURY`; the personal webmail domains are
+  `inboxly.example`, `mailnest.example`, `postmail.example` (a list in the Job SQL); the single-approver expense limit is 500.
+- **Link kinds:** one row per pair. `granted_by` is grantee → approver with the grant counts in `via` (`no_ticket:`,
+  `finance_after_onboarding:` = finance grants more than 30 days after the hire date, `finance_no_ticket:`, last finance grant
+  and ticket). `accessed` is employee → `SYS-<system>` for every system held, with the daily median and the largest 21-day
+  average of daily reads over windows of 5 read days or more (`peak_ratio:`). `approved_for` carries `near_limit:` (450 up to
+  500), `weekend:` and `approved_back:`; `changed_vendor` carries `bank_changes:` and `vendor_editors:`. Every grant in the
+  background is approved by the employee's own manager, so `granted_by` pairs match `reports_to` pairs (2 999 each).
+- **Views and the canvas cap:** one derived Job, `insider_screen_links` (on `job.dataset.produced`), writes three screens:
+  `leaver_exfiltration` (`accessed` with `peak_ratio:` 10 or more, plus that person's `mailed_domain` links of 100 MB or more),
+  `access_creep` (`granted_by` with a finance grant after onboarding, plus those employees' bank-detail vendor changes) and
+  `mutual_approvals` (`approved_for` approved back, or 20 approvals or more). Systems are nodes, so a view that kept every read of
+  a spiking person would bridge the look-alike to the story through `SYS-MAIL` and the like: each screen keeps only the links
+  that carry its evidence. `insider_links` also runs on `cron: "*/5 * * * *"`. The golden test reads each view with its own
+  filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the look-alike on the canvas but in
+  another component: `leaver_exfiltration` 3 rows, 5 nodes; `access_creep` 18 rows, 26 nodes; `mutual_approvals` 101 rows, 129
+  nodes.
+- **Stories as built:** leaver exfiltration: `EMP-0031`, customer account specialist, notice 2026-06-01, left 2026-06-30; daily
+  median 43 in `SYS-CRM`, 860-960 on all 15 working days 2026-06-02..06-22 (`peak_ratio:20.0`); 1 228.8 MB to `postmail.example`
+  on 9 of those days (3 small mails there earlier in the year). Look-alike `EMP-0386`, data migration engineer: median 25 in
+  `SYS-CUSTARCH`, 500-600 on 2026-04-06..04-24 (`peak_ratio:22.1`) after a grant under `CHG-163782` on 2026-04-02; no notice, no
+  CRM grant, no personal or large mail. Access creep: `EMP-0007` (operations manager; the spec's M-7) granted `PAYROLL` and
+  `TREASURY` with no ticket to `EMP-0482`, `EMP-0636`, `EMP-1059`, `EMP-1415` (operations roles) on 2026-01-12..02-10, the only 8
+  finance grants without a ticket; `EMP-0482` changed the bank account of `VEN-0264` on 2026-05-14, the only person ever to touch
+  that vendor (everywhere else only accounts payable changes vendors). Look-alike `EMP-0062`, payroll officer since 2026-03-02
+  (hired 2013), granted `PAYROLL` by the payroll manager `EMP-1802` on 2026-03-03 under `REQ-163776`; 12 finance staff picking
+  up a second finance system from their own manager, ticketed, share the view. Mutual approvals: account managers `EMP-0022` and
+  `EMP-0040` (different teams) approved each other 21 + 19 times, 455-498 against the 500 limit, 32 at weekends, 2025-10-21..
+  2026-08-29; the only pair in the company that approves back. Look-alike `EMP-1613`, sales team lead of 20 field sales
+  representatives: about 520 approvals, 19 reports at 20 or more, weekdays, 3 near the limit, never approved back.
+- **Staged month:** October adds about 9 600 daily counts, 3 100 mail-days, 1 560 expenses, 22 grants and 31 vendor changes;
+  no HR re-extract; the screens recomputed over landed plus staged with DuckDB show the same stories.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (only recomputed outside the engine).
+- **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5): no Space or industry
+  prefix; the *Enterprise* table there lists them.
 
 #### 13. `la-crypto` — crypto laundering
 
@@ -949,6 +1047,58 @@ Deliberate deviations:
   out to 3 bank accounts — an over-the-counter desk whose many customers deposit their own funds.
 
 **Alert Rule:** a deposit whose funds trace to a labelled hack within 5 hops.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-crypto-data.py` (seed 20261113; ground truth
+`tools/gen-la-crypto-data.ground-truth.json`), `tools/gen-la-crypto-data.test.mjs`, `CryptoLinksJobGoldenTest` (inspecto-engine),
+template `spaces/_templates/la-crypto/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-crypto/`. Addresses are `syn1` + 26 characters of a bech32-like alphabet; the assets `SYC` and
+`SUSD`, the five exchanges (Larkmoor Digital, Fernhill Coin, Ashgrove, Pebblebrook, Wrenfield), the mixer, the company, the people
+and the bank accounts (`BK-` + 8 digits) are invented. Deliberate deviations:
+- **Scale:** 10 875 landed addresses (spec: 30 000), 44 559 landed transfers (spec: 150 000), 2 722 hinted addresses (spec:
+  30 000: only addresses spent with another get a hint), 3 154 exchange accounts and 3 021 KYC persons (spec: 5 000 each), 4 635
+  landed cash-outs (spec: 12 000). With every address pair a link row the spec's sizes would pass 100 000 links; these give about
+  39 500 link rows and 4.7 MB of data.
+- **Columns:** `from`, `to` and `at` are SQL keywords, so `transfer.from_address`, `to_address`, `tx_at`; `cashout` gains
+  `cashout_id` and its time is `cashout_at`; `exchange_account` gains `exchange` and `opened_at`. The `wallet.label` set gains
+  `hacked` (reported stolen from), which the hack story and the wave D Alert Rule need. Each address pair carries one asset: SUSD for
+  merchant payments and merchants' weekly sweeps, SYC for everything else. No balances are kept (exchange hot wallets and the mixer
+  pool pay out without a modelled inflow; deposit addresses are not swept).
+- **Link kinds:** the five specified (`sent_to` address → address, `same_cluster` address → `CL-`, `deposit_of` deposit address →
+  `XA-`, `kyc_of` `XA-` → `KP-`, `cashed_out_to` `XA-` → `BK-`) plus a sixth, **`mixer_exit`**: the timing-and-amount match is
+  worked out by the Job, not recorded, so it is its own link (input address → exit recipient, every exit within 6 hours and 90-100 %
+  of an input; `matched:yes` within 120 minutes and at least 98 %). Evidence in `via`: `sent_to` carries `src_hop` / `dst_hop` (the
+  peel shape: exactly one transfer in, two out to two addresses, both within 24 hours), `same_cluster` carries `cluster_exchange`,
+  `cashed_out_to` carries `accounts_to_this_bank`.
+- **Views and the canvas cap:** one derived Job, `crypto_screen_links` (on `job.dataset.produced`), writes three screens.
+  `peel_chain`: every `sent_to` link in or out of a peel-shaped address chained to another, plus the exchange accounts such a hop
+  paid and their KYC persons. `mixer_hop`: every `mixer_exit` link, and for matched exits the deposit, account and person.
+  `converging_cash_out`: clusters with no exchange-labelled address that paid 10 or more exchange accounts, with those payments,
+  accounts, persons and cash-out bank accounts. `crypto_links` also runs on `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The
+  golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the
+  look-alike on the canvas but in another component: `hack_peel_chain` 785 rows, 426 nodes (the 80-hop chain is one thin component
+  of 100 nodes); `mixer_hop_timing_match` 12 rows, 15 nodes; `converging_cash_out` 670 rows, 397 nodes.
+- **Stories as built:** peel chain: the wallet labelled hacked `syn15z47fslrxrnhuwm4dppk77s0z7` loses 412.5 SYC (of 551 SYC it was sent) on 2026-03-14
+  02:17 to the first of 80 hops; each hop sends a peel of 1.6-4.9 SYC to one of six deposit addresses and the change on, 12-140
+  minutes apart, until 2026-03-18; the last change address keeps 170.6 SYC; the six accounts `XA-03111`..`XA-03116` (four exchanges,
+  opened February-March 2026, persons `KP-02973`..`KP-02978` with no shared surname) cash out to their own banks. Look-alike: the
+  company payroll wallet `syn1g6x78slgxx5zne6cwpmes8j554` (label `merchant`), whose month-end run of 25 hops pays the same 25 staff
+  wallets and returns the rest (300 landed hops). Mixer hop: the ransom address `syn1g2sua43rg5kfcjunpv6chu7rws` (seven payments,
+  about 36 SYC, April 2026) pays 11.8, 9.65 and 8.9 SYC into fresh mixer deposit addresses on 05-14, 05-21 and 06-02; each comes out
+  53-67 minutes later at 98.2-98.9 % to a fresh address that deposits it all at `XA-03118` (Ashgrove Exchange, `KP-02980`).
+  Look-alikes: `syn1zngjgrnpdxuwp8trqf4pddkppf` (another user's exit 75 minutes later at 92.5 %) and
+  `syn1sfr9e266n86z4c8zd7k00q4uph` (99.1 % but 281 minutes later), both `matched:no`; background exits never match by
+  construction (the generator moves a chance match 3 hours later). Converging cash-out: cluster `CL-01125` (30 addresses, fed by
+  about 200 payments from 150 people February-June) pays the 40 accounts `XA-03119`..`XA-03158` (22 Fernhill Coin, 18
+  Pebblebrook; 40 names, persons `KP-02981`..`KP-03020`), which cash out to `BK-49804167`, `BK-77665088` and `BK-95284540`.
+  Look-alike: the over-the-counter desk `CL-01126` (8 addresses) pays 60 customers' own accounts, which cash out to 54 banks of their
+  own. The generator also moves the last coins of any background address that would chain with another peel-shaped address, so the
+  peel screen holds exactly the story and the payroll.
+- **Staged month:** October adds 3 935 transfers, 275 addresses, a month of cash-outs and one more payroll run (the peel view grows
+  to about 451 nodes); no story activity.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (checked outside the engine only).
+- **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5): `hack_peel_chain`,
+  `mixer_hop_timing_match`, `converging_cash_out`, added to its *Banking and finance* table.
 
 #### 14. `la-mfs` — mobile financial services fraud (added 2026-11-08)
 
@@ -981,6 +1131,56 @@ business and its customers. All data is invented. It shares no data, names or id
   with steady payments from many wallets over months.
 
 **Alert Rule:** a wallet drained within 2 hours of a SIM swap.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-mfs-data.py` (seed 20261111; ground truth
+`tools/gen-la-mfs-data.ground-truth.json`), `tools/gen-la-mfs-data.test.mjs`, `MfsLinksJobGoldenTest` (inspecto-engine), template
+`spaces/_templates/la-mfs/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub `docs/okf/product/solution-pack/la-mfs/`.
+`la-mobile-money` and `mobile-money` are separate templates and are untouched; `la-mfs` shares no ids, names or data with them
+(wallets `WL-`, agents `A-`, merchants `MR-`, handsets `HS-`, staff logins `S-`, bank accounts `BA-`; MSISDNs `9997…`). Deliberate
+deviations:
+- **Scale:** 8 000 wallets (spec: 20 000), 300 agents under 12 super agents (spec: 600), 400 merchants (spec: 800), about 101 000
+  landed transactions (spec: 200 000), 1 146 SIM events (spec: 8 000), about 69 000 logins (spec: 60 000), 3 600 commission rows. With
+  every pair a link row the spec's sizes would pass 100 000 links; these give about 47 000 link rows and 10.9 MB of data.
+- **Columns:** `at` is a SQL keyword, so `wallet_txn.txn_at`, `sim_event.event_at` and `device_login.login_at`. `wallet_txn` gains
+  type `settlement` (a merchant's sweep to its bank account), which is how daily settlement shows; `device_id` is blank on a cash-in
+  (the agent's till starts it) and on a settlement. `device_login` is one row per wallet, handset and day (the day's first login).
+  `agent_commission.month` is the first of the month; the commission is 0.40 a cash-in or cash-out up to 50, 0.80 up to 200, 1.50
+  above, so splitting a deposit pays. Ids are zero-padded (`A-052`, `MR-077`; the spec's `A-52`, `MR-77`); `S-41` is as specified.
+- **Link kinds:** as specified, with `swapped_by` from the **wallet** on that MSISDN to the staff login (an MSISDN node would need a
+  wallet-to-number link to reach the money), and port-outs kept as rows, not links. Evidence in `via`: `registered_by` carries the
+  wallet's cash-ins, those at its registrar, cash-outs, P2P and merchant payments; `paid` carries `within_60m_of_cash_in:`;
+  `cashed_in_at` carries `per_day:`, `average:` and `merchant_pay_within_60m:`; `swapped_by` carries `new_device_minutes:`,
+  `out_within_2h:` (also its `amount`, for the wave D Alert Rule "drained within 2 hours of a SIM swap") and
+  `login_max_swaps_10d:`; `settles_to` carries `merchant_opened:`, `settlements:` and `settlement_days:`. No balance is
+  computed: the corpus has no opening balances, so "drained" is the amount paid out within 2 hours.
+- **Views and the canvas cap:** one derived Job, `mfs_screen_links` (on `job.dataset.produced`, la-benefits style), writes three
+  screens with a `screen` column. `swap_burst`: swaps by a login with 15 or more swaps in any 10 days, plus the handsets first used
+  within 24 hours after each swap, the payees first paid within 24 hours, and the cash-outs of any payee of two or more of those
+  wallets. `split_deposit`: cash-ins at an agent with 1 000 or more averaging under 25, plus its own registrations of those wallets.
+  `merchant_quick_pay`: payments to a merchant with 30 or more payers paying within 60 minutes after a cash-in, its settlement
+  account, and the agents where those quick payers were cashed in. `mfs_links` also runs on `cron: "*/5 * * * *"`
+  (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the
+  story whole and connected, and the look-alike on the canvas but in another component: `mfs_sim_swap_bursts` 409 rows, 327 nodes;
+  `mfs_split_deposits` 609 rows, 372 nodes; `mfs_merchant_quick_pay` 385 rows, 287 nodes.
+- **Stories as built:** SIM-swap takeover: `S-41` swaps 30 numbers on 2026-06-08..06-17; each wallet is logged into within the hour
+  from one of `HS-08913`..`HS-08918` (five victims each) and drained of 460-1 840 within 2 hours to mules `WL-07936`..`WL-07940`
+  (opened in the app in May), which cash everything out within hours at `A-088` and `A-093` (Eastfield); each customer gets the number
+  back at another store 1-3 days later, and nothing of theirs moves in between; `S-41` also makes ten ordinary swaps in other months.
+  Look-alike `S-72` (Riverside store) makes 160 swaps, 110 in a SIM upgrade drive in March 2026; about three in four customers move
+  to a new handset of their own within a day; nobody pays out more than 100 within 2 hours. Split deposits: `A-052` (Brickfield)
+  registers `WL-07816`..`WL-07935` (KYC 1, 2025-12..2026-01) and splits each deposit of about 55-180 into 3-13 cash-ins of 5-25 a few
+  minutes apart (6 267 cash-ins averaging 16.8, all of its cash-ins), with an occasional cash-out at `A-052`, no merchant payment
+  and at most one P2P; it earns 2 897 commission against a median of 48. Look-alike `A-131` (Old Market) takes 2 779 small cash-ins
+  from 250 traders, about one a visit, who also pay merchants and each other. Merchant cash-out: `MR-077`, opened 2026-09-07, paid
+  from 09-09 by `WL-07941`..`WL-08000`, each opened in the three weeks before at and funded by one of `A-207`, `A-208`, `A-219`
+  (Station Road), 3-25 minutes after each cash-in of 150-480, passing on 95-100 %; 22 settlements on 22 days to `BA-4194142`.
+  Look-alike `MR-214` (Hillcrest grocery, since 2023) with 200 regulars all year, 52 of whom sometimes pay within an hour of a
+  cash-in at their local agent; weekly settlement to `BA-3034434`. Areas keep each look-alike apart by design: background wallets
+  use agents and merchants of their own area only, and `A-052`, `A-131` and the three Station Road agents serve no background wallet.
+- **Staged month:** October adds 92 wallets and a month of transactions, SIM events, logins and commissions; no story activity
+  (the screens recomputed over landed plus staged with DuckDB are unchanged).
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (checked outside the engine only).
 
 ## Steps
 

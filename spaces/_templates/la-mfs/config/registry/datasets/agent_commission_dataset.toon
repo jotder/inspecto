@@ -1,0 +1,8 @@
+physicalRef: agent_commission/database
+description: "Mobile financial services fraud Link Analysis showcase - One row per agent and month: the cash-ins and cash-outs it handled and the commission it earned (0.40 a transaction up to 50, 0.80 up to 200, 1.50 above). One file per month (AGENT_COMMISSION_YYYYMM.csv); the next month is in data/staged. Landed by the agent_commission Pipeline. Synthetic."
+eventDate: month
+columns[4]{name,type,classification}:
+  agent_id,string,
+  month,date,
+  transactions,number,
+  commission,number,

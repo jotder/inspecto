@@ -1,0 +1,13 @@
+physicalRef: trip/database
+description: "Logistics cargo theft Link Analysis showcase - One row per trip (one per shipment): driver, co-driver for a two-driver team, vehicle (blank for a few), carrier, route (origin-destination city), departure and arrival (blank when the truck never got there). One file per month of departure (TRIP_YYYYMM.csv); the next month is in data/staged. Landed by the trip Pipeline. Synthetic."
+eventDate: depart_at
+columns[9]{name,type,classification}:
+  trip_id,string,
+  shipment_id,string,
+  driver_id,string,
+  co_driver_id,string,
+  vehicle,string,
+  carrier_id,string,
+  route,string,
+  depart_at,timestamp,
+  arrive_at,timestamp,

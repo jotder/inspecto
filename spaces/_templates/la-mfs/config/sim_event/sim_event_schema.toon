@@ -1,0 +1,28 @@
+raw:
+  name: SIM_EVENT
+  format: CSV
+  fields[5]{name,selector,type}:
+    msisdn,"0",VARCHAR
+    event,"1",VARCHAR
+    event_at,"2",TIMESTAMP
+    channel,"3",VARCHAR
+    staff_login,"4",VARCHAR
+mapping:
+  canonicalName: sim_event
+  rawName: SIM_EVENT
+  fields[5]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: event
+      from: event
+      fn: keep
+    - name: event_at
+      from: event_at
+      fn: keep
+    - name: channel
+      from: channel
+      fn: keep
+    - name: staff_login
+      from: staff_login
+      fn: keep

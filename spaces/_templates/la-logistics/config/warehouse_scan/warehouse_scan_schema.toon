@@ -1,0 +1,28 @@
+raw:
+  name: WAREHOUSE_SCAN
+  format: CSV
+  fields[5]{name,selector,type}:
+    shipment_id,"0",VARCHAR
+    warehouse_id,"1",VARCHAR
+    scan_type,"2",VARCHAR
+    scanned_at,"3",TIMESTAMP
+    employee_id,"4",VARCHAR
+mapping:
+  canonicalName: warehouse_scan
+  rawName: WAREHOUSE_SCAN
+  fields[5]:
+    - name: shipment_id
+      from: shipment_id
+      fn: keep
+    - name: warehouse_id
+      from: warehouse_id
+      fn: keep
+    - name: scan_type
+      from: scan_type
+      fn: keep
+    - name: scanned_at
+      from: scanned_at
+      fn: keep
+    - name: employee_id
+      from: employee_id
+      fn: keep

@@ -1,0 +1,28 @@
+raw:
+  name: VENDOR_CHANGE
+  format: CSV
+  fields[5]{name,selector,type}:
+    change_id,"0",VARCHAR
+    vendor_id,"1",VARCHAR
+    field_name,"2",VARCHAR
+    changed_by,"3",VARCHAR
+    changed_at,"4",TIMESTAMP
+mapping:
+  canonicalName: vendor_change
+  rawName: VENDOR_CHANGE
+  fields[5]:
+    - name: change_id
+      from: change_id
+      fn: keep
+    - name: vendor_id
+      from: vendor_id
+      fn: keep
+    - name: field_name
+      from: field_name
+      fn: keep
+    - name: changed_by
+      from: changed_by
+      fn: keep
+    - name: changed_at
+      from: changed_at
+      fn: keep

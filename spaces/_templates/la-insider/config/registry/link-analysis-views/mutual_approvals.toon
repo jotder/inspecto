@@ -1,0 +1,23 @@
+name: mutual_approvals
+description: "Mutual approvals - every approver and employee where the employee also approved the approver's own expenses, or with 20 approvals or more (via on approved_for = approvals, those just under the 500 limit, those at a weekend, the largest, and approvals the other way). A team lead approving a busy field team is normal; two peers approving each other just under the limit, mostly at weekends, is another thing."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: insider_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","mutual_approvals"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

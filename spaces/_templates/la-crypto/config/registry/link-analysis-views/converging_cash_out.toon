@@ -1,0 +1,23 @@
+name: converging_cash_out
+description: "Converging cash-out - common-input clusters that paid 10 or more exchange accounts (via on same_cluster: cluster_size), those accounts, the people who hold them and the bank accounts they cashed out to (via on cashed_out_to: accounts_to_this_bank). An over-the-counter desk pays its customers' own accounts; one cluster paid 40 accounts in unrelated names that all cash out to the same three bank accounts."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: crypto_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","converging_cash_out"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

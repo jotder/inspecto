@@ -1,0 +1,24 @@
+raw:
+  name: STOP
+  format: CSV
+  fields[4]{name,selector,type}:
+    trip_id,"0",VARCHAR
+    place_id,"1",VARCHAR
+    start_at,"2",TIMESTAMP
+    minutes,"3",INTEGER
+mapping:
+  canonicalName: stop
+  rawName: STOP
+  fields[4]:
+    - name: trip_id
+      from: trip_id
+      fn: keep
+    - name: place_id
+      from: place_id
+      fn: keep
+    - name: start_at
+      from: start_at
+      fn: keep
+    - name: minutes
+      from: minutes
+      fn: keep

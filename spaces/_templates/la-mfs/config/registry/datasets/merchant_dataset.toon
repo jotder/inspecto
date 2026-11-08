@@ -1,0 +1,9 @@
+physicalRef: merchant/database
+description: "Mobile financial services fraud Link Analysis showcase - One row per merchant that takes wallet payments: name, category, the date it opened and the bank account it settles to. One extract (MERCHANT_20260930.csv). Landed by the merchant Pipeline. Synthetic."
+eventDate: opened_at
+columns[5]{name,type,classification}:
+  merchant_id,string,
+  name,string,
+  category,string,
+  opened_at,date,
+  settlement_account,string,
