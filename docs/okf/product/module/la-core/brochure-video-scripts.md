@@ -47,7 +47,7 @@ Telecom, its banking stories under Banking and finance.
 | 3.3 | Insurance | Claims fraud | 40 s | Advanced | Yes |
 | 3.4 | Utilities | Electricity revenue protection | 40 s | Basic | Yes |
 | 3.5 | Law enforcement | Criminal investigation | 40 s | Basic | Yes |
-| 3.6 | Public sector | Procurement · Benefits and tax | 50 s | Basic | No: both Spaces planned |
+| 3.6 | Public sector | Procurement · Benefits and tax | 50 s | Basic | 1 of 2 segments (procurement planned) |
 | 3.7 | Healthcare | Provider billing | 40 s | Basic | No: Space planned |
 | 3.8 | Logistics | Cargo theft | 40 s | Basic | No: Space planned |
 | 3.9 | Enterprise | Internal audit · Insider threat | 50 s | Advanced | 1 of 2 segments (insider planned) |
@@ -388,12 +388,13 @@ The opening, map and close are the same in every multi-segment video:
 |---|---|
 | Audience | Public-procurement integrity units, benefits-integrity and tax-compliance teams. |
 | Film on | Basic install. |
-| Ready | When `la-procurement` and `la-benefits` are built. |
+| Ready | Segment B now; A when `la-procurement` is built. |
+| Alternative segments | `la-benefits` holds three more built stories, each with its own saved view and look-alike: payments to the deceased, undeclared work, and a tax-preparer refund ring (exercises 2–4 of its [user guide](../../solution-pack/la-benefits/user-guide.md)). |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
 | A | Procurement | `la-procurement` (planned) | Tender awards and a company register. | Bid rotation: 4 firms win 24 tenders in one category in turn; 2 of them share a director. | *Tight groups* over bids and directors: the 4 firms and the shared director. | A bidding pattern to refer, with the shared director named. | 3 large firms that win often but bid independently. |
-| B | Benefits and tax | `la-benefits` (planned) | Benefit claims with addresses and bank accounts. | Address farm: 14 claimants under 5 surnames at one address, each "living alone", paid into 3 accounts. | *Busiest nodes* over addresses: the one address, its 14 claimants, the 3 accounts. | 14 claims and 3 accounts to review. | A care home with many genuine residents and their own accounts. |
+| B | Benefits and tax | `la-benefits` (built) | Benefit claims and household declarations. | Address farm: `AD-03141` has 14 residents, all claimants under 5 surnames, each declaring a household of one; all 14 are paid into 3 accounts (`SYN-57707034`, `SYN-19642862`, `SYN-47766627`) that nobody else uses. | Saved view `benefits_shared_addresses` (every address with 8 or more claimants): three care homes drawn as stars, and `AD-03141`. Click `AD-03141` for its node detail; its 14 claims meet in the 3 accounts. Not *Busiest nodes*: it would rank the larger care homes first. | 14 claims and 3 accounts to review. | The three care homes in the same view (`AD-00412` Linden Court, 31 residents; `AD-02718` Harbour View, 24; `AD-05077` Orchard House, 27): one declaration each, every resident paid into their own account. They are on screen, so the voice-over names them as genuine. |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
@@ -402,9 +403,9 @@ The opening, map and close are the same in every multi-segment video:
 | A1 | 3 | Tender awards and the company register as they landed. | *Procurement* | Tender awards, and a register of company directors. |
 | A2 | 5 | *Tight groups* over bids and directors. | *Tight groups* | Ask who wins together. |
 | A3 | 5 | The 4 firms and the shared director, held. | *4 firms · 24 tenders · 1 director* | Four firms taking turns to win, two of them under one director: a pattern to refer. |
-| B1 | 3 | Benefit claims as they landed. | *Benefits and tax* | Benefit claims: a name, an address, a bank account. |
-| B2 | 5 | *Busiest nodes* over addresses. | *Busiest nodes* | Ask which address holds the most claims. |
-| B3 | 5 | The address, its 14 claimants and the 3 accounts, held. | *1 address · 14 claimants · 3 accounts* | Fourteen people, each living alone, at one address, paid into three accounts: claims to review. |
+| B1 | 3 | Benefit claims and household declarations as they landed. | *Benefits and tax* | Claims and household declarations: a name, an address, a bank account. |
+| B2 | 6 | Saved view `benefits_shared_addresses`: four addresses; three draw as big stars. | *Saved view* | Ask which addresses hold eight or more claimants. Three are care homes, each resident paid into their own account. |
+| B3 | 6 | Click `AD-03141`: its node detail; then its 14 claims meeting in 3 accounts, held. | *AD-03141 · 14 claimants · 3 accounts* | The fourth is a house: fourteen people, each living alone, paid into three accounts. Claims to review. |
 | 3 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
 | 4 | 4 | End card. | *For public-sector integrity.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -640,7 +641,7 @@ the data. For analysts who already have their data in; not part of the main cut.
 - **Raw beats:** pick, per story, the landed file and the rows to show (ideally rows holding the story's ids), and
   check that the Data page's *Entities* shows what the Map beat's voice-over says for each Dataset filmed.
 - Industry videos: check every reveal against the Space's ground truth file before filming. Segments on planned
-  Spaces (3.1 B and D, 3.2 E and F, 3.6, 3.7, 3.8, 3.9 B) are filmed only after their Spaces are built, and
+  Spaces (3.1 B and D, 3.2 E and F, 3.6 A, 3.7, 3.8, 3.9 B) are filmed only after their Spaces are built, and
   re-read against the Space as built. Decide per industry whether to publish with built segments only or wait.
 - Segments 3.1 C, 3.2 A and B, 3.3 and 3.9 A have no look-alike listed in the showcase plan for the story filmed;
   confirm with the Space's owner that nothing else on screen reads as suspect.
