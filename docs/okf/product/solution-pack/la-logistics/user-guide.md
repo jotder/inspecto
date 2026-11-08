@@ -88,7 +88,7 @@ links. Then read `warehouse:` and `shift:` on the `scanned_by` links, and `loss_
 **Answer:** the two-driver team **`DRV-0892` (Priya Jones) and `DRV-0893` (Stephen Uttley)** of **`CAR-052`
 (Eastgate Carriers Ltd)** drove **12 loads that arrived short** (`loss_type:shortage`) between 2025-10-10 and
 2026-08-20. That is 12 losses in 107 trips. **`EMP-0123`**, a night-shift scanner at **`WH-06` (Trentfield
-Distribution Centre, Nottingham)**, scanned **10 of them** out onto the truck, between 23:30 and 04:00. The loads
+Distribution Centre, Nottingham)**, scanned **10 of them** out onto the truck, between 00:50 and 03:30. The loads
 were electronics, spirits, pharmaceuticals and tobacco, worth 46 700–91 300 each. Three people to interview.
 **Not the story:** **`DRV-0894` (Daniel Hargreaves, `CAR-103`)** is the busiest driver on the busiest route,
 Southampton–Birmingham, with **318 trips and 2 thefts** (`driver_losses:2`). Neither theft was scanned out by

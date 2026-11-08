@@ -90,7 +90,7 @@ test('the corpus: 120 carriers, 900 drivers, one shipment per trip, October 2026
   assert.ok(trips.every((t) => t.depart_at <= LANDED_END + ' 23:59:59' && ship[t.shipment_id]), 'one shipment per landed trip');
   assert.ok(Object.values(loss).every((l) => l.reported_at <= LANDED_END + ' 23:59:59'));
   const phones = [...Object.values(driver), ...Object.values(carrier)].map((x) => x.phone).filter(Boolean);
-  assert.ok(phones.every((p) => /^(07700 ?900\d{3}|\+44 7700 900\d{3}|0\d{2,3} \d{3,4} \d{3,4}|01632 960\d{3})$/.test(p)), 'phones in the reserved drama ranges');
+  assert.ok(phones.every((p) => /^(07700 ?900\d{3}|\+44 7700 900\d{3}|01(13|15|21|61|51|17|41) 496 0\d{3}|0191 498 0\d{3}|029 2018 0\d{3}|020 7946 0\d{3}|01632 960\d{3})$/.test(p)), 'phones in the reserved drama ranges');
   const blankVehicle = trips.filter((t) => !t.vehicle).length / trips.length;
   assert.ok(blankVehicle > 0.02 && blankVehicle < 0.08, `missing vehicles are realistic (${blankVehicle})`);
   assert.ok(trips.length / Object.keys(loss).length > 150, 'losses are rare');

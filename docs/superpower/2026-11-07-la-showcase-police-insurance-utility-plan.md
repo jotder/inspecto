@@ -931,7 +931,7 @@ later). Deliberate deviations:
   the story whole and connected, and the look-alike on the canvas but in another component: `driver_team_inside_job` 88 rows, 79
   nodes; `theft_stop_hotspot` 333 rows, 335 nodes; `fictitious_carrier` 26 rows, 30 nodes.
 - **Stories as built:** inside job: the team `DRV-0892` / `DRV-0893` (`CAR-052`) drove 12 short-delivered loads in 107 landed trips
-  (2025-10-10..2026-08-20); `EMP-0123`, night shift at `WH-06` (Nottingham), scanned 10 of them out between 23:30 and 04:00 and no
+  (2025-10-10..2026-08-20); `EMP-0123`, night shift at `WH-06` (Nottingham), scanned 10 of them out between 00:50 and 03:30 and no
   other lost load. Look-alike `DRV-0894` (`CAR-103`): 318 landed trips, about 300 on Southampton-Birmingham, 2 thefts. The generator
   keeps every other driver to at most one loss and the look-alike's scanners off the team's losses. Stop hotspot: `PL-118` Lay-by at
   Rowley Gap (near Birmingham, beside 14 roads of 2.5 hours or more): 82 long stops, 9 of them high value, all 9 stolen there
