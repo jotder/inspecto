@@ -249,6 +249,16 @@ final class AlertRoutes implements RouteModule {
                            Map<String, Object> body) {
         if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
+        return parseContent(writeRoot, dataRoot, body);
+    }
+
+    /**
+     * {@link #parse} without its edition door: every content check an Alert Rule meets, on any build. Only the template seed
+     * gate calls it alone, for a template with a Basic tier on a build without Alert Rules: its rules ship unarmed (the
+     * showcase plan's Edition rule, operator 2026-11-08 "A: allow, unarmed"), so they are judged but not refused.
+     */
+    static AlertRule parseContent(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                                  Map<String, Object> body) {
         AlertRule rule;
         try {
             rule = AlertRule.fromMap(body);

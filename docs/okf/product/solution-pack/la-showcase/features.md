@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link Analysis showcase — features
 
-**Product Map Item:** [`solution-pack.la-showcase`](../../../../../product-map/solution-pack/la-showcase.toon) · **Status:** preview · **Availability:** not billable; Space Template `la-showcase` declares `minEdition: advanced` and needs Demo Auth (`spaces/_templates/la-showcase/template.toon`).
+**Product Map Item:** [`solution-pack.la-showcase`](../../../../../product-map/solution-pack/la-showcase.toon) · **Status:** preview · **Availability:** not billable; Space Template `la-showcase` declares `minEdition: basic` (`spaces/_templates/la-showcase/template.toon`). Its Basic tier (data, link Jobs, saved views, pattern packs) runs on every edition. Its Advanced tier (personas, typed masking and Reveal, Investigations, four-eyes approval, the Risk Score, the Alert Rules, the seed script) needs an Advanced or Preview build with sign-in, and does nothing on Basic: the Alert Rules ship unarmed there.
 
 ## What it is
 

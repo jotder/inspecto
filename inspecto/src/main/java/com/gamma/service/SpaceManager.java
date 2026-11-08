@@ -601,6 +601,20 @@ public final class SpaceManager implements AutoCloseable {
         return SpaceSamples.shipped(tpl);
     }
 
+    /**
+     * Whether the shipped template {@code templateId} has a Basic tier ({@link #hasBasicTier}): the seed gate then leaves
+     * its Alert Rules unarmed instead of refusing them on a build without Alert Rules.
+     *
+     * @throws IllegalArgumentException when no such template ships (or this server hosts a single space)
+     */
+    public boolean templateHasBasicTier(String templateId) {
+        Path root = templatesRoot();
+        Path tpl = root == null || templateId == null ? null : root.resolve(templateId).normalize();
+        if (tpl == null || !tpl.startsWith(root) || !Files.exists(tpl.resolve("template.toon")))
+            throw new IllegalArgumentException("no such space template '" + templateId + "'");
+        return hasBasicTier(tpl.resolve("config"));
+    }
+
     /** A template's Demo User roster, and the gallery's name for the sign-in it needs ({@link #missingFeatures}). */
     static final String DEMO_USERS = "demo-users.toon", DEMO_AUTH = "demo-auth";
 
@@ -622,7 +636,8 @@ public final class SpaceManager implements AutoCloseable {
     /**
      * Whether the template that owns {@code config} has a Basic tier: its {@code template.toon} says {@code minEdition: basic}.
      * Its Demo User roster is then the template's Advanced tier, inert where nobody signs in (the showcase plan's Edition
-     * rule, operator 2026-11-08: "allow on Basic"), so the gallery does not refuse it for the missing Demo Auth. A Space
+     * rule, operator 2026-11-08: "allow on Basic"), so the gallery does not refuse it for the missing Demo Auth; its Alert
+     * Rules ship unarmed where Alert Rules are absent ("A: allow, unarmed"). A Space
      * (no template.toon) or an unreadable template.toon has no Basic tier.
      */
     private static boolean hasBasicTier(Path config) {
@@ -646,13 +661,17 @@ public final class SpaceManager implements AutoCloseable {
      * would mark a creatable template uncreatable. A template carrying a Demo User roster ({@code demo-users.toon}) needs
      * the Demo Auth sign-in ({@code demo-auth}, {@code LA-SAMPLE-GALLERY-DEMOAUTH-1}); the gallery alone reports that one -
      * the seed gate does not refuse it, so such a Space can still be created through the API without its sign-in. A
-     * template with a Basic tier ({@code minEdition: basic}) is not refused for its roster: {@link #hasBasicTier}.
+     * template with a Basic tier ({@code minEdition: basic}) is not refused for its roster, nor for its Alert Rules
+     * ({@code alert-rules/}, registry or pending), which ship unarmed where Alert Rules are absent: the boot leaves each one
+     * unarmed with a WARN, and the seed gate judges their content only ({@link #hasBasicTier}; operator 2026-11-08,
+     * "A: allow, unarmed"). A Decision Rule's {@code create-alert} still counts.
      */
     static List<Map<String, String>> missingFeatures(Path config) throws IOException {
         java.util.TreeMap<String, String> missing = new java.util.TreeMap<>();
         if (!Files.isDirectory(config)) return List.of();
+        boolean basicTier = hasBasicTier(config);
         if (Files.isRegularFile(config.resolve(DEMO_USERS)) && !demoUsersSignIn(config)   // LA-SAMPLE-GALLERY-DEMOAUTH-1
-                && !hasBasicTier(config))
+                && !basicTier)
             missing.put(DEMO_AUTH, "Demo User sign-in (config/" + DEMO_USERS + ") needs a demo build with Demo Auth — "
                     + "this server does not include it");
         String alert = com.gamma.etl.EditionFeatures.ALERT_DISPATCH;
@@ -660,7 +679,10 @@ public final class SpaceManager implements AutoCloseable {
             for (Path p : s.filter(Files::isRegularFile).filter(f -> f.toString().endsWith(".toon")).toList()) {
                 String name = p.getFileName().toString();
                 String parent = p.getParent().getFileName().toString();
+                // a Basic-tier template's Alert Rules ship unarmed (operator 2026-11-08, "A: allow, unarmed"); a Decision
+                // Rule's create-alert consequence is not an Alert Rule the boot can leave unarmed, so it is still counted
                 if (!com.gamma.etl.EditionFeatures.present(alert)
+                        && !(basicTier && "alert-rules".equals(parent))
                         && ("alert-rules".equals(parent)   // registry/alert-rules/ and a pending/alert-rules/ deferred seed
                             || ("decision-rules".equals(parent) && Files.readString(p).contains("create-alert"))))
                     missing.putIfAbsent(alert, com.gamma.etl.EditionFeatures.refusal(alert));

@@ -22,7 +22,7 @@ Presales teams and prospects evaluating Link Analysis for financial-crime or tel
 
 ## How it fits with the Editions
 
-Needs an [Advanced](../../edition/advanced/brochure.md) or [Preview](../../edition/preview/brochure.md) build with demo sign-in. Companion: [Link Analysis showcase (feature off)](../../solution-pack/la-showcase-off/brochure.md).
+The mule and telecom data, the link Jobs, the saved views and the planted rings run on every edition, [Basic](../../edition/basic/brochure.md) included; the Geo Views need Standard or above. The analyst's day needs an [Advanced](../../edition/advanced/brochure.md) or [Preview](../../edition/preview/brochure.md) build with sign-in: the demo users, masked accounts with an audited Reveal, Investigations, four-eyes approval, the Suspicion score's Risk Score Factors, the telecom Alert Rules and the seeded Case. Companion: [Link Analysis showcase (feature off)](../../solution-pack/la-showcase-off/brochure.md).
 
 ## How it works
 

@@ -32,7 +32,7 @@ default, with a second approver for wide expansions and standing detection on wh
   `four_eyes_fan_out_above: 2000`, `index.enabled: true`, Drafts limits (`max_open: 10`,
   `hibernate_after_minutes: 60`, `expire_after_days: 14`). The mobile-money template sets a fan-out
   threshold of 100 (`spaces/_templates/la-mobile-money/config/link-analysis.toon`). Both templates declare
-  `minEdition: advanced`.
+  `minEdition: basic` (plan wave B, step 5): a Basic tier with an Advanced tier on top.
 - **Index Job** `la_index_build` (`la.index.build`, `on_signal: pipeline.commit` for `mule_transfers`):
   first a full build, then appends (`spaces/_templates/la-showcase/config/jobs/la_index_build_job.toon`).
 - **Standing detection** `la_detect` (`la.detect`, every 5 minutes) evaluates Alert Rules bound to an
@@ -43,13 +43,22 @@ default, with a second approver for wide expansions and standing detection on wh
   `job.dataset.produced`. In `la-mobile-money`, `mm_links` folds wallets into one link Dataset (p2p,
   cash in/out, merchant pay, shared device, shared id).
 - **Alert Rules** `telecom_irsf_lines`, `telecom_simbox_lines` (CRITICAL) and `telecom_wangiri_lines`
-  (WARNING) over `telecom_typology_counts_dataset`.
+  (WARNING) over `telecom_typology_counts_dataset`. Advanced tier: on a build without Alert Rules (Basic) they ship
+  unarmed. The boot logs one WARN per rule ("Not arming alert rule") and arms none, and the template gallery and
+  `POST /spaces` accept the template because `minEdition: basic` marks them unarmed (operator 2026-11-08, "A: allow,
+  unarmed"; `SpaceManager.missingFeatures`, `TemplateSeedGate`).
 - **Saved views** — `mule_large_transfers`, `mule_layering_ring`, `mule_structuring`,
   `telecom_fraud_network`; in mobile money `mm_device_farm`, `mm_money_trail`, `mm_structuring_band`.
 - **Pattern packs** `telecom-forwarding-chain`, `telecom-payment-ring`, `telecom-subscription-ring`.
 - **Geo Views** `mule_account_locations_map`, `mule_ring_route_map`, `mule_cashout_till_map`.
 - **Demo Users and roles** — `roles.toon` and `demo-users.toon` (lead analyst, second approver,
   read-only reviewer, a non-member, an admin who can reveal masked values).
+
+**Tiers.** The Basic tier is every feed, Pipeline and Dataset, the `sql.template` link Jobs, `la_index_build`, the
+pattern packs and the four saved views; the Geo Views and the dashboard's Link analysis Widget need Standard and above.
+The Advanced tier is masking, four-eyes, Drafts, `la_detect`, the `mule_account` Risk Score and its Job, the three Alert
+Rules and `telecom_typology_alerts`, the roster and roles, and the seed script's runtime state. On Basic it is inert,
+never an error.
 
 Investigations, members, Entity Lists, a Case and a bound Alert Rule are runtime state with no template
 home; `tools/seed-la-showcase.mjs` and `tools/seed-la-mm.mjs` create them against a running server.

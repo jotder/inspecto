@@ -218,6 +218,16 @@ scripts present but unused) was **proven on `la-claims` on 2026-11-08** (step 5 
 (`config/demo-users.toon`) when its `template.toon` says `minEdition: basic`. Without that change the gallery would list
 the template on Basic and refuse to create it. A stated `masking_mode` is the other trap: leave it unset (see step 5).
 
+**Alert Rules ship unarmed on Basic** (operator 2026-11-08, "A: allow, unarmed"; found on `la-showcase`, wave D relies on
+it for every new Space's Alert Rule). A template whose `template.toon` says `minEdition: basic` may carry Alert Rules
+(`config/registry/alert-rules/`, or a deferred `config/pending/alert-rules/`). On a build without Alert Rules
+(`alert.dispatch` absent, i.e. Basic) the template gallery (`SpaceManager.missingFeatures`) and `POST /spaces` from the
+template (`TemplateSeedGate`) no longer refuse them: the seed gate judges each rule's content only
+(`AlertRoutes.parseContent`, so a malformed rule still refuses the create), and the boot leaves each one unarmed with a
+WARN ("Not arming alert rule"), as it already did for an unzipped Space download. A template without `minEdition:
+basic` is still refused, and a Decision Rule's `create-alert` consequence still counts as needing Alert Rules. Pinned by
+`ControlApiSpaceTemplatesTest.aBasicTierTemplateShipsItsAlertRulesUnarmedOnBasic` (falsified on both gates).
+
 ### Play, learn, test
 
 - **Play:** each showcase's user guide opens with a five-minute tour from its saved views.

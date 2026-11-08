@@ -12,6 +12,17 @@ The showcase is a demo Space; the screens are the standard Link Analysis studio 
 [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md).
 This page names what the Space holds so a walk-through lands on the planted story. Install: [architecture](architecture.md) and the [variants runbook](admin-guide-variants-runbook.md).
 
+## Which edition
+
+The Space has two tiers.
+
+- **Basic tier: every edition, Basic included.** The mule and telecom data, the link Jobs, the four saved views and
+  the pattern packs all work on Basic. Nobody signs in, so masking is off and you read the real ids (`MULE-HUB-01`,
+  `TILL-06`) on the canvas. The Geo Views need Standard or above.
+- **Advanced tier: a build where people sign in.** You get the users below, typed masking with the admin's Reveal,
+  Investigations, four-eyes approval, the Suspicion score's Risk Score Factors, the three telecom Alert Rules (unarmed on
+  Basic) and the seeded Case, so this section and the walk-through after it need it.
+
 ## Sign in
 
 Pick a Demo User (`spaces/_templates/la-showcase/config/demo-users.toon`, `roles.toon`):

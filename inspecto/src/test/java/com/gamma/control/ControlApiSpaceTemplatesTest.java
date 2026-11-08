@@ -139,6 +139,65 @@ class ControlApiSpaceTemplatesTest {
     }
 
     /**
+     * Plan wave B step 5 (operator 2026-11-08, "A: allow, unarmed"): on a Basic build (no {@code alert.dispatch}) a template
+     * whose {@code minEdition} is {@code basic} ships its Alert Rules unarmed - the gallery lists it creatable and
+     * {@code POST /spaces} creates it with the rule file in place (the boot leaves it unarmed with a WARN) - while the SAME
+     * template without {@code minEdition: basic} is still marked uncreatable and refused with a 422. A Basic-tier rule is
+     * still judged by its content: a malformed one refuses the create. Falsified: without the minEdition check in
+     * {@code SpaceManager.missingFeatures} the basic one is {@code creatable: false}; without it in {@code TemplateSeedGate}
+     * its create answers 422.
+     */
+    @Test
+    void aBasicTierTemplateShipsItsAlertRulesUnarmedOnBasic(@TempDir Path root) throws Exception {
+        seedTemplate(root);
+        Path starter = root.resolve("_templates").resolve("starter");
+        String rule = """
+                name: low_volume
+                dataset: orders_dataset
+                measure: count
+                comparator: lt
+                threshold: 10
+                """;
+        for (String edition : java.util.List.of("basic", "advanced", "badrule")) {
+            Path tpl = root.resolve("_templates").resolve("tier-" + edition);
+            try (java.util.stream.Stream<Path> walk = Files.walk(starter)) {
+                for (Path p : walk.sorted().toList()) {
+                    Path t = tpl.resolve(starter.relativize(p).toString());
+                    if (Files.isDirectory(p)) Files.createDirectories(t);
+                    else Files.copy(p, t);
+                }
+            }
+            Files.writeString(tpl.resolve("template.toon"), Files.readString(tpl.resolve("template.toon"))
+                    + "minEdition: " + ("advanced".equals(edition) ? "advanced" : "basic") + "\n");
+            Path rules = Files.createDirectories(tpl.resolve("config/registry/alert-rules"));
+            Files.writeString(rules.resolve("low_volume.toon"), "badrule".equals(edition) ? rule + "colour: red\n" : rule);   // a key no Alert Rule models
+        }
+        try {
+            com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of());   // Basic
+            try (Ctx c = open(root)) {
+                JsonNode all = json(send(c.port, "GET", "/spaces/templates", null));
+                JsonNode basic = find(all, "tier-basic"), advanced = find(all, "tier-advanced");
+                assertTrue(basic.get("creatable").asBoolean(), basic.toString());
+                assertEquals(0, basic.get("missingFeatures").size(), basic.toString());
+                assertFalse(advanced.get("creatable").asBoolean(), advanced.toString());
+                assertEquals("alert.dispatch", advanced.get("missingFeatures").get(0).get("feature").asText(), advanced.toString());
+
+                HttpResponse<String> made = send(c.port, "POST", "/spaces", "{\"id\":\"tiered\",\"template\":\"tier-basic\"}");
+                assertTrue(made.statusCode() / 100 == 2, "a Basic-tier template's rules ship unarmed: " + made.body());
+                assertTrue(Files.isRegularFile(root.resolve("tiered/config/registry/alert-rules/low_volume.toon")),
+                        "the rule ships in the Space, unarmed");
+                HttpResponse<String> refused = send(c.port, "POST", "/spaces", "{\"id\":\"plain\",\"template\":\"tier-advanced\"}");
+                assertEquals(422, refused.statusCode(), "without a Basic tier the rule still refuses the create: " + refused.body());
+                HttpResponse<String> bad = send(c.port, "POST", "/spaces", "{\"id\":\"badly\",\"template\":\"tier-badrule\"}");
+                assertEquals(422, bad.statusCode(), "a Basic-tier rule is still judged by its content: " + bad.body());
+                assertFalse(Files.exists(root.resolve("plain")) || Files.exists(root.resolve("badly")), "a refused create leaves nothing");
+            }
+        } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
+        }
+    }
+
+    /**
      * Plan wave B step 5 (operator 2026-11-08, "allow on Basic"): with no Demo User sign-in installed, the SAME roster refuses a
      * template whose {@code minEdition} is {@code advanced} (or unstated) and does not refuse one whose {@code minEdition} is
      * {@code basic}, whose roster is its inert Advanced tier. Falsified: without the minEdition check the basic one is
@@ -176,7 +235,8 @@ class ControlApiSpaceTemplatesTest {
      * {@code demo-auth}; the test's own {@code starter} is such a template and {@code la-sample} has no roster.
      * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
      * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims},
-     * {@code la-mobile-money} and {@code la-audit}, none of them needing Demo Auth. With an
+     * {@code la-mobile-money}, {@code la-audit} and {@code la-showcase} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
+     * none of them needing Demo Auth. With an
      * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
      * without the roster check every one of them lists {@code creatable: true}.
      */
@@ -184,7 +244,7 @@ class ControlApiSpaceTemplatesTest {
     void galleryCountsTheDemoUserSignInATemplateNeeds(@TempDir Path root) throws Exception {
         seedTemplate(root);
         Files.writeString(root.resolve("_templates/starter/config/demo-users.toon"), "users[0]:\n");
-        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-sample")) {
+        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-sample", "la-showcase")) {
             Path src = Path.of("..", "spaces", "_templates", shipped);
             Path dst = root.resolve("_templates").resolve(shipped);
             Files.createDirectories(dst);
@@ -201,7 +261,7 @@ class ControlApiSpaceTemplatesTest {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
                     // la-sample has no roster; the shipped showcases with a Basic tier keep theirs inert, so it does not refuse them
-                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit");
+                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase");
                     String id = t.get("id").asText();
                     boolean needsDemo = !"la-sample".equals(id) && !basicTier.contains(id);
                     boolean named = false;

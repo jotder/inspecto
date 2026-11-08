@@ -49,7 +49,12 @@ final class TemplateSeedGate {
 
     private TemplateSeedGate() {}
 
-    static void require(HttpExchange ex, Path spaceBase) {
+    /**
+     * @param basicTier whether the template has a Basic tier ({@code minEdition: basic}, {@code SpaceManager#templateHasBasicTier}):
+     *                  on a build without Alert Rules its Alert Rules (registry and pending) are judged by content only and
+     *                  ship unarmed instead of refusing the template (operator 2026-11-08, "A: allow, unarmed")
+     */
+    static void require(HttpExchange ex, Path spaceBase, boolean basicTier) {
         Path config = spaceBase.resolve("config");
         try {
             ImportCapabilityGuard.checkFiles(ex, configEntries(config), true);
@@ -64,12 +69,14 @@ final class TemplateSeedGate {
         com.gamma.config.safety.SafetyPolicy.runWithPinned(new com.gamma.config.safety.SafetyPolicy.Pin(
                 com.gamma.util.CurrentSpace.id(), stagedPolicy(config), com.gamma.config.safety.SafetyPolicy.effectiveTier()),
                 () -> {
-                    requireSeed(ex, spaceBase, config);
+                    requireSeed(ex, spaceBase, config, basicTier);
                     return null;
                 });
     }
 
-    private static void requireSeed(HttpExchange ex, Path spaceBase, Path config) {
+    private static void requireSeed(HttpExchange ex, Path spaceBase, Path config, boolean basicTier) {
+        // a Basic-tier template's Alert Rules ship unarmed on a build without Alert Rules (the boot WARNs and skips them)
+        boolean unarmed = basicTier && !com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.ALERT_DISPATCH);
         Path data = spaceBase.resolve("data");
         Supplier<Path> dataRoot = () -> data;
         Map<String, String> carried = DecisionRuleGuard.carriedConnections(configEntries(config));
@@ -85,7 +92,7 @@ final class TemplateSeedGate {
                         .orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template "
                                 + type + " file '" + file.getFileName() + "' is unreadable; nothing was created"));
                 try {
-                    validate(config, dataRoot, carried, ex, type, c);
+                    validate(config, dataRoot, carried, ex, type, c, unarmed);
                 } catch (IllegalArgumentException bad) {
                     throw refused(type, c.name(), bad.getMessage());
                 } catch (ApiException bad) {
@@ -95,7 +102,7 @@ final class TemplateSeedGate {
             }
         }
         KpiRoutes.requireTemplateKpis(ex, spaceBase);
-        requirePendingAlertRules(config);
+        requirePendingAlertRules(config, unarmed);
         requireStructure(config);
         stampJobs(ex, config);   // T5 owner-spoofing: a seeded la.index.build Job is owned by the applier
         requireConnections(config);
@@ -103,16 +110,17 @@ final class TemplateSeedGate {
 
     /**
      * Each deferred Alert Rule ({@code pending/alert-rules/}, {@code TEMPLATE-RISK-SCORE-ALERT-RULE-1}) meets what can
-     * be judged before its Risk Score runs: the edition carries Alert Rules, it parses, and it reads the
+     * be judged before its Risk Score runs: the edition carries Alert Rules (unless it ships {@code unarmed}, a Basic-tier
+     * template on a build without them), it parses, and it reads the
      * {@code _latest} output of a Risk Score model this template seeds. Its {@code by} Schema check runs when it is
      * created ({@link PendingAlertRules#onScoreProduced}).
      */
-    private static void requirePendingAlertRules(Path config) {
+    private static void requirePendingAlertRules(Path config, boolean unarmed) {
         Path dir = config.resolve(PendingAlertRules.DIR);
         if (!Files.isDirectory(dir)) return;
         for (Path file : files(dir, ".toon")) {
             String name = file.getFileName().toString().replaceFirst("\\.toon$", "");
-            if (!com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.ALERT_DISPATCH))
+            if (!unarmed && !com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.ALERT_DISPATCH))
                 throw refused("pending alert-rule", name, com.gamma.etl.EditionFeatures.refusal(
                         com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
             try {
@@ -204,7 +212,7 @@ final class TemplateSeedGate {
 
     /** What {@code ComponentRoutes.writeComponent} runs before its write, over the content as stored. */
     private static void validate(Path config, Supplier<Path> dataRoot, Map<String, String> carried, HttpExchange ex,
-                                 String type, ComponentRegistry.Component c) {
+                                 String type, ComponentRegistry.Component c, boolean unarmed) {
         String id = c.name();
         Map<String, Object> body = new LinkedHashMap<>(c.content());
         ComponentRoutes.validateKind(config, dataRoot, type, id, body);
@@ -222,7 +230,8 @@ final class TemplateSeedGate {
         }
         if ("alert-rule".equals(type)) {
             body.put("name", id);
-            AlertRoutes.parse(config, dataRoot, body);
+            if (unarmed) AlertRoutes.parseContent(config, dataRoot, body);   // ships unarmed: judged, not refused
+            else AlertRoutes.parse(config, dataRoot, body);
         }
     }
 
