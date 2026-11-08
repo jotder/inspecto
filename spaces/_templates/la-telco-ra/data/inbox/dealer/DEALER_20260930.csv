@@ -1,0 +1,201 @@
+dealer_id,name,city
+DL-000,Network test team (internal),Leeds
+DL-001,Ashdown Talk,Newcastle
+DL-002,Redwing Handsets,Glasgow
+DL-003,Larkspur Talk,Newcastle
+DL-004,Pebble Mobile,Manchester
+DL-005,Yardley Mobile Hub,Leeds
+DL-006,Thistle Phone Shop,Newcastle
+DL-007,Underhill Phones,Glasgow
+DL-008,Lantern Mobile,Newcastle
+DL-009,Underhill Connect,Newcastle
+DL-010,Saltmarsh Phones,Leeds
+DL-011,Greystone Phone Shop,Liverpool
+DL-012,Foxglove Phones,Glasgow
+DL-013,Larkspur Mobile Hub,Liverpool
+DL-014,Oakridge Phone Shop,Manchester
+DL-015,Foxglove Wireless,Glasgow
+DL-016,Copperfield Connect,Glasgow
+DL-017,Westbrook Mobile Hub,Liverpool
+DL-018,Cobalt Phones,Sheffield
+DL-019,Oakridge Mobile,Newcastle
+DL-020,Oakridge Wireless,Sheffield
+DL-021,Hawthorn Phone Shop,Sheffield
+DL-022,Zephyr Handsets,Leeds
+DL-023,Harbour Wireless,Liverpool
+DL-024,Greystone Connect,Sheffield
+DL-025,Thistle Wireless,Newcastle
+DL-026,Pebble Phone Shop,Newcastle
+DL-027,Kingfisher Connect,Liverpool
+DL-028,Cobalt Phone Shop,Liverpool
+DL-029,Hawthorn Mobile Hub,Liverpool
+DL-030,Yardley Mobile,Leeds
+DL-031,Yardley Talk,Glasgow
+DL-032,Copperfield Phones,Manchester
+DL-033,Driftwood Handsets,Liverpool
+DL-034,Driftwood Talk,Liverpool
+DL-035,Saltmarsh Phone Shop,Manchester
+DL-036,Lantern Phone Shop,Leeds
+DL-037,Oakridge Connect,Sheffield
+DL-038,Millstone Talk,Leeds
+DL-039,Harbour Phone Shop,Leeds
+DL-040,Larkspur Phones,Glasgow
+DL-041,Westbrook Connect,Sheffield
+DL-042,Bramble Wireless,Glasgow
+DL-043,Underhill Handsets,Liverpool
+DL-044,Kestrel Mobile,Manchester
+DL-045,Kestrel Connect,Newcastle
+DL-046,Ashdown Mobile Hub,Sheffield
+DL-047,Lantern Wireless,Manchester
+DL-048,Ridgeway Handsets,Glasgow
+DL-049,Kestrel Talk,Newcastle
+DL-050,Larkspur Phone Shop,Glasgow
+DL-051,Driftwood Connect,Sheffield
+DL-052,Hawthorn Wireless,Glasgow
+DL-053,Redwing Phone Shop,Newcastle
+DL-054,Copperfield Handsets,Sheffield
+DL-055,Lantern Phones,Sheffield
+DL-056,Cobalt Wireless,Manchester
+DL-057,Kestrel Mobile Hub,Sheffield
+DL-058,Millstone Phone Shop,Newcastle
+DL-059,Zephyr Talk,Glasgow
+DL-060,Kingfisher Phone Shop,Leeds
+DL-061,Ironbridge Phone Shop,Newcastle
+DL-062,Kestrel Handsets,Manchester
+DL-063,Quayside Mobile Hub,Manchester
+DL-064,Harbour Phones,Newcastle
+DL-065,Northgate Phone Shop,Sheffield
+DL-066,Underhill Phone Shop,Sheffield
+DL-067,Bramble Handsets,Liverpool
+DL-068,Zephyr Mobile,Sheffield
+DL-069,Harbour Handsets,Liverpool
+DL-070,Thistle Mobile Hub,Manchester
+DL-071,Westbrook Talk,Sheffield
+DL-072,Ashdown Handsets,Manchester
+DL-073,Harbour Connect,Glasgow
+DL-074,Valley Wireless,Glasgow
+DL-075,Saltmarsh Connect,Liverpool
+DL-076,Ridgeway Talk,Liverpool
+DL-077,Pebble Mobile Hub,Liverpool
+DL-078,Ashdown Phones,Leeds
+DL-079,Driftwood Wireless,Newcastle
+DL-080,Northgate Handsets,Newcastle
+DL-081,Quayside Phone Shop,Liverpool
+DL-082,Foxglove Mobile,Glasgow
+DL-083,Westbrook Handsets,Sheffield
+DL-084,Kingfisher Wireless,Newcastle
+DL-085,Millstone Connect,Liverpool
+DL-086,Copperfield Phone Shop,Sheffield
+DL-087,Kingfisher Mobile Hub,Glasgow
+DL-088,Hawthorn Connect,Newcastle
+DL-089,Larkspur Wireless,Manchester
+DL-090,Thistle Talk,Liverpool
+DL-091,Millstone Phones,Leeds
+DL-092,Kingfisher Mobile,Leeds
+DL-093,Northgate Wireless,Liverpool
+DL-094,Bramble Mobile Hub,Glasgow
+DL-095,Northgate Mobile,Liverpool
+DL-096,Redwing Connect,Leeds
+DL-097,Foxglove Connect,Liverpool
+DL-098,Ironbridge Phones,Liverpool
+DL-099,Underhill Mobile Hub,Sheffield
+DL-100,Meadow Phone Shop,Manchester
+DL-101,Greystone Phones,Liverpool
+DL-102,Ridgeway Mobile Hub,Sheffield
+DL-103,Ridgeway Connect,Newcastle
+DL-104,Northgate Connect,Glasgow
+DL-105,Quayside Phones,Manchester
+DL-106,Westbrook Wireless,Leeds
+DL-107,Zephyr Phones,Sheffield
+DL-108,Thistle Connect,Leeds
+DL-109,Oakridge Mobile Hub,Newcastle
+DL-110,Valley Talk,Manchester
+DL-111,Northgate Talk,Newcastle
+DL-112,Copperfield Talk,Leeds
+DL-113,Westbrook Phones,Sheffield
+DL-114,Ironbridge Mobile Hub,Manchester
+DL-115,Ashdown Mobile,Liverpool
+DL-116,Millstone Wireless,Glasgow
+DL-117,Thistle Handsets,Manchester
+DL-118,Meadow Phones,Glasgow
+DL-119,Foxglove Handsets,Glasgow
+DL-120,Pebble Talk,Glasgow
+DL-121,Meadow Mobile,Newcastle
+DL-122,Bramble Phone Shop,Leeds
+DL-123,Greystone Mobile,Liverpool
+DL-124,Juniper Handsets,Leeds
+DL-125,Kestrel Phone Shop,Sheffield
+DL-126,Kingfisher Talk,Manchester
+DL-127,Larkspur Connect,Newcastle
+DL-128,Greystone Wireless,Leeds
+DL-129,Lantern Talk,Leeds
+DL-130,Ironbridge Mobile,Liverpool
+DL-131,Ridgeway Phones,Manchester
+DL-132,Yardley Connect,Leeds
+DL-133,Oakridge Phones,Sheffield
+DL-134,Lantern Connect,Sheffield
+DL-135,Redwing Talk,Leeds
+DL-136,Oakridge Talk,Liverpool
+DL-137,Yardley Phone Shop,Liverpool
+DL-138,Hawthorn Handsets,Glasgow
+DL-139,Foxglove Phone Shop,Leeds
+DL-140,Hawthorn Mobile,Newcastle
+DL-141,Driftwood Phones,Liverpool
+DL-142,Juniper Talk,Sheffield
+DL-143,Valley Phones,Sheffield
+DL-144,Juniper Phone Shop,Liverpool
+DL-145,Thistle Phones,Glasgow
+DL-146,Westbrook Mobile,Liverpool
+DL-147,Meadow Wireless,Glasgow
+DL-148,Ironbridge Wireless,Sheffield
+DL-149,Millstone Mobile,Newcastle
+DL-150,Driftwood Phone Shop,Glasgow
+DL-151,Yardley Wireless,Sheffield
+DL-152,Juniper Mobile,Glasgow
+DL-153,Millstone Mobile Hub,Newcastle
+DL-154,Ashdown Connect,Leeds
+DL-155,Ridgeway Phone Shop,Glasgow
+DL-156,Juniper Wireless,Newcastle
+DL-157,Quayside Talk,Manchester
+DL-158,Saltmarsh Mobile,Glasgow
+DL-159,Ironbridge Handsets,Manchester
+DL-160,Bramble Talk,Leeds
+DL-161,Quayside Connect,Glasgow
+DL-162,Lantern Handsets,Sheffield
+DL-163,Yardley Handsets,Sheffield
+DL-164,Zephyr Mobile Hub,Manchester
+DL-165,Driftwood Mobile Hub,Manchester
+DL-166,Quayside Handsets,Sheffield
+DL-167,Saltmarsh Talk,Manchester
+DL-168,Driftwood Mobile,Sheffield
+DL-169,Bramble Mobile,Sheffield
+DL-170,Zephyr Connect,Glasgow
+DL-171,Cobalt Connect,Liverpool
+DL-172,Ironbridge Connect,Glasgow
+DL-173,Underhill Mobile,Manchester
+DL-174,Cobalt Talk,Leeds
+DL-175,Larkspur Handsets,Sheffield
+DL-176,Larkspur Mobile,Newcastle
+DL-177,Copperfield Mobile Hub,Leeds
+DL-178,Westbrook Phone Shop,Manchester
+DL-179,Valley Phone Shop,Newcastle
+DL-180,Saltmarsh Wireless,Liverpool
+DL-181,Foxglove Talk,Glasgow
+DL-182,Juniper Connect,Liverpool
+DL-183,Greystone Mobile Hub,Leeds
+DL-184,Ridgeway Mobile,Glasgow
+DL-185,Pebble Handsets,Newcastle
+DL-186,Juniper Phones,Liverpool
+DL-187,Meadow Connect,Leeds
+DL-188,Thistle Mobile,Glasgow
+DL-189,Redwing Mobile,Liverpool
+DL-190,Meadow Mobile Hub,Liverpool
+DL-191,Ashdown Phone Shop,Liverpool
+DL-192,Meadow Handsets,Manchester
+DL-193,Bramble Phones,Glasgow
+DL-194,Juniper Mobile Hub,Leeds
+DL-195,Quayside Wireless,Liverpool
+DL-196,Millstone Handsets,Glasgow
+DL-197,Pebble Connect,Sheffield
+DL-198,Pebble Wireless,Liverpool
+DL-199,Kestrel Wireless,Manchester

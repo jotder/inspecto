@@ -1,0 +1,6 @@
+physicalRef: dealer/database
+description: "Telecom revenue assurance Link Analysis showcase - One row per dealer (retail shops and franchises that activate SIMs, plus the operator's internal network test team, DL-000): name and city. One extract (DEALER_20260930.csv). Landed by the dealer Pipeline. Synthetic."
+columns[3]{name,type,classification}:
+  dealer_id,string,
+  name,string,
+  city,string,

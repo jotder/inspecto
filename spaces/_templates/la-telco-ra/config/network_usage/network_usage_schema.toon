@@ -1,0 +1,24 @@
+raw:
+  name: NETWORK_USAGE
+  format: CSV
+  fields[4]{name,selector,type}:
+    msisdn,"0",VARCHAR
+    period,"1",DATE
+    minutes,"2",DOUBLE
+    mb,"3",DOUBLE
+mapping:
+  canonicalName: network_usage
+  rawName: NETWORK_USAGE
+  fields[4]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: period
+      from: period
+      fn: keep
+    - name: minutes
+      from: minutes
+      fn: keep
+    - name: mb
+      from: mb
+      fn: keep

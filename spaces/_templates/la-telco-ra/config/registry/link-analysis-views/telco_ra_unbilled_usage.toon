@@ -1,0 +1,23 @@
+name: telco_ra_unbilled_usage
+description: "Unbilled usage - every subscriber whose network usage reached no billing record in 2 or more months, with the dealer that activated it and the device it was activated on (via on activated_by = plan, top-ups, usage months, unbilled_months, usage and billed minutes). A few ordinary subscribers reached billing a month or two late. One dealer activated 300 heavily used SIMs on one device on one day that were never billed; the network test team's SIMs are never billed either, and are on the known list (plan Internal test)."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: telco_ra_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","unbilled_usage"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

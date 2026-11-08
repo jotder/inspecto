@@ -1,0 +1,36 @@
+name: billing_record
+active: true
+description: "Telecom revenue assurance Link Analysis showcase - One row per subscriber per month, summed from the rated records the billing system charged: the period (the first of the month), billed minutes and billed MB. A month of network usage with no billing record is usage that was never charged. One file per month (BILLING_RECORD_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-telco-ra-data.py."
+
+dirs:
+  poll:       data/inbox/billing_record
+  database:   data/billing_record/database
+  backup:     data/billing_record/backup
+  temp:       data/billing_record/temp
+  errors:     data/billing_record/errors
+  quarantine: data/billing_record/quarantine
+  markers:    data/billing_record/markers
+  status_dir: data/billing_record/status
+  log_dir:    data/billing_record/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: billing_record_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

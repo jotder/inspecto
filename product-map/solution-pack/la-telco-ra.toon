@@ -1,0 +1,7 @@
+id: solution-pack.la-telco-ra
+kind: solution-pack
+title: Link Analysis telecom revenue assurance showcase
+template: la-telco-ra
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-telco-ra/index.md

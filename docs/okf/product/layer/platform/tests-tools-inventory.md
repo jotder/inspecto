@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-67 test file(s). Run one, or all:
+68 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -56,6 +56,7 @@ node --test tools/
 | `tools/gen-la-police-data.test.mjs` | Determinism and planted facts of tools/gen-la-police-data.py. Run: node --test tools/gen-la-police-data.test.mjs |
 | `tools/gen-la-procurement-data.test.mjs` | Determinism and planted facts of tools/gen-la-procurement-data.py. Run: node --test tools/gen-la-procurement-data.test.mjs |
 | `tools/gen-la-showcase-data.test.mjs` | Determinism of tools/gen-la-showcase-data.py. Run: node --test tools/gen-la-showcase-data.test.mjs |
+| `tools/gen-la-telco-ra-data.test.mjs` | Determinism and planted facts of tools/gen-la-telco-ra-data.py. Run: node --test tools/gen-la-telco-ra-data.test.mjs |
 | `tools/gen-la-trade-data.test.mjs` | Golden test of tools/gen-la-trade-data.py. Run: node --test tools/gen-la-trade-data.test.mjs |
 | `tools/gen-la-utility-data.test.mjs` | Determinism and planted facts of tools/gen-la-utility-data.py. Run: node --test tools/gen-la-utility-data.test.mjs |
 | `tools/java-closure.test.mjs` | Fixture test for tools/java-closure.mjs — each blind spot that bit the D-1 closure script must now be SEEN. |

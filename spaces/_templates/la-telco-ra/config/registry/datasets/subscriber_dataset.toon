@@ -1,0 +1,10 @@
+physicalRef: subscriber/database
+description: "Telecom revenue assurance Link Analysis showcase - One row per subscriber (SIM) from the activation register: MSISDN, IMSI, the dealer that activated it, when, the plan (prepaid, postpaid, or Internal test for the network test team's known list of test SIMs) and the dealer device it was activated on (blank for some older activations). One extract of every SIM activated by 2026-09-30 (SUBSCRIBER_20260930.csv); the October activations are in data/staged. Landed by the subscriber Pipeline. Synthetic."
+eventDate: activated_at
+columns[6]{name,type,classification}:
+  msisdn,string,
+  imsi,string,
+  dealer_id,string,
+  activated_at,timestamp,
+  plan,string,
+  activation_device,string,

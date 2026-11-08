@@ -1,0 +1,20 @@
+raw:
+  name: DEALER
+  format: CSV
+  fields[3]{name,selector,type}:
+    dealer_id,"0",VARCHAR
+    name,"1",VARCHAR
+    city,"2",VARCHAR
+mapping:
+  canonicalName: dealer
+  rawName: DEALER
+  fields[3]:
+    - name: dealer_id
+      from: dealer_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
