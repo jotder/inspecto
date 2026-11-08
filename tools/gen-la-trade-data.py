@@ -524,7 +524,7 @@ while len(trades) < N_TRADE_TARGET:
             add_trade(e, i, pick(hs), [(s[0], pl, pd, s[1], s[2])], round(max(min(rng.lognormvariate(0, 0.15), 2.2), 0.5), 2))
 for t in trades[n_story:]:
     if rng.random() < 0.04:
-        t["vessel"] = ""          # documentary collections sometimes name no vessel
+        t["vessel"] = ""          # some trades name no vessel
 
 # ---- containers: date order, a box is reused at most BOX_CAP times and never comes back to a former consignee --------------
 box_uses: dict[str, list[tuple[str, str]]] = {}      # box -> [(shipper, consignee)]

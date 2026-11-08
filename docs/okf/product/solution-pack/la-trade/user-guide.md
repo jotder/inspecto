@@ -56,12 +56,12 @@ on the ship date, but each leg's B/L matches its own vessel.
    (between 23 and about 200 links), so it draws in full, and each shows its story beside a look-alike. The
    description of each view says what to look for.
 2. Open `trade_over_invoicing`. Two shapes appear: a star of one German supplier and its eight buyers, and a small
-   triangle of two companies and one person. Open a `traded_with` link and read `max_x_reference` in `via`.
+   group of two companies joined through one person they share as director. Open a `traded_with` link and read `max_x_reference` in `via`.
 3. Open `trade_phantom_shipment`. Most of it is transhipments: a shipper linked to two vessels. One shipper is linked
    to a single vessel by a link whose `flag` is `vessel_elsewhere`; its `via` lists five B/Ls and where the vessel
    really was on each date.
-4. Open `trade_circular_trade`. Six boxes linked to the same three shippers stand apart from six stars, each a box
-   loaded by ten different shippers.
+4. Open `trade_circular_trade`. Six boxes linked to the same three shippers stand apart from a looser web of six boxes,
+   each loaded by ten different shippers.
 5. To follow a node out of a view into the whole Dataset, use **File ▸ New**, **Start a graph**: Dataset
    `trade_links_dataset`, start from **One entity**, Entity Type **Trade entity**, type an id such as `CO-00597` and
    choose **Draw**, then **Expand** (**G**).
@@ -105,7 +105,7 @@ The exercises below take each story in turn. Try them blind first; the answers f
   went on two B/Ls: `MV HALCYON GLORY` from Harbour Crest to Saltmere (SG) on 4 March, then `MV TAMARIND CREST` from
   Saltmere on 10 April, and each vessel was in its B/L's port of loading on its B/L's date. The others are `TR-005681`,
   `TR-004674`, `TR-001572` and `TR-011122` (exporters `CO-02497`, `CO-00264`, `CO-01639`, `CO-01311`). The view also
-  holds 27 ordinary background transhipments.
+  holds 24 ordinary background transhipments (27 once the October files are staged).
 
 ### 3. Circular trade
 
@@ -120,8 +120,9 @@ The exercises below take each story in turn. Try them blind first; the answers f
   `TR-008054`, `TR-008712`), the same 1 100 units each time, invoiced at **450 681, 502 678, 582 373, 641 729,
   706 299 and 788 128**. Each consignee ships the boxes on (5 relays per box). The goods go nowhere; the invoices grow.
 - **Not the answer:** the leasing pool's boxes `PWCU0827459`, `PWCU9046170`, `PWCU3999100`, `PWCU2508727`,
-  `PWCU0444452` and `PWCU6477031` (flag `many_shippers`) are each loaded by **10** shippers that never trade with each
-  other, and no box ever goes back to a company that received it. Boxes are reused; that is what leasing is.
+  `PWCU0444452` and `PWCU6477031` (flag `many_shippers`) are each loaded by **10** different shippers, and no box ever goes back
+  to a company that received it. A few of those shippers also trade with each other, as busy companies do, but none of
+  them ships a box on after receiving it. Boxes are reused; that is what leasing is.
 
 ### 4. Shell importers
 

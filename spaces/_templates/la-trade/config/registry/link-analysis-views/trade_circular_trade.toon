@@ -1,5 +1,5 @@
 name: trade_circular_trade
-description: "Circular trade - containers and the shippers that loaded them, where a box is relayed (its consignee ships it on) or carried for many shippers. Look for a few boxes that the same three companies keep shipping round to each other, the trade value rising on every leg. A leasing pool's boxes, each loaded by many unrelated shippers who never trade with each other, are ordinary."
+description: "Circular trade - containers and the shippers that loaded them, where a box is relayed (its consignee ships it on) or carried for many shippers. Look for a few boxes that the same three companies keep shipping round to each other, the trade value rising on every leg. A leasing pool's boxes, each loaded by many shippers and never shipped on by a company that received them, are ordinary."
 sourceId: entity-projection
 layout: force
 query:

@@ -74,7 +74,7 @@ avoids the word.
 first: 25 invented ports in 24 real countries, 30 liner services (four fixed so the stories have a route), 10 vessels
 per service sailing their loop day by day from July 2025, so every genuine B/L is dated on a day its vessel is in its
 port of loading. It then builds the background (heavy-tailed trade relationships, 27 transhipments through a hub, boxes
-reused at most 4 times and never back to a former consignee, 4 % blank addresses and collection vessels, 20 people
+reused at most 4 times and never back to a former consignee, 4 % blank addresses and trade vessels, 20 people
 registered twice under a spelling variant) and plants four stories with a look-alike each. Company and person ids are
 shuffled, trade and B/L ids follow the date, so a story is not visible in the numbering. Before writing, it re-runs
 every red-flag rule on its own corpus and refuses to write if a flag fires anywhere but on the planted records. It writes
