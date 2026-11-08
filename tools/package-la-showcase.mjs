@@ -109,8 +109,10 @@ export function plan(id, files) {
 /**
  * LA-INDUSTRY-SPACES-1: an industry Space is composed from use-case templates named by a recipe
  * (`spaces/_industries/<id>.toon`, `useCases[n]: a,b`). Every file comes from exactly one use case: a path two use cases
- * both ship is refused, so a collision is renamed in its template on purpose. The one exception is
- * `config/link-analysis.toon`, whose `entity_types` are merged by id (the same id must be declared the same way).
+ * both ship with different content is refused, so a real collision is renamed in its template on purpose. Three
+ * exceptions: the same bytes in several use cases ship once; `config/link-analysis.toon` is merged by entity-type id
+ * (the same id must be declared the same way); and `config/examples/*.md` are joined. A lone copy of either joined
+ * file ships verbatim.
  * @param byTemplate  [{ tpl, files: [paths relative to the template folder] }]
  * @returns Map path -> template that ships it (link-analysis.toon maps to every template that has one)
  */

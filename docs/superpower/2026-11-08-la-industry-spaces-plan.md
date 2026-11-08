@@ -272,12 +272,18 @@ The operator approved this plan and the spike on 2026-11-08 ("Approve, start spi
     not by the packer.
   - No test checks a template's Dataset entries against `DatasetEntryRules` and the declared types; add one with the
     next pack.
-  - A real collision exists today: `config/examples/sla-escalation-examples.md` ships in both `la-utility` and
-    `la-claims`.
+  - A real collision existed: every template must ship `config/examples/sla-escalation-examples.md`, each titled
+    for its own Space. Settled in step 3: the packer joins several such files into one.
 - **Not done in the spike:** the bundle's in-app template gallery (`package.ps1` stages only `spaces/_templates`, so
   `la-utilities` is not in the gallery yet), and the D2 choice to hide the per-use-case template.
 
 ### Step 3, first lane as built (2026-11-08) — *Insurance*
+
+- **Packer rules added in this lane** (`tools/package-la-showcase.mjs`, unit-tested):
+  - a lone `config/link-analysis.toon` ships verbatim;
+  - a path several use cases ship with the same bytes ships once;
+  - several use cases' `config/examples/*.md` are joined into one document;
+  - a path whose copies differ is still refused, and so is a recipe naming a missing use case.
 
 - Recipe `spaces/_industries/la-insurance.toon` (use case `la-claims`).
 - The packer ships a lone use case's `config/link-analysis.toon` verbatim. `la-claims`' file also holds four-eyes,
