@@ -1,0 +1,36 @@
+name: expense
+active: true
+description: "Insider threat Link Analysis showcase - One row per expense claim: who claimed it, who approved it, the amount (the single-approver limit is 500) and when it was submitted. One file per month (EXPENSE_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-insider-data.py."
+
+dirs:
+  poll:       data/inbox/expense
+  database:   data/expense/database
+  backup:     data/expense/backup
+  temp:       data/expense/temp
+  errors:     data/expense/errors
+  quarantine: data/expense/quarantine
+  markers:    data/expense/markers
+  status_dir: data/expense/status
+  log_dir:    data/expense/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: expense_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

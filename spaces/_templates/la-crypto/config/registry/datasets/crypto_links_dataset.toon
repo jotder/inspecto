@@ -1,0 +1,11 @@
+physicalRef: crypto_links
+description: "Crypto laundering Link Analysis showcase - ONE link Dataset built by the crypto_links Job from wallet, transfer, cluster_hint, exchange_account, kyc_person and cashout. kind is one of sent_to, same_cluster, deposit_of, kyc_of, cashed_out_to, mixer_exit; one row per pair; via names the evidence. Ids say what an endpoint is: syn1... address (an invented format), CL- cluster, XA- exchange account, KP- KYC person, BK- bank account. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,

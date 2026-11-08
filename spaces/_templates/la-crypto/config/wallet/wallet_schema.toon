@@ -1,0 +1,20 @@
+raw:
+  name: WALLET
+  format: CSV
+  fields[3]{name,selector,type}:
+    address,"0",VARCHAR
+    first_seen,"1",TIMESTAMP
+    label,"2",VARCHAR
+mapping:
+  canonicalName: wallet
+  rawName: WALLET
+  fields[3]:
+    - name: address
+      from: address
+      fn: keep
+    - name: first_seen
+      from: first_seen
+      fn: keep
+    - name: label
+      from: label
+      fn: keep

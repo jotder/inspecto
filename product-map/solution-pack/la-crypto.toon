@@ -1,0 +1,7 @@
+id: solution-pack.la-crypto
+kind: solution-pack
+title: Link Analysis crypto laundering showcase
+template: la-crypto
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-crypto/index.md

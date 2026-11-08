@@ -1,0 +1,24 @@
+raw:
+  name: ACCESS_DAILY
+  format: CSV
+  fields[4]{name,selector,type}:
+    employee_id,"0",VARCHAR
+    system,"1",VARCHAR
+    read_date,"2",DATE
+    records_read,"3",INTEGER
+mapping:
+  canonicalName: access_daily
+  rawName: ACCESS_DAILY
+  fields[4]:
+    - name: employee_id
+      from: employee_id
+      fn: keep
+    - name: system
+      from: system
+      fn: keep
+    - name: read_date
+      from: read_date
+      fn: keep
+    - name: records_read
+      from: records_read
+      fn: keep

@@ -1,0 +1,12 @@
+physicalRef: crypto_screen_links
+description: "Crypto laundering Link Analysis showcase - Derived from crypto_links each time it is produced, for the three saved views: the links each screen selects, tagged in screen (peel_chain, mixer_hop, converging_cash_out). A link selected by two screens appears once in each. Same columns as crypto_links plus screen. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+  screen,string,

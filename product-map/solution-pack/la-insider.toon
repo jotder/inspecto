@@ -1,0 +1,7 @@
+id: solution-pack.la-insider
+kind: solution-pack
+title: Link Analysis insider threat showcase
+template: la-insider
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-insider/index.md
