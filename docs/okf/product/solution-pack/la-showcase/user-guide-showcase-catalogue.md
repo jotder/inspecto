@@ -118,7 +118,7 @@ Telecom and under Banking and finance.
 
 | Template | What it teaches | Stories | Edition | Data | Guide |
 |---|---|---|---|---|---|
-| `la-police` | Criminal investigation: incidents, people, vehicles, handsets and addresses | A burglary series traced through second-hand-dealer sales and one vehicle; a drug-supply handset network with a rotating controller number; drug bases at vulnerable residents' addresses; a witness who was arrested with the suspect | Basic; Advanced tier: planned | 1.2 MB | [user guide, 4 exercises](../la-police/user-guide.md#exercises) · [install](../la-police/admin-guide-install.md) |
+| `la-police` | Criminal investigation: incidents, people, vehicles, handsets and addresses | A burglary series traced through second-hand-dealer sales and one vehicle; a drug-supply handset network with a rotating controller number; drug bases at vulnerable residents' addresses; a witness who was arrested with the suspect | Basic; **Advanced tier:** five Demo Users, Investigations, four-eyes, Drafts, an Alert Rule on stolen serials resurfacing through one seller (unarmed on Basic), and a seed script for the Investigation, an Entity List of the sellers and a Case | 1.2 MB | [user guide, 4 exercises](../la-police/user-guide.md#exercises) · [install](../la-police/admin-guide-install.md) |
 
 ### Public sector
 

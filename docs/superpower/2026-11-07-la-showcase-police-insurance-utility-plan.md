@@ -1407,10 +1407,14 @@ deviations:
      `SPACES_DATA_ROOT`): 11 Pipelines, 0 rejected; all six Jobs succeed; one WARN "Not arming alert rule
      'police_repeat_seller_serial_matches'"; `police_serial_match_alerts` "no rule breached"; the three views' projections
      unchanged (61, 736, 751 nodes, not cut short, `masking: none`); 0 ERROR lines.
-   - **Not checked:** the gallery on a live Basic bundle (`la-police` is in no Offering's `contentPacks`, so no bundle's
-     gallery lists it. `ControlApiSpaceTemplatesTest` runs its gallery with the Advanced features; the verification
-     agent re-ran it with no features, as on Basic, and `la-police` was creatable with no missing feature), the Link Analysis UI (both bundles were `-NoUi`; checked through the
-     API), an OIDC sign-in build, and the staged month on either build.
+   - **Not checked:** the gallery on a live Basic bundle. Every committed template ships in every bundle's gallery
+     (`package-spaces.ps1`), so `la-police` was there; it was not opened. `ControlApiSpaceTemplatesTest` runs its gallery
+     with the Advanced features; the verification agent re-ran it with no features, as on Basic, and `la-police` was
+     creatable with no missing feature. Also not checked: the Link Analysis UI (both bundles were `-NoUi`; checked
+     through the API), an OIDC sign-in build, and the staged month on either build.
+   - **Offering (2026-11-08, follow-up):** `la-police` was the only LA showcase missing from `offerings/basic.toon`
+     `contentPacks` (the Offering's declared catalogue, read by `tools/customer-build.mjs` and the Product Map; the
+     bundle gallery does not read it). Added, and pinned in `tools/check-offerings.test.mjs`.
 
 **Docs, with each Space**
 
