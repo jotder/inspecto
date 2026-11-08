@@ -1,6 +1,6 @@
 // Determinism and planted facts of tools/gen-la-crypto-data.py. Run: node --test tools/gen-la-crypto-data.test.mjs
 // Runs the generator (it writes under spaces/_templates/la-crypto/data and the ground truth beside itself) and asserts every file is
-// byte-identical to what is committed, then checks each story's facts in the files against the ground truth: a hacked wallet emptied
+// byte-identical to what is committed, then checks each story's facts in the files against the ground truth: 412.5 SYC stolen from a hacked wallet
 // into an 80-hop peel chain whose peels land at 6 exchange deposit addresses; three ransom lots that leave the mixer within 2 hours at
 // 98-99 % to one exchange account; one cluster paying 40 accounts in 40 names that cash out to 3 bank accounts - and that each
 // look-alike has the innocent shape. That the stories LINK (and the look-alikes do not) over the real link Datasets is
@@ -104,7 +104,7 @@ test('the corpus: invented syn1 addresses, five invented exchanges, October 2026
   assert.ok(blank > 0.02 && blank < 0.08, `a few birth years are blank (${blank})`);
 });
 
-test('peel chain: the hacked wallet is emptied into 80 hops of one in, two out, peeling into 6 exchange deposit addresses', () => {
+test('peel chain: 412.5 SYC leaves the hacked wallet into 80 hops of one in, two out, peeling into 6 exchange deposit addresses', () => {
   const p = truth.peel_chain;
   assert.equal(labelOf[p.hacked], 'hacked');
   const theft = outOf[p.hacked].filter((t) => t.tx_at.startsWith('2026-03-14'));
