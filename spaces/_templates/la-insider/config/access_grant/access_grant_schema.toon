@@ -1,0 +1,28 @@
+raw:
+  name: ACCESS_GRANT
+  format: CSV
+  fields[5]{name,selector,type}:
+    employee_id,"0",VARCHAR
+    system,"1",VARCHAR
+    granted_by,"2",VARCHAR
+    granted_at,"3",TIMESTAMP
+    ticket_id,"4",VARCHAR
+mapping:
+  canonicalName: access_grant
+  rawName: ACCESS_GRANT
+  fields[5]:
+    - name: employee_id
+      from: employee_id
+      fn: keep
+    - name: system
+      from: system
+      fn: keep
+    - name: granted_by
+      from: granted_by
+      fn: keep
+    - name: granted_at
+      from: granted_at
+      fn: keep
+    - name: ticket_id
+      from: ticket_id
+      fn: keep

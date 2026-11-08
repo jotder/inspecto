@@ -1,0 +1,9 @@
+physicalRef: access_grant/database
+description: "Insider threat Link Analysis showcase - One row per access grant: the employee, the system (an invented upper-case name; AP, PAYROLL and TREASURY are the finance systems), who approved the grant, when, and the access request or change ticket (blank when there was none). One extract of every grant up to 2026-09-30 (ACCESS_GRANT_20260930.csv); October's grants are in data/staged. Landed by the access_grant Pipeline. Synthetic."
+eventDate: granted_at
+columns[5]{name,type,classification}:
+  employee_id,string,
+  system,string,
+  granted_by,string,
+  granted_at,timestamp,
+  ticket_id,string,

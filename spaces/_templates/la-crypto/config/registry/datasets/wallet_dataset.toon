@@ -1,0 +1,7 @@
+physicalRef: wallet/database
+description: "Crypto laundering Link Analysis showcase - One row per address in the invented syn1 format (it cannot match a real chain): when it was first seen in a transfer, and the label the analytics provider gives it (exchange - an exchange's hot wallet or a customer deposit address; mixer; merchant - a business; hacked - reported stolen from; unknown). One extract of every address first seen by 2026-09-30 (WALLET_20260930.csv); the addresses first seen in October are in data/staged. Landed by the wallet Pipeline. Synthetic."
+eventDate: first_seen
+columns[3]{name,type,classification}:
+  address,string,
+  first_seen,timestamp,
+  label,string,

@@ -1,0 +1,9 @@
+physicalRef: expense/database
+description: "Insider threat Link Analysis showcase - One row per expense claim: who claimed it, who approved it, the amount (the single-approver limit is 500) and when it was submitted. One file per month (EXPENSE_YYYYMM.csv); the next month is in data/staged. Landed by the expense Pipeline. Synthetic."
+eventDate: submitted_at
+columns[5]{name,type,classification}:
+  expense_id,string,
+  requester_id,string,
+  approver_id,string,
+  amount,number,
+  submitted_at,timestamp,
