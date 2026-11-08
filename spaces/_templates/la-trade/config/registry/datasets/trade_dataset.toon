@@ -1,0 +1,16 @@
+physicalRef: trade/database
+description: "Trade-based money-laundering Link Analysis showcase - One row per trade financed by the bank (letter of credit or documentary collection): applicant (importer), beneficiary (exporter), HS code, quantity, unit price, value, ports, the vessel named on the trade (blank on about 4 % of trades) and the ship date. Landed by the trade Pipeline. Synthetic."
+eventDate: ship_date
+columns[12]{name,type,classification}:
+  trade_id,string,
+  instrument,string,
+  applicant,string,
+  beneficiary,string,
+  hs_code,string,
+  qty,number,
+  unit_price,number,
+  value,number,
+  port_load,string,
+  port_discharge,string,
+  vessel,string,
+  ship_date,date,

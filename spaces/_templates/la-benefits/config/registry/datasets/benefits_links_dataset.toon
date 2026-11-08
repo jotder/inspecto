@@ -1,0 +1,11 @@
+physicalRef: benefits_links
+description: "Benefits and tax fraud Link Analysis showcase - ONE link Dataset built by the benefits_links Job from claim, death_register, person, household, payroll and tax_return. kind is one of claims, paid_into, lives_at, employed_by, prepared_by, refund_to; one row per pair; via names the evidence. Ids say what an endpoint is: CIT- person, CL- claim, AD- address, EMP- employer, P- tax preparer, SYN- bank account. Synthetic."
+eventDate: event_date
+columns[7]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,

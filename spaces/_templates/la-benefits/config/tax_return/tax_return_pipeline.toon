@@ -1,0 +1,36 @@
+name: tax_return
+active: true
+description: "Benefits and tax fraud Link Analysis showcase - One row per income tax return: the taxpayer, the preparer who filed it (blank when the taxpayer filed it alone), the refund (0 when tax was owed) and the account it is paid into, and the day it was filed. One file per month filed (TAX_RETURN_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-benefits-data.py."
+
+dirs:
+  poll:       data/inbox/tax_return
+  database:   data/tax_return/database
+  backup:     data/tax_return/backup
+  temp:       data/tax_return/temp
+  errors:     data/tax_return/errors
+  quarantine: data/tax_return/quarantine
+  markers:    data/tax_return/markers
+  status_dir: data/tax_return/status
+  log_dir:    data/tax_return/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: tax_return_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

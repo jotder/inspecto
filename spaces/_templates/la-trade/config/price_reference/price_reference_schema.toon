@@ -1,0 +1,20 @@
+raw:
+  name: PRICE_REFERENCE
+  format: CSV
+  fields[3]{name,selector,type}:
+    hs_code,"0",VARCHAR
+    month,"1",VARCHAR
+    median_unit_price,"2",DOUBLE
+mapping:
+  canonicalName: price_reference
+  rawName: PRICE_REFERENCE
+  fields[3]:
+    - name: hs_code
+      from: hs_code
+      fn: keep
+    - name: month
+      from: month
+      fn: keep
+    - name: median_unit_price
+      from: median_unit_price
+      fn: keep

@@ -1,0 +1,36 @@
+name: death_register
+active: true
+description: "Benefits and tax fraud Link Analysis showcase - One row per death notified to the agency: the person, the day they died and the day the notice arrived (usually within days, sometimes up to 60 days later). One file per month notified (DEATH_REGISTER_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-benefits-data.py."
+
+dirs:
+  poll:       data/inbox/death_register
+  database:   data/death_register/database
+  backup:     data/death_register/backup
+  temp:       data/death_register/temp
+  errors:     data/death_register/errors
+  quarantine: data/death_register/quarantine
+  markers:    data/death_register/markers
+  status_dir: data/death_register/status
+  log_dir:    data/death_register/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: death_register_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

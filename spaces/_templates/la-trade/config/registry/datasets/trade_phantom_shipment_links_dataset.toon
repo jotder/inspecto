@@ -1,0 +1,12 @@
+physicalRef: trade_phantom_shipment_links
+description: "Trade-based money-laundering Link Analysis showcase - The link Dataset of the saved view trade_phantom_shipment, derived from trade_links by the trade_phantom_shipment_links Job: the bills of lading. Every on_vessel and traded_with link flagged vessel_elsewhere (a B/L whose vessel was not in the port of loading on the B/L date) or transhipment (a trade carried on two vessels). Same columns as trade_links. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,TRADE_ENTITY
+  dst,string,TRADE_ENTITY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+  flag,string,

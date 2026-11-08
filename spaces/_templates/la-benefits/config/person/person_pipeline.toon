@@ -1,0 +1,36 @@
+name: person
+active: true
+description: "Benefits and tax fraud Link Analysis showcase - One row per person known to the agency (claimants, taxpayers, the people they live with): name, birth year, home address id and phone (blank when not given). One extract (PERSON_20260930.csv). Synthetic; regenerate with tools/gen-la-benefits-data.py."
+
+dirs:
+  poll:       data/inbox/person
+  database:   data/person/database
+  backup:     data/person/backup
+  temp:       data/person/temp
+  errors:     data/person/errors
+  quarantine: data/person/quarantine
+  markers:    data/person/markers
+  status_dir: data/person/status
+  log_dir:    data/person/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: person_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

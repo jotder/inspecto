@@ -1,0 +1,36 @@
+name: director
+active: true
+description: "Trade-based money-laundering Link Analysis showcase - One row per company and director: the person's id and invented name (a few people are registered twice with a spelling variant). One extract (DIRECTOR_20260930.csv). Synthetic; regenerate with tools/gen-la-trade-data.py."
+
+dirs:
+  poll:       data/inbox/director
+  database:   data/director/database
+  backup:     data/director/backup
+  temp:       data/director/temp
+  errors:     data/director/errors
+  quarantine: data/director/quarantine
+  markers:    data/director/markers
+  status_dir: data/director/status
+  log_dir:    data/director/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: director_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -70,7 +70,7 @@ Telecom), with the same template id.
 | Use case | Template | Stories | Status |
 |---|---|---|---|
 | Bid rigging and procurement fraud | `la-procurement` | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | exists |
-| Benefits and tax fraud | `la-benefits` | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | planned |
+| Benefits and tax fraud | `la-benefits` | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | exists |
 
 ### Healthcare
 
@@ -580,6 +580,37 @@ with a score).
 
 **Alert Rule:** a unit price over 3× the reference.
 
+**Basic tier BUILT 2026-11-07** (hub `okf/product/solution-pack/la-trade/`, `TradeLinksJobGoldenTest`,
+`tools/gen-la-trade-data.test.mjs`). As built, where it differs from the spec above:
+- **The phantom-shipment check is engine SQL, not a precomputed flag.** The `trade_links` Job LEFT JOINs each bill of
+  lading to `vessel_position` on vessel and `pos_date = bl_date` and flags `vessel_elsewhere` when the vessel was in
+  another port or at sea. Checking each B/L against its own vessel lets a transhipment's two legs pass; a check of the
+  trade's named vessel on the ship date would flag all five look-alikes. Price ratio, relayed boxes and shared
+  addresses are SQL too; the generator only re-runs every rule and refuses to write if a flag fires off-story.
+- **A real world, not random positions:** 300 vessels on 30 liner services sail their loops day by day over 25 invented
+  ports in 24 real countries; every genuine B/L is dated on a day its vessel is in its port of loading.
+- **Trades are not nodes.** `shipped_in` and `on_vessel` run from the shipper, not the trade (trade nodes would need a
+  seventh kind to reach a company and push the links past 60 000). Columns added: `company.account_id`,
+  `trade.instrument`, `payment.payment_id`, `payment.trade_ref`, a `flag` column on the link Dataset.
+- **62 real HS codes**, not 400, with invented prices. Staged month: October 2026 for the five monthly feeds.
+- **One derived Dataset per saved view** (as `la-police`), fired on `job.dataset.produced`: 23, 90, 102 and 199 rows,
+  each with its story's look-alike beside it. The link Job also has a 5-minute cron (`JOB-SIGNAL-OVERLAP-SKIP-1`).
+- **SQL guard gotcha:** the word `from` inside a string literal of a `sql.template` Job is read as a FROM clause naming a
+  file and the Job is refused; keep it out of `via` text.
+- **Scale:** 2 500 companies, 3 514 directors, 11 896 landed trades, 11 955 B/Ls, 109 500 positions, 28 993 payments,
+  49 964 link rows; data 11 MB unzipped.
+- **Live proof on Basic (2026-11-07):** a Basic build with the Link Analysis UI (`package.ps1 -Edition Basic -Ui la-app`),
+  `node tools/package-la-showcase.mjs la-trade` (39 Space files, 67 data files, data zip 1.9 MB). Product, Space and data
+  were unzipped side by side and started with `SPACES_ROOT=..\inspecto-la-spaces SPACES_DATA_ROOT=..\inspecto-la-data`
+  and nothing else. All seven Pipelines landed 62 files in 62 batches with 0 rejected files or rows. `pipeline.commit`
+  fired `trade_links`, whose last run built 49 964 links, and its signal fired the four view Jobs (23, 90, 102 and 199
+  rows). All state was written under `inspecto-la-data\la-trade`; the Space folder held only `space.toon` and `config\`.
+  In the UI the four saved views are listed and draw without "Result cut short" (24, 112, 75 and 141 nodes). Over each
+  view's `POST /inv/projection` (not truncated), every story's entities are present and form one connected piece
+  (3 of 3, 4 of 4, 9 of 9, 10 of 10), every look-alike is present (9, 10, 6, 15), and no look-alike links to its story.
+  Not checked: the staged month on the live build (the verification review computed the views as 23/98/102/209 rows
+  with October landed, still under the cap).
+
 #### 7. `la-procurement` — bid rigging and procurement fraud
 
 **Audience:** public-procurement integrity units and internal audit.
@@ -658,6 +689,45 @@ with a score).
   controls — a large preparer whose refunds go to each client's own account.
 
 **Alert Rule:** a payment to an account linked to a death-register entry.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-benefits-data.py` (seed 20261109; ground truth
+`tools/gen-la-benefits-data.ground-truth.json`), `tools/gen-la-benefits-data.test.mjs`, `BenefitsLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-benefits/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-benefits/`. Deliberate deviations:
+- **Columns:** `claim.start` / `end` are `start_date` / `end_date` (`end` is an SQL keyword); `claim` gains `overpaid_recovered` (the
+  look-alike's recovered overpayment); `household` is one row per declaration (`household_id`, `address_id`, `declared_by`,
+  `declared_members`), so an address can carry 14 declarations of one; `person.phone` is not a link kind (every phone is unique).
+- **Link kinds:** `claims` is person → claim and `paid_into` is claim → account, so a claim is a node; `prepared_by` and `refund_to`
+  start at the taxpayer (one return each), not the return. Evidence is in `via`: `lives_at` carries residents, claimants and
+  household declarations at the address; `paid_into` carries `died:`, `paid_after_death_days:` (`ongoing` while still paid) and
+  `recovered:` for a claimant on the death register; `employed_by` carries `jobseeker_months:` and `over_limit_months:` (wages above
+  200 a month, this showcase's permitted-earnings figure).
+- **Views and the canvas cap:** one derived Job, `benefits_screen_links` (on `job.dataset.produced`), writes the four integrity
+  screens into one Dataset with a `screen` column; each saved view filters one screen. Screens: addresses with 8 or more claimants;
+  accounts paid a claim 30 or more days after a death (or still paid); payroll while on Jobseeker benefit; the clients of preparers
+  with 60 or more returns plus refund accounts shared by 3 or more taxpayers. `benefits_links` also runs on `cron: "*/5 * * * *"`
+  (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the
+  story whole and connected, and the look-alike on the canvas: `benefits_shared_addresses` 366 rows, 320 nodes;
+  `benefits_paid_after_death` 132 rows, 148 nodes; `benefits_work_while_claiming` 166 rows, 208 nodes;
+  `benefits_refund_concentration` 592 rows, 520 nodes.
+- **Stories as built:** the farm is `AD-03141` (14 claimants, 5 surnames, 14 declarations of one, accounts `SYN-57707034`,
+  `SYN-19642862`, `SYN-47766627`); the look-alikes are care homes `AD-00412`, `AD-02718`, `AD-05077` (31, 24, 27 residents, one
+  declaration each). The deceased are 9 pensioners who died 2025-11..2026-04, notified within 14 days, pensions never stopped, into
+  3 accounts that also take the Housing, Disability and Carer claims of `CIT-08276`; the look-alike `CIT-05289` died 2026-02-09, was
+  notified 40 days late, the claim stopped 2 days later (`paid_after_death_days:42`) and the overpayment was recovered. Undeclared work
+  is 20 jobseekers on `EMP-0217` and `EMP-0388` (4 on both) at 1 100-2 000 a month for 6-12 months; the look-alike `CIT-02003` earns
+  under 200 a month at `EMP-0441` for 11 months, beside 30 more permitted earners and 30 people paid in the month their claim closed.
+  The ring is `P-12`, 80 returns filed 2026-01-06..02-27 with refunds of 1 800-3 400 into 6 accounts; the look-alike `P-03` has 250
+  clients (244 landed), each refunded into their own or a joint account. About 1 % of honest refunds are 2 500-5 000, so refund size
+  alone does not find the ring.
+- **Background deaths:** notices arrive 0-60 days after the death (60 % within a week); the claim stops 0-5 days after the notice and
+  85 % of overpayments are recovered in full. A death notified in the staged month is never a current claimant: the staged month
+  carries new claims only, not updates to landed ones; as generated, the staged death-register file is empty.
+- **Scale:** 12 000 people at 5 245 occupied addresses of 6 500, 7 534 landed claims (spec: 9 000; the working-age claim rates were
+  kept realistic rather than raised), 300 deaths, 36 479 landed payroll rows (39 537 with October), 8 000 returns (7 736 landed),
+  5 258 household declarations (spec: 6 000; one per household). About 39 000 link rows; data 3.4 MB.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (the screens were recomputed over landed plus staged files outside the engine: stories unchanged).
 
 #### 9. `la-health` — provider billing fraud
 

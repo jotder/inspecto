@@ -1,0 +1,12 @@
+physicalRef: trade_links
+description: "Trade-based money-laundering Link Analysis showcase - ONE link Dataset built by the trade_links Job from company, director, trade, bill_of_lading, vessel_position, price_reference and payment. kind is one of traded_with, on_vessel, shipped_in, directed_by, registered_at, paid; one row per pair; amount is the trade value (traded_with), B/L count (on_vessel, shipped_in) or payments summed (paid); via names the evidence; flag marks a red flag (price_over_reference, vessel_elsewhere, transhipment, relayed, many_shippers, shared_address), blank otherwise. Ids say what an endpoint is: CO- company, PER- person, MV vessel, a container number (4 letters, 7 digits), an upper-cased address. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,TRADE_ENTITY
+  dst,string,TRADE_ENTITY
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+  flag,string,

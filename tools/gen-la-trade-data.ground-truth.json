@@ -1,0 +1,242 @@
+{
+ "landed_rows": {
+  "bill_of_lading": 11955,
+  "payment": 28993,
+  "trade": 11896,
+  "vessel_position": 109500
+ },
+ "note": "Story -> the entity ids that must form ONE connected group in the trade_links Dataset (and in the story's saved-view Dataset), and look-alike ids that must have no link to any of them. Address nodes are the upper-cased registered address. Written by tools/gen-la-trade-data.py; not part of the data download.",
+ "price_ratio_alert": 3.0,
+ "seed": 20261107,
+ "stories": {
+  "circular_trade": {
+   "entities": [
+    "CO-00213",
+    "CO-00388",
+    "CO-00941",
+    "KLNU0722138",
+    "KLNU5682691",
+    "KLNU6490823",
+    "KLNU7238600",
+    "KLNU7946736",
+    "KLNU9605085"
+   ],
+   "facts": {
+    "containers": [
+     "KLNU7238600",
+     "KLNU0722138",
+     "KLNU9605085",
+     "KLNU6490823",
+     "KLNU5682691",
+     "KLNU7946736"
+    ],
+    "cycle": [
+     "CO-00941",
+     "CO-00388",
+     "CO-00213"
+    ],
+    "first_ship_date": "2026-03-18",
+    "last_ship_date": "2026-06-27",
+    "leasing_boxes": [
+     "PWCU0827459",
+     "PWCU9046170",
+     "PWCU3999100",
+     "PWCU2508727",
+     "PWCU0444452",
+     "PWCU6477031"
+    ],
+    "leg_values": [
+     450681.0,
+     502678.0,
+     582373.0,
+     641729.0,
+     706299.0,
+     788128.0
+    ],
+    "legs": 6,
+    "trades": [
+     "TR-005290",
+     "TR-005652",
+     "TR-006000",
+     "TR-006757",
+     "TR-008054",
+     "TR-008712"
+    ]
+   },
+   "lookalikes": [
+    "PWCU0444452",
+    "PWCU0827459",
+    "PWCU2508727",
+    "PWCU3999100",
+    "PWCU6477031",
+    "PWCU9046170"
+   ]
+  },
+  "over_invoicing": {
+   "entities": [
+    "CO-01461",
+    "CO-02275",
+    "PER-00291"
+   ],
+   "facts": {
+    "exporter": "CO-02275",
+    "hs_code": "854231",
+    "importer": "CO-01461",
+    "price_x_reference": [
+     3.6,
+     7.77
+    ],
+    "shared_director": "PER-00291",
+    "shipments": 14,
+    "specialty_buyers": 8,
+    "specialty_hs_code": "901890",
+    "specialty_price_x_reference": [
+     3.31,
+     3.89
+    ],
+    "specialty_supplier": "CO-02169",
+    "specialty_trades": 28,
+    "trades": [
+     "TR-000163",
+     "TR-000798",
+     "TR-001589",
+     "TR-002431",
+     "TR-002635",
+     "TR-002922",
+     "TR-002923",
+     "TR-004003",
+     "TR-005574",
+     "TR-005765",
+     "TR-007446",
+     "TR-007479",
+     "TR-007657",
+     "TR-010288"
+    ]
+   },
+   "lookalikes": [
+    "CO-00382",
+    "CO-00881",
+    "CO-01103",
+    "CO-01671",
+    "CO-01705",
+    "CO-01806",
+    "CO-01940",
+    "CO-01993",
+    "CO-02169"
+   ]
+  },
+  "phantom_shipment": {
+   "entities": [
+    "CO-01200",
+    "CO-01568",
+    "CO-02046",
+    "MV TAMARIND SPIRIT"
+   ],
+   "facts": {
+    "background_transhipments": 27,
+    "bills_of_lading": [
+     "BL-0004138",
+     "BL-0005359",
+     "BL-0006703",
+     "BL-0007964",
+     "BL-0009386"
+    ],
+    "exporter": "CO-01200",
+    "importers": [
+     "CO-01568",
+     "CO-02046"
+    ],
+    "paid": 3165075.08,
+    "port_of_loading": "Marbleport (TR)",
+    "trades": [
+     "TR-004131",
+     "TR-005341",
+     "TR-006670",
+     "TR-007926",
+     "TR-009334"
+    ],
+    "transhipment_trades": [
+     "TR-005681",
+     "TR-004859",
+     "TR-004674",
+     "TR-001572",
+     "TR-011122"
+    ],
+    "vessel": "MV TAMARIND SPIRIT",
+    "vessel_was_at": {
+     "BL-0004138": "2026-02-12: Red Sands (EG)",
+     "BL-0005359": "2026-03-20: Lantern Bay (VN)",
+     "BL-0006703": "2026-04-28: At sea - North Sea",
+     "BL-0007964": "2026-06-04: Red Sands (EG)",
+     "BL-0009386": "2026-07-15: Red Sands (EG)"
+    }
+   },
+   "lookalikes": [
+    "CO-00264",
+    "CO-00304",
+    "CO-01311",
+    "CO-01555",
+    "CO-01639",
+    "CO-01777",
+    "CO-01837",
+    "CO-02064",
+    "CO-02282",
+    "CO-02497"
+   ]
+  },
+  "shell_importers": {
+   "entities": [
+    "CO-00597",
+    "CO-00780",
+    "CO-01014",
+    "CO-01087",
+    "CO-01501",
+    "CO-02455",
+    "CO-02491",
+    "PER-00068",
+    "PER-00104",
+    "SUITE 9, 41 LARKSPUR ROW, LONDON"
+   ],
+   "facts": {
+    "agent_address": "Suite 9, 41 Larkspur Row, London",
+    "business_centre": "Floor 3, Kingsbury Business Centre, 200 Aldwick Road, London",
+    "exporter": "CO-00597",
+    "importers": [
+     "CO-01501",
+     "CO-02455",
+     "CO-00780",
+     "CO-01014",
+     "CO-01087",
+     "CO-02491"
+    ],
+    "incorporated": [
+     "2026-03-02",
+     "2026-04-24"
+    ],
+    "nominee_directors": [
+     "PER-00104",
+     "PER-00068"
+    ],
+    "paid_to_exporter": 4176723.44,
+    "shipped_by_exporter": 114699.1
+   },
+   "lookalikes": [
+    "CO-00216",
+    "CO-00419",
+    "CO-00819",
+    "CO-00876",
+    "CO-01031",
+    "CO-01290",
+    "CO-01330",
+    "CO-01369",
+    "CO-01643",
+    "CO-01677",
+    "CO-02026",
+    "CO-02083",
+    "CO-02119",
+    "CO-02184",
+    "FLOOR 3, KINGSBURY BUSINESS CENTRE, 200 ALDWICK ROAD, LONDON"
+   ]
+  }
+ }
+}

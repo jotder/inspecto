@@ -1,0 +1,6 @@
+physicalRef: price_reference/database
+description: "Trade-based money-laundering Link Analysis showcase - One row per HS code per month: the reference median unit price (real HS codes, invented prices). Landed by the price_reference Pipeline. Synthetic."
+columns[3]{name,type,classification}:
+  hs_code,string,
+  month,string,
+  median_unit_price,number,

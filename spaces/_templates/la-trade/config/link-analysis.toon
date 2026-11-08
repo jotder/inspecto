@@ -1,0 +1,6 @@
+entity_types[1]:
+  - id: trade_entity
+    label: Trade entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TRADE_ENTITY

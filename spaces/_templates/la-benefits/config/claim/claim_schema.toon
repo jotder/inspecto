@@ -1,0 +1,40 @@
+raw:
+  name: CLAIM
+  format: CSV
+  fields[8]{name,selector,type}:
+    claim_id,"0",VARCHAR
+    person_id,"1",VARCHAR
+    benefit_type,"2",VARCHAR
+    start_date,"3",DATE
+    end_date,"4",DATE
+    monthly_amount,"5",DOUBLE
+    bank_account,"6",VARCHAR
+    overpaid_recovered,"7",DOUBLE
+mapping:
+  canonicalName: claim
+  rawName: CLAIM
+  fields[8]:
+    - name: claim_id
+      from: claim_id
+      fn: keep
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: benefit_type
+      from: benefit_type
+      fn: keep
+    - name: start_date
+      from: start_date
+      fn: keep
+    - name: end_date
+      from: end_date
+      fn: keep
+    - name: monthly_amount
+      from: monthly_amount
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep
+    - name: overpaid_recovered
+      from: overpaid_recovered
+      fn: keep

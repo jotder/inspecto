@@ -1,0 +1,20 @@
+raw:
+  name: DEATH_REGISTER
+  format: CSV
+  fields[3]{name,selector,type}:
+    person_id,"0",VARCHAR
+    died_on,"1",DATE
+    notified_on,"2",DATE
+mapping:
+  canonicalName: death_register
+  rawName: DEATH_REGISTER
+  fields[3]:
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: died_on
+      from: died_on
+      fn: keep
+    - name: notified_on
+      from: notified_on
+      fn: keep

@@ -1,0 +1,8 @@
+physicalRef: payroll/database
+description: "Benefits and tax fraud Link Analysis showcase - One row per person per employer per month from employers' payroll returns: the pay period (the first of the month) and the wages paid. One file per pay period (PAYROLL_YYYYMM.csv); the next month is in data/staged. Landed by the payroll Pipeline. Synthetic."
+eventDate: period
+columns[4]{name,type,classification}:
+  employer_id,string,
+  person_id,string,
+  period,date,
+  wages,number,

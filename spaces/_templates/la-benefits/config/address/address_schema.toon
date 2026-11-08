@@ -1,0 +1,28 @@
+raw:
+  name: ADDRESS
+  format: CSV
+  fields[5]{name,selector,type}:
+    address_id,"0",VARCHAR
+    street,"1",VARCHAR
+    city,"2",VARCHAR
+    lat,"3",DOUBLE
+    lon,"4",DOUBLE
+mapping:
+  canonicalName: address
+  rawName: ADDRESS
+  fields[5]:
+    - name: address_id
+      from: address_id
+      fn: keep
+    - name: street
+      from: street
+      fn: keep
+    - name: city
+      from: city
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep

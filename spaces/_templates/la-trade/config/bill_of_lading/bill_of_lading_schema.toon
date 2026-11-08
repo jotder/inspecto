@@ -1,0 +1,44 @@
+raw:
+  name: BILL_OF_LADING
+  format: CSV
+  fields[9]{name,selector,type}:
+    bl_id,"0",VARCHAR
+    trade_id,"1",VARCHAR
+    vessel,"2",VARCHAR
+    container,"3",VARCHAR
+    shipper,"4",VARCHAR
+    consignee,"5",VARCHAR
+    port_from,"6",VARCHAR
+    port_to,"7",VARCHAR
+    bl_date,"8",DATE
+mapping:
+  canonicalName: bill_of_lading
+  rawName: BILL_OF_LADING
+  fields[9]:
+    - name: bl_id
+      from: bl_id
+      fn: keep
+    - name: trade_id
+      from: trade_id
+      fn: keep
+    - name: vessel
+      from: vessel
+      fn: keep
+    - name: container
+      from: container
+      fn: keep
+    - name: shipper
+      from: shipper
+      fn: keep
+    - name: consignee
+      from: consignee
+      fn: keep
+    - name: port_from
+      from: port_from
+      fn: keep
+    - name: port_to
+      from: port_to
+      fn: keep
+    - name: bl_date
+      from: bl_date
+      fn: keep

@@ -1,0 +1,24 @@
+raw:
+  name: PAYROLL
+  format: CSV
+  fields[4]{name,selector,type}:
+    employer_id,"0",VARCHAR
+    person_id,"1",VARCHAR
+    period,"2",DATE
+    wages,"3",DOUBLE
+mapping:
+  canonicalName: payroll
+  rawName: PAYROLL
+  fields[4]:
+    - name: employer_id
+      from: employer_id
+      fn: keep
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: period
+      from: period
+      fn: keep
+    - name: wages
+      from: wages
+      fn: keep

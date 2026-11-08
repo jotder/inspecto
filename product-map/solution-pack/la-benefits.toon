@@ -1,0 +1,7 @@
+id: solution-pack.la-benefits
+kind: solution-pack
+title: Link Analysis benefits and tax fraud showcase
+template: la-benefits
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-benefits/index.md

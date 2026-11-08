@@ -1,0 +1,36 @@
+name: bill_of_lading
+active: true
+description: "Trade-based money-laundering Link Analysis showcase - One row per bill of lading: the trade it documents, vessel, container, shipper, consignee, port from, port to and the shipped-on-board date. A transhipped trade has one B/L per leg; a multi-container trade one per container. One file per month (BILL_OF_LADING_YYYYMM.csv), October 2026 staged. Synthetic; regenerate with tools/gen-la-trade-data.py."
+
+dirs:
+  poll:       data/inbox/bill_of_lading
+  database:   data/bill_of_lading/database
+  backup:     data/bill_of_lading/backup
+  temp:       data/bill_of_lading/temp
+  errors:     data/bill_of_lading/errors
+  quarantine: data/bill_of_lading/quarantine
+  markers:    data/bill_of_lading/markers
+  status_dir: data/bill_of_lading/status
+  log_dir:    data/bill_of_lading/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: bill_of_lading_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

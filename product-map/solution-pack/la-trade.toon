@@ -1,0 +1,7 @@
+id: solution-pack.la-trade
+kind: solution-pack
+title: Link Analysis trade showcase
+template: la-trade
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-trade/index.md

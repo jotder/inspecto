@@ -1,0 +1,32 @@
+raw:
+  name: TAX_RETURN
+  format: CSV
+  fields[6]{name,selector,type}:
+    return_id,"0",VARCHAR
+    taxpayer_id,"1",VARCHAR
+    preparer_id,"2",VARCHAR
+    refund,"3",DOUBLE
+    bank_account,"4",VARCHAR
+    filed_at,"5",DATE
+mapping:
+  canonicalName: tax_return
+  rawName: TAX_RETURN
+  fields[6]:
+    - name: return_id
+      from: return_id
+      fn: keep
+    - name: taxpayer_id
+      from: taxpayer_id
+      fn: keep
+    - name: preparer_id
+      from: preparer_id
+      fn: keep
+    - name: refund
+      from: refund
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep
+    - name: filed_at
+      from: filed_at
+      fn: keep

@@ -1,0 +1,36 @@
+name: claim
+active: true
+description: "Benefits and tax fraud Link Analysis showcase - One row per benefit claim open at some point in the window: claimant, benefit type, start and end dates (end blank while it runs), monthly amount, the account it is paid into and, for a claim stopped after a death, the overpayment recovered. One extract of the landed months (CLAIM_20260930.csv); the claims that start in the next month are in data/staged. Synthetic; regenerate with tools/gen-la-benefits-data.py."
+
+dirs:
+  poll:       data/inbox/claim
+  database:   data/claim/database
+  backup:     data/claim/backup
+  temp:       data/claim/temp
+  errors:     data/claim/errors
+  quarantine: data/claim/quarantine
+  markers:    data/claim/markers
+  status_dir: data/claim/status
+  log_dir:    data/claim/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: claim_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
