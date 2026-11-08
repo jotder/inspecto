@@ -26,7 +26,7 @@ with my own records*. Every story follows the same beats, and every script below
 | **Outcome** | The finding, held, with its key ids and numbers on screen. | Says what it means and what the investigator does next: a lead to check, never a verdict. |
 | **Why a graph** | The finding held, or the raw rows beside the graph. | Says what Link Analysis solved: why the rows could not show it, and which links did. |
 | **Explore it** | The example Space in the app: its home page, the saved views under *My work*. | Says this example ships with Inspecto LA, and invites the viewer to open it, take its tour and try its exercises. |
-| **Your data** | *Your data · same steps* on screen, over the raw file turning into the graph. | Says the records were an example and the steps are the same on the viewer's own. |
+| **Your data** | *Play with it · your data, any domain* on screen, over the raw file turning into the graph. | Invites the viewer to play with the example and look for cases the video did not show, then to bring records of their own, from any domain they can think of. |
 | **Edition** | *Everything shown: Inspecto LA Basic*, then a short card of what Standard and above add. | Says the viewer has just explored Basic, and in one sentence what Standard and above add. |
 
 ## Contents
@@ -95,9 +95,15 @@ it, and shows its home page with the saved views under *My work*. The line is *T
 open the <Space name> Space and explore it yourself.* Product confirms how a user adds a showcase from inside the
 application before the line is final (see Open points).
 
+**Play with it (binding).** Every video ends by inviting the viewer to play: open the example, look for the other planted
+stories and for cases nobody planted, and then try the same questions on records of their own, from any domain they can
+think of (calls, payments, claims, visits, access logs). The invitation is spoken in the *Your data* beat and shown on
+screen as *Play with it · your data, any domain*. It never promises a finding: it invites the viewer to look.
+
 **The own-data message (binding).** Every video says once, near the end, that its records are an example and that the
-viewer's own take the same steps. The standard line is *These records are examples. Drop in your own, say what each
-column holds, and ask the same questions.* Concept video 7 shows those steps in full; the others point at them. Say
+viewer's own take the same steps. The standard line is *These records are examples. Play with them and look for the
+cases we didn't show you. Then bring your own records, from any domain you can think of, say what each column holds,
+and ask who is connected.* Concept video 7 shows those steps in full; the others point at them. Say
 "same steps" only where it is true: product confirms, per story, that the outcome can be reached from the raw files
 with *Add data* and the analysis shown. Where the Space also relies on something set up once (a Job that derives
 links, a prepared saved view), that story's line says so: *…plus one Job, set up once.*
@@ -213,6 +219,21 @@ agency films from. Drafts are for internal review only: never published, never s
 | 8 | 7 · One graph for any data | A new Space from the two prepared files | After the files are generated and product's confirmations are in. |
 | 9 | 5 · It stays current | `la-police` and its staged month; the video 7 Space for shot 8 | Without shot 7. |
 
+**Drafts made (2026-11-08).** Each is one story told in the full beats, ending with the play-with-it invitation and
+the edition close. The asks use *Busiest nodes* only where it names the story first (see Open points).
+
+| Draft | Space · saved view | *Busiest nodes* said | Length |
+|---|---|---|---|
+| 3.4 · Utilities | `la-utilities` · the contractor view | not used: it named a look-alike, so the ask starts from *Pasted values* of the 22 low meters | about 139 s |
+| 3.5 · Law enforcement | `la-law-enforcement` · `burglary_series` | `ZX 9117 X` 15, `P-00476` 12 | about 129 s |
+| 3.8 · Logistics | `la-logistics-industry` · `driver_team_inside_job` | `DRV-0892` 12, `DRV-0893` 12, `EMP-0123` 10 | about 116 s |
+| 3.1 D · Telecom revenue assurance | `la-telecom` · `dealer_commission_fraud` | `DL-112` 400, `POS-0008` 400, `DL-163` 350 | about 131 s |
+| 3.2 D · Banking card fraud | `la-banking` · `common_point_of_purchase` | `M-317` 60, then cards with 4 | about 120 s |
+| 3.9 B · Enterprise insider | `la-enterprise` · `access_creep` | `EMP-0007` 4, then `EMP-2057` 3 | about 127 s |
+
+On `dealer_commission_fraud` the two dealers draw as two clusters far apart, so a push-in on the middle of the canvas
+lands on empty space: the 3.1 D draft holds the whole view instead. Film the master's push-in on `DL-112` itself.
+
 **Drafted later.** Videos 1 and 4 and industry videos 3.1 and 3.9 use templates that need an Advanced install
 today (`la-mobile-money`, `la-showcase`, `la-audit`); segment D of 3.1 (`la-telco-ra`) is Basic and can be drafted in
 the Basic round on its own. They join the Basic round when the plan's wave B gives those templates a Basic tier, or
@@ -252,7 +273,7 @@ is built.
 | 8 | 9 | A beat of quiet on the nine, then slow push-in. | *9 wallets · shared devices* | Nine wallets on shared devices, moving money among themselves. One group to review, every link behind it on screen. |
 | 9 | 7 | The raw file beside the nine. | — | No transfer in the file was unusual. The shared phones and the circle of payments only show as links. |
 | 10 | 10 | The Space's home page: `mm_money_trail`, `mm_structuring_band` and `mm_device_farm` under *My work*. | *Ships with Inspecto LA · Link Analysis mobile money* | This example ships with Inspecto LA. Open it and explore it yourself: a structuring agent and a mule chain are planted in the same fortnight. |
-| 11 | 7 | The raw file for a second, dissolving into the graph. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 11 | 7 | The raw file for a second, dissolving into the graph. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 12 | 4 | End card. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -288,7 +309,7 @@ is built.
 | 8 | 8 | *Route from A to B* from a smurf account to `OFFSHORE-77`; the path lights through `MULE-HUB-01` and a relay. | *Route from A to B* | Ask where one small account's money ends up. Route from A to B follows the payments, hop by hop… |
 | 9 | 6 | A beat of quiet on the route. | *Smurf → hub → relay → OFFSHORE-77* | …offshore, through one hub and a relay. That's your first lead. |
 | 10 | 7 | The sample's rows beside the route. | — | Each payment on its own is small and ordinary. Only the chain of links shows where the money goes. |
-| 11 | 9 | Click the light bulb: *What can I do next?* opens with its suggestions. | *Ships with Inspecto LA* · *Your data · same steps* | The sample ships with Inspecto LA, and it's yours to explore: a loop of shell accounts is hidden in it too. When you're ready, add your own file; it shows you each step. |
+| 11 | 9 | Click the light bulb: *What can I do next?* opens with its suggestions. | *Ships with Inspecto LA* · *Play with it · your data, any domain* | The sample ships with Inspecto LA, and it's yours to explore: a loop of shell accounts is hidden in it too. When you're ready, add your own file; it shows you each step. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 12 | 4 | End card. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -334,8 +355,8 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 |---|---|---|---|---|
 | Opening | 8 | The raw files of every segment flash past, unformatted. | [Industry] · *Example · synthetic data* | [The industry and its problems, in two sentences] |
 | Map | 8 | The Data page: one of the industry's Datasets open, each id column and what it holds, and its own Mapping. | *What each column holds* | Each of these began as a raw export. You say once what each column holds and how a row links two of them; then you ask. |
-| Explore it | 10 | Each Space's home page in turn, its saved views under *My work*. | *Ships with Inspecto LA* · [Space names] | Every example here ships with Inspecto LA. Open the Spaces and explore them yourself: each comes with a short tour, and an exercise for every story, with the answers. |
-| Your data | 7 | One raw file dissolving into its graph. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Explore it | 10 | Each Space's home page in turn, its saved views under *My work*. | *Ships with Inspecto LA* · [Space names] | Every example here ships with Inspecto LA. Open the Spaces and explore them yourself: each comes with a short tour, and an exercise for every story, with the answers. Then go past the exercises: change a filter, start from another circle, and see what else turns up. |
+| Your data | 7 | One raw file dissolving into its graph. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, say what each column holds, and ask who is connected. |
 | Edition close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | End card | 4 | End card. | [Industry line] · *Try it on your own data.* | Inspecto LA. |
 
@@ -385,7 +406,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | D5 | 10 | A beat of quiet; `DL-112`, its three devices and `POS-0008`, held. | *DL-112 · 400 SIMs · POS-0008* | Four hundred SIMs from three devices, each topped up once with five, at the dealer's own shop, and then never used. A dealer's commissions to audit. |
 | D6 | 7 | The two dealers side by side. | — | In the commission report both dealers look the same: a spike of new SIMs. The links show who paid for them. |
 | 3 | 10 | Explore it: the *Telecom* Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Telecom* | Every example here ships with Inspecto LA. Open the Telecom Space and explore: each story comes with a short tour and an exercise, with the answers. |
-| 4 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 4 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 5 | 4 | End card. | *For telecom fraud and revenue assurance.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -448,8 +469,8 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | F4 | 8 | Compare the two clusters; hover `cashed_out_to` links: `accounts_to_this_bank:`. | *cashed_out_to* | Ask how many accounts each cluster paid, how many people hold them, and how many bank accounts the money ends in. |
 | F5 | 10 | A beat of quiet; `CL-01125`, its 40 accounts and the three bank accounts, held. | *CL-01125 · 40 accounts · 3 bank accounts* | Forty accounts in forty names, all paid by one cluster, all cashing out to the same three bank accounts. One controller; three bank accounts to follow. |
 | F6 | 7 | The cluster beside the over-the-counter desk. | — | A desk paying sixty customers looks the same from the chain. Only the links to the cash-outs show one hand behind the straw accounts. |
-| 3 | 10 | Explore it: each Space's home page. | *Ships with Inspecto LA · Banking and finance* | Every example here ships with Inspecto LA; the sample opens with one click. Explore them yourself: each comes with a short tour, and an exercise for every story, with the answers. |
-| 4 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| 3 | 10 | Explore it: each Space's home page. | *Ships with Inspecto LA · Banking and finance* | Every example here ships with Inspecto LA; the sample opens with one click. Explore them yourself: each comes with a short tour, and an exercise for every story, with the answers. Then go past the exercises: change a filter, start from another circle, and see what else turns up. |
+| 4 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, say what each column holds, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 5 | 4 | End card. | *For financial crime and compliance.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -477,7 +498,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | 6 | 10 | A beat of quiet; the community held. | *12 claimants · 4 phones · 3 addresses* | Twelve claimants sharing four phones and three addresses, one garage, one clinic and one lawyer. One ring to refer to the investigators. |
 | 7 | 8 | The family of four in its own small group, beside the ring. | — | A family sharing one phone forms a group too, but a small one, with its own garage. The links tell a household from a ring. |
 | 8 | 10 | The Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Insurance* | This example ships with Inspecto LA. Open the Insurance Space and explore it yourself: a parts-supplier ring and a ghost broker are planted in the same claims. |
-| 9 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 9 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *For Special Investigations Units.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -506,7 +527,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | 6 | 12 | A beat of quiet; *Show on graph* on `C-14`; a gentle push-in on it, the premises around it. | *C-14 · 22 links · TX-007 and TX-019* | One contractor, C-14, visited every one of them, and they all sit under two transformers. Twenty-two premises to inspect, one contractor to question. |
 | 7 | 9 | The meter file beside the graph, `C-14` at its centre. | — | In the meter file each premise is a row on its own, and the visits live in another file. The links put them on one picture, and the contractor they share stands out. |
 | 8 | 10 | The Space's home page: *My work* lists `meter_tampering_contractor`, `account_churn_by_bank_account` and `prepaid_token_fraud_vendor`. | *Ships with Inspecto LA · Utilities* | This example ships with Inspecto LA. Open the Utilities Space and explore it yourself: four more stories are planted in the same data, from illegal reconnections to prepaid token fraud. |
-| 9 | 10 | The raw files dissolving into the graph. | *Your data · same questions* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 9 | 10 | The raw files dissolving into the graph. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 11 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *For revenue protection.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -538,7 +559,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | 6 | 10 | A beat of quiet; the series held as one group, the car joining it. | *2 dealers · 3 sellers · 1 car · 11 of 18 scenes* | Two dealers, three sellers, and a car kept at the seller's address, seen near eleven of the eighteen scenes. Three lines of enquiry. |
 | 7 | 8 | The group held. | — | A taxi was seen near more incidents than that car, all over the city, and none in this series. The links tell a busy car from a connected one. |
 | 8 | 10 | The Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Law enforcement* | This example ships with Inspecto LA. Open the Law enforcement Space and explore it yourself: a drug-supply phone network and a suspicious witness are planted in the same data. |
-| 9 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 9 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *For intelligence analysts.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -573,8 +594,8 @@ passes over it; product decides whether that hint should stay on a node the anal
 | B4 | 7 | Click `AD-03141`: its node detail. | *Node detail* | Ask what the fourth one is. |
 | B5 | 10 | Its 14 claims meeting in 3 accounts, held. | *AD-03141 · 14 claimants · 3 accounts* | The fourth is a house: fourteen people, each living alone, paid into three accounts that nobody else uses. Claims to review. |
 | B6 | 7 | The house beside a care home. | — | A care home and a farmed address both hold many claimants. Only the links to the money tell them apart. |
-| 3 | 10 | Explore it: each Space's home page. | *Ships with Inspecto LA · Public sector* | Both examples ship with Inspecto LA, in the Public sector Space. Open it and explore: each comes with a short tour, and an exercise for every story, with the answers. |
-| 4 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 3 | 10 | Explore it: each Space's home page. | *Ships with Inspecto LA · Public sector* | Both examples ship with Inspecto LA, in the Public sector Space. Open it and explore: each comes with a short tour, and an exercise for every story, with the answers. Then go past the exercises: change a filter, start from another circle, and see what else turns up. |
+| 4 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 5 | 4 | End card. | *For public-sector integrity.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -602,7 +623,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | 6 | 10 | A beat of quiet; the two owners meeting at `AD-05150`, held. | *Emberlea · Brackenmoor · one home* | The imaging centre's owner and the owner of one referring practice share a home. A conflict of interest to look into. |
 | 7 | 8 | The town hospital's practices beside the imaging centre's. | — | Every practice here sends most referrals to one place. Only the ownership links show which of them has a reason to. |
 | 8 | 10 | The Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Healthcare* | This example ships with Inspecto LA. Open the Healthcare Space and explore it yourself: phantom billing, a pill mill and upcoding clinics are planted in the same data. |
-| 9 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 9 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *For program integrity.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -629,7 +650,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | 6 | 10 | A beat of quiet; the two drivers, `EMP-0123` and the 12 losses, held. | *2 drivers · 12 losses · 1 night scanner* | The same two drivers on twelve short loads, and the same night-shift scanner on ten of them. Three people to interview. |
 | 7 | 8 | The team beside the busiest driver. | — | The busiest driver on the busiest route lost two loads too, but shares nothing with them. The links tell bad luck from a team. |
 | 8 | 10 | The *Logistics* Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Logistics* | This example ships with Inspecto LA. Open the Logistics Space and explore it yourself: a theft hotspot and a fictitious carrier are planted in the same data. |
-| 9 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 9 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *For cargo security.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -665,7 +686,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | B5 | 10 | A beat of quiet; `EMP-0007`, the four reports and vendor `VEN-0264`, held. | *EMP-0007 · 4 grants · no ticket · VEN-0264* | One manager gave payroll and treasury to four people outside finance; one of them changed a vendor's bank account. An access review to start, a payment to stop and check. |
 | B6 | 7 | The grants beside a normal one with a ticket. | — | A role change with a ticket looks the same in the access log. Only the links show who granted what to whom, and why. |
 | 3 | 10 | Explore it: the *Enterprise* Space's home page. | *Ships with Inspecto LA · Enterprise* | This example ships with Inspecto LA. Open the Enterprise Space and explore it yourself: a leaver taking data and two colleagues approving each other's expenses are planted in the same data. |
-| 4 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| 4 | 7 | Your data. | *Play with it · your data, any domain* | These records are examples. Play with them and look for the cases we didn't show you. Then bring your own records, from any domain you can think of, set up how they link once, and ask who is connected. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 5 | 4 | End card. | *For internal audit and investigations.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -694,7 +715,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | 2 | 5 | Split screen opens. Right: the same wallets as a graph. | — | You've seen this board before. |
 | 3 | 8 | Left: hands hunt for the next string. Right: *Route from A to B* ▸ *Find route*. | *Route from A to B* | From the first wallet to whoever cashed out… |
 | 4 | 6 | Right: the chain to `AG-39` lights up, link by link. Left: the hands stop. | *AG-39* | …one click. That agent is your next call. |
-| 5 | 4 | Left fades out; the graph holds. | *Ships with Inspecto LA · explore it* · *Your data · same steps* | Bring your own records. |
+| 5 | 4 | Left fades out; the graph holds. | *Ships with Inspecto LA · explore it* · *Play with it · your data, any domain* | Play with it, then bring your own records, from any domain. |
 | Close | 4 | The graph holds; the edition badge, then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | *(no voice-over)* |
 | 6 | 4 | End card. | *Retire the red string.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -729,7 +750,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | 6 | 7 | Click it: the node detail dialog. | — | Same question, fresh answer: one more item for the series. Nobody had to search November's records for it: the saved view asked again when it opened. |
 | 7 | 4 | **Advanced, when built:** an Alert raised by the Alert Rule on new serial matches. | *Inspecto LA Advanced* | Or let an Alert Rule ask it for you. |
 | 7b | 9 | The `la-police` home page: its saved views under *My work*. | *Ships with Inspecto LA* · Law enforcement | This example ships with Inspecto LA, November's files included. Open it, drop the new month in yourself, and watch the series grow. |
-| 8 | 6 | The Data page: a Dataset's *Inbox*, *Watch this folder* switched on. | *Watch this folder* · *Your data · same steps* | Your own files work the same way: point it at the folder they land in. |
+| 8 | 6 | The Data page: a Dataset's *Inbox*, *Watch this folder* switched on. | *Watch this folder* · *Play with it · your data, any domain* | Your own files work the same way: point it at the folder they land in. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* (with shot 7 in: *Everything else shown: Inspecto LA Basic*) · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 9 | 4 | End card. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
