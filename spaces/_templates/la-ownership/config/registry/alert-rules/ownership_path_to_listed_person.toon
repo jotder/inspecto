@@ -1,0 +1,7 @@
+name: ownership_path_to_listed_person
+dataset: ownership_sanctions_counts_dataset
+measure: max(listed_paths)
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "An ownership path reaches a listed person within 3 hops: a bank customer's company is owned, directly or through up to two intermediate owners, by a person whose name_match links them to the sanctions list (name, birth year and nationality). The Alert carries how many such paths there are; no customer or person id leaves ownership_sanctions_counts, so open the sanctioned_owner_path view to find them. A near-namesake with a different birth year or nationality is never matched, so it never counts. Not grouped by customer: ownership_sanctions_counts is a Job output, so a by column cannot be checked when the Space is created."

@@ -1,0 +1,11 @@
+job:
+  name: trade_over_reference_counts
+  type: sql.template
+  description: "Runs each time the trade_links Job produces its Dataset. One row of counts over every landed trade: trades_over_reference (trades whose unit price is over price_ratio_alert times the month's reference median), shared_director_trades_over_reference (those of them between an exporter and an importer that share a director, from the directed_by links: the over-invoicing pattern) and shared_director_pairs_over_reference (how many such exporter-importer pairs). A specialty supplier priced steadily over the threshold to buyers with their own directors counts in the first column only. The Alert Rule trade_unit_price_over_reference reads the second; no company or person id leaves this Job, they are found in the Investigation."
+  sql: "WITH pr AS (SELECT hs_code, month, max(median_unit_price) AS ref FROM price_reference GROUP BY hs_code, month), t AS (SELECT t.trade_id, t.applicant, t.beneficiary, t.unit_price / nullif(r.ref, 0) AS x_ref FROM trade t JOIN pr r ON r.hs_code = t.hs_code AND r.month = strftime(t.ship_date, '%Y-%m')), o AS (SELECT * FROM t WHERE x_ref > CAST($price_ratio_alert AS DOUBLE)), d AS (SELECT DISTINCT src AS company_id, dst AS person_id FROM trade_links WHERE kind = 'directed_by'), rel AS (SELECT DISTINCT o.trade_id, o.applicant, o.beneficiary FROM o JOIN d a ON a.company_id = o.applicant JOIN d b ON b.company_id = o.beneficiary AND b.person_id = a.person_id) SELECT (SELECT count(DISTINCT trade_id) FROM o) AS trades_over_reference, (SELECT count(DISTINCT trade_id) FROM rel) AS shared_director_trades_over_reference, (SELECT count(DISTINCT beneficiary || ' ' || applicant) FROM rel) AS shared_director_pairs_over_reference"
+  sources: trade_links,trade,price_reference
+  sink_dataset: trade_over_reference_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == trade_links"
+  price_ratio_alert: "3.0"
+  enabled: true

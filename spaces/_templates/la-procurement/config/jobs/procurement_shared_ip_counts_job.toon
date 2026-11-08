@@ -1,0 +1,10 @@
+job:
+  name: procurement_shared_ip_counts
+  type: sql.template
+  description: "Runs each time the procurement_links Job produces its Dataset. One row of counts over the landed bids: same_tender_ip_bids (bids sent from an IP address that another bidder had already used for its own bid on the same tender, earlier: a cover bid from the winner's office), same_tender_ip_tenders (the tenders those bids are on) and ips_shared_across_tenders_only (IP addresses two or more bidders use, but never two on one tender: the margin a shared public terminal keeps, as the buyer's help-desk kiosk does). A blank IP is never a match. The Alert Rule procurement_same_tender_shared_ip reads it; no bidder, tender or IP address leaves this Job, they are found in the Investigation."
+  sql: "WITH b AS (SELECT bid_id, tender_id, bidder_id, submitted_at, nullif(trim(ip), '') AS ip FROM bid), hit AS (SELECT y.bid_id, y.tender_id, y.ip FROM b y WHERE y.ip IS NOT NULL AND EXISTS (SELECT 1 FROM b x WHERE x.tender_id = y.tender_id AND x.ip = y.ip AND x.bidder_id <> y.bidder_id AND x.submitted_at < y.submitted_at)), shared AS (SELECT ip FROM b WHERE ip IS NOT NULL GROUP BY ip HAVING count(DISTINCT bidder_id) >= 2) SELECT (SELECT count(*) FROM hit) AS same_tender_ip_bids, (SELECT count(DISTINCT tender_id) FROM hit) AS same_tender_ip_tenders, (SELECT count(*) FROM shared WHERE ip NOT IN (SELECT ip FROM hit)) AS ips_shared_across_tenders_only"
+  sources: bid
+  sink_dataset: procurement_shared_ip_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == procurement_links"
+  enabled: true

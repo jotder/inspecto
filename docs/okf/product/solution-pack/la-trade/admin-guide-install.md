@@ -75,7 +75,57 @@ checked when its vessel's position for that day has landed, and a trade's price 
 Stop the server and delete `<parent>\inspecto-la-data\la-trade`, then unzip the data download again. The Space
 configuration is untouched. Each Space's runtime state (`audit\`, `duckdb\`) is written beside its `data\`.
 
-## 6. Rebuild the downloads (maintainers)
+## 6. Advanced tier: personas, the unit-price Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `trade_unit_price_over_reference` is loaded but not armed, and the
+`trade_over_reference_counts` and `trade_over_reference_alerts` Jobs run after each `trade_links` build; the second finds
+no armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs people in by name
+with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the seven Pipelines have landed and `trade_links` has run (a minute or two), create the runtime state from a
+checkout of the repository:
+
+```bash
+node tools/seed-la-trade.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `over-invoicing` (seeded
+with the exporter `CO-02275`, expanded once over `traded_with` and `directed_by` to its four buyers and its two
+directors, the importer `CO-01461` and the shared director `PER-00291` among them; annotated, snapshotted), its members,
+the Entity List `related-party-traders` (`CO-02275`, `CO-01461`, `PER-00291`), a Case assigned to `trade.manager` and
+linked to the Investigation, an Investigation template, one unbounded expand held for a second person, and one open
+Draft. To lay the Space out offline instead of unzipping the downloads, `node tools/seed-la-trade.mjs --scaffold
+<bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `trade.analyst` | `trade-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `trade.manager` | `trade-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `trade.reviewer` | `la-viewer`, member as reviewer | reads `over-invoicing`; any change is refused (403) |
+| `trade.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `trade_unit_price_over_reference` (WARNING) reads the one row of `trade_over_reference_counts` and
+fires when one or more trades are priced over **3 times** the month's reference median **between an exporter and an
+importer that share a director**. On the shipped data **42** trades are over 3 times the reference, and the Alert
+carries **14**: the over-invoicing pair's 14 shipments, its only related pair. The specialty supplier `CO-02169`'s 28
+trades are over 3 times too, but its eight buyers have their own directors, so they are not counted; seven other
+trading pairs share a director, but none of them trades over 1.5 times the reference. A rule on the price alone would
+have fired on the specialty supplier as well. The count is a running total over every landed trade, so the rule stays
+met after every build (one open Alert, not one per build). It names no company; `over_invoicing` shows the pair. The
+rule is not grouped by pair, because `trade_over_reference_counts` is a Job output: a `by` column cannot be checked
+against its Schema when the Space is created.
+
+## 7. Rebuild the downloads (maintainers)
 
 | Step | Command |
 |---|---|

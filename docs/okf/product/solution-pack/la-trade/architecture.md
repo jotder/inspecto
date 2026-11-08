@@ -8,8 +8,8 @@ timestamp: 2026-11-07T00:00:00Z
 
 # Link Analysis trade showcase — architecture
 
-Template: `spaces/_templates/la-trade/` (`minEdition: basic`, listed in `offerings/basic.toon`). Basic tier only:
-no personas, roles, Alert Rules or seed script; the Advanced tier is open work.
+Template: `spaces/_templates/la-trade/` (`minEdition: basic`, listed in `offerings/basic.toon`). The Advanced tier
+(2026-11-09) ships in the same template, inert on Basic: see [Advanced tier](#advanced-tier) below.
 
 ## Data flow
 
@@ -94,6 +94,28 @@ every red-flag rule on its own corpus and refuses to write if a flag fires anywh
 - **Columns added:** `company.account_id` (to resolve `payment` accounts to companies), `trade.instrument`,
   `payment.payment_id` and `payment.trade_ref`. Date columns are named `ship_date`, `bl_date`, `pos_date`.
 - **`flag` column** on the link Dataset, holding the red flags (a comma list on `traded_with`).
+
+## Advanced tier
+
+`config/demo-users.toon` and `config/roles.toon` (`trade.analyst` lead, `trade.manager` second approver, `trade.reviewer`
+read-only, `trade.outsider` not a member, and `admin` defined exactly as in every other showcase), four-eyes above a
+fan-out of 2000 and Drafts limits in `link-analysis.toon` (the same values as every Space composed into *Banking and
+finance*; `masking_mode` unset). The Alert Rule is a registry rule over a counts Job, as in `la-police` and `la-card`:
+
+```
+trade_links --job.dataset.produced--> trade_over_reference_counts (sql.template, one row)
+            --job.dataset.produced--> trade_over_reference_alerts (alert.evaluate) --> trade_unit_price_over_reference
+```
+
+`trade_over_reference_counts` reads `trade`, `price_reference` and the `directed_by` links of `trade_links`:
+`trades_over_reference` (unit price over `price_ratio_alert` 3.0 times the month's reference median; 42 on the shipped
+data), `shared_director_trades_over_reference` (those between an exporter and an importer that share a director; 14) and
+`shared_director_pairs_over_reference` (1). The rule is `max(shared_director_trades_over_reference) gte 1`, WARNING, not
+grouped (a Job output has no Schema when the Space is created). The spec's rule, "a unit price over 3× the reference",
+alone would fire on the specialty supplier's 28 trades too, so the rule adds the story's other half, the shared director.
+A running total, not "new since the last build": a `sql.template` Job keeps no watermark, and an Alert stays one open
+Alert while the breach lasts. Pinned by `LaTradeTemplateTest` (inspecto) and `TradeLinksJobGoldenTest`; the runtime
+state by `tools/seed-la-trade.mjs` and its test.
 
 ## References
 

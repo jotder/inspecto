@@ -68,7 +68,17 @@ class OwnershipLinksJobGoldenTest {
             assertFalse(hasFiles(Path.of(pc.dirs().errors())), feed + ": nothing in the corpus is an error");
         }
         data = space.resolve("data");
-        JobConfig job = JobConfig.load(space.resolve("config/jobs/ownership_links_job.toon").toString());
+        // the link Job first, then the Advanced tier's counts Job in a service of its own, so no signal-fired run races a read
+        runJob(space, "ownership_links");
+        runJob(space, "ownership_sanctions_counts");
+        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-ownership-data.ground-truth.json").toFile());
+        links = new ArrayList<>();
+        for (Map<String, Object> r : rows("SELECT src, dst, kind FROM " + parquet("ownership_links")))
+            links.add(new String[]{(String) r.get("src"), (String) r.get("dst"), (String) r.get("kind")});
+    }
+
+    private static void runJob(Path space, String name) throws Exception {
+        JobConfig job = JobConfig.load(space.resolve("config/jobs/" + name + "_job.toon").toString());
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
         // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
         for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
@@ -87,17 +97,96 @@ class OwnershipLinksJobGoldenTest {
             assertNotNull(r, job.name() + " never ran");
             assertEquals("SUCCESS", r.status(), job.name() + " failed: " + r.message());
         }
-        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-ownership-data.ground-truth.json").toFile());
-        links = new ArrayList<>();
-        for (Map<String, Object> r : rows("SELECT src, dst, kind FROM " + parquet("ownership_links")))
-            links.add(new String[]{(String) r.get("src"), (String) r.get("dst"), (String) r.get("kind")});
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (plan step 8)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/ownership_sanctions_counts_job.toon",
+                "config/jobs/ownership_sanctions_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("ownership_sanctions_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "ownership_sanctions_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet("ownership_sanctions_counts");
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: one path, customer CUS-00528's company <- its 50 % owner <- 60 % by the person
+        // matched to the list (two owns hops); one customer exposed; one matched person in the whole register
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(1L, ((Number) row.get("listed_paths")).longValue());
+        assertEquals(1L, ((Number) row.get("customers_exposed")).longValue());
+        assertEquals(1L, ((Number) row.get("matched_persons")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+        // and the one path is the planted one, two owns hops above the customer's company
+        JsonNode s = truth.get("stories").get("sanctions_two_hops");
+        String customer = s.get("facts").get("customer").asText(), l = parquet("ownership_links");
+        assertEquals(1, count("SELECT count(*) FROM " + l + " ci JOIN " + l + " h1 ON h1.kind = 'owns' AND h1.dst = ci.dst JOIN " + l
+                + " h2 ON h2.kind = 'owns' AND h2.dst = h1.src JOIN " + l + " nm ON nm.kind = 'name_match' AND nm.src = h2.src AND nm.dst = '"
+                + s.get("hub").asText() + "' WHERE ci.kind = 'customer_is' AND ci.src = '" + customer + "'"), customer + " <- owner <- matched person");
+    }
+
+    @Test
+    void withoutTheSanctionedPersonTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same output with the matched person's links taken out: no path, no Alert
+        String person = matchedPerson();
+        Map<String, Object> without = countsOver("SELECT src, dst, kind FROM " + parquet("ownership_links")
+                + " WHERE src <> '" + person + "' AND dst <> '" + person + "'");
+        assertEquals(0L, ((Number) without.get("listed_paths")).longValue(), without.toString());
+        assertTrue(((Number) without.get("listed_paths")).doubleValue() < rule().threshold(), "without " + person + " it would not fire: " + without);
+    }
+
+    @Test
+    void theNearNamesakeNeverCountsThoughItSitsOneHopAboveACustomer() throws Exception {
+        JsonNode s = truth.get("stories").get("sanctions_two_hops");
+        Set<String> lookalikes = ids(s.get("lookalikes"));
+        String namesake = lookalikes.stream().filter(x -> x.startsWith("PER-")).findFirst().orElseThrow();
+        String namesakeCustomer = lookalikes.stream().filter(x -> x.startsWith("CUS-")).findFirst().orElseThrow();
+        String l = parquet("ownership_links");
+        // closer to a customer than the planted person: it owns the customer's company outright
+        assertEquals(1, count("SELECT count(*) FROM " + l + " ci JOIN " + l + " o ON o.kind = 'owns' AND o.dst = ci.dst AND o.src = '"
+                + namesake + "' WHERE ci.kind = 'customer_is' AND ci.src = '" + namesakeCustomer + "'"), namesake + " owns " + namesakeCustomer + "'s company");
+        assertEquals(0, count("SELECT count(*) FROM " + l + " WHERE kind = 'name_match' AND src = '" + namesake + "'"), "never matched");
+        // only the match rule keeps it out: given a name_match, the counts Job's own SQL WOULD count its path
+        Map<String, Object> ifMatched = countsOver("SELECT src, dst, kind FROM " + l + " UNION ALL SELECT '" + namesake + "', '"
+                + s.get("facts").get("near_namesake_list_id").asText() + "', 'name_match'");
+        assertEquals(2L, ((Number) ifMatched.get("listed_paths")).longValue(), ifMatched.toString());
+        assertEquals(2L, ((Number) ifMatched.get("customers_exposed")).longValue(), ifMatched.toString());
+    }
+
+    @Test
+    void aListedPersonDeeperThanThreeHopsIsNotCounted() throws Exception {
+        // the hidden owner sits 6 owns hops above its customers' companies: were they listed, no path of 3 hops or fewer reaches them
+        String hidden = truth.get("stories").get("hidden_owner").get("hub").asText();
+        Map<String, Object> ifListed = countsOver("SELECT src, dst, kind FROM " + parquet("ownership_links")
+                + " UNION ALL SELECT '" + hidden + "', 'SL-0001', 'name_match'");
+        assertEquals(2L, ((Number) ifListed.get("matched_persons")).longValue(), ifListed.toString());
+        assertEquals(1L, ((Number) ifListed.get("listed_paths")).longValue(), "only the planted path: " + ifListed);
+    }
+
+    private static String matchedPerson() throws Exception {
+        return (String) rows("SELECT src FROM " + parquet("ownership_links") + " WHERE kind = 'name_match'").get(0).get("src");
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/ownership_path_to_listed_person.toon").toString()));
+    }
+
+    /** The counts Job's own SQL over a view standing in for {@code ownership_links} (src, dst, kind are all it reads). */
+    private static Map<String, Object> countsOver(String linksSql) throws Exception {
+        String sql = JobConfig.load(TEMPLATE.resolve("config/jobs/ownership_sanctions_counts_job.toon").toString()).require("sql");
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW ownership_links AS " + linksSql);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test
