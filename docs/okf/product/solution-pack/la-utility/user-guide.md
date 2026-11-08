@@ -46,13 +46,13 @@ canvas).
 
 ## Five-minute tour
 
-1. **File ▸ Open… ▸ Saved views ▸ `utility_contractor_network`.** Premises linked to the contractors who visited
+1. **File ▸ Open… ▸ Saved views ▸ `meter_tampering_contractor`.** Premises linked to the contractors who visited
    them or closed their orders. The busiest contractors (`C-27`, `C-21`) are not the story; volume alone says
    nothing here. Seed `C-14` and expand once: most of its premises sit under just two transformers.
-2. **Open `utility_churn_by_bank`.** Bank accounts, the accounts that pay from them, and their premises. Most
+2. **Open `account_churn_by_bank_account`.** Bank accounts, the accounts that pay from them, and their premises. Most
    groups are small: one premise, an old and a new account, each with its own bank account (or none, for cash). Two
    bank accounts are hubs.
-3. **Open `utility_vendor_network`.** Prepaid premises linked to the vending points that sold them tokens. Compare
+3. **Open `prepaid_token_fraud_vendor`.** Prepaid premises linked to the vending points that sold them tokens. Compare
    `V-01` and `V-08`: both are busy; read `kWh per unit of money` and `night` in `via`.
 4. **Open the `transformer_loss` Dataset** (Discover). Sort by `loss_pct`: two transformers stand out. On Standard
    and above the saved Geo View `utility_transformer_loss_map` shows the same on a map.
@@ -67,7 +67,7 @@ Work blind first: each has the steps to find it, then the answer. The answers ar
 
 *Steps:* start from the energy: in `transformer_loss`, find the transformers whose `loss_band` turns
 `loss over threshold`. In `meter_read`, find the premises under them whose reads fall sharply part-way through the
-year. Seed those premises in `utility_contractor_network` and expand once: they share one contractor. Compare each
+year. Seed those premises in `meter_tampering_contractor` and expand once: they share one contractor. Compare each
 premise's reads in the weeks before and after that contractor's visit day (in `via`).
 
 **Answer:** contractor **`C-14`** visited **32 premises**; **22** of them register **40–70 % less** within two weeks
@@ -80,7 +80,7 @@ November to February every year, but no contractor has ever visited it and its t
 
 ### 2. Illegal reconnection — who put the supply back without payment?
 
-*Steps:* in `utility_contractor_network`, seed `C-22` (three of its visits were joint with `C-14`) and read the
+*Steps:* in `meter_tampering_contractor`, seed `C-22` (three of its visits were joint with `C-14`) and read the
 `order_closed_by` links: `via` names `reconnect:ORD-…`. For those premises, check `meter_read` after the disconnect
 order and `payment` before the reconnect.
 
@@ -93,7 +93,7 @@ a day or two later by other contractors (`C-08`, `C-13`, `C-18`, `C-20`, `C-25`,
 
 ### 3. Debt-dodging account churn — which bank account keeps paying for new names?
 
-*Steps:* in `utility_churn_by_bank`, find the bank account with the most `paid_from` links and expand twice (to its
+*Steps:* in `account_churn_by_bank_account`, find the bank account with the most `paid_from` links and expand twice (to its
 accounts, then to their premises). Read `account_at` `via`: holder, opened, closed; and `amount`: the arrears.
 
 **Answer:** bank account **`BA-40000032`** pays **18 accounts at 6 premises** (`PRM-0032`, `PRM-0037`, `PRM-0100`,
@@ -107,7 +107,7 @@ the new tenant pays from a new bank account; each stays its own small group and 
 
 ### 4. Commercial load on a residential tariff — which homes run like a business?
 
-*Steps:* in `utility_churn_by_bank`, find the second hub bank account and expand to its premises. Open `meter_read`
+*Steps:* in `account_churn_by_bank_account`, find the second hub bank account and expand to its premises. Open `meter_read`
 for them: compare a winter and a summer month, and a weekday with a weekend, against their street.
 
 **Answer:** bank account **`BA-40000075`** pays the accounts of **6 residential premises** (`PRM-0085`, `PRM-0099`,
@@ -118,7 +118,7 @@ rises at weekends, and it pays from its own bank account (`BA-40040149`), so it 
 
 ### 5. Prepaid token fraud — which vending point gives energy away?
 
-*Steps:* in `utility_vendor_network`, compare the two busiest vending points. Read `via` on their `vended_by` links:
+*Steps:* in `prepaid_token_fraud_vendor`, compare the two busiest vending points. Read `via` on their `vended_by` links:
 `kwh_per_money` and `night`.
 
 **Answer:** **`V-08`** (Coventry) sells to 53 premises; **40** of them, from 2026-01-05, got tokens crediting about

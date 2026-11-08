@@ -1,9 +1,15 @@
 physicalRef: payment/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per bill payment by a credit (smart-meter) account: the instant, the amount and the bank account it came from (blank for cash). One landed extract; the next month is in data/staged. Landed by the payment Pipeline. Synthetic."
 eventDate: paid_at
+primaryEntityType: account
 columns[5]{name,type,classification}:
   payment_id,string,
-  account_id,string,
+  account_id,string,ACCOUNT
   paid_at,timestamp,
   amount,number,
-  bank_account,string,
+  bank_account,string,BANK_ACCOUNT
+defaultLinkMapping:
+  from: account_id
+  to: bank_account
+  primaryTime: paid_at
+  primaryMeasure: amount

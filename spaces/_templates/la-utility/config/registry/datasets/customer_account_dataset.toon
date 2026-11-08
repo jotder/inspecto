@@ -1,11 +1,15 @@
 physicalRef: customer_account/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per customer account: the premise, the holder name, opened and closed dates (closed blank while open), the bank account it pays from (blank for cash payers) and the arrears at closing or today. One extract (CUSTOMER_ACCOUNT_20260930.csv). Landed by the customer_account Pipeline. Synthetic."
 eventDate: opened_at
+primaryEntityType: account
 columns[7]{name,type,classification}:
-  account_id,string,
-  premise_id,string,
+  account_id,string,ACCOUNT
+  premise_id,string,PREMISE
   holder_name,string,
   opened_at,date,
   closed_at,date,
-  bank_account,string,
+  bank_account,string,BANK_ACCOUNT
   arrears,number,
+defaultLinkMapping:
+  from: account_id
+  to: premise_id

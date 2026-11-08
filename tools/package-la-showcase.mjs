@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATES = 'spaces/_templates';
+const INDUSTRIES = 'spaces/_industries';
 
 function git(args, opts = {}) {
   return execFileSync('git', args, { cwd: REPO, maxBuffer: 1 << 30, ...opts });
@@ -105,6 +106,60 @@ export function plan(id, files) {
   return { space, data };
 }
 
+/**
+ * LA-INDUSTRY-SPACES-1: an industry Space is composed from use-case templates named by a recipe
+ * (`spaces/_industries/<id>.toon`, `useCases[n]: a,b`). Every file comes from exactly one use case: a path two use cases
+ * both ship is refused, so a collision is renamed in its template on purpose. The one exception is
+ * `config/link-analysis.toon`, whose `entity_types` are merged by id (the same id must be declared the same way).
+ * @param byTemplate  [{ tpl, files: [paths relative to the template folder] }]
+ * @returns Map path -> template that ships it (link-analysis.toon maps to every template that has one)
+ */
+export const MERGED = 'config/link-analysis.toon';
+export function composeSources(byTemplate) {
+  const owner = new Map();
+  for (const { tpl, files } of byTemplate) {
+    if (!files.includes('template.toon')) throw new Error(`use case '${tpl}' has no committed template.toon: not a Space template (a typo in the recipe?)`);
+    for (const f of files) {
+      if (f === 'template.toon' || f.startsWith('portal/')) continue;
+      if (f === MERGED) { owner.set(f, [...(owner.get(f) ?? []), tpl]); continue; }
+      if (owner.has(f)) throw new Error(`'${f}' is shipped by both ${owner.get(f)} and ${tpl}: rename it in one template`);
+      owner.set(f, tpl);
+    }
+  }
+  return owner;
+}
+
+/** Merge several link-analysis.toon files that hold only `entity_types`, by id; a differing re-declaration is refused. */
+export function mergeEntityTypes(texts) {
+  const byId = new Map();
+  for (const text of texts) {
+    const body = text.replace(/\r/g, '').split('\n');
+    if (!/^entity_types\[\d+\]:\s*$/.test(body[0] ?? '')) throw new Error('only an entity_types-only link-analysis.toon can be merged');
+    const blocks = [];
+    for (const line of body.slice(1)) {
+      if (line.startsWith('  - ')) blocks.push([line]);
+      else if (line.trim() && blocks.length) blocks[blocks.length - 1].push(line);
+      else if (line.trim()) throw new Error(`unexpected line in link-analysis.toon: ${line}`);
+    }
+    for (const b of blocks) {
+      const id = (b[0].match(/- id:\s*(\S+)/) ?? [])[1];
+      if (!id) throw new Error('an entity type without an id');
+      const block = b.join('\n');
+      if (byId.has(id) && byId.get(id) !== block) throw new Error(`entity type '${id}' is declared differently in two use cases`);
+      byId.set(id, block);
+    }
+  }
+  return `entity_types[${byId.size}]:\n${[...byId.values()].join('\n')}\n`;
+}
+
+/** The use-case template ids a recipe names. */
+export function recipeUseCases(recipe) {
+  const m = recipe.match(/^useCases\[\d+\]:\s*(.+)$/m);
+  const ids = m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : [];
+  if (!ids.length) throw new Error('the recipe names no useCases');
+  return ids;
+}
+
 function zip(stageDir, top, zipPath) {
   rmSync(zipPath, { force: true });
   if (process.platform === 'win32') {
@@ -119,12 +174,29 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const version = opts.version || reactorVersion();
   const minProduct = opts.minProduct || version.split(/[-+]/)[0];
-  const tplDir = `${TEMPLATES}/${opts.id}`;
-  const files = git(['ls-tree', '-r', '--name-only', 'HEAD', `${tplDir}/`], { encoding: 'utf8' })
-    .split('\n').filter(Boolean).map((p) => p.slice(tplDir.length + 1));
-  if (!files.includes('template.toon')) throw new Error(`no committed ${tplDir}/template.toon - not a Space template`);
+  const listed = (dir) => git(['ls-tree', '-r', '--name-only', 'HEAD', `${dir}/`], { encoding: 'utf8' })
+    .split('\n').filter(Boolean).map((p) => p.slice(dir.length + 1));
+  const recipePath = `${INDUSTRIES}/${opts.id}.toon`;
+  let files, show, templateToon;
+  if (git(['ls-tree', '--name-only', 'HEAD', recipePath], { encoding: 'utf8' }).trim()) {
+    // An industry Space: compose it from the use-case templates its recipe names.
+    const recipe = git(['show', `HEAD:${recipePath}`], { encoding: 'utf8' });
+    const byTemplate = recipeUseCases(recipe).map((tpl) => ({ tpl, files: listed(`${TEMPLATES}/${tpl}`) }));
+    const owner = composeSources(byTemplate);
+    files = [...owner.keys()];
+    templateToon = recipe;
+    show = (rel) => rel === MERGED
+      ? Buffer.from(mergeEntityTypes(owner.get(rel).map((t) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }))))
+      : git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
+    console.log(`  composing ${opts.id} from ${byTemplate.map((b) => b.tpl).join(', ')}`);
+  } else {
+    const tplDir = `${TEMPLATES}/${opts.id}`;
+    files = listed(tplDir);
+    if (!files.includes('template.toon')) throw new Error(`no committed ${tplDir}/template.toon or ${recipePath} - not a Space template`);
+    show = (rel) => git(['show', `HEAD:${tplDir}/${rel}`]);
+    templateToon = show('template.toon').toString('utf8');
+  }
   const p = plan(opts.id, files);
-  const show = (rel) => git(['show', `HEAD:${tplDir}/${rel}`]);
 
   const work = mkdtempSync(join(tmpdir(), 'la-showcase-'));
   try {
@@ -135,7 +207,7 @@ function main() {
       const bytes = show(from);
       writeFileSync(target, toon ? bytes.toString('utf8').replaceAll('${SPACE}', opts.id) : bytes);
     }
-    writeFileSync(join(spaceStage, opts.id, 'space.toon'), spaceToon(show('template.toon').toString('utf8'), opts.id, minProduct));
+    writeFileSync(join(spaceStage, opts.id, 'space.toon'), spaceToon(templateToon, opts.id, minProduct));
     writeFileSync(join(spaceStage, opts.id, 'config', 'egress.toon'), egressToon());
     for (const { from, to } of p.data) {
       const target = join(dataStage, to);

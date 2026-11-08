@@ -1,0 +1,36 @@
+name: loss_report
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per loss reported on a shipment: when, and the type - theft (the load did not arrive), shortage (it arrived with goods missing) or non_delivery (the carrier never delivered). One landed file (LOSS_REPORT_20260930.csv); the reports filed in October are in data/staged. Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/loss_report
+  database:   data/loss_report/database
+  backup:     data/loss_report/backup
+  temp:       data/loss_report/temp
+  errors:     data/loss_report/errors
+  quarantine: data/loss_report/quarantine
+  markers:    data/loss_report/markers
+  status_dir: data/loss_report/status
+  log_dir:    data/loss_report/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: loss_report_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

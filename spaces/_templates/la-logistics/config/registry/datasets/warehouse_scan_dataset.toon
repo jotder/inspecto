@@ -1,0 +1,9 @@
+physicalRef: warehouse_scan/database
+description: "Logistics cargo theft Link Analysis showcase - One row per barcode scan of a shipment at a warehouse: inbound (received at the origin), putaway, outbound (loaded onto the truck) and arrived (received at the destination), when, and the employee whose handheld scanned it (blank for a few). One file per month of departure (WAREHOUSE_SCAN_YYYYMM.csv); the next month is in data/staged. Landed by the warehouse_scan Pipeline. Synthetic."
+eventDate: scanned_at
+columns[5]{name,type,classification}:
+  shipment_id,string,
+  warehouse_id,string,
+  scan_type,string,
+  scanned_at,timestamp,
+  employee_id,string,

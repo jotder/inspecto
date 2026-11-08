@@ -45,3 +45,37 @@ test('arguments: id required and validated', () => {
   assert.throws(() => parseArgs([]), /usage/);
   assert.throws(() => parseArgs(['Bad_Id']), /not a Space id/);
 });
+
+// LA-INDUSTRY-SPACES-1: industry Spaces composed from use-case templates.
+import { composeSources, mergeEntityTypes, recipeUseCases, MERGED } from './package-la-showcase.mjs';
+
+test('an industry recipe names its use-case templates', () => {
+  assert.deepEqual(recipeUseCases('name: Banking\nuseCases[2]: la-card,la-trade\n'), ['la-card', 'la-trade']);
+  assert.throws(() => recipeUseCases('name: Empty\n'), /names no useCases/);
+});
+
+test('composing takes each file from one use case and refuses a path two use cases ship', () => {
+  const owner = composeSources([
+    { tpl: 'la-card', files: ['template.toon', 'config/card/a.toon', MERGED, 'data/inbox/card/x.csv', 'portal/p.html'] },
+    { tpl: 'la-trade', files: ['template.toon', 'config/trade/b.toon', MERGED] },
+  ]);
+  assert.equal(owner.get('config/card/a.toon'), 'la-card');
+  assert.equal(owner.get('config/trade/b.toon'), 'la-trade');
+  assert.deepEqual(owner.get(MERGED), ['la-card', 'la-trade']);
+  assert.ok(!owner.has('template.toon') && !owner.has('portal/p.html'));
+  assert.throws(() => composeSources([
+    { tpl: 'la-card', files: ['template.toon', 'config/company/c.toon'] }, { tpl: 'la-trade', files: ['template.toon', 'config/company/c.toon'] },
+  ]), /shipped by both la-card and la-trade/);
+});
+
+test('entity types merge by id; the same id declared differently is refused', () => {
+  const a = 'entity_types[1]:\n  - id: party\n    label: Party\n';
+  const b = 'entity_types[2]:\n  - id: party\n    label: Party\n  - id: box\n    label: Container\n';
+  assert.equal(mergeEntityTypes([a, b]), 'entity_types[2]:\n  - id: party\n    label: Party\n  - id: box\n    label: Container\n');
+  assert.throws(() => mergeEntityTypes([a, 'entity_types[1]:\n  - id: party\n    label: Other\n']), /declared differently/);
+});
+
+test('a recipe naming a template that does not exist is refused, not skipped', () => {
+  assert.throws(() => composeSources([{ tpl: 'la-utility', files: ['template.toon', 'config/a.toon'] }, { tpl: 'la-utlity', files: [] }]),
+    /'la-utlity' has no committed template.toon/);
+});

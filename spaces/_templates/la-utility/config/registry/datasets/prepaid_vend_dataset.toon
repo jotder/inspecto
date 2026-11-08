@@ -1,10 +1,16 @@
 physicalRef: prepaid_vend/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per prepaid token sale: the premise, the vending point, the money received and the kWh credited, and the instant. One landed extract; the next month is in data/staged. Landed by the prepaid_vend Pipeline. Synthetic."
 eventDate: vend_at
+primaryEntityType: premise
 columns[6]{name,type,classification}:
   vend_id,string,
-  premise_id,string,
-  vendor_id,string,
+  premise_id,string,PREMISE
+  vendor_id,string,VENDING_POINT
   amount,number,
   kwh,number,
   vend_at,timestamp,
+defaultLinkMapping:
+  from: premise_id
+  to: vendor_id
+  primaryTime: vend_at
+  primaryMeasure: amount

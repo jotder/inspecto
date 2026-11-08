@@ -1,0 +1,23 @@
+name: driver_team_inside_job
+description: "Inside job - every driver, co-driver and outbound scanner on 2 or more lost trips, with those trips and their loss reports (via on drove = the driver's trips and losses; on scanned_by = warehouse, shift and the scanner's outbound scans and losses). A busy driver loses a load now and then; a team that loses twelve, scanned out by the same night-shift scanner, does not."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: logistics_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","inside_job"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

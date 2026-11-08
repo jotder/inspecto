@@ -1,0 +1,23 @@
+name: fictitious_carrier
+description: "New carriers on high-value loads - every load worth 100 000 or more given to a carrier under 60 days old (via on carried_by = carrier age in days, insured, GPS stops sent, arrived), with the loss report of any that did not arrive, the carrier's same_phone links and the lost trips of a driver whose phone it shares. Carriers start up every month; one that shares a dismissed driver's phone and whose loads all vanish is another thing."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: logistics_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","new_carrier"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

@@ -1,0 +1,5 @@
+name: Utilities
+tagline: "Electricity revenue protection on synthetic data - meter tampering behind one contractor, illegal reconnections, account churn, commercial load on a residential tariff and prepaid token fraud, every Dataset mapped."
+minEdition: basic
+icon: heroicons_outline:bolt
+useCases[1]: la-utility

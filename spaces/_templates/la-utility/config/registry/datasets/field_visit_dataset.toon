@@ -1,9 +1,15 @@
 physicalRef: field_visit/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per field visit: the premise, the contractor, the instant and the visit type (blank when not recorded). One landed extract; the next month is in data/staged. Landed by the field_visit Pipeline. Synthetic."
 eventDate: visit_at
+primaryEntityType: premise
 columns[5]{name,type,classification}:
   visit_id,string,
-  premise_id,string,
-  contractor_id,string,
+  premise_id,string,PREMISE
+  contractor_id,string,CONTRACTOR
   visit_at,timestamp,
   visit_type,string,
+defaultLinkMapping:
+  from: premise_id
+  to: contractor_id
+  kind: visit_type
+  primaryTime: visit_at

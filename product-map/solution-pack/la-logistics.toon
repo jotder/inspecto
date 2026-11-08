@@ -1,0 +1,7 @@
+id: solution-pack.la-logistics
+kind: solution-pack
+title: Link Analysis logistics cargo theft showcase
+template: la-logistics
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-logistics/index.md

@@ -1,0 +1,28 @@
+raw:
+  name: CARRIER
+  format: CSV
+  fields[5]{name,selector,type}:
+    carrier_id,"0",VARCHAR
+    name,"1",VARCHAR
+    phone,"2",VARCHAR
+    registered_at,"3",TIMESTAMP
+    insured,"4",VARCHAR
+mapping:
+  canonicalName: carrier
+  rawName: CARRIER
+  fields[5]:
+    - name: carrier_id
+      from: carrier_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: phone
+      from: phone
+      fn: keep
+    - name: registered_at
+      from: registered_at
+      fn: keep
+    - name: insured
+      from: insured
+      fn: keep

@@ -1,0 +1,36 @@
+entity_types[7]:
+  - id: premise
+    label: Premise
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PREMISE
+  - id: transformer
+    label: Transformer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TRANSFORMER
+  - id: contractor
+    label: Contractor
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CONTRACTOR
+  - id: vending_point
+    label: Vending point
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: VENDING_POINT
+  - id: account
+    label: Account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ACCOUNT
+  - id: bank_account
+    label: Bank account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BANK_ACCOUNT
+  - id: utility_entity
+    label: Utility entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: UTILITY_ENTITY

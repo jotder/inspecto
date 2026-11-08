@@ -1,10 +1,16 @@
 physicalRef: service_order/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per service order (connect, disconnect, reconnect, meter_swap): when it was raised, the contractor who closed it and when (both blank while open). One landed extract; the next month is in data/staged. Landed by the service_order Pipeline. Synthetic."
 eventDate: raised_at
+primaryEntityType: premise
 columns[6]{name,type,classification}:
   order_id,string,
-  premise_id,string,
+  premise_id,string,PREMISE
   order_type,string,
   raised_at,timestamp,
-  closed_by,string,
+  closed_by,string,CONTRACTOR
   closed_at,timestamp,
+defaultLinkMapping:
+  from: premise_id
+  to: closed_by
+  kind: order_type
+  primaryTime: closed_at

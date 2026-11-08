@@ -1,0 +1,32 @@
+raw:
+  name: PLACE
+  format: CSV
+  fields[6]{name,selector,type}:
+    place_id,"0",VARCHAR
+    name,"1",VARCHAR
+    place_type,"2",VARCHAR
+    area,"3",VARCHAR
+    lat,"4",DOUBLE
+    lon,"5",DOUBLE
+mapping:
+  canonicalName: place
+  rawName: PLACE
+  fields[6]:
+    - name: place_id
+      from: place_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: place_type
+      from: place_type
+      fn: keep
+    - name: area
+      from: area
+      fn: keep
+    - name: lat
+      from: lat
+      fn: keep
+    - name: lon
+      from: lon
+      fn: keep

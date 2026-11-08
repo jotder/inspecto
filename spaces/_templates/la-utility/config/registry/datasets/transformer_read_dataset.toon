@@ -1,7 +1,8 @@
 physicalRef: transformer_read/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per metered transformer per day: the kWh it supplied (12 of the 40 transformers carry a meter). Twelve monthly files TRANSFORMER_READ_yyyyMM.csv landed; the next month is in data/staged. Landed by the transformer_read Pipeline. Synthetic."
 eventDate: read_date
+primaryEntityType: transformer
 columns[3]{name,type,classification}:
-  transformer_id,string,
+  transformer_id,string,TRANSFORMER
   read_date,date,
   kwh_supplied,number,
