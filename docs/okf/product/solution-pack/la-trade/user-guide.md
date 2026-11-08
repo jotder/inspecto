@@ -22,11 +22,11 @@ two-letter code after each port name), and HS codes are real codes of the public
 
 | Node looks like | Is a | Comes from |
 |---|---|---|
-| `CO-01461` | company (name, country, registered address, incorporation date, bank account) | `company` |
+| `CO-01461` | company (name, country, registered address, incorporation date, bank account) | `trade_company` |
 | `PER-00291` | director (a person; a few people are registered twice under a spelling variant) | `director` |
 | `MV TAMARIND SPIRIT` | vessel | `bill_of_lading`, `vessel_position` |
 | `KLNU7238600` | container: four letters and seven digits | `bill_of_lading` |
-| `SUITE 9, 41 LARKSPUR ROW, LONDON` | registered address, upper-cased | `company` |
+| `SUITE 9, 41 LARKSPUR ROW, LONDON` | registered address, upper-cased | `trade_company` |
 
 One link Dataset, `trade_links_dataset`, joins them with six kinds of link, one link per pair:
 

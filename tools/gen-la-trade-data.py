@@ -3,7 +3,7 @@
 
 Writes spaces/_templates/la-trade/data/inbox/<feed>/ (12 months landed, 2025-10-01 .. 2026-09-30) and
 spaces/_templates/la-trade/data/staged/<feed>/ (October 2026, copied in during the demo) for seven feeds:
-  company, director (register snapshots), trade, bill_of_lading, vessel_position, price_reference, payment (one file per month)
+  trade_company, director (register snapshots), trade, bill_of_lading, vessel_position, price_reference, trade_payment (one file per month)
 and tools/gen-la-trade-data.ground-truth.json (story -> entity ids and look-alike ids; NOT part of the data download).
 
 The world: 300 vessels on 30 liner services that call 25 invented ports in 24 real countries. Each vessel sails its service

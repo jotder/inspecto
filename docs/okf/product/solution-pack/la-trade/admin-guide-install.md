@@ -65,7 +65,7 @@ The `trade_links` Dataset then holds about 50 000 links in six kinds (`traded_wi
 
 ## 4. New data arrives (optional demo step)
 
-`data\staged` holds October 2026 for the five monthly feeds: `trade`, `bill_of_lading`, `payment`, `vessel_position`
+`data\staged` holds October 2026 for the five monthly feeds: `trade`, `bill_of_lading`, `trade_payment`, `vessel_position`
 and `price_reference` (one file each). Copy each file into the matching `data\inbox\<feed>\` folder; the Pipeline
 lands it and the link Datasets are rebuilt. Copy `vessel_position` and `price_reference` with the others: a B/L is only
 checked when its vessel's position for that day has landed, and a trade's price only when its month's reference has.
