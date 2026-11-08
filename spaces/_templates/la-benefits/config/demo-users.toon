@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  benefits.analyst,Demo Benefits Integrity Analyst,Benefits integrity analyst (lead),benefits-analyst
+  benefits.manager,Demo Benefits Integrity Manager,Benefits integrity manager (second approver),benefits-manager
+  benefits.reviewer,Demo Benefits Integrity Reviewer,Reviewer (read-only),la-viewer
+  benefits.outsider,Demo Benefits Integrity Outsider,Not a member of the Investigation,la-viewer

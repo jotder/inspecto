@@ -1510,6 +1510,65 @@ deviations:
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
 
+   **`la-benefits` BUILT 2026-11-09** (the `la-card` pattern). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`benefits.analyst` lead,
+     `benefits.manager` second approver, `benefits.reviewer` read-only, `benefits.outsider` not a member, and `admin`
+     byte-identical to `la-showcase` and `la-card`), `config/roles.toon` (`benefits-analyst`, `benefits-manager`, and
+     `fraud-analyst`, `la-viewer`, `la-settings` byte-identical to `la-card`'s, since the *Public sector* industry Space
+     composes `la-benefits` with `la-procurement` and a merge of `roles.toon` refuses a role defined twice differently),
+     `four_eyes_fan_out_above: 2000` plus the Drafts limits (10 / 60 / 14) in `link-analysis.toon` (no `masking_mode`; no
+     Entity Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `benefits_deceased_counts` (`sql.template` on `benefits_links`'
+     `job.dataset.produced`, sources `benefits_links`, `claim`, `death_register`, `grace_days_after_notice: "30"`) writes one
+     row: `deceased_claims_paid_after_notice`, `accounts_paid_after_notice` (from the `paid_into` links),
+     `living_claims_into_those_accounts`, `overpayments_stopped_after_notice`, `slowest_stop_after_notice_days`;
+     `benefits_deceased_alerts` (`alert.evaluate`) runs after it; `benefits_paid_to_the_deceased_after_notice` is
+     `max(deceased_claims_paid_after_notice) gte 1`, WARNING, not grouped (a Job output).
+   - **Decided: days are counted from the notice, not the death.** The spec's rule ("a payment to an account linked to a
+     death-register entry") taken literally fires on 259 accounts (every account a dead claimant was ever paid into; 65
+     of them also take a living person's claims, the joint accounts of widows and widowers), and "paid 30 or more days after
+     the death" (the `paid_after_death` screen) fires on 34 claims, the look-alike `CIT-05289` (42 days) among them, because
+     notices arrive 0–60 days late. Every background claim stops 0–5 days after its notice, so the faithful version is a
+     claim still paid more than 30 days after the agency was told. A running claim is measured to the latest date any feed
+     reports (`greatest(max(notified_on), max(start_date))`, 2026-09-30 on the landed data), so a death notified yesterday
+     with its claim still open does not count. The account linkage is kept in the counts (accounts, and who else is paid
+     into them) and in the Investigation, not in the measure.
+   - **Running total, not "new":** the Job recomputes one row from everything landed and holds no prior-run state; a claim
+     paid long after its notice is an overpayment to recover whether or not it has since stopped, so it keeps counting and
+     the rule stays met after every build while the claims are in the data.
+   - **Real figures on the shipped data** (the Job's SQL over the real `benefits_links`, `claim`, `death_register`; pinned by
+     `BenefitsLinksJobGoldenTest`): deceased_claims_paid_after_notice **9** (the nine pensions, 197–327 days past their
+     notices), accounts_paid_after_notice **3** (the story's accounts), living_claims_into_those_accounts **3**
+     (`CIT-08276`'s), overpayments_stopped_after_notice **314** (look-alike included), slowest_stop_after_notice_days **5**.
+     With the nine taken off the death register the Job yields 0 / 0 / 0 / 314 / 5; with only the look-alike on it, 0 / 0 /
+     0 / 1 / 2.
+   - **Seed** `tools/seed-la-benefits.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `paid-after-death` (seeded with the 3 accounts; bounded expands over `paid_into` then `claims`,
+     `maxFanOut` 20 each, to the 12 claims and 10 claimants; annotate `CIT-08276`, threshold, window, resolve, snapshot),
+     members (`benefits.reviewer` and `benefits.manager` reviewers, `admin` lead; not `benefits.outsider`), Entity List
+     `deceased-still-paid` (the 9), a Case from `CIT-08276` assigned to `benefits.manager` and linked, an Investigation
+     template, one unbounded expand held for four-eyes, one open Draft annotating `CIT-08276` (in the Working Set; the
+     expands follow no `lives_at` link, so an address is outside it). The look-alike is in no step.
+   - **Tests:** `LaBenefitsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts equal to `la-card`'s; no masked type; persona capabilities; every persona
+     role defined; `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals); `BenefitsLinksJobGoldenTest` (`theTemplateIsBasicTierOnly` replaced:
+     runs the counts Job after the two link Jobs; the real figures above and the rule fires; without the nine it would not;
+     the late notice never counts, while a count from the death would catch 34); the gallery test pins `la-benefits`
+     creatable with no missing feature and no Demo Auth; `tools/seed-la-benefits.test.mjs` (mocked fetch, 12 tests).
+     Falsified, each then restored: the counts Job counting from the death instead of the notice (38 claims; the look-alike
+     counts; 29 without the nine), the Job counting every post-death payment regardless of the grace (323; 314 without the
+     nine), `masking_mode: typed`, *Bank account* masked, `benefits-analyst` given the approve capability,
+     `benefits.outsider` given `benefits-manager`, `admin` given `benefits-analyst` instead of `fraud-analyst`,
+     `fraud-analyst` without `canRevealLinkEntities`, `la-benefits` out of the gallery's Basic-tier set, and in the seed:
+     the outsider made a member, the Draft annotating an address, the look-alike added to the Entity List.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 9, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `benefits_deceased_alerts` reporting no breach, 0 rejected);
+     the expands' `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
+     Link Analysis UI, the composed *Public sector* industry Space with this tier (it also needs the packer to merge
+     `demo-users.toon` and `roles.toon`, a parallel lane), the staged month landing (it adds new claims only, which moves
+     the running-claim cut-off to 2026-10-01 and changes no figure), an OIDC build.
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),
