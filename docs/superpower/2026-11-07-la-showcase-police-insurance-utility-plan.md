@@ -655,7 +655,7 @@ with a score).
   (approvals, plus only the homes shared by two or more of those officials and directors) and `procurement_debarment_links`
   (directors of debarred firms, all their directorships, their firms' wins). `procurement_links` also runs on
   `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows
-  and 1 000 nodes, the story whole and connected, and the look-alike on the canvas: `procurement_bid_rotation` 1 291 rows, 512 nodes; `procurement_change_approvals` 700 rows, 556 nodes; `procurement_cover_bids` 20 rows, 19 nodes; `procurement_debarred_directors` 27 rows, 36 nodes.
+  and 1 000 nodes, the story whole and connected, and the look-alike on the canvas: `bid_rotation` 1 291 rows, 512 nodes; `official_approving_relative_firm` 700 rows, 556 nodes; `cover_bids_shared_ip` 20 rows, 19 nodes; `debarred_firm_reborn` 27 rows, 36 nodes.
 - **Stories as built:** rotation tenders are Highways North (24, two a month), the look-alike big three win 74 % of Highways South
   in the same market view; cover bids are 27 on 10 IT tenders, 16 (60 %) from the winner's IP 2-25 minutes after it, 20 with its
   estimator as author; the kiosk is `198.51.100.20` (14 firms, bids on one tender at least an hour apart); the conflict is
@@ -709,9 +709,9 @@ with a score).
   accounts paid a claim 30 or more days after a death (or still paid); payroll while on Jobseeker benefit; the clients of preparers
   with 60 or more returns plus refund accounts shared by 3 or more taxpayers. `benefits_links` also runs on `cron: "*/5 * * * *"`
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the
-  story whole and connected, and the look-alike on the canvas: `benefits_shared_addresses` 366 rows, 320 nodes;
-  `benefits_paid_after_death` 132 rows, 148 nodes; `benefits_work_while_claiming` 166 rows, 208 nodes;
-  `benefits_refund_concentration` 592 rows, 520 nodes.
+  story whole and connected, and the look-alike on the canvas: `address_farm` 366 rows, 320 nodes;
+  `paid_after_death` 132 rows, 148 nodes; `undeclared_work` 166 rows, 208 nodes;
+  `tax_preparer_refund_ring` 592 rows, 520 nodes.
 - **Stories as built:** the farm is `AD-03141` (14 claimants, 5 surnames, 14 declarations of one, accounts `SYN-57707034`,
   `SYN-19642862`, `SYN-47766627`); the look-alikes are care homes `AD-00412`, `AD-02718`, `AD-05077` (31, 24, 27 residents, one
   declaration each). The deceased are 9 pensioners who died 2025-11..2026-04, notified within 14 days, pensions never stopped, into

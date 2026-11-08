@@ -116,7 +116,7 @@
     "AD-02718",
     "AD-05077"
    ],
-   "view": "benefits_shared_addresses"
+   "view": "address_farm"
   },
   "payments_to_the_deceased": {
    "entities": [
@@ -150,7 +150,7 @@
    "lookalikes": [
     "CIT-05289"
    ],
-   "view": "benefits_paid_after_death"
+   "view": "paid_after_death"
   },
   "tax_preparer_ring": {
    "entities": [
@@ -246,7 +246,7 @@
    "lookalikes": [
     "P-03"
    ],
-   "view": "benefits_refund_concentration"
+   "view": "tax_preparer_refund_ring"
   },
   "undeclared_work": {
    "entities": [
@@ -297,7 +297,7 @@
    "lookalikes": [
     "CIT-02003"
    ],
-   "view": "benefits_work_while_claiming"
+   "view": "undeclared_work"
   }
  },
  "tax_preparer_ring": {

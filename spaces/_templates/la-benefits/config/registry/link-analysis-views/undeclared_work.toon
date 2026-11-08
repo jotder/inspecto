@@ -1,4 +1,4 @@
-name: benefits_work_while_claiming
+name: undeclared_work
 description: "Work while claiming - everyone on an employer's payroll while on Jobseeker benefit, and their Jobseeker claims (via on employed_by = jobseeker_months and over_limit_months above the 200-a-month permitted earnings). Most earned under the limit or started work in the month their claim closed. Two employers pay 20 claimants full wages for 6 months or more."
 sourceId: entity-projection
 layout: force

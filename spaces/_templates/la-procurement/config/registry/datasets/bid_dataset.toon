@@ -1,11 +1,17 @@
 physicalRef: bid/database
 description: "Bid rigging and procurement fraud Link Analysis showcase - One row per bid on the e-procurement platform: tender, bidder, amount, the instant it was submitted, the IP address it came from and the author recorded in the bid document (blank or a placeholder such as Administrator when unset). One file per month of the tender's publication (BID_YYYYMM.csv); the next month is in data/staged. Landed by the bid Pipeline. Synthetic."
 eventDate: submitted_at
+primaryEntityType: company
 columns[7]{name,type,classification}:
   bid_id,string,
-  tender_id,string,
-  bidder_id,string,
+  tender_id,string,TENDER
+  bidder_id,string,COMPANY
   amount,number,
   submitted_at,timestamp,
-  ip,string,
-  doc_author,string,
+  ip,string,IP
+  doc_author,string,DOC_AUTHOR
+defaultLinkMapping:
+  from: bidder_id
+  to: tender_id
+  primaryTime: submitted_at
+  primaryMeasure: amount

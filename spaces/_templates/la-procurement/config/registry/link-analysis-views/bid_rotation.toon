@@ -1,4 +1,4 @@
-name: procurement_bid_rotation
+name: bid_rotation
 description: "Bid rotation - every link of the Road maintenance market: bids (via = rank and how far above the award), wins, the directors of road firms and the officials who changed road contracts. Highways North's 24 road tenders form a tight block that only four firms ever bid on, each winning in turn, the other three always 5-12 percent above; two of the four share a director. Compare Highways South, where three large firms win most tenders but skip some, and their losing bids range from under 1 to over 20 percent above the winner."
 sourceId: entity-projection
 layout: force

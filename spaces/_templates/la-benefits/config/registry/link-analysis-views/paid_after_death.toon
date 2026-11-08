@@ -1,4 +1,4 @@
-name: benefits_paid_after_death
+name: paid_after_death
 description: "Paid after death - every account that received a claim paid 30 or more days after the claimant died (or still paid), every claim paid into those accounts and its claimant (via on paid_into = died, notified, paid_after_death_days, recovered). Most are late death notices whose overpayment was recovered. Nine pensions are still being paid months after the death, into 3 accounts that also receive the claims of one living person."
 sourceId: entity-projection
 layout: force

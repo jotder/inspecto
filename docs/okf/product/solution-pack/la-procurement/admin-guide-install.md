@@ -58,8 +58,8 @@ Within a minute or two:
   `<feed>/errors`.
 - `inspecto-la-data/la-procurement/data/procurement_links/` holds the link Dataset (about 11 000 rows, seven kinds);
   `procurement_approval_links/` and `procurement_debarment_links/` hold the two view Datasets.
-- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `procurement_bid_rotation`, `procurement_cover_bids`,
-  `procurement_change_approvals` and `procurement_debarred_directors`. The [user guide](user-guide.md) has the tour
+- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `bid_rotation`, `cover_bids_shared_ip`,
+  `official_approving_relative_firm` and `debarred_firm_reborn`. The [user guide](user-guide.md) has the tour
   and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
@@ -87,3 +87,19 @@ node tools/package-la-showcase.mjs la-procurement
 The generator is deterministic (seed 20261108) and writes the ground truth to
 `tools/gen-la-procurement-data.ground-truth.json`, which is not part of any download. The packer reads committed
 content only, so commit first.
+
+## As part of the *Public sector* industry Space
+
+This use case also ships inside the industry Space *Public sector* (`la-public-sector`), together with the other
+public-sector showcase. The recipe is `spaces/_industries/la-public-sector.toon` (use cases `la-procurement` and
+`la-benefits`), and `node tools/package-la-showcase.mjs la-public-sector` composes it into one Space download and one
+data download. Install them as above, with `la-public-sector` in place of this Space's id.
+
+Composing refuses a file both use cases would ship, so procurement's people feed is called `procurement_person` (its
+Pipeline, Dataset and inbox folder); benefits keeps `person`. The two packs declare the shared types *Person*,
+*Address*, *Bank account* and *Public-sector entity* identically, so they merge into one. Every Dataset says what its
+id columns hold, and each Dataset of events has its own Mapping. In each link Dataset, the ends mixing kinds hold
+*Public-sector entity*.
+
+Views carry use-case names: `bid_rotation`, `cover_bids_shared_ip`, `official_approving_relative_firm`,
+`debarred_firm_reborn`, `address_farm`, `paid_after_death`, `undeclared_work` and `tax_preparer_refund_ring`.

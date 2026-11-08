@@ -1,12 +1,19 @@
 physicalRef: procurement_links
 description: "Bid rigging and procurement fraud Link Analysis showcase - ONE link Dataset built by the procurement_links Job from tender, bid, company, director, person and contract_change. kind is one of bid_on, won, directed_by, same_ip, same_author, approved_change, lives_at; one row per pair; via names the evidence; market is the tender category of a tender link, or the category a company mostly bids in for its own links (blank for lives_at). Ids say what an endpoint is: CO- company, T- tender, P- person, AD- home address, an IP address, or a document author. Synthetic."
 eventDate: event_date
+primaryEntityType: public_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,PUBLIC_ENTITY
+  dst,string,PUBLIC_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   market,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

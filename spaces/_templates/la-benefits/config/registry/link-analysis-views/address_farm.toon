@@ -1,4 +1,4 @@
-name: benefits_shared_addresses
+name: address_farm
 description: "Shared addresses - every address with 8 or more claimants, the people who live there, their claims and the accounts those are paid into (via on lives_at = residents, claimants and household declarations). Three care homes each make one declaration for 20-35 residents, every resident paid into their own account. One ordinary-looking address is different: 14 claimants under 5 surnames, each declaring a household of one, and their claims paid into only 3 accounts."
 sourceId: entity-projection
 layout: force
