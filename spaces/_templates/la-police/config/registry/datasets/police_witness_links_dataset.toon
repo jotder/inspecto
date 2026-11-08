@@ -1,11 +1,18 @@
 physicalRef: police_witness_links
 description: "Police Link Analysis showcase - Repeat witnesses in police_links: people recorded as a witness on two or more incidents, every involved_in link of those incidents and their co_arrested links. Built by the police_witness_links Job. Synthetic."
 eventDate: event_date
+primaryEntityType: police_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,POLICE_ENTITY
+  dst,string,POLICE_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

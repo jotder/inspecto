@@ -1,12 +1,19 @@
 physicalRef: mfs_screen_links
 description: "Mobile financial services fraud Link Analysis showcase - Derived from mfs_links each time it is produced, for the three saved views: the links each fraud screen selects, tagged in screen (swap_burst, split_deposit, merchant_quick_pay). A link selected by two screens appears once in each. Same columns as mfs_links plus screen. Synthetic."
 eventDate: event_date
+primaryEntityType: telecom_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,TELECOM_ENTITY
+  dst,string,TELECOM_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   screen,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

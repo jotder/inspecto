@@ -1,12 +1,19 @@
 physicalRef: prescription/database
 description: "Provider billing fraud Link Analysis showcase - One row per filled prescription: prescriber and pharmacy (provider ids), member, drug class, quantity, whether the member paid cash (Y/N) and the fill date. One file per fill month (PRESCRIPTION_YYYYMM.csv); the next month is in data/staged. Landed by the prescription Pipeline. Synthetic."
 eventDate: filled_on
+primaryEntityType: provider
 columns[8]{name,type,classification}:
   prescription_id,string,
-  prescriber_id,string,
+  prescriber_id,string,PROVIDER
   pharmacy_id,string,
-  member_id,string,
+  member_id,string,MEMBER
   drug_class,string,
   qty,number,
   paid_cash,string,
   filled_on,date,
+defaultLinkMapping:
+  from: prescriber_id
+  to: member_id
+  kind: drug_class
+  primaryTime: filled_on
+  primaryMeasure: qty

@@ -1,7 +1,8 @@
 physicalRef: death_register/database
 description: "Benefits and tax fraud Link Analysis showcase - One row per death notified to the agency: the person, the day they died and the day the notice arrived (usually within days, sometimes up to 60 days later). One file per month notified (DEATH_REGISTER_YYYYMM.csv); the next month is in data/staged. Landed by the death_register Pipeline. Synthetic."
 eventDate: notified_on
+primaryEntityType: person
 columns[3]{name,type,classification}:
-  person_id,string,
+  person_id,string,PERSON
   died_on,date,
   notified_on,date,

@@ -1,7 +1,11 @@
 physicalRef: vehicle/database
 description: "Police Link Analysis showcase - One row per registered vehicle: invented plate, make, colour and keeper. Landed by the vehicle Pipeline. Synthetic."
+primaryEntityType: vehicle
 columns[4]{name,type,classification}:
-  plate,string,
+  plate,string,PLATE
   make,string,
   colour,string,
-  keeper_person_id,string,
+  keeper_person_id,string,PERSON
+defaultLinkMapping:
+  from: keeper_person_id
+  to: plate

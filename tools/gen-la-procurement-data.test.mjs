@@ -50,14 +50,14 @@ const tender = Object.fromEntries(tenders.map((t) => [t.tender_id, t]));
 const bids = feed('bid');
 const bidsOn = (tid) => bids.filter((b) => b.tender_id === tid);
 const company = Object.fromEntries(feed('company').map((c) => [c.company_id, c]));
-const person = Object.fromEntries(feed('person').map((p) => [p.person_id, p]));
+const person = Object.fromEntries(feed('procurement_person').map((p) => [p.person_id, p]));
 const directors = feed('director');
 const changes = feed('contract_change');
 
 test('generator twice = the committed bytes; seven feeds; under 10 MB', { skip: !python }, () => {
   const before = snapshot();
   const feeds = new Set(Object.keys(before).filter((k) => k.includes('/data/')).map((k) => k.split('/').at(-2)));
-  assert.deepEqual([...feeds].sort(), ['bid', 'company', 'contract_change', 'director', 'official', 'person', 'tender']);
+  assert.deepEqual([...feeds].sort(), ['bid', 'company', 'contract_change', 'director', 'official', 'procurement_person', 'tender']);
   assert.ok(files().reduce((n, f) => n + statSync(f).size, 0) < 10_000_000, 'the corpus is under 10 MB');
   for (let i = 0; i < 2; i++) {
     assert.equal(spawnSync(python, [join(ROOT, 'tools', 'gen-la-procurement-data.py')], { encoding: 'utf8' }).status, 0);

@@ -1,11 +1,18 @@
 physicalRef: police_property_links
 description: "Police Link Analysis showcase - The stolen-property circle of police_links: item_match, the matched sellers' sold_item links, lives_at and keeper_of of the sellers and their households, and seen_near of the plates they keep. Built by the police_property_links Job. Synthetic."
 eventDate: event_date
+primaryEntityType: police_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,POLICE_ENTITY
+  dst,string,POLICE_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

@@ -47,7 +47,7 @@ class ProcurementLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-procurement");
-    private static final List<String> FEEDS = List.of("company", "director", "person", "official", "tender", "bid", "contract_change");
+    private static final List<String> FEEDS = List.of("company", "director", "procurement_person", "official", "tender", "bid", "contract_change");
     private static final List<String> JOBS = List.of("procurement_links", "procurement_approval_links", "procurement_debarment_links");
 
     @TempDir static Path tmp;

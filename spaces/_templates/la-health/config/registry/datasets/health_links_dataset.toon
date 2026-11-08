@@ -1,11 +1,18 @@
 physicalRef: health_links
 description: "Provider billing fraud Link Analysis showcase - ONE link Dataset built by the health_links Job from claim_line, admission, member, referral, prescription, provider, provider_owner, owner and address. kind is one of treated, referred_to, owned_by, prescribed, filled_at, lives_at; one row per pair; via names the evidence. Ids say what an endpoint is: PR- provider, OW- owner, M- member, AD- address. Synthetic."
 eventDate: event_date
+primaryEntityType: health_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,HEALTH_ENTITY
+  dst,string,HEALTH_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

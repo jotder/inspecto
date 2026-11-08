@@ -1,8 +1,13 @@
 physicalRef: director/database
 description: "Bid rigging and procurement fraud Link Analysis showcase - One row per directorship: company, person, the day it began and the day it ended (blank while serving). One extract (DIRECTOR_20260930.csv). Landed by the director Pipeline. Synthetic."
 eventDate: from_date
+primaryEntityType: company
 columns[4]{name,type,classification}:
-  company_id,string,
-  person_id,string,
+  company_id,string,COMPANY
+  person_id,string,PERSON
   from_date,date,
   to_date,date,
+defaultLinkMapping:
+  from: company_id
+  to: person_id
+  primaryTime: from_date

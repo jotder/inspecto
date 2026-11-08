@@ -1245,7 +1245,7 @@
    "lookalikes": [
     "DL-163"
    ],
-   "view": "telco_ra_commission_spikes"
+   "view": "dealer_commission_fraud"
   },
   "pbx_hacking": {
    "entities": [
@@ -1265,7 +1265,7 @@
    "lookalikes": [
     "TRK-027"
    ],
-   "view": "telco_ra_pbx_off_hours"
+   "view": "pbx_hacking_off_hours"
   },
   "unbilled_usage": {
    "entities": [
@@ -1576,7 +1576,7 @@
    "lookalikes": [
     "DL-000"
    ],
-   "view": "telco_ra_unbilled_usage"
+   "view": "unbilled_usage"
   }
  },
  "unbilled_usage": {

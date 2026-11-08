@@ -1,0 +1,23 @@
+name: parts_supplier_ring
+description: "Claims parts suppliers - only supplied_parts links: a parts supplier to each garage it invoiced parts through; amount is the value of the parts the garage did NOT fit. Two suppliers reach all nine garages: one carries money on every link (parts invoiced, never fitted), the other carries none. Sort the links by amount, then open the supplier's claims in repair_invoice."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: claims_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[3]: ts,amount,via
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,kind,"=","supplied_parts"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

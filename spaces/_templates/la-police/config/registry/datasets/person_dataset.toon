@@ -1,8 +1,12 @@
 physicalRef: person/database
 description: "Police Link Analysis showcase - One row per person on record: invented name, birth year, address and flags (prior_record, vulnerable); a few spelling variants of one person are left for identity resolution. Landed by the person Pipeline. Synthetic."
+primaryEntityType: person
 columns[5]{name,type,classification}:
-  person_id,string,
+  person_id,string,PERSON
   name,string,
   birth_year,number,
-  address_id,string,
+  address_id,string,ADDRESS
   role_flags,string,
+defaultLinkMapping:
+  from: person_id
+  to: address_id
