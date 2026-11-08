@@ -1,0 +1,36 @@
+name: access_grant
+active: true
+description: "Insider threat Link Analysis showcase - One row per access grant: the employee, the system (an invented upper-case name; AP, PAYROLL and TREASURY are the finance systems), who approved the grant, when, and the access request or change ticket (blank when there was none). One extract of every grant up to 2026-09-30 (ACCESS_GRANT_20260930.csv); October's grants are in data/staged. Synthetic; regenerate with tools/gen-la-insider-data.py."
+
+dirs:
+  poll:       data/inbox/access_grant
+  database:   data/access_grant/database
+  backup:     data/access_grant/backup
+  temp:       data/access_grant/temp
+  errors:     data/access_grant/errors
+  quarantine: data/access_grant/quarantine
+  markers:    data/access_grant/markers
+  status_dir: data/access_grant/status
+  log_dir:    data/access_grant/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: access_grant_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

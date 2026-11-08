@@ -1,0 +1,28 @@
+raw:
+  name: CASHOUT
+  format: CSV
+  fields[5]{name,selector,type}:
+    cashout_id,"0",VARCHAR
+    account_id,"1",VARCHAR
+    bank_account,"2",VARCHAR
+    amount,"3",DOUBLE
+    cashout_at,"4",TIMESTAMP
+mapping:
+  canonicalName: cashout
+  rawName: CASHOUT
+  fields[5]:
+    - name: cashout_id
+      from: cashout_id
+      fn: keep
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: cashout_at
+      from: cashout_at
+      fn: keep

@@ -1,0 +1,36 @@
+name: cashout
+active: true
+description: "Crypto laundering Link Analysis showcase - One row per fiat withdrawal from an exchange account to a bank account (amount in fiat, no currency). One file per month (CASHOUT_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-crypto-data.py."
+
+dirs:
+  poll:       data/inbox/cashout
+  database:   data/cashout/database
+  backup:     data/cashout/backup
+  temp:       data/cashout/temp
+  errors:     data/cashout/errors
+  quarantine: data/cashout/quarantine
+  markers:    data/cashout/markers
+  status_dir: data/cashout/status
+  log_dir:    data/cashout/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: cashout_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,32 @@
+raw:
+  name: TRANSFER
+  format: CSV
+  fields[6]{name,selector,type}:
+    tx_id,"0",VARCHAR
+    from_address,"1",VARCHAR
+    to_address,"2",VARCHAR
+    amount,"3",DOUBLE
+    asset,"4",VARCHAR
+    tx_at,"5",TIMESTAMP
+mapping:
+  canonicalName: transfer
+  rawName: TRANSFER
+  fields[6]:
+    - name: tx_id
+      from: tx_id
+      fn: keep
+    - name: from_address
+      from: from_address
+      fn: keep
+    - name: to_address
+      from: to_address
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: asset
+      from: asset
+      fn: keep
+    - name: tx_at
+      from: tx_at
+      fn: keep

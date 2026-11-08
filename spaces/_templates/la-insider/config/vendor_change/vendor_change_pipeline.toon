@@ -1,0 +1,36 @@
+name: vendor_change
+active: true
+description: "Insider threat Link Analysis showcase - One row per change to the vendor master: the vendor, the field changed (address, phone, contact_email, bank_account, payment_terms), who changed it and when. One landed file (VENDOR_CHANGE_20260930.csv); October's changes are in data/staged. Synthetic; regenerate with tools/gen-la-insider-data.py."
+
+dirs:
+  poll:       data/inbox/vendor_change
+  database:   data/vendor_change/database
+  backup:     data/vendor_change/backup
+  temp:       data/vendor_change/temp
+  errors:     data/vendor_change/errors
+  quarantine: data/vendor_change/quarantine
+  markers:    data/vendor_change/markers
+  status_dir: data/vendor_change/status
+  log_dir:    data/vendor_change/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: vendor_change_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

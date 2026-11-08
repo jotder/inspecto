@@ -1,0 +1,23 @@
+name: hack_peel_chain
+description: "Peel chain from a hack - addresses with one transfer in and two out within 24 hours, chained one after another (via on sent_to: src_hop, dst_hop, first, transfers), the exchange accounts such a hop paid and who holds them. A company payroll wallet pays its staff one by one, change to a fresh address each time, every month; one hacked wallet was emptied into a long chain that peels small amounts into a few exchange deposit addresses."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: crypto_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","peel_chain"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate
