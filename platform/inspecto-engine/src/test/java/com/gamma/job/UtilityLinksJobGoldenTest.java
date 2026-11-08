@@ -199,6 +199,29 @@ class UtilityLinksJobGoldenTest {
     }
 
     @Test
+    void aMonthWhoseMeterReadsHaveNotLandedIsNotBalanced() throws Exception {
+        // files land one feed at a time: a month's transformer_read can land before its meter_read. Balanced then, it would read
+        // 100 % loss and fire the Alert Rule. The shipped SQL balances a month only once both sides have landed.
+        Map<String, Object> job = ToonHelper.load(TEMPLATE.resolve("config/jobs/transformer_loss_job.toon").toString());
+        @SuppressWarnings("unchecked") Map<String, Object> j = (Map<String, Object>) job.get("job");
+        String sql = ((String) j.get("sql")).replace("$loss_alarm_pct", "15").replace("$loss_watch_pct", "9");
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE premise AS SELECT * FROM (VALUES ('P-1', 'TX-1', 'X', 1.0, 2.0)) v(premise_id, transformer_id, city, lat, lon)");
+            st.execute("CREATE TABLE transformer_read AS SELECT * FROM (VALUES ('TX-1', DATE '2026-01-05', 100.0), ('TX-1', DATE '2026-02-05', 100.0)) v(transformer_id, read_date, kwh_supplied)");
+            st.execute("CREATE TABLE meter_read AS SELECT * FROM (VALUES ('P-1', DATE '2026-01-05', 95.0)) v(premise_id, read_date, kwh)");
+            List<String> months = new ArrayList<>();
+            try (ResultSet rs = st.executeQuery(sql)) {
+                while (rs.next()) {
+                    months.add(rs.getString("month"));
+                    assertTrue(rs.getDouble("loss_pct") < 15, "a balanced month: " + rs.getDouble("loss_pct"));
+                }
+            }
+            assertEquals(List.of("2026-01-01"), months, "February has transformer reads but no meter reads yet: no row, not 100 % loss");
+        }
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void everySavedViewFitsOneCanvasAndShowsItsStories() throws Exception {
         // a saved view draws its whole (filtered) Dataset; past the canvas's projection_node_cap (1 000 nodes) or the explorer's
