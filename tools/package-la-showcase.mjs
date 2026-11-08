@@ -115,14 +115,18 @@ export function plan(id, files) {
  * @returns Map path -> template that ships it (link-analysis.toon maps to every template that has one)
  */
 export const MERGED = 'config/link-analysis.toon';
-export function composeSources(byTemplate) {
+export function composeSources(byTemplate, sameBytes = () => false) {
   const owner = new Map();
   for (const { tpl, files } of byTemplate) {
     if (!files.includes('template.toon')) throw new Error(`use case '${tpl}' has no committed template.toon: not a Space template (a typo in the recipe?)`);
     for (const f of files) {
       if (f === 'template.toon' || f.startsWith('portal/')) continue;
       if (f === MERGED) { owner.set(f, [...(owner.get(f) ?? []), tpl]); continue; }
-      if (owner.has(f)) throw new Error(`'${f}' is shipped by both ${owner.get(f)} and ${tpl}: rename it in one template`);
+      if (owner.has(f)) {
+        // The same bytes in both (a shared governance example, for one) is one file; anything else is a real clash.
+        if (sameBytes(f, owner.get(f), tpl)) continue;
+        throw new Error(`'${f}' is shipped by both ${owner.get(f)} and ${tpl}: rename it in one template`);
+      }
       owner.set(f, tpl);
     }
   }
@@ -182,7 +186,8 @@ function main() {
     // An industry Space: compose it from the use-case templates its recipe names.
     const recipe = git(['show', `HEAD:${recipePath}`], { encoding: 'utf8' });
     const byTemplate = recipeUseCases(recipe).map((tpl) => ({ tpl, files: listed(`${TEMPLATES}/${tpl}`) }));
-    const owner = composeSources(byTemplate);
+    const blob = (t, rel) => git(['rev-parse', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }).trim();
+    const owner = composeSources(byTemplate, (rel, a, b) => blob(a, rel) === blob(b, rel));
     files = [...owner.keys()];
     templateToon = recipe;
     // link-analysis.toon from ONE use case ships verbatim (it may hold more than entity_types, as la-claims' does);

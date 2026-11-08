@@ -79,3 +79,9 @@ test('a recipe naming a template that does not exist is refused, not skipped', (
   assert.throws(() => composeSources([{ tpl: 'la-utility', files: ['template.toon', 'config/a.toon'] }, { tpl: 'la-utlity', files: [] }]),
     /'la-utlity' has no committed template.toon/);
 });
+
+test('a path two use cases ship with the same bytes is one file; different bytes are refused', () => {
+  const t = [{ tpl: 'a', files: ['template.toon', 'config/examples/x.md'] }, { tpl: 'b', files: ['template.toon', 'config/examples/x.md'] }];
+  assert.equal(composeSources(t, () => true).get('config/examples/x.md'), 'a');
+  assert.throws(() => composeSources(t, () => false), /shipped by both a and b/);
+});
