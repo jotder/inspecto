@@ -1,0 +1,7 @@
+job:
+  name: procurement_shared_ip_alerts
+  type: alert.evaluate
+  description: "Evaluates the Alert Rules each time the procurement_shared_ip_counts Job produces its Dataset, so procurement_same_tender_shared_ip sees the new counts without anyone pressing Evaluate. On a build without Alert Rules (Basic) the rule is not armed and this Job finds nothing to evaluate."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == procurement_shared_ip_counts"
+  enabled: true

@@ -1,0 +1,7 @@
+name: benefits_paid_to_the_deceased_after_notice
+dataset: benefits_deceased_counts_dataset
+measure: max(deceased_claims_paid_after_notice)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "Payments to the deceased: a claim of a person on the death register still paid more than 30 days after the death was notified. The Alert carries how many such claims there are; benefits_deceased_counts also counts the accounts they are paid into and the living people's claims paid into the same accounts, and names no one, so open the paid_after_death view to find them. A short overpayment after a late death notice is normal (notices arrive 0-60 days after the death and the claim stops days after the notice), so days are counted from the notice and such a claim never counts. Not grouped by account: benefits_deceased_counts is a Job output, so a by column cannot be checked when the Space is created."

@@ -147,3 +147,25 @@ tests are `tools/gen-la-health-data.test.mjs` and `HealthLinksJobGoldenTest`.
 - [ ] No look-alike links to its story: `PR-0828`; `PR-0632`; `PR-0031`; `PR-0277`.
 - [ ] Each saved view holds its story whole and its look-alike beside it but apart, and draws without "Result cut
       short" (the largest, `pill_mill`, is about 390 rows and 150 nodes).
+
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-billed-in-hospital-or-after-death-alert-rule-and-the-seed)),
+after `node tools/seed-la-health.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`health.analyst` (lead):** **Alerts** lists `health_billed_in_admission_or_after_death` (WARNING) with the value
+   159: open claim lines dated inside a stay at another hospital or after the member's death. Open the Investigation
+   `phantom-billing`: it is seeded with `PR-1241` and expanded once to its patients, the 40 of exercise 2 among them.
+   The Entity List `billed-in-hospital-or-after-death` holds those 40. The Case "Billed in hospital or after death at
+   PR-1241" is linked to it.
+2. **Four-eyes:** an unbounded expand by `health.analyst` is held, not run. Sign in as **`health.manager`**: it is in
+   the approval inbox; approve or refuse it. `health.analyst` cannot approve its own request.
+3. **`health.reviewer`:** opens `phantom-billing` and reads every step; any change is refused.
+4. **`health.outsider`:** sees the Datasets, but `phantom-billing` is not found (404).
+5. **Draft:** `health.analyst` has one open Draft that annotates `PR-1241` about the hospitals that admitted its
+   patients; promote it, or leave it.
+
+**Not the story:** `PR-0632` Willowmere Physiotherapy also billed 15 patients during a stay, but reversed every line
+within a week, so the rule never counts it; the seaside hospital `PR-1129`, first on *Busiest nodes* in
+`referral_kickbacks`, bills inside its own stays only, which is not a stay elsewhere. Without `PR-1241` the rule would
+not fire at all.

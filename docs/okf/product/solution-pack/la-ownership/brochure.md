@@ -23,7 +23,7 @@ Know-your-customer (KYC) and sanctions-compliance teams at a bank, and presales 
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier (personas, an Alert Rule on a new path to a listed person, a seeding script) is planned.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead KYC analyst, second approver, read-only reviewer, outsider), an Alert Rule for an ownership path that reaches a listed person within 3 hops, and a seeding script for the Investigation, the list of parties on the path, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 

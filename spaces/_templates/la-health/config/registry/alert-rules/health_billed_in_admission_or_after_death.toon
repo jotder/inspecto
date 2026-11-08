@@ -1,0 +1,7 @@
+name: health_billed_in_admission_or_after_death
+dataset: health_phantom_counts_dataset
+measure: max(lines_in_admission_or_after_death)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A service billed during an admission or after death: an open claim line dated inside the member's stay at another hospital, or after the member died. Lines reversed afterwards (date errors put right) are not counted, nor is a hospital's own line inside its own stay. The Alert carries how many such lines there are; no member or provider id leaves health_phantom_counts, so open the phantom_billing view to find the provider. Not grouped by provider: health_phantom_counts is a Job output, so a by column cannot be checked when the Space is created."

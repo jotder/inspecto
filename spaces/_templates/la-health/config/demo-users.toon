@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  health.analyst,Demo Program Integrity Analyst,Program integrity analyst (lead),health-analyst
+  health.manager,Demo Program Integrity Manager,Program integrity manager (second approver),health-manager
+  health.reviewer,Demo Program Integrity Reviewer,Reviewer (read-only),la-viewer
+  health.outsider,Demo Program Integrity Outsider,Not a member of the Investigation,la-viewer

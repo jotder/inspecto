@@ -109,17 +109,20 @@ export function plan(id, files) {
 /**
  * LA-INDUSTRY-SPACES-1: an industry Space is composed from use-case templates named by a recipe
  * (`spaces/_industries/<id>.toon`, `useCases[n]: a,b`). Every file comes from exactly one use case: a path two use cases
- * both ship with different content is refused, so a real collision is renamed in its template on purpose. Three
+ * both ship with different content is refused, so a real collision is renamed in its template on purpose. Four
  * exceptions: the same bytes in several use cases ship once; `config/link-analysis.toon` is merged by entity-type id
- * (the same id must be declared the same way); and `config/examples/*.md` are joined. A lone copy of either joined
- * file ships verbatim.
+ * (the same id must be declared the same way); the Advanced tier's roster, `config/demo-users.toon` by user id and
+ * `config/roles.toon` by role name (the shared `admin` or `la-viewer` must read the same in each); and
+ * `config/examples/*.md` are joined. A lone copy of any joined file ships verbatim.
  * @param byTemplate  [{ tpl, files: [paths relative to the template folder] }]
  * @returns Map path -> template that ships it (link-analysis.toon maps to every template that has one)
  */
 export const MERGED = 'config/link-analysis.toon';
-/** Files every use case may ship, joined in the composed Space: link-analysis.toon (merged) and the inert examples
- *  (config/examples/*.md, which every template must carry under the same name, each titled for its own Space). */
-export const isJoined = (f) => f === MERGED || (f.startsWith('config/examples/') && f.endsWith('.md'));
+/** The Advanced tier's roster: two use cases with personas each ship these, merged by user id and by role name. */
+export const ROSTERS = ['config/demo-users.toon', 'config/roles.toon'];
+/** Files every use case may ship, joined in the composed Space: link-analysis.toon and the roster (merged) and the inert
+ *  examples (config/examples/*.md, which every template must carry under the same name, each titled for its own Space). */
+export const isJoined = (f) => f === MERGED || ROSTERS.includes(f) || (f.startsWith('config/examples/') && f.endsWith('.md'));
 /** Inert example documents from several use cases, one after the other. */
 export const joinExamples = (texts) => texts.map((t) => t.replace(/\s+$/, '')).join('\n\n---\n\n') + '\n';
 export function composeSources(byTemplate, sameBytes = () => false) {
@@ -187,6 +190,49 @@ export function mergeEntityTypes(texts) {
   return out;
 }
 
+/**
+ * Merge several copies of one TOON list file (`<name>[n]...:` then its items): each item is keyed by `key(firstLine)`;
+ * the same key stated the same way ships once, stated differently is refused. The header (minus its count) must agree.
+ */
+function mergeList(texts, name, isItemStart, key, what) {
+  const byKey = new Map();
+  let header = null;
+  for (const text of texts) {
+    const lines = text.replace(/\r/g, '').split('\n').filter((l) => l.trim());
+    const h = (lines.shift() ?? '').replace(/^(\w+)\[\d+\]/, '$1[]');
+    if (!h.startsWith(`${name}[]`)) throw new Error(`unexpected first line in ${name}: ${h}`);
+    if (header !== null && header !== h) throw new Error(`${name} has a different header in two use cases`);
+    header = h;
+    const items = [];
+    for (const line of lines) {
+      if (isItemStart(line)) items.push([line]);
+      else if (items.length && line.startsWith('    ')) items[items.length - 1].push(line);
+      else throw new Error(`unexpected line in ${name}: ${line}`);
+    }
+    for (const it of items) {
+      const k = key(it[0]);
+      const block = it.join('\n');
+      if (byKey.has(k) && byKey.get(k) !== block) throw new Error(`${what} '${k}' is defined differently in two use cases`);
+      byKey.set(k, block);
+    }
+  }
+  return `${header.replace('[]', `[${byKey.size}]`)}\n${[...byKey.values()].join('\n')}\n`;
+}
+
+/** Merge several demo-users.toon files by user id (a tabular `users[n]{id,...}:` list, one row per user). */
+export const mergeDemoUsers = (texts) => mergeList(texts, 'users', (l) => /^ {2}\S/.test(l), (l) => l.trim().split(',')[0], 'demo user');
+
+/** Merge several roles.toon files by role name (`roles[n]:` then `  - name: x` blocks). */
+export const mergeRoles = (texts) => mergeList(texts, 'roles', (l) => l.startsWith('  - '), (l) => (l.match(/- name:\s*(\S+)/) ?? [])[1], 'role');
+
+/** The joined content of one file several use cases ship. */
+export function joinFile(rel, texts) {
+  if (rel === MERGED) return mergeEntityTypes(texts);
+  if (rel === 'config/demo-users.toon') return mergeDemoUsers(texts);
+  if (rel === 'config/roles.toon') return mergeRoles(texts);
+  return joinExamples(texts);
+}
+
 /** The use-case template ids a recipe names. */
 export function recipeUseCases(recipe) {
   const m = recipe.match(/^useCases\[\d+\]:\s*(.+)$/m);
@@ -222,14 +268,15 @@ function main() {
     files = [...owner.keys()];
     templateToon = recipe;
     // link-analysis.toon from ONE use case ships verbatim (it may hold more than entity_types, as la-claims' does);
-    // from several it is merged: entity_types by id, other top-level settings by key (mergeEntityTypes).
+    // from several it is merged: entity_types by id, other top-level settings by key (mergeEntityTypes); the roster by
+    // user id and role name (mergeDemoUsers, mergeRoles).
     const text = (t, rel) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' });
     show = (rel) => {
       if (!isJoined(rel)) return git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
       const from = owner.get(rel);
       if (from.length === 1) return git(['show', `HEAD:${TEMPLATES}/${from[0]}/${rel}`]);
       const texts = from.map((t) => text(t, rel));
-      return Buffer.from(rel === MERGED ? mergeEntityTypes(texts) : joinExamples(texts));
+      return Buffer.from(joinFile(rel, texts));
     };
     console.log(`  composing ${opts.id} from ${byTemplate.map((b) => b.tpl).join(', ')}`);
   } else {

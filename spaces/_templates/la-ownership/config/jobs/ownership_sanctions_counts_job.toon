@@ -1,0 +1,10 @@
+job:
+  name: ownership_sanctions_counts
+  type: sql.template
+  description: "Runs each time the ownership_links Job produces its Dataset. One row of counts: listed_paths (ownership paths of 1 to 3 owns hops from a bank customer's company up to a person whose name_match links them to the sanctions list - the person IS the listed person, matched on name, birth year and nationality), customers_exposed (distinct customers with such a path) and matched_persons (people with any name_match, whether or not they own into a customer). A stake of any size counts. A near-namesake with a different birth year or nationality has no name_match, so it never counts, however close to a customer it sits. A running total over the current register, not a per-build delta: the register carries no date a stake was registered. The Alert Rule ownership_path_to_listed_person reads it; no customer or person id leaves this Job, they are found in the Investigation."
+  sql: "WITH o AS (SELECT src, dst FROM ownership_links WHERE kind = 'owns'), m AS (SELECT DISTINCT src AS person_id FROM ownership_links WHERE kind = 'name_match'), c AS (SELECT src AS customer_id, dst AS company_id FROM ownership_links WHERE kind = 'customer_is'), p AS (SELECT c.customer_id, h1.src AS person_id FROM c JOIN o h1 ON h1.dst = c.company_id JOIN m ON m.person_id = h1.src UNION ALL SELECT c.customer_id, h2.src FROM c JOIN o h1 ON h1.dst = c.company_id JOIN o h2 ON h2.dst = h1.src JOIN m ON m.person_id = h2.src UNION ALL SELECT c.customer_id, h3.src FROM c JOIN o h1 ON h1.dst = c.company_id JOIN o h2 ON h2.dst = h1.src JOIN o h3 ON h3.dst = h2.src JOIN m ON m.person_id = h3.src WHERE h2.src <> c.company_id) SELECT (SELECT count(*) FROM p) AS listed_paths, (SELECT count(DISTINCT customer_id) FROM p) AS customers_exposed, (SELECT count(*) FROM m) AS matched_persons"
+  sources: ownership_links
+  sink_dataset: ownership_sanctions_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == ownership_links"
+  enabled: true

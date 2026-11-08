@@ -88,13 +88,39 @@ test('top-level settings (four-eyes, drafts) are carried once; stated differentl
   assert.throws(() => mergeEntityTypes([adv, 'drafts:\n  max_open: 3\n' + plain]), /'drafts' is stated differently/);
 });
 
-test('every committed industry recipe composes from the real templates (link-analysis.toon merges)', () => {
+test('every committed industry recipe composes from the real templates (link-analysis.toon and the roster merge)', async () => {
+  const { ROSTERS, joinFile } = await import('./package-la-showcase.mjs');
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const filesOf = (dir, rel = '') => readdirSync(join(dir, rel), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? filesOf(dir, `${rel}${e.name}/`) : [`${rel}${e.name}`]);
   for (const r of readdirSync(join(root, 'spaces', '_industries')).filter((f) => f.endsWith('.toon'))) {
-    const texts = recipeUseCases(readFileSync(join(root, 'spaces', '_industries', r), 'utf8'))
-      .map((t) => join(root, 'spaces', '_templates', t, MERGED)).filter((p) => existsSync(p)).map((p) => readFileSync(p, 'utf8'));
-    if (texts.length > 1) assert.match(mergeEntityTypes(texts), /^entity_types\[\d+\]:/, r);
+    const tpls = recipeUseCases(readFileSync(join(root, 'spaces', '_industries', r), 'utf8'));
+    const tplDir = (t) => join(root, 'spaces', '_templates', t);
+    // every file comes from one use case, as the packer composes it (the working tree here, HEAD in the packer)
+    const owner = composeSources(tpls.map((tpl) => ({ tpl, files: filesOf(tplDir(tpl)).filter((f) => f === 'template.toon' || f.startsWith('config/')) })),
+      (rel, a, b) => readFileSync(join(tplDir(a), rel)).equals(readFileSync(join(tplDir(b), rel))));
+    for (const rel of [MERGED, ...ROSTERS]) {
+      const texts = (owner.get(rel) ?? []).map((t) => readFileSync(join(tplDir(t), rel), 'utf8'));
+      if (texts.length > 1) assert.ok(joinFile(rel, texts).length > 0, `${r}: ${rel}`);
+    }
   }
+});
+
+test('the roster merges by user id and role name; a shared id defined differently is refused', async () => {
+  const { mergeDemoUsers, mergeRoles } = await import('./package-la-showcase.mjs');
+  const head = 'users[2]{id,displayName,title,roles}:\n';
+  const admin = '  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings\n';
+  const card = head + admin + '  card.analyst,Demo Card Fraud Analyst,Fraud analyst (lead),card-analyst\n';
+  const own = head + admin + '  ownership.analyst,Demo KYC Analyst,KYC analyst (lead),ownership-analyst\n';
+  assert.equal(mergeDemoUsers([own, card]), 'users[3]{id,displayName,title,roles}:\n' + admin
+    + '  ownership.analyst,Demo KYC Analyst,KYC analyst (lead),ownership-analyst\n  card.analyst,Demo Card Fraud Analyst,Fraud analyst (lead),card-analyst\n');
+  assert.throws(() => mergeDemoUsers([card, head + '  admin,Demo Admin,Platform administrator,admin;card-analyst\n']), /demo user 'admin' is defined differently/);
+  const viewer = '  - name: la-viewer\n    capabilities[0]:\n';
+  const a = 'roles[2]:\n  - name: card-analyst\n    capabilities[1]: canWorkIncidents\n' + viewer;
+  const b = 'roles[2]:\n  - name: ownership-analyst\n    capabilities[1]: canWorkIncidents\n' + viewer;
+  assert.equal(mergeRoles([a, b]), 'roles[3]:\n  - name: card-analyst\n    capabilities[1]: canWorkIncidents\n' + viewer
+    + '  - name: ownership-analyst\n    capabilities[1]: canWorkIncidents\n');
+  assert.throws(() => mergeRoles([a, 'roles[1]:\n  - name: la-viewer\n    capabilities[1]: canWorkIncidents\n']), /role 'la-viewer' is defined differently/);
 });
 
 test('a recipe naming a template that does not exist is refused, not skipped', () => {

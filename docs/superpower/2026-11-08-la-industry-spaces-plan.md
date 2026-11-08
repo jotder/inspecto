@@ -270,7 +270,12 @@ The operator approved this plan and the spike on 2026-11-08 ("Approve, start spi
     `four_eyes_fan_out_above` and `index:`, so composing it needs those keys handled first. **Handled 2026-11-09**
     (la-card Advanced tier, which put `four_eyes_fan_out_above` and `drafts:` into a Banking and finance use case): other
     top-level keys are carried once and refused when two use cases state them differently; a test composes every
-    committed recipe from the real templates (`tools/package-la-showcase.test.mjs`).
+    committed recipe from the real templates (`tools/package-la-showcase.test.mjs`). **Roster, 2026-11-09**
+    (la-ownership Advanced tier, the second Banking and finance use case with personas): `config/demo-users.toon` and
+    `config/roles.toon` are now joined like `link-analysis.toon`, users by id and roles by name, a shared id (`admin`,
+    `la-viewer`, `fraud-analyst`) defined differently refused. Without it the packer refused *Banking and finance*
+    ("'config/demo-users.toon' is shipped by both la-ownership and la-card"); the recipe test now runs `composeSources`
+    over every recipe's working-tree `config/` too, so a file two use cases ship is caught before it is committed.
   - The same classification claimed under two type ids by two use cases is caught only at boot (`EntityTypes.validate`),
     not by the packer.
   - No test checks a template's Dataset entries against `DatasetEntryRules` and the declared types; add one with the
