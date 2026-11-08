@@ -89,8 +89,8 @@ test('placement (OFFERING-DECLARATION-DRIFT-1): Basic lists no business-assuranc
     assert.ok(o.standard.contentPacks.includes('business-assurance'));
     // the LA showcases with a Basic tier (plan wave B, step 5): Basic lists it and Preview carries it through its includes
     const preview = o.preview.contentPacks ?? [];
-    for (const t of ['la-showcase', 'la-audit']) assert.ok(preview.includes(t), t);
-    for (const t of ['la-claims', 'la-mobile-money'])
+    for (const t of ['la-showcase']) assert.ok(preview.includes(t), t);
+    for (const t of ['la-audit', 'la-claims', 'la-mobile-money'])
         assert.ok(o.basic.contentPacks.includes(t) && !preview.includes(t), t);
     assert.ok(!preview.includes('la-showcase-off') && !o.basic.contentPacks.includes('la-showcase-off'));
 });

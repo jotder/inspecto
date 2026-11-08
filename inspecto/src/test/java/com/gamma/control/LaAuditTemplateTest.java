@@ -17,6 +17,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -31,7 +32,18 @@ class LaAuditTemplateTest {
     @Test
     void settingsMaskPartiesNotLegalEntitiesAndFourEyesHoldsTheCfoExpand() {
         LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(CFG);
-        assertEquals("typed", s.maskingMode());
+        // Basic tier (plan wave B, step 5): masking_mode is NOT stated, so the edition default holds - typed where people
+        // sign in (the Advanced tier's personas), none on a Basic build, where nobody can reveal and a masked graph is unreadable.
+        assertNull(s.maskingMode(), "a stated masking_mode would mask the Basic tier's graph with no way to reveal it");
+        String before = System.getProperty("auth.mode");
+        try {
+            System.clearProperty("auth.mode");
+            assertEquals("none", s.effectiveMaskingMode(), "Basic (no sign-in) shows the ids");
+            System.setProperty("auth.mode", "demo");
+            assertEquals("typed", s.effectiveMaskingMode(), "a sign-in build (Demo Auth, OIDC) masks the party ids");
+        } finally {
+            if (before == null) System.clearProperty("auth.mode"); else System.setProperty("auth.mode", before);
+        }
         assertEquals(30, s.fourEyesFanOutAbove());
         assertEquals(Boolean.TRUE, s.index().enabled());
         assertEquals(10, s.drafts().maxOpen());

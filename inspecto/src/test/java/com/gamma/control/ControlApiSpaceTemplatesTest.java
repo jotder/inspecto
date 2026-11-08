@@ -175,8 +175,8 @@ class ControlApiSpaceTemplatesTest {
      * creatable on a server without that sign-in (Basic, or OIDC, which cannot name its principals), naming
      * {@code demo-auth}; the test's own {@code starter} is such a template and {@code la-sample} has no roster.
      * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
-     * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims} and
-     * {@code la-mobile-money}, none of them needing Demo Auth. With an
+     * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims},
+     * {@code la-mobile-money} and {@code la-audit}, none of them needing Demo Auth. With an
      * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
      * without the roster check every one of them lists {@code creatable: true}.
      */
@@ -201,7 +201,7 @@ class ControlApiSpaceTemplatesTest {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
                     // la-sample has no roster; the shipped showcases with a Basic tier keep theirs inert, so it does not refuse them
-                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money");
+                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit");
                     String id = t.get("id").asText();
                     boolean needsDemo = !"la-sample".equals(id) && !basicTier.contains(id);
                     boolean named = false;

@@ -21,7 +21,7 @@ Internal audit, finance controls and presales teams evaluating Link Analysis for
 
 ## How it fits with the Editions
 
-Needs an [Advanced](../../edition/advanced/brochure.md) or [Preview](../../edition/preview/brochure.md) build with demo sign-in.
+The data, the link Jobs, the three saved views and the stories run on every edition, [Basic](../../edition/basic/brochure.md) included. The auditor's day needs an [Advanced](../../edition/advanced/brochure.md) or [Preview](../../edition/preview/brochure.md) build with sign-in: the demo users, masked parties with an audited Reveal, Investigations, four-eyes approval, the committee portal, the bound Alert Rule and the seeded Case.
 
 ## How it works
 

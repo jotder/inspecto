@@ -10,6 +10,16 @@ timestamp: 2026-10-19T00:00:00Z
 
 Screens and controls are the shared studio ones: see the [la-showcase user guide](../la-showcase/user-guide.md) and the [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). The scripted demo with expected values is the [runbook](admin-guide-showcase-runbook.md).
 
+## Which edition
+
+The Space has two tiers.
+
+- **Basic tier: every edition, Basic included.** The data, the link Jobs, the three saved views and the stories all
+  work on Basic. Nobody signs in, so masking is off and you read the real ids (`V-117`, `E-31`) on the canvas.
+- **Advanced tier: a build where people sign in.** You get the users below, typed masking of parties with the admin's
+  Reveal, Investigations, four-eyes approval, Drafts, the Dossier, the committee portal, the bound Alert Rule and the
+  seeded Case, so this section and the walk-through after it need it.
+
 ## Who signs in
 
 | User | Works as |
