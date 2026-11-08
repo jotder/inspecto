@@ -564,6 +564,8 @@ with a score).
   acyclic, so the planted circle is the only one.
 - **Staged month:** October payments plus 8 newly onboarded customers.
 
+**Advanced tier BUILT 2026-11-09:** see step 8, "`la-ownership` BUILT 2026-11-09".
+
 #### 6. `la-trade` — trade-based money laundering
 
 **Audience:** trade-finance compliance at a bank.
@@ -1562,6 +1564,73 @@ deviations:
      rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
      Also not checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier (its other
      packs' Advanced tiers are other lanes), the staged month, an OIDC build.
+
+   **`la-ownership` BUILT 2026-11-09** (the `la-card` pattern; spec 5's "a new ownership path that reaches a listed person
+   within 3 hops"). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`ownership.analyst` lead,
+     `ownership.manager` second approver, `ownership.reviewer` read-only, `ownership.outsider` not a member, and `admin`
+     byte-identical to `la-showcase`, `la-utility` and `la-card`), `config/roles.toon` (`ownership-analyst`,
+     `fraud-analyst` as in `la-card` and `la-utility`, `ownership-manager`, `la-viewer`, `la-settings`),
+     `four_eyes_fan_out_above: 2000` plus the same Drafts block as `la-card` in `link-analysis.toon` (no `masking_mode`; no
+     Entity Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `ownership_sanctions_counts` (`sql.template` on
+     `ownership_links`' `job.dataset.produced`, sources `ownership_links` only) writes one row: `listed_paths` (ownership
+     paths of 1, 2 or 3 `owns` hops from a `customer_is` company up to a person with a `name_match`; explicit joins, a
+     3-hop path may not pass back through the customer's company), `customers_exposed`, `matched_persons`;
+     `ownership_sanctions_alerts` (`alert.evaluate`) runs after it; `ownership_path_to_listed_person` is
+     `max(listed_paths) gte 1`, CRITICAL, not grouped (a Job output).
+   - **Real figures on the shipped data** (the Job run after `ownership_links` in `OwnershipLinksJobGoldenTest`):
+     listed_paths **1** (`CUS-00528`'s company `CO-04313` ← 50 % `CO-04431` ← 60 % `PER-03904`, two hops), customers_exposed
+     **1**, matched_persons **1**. By hop count over all customers: 2 235 one-hop, 1 208 two-hop and 15 three-hop paths, of
+     which only that one ends at a matched person. With `PER-03904`'s links removed: 0 / 0 / 0. With a `name_match` given to
+     the near-namesake `PER-02226`: 2 paths, 2 customers (he owns `CUS-00642`'s company outright, one hop), so only the
+     match rule keeps him out. With one given to the hidden owner `PER-02104` (six hops above his customers): still 1. The
+     8 staged customers add no path (checked by hand over the staged `customer` file, not pinned).
+   - **Decided while building:**
+     - **"Within 3 hops" counts `owns` hops from the customer's company to the matched person.** The `customer_is` link
+       (the customer IS the company) and the `name_match` (the person IS the listed person) are identities, not hops;
+       counted as links the planted path is four. A stake of any size counts (no 25 % or 50 % threshold: spec 5 names
+       none, and a sanctions screen follows small stakes too). Only `owns`: an officer is not an ownership path.
+     - **A running total, not a "new path" count** (as `la-police` decided). The register is a snapshot with no date a
+       stake was registered (`owns.ts` is the owned company's incorporation date), so "new" could only mean "not in the
+       previous build", which a `sql.template` Job cannot see. An exposure stays an exposure until it is resolved, so the
+       rule stays met after every build and the open Alert is not raised twice; a later path raises the value.
+     - **The industry packer now joins the roster.** `la-ownership` is the second *Banking and finance* use case with
+       `config/demo-users.toon` and `config/roles.toon`, and `composeSources` refused the recipe ("'config/demo-users.toon'
+       is shipped by both la-ownership and la-card"). Both files are now merged like `link-analysis.toon` (users by id,
+       roles by name, a shared id defined differently refused; `mergeDemoUsers`, `mergeRoles`, `joinFile`), and the
+       recipe test runs `composeSources` over every recipe's working-tree `config/`. Not visible at HEAD: the packer reads
+       committed files, so `package-la-showcase.mjs la-banking` passed before the commit either way.
+     - The Draft annotates `PER-03904` (one hop from the seed `SL-0137`); `CO-04431`, the 50 % owner, is two hops from
+       either seed and would be refused. The bounded expand leaves it out on purpose, so the held unbounded expand is the
+       step that closes the path.
+   - **Seed** `tools/seed-la-ownership.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `sanctions-exposure` (seeds `SL-0137` + `CUS-00528`; a bounded expand over `name_match`, `owns`,
+     `customer_is`, `maxFanOut` 50; annotate, window 2016-01-01 to 2026-10-01, snapshot; no threshold step, since every
+     ownership link's amount is 0), members (`ownership.reviewer` and `ownership.manager` reviewers, `admin` lead; not
+     `ownership.outsider`), Entity List `sanctions-path-parties` (the four parties on the path), a Case from `CUS-00528`
+     assigned to `ownership.manager` and linked, an Investigation template, one unbounded expand held for four-eyes, one
+     open Draft. No look-alike is in any step.
+   - **Tests:** `LaOwnershipTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000, Drafts; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst` as in `la-utility`, and `fraud-analyst`, `la-viewer`, `la-settings` as in `la-card`; the shared
+     `admin`; the rule through `AlertRoutes.parseContent`; the Jobs' signals); `OwnershipLinksJobGoldenTest` (runs the
+     counts Job after `ownership_links`; the figures above, the planted path, the rule fires; without `PER-03904` it would
+     not; the near-namesake is one hop above a customer yet never counts, and would if matched; a listed person six hops
+     up is not counted); the gallery test pins `la-ownership` creatable with no missing feature and no Demo Auth;
+     `tools/seed-la-ownership.test.mjs` (mocked fetch, 11 tests); `tools/package-la-showcase.test.mjs` (the roster merge,
+     and every recipe composes from the working tree). Falsified, each then restored: the counts Job counting every owner
+     instead of matched persons (3 458 paths), `name_match` without the birth year and nationality (the near-namesake
+     matched; 2 paths), the counts Job reaching six hops (13 paths with the hidden owner listed), `masking_mode: typed`,
+     `ownership-analyst` given the approve capability, `admin` redefined, `la-viewer` given a capability, `fraud-analyst`
+     removed, `la-ownership` out of the gallery's Basic-tier set; in the seed the outsider made a member, the Draft
+     annotating `CO-04431`, the near-namesake's customer seeded; in the packer the roster not joined (*Banking and
+     finance* refused) and a differing definition not refused.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 1, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `ownership_sanctions_alerts` reporting no breach, 0 rejected);
+     the expand's `linkKinds`, the window and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build, and
+     the packed downloads of a commit holding this tier (the packer reads HEAD).
 
 **Docs, with each Space**
 

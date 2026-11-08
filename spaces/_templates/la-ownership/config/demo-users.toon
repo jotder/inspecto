@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  ownership.analyst,Demo KYC Analyst,KYC and sanctions analyst (lead),ownership-analyst
+  ownership.manager,Demo Compliance Manager,Sanctions compliance manager (second approver),ownership-manager
+  ownership.reviewer,Demo KYC Reviewer,Reviewer (read-only),la-viewer
+  ownership.outsider,Demo KYC Outsider,Not a member of the Investigation,la-viewer
