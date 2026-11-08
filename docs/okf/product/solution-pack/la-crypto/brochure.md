@@ -1,6 +1,6 @@
 # Link Analysis crypto laundering showcase — brochure
 
-> **A hacked wallet is emptied and the coins are peeled off, a little at a time, over 80 hops into six exchange accounts. Ransom money goes into a mixer and comes out under two hours later, 98 % of it, at a fresh address that pays one exchange account. Forty exchange accounts in forty unrelated names are all funded by one wallet cluster and all cash out to the same three bank accounts. All of it is hidden among 10 900 addresses and 44 500 transfers. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**
+> **Coins stolen from a hacked wallet are peeled off, a little at a time, over 80 hops into six exchange accounts. Ransom money goes into a mixer and comes out under two hours later, 98 % of it, at a fresh address that pays one exchange account. Forty exchange accounts in forty unrelated names are all funded by one wallet cluster and all cash out to the same three bank accounts. All of it is hidden among 10 900 addresses and 44 500 transfers. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**
 
 *Audience: customers, presales and sales. Product Map Item `solution-pack.la-crypto` · status **preview**. This is a seeded demonstration Space on synthetic data, not a sold product. Prices are not published here.*
 

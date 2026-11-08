@@ -74,8 +74,7 @@ Work blind first: each exercise has a hint, then the answer. The answers are not
 hop, and look at where the small amounts go (`dst_label:exchange`, then `deposit_of` and `kyc_of`). Compare it with the
 other chain.
 
-**Answer:** on **2026-03-14 at 02:17** the wallet labelled hacked, **`syn15z47fslrxrnhuwm4dppk77s0z7`**, sent everything it
-held, **412.5 SYC**, to **`syn1mdsja4svnugvd4chxrt2xnywxr`** in one transfer. That was the first of **80 hops**. Each hop
+**Answer:** on **2026-03-14 at 02:17** the wallet labelled hacked, **`syn15z47fslrxrnhuwm4dppk77s0z7`**, lost **412.5 SYC** in one transfer to **`syn1mdsja4svnugvd4chxrt2xnywxr`**, about three quarters of the 551 SYC it had been sent (the rest was never moved). That was the first of **80 hops**. Each hop
 received one transfer and, 12 to 140 minutes later, sent two: a peel of 1.6 to 4.9 SYC to an exchange deposit address,
 and the change to a fresh address. The last hop, `syn1lry5j5myhzevl8wnw2zvwpr7pc`, ran on 2026-03-18 at 07:48, and the
 final change address, **`syn1sye3wp0tm9zdqmlwm60gha4uma`**, still holds about 170.6 SYC. The peels, about 241.9 SYC in
@@ -102,8 +101,7 @@ account `XA-03118` at Ashgrove Exchange**, held by **`KP-02980`, Olga Moreau**. 
 on 2026-05-24 and 06-03. **Not the story:** two other mixer users each have one near miss. **`syn1zngjgrnpdxuwp8trqf4pddkppf`**
 paid 5.2 SYC in, and 75 minutes later the mixer paid someone else 92.5 % of that: the timing fits but the amount is 7.5 %
 short. **`syn1sfr9e266n86z4c8zd7k00q4uph`** paid 3.4 SYC in, and an exit of 99.1 % of that came 281 minutes later: the
-amount fits but it is over 4 hours later. Both are `matched:no`, and so are the other near misses. Their own coins came out
-a day or more later, split into pieces.
+amount fits but it is over 4 hours later. Both are `matched:no`, and so are the other near misses. Their own coins came out about 21 hours later, in one piece at 98 %, far outside the 2-hour window.
 
 ### 3. Converging cash-out — who is behind the 40 accounts?
 

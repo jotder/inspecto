@@ -1026,7 +1026,7 @@ and the bank accounts (`BK-` + 8 digits) are invented. Deliberate deviations:
   golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the
   look-alike on the canvas but in another component: `hack_peel_chain` 785 rows, 426 nodes (the 80-hop chain is one thin component
   of 100 nodes); `mixer_hop_timing_match` 12 rows, 15 nodes; `converging_cash_out` 670 rows, 397 nodes.
-- **Stories as built:** peel chain: the wallet labelled hacked `syn15z47fslrxrnhuwm4dppk77s0z7` sends all 412.5 SYC on 2026-03-14
+- **Stories as built:** peel chain: the wallet labelled hacked `syn15z47fslrxrnhuwm4dppk77s0z7` loses 412.5 SYC (of 551 SYC it was sent) on 2026-03-14
   02:17 to the first of 80 hops; each hop sends a peel of 1.6-4.9 SYC to one of six deposit addresses and the change on, 12-140
   minutes apart, until 2026-03-18; the last change address keeps 170.6 SYC; the six accounts `XA-03111`..`XA-03116` (four exchanges,
   opened February-March 2026, persons `KP-02973`..`KP-02978` with no shared surname) cash out to their own banks. Look-alike: the
