@@ -1,7 +1,7 @@
 job:
   name: police_call_links
   type: sql.template
-  description: "Derived from police_links each time it is produced: the busy handsets. Every called link that touches a number with 6 or more distinct call partners (ts = the pair's first call), uses_number for the numbers in those links, and lives_at for the people they are attributed to. Most numbers have one or two partners; keeping only the busy ones holds the saved view police_handset_network under the canvas's 1 000 nodes."
+  description: "Derived from police_links each time it is produced: the busy handsets. Every called link that touches a number with 6 or more distinct call partners (ts = the pair's first call), uses_number for the numbers in those links, and lives_at for the people they are attributed to. Most numbers have one or two partners; keeping only the busy ones holds the saved view drug_supply_handset_network under the canvas's 1 000 nodes."
   sql: "WITH c AS (SELECT * FROM police_links WHERE kind = 'called'), partners AS (SELECT n, count(DISTINCT m) AS k FROM (SELECT src AS n, dst AS m FROM c UNION ALL SELECT dst, src FROM c) GROUP BY n), busy AS (SELECT n FROM partners WHERE k >= 6), kept AS (SELECT * FROM c WHERE src IN (SELECT n FROM busy) OR dst IN (SELECT n FROM busy)), nums AS (SELECT src AS n FROM kept UNION SELECT dst FROM kept), un AS (SELECT * FROM police_links WHERE kind = 'uses_number' AND dst IN (SELECT n FROM nums)), la AS (SELECT * FROM police_links WHERE kind = 'lives_at' AND src IN (SELECT src FROM un)), links AS (SELECT * FROM kept UNION ALL SELECT * FROM un UNION ALL SELECT * FROM la) SELECT src, dst, kind, ts, amount, event_date, via FROM links ORDER BY kind, src, dst"
   sources: police_links
   sink_dataset: police_call_links

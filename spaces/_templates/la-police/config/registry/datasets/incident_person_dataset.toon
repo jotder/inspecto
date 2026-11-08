@@ -1,6 +1,11 @@
 physicalRef: incident_person/database
 description: "Police Link Analysis showcase - One row per person recorded on an incident, with their role (suspect, victim, witness). Landed by the incident_person Pipeline. Synthetic."
+primaryEntityType: person
 columns[3]{name,type,classification}:
-  incident_id,string,
-  person_id,string,
+  incident_id,string,INCIDENT
+  person_id,string,PERSON
   role,string,
+defaultLinkMapping:
+  from: person_id
+  to: incident_id
+  kind: role

@@ -1,7 +1,8 @@
 physicalRef: plate_read/database
 description: "Police Link Analysis showcase - One row per number-plate camera read: plate, camera, time and the camera's location on a main road. Landed by the plate_read Pipeline. Synthetic."
+primaryEntityType: vehicle
 columns[5]{name,type,classification}:
-  plate,string,
+  plate,string,PLATE
   camera_id,string,
   read_at,timestamp,
   lat,number,
