@@ -40,6 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * link to any of them, each view fits the canvas, and the engine's own SQL raises each red flag on exactly the planted records -
  * above all {@code vessel_elsewhere}, the bill of lading checked against its vessel's position on the B/L date, which the five
  * transhipment look-alikes pass. The facts in the files themselves are pinned by {@code tools/gen-la-trade-data.test.mjs}.
+ * The Advanced tier's {@code trade_over_reference_counts} Job runs on the same signal: its Alert Rule fires on the over-invoicing
+ * pair that shares a director, would not without it, and never counts the specialty supplier priced steadily over 3x.
  */
 class TradeLinksJobGoldenTest {
 
@@ -48,6 +50,7 @@ class TradeLinksJobGoldenTest {
     private static final List<String> FEEDS = List.of("trade_company", "director", "trade", "bill_of_lading", "vessel_position",
             "price_reference", "trade_payment");
     private static final List<String> VIEWS = List.of("over_invoicing", "phantom_shipment", "circular_trade", "shell_importers");
+    private static final String COUNTS = "trade_over_reference_counts";
 
     @TempDir static Path tmp;
     private static Path data;
@@ -73,7 +76,10 @@ class TradeLinksJobGoldenTest {
         data = space.resolve("data");
         List<String> jobs = new ArrayList<>(List.of("trade_links"));
         VIEWS.forEach(v -> jobs.add("trade_" + v + "_links"));
-        run(space, jobs);
+        // the Advanced tier's counts Job is fired by the same trade_links signal; its one row of counts is no link Dataset
+        List<String> all = new ArrayList<>(jobs);
+        all.add(COUNTS);
+        run(space, all);
         truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-trade-data.ground-truth.json").toFile());
         for (String sink : jobs) {
             List<String[]> ls = new ArrayList<>();
@@ -84,10 +90,53 @@ class TradeLinksJobGoldenTest {
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (plan step 8)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/" + COUNTS + "_job.toon",
+                "config/jobs/trade_over_reference_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(COUNTS + "_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), COUNTS + " is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet(COUNTS);
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: 42 trades over 3x the reference (the over-invoicing pair's 14 and the specialty
+        // supplier's 28); only the 14 are between companies that share a director, all of one exporter-importer pair
+        JsonNode oi = truth.get("stories").get("over_invoicing").get("facts");
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(42L, ((Number) row.get("trades_over_reference")).longValue());
+        assertEquals((long) oi.get("shipments").asInt() + oi.get("specialty_trades").asInt(), ((Number) row.get("trades_over_reference")).longValue());
+        assertEquals(14L, ((Number) row.get("shared_director_trades_over_reference")).longValue());
+        assertEquals(oi.get("trades").size(), ((Number) row.get("shared_director_trades_over_reference")).intValue(), "every planted trade, nothing else");
+        assertEquals(1L, ((Number) row.get("shared_director_pairs_over_reference")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+    }
+
+    @Test
+    void withoutTheOverInvoicingPairTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same output with the exporter taken out: no related-party trade over the reference
+        String exporter = truth.get("stories").get("over_invoicing").get("facts").get("exporter").asText();
+        Map<String, Object> without = countsOver("src <> '" + exporter + "' AND dst <> '" + exporter + "'", "beneficiary <> '" + exporter + "'");
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(0L, ((Number) without.get("shared_director_trades_over_reference")).longValue(), "without " + exporter + ": " + without);
+        assertTrue(((Number) without.get("shared_director_trades_over_reference")).doubleValue() < rule.threshold(), "it would not fire");
+        assertEquals(28L, ((Number) without.get("trades_over_reference")).longValue(), "the specialty supplier's trades are still over 3x");
+        // and the shared director is what makes the pair related: with the directed_by links gone it would not fire either
+        Map<String, Object> noDirectors = countsOver("kind <> 'directed_by'", "true");
+        assertEquals(0L, ((Number) noDirectors.get("shared_director_trades_over_reference")).longValue(), noDirectors.toString());
+    }
+
+    @Test
+    void theSpecialtySupplierIsOverTheReferenceButNeverCounted() throws Exception {
+        JsonNode oi = truth.get("stories").get("over_invoicing").get("facts");
+        String supplier = oi.get("specialty_supplier").asText();
+        // the counts Job's own SQL over the real output with only the specialty supplier's trades: a naive "over 3x" rule fires
+        Map<String, Object> only = countsOver("true", "beneficiary = '" + supplier + "'");
+        assertEquals((long) oi.get("specialty_trades").asInt(), ((Number) only.get("trades_over_reference")).longValue(), supplier + " " + only);
+        assertEquals(0L, ((Number) only.get("shared_director_trades_over_reference")).longValue(), supplier + " shares no director with a buyer: " + only);
+        assertEquals(0L, ((Number) only.get("shared_director_pairs_over_reference")).longValue(), supplier + " " + only);
     }
 
     @Test
@@ -223,6 +272,29 @@ class TradeLinksJobGoldenTest {
                 assertFalse(lookalikes.contains(l[0]) && members.contains(l[1]) || lookalikes.contains(l[1]) && members.contains(l[0]),
                         e.getKey() + ": the look-alike link " + String.join(" ", l) + " joins the story");
         });
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/trade_unit_price_over_reference.toon").toString()));
+    }
+
+    /** The counts Job's own SQL (its params substituted as the Job does) over the real link Dataset and feeds, each narrowed. */
+    private static Map<String, Object> countsOver(String linkFilter, String tradeFilter) throws Exception {
+        JobConfig job = JobConfig.load(TEMPLATE.resolve("config/jobs/" + COUNTS + "_job.toon").toString());
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("price_ratio_alert", job.require("price_ratio_alert")));
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW trade_links AS SELECT * FROM " + parquet("trade_links") + " WHERE " + linkFilter);
+            st.execute("CREATE VIEW trade AS SELECT * FROM " + feedParquet("trade") + " WHERE " + tradeFilter);
+            st.execute("CREATE VIEW price_reference AS SELECT * FROM " + feedParquet("price_reference"));
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     private static List<String> pairs(String kind, String flag) {

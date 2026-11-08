@@ -43,7 +43,7 @@ Telecom), with the same template id.
 | Financial crime tour | `la-showcase` | Mule ring and shell loop; TILL-06 takes 80 % of cash-out; SKIMMER-01 skims benefit payments; geo route of the ring | exists |
 | Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
 | Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
-| Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
+| Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | exists |
 | Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | exists (Basic tier) |
 
 ### Insurance
@@ -1509,6 +1509,59 @@ deviations:
      `--apply`, the persona probes) and no Basic bundle (rule unarmed, `card_compromise_alerts` reporting no breach, 0
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
+
+   **`la-trade` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`trade.analyst` lead, `trade.manager`
+     second approver, `trade.reviewer` read-only, `trade.outsider` not a member, and `admin` byte-identical to every other
+     showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`trade-analyst`, `fraud-analyst` as in `la-card`,
+     `trade-manager` with `canApproveLinkExpansions`, `la-viewer`, `la-settings`), `four_eyes_fan_out_above: 2000` plus
+     Drafts limits (10 / 60 min / 14 days) in `link-analysis.toon`, the same values as `la-card`, since `la-trade` is composed
+     with it into *Banking and finance* and the packer refuses a setting two use cases state differently. No `masking_mode`;
+     no Entity Type masked.
+   - **The Alert Rule is the spec's "unit price over 3× the reference" between companies that share a director.**
+     The price test alone would fire on the look-alike: the specialty supplier `CO-02169` prices 28 trades at a steady 3.31
+     to 3.89 times the reference. The story's other half, the director shared by exporter and importer, tells them apart,
+     as the user guide's exercise 1 already says. `trade_over_reference_counts` (`sql.template` on `trade_links`'
+     `job.dataset.produced`, `price_ratio_alert: "3.0"`, equal to the link Job's) reads `trade`, `price_reference` and the
+     `directed_by` links of `trade_links` and writes one row: `trades_over_reference`, `shared_director_trades_over_reference`,
+     `shared_director_pairs_over_reference`. `trade_over_reference_alerts` (`alert.evaluate`) runs after it;
+     `trade_unit_price_over_reference` is `max(shared_director_trades_over_reference) gte 1`, WARNING, not grouped (a Job
+     output, as in `la-utility`). The Job sends no company or person id; the Alert carries a count.
+   - **Running total, not "new".** The count covers every landed trade, so the rule stays met after every build. A
+     `sql.template` Job keeps no watermark of what it counted last time, and the Alert stays one open Alert while the
+     breach lasts (an Alert is de-duplicated while a non-terminal one exists), so a running total gives one Alert for the
+     story, not one per build.
+   - **Real figures on the shipped data** (the counts Job over the real `trade_links`, `trade`, `price_reference`; pinned by
+     `TradeLinksJobGoldenTest`, first computed with DuckDB over the CSV files): trades_over_reference **42** (the pair's 14
+     plus the specialty supplier's 28); shared_director_trades_over_reference **14** (exactly the ground truth's 14 trades,
+     `CO-02275` to `CO-01461`, director `PER-00291`); shared_director_pairs_over_reference **1**. Eight trading pairs
+     share a director in all; the other seven never trade over 1.46 times the reference. Without `CO-02275` the Job yields
+     28 / 0 / 0; with the `directed_by` links removed, 0 related trades; the specialty supplier's trades alone, 28 / 0 / 0.
+   - **Seed** `tools/seed-la-trade.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `over-invoicing` (seed `CO-02275`; one bounded expand over `traded_with` and `directed_by`, `maxFanOut` 20,
+     to its 4 buyers and 2 directors, `CO-01461` and `PER-00291` among them; annotate, threshold, window, resolve, snapshot),
+     members (`trade.reviewer` and `trade.manager` reviewers, `admin` lead; not `trade.outsider`), Entity List
+     `related-party-traders` (`CO-02275`, `CO-01461`, `PER-00291`), a Case from `CO-02275` assigned to `trade.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `CO-01461` (in
+     the Working Set after the expand; its six other suppliers are two hops out). The specialty supplier is in no step.
+   - **Tests:** `LaTradeTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined and `fraud-analyst`
+     equal to `la-utility`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs' signals and the
+     shared `price_ratio_alert`); `TradeLinksJobGoldenTest` (the counts Job fired by the `trade_links` signal with the view
+     Jobs; the real figures above and the rule's own measure and threshold fire; the Job's own SQL without `CO-02275`, and
+     without `directed_by`, would not fire; the specialty supplier is over 3× yet never counted; the old "Basic tier only"
+     test replaced); the gallery test pins `la-trade` creatable with no missing feature and no Demo Auth;
+     `tools/seed-la-trade.test.mjs` (mocked fetch, 11 tests). Falsified, each then restored: the counts Job without the
+     shared-director join (42 counted; the positive, the no-exporter and the specialty-supplier tests all go red; the
+     no-`directed_by` assertion was broken by the same mutation but sits behind the no-exporter one in its method),
+     `masking_mode: typed`, `trade-analyst` given the approve capability, `la-trade` out of the gallery's Basic-tier set,
+     `fraud-analyst` removed, `admin` given `trade-analyst`, and in the seed: the outsider made a member, the Draft
+     annotating a company two hops out, the specialty supplier added to the seed, the first expand unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 14, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `trade_over_reference_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
+     Also not checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier (its other
+     packs' Advanced tiers are other lanes), the staged month, an OIDC build.
 
 **Docs, with each Space**
 
