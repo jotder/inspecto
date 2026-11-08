@@ -593,6 +593,33 @@ with a score).
 
 **Alert Rule:** a bid from an IP address already used by another bidder on the same tender.
 
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-procurement-data.py` (seed 20261108; ground truth
+`tools/gen-la-procurement-data.ground-truth.json`), `tools/gen-la-procurement-data.test.mjs`, `ProcurementLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-procurement/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-procurement/`. Deliberate deviations:
+- **Columns:** `director.from` / `to` are `from_date` / `to_date` (SQL keywords); `bid` gains `bid_id`, `contract_change` gains
+  `change_id`, `tender` gains `awarded_at`; `director` has no role. A tender still open at the end of the staged month has a blank
+  award.
+- **Link kinds:** `same_ip` and `same_author` link a bidder to the shared IP address or author node (only when two or more bidders
+  used it), not bidder to bidder; `same_ip`'s `via` carries the fewest minutes to another bidder's bid from that address on the same
+  tender. A blank or placeholder author (`Administrator`, about 3 % of bids) never links. `approved_change` is official → winning
+  firm, one row per pair (`via` = changes and tenders). The link Dataset has an extra column, `market` (the tender category, or the
+  category a company mostly bids in), so the rotation view can filter to one market.
+- **Views and the canvas cap:** two derived Jobs on `job.dataset.produced` (as `la-police`): `procurement_approval_links`
+  (approvals, plus only the homes shared by two or more of those officials and directors) and `procurement_debarment_links`
+  (directors of debarred firms, all their directorships, their firms' wins). `procurement_links` also runs on
+  `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows
+  and 1 000 nodes, the story whole and connected, and the look-alike on the canvas: `procurement_bid_rotation` 1 291 rows, 512 nodes; `procurement_change_approvals` 700 rows, 556 nodes; `procurement_cover_bids` 20 rows, 19 nodes; `procurement_debarred_directors` 27 rows, 36 nodes.
+- **Stories as built:** rotation tenders are Highways North (24, two a month), the look-alike big three win 74 % of Highways South
+  in the same market view; cover bids are 27 on 10 IT tenders, 16 (60 %) from the winner's IP 2-25 minutes after it, 20 with its
+  estimator as author; the kiosk is `198.51.100.20` (14 firms, bids on one tender at least an hour apart); the conflict is
+  `P-00002` → `CO-0426` (9 changes; director `P-00003` at home `AD-00002`), the look-alike `P-00008` approves 34 changes, at most 2
+  per supplier; the phoenix is `CO-0815` (debarred 2026-01-15) → `CO-0899` (incorporated 2026-02-02, wins `T-00519` on
+  2026-04-08), the look-alike director `P-00007` joins `CO-0233` 3.5 years after `CO-0640`'s debarment.
+- **Scale:** 900 companies, 2 000 people (300 officials), 1 445 directorships, 1 228 landed tenders, 6 001 landed bids, 834
+  contract changes; about 11 000 link rows (the spec's row counts give far fewer than the shared plan's 20-60 k); data 0.5 MB.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing.
+
 #### 8. `la-benefits` — benefits and tax fraud
 
 **Audience:** government benefits-integrity and tax-compliance teams.
