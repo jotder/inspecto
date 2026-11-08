@@ -1,0 +1,6 @@
+physicalRef: trade_over_reference_counts
+description: "Trade-based money-laundering Link Analysis showcase - one row of counts built by the trade_over_reference_counts Job: trades_over_reference (landed trades priced over 3 times the month's reference median), shared_director_trades_over_reference (those between an exporter and an importer that share a director) and shared_director_pairs_over_reference (how many such pairs). Read by the Alert Rule trade_unit_price_over_reference. Names no company or person. Synthetic."
+columns[3]{name,type,classification}:
+  trades_over_reference,number,
+  shared_director_trades_over_reference,number,
+  shared_director_pairs_over_reference,number,

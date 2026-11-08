@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  trade.analyst,Demo Trade Finance Analyst,Trade-finance compliance analyst (lead),trade-analyst
+  trade.manager,Demo Trade Finance Manager,Trade-finance compliance manager (second approver),trade-manager
+  trade.reviewer,Demo Trade Finance Reviewer,Reviewer (read-only),la-viewer
+  trade.outsider,Demo Trade Finance Outsider,Not a member of the Investigation,la-viewer

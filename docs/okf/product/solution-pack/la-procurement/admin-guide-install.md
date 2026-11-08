@@ -144,9 +144,9 @@ public-sector showcase. The recipe is `spaces/_industries/la-public-sector.toon`
 data download. Install them as above, with `la-public-sector` in place of this Space's id.
 
 Composing refuses a file both use cases would ship, so procurement's people feed is called `procurement_person` (its
-Pipeline, Dataset and inbox folder); benefits keeps `person`. The same rule applies to this Space's Advanced tier:
-`config/demo-users.toon` and `config/roles.toon` ship in the industry Space only while `la-benefits` has none of its
-own; two different copies are refused until the packer joins rosters. The four-eyes and Drafts settings in
+Pipeline, Dataset and inbox folder); benefits keeps `person`. The Advanced tier's
+`config/demo-users.toon` and `config/roles.toon` are joined with `la-benefits`' (users by id, roles by name); a user or
+role the two define differently is refused. The four-eyes and Drafts settings in
 `link-analysis.toon` are merged by key, so both use cases state the same values. The two packs declare the shared types *Person*,
 *Address*, *Bank account* and *Public-sector entity* identically, so they merge into one. Every Dataset says what its
 id columns hold, and each Dataset of events has its own Mapping. In each link Dataset, the ends mixing kinds hold
