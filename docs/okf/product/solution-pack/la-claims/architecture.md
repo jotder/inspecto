@@ -22,6 +22,7 @@ Placeholder phones and addresses (blank, all-zero, `UNKNOWN`) make no shared-att
 
 ## Settings and access
 
-- `config/link-analysis.toon`: masking `typed` with one masked Entity Type `party`, a four-eyes fan-out threshold, link index ON, Drafts limits, embed `frame_ancestors`.
+- `config/link-analysis.toon`: one masked Entity Type `party`, a four-eyes fan-out threshold, link index ON, Drafts limits, embed `frame_ancestors`. `masking_mode` is **not stated** (plan step 5, Basic tier). The edition default holds (`EditionMaskingDefault`): `typed` on any build where people sign in, `none` on Basic, where nobody can reveal and a masked graph would be unreadable.
+- **Tiers.** On Basic, the Advanced tier is inert, never an error. On a live Basic boot (2026-11-08), `la_index_build` built the index (`built (full)`) and `la_detect` ran with nothing to evaluate. The Space ignores `demo-users.toon` on Basic (demo sign-in is not in the build), and the template gallery accepts the template despite its roster, because `minEdition: basic` marks the roster as the inert Advanced tier (`SpaceManager.missingFeatures`, operator 2026-11-08). The Geo Views need the Geo map (Standard and above).
 - Saved views: `claims_network`, `claims_shared_identity`, `claims_provider_money`, `claims_parts_suppliers`, `claims_premium_payers`. Geo Views: `claims_accidents_map`, `claims_junction_cluster_map`, `claims_providers_map`.
 - Demo Users: `siu.analyst`, `siu.manager`, `partner.reviewer`, `outsider`, `admin`. `portal/partner-portal.html` is the embed host page.

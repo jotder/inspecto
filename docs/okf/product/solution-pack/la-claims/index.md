@@ -34,6 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SHOWCASE-CLAIMS-ADDITIONS-1` | P2 | feature | la-claims gains a Basic tier that loads on a Basic build | — |
 | `LA-SHOWCASE-EXISTING-BASIC-1` | P2 | feature | the existing showcases la-showcase, la-mobile-money, la-claims and la-audit get a Basic tier (minEdition: basic, anything Basic refuses m… | — |
 | `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | all three showcases are driven in the browser (2026-10-24, and the items left then on 2026-10-28 on the reorganized Studio); what is left… | — |

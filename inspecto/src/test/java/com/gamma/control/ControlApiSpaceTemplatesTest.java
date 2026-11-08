@@ -139,11 +139,45 @@ class ControlApiSpaceTemplatesTest {
     }
 
     /**
+     * Plan wave B step 5 (operator 2026-11-08, "allow on Basic"): with no Demo User sign-in installed, the SAME roster refuses a
+     * template whose {@code minEdition} is {@code advanced} (or unstated) and does not refuse one whose {@code minEdition} is
+     * {@code basic}, whose roster is its inert Advanced tier. Falsified: without the minEdition check the basic one is
+     * {@code creatable: false} naming {@code demo-auth}.
+     */
+    @Test
+    void aBasicTierTemplateKeepsItsDemoUserRosterAsAnInertAdvancedTier(@TempDir Path root) throws Exception {
+        seedTemplate(root);
+        Path starter = root.resolve("_templates").resolve("starter");
+        for (String edition : java.util.List.of("basic", "advanced")) {
+            Path tpl = root.resolve("_templates").resolve("tier-" + edition);
+            try (java.util.stream.Stream<Path> walk = Files.walk(starter)) {
+                for (Path p : walk.sorted().toList()) {
+                    Path t = tpl.resolve(starter.relativize(p).toString());
+                    if (Files.isDirectory(p)) Files.createDirectories(t);
+                    else Files.copy(p, t);
+                }
+            }
+            Files.writeString(tpl.resolve("template.toon"), Files.readString(tpl.resolve("template.toon")) + "minEdition: " + edition + "\n");
+            Files.writeString(tpl.resolve("config/demo-users.toon"), "users[0]:\n");
+        }
+        try (Ctx c = open(root)) {
+            JsonNode all = json(send(c.port, "GET", "/spaces/templates", null));
+            JsonNode basic = find(all, "tier-basic"), advanced = find(all, "tier-advanced");
+            assertTrue(basic.get("creatable").asBoolean(), basic.toString());
+            assertEquals(0, basic.get("missingFeatures").size(), basic.toString());
+            assertFalse(advanced.get("creatable").asBoolean(), advanced.toString());
+            assertEquals("demo-auth", advanced.get("missingFeatures").get(0).get("feature").asText(), advanced.toString());
+        }
+    }
+
+    /**
      * LA-SAMPLE-GALLERY-DEMOAUTH-1: a template whose people sign in as Demo Users ({@code config/demo-users.toon}) is NOT
      * creatable on a server without that sign-in (Basic, or OIDC, which cannot name its principals), naming
-     * {@code demo-auth}; the shipped {@code la-audit}, {@code la-claims} and {@code la-mobile-money} are such templates and
-     * {@code la-sample} is not. With an Authenticator that names its principals from a Space's config (Demo Auth) the same
-     * template is creatable. Falsified: without the roster check every one of them lists {@code creatable: true}.
+     * {@code demo-auth}; the shipped {@code la-audit} and {@code la-mobile-money} are such templates and {@code la-sample} is not.
+     * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
+     * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims}. With an
+     * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
+     * without the roster check every one of them lists {@code creatable: true}.
      */
     @Test
     void galleryCountsTheDemoUserSignInATemplateNeeds(@TempDir Path root) throws Exception {
@@ -165,11 +199,13 @@ class ControlApiSpaceTemplatesTest {
         try {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
-                    boolean needsDemo = !"la-sample".equals(t.get("id").asText());
+                    // la-sample has no roster; la-claims has a Basic tier, so its roster does not refuse it
+                    boolean needsDemo = !java.util.Set.of("la-sample", "la-claims").contains(t.get("id").asText());
                     boolean named = false;
                     for (JsonNode m : t.get("missingFeatures")) named |= "demo-auth".equals(m.get("feature").asText());
                     assertEquals(needsDemo, named, t.toString());
                     if (needsDemo) assertFalse(t.get("creatable").asBoolean(), t.toString());
+                    if ("la-claims".equals(t.get("id").asText())) assertTrue(t.get("creatable").asBoolean(), t.toString());
                 }
             }
             // OIDC: an Authenticator that cannot say who exists is not a Demo User sign-in

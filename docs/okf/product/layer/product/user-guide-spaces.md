@@ -34,11 +34,13 @@ each gallery entry carries `creatable` and `missingFeatures[{feature, message}]`
   one.
 - **Pipeline features:** a Pipeline's archive or DuckLake use, through `EditionFeatures.pipelineRefusals`.
 - **Demo User sign-in** (`demo-auth`, `LA-SAMPLE-GALLERY-DEMOAUTH-1`, 2026-10-23): a template carrying
-  `config/demo-users.toon` (the shipped `la-audit`, `la-claims`, `la-mobile-money`, `la-showcase`,
-  `la-showcase-off`) needs an installed Authenticator that names its principals from a Space's config - only Demo
+  `config/demo-users.toon` (the shipped `la-audit`, `la-mobile-money`, `la-showcase`, `la-showcase-off`) needs an installed Authenticator that names its principals from a Space's config - only Demo
   Auth does; Basic has none and OIDC cannot say who exists. ⚠ Unlike the two above this is the gallery's verdict
   only: `POST /spaces` does not refuse such a template, so the API still creates it (its Demo Users are then inert).
-  Pinned by `ControlApiSpaceTemplatesTest.galleryCountsTheDemoUserSignInATemplateNeeds`.
+  Pinned by `ControlApiSpaceTemplatesTest.galleryCountsTheDemoUserSignInATemplateNeeds`. **Exception (operator
+  2026-11-08):** a template whose `template.toon` says `minEdition: basic` (the shipped `la-claims`) has a Basic tier;
+  its roster is the inert Advanced tier and does not make it uncreatable
+  (`ControlApiSpaceTemplatesTest.aBasicTierTemplateKeepsItsDemoUserRosterAsAnInertAdvancedTier`).
 
 A template this build cannot create renders as an **`aria-disabled`** card that names the missing feature,
 so the gallery never offers a create that `POST /spaces` would refuse with a 422.

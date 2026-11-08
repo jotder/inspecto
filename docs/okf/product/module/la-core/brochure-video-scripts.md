@@ -54,9 +54,10 @@ Telecom, its banking stories under Banking and finance.
 | 3.9 | Enterprise | Internal audit · Insider threat | 60 s | Advanced | 1 of 2 segments (insider planned) |
 
 *Features shown* is the lowest edition that has every feature on screen. *Film on* is the install the video must be
-captured on: `la-mobile-money`, `la-claims`, `la-showcase` and `la-audit` are templates that need an Advanced install
-(`minEdition: advanced`) today, even where every feature shown is in Basic. The plan's wave B gives those four a Basic
-tier; when it lands, re-film or keep them on Advanced. The planned Spaces are specified with a Basic tier first.
+captured on: `la-mobile-money`, `la-showcase` and `la-audit` are templates that need an Advanced install
+(`minEdition: advanced`) today, even where every feature shown is in Basic. The plan's wave B gives those three a Basic
+tier; when it lands, re-film or keep them on Advanced. `la-claims` got its Basic tier on 2026-11-08: its saved views
+run on Basic with unmasked ids, while its Investigation, Reveal and Case segments still need an Advanced install. The planned Spaces are specified with a Basic tier first.
 
 ---
 
@@ -182,8 +183,9 @@ agency films from. Drafts are for internal review only: never published, never s
 | 6 | 7 · One graph for any data | A new Space from the two prepared files | After the files are generated and product's confirmations are in. |
 | 7 | 5 · It stays current | `la-police` and its staged month; the video 7 Space for shot 8 | Without shot 7. |
 
-**Drafted later.** Videos 1 and 4 and industry videos 3.1, 3.3 and 3.9 use templates that need an Advanced install
-today (`la-mobile-money`, `la-showcase`, `la-claims`, `la-audit`). They join the Basic round when the plan's wave B gives
+**Drafted later.** Videos 1 and 4 and industry videos 3.1 and 3.9 use templates that need an Advanced install
+today (`la-mobile-money`, `la-showcase`, `la-audit`; `la-claims` got its Basic tier on 2026-11-08, so 3.3 can join the
+Basic round). They join the Basic round when the plan's wave B gives
 those templates a Basic tier, or are drafted on an Advanced install, signed in as a user who can reveal identifiers.
 Video 6 shows Standard features and is drafted after casting, on a Standard or Advanced install. A planned Space's
 segment is drafted when its Space is built.
@@ -274,7 +276,7 @@ industry as a segment**. The agency builds one segment template and reuses it ev
 | Shape | **Opening** (the industry in one line, over its raw records) → **Map**, once per video (one of its Datasets at *Entities*) → **one segment per use case** → **Your data** → **edition close** → end card with the industry line. The length follows the number of segments. |
 | Segment | Three beats, roughly 12–15 s in all: **Raw** (that use case's file as it landed, the use-case label on screen, one blunt sentence), **Ask** (the Space's graph or saved view and the one analysis named), **Outcome** (the finding held at least 2 s, its ids and numbers on screen; the voice says the finding and the next step). |
 | Modular | Segments are filmed separately. A video whose Spaces are all built is filmed now; a planned Space's segment is filmed when the Space is built and cut in. Until then, publish the video with its built segments only, or hold it (the owner decides per industry). |
-| Film on | One install per video: an **Advanced** install if any of its segments needs one (`la-mobile-money`, `la-claims`, `la-showcase`, `la-audit` need one today), otherwise Basic. On Advanced, film as a user who can reveal identifiers. |
+| Film on | One install per video: an **Advanced** install if any of its segments needs one (`la-mobile-money`, `la-showcase`, `la-audit` need one today; `la-claims` only for its Investigation, Reveal and Case segments), otherwise Basic. On Advanced, film as a user who can reveal identifiers. |
 | Must show | Each reveal exactly as the Space's ground truth file lists it: the same entities, nothing added. |
 | Must not | Use real place, company or person names. Show a story's look-alike as suspicious. Present an outcome as a verdict. |
 | Before filming | Check each reveal against the Space's ground truth file. Pick each Raw beat's file and rows: the file the story was built from, ideally rows that hold the story's ids. For a planned Space, re-read its segment against the Space as built: ids and figures can move during the build. |
@@ -380,7 +382,7 @@ The opening, map and close are the same in every multi-segment video:
 | | |
 |---|---|
 | Audience | Special Investigations Units at insurers. |
-| Film on | Advanced install (`la-claims`). |
+| Film on | Basic install (`la-claims` has a Basic tier since 2026-11-08; ids show unmasked there). |
 | Ready | Now. When the planned `la-claims` additions land, a second segment (parts-supplier ring: one supplier on invoices from 9 garages, parts never fitted; look-alike a high-volume supplier whose parts are all fitted) adds about 13 s. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
