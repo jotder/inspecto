@@ -76,7 +76,7 @@ Telecom), with the same template id.
 
 | Use case | Template | Stories | Status |
 |---|---|---|---|
-| Provider billing fraud (payer) | `la-health` | Referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for admitted or deceased patients; pill mill; upcoding clinics under one owner | planned |
+| Provider billing fraud (payer) | `la-health` | Referral kickback ring to an imaging centre owned by a doctor's spouse; phantom billing for admitted or deceased patients; pill mill; upcoding clinics under one owner | exists |
 
 ### Logistics
 
@@ -755,6 +755,58 @@ with a score).
   — a specialist clinic whose patients really are more complex.
 
 **Alert Rule:** a service billed during an admission or after death.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-health-data.py` (seed 20261110; ground truth
+`tools/gen-la-health-data.ground-truth.json`), `tools/gen-la-health-data.test.mjs`, `HealthLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-health/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-health/`. Deliberate deviations:
+- **Feeds and columns:** two more feeds, `address` (street, city, lat, lon: members' homes, premises, owners' addresses) and
+  `owner` (owner_id, name, `owner_type` person or organisation, address_id), because some owners are organisations (hospital
+  trusts, two pharmacy groups, a laboratory company); so `provider_owner.owner_person_id` is `owner_id`. `provider` gains
+  `name` and has `address_id` for `address`; `admission.from` / `to` are `from_date` / `to_date` (SQL keywords);
+  `claim_line` gains `received_on` and `reverses` (a reversal is its own line with negative amounts, which is how the
+  look-alike's date errors are corrected); `referral` gains `referral_id`; `prescription` gains `prescription_id` and
+  `filled_on`, and `paid_cash` is `Y` / `N`. `level` is 1-5 on office visits (`OFV`) only. Procedure codes are invented
+  (`OFV`, `SPV`, `PHY`, `LAB`, `IMG-XR` / `IMG-CT` / `IMG-MR`, `INP`), not a real code set.
+- **Link kinds:** one row per pair, not per provider, member and month (that would break the one-row-per-pair rule and the
+  link budget). `treated` is provider → member with the evidence in `via` (`in_admission:`, `after_death:` open lines,
+  `corrected:` reversed ones, `corrected_within_days:`, `admitted_at:`, `died:`); a hospital stay is not a link (a hospital
+  node would join unrelated patients in the phantom view), it is read into `in_admission:`. `lives_at` is an owner who is a
+  person → home only; members' homes stay attributes (20 000 one-member links add nothing and would bust the budget). The
+  upcoding evidence rides on `owned_by` (`office_visits:`, `top_level_share:`, `all_providers_share:`,
+  `same_age_mix_share:` - the level-5 share expected from the patients' age bands, ages counted in 2026 -
+  `ratio_to_same_age_mix:`, `patients_80_plus:`). `prescribed` / `filled_at` carry `distance_km:` (haversine in the SQL
+  from the address positions) and the strong-opioid and cash counts.
+- **Views and the canvas cap:** one derived Job, `health_screen_links` (on `job.dataset.produced`), writes four screens with a
+  `screen` column (la-benefits style). `referral_concentration` keeps only each concentrated practice's top link (60 % or
+  more of 20 or more referrals): its other referrals go to the same city specialists the seaside practices use for
+  specialties, which would join the look-alike to the story. `health_links` also runs on `cron: "*/5 * * * *"`
+  (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000
+  nodes, the story whole and connected, and the look-alike on the canvas but in another component:
+  `health_referral_concentration` 22 rows, 23 nodes; `health_phantom_billing` 70 rows, 87 nodes; `health_pill_mill` 385
+  rows, 149 nodes; `health_upcoding` 8 rows, 12 nodes.
+- **Stories as built:** kickbacks: `PR-1426` Brackenmoor Surgery (68 of 79 referrals) and `PR-1392` Kilnworth Medical
+  Practice (182 of 216) to `PR-1170` Emberlea Imaging Centre, York; its owner `OW-0434` shares home `AD-05150` with
+  `OW-1270`, owner of `PR-1426`; look-alike `PR-0828` (38 of 44 to `PR-1129` Saltmere Bay Hospital, Scarborough's only
+  hospital, owned by the trust `OW-0263`), beside six more Scarborough practices (shares 0.68-0.86). Phantom billing:
+  `PR-1241` Sedgefold Physiotherapy, Hull, 89 open session lines for 28 patients in another hospital and 70 for 12
+  patients who died 2026-01..05; look-alike `PR-0632` Willowmere Physiotherapy, Leeds, 15 patients with one line each in a
+  stay, reversed in 2-6 days, plus 15 single corrected errors at other providers. Pill mill: `PR-1150` Flintcross Pain
+  Clinic, Sheffield, 70 patients 61-127 km away (York, Hull, Lincoln, Scarborough), 514 scripts averaging 135 tablets
+  (background median 56), 462 cash, at `PR-1060` and `PR-0594`; look-alike `PR-0031` Rowanbrook Oncology Centre, Leeds,
+  60 patients within 12 km, 5 cash scripts of 360. Upcoding: `PR-0173`, `PR-1117`, `PR-1251` (urgent care in Hull,
+  Lincoln, York) under `OW-0441`, level-5 share 24-29 % against 6-7 % expected (ratio 3.8-4.1); look-alike `PR-0277`
+  Aldermoor Elderly Care Clinic, Lincoln, 28 % against 25 % expected (ratio 1.14), patients all over 80. The upcoding
+  screen threshold is 1.75x all providers (not 2x) with 150 or more visits, so the three clinics clear it with margin
+  while no background practice does.
+- **Scale:** 20 000 members, 1 500 providers, 1 307 owners (1 585 ownership rows), about 81 000 landed claim lines (spec:
+  200 000; kept lower to hold the data near 10 MB and the links under 60 000), 2 796 landed stays (spec: 3 000), 14 408
+  landed referrals, 29 702 landed prescriptions. About 55 000 link rows; data 10 MB. The staged month adds lines, stays,
+  referrals and prescriptions only (no member, provider or owner re-extract), and nothing in it bills inside a stay or
+  after a death.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (the screens were recomputed over landed plus staged files outside the engine with DuckDB: stories and
+  look-alikes unchanged, `health_upcoding` gains a few elderly-care clinics).
 
 #### 10. `la-telco-ra` — telecom revenue assurance
 

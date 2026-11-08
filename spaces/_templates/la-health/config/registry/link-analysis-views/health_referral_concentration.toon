@@ -1,0 +1,23 @@
+name: health_referral_concentration
+description: "Referral concentration - every practice that sends 60 % or more of its referrals to one provider (via on referred_to = referrals, share), the owners of both ends and any home two of those owners share. Most are the practices of a seaside town whose only hospital is nearby. Two city practices send 85 % to one imaging centre, and its owner shares a home with the owner of one of them."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: health_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","referral_concentration"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

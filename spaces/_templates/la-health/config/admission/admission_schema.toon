@@ -1,0 +1,28 @@
+raw:
+  name: ADMISSION
+  format: CSV
+  fields[5]{name,selector,type}:
+    admission_id,"0",VARCHAR
+    member_id,"1",VARCHAR
+    hospital_id,"2",VARCHAR
+    from_date,"3",DATE
+    to_date,"4",DATE
+mapping:
+  canonicalName: admission
+  rawName: ADMISSION
+  fields[5]:
+    - name: admission_id
+      from: admission_id
+      fn: keep
+    - name: member_id
+      from: member_id
+      fn: keep
+    - name: hospital_id
+      from: hospital_id
+      fn: keep
+    - name: from_date
+      from: from_date
+      fn: keep
+    - name: to_date
+      from: to_date
+      fn: keep

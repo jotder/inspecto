@@ -1,0 +1,28 @@
+raw:
+  name: PROVIDER
+  format: CSV
+  fields[5]{name,selector,type}:
+    provider_id,"0",VARCHAR
+    name,"1",VARCHAR
+    specialty,"2",VARCHAR
+    address_id,"3",VARCHAR
+    bank_account,"4",VARCHAR
+mapping:
+  canonicalName: provider
+  rawName: PROVIDER
+  fields[5]:
+    - name: provider_id
+      from: provider_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: specialty
+      from: specialty
+      fn: keep
+    - name: address_id
+      from: address_id
+      fn: keep
+    - name: bank_account
+      from: bank_account
+      fn: keep

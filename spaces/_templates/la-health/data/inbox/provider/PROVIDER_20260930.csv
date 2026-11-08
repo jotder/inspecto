@@ -1,0 +1,1501 @@
+provider_id,name,specialty,address_id,bank_account
+PR-0001,Larch Lane Counselling Service,Counselling,AD-07628,SYN-47367917
+PR-0002,Kiln Square Counselling Service,Counselling,AD-00824,SYN-10296368
+PR-0003,Ember Court Medical Practice,General practice,AD-10939,SYN-90395034
+PR-0004,Bracken Square Physiotherapy,Physiotherapy,AD-05790,SYN-23781176
+PR-0005,Amber Gate Imaging Centre,Imaging,AD-03577,SYN-82400636
+PR-0006,Iron Row Medical Practice,General practice,AD-02278,SYN-31929384
+PR-0007,Vetch Hill Chemist,Pharmacy,AD-12801,SYN-27209589
+PR-0008,Mill Grove Walk-in Clinic,Urgent care,AD-04302,SYN-89740264
+PR-0009,Brook Park Pharmacy,Pharmacy,AD-00633,SYN-68769928
+PR-0010,Pippin Green Foot Clinic,Podiatry,AD-10696,SYN-23450376
+PR-0011,Ember Road Walk-in Clinic,Urgent care,AD-07899,SYN-70303601
+PR-0012,Quarry Road Health Centre,General practice,AD-04221,SYN-97202848
+PR-0013,Chalk Park Medical Clinic,Internal medicine,AD-05674,SYN-73251791
+PR-0014,Dove Park Counselling Service,Counselling,AD-12608,SYN-23025007
+PR-0015,Vetch Mews Foot Clinic,Podiatry,AD-04781,SYN-14602463
+PR-0016,Brook Court Chemist,Pharmacy,AD-01161,SYN-83782606
+PR-0017,Mill Gate Eye Clinic,Ophthalmology,AD-00630,SYN-10001014
+PR-0018,Brook Grove Heart Clinic,Cardiology,AD-10050,SYN-65911504
+PR-0019,Willow Park Heart Clinic,Cardiology,AD-02238,SYN-17625578
+PR-0020,Yew Court Pharmacy,Pharmacy,AD-01464,SYN-43746914
+PR-0021,Bracken Row Eye Clinic,Ophthalmology,AD-02887,SYN-57763564
+PR-0022,Quarry Court Orthopaedic Clinic,Orthopaedics,AD-04726,SYN-75390069
+PR-0023,Flint Square Heart Clinic,Cardiology,AD-03695,SYN-78904370
+PR-0024,Pippin Mews Surgery,General practice,AD-03686,SYN-20073193
+PR-0025,Lark Court Chemist,Pharmacy,AD-04265,SYN-81010461
+PR-0026,Bracken Hill Health Centre,General practice,AD-07316,SYN-99724003
+PR-0027,Vetch Green Walk-in Clinic,Urgent care,AD-02522,SYN-36423999
+PR-0028,Gorse Green Surgery,General practice,AD-06482,SYN-51714291
+PR-0029,Plover House Physiotherapy,Physiotherapy,AD-00274,SYN-12579386
+PR-0030,Sorrel Row Health Centre,General practice,AD-07036,SYN-12392742
+PR-0031,Rowanbrook Oncology Centre,Oncology,AD-05158,SYN-61293939
+PR-0032,Iron Lane Orthopaedic Clinic,Orthopaedics,AD-04850,SYN-80927401
+PR-0033,Dunnock Green Foot Clinic,Podiatry,AD-08669,SYN-46749633
+PR-0034,Wagtail House Pharmacy,Pharmacy,AD-00421,SYN-19192892
+PR-0035,Rush Gate Health Centre,General practice,AD-06042,SYN-22917959
+PR-0036,Amber Bank Physiotherapy,Physiotherapy,AD-07211,SYN-80683556
+PR-0037,Willow Lane Foot Clinic,Podiatry,AD-06776,SYN-95247637
+PR-0038,Lark Park Health Centre,General practice,AD-00728,SYN-44776334
+PR-0039,Plover Green Surgery,General practice,AD-12017,SYN-87388463
+PR-0040,Flint Row Pharmacy,Pharmacy,AD-07753,SYN-22388833
+PR-0041,Quarry Road Medical Practice,General practice,AD-03057,SYN-68977403
+PR-0042,Vetch Green Chemist,Pharmacy,AD-10569,SYN-93571474
+PR-0043,Rush Mews Pharmacy,Pharmacy,AD-05979,SYN-19512625
+PR-0044,Lark Green Surgery,General practice,AD-04874,SYN-89264841
+PR-0045,Elder Lane Health Centre,General practice,AD-09536,SYN-70275961
+PR-0046,Sedge Green Health Centre,General practice,AD-08733,SYN-48386672
+PR-0047,Pippin Field Pharmacy,Pharmacy,AD-01797,
+PR-0048,Flint Green Physiotherapy,Physiotherapy,AD-06407,SYN-46582779
+PR-0049,Dunnock Mews Skin Clinic,Dermatology,AD-07575,SYN-27079519
+PR-0050,Teasel Road Foot Clinic,Podiatry,AD-08654,SYN-15415635
+PR-0051,Dunnock Row Foot Clinic,Podiatry,AD-01087,SYN-51711997
+PR-0052,Gorse House Foot Clinic,Podiatry,AD-09834,SYN-13790553
+PR-0053,Rowan Grove Medical Clinic,Internal medicine,AD-04299,SYN-47138126
+PR-0054,Hazel Road Surgery,General practice,AD-12515,SYN-13508666
+PR-0055,Teasel Lane Surgery,General practice,AD-03419,SYN-77942623
+PR-0056,Yew Gate Foot Clinic,Podiatry,AD-01365,SYN-51630344
+PR-0057,Rowan Row Heart Clinic,Cardiology,AD-04860,SYN-46970767
+PR-0058,Dove Park Physiotherapy,Physiotherapy,AD-11355,SYN-69609273
+PR-0059,Teasel Court Chemist,Pharmacy,AD-02523,SYN-15472202
+PR-0060,Nettle Row Elderly Care Clinic,Geriatric medicine,AD-12477,SYN-50690990
+PR-0061,Dunnock Lane Pharmacy,Pharmacy,AD-11242,SYN-72303760
+PR-0062,Chalk Road Medical Practice,General practice,AD-07400,SYN-82924422
+PR-0063,Moss Grove Eye Clinic,Ophthalmology,AD-02194,SYN-10758892
+PR-0064,Gorse Row Physiotherapy,Physiotherapy,AD-08320,SYN-96837606
+PR-0065,Moss Road Imaging Centre,Imaging,AD-06258,SYN-74282517
+PR-0066,Elder Hill Skin Clinic,Dermatology,AD-11996,SYN-64283017
+PR-0067,Teasel Mews Medical Practice,General practice,AD-01054,SYN-40041009
+PR-0068,Wagtail Gate Imaging Centre,Imaging,AD-11550,SYN-18762157
+PR-0069,Brook Gate Eye Clinic,Ophthalmology,AD-11938,SYN-11734132
+PR-0070,Willow Bank Foot Clinic,Podiatry,AD-03108,
+PR-0071,Nettle Field Skin Clinic,Dermatology,AD-10766,SYN-15124740
+PR-0072,Mill House Laboratory,Laboratory,AD-00221,SYN-58292297
+PR-0073,Willow Square Walk-in Clinic,Urgent care,AD-12764,SYN-26403805
+PR-0074,Plover Mews Medical Clinic,Internal medicine,AD-05103,SYN-26822077
+PR-0075,Elder Court Surgery,General practice,AD-01291,SYN-91375470
+PR-0076,Brook Gate Medical Clinic,Internal medicine,AD-08310,SYN-47528137
+PR-0077,Hazel Hill Physiotherapy,Physiotherapy,AD-04964,SYN-79979667
+PR-0078,Lark Gate Health Centre,General practice,AD-01677,SYN-39719836
+PR-0079,Hazel Park Eye Clinic,Ophthalmology,AD-05338,SYN-14784116
+PR-0080,Oak Gate Walk-in Clinic,Urgent care,AD-03055,SYN-95756577
+PR-0081,Larch Grove Health Centre,General practice,AD-09830,SYN-61773914
+PR-0082,Yew Hill Walk-in Clinic,Urgent care,AD-01877,SYN-88173378
+PR-0083,Elder Gate Pharmacy,Pharmacy,AD-03816,SYN-70735483
+PR-0084,Vetch Green Pharmacy,Pharmacy,AD-01656,SYN-55162909
+PR-0085,Teasel Green Surgery,General practice,AD-05455,SYN-65443188
+PR-0086,Nettle Green Eye Clinic,Ophthalmology,AD-01555,SYN-52205679
+PR-0087,Plover Mews Physiotherapy,Physiotherapy,AD-07238,SYN-88080016
+PR-0088,Kiln Square Imaging Centre,Imaging,AD-07698,SYN-16451255
+PR-0089,Alder Hill Medical Practice,General practice,AD-06475,SYN-92937390
+PR-0090,Wagtail Hill Health Centre,General practice,AD-00073,SYN-84533055
+PR-0091,Ember Row Surgery,General practice,AD-00171,SYN-44064770
+PR-0092,Vetch House Physiotherapy,Physiotherapy,AD-01127,SYN-63228681
+PR-0093,Elder Field Orthopaedic Clinic,Orthopaedics,AD-02809,SYN-76089330
+PR-0094,Ember Gate Physiotherapy,Physiotherapy,AD-10253,SYN-83018101
+PR-0095,Teasel Row Chemist,Pharmacy,AD-05256,SYN-65322352
+PR-0096,Plover Hill Health Centre,General practice,AD-11327,SYN-93832511
+PR-0097,Plover Gate Oncology Centre,Oncology,AD-03718,
+PR-0098,Bracken Mews Psychiatry Practice,Psychiatry,AD-11844,SYN-78252401
+PR-0099,Yew Road Skin Clinic,Dermatology,AD-06102,SYN-65529411
+PR-0100,Oak Mews Pharmacy,Pharmacy,AD-09138,SYN-81495968
+PR-0101,Quarry Green Pharmacy,Pharmacy,AD-03566,SYN-54382967
+PR-0102,Sedge Bank Foot Clinic,Podiatry,AD-01530,SYN-31676930
+PR-0103,Quarry Park Physiotherapy,Physiotherapy,AD-11472,SYN-64887592
+PR-0104,Rush Grove Psychiatry Practice,Psychiatry,AD-07498,SYN-18350852
+PR-0105,Teasel Court Medical Practice,General practice,AD-05612,SYN-49081160
+PR-0106,Elder House Hospital,Hospital,AD-11361,SYN-39242692
+PR-0107,Sorrel Row Pharmacy,Pharmacy,AD-10221,SYN-64758412
+PR-0108,Dove Row Chemist,Pharmacy,AD-07508,
+PR-0109,Quarry Square Pharmacy,Pharmacy,AD-12818,SYN-74423199
+PR-0110,Larch Field Medical Practice,General practice,AD-08212,SYN-92351471
+PR-0111,Rowan Park Foot Clinic,Podiatry,AD-06136,SYN-36409165
+PR-0112,Cobble Court Pharmacy,Pharmacy,AD-04346,SYN-56715056
+PR-0113,Lark Park Physiotherapy,Physiotherapy,AD-08529,SYN-81856018
+PR-0114,Brook Gate Heart Clinic,Cardiology,AD-00778,SYN-15332273
+PR-0115,Kiln Grove Imaging Centre,Imaging,AD-12059,SYN-34015564
+PR-0116,Amber Mews Medical Practice,General practice,AD-09202,SYN-60302341
+PR-0117,Dove Mews Medical Practice,General practice,AD-01252,SYN-87413637
+PR-0118,Alder Row Eye Clinic,Ophthalmology,AD-05768,SYN-96350843
+PR-0119,Cobble Row Pain Clinic,Pain medicine,AD-03308,SYN-97634551
+PR-0120,Hazel Lane Skin Clinic,Dermatology,AD-10198,SYN-13757734
+PR-0121,Dove Gate Hospital,Hospital,AD-05858,SYN-27166550
+PR-0122,Alder Court Imaging Centre,Imaging,AD-08402,SYN-16335722
+PR-0123,Gorse Bank Elderly Care Clinic,Geriatric medicine,AD-12275,SYN-11280863
+PR-0124,Gorse Hill Psychiatry Practice,Psychiatry,AD-12375,SYN-25495003
+PR-0125,Pippin Gate Imaging Centre,Imaging,AD-03338,
+PR-0126,Amber Park Surgery,General practice,AD-11496,SYN-40078228
+PR-0127,Larch Row Foot Clinic,Podiatry,AD-04255,
+PR-0128,Wagtail Grove Foot Clinic,Podiatry,AD-10258,SYN-55277870
+PR-0129,Cobble Road Medical Practice,General practice,AD-10307,SYN-71957758
+PR-0130,Vetch Court Oncology Centre,Oncology,AD-01765,SYN-70710689
+PR-0131,Sorrel Field Medical Practice,General practice,AD-03847,SYN-16865577
+PR-0132,Iron Grove Surgery,General practice,AD-06703,SYN-18067007
+PR-0133,Elder Field Chemist,Pharmacy,AD-03890,SYN-59641531
+PR-0134,Amber Row Walk-in Clinic,Urgent care,AD-04029,SYN-26187502
+PR-0135,Quarry Park Health Centre,General practice,AD-09100,SYN-36790738
+PR-0136,Kiln Field Medical Clinic,Internal medicine,AD-05208,SYN-62785204
+PR-0137,Flint Square Pharmacy,Pharmacy,AD-07683,SYN-58645764
+PR-0138,Plover Hill Medical Clinic,Internal medicine,AD-03640,SYN-45928780
+PR-0139,Elder Road Counselling Service,Counselling,AD-04402,SYN-74598683
+PR-0140,Lark Row Eye Clinic,Ophthalmology,AD-12733,SYN-94917622
+PR-0141,Pippin Gate Laboratory,Laboratory,AD-09500,SYN-93794638
+PR-0142,Hazel Road Medical Practice,General practice,AD-05971,SYN-89884356
+PR-0143,Thrush Field Chemist,Pharmacy,AD-01583,SYN-56235547
+PR-0144,Oak Hill Counselling Service,Counselling,AD-00618,SYN-16769312
+PR-0145,Nettle Field Walk-in Clinic,Urgent care,AD-12610,SYN-66019467
+PR-0146,Nettle Green Health Centre,General practice,AD-05682,SYN-43626165
+PR-0147,Amber Bank Heart Clinic,Cardiology,AD-10481,SYN-25045391
+PR-0148,Chalk House Counselling Service,Counselling,AD-02568,SYN-52106297
+PR-0149,Rowan Gate Counselling Service,Counselling,AD-02962,SYN-78092862
+PR-0150,Dunnock Grove Medical Practice,General practice,AD-09720,SYN-58552847
+PR-0151,Brook Hill Foot Clinic,Podiatry,AD-03621,SYN-19354783
+PR-0152,Yew Hill Skin Clinic,Dermatology,AD-04501,SYN-98843323
+PR-0153,Brook Court Health Centre,General practice,AD-05166,SYN-46620290
+PR-0154,Lark Road Surgery,General practice,AD-06287,SYN-43528656
+PR-0155,Larch Square Skin Clinic,Dermatology,AD-05931,SYN-51407958
+PR-0156,Plover Field Eye Clinic,Ophthalmology,AD-03711,SYN-20319379
+PR-0157,Sedge Hill Physiotherapy,Physiotherapy,AD-08809,SYN-36246852
+PR-0158,Pippin House Foot Clinic,Podiatry,AD-08133,SYN-25191613
+PR-0159,Jasper Court Heart Clinic,Cardiology,AD-07472,SYN-94737511
+PR-0160,Hazel Hill Counselling Service,Counselling,AD-11774,SYN-73259474
+PR-0161,Nettle Bank Physiotherapy,Physiotherapy,AD-06259,SYN-67443206
+PR-0162,Hazel Park Orthopaedic Clinic,Orthopaedics,AD-08509,SYN-83843809
+PR-0163,Pippin Grove Medical Practice,General practice,AD-11364,SYN-39240125
+PR-0164,Sorrel Square Walk-in Clinic,Urgent care,AD-06913,SYN-17931738
+PR-0165,Rush Field Laboratory,Laboratory,AD-10234,SYN-91912879
+PR-0166,Mill House Chemist,Pharmacy,AD-05060,SYN-55313448
+PR-0167,Lark Hill Foot Clinic,Podiatry,AD-09596,SYN-32236207
+PR-0168,Alder Field Chemist,Pharmacy,AD-03647,SYN-37436634
+PR-0169,Teasel Field Chemist,Pharmacy,AD-05151,SYN-76139650
+PR-0170,Kiln Square Heart Clinic,Cardiology,AD-12600,SYN-98548393
+PR-0171,Pippin House Pharmacy,Pharmacy,AD-07171,SYN-81323332
+PR-0172,Ember Hill Medical Clinic,Internal medicine,AD-05511,
+PR-0173,Lark Field Walk-in Clinic,Urgent care,AD-12348,SYN-47793832
+PR-0174,Oak Park Counselling Service,Counselling,AD-03766,SYN-63497013
+PR-0175,Rush Court Pain Clinic,Pain medicine,AD-09860,SYN-78702153
+PR-0176,Rowan Mews Psychiatry Practice,Psychiatry,AD-05552,SYN-18767468
+PR-0177,Alder Park Psychiatry Practice,Psychiatry,AD-02790,SYN-26103791
+PR-0178,Willow Green Chemist,Pharmacy,AD-01791,SYN-13644076
+PR-0179,Gorse House Counselling Service,Counselling,AD-09185,SYN-11634596
+PR-0180,Sedge Field Medical Practice,General practice,AD-08168,SYN-99059931
+PR-0181,Chalk Hill Health Centre,General practice,AD-01361,SYN-27464477
+PR-0182,Hazel Mews Skin Clinic,Dermatology,AD-08903,SYN-27323068
+PR-0183,Vetch House Medical Practice,General practice,AD-07109,SYN-98712254
+PR-0184,Lark Bank Medical Clinic,Internal medicine,AD-04733,SYN-47728352
+PR-0185,Dove Hill Psychiatry Practice,Psychiatry,AD-00509,SYN-67770897
+PR-0186,Chalk Court Surgery,General practice,AD-07977,SYN-36179408
+PR-0187,Gorse Mews Counselling Service,Counselling,AD-05135,SYN-13496961
+PR-0188,Bracken Hill Eye Clinic,Ophthalmology,AD-08479,SYN-80353224
+PR-0189,Hazel Mews Physiotherapy,Physiotherapy,AD-05193,SYN-65416547
+PR-0190,Mill Green Medical Clinic,Internal medicine,AD-01922,SYN-85379141
+PR-0191,Chalk Hill Physiotherapy,Physiotherapy,AD-04744,SYN-80490102
+PR-0192,Thrush Court Medical Clinic,Internal medicine,AD-07278,SYN-81574223
+PR-0193,Brook Road Chemist,Pharmacy,AD-02329,
+PR-0194,Chalk Park Chemist,Pharmacy,AD-12026,SYN-96365543
+PR-0195,Sorrel Row Foot Clinic,Podiatry,AD-05084,SYN-43261800
+PR-0196,Moss Road Pharmacy,Pharmacy,AD-07649,SYN-56249874
+PR-0197,Dove Grove Chemist,Pharmacy,AD-03588,SYN-67098388
+PR-0198,Cobble House Psychiatry Practice,Psychiatry,AD-09094,SYN-81235719
+PR-0199,Dove Hill Hospital,Hospital,AD-01401,SYN-43731728
+PR-0200,Hazel Row Skin Clinic,Dermatology,AD-08655,SYN-82085328
+PR-0201,Yew Hill Medical Practice,General practice,AD-01886,SYN-87091884
+PR-0202,Cobble Lane Orthopaedic Clinic,Orthopaedics,AD-12229,SYN-63792017
+PR-0203,Brook Road Physiotherapy,Physiotherapy,AD-12300,SYN-63203129
+PR-0204,Dunnock Bank Chemist,Pharmacy,AD-08374,SYN-83856127
+PR-0205,Ember Mews Medical Practice,General practice,AD-09224,SYN-70916527
+PR-0206,Mill Square Surgery,General practice,AD-07514,SYN-82904817
+PR-0207,Sedge Green Orthopaedic Clinic,Orthopaedics,AD-09024,SYN-33839447
+PR-0208,Pippin Park Pain Clinic,Pain medicine,AD-04468,SYN-54543830
+PR-0209,Thrush Grove Imaging Centre,Imaging,AD-10366,SYN-92282437
+PR-0210,Vetch Bank Orthopaedic Clinic,Orthopaedics,AD-03522,SYN-23483486
+PR-0211,Dunnock House Pain Clinic,Pain medicine,AD-01255,SYN-37873232
+PR-0212,Amber House Laboratory,Laboratory,AD-02494,SYN-21603477
+PR-0213,Dunnock Park Walk-in Clinic,Urgent care,AD-01489,SYN-43312832
+PR-0214,Fern Grove Chemist,Pharmacy,AD-02559,SYN-85609250
+PR-0215,Willow Park Chemist,Pharmacy,AD-05488,SYN-74439839
+PR-0216,Nettle Square Pharmacy,Pharmacy,AD-02112,SYN-30613326
+PR-0217,Wagtail Field Imaging Centre,Imaging,AD-09065,SYN-46451521
+PR-0218,Larch Hill Health Centre,General practice,AD-10812,SYN-78692982
+PR-0219,Teasel Court Psychiatry Practice,Psychiatry,AD-11772,SYN-31952693
+PR-0220,Sorrel Bank Medical Clinic,Internal medicine,AD-04766,SYN-70005412
+PR-0221,Pippin House Counselling Service,Counselling,AD-11039,SYN-26479454
+PR-0222,Jasper Grove Chemist,Pharmacy,AD-06134,SYN-53245934
+PR-0223,Yew Mews Medical Practice,General practice,AD-03624,
+PR-0224,Willow Square Medical Practice,General practice,AD-10892,SYN-36992251
+PR-0225,Gorse Lane Health Centre,General practice,AD-00487,SYN-97153281
+PR-0226,Yew Lane Chemist,Pharmacy,AD-03326,SYN-43060969
+PR-0227,Elder Mews Medical Clinic,Internal medicine,AD-02370,SYN-42235480
+PR-0228,Flint Square Physiotherapy,Physiotherapy,AD-10283,SYN-19781588
+PR-0229,Hazel Green Heart Clinic,Cardiology,AD-11894,SYN-28561720
+PR-0230,Lark Gate Surgery,General practice,AD-11723,SYN-91394523
+PR-0231,Fern Grove Imaging Centre,Imaging,AD-12498,SYN-85754770
+PR-0232,Mill Court Surgery,General practice,AD-06368,SYN-28127302
+PR-0233,Moss Court Chemist,Pharmacy,AD-03269,SYN-64783355
+PR-0234,Sorrel Grove Physiotherapy,Physiotherapy,AD-05099,SYN-68965800
+PR-0235,Gorse Park Physiotherapy,Physiotherapy,AD-06711,SYN-94085409
+PR-0236,Dunnock Square Counselling Service,Counselling,AD-12163,SYN-28107962
+PR-0237,Wagtail Square Chemist,Pharmacy,AD-01520,SYN-59798387
+PR-0238,Gorse Park Skin Clinic,Dermatology,AD-07512,SYN-52633739
+PR-0239,Wagtail Road Foot Clinic,Podiatry,AD-02745,SYN-35107552
+PR-0240,Larch Mews Pharmacy,Pharmacy,AD-02173,SYN-24447890
+PR-0241,Pippin Gate Surgery,General practice,AD-01417,SYN-90490185
+PR-0242,Hazel Row Counselling Service,Counselling,AD-04062,SYN-88098780
+PR-0243,Elder Bank Pharmacy,Pharmacy,AD-09322,SYN-82960113
+PR-0244,Amber Field Physiotherapy,Physiotherapy,AD-01292,SYN-44493518
+PR-0245,Sedge Lane Skin Clinic,Dermatology,AD-05307,SYN-24498854
+PR-0246,Amber Park Pharmacy,Pharmacy,AD-10184,SYN-34381382
+PR-0247,Larch Mews Skin Clinic,Dermatology,AD-01557,SYN-48092893
+PR-0248,Teasel House Orthopaedic Clinic,Orthopaedics,AD-12716,SYN-79601311
+PR-0249,Thrush Park Pharmacy,Pharmacy,AD-07687,SYN-53061618
+PR-0250,Yew Green Oncology Centre,Oncology,AD-09526,SYN-90557768
+PR-0251,Larch Grove Surgery,General practice,AD-02241,SYN-21872242
+PR-0252,Willow Mews Foot Clinic,Podiatry,AD-04026,SYN-55494172
+PR-0253,Dove Field Chemist,Pharmacy,AD-08667,SYN-11607454
+PR-0254,Jasper Bank Medical Clinic,Internal medicine,AD-09800,SYN-91326932
+PR-0255,Alder Road Pharmacy,Pharmacy,AD-00419,SYN-21095484
+PR-0256,Sorrel Lane Pharmacy,Pharmacy,AD-11056,SYN-37828033
+PR-0257,Jasper Gate Imaging Centre,Imaging,AD-04938,SYN-79811510
+PR-0258,Plover Lane Skin Clinic,Dermatology,AD-02869,SYN-24037107
+PR-0259,Thrush Square Medical Clinic,Internal medicine,AD-12695,SYN-68897409
+PR-0260,Quarry Lane Health Centre,General practice,AD-02978,SYN-48375513
+PR-0261,Quarry Gate Chemist,Pharmacy,AD-10353,SYN-84167977
+PR-0262,Wagtail Court Medical Clinic,Internal medicine,AD-00664,SYN-81927476
+PR-0263,Iron Bank Medical Clinic,Internal medicine,AD-07043,SYN-65611005
+PR-0264,Moss Field Surgery,General practice,AD-10996,SYN-11410005
+PR-0265,Elder Grove Counselling Service,Counselling,AD-07145,SYN-74572764
+PR-0266,Sorrel Grove Orthopaedic Clinic,Orthopaedics,AD-07989,SYN-27432924
+PR-0267,Cobble Square Medical Clinic,Internal medicine,AD-00988,SYN-70117849
+PR-0268,Sedge Green Chemist,Pharmacy,AD-00985,SYN-88710748
+PR-0269,Jasper Field Pharmacy,Pharmacy,AD-07971,SYN-47055940
+PR-0270,Bracken Lane Medical Clinic,Internal medicine,AD-12738,SYN-12304049
+PR-0271,Elder Lane Eye Clinic,Ophthalmology,AD-08847,SYN-42845433
+PR-0272,Flint Mews Medical Practice,General practice,AD-05588,SYN-86425418
+PR-0273,Sedge Row Chemist,Pharmacy,AD-12641,SYN-96058010
+PR-0274,Quarry Hill Physiotherapy,Physiotherapy,AD-12830,SYN-28510512
+PR-0275,Dunnock Park Pharmacy,Pharmacy,AD-01853,SYN-56491008
+PR-0276,Pippin Hill Surgery,General practice,AD-10977,SYN-19481152
+PR-0277,Aldermoor Elderly Care Clinic,Geriatric medicine,AD-08788,SYN-16296720
+PR-0278,Sorrel Gate Imaging Centre,Imaging,AD-02372,SYN-87813300
+PR-0279,Iron Court Medical Clinic,Internal medicine,AD-11219,SYN-28007453
+PR-0280,Oak Row Counselling Service,Counselling,AD-07985,SYN-44100329
+PR-0281,Brook Bank Health Centre,General practice,AD-11417,SYN-16115917
+PR-0282,Iron House Medical Clinic,Internal medicine,AD-10096,SYN-87635695
+PR-0283,Amber Road Physiotherapy,Physiotherapy,AD-09101,SYN-46849715
+PR-0284,Ember Bank Oncology Centre,Oncology,AD-05533,SYN-98232219
+PR-0285,Thrush House Chemist,Pharmacy,AD-09907,SYN-29425047
+PR-0286,Yew Bank Counselling Service,Counselling,AD-11354,SYN-44553873
+PR-0287,Nettle Park Laboratory,Laboratory,AD-00980,SYN-18603833
+PR-0288,Bracken Road Medical Practice,General practice,AD-07772,SYN-97532202
+PR-0289,Dove Road Psychiatry Practice,Psychiatry,AD-06984,SYN-83168866
+PR-0290,Thrush Grove Counselling Service,Counselling,AD-09450,SYN-41470689
+PR-0291,Chalk Bank Health Centre,General practice,AD-09044,SYN-99662656
+PR-0292,Yew Mews Hospital,Hospital,AD-09517,SYN-10548582
+PR-0293,Cobble Lane Medical Clinic,Internal medicine,AD-02912,SYN-42438234
+PR-0294,Bracken Grove Laboratory,Laboratory,AD-01222,SYN-77088167
+PR-0295,Amber Hill Pharmacy,Pharmacy,AD-09549,SYN-59593954
+PR-0296,Thrush Grove Surgery,General practice,AD-10594,SYN-28038824
+PR-0297,Ember Green Health Centre,General practice,AD-11627,SYN-36036288
+PR-0298,Amber Gate Chemist,Pharmacy,AD-10951,SYN-48294060
+PR-0299,Fern House Chemist,Pharmacy,AD-00683,SYN-83790731
+PR-0300,Hazel Grove Medical Clinic,Internal medicine,AD-12254,SYN-92033780
+PR-0301,Willow Square Surgery,General practice,AD-06139,SYN-51886524
+PR-0302,Hazel House Laboratory,Laboratory,AD-02965,SYN-35352185
+PR-0303,Plover Grove Laboratory,Laboratory,AD-01373,SYN-11550790
+PR-0304,Teasel Lane Medical Clinic,Internal medicine,AD-01693,SYN-26100885
+PR-0305,Larch Park Chemist,Pharmacy,AD-03217,SYN-81784478
+PR-0306,Amber Court Medical Practice,General practice,AD-04849,SYN-23247926
+PR-0307,Amber Hill Foot Clinic,Podiatry,AD-03254,SYN-32044674
+PR-0308,Oak House Pharmacy,Pharmacy,AD-00923,SYN-14384545
+PR-0309,Jasper Field Eye Clinic,Ophthalmology,AD-09706,SYN-80519160
+PR-0310,Rush Court Chemist,Pharmacy,AD-05436,SYN-32503951
+PR-0311,Sedge Bank Walk-in Clinic,Urgent care,AD-11797,SYN-99189437
+PR-0312,Pippin Row Surgery,General practice,AD-10942,SYN-86990362
+PR-0313,Rush Bank Orthopaedic Clinic,Orthopaedics,AD-01082,SYN-22160669
+PR-0314,Dove Gate Imaging Centre,Imaging,AD-08548,SYN-87895641
+PR-0315,Chalk Green Chemist,Pharmacy,AD-08642,SYN-99238789
+PR-0316,Bracken Road Walk-in Clinic,Urgent care,AD-05364,SYN-91699480
+PR-0317,Rush Road Medical Practice,General practice,AD-02970,SYN-73542835
+PR-0318,Fern Court Heart Clinic,Cardiology,AD-04998,
+PR-0319,Hazel Mews Health Centre,General practice,AD-07279,SYN-96934673
+PR-0320,Moss Field Skin Clinic,Dermatology,AD-00232,SYN-68699713
+PR-0321,Rush Park Health Centre,General practice,AD-02164,SYN-41086547
+PR-0322,Thrush Park Psychiatry Practice,Psychiatry,AD-00367,
+PR-0323,Amber Mews Imaging Centre,Imaging,AD-02393,SYN-42709222
+PR-0324,Sorrel Grove Pharmacy,Pharmacy,AD-12528,SYN-62293014
+PR-0325,Wagtail Lane Health Centre,General practice,AD-03278,SYN-19857899
+PR-0326,Alder Gate Health Centre,General practice,AD-12013,SYN-89522829
+PR-0327,Gorse Mews Pharmacy,Pharmacy,AD-05754,SYN-28957768
+PR-0328,Bracken Bank Walk-in Clinic,Urgent care,AD-06533,SYN-64432067
+PR-0329,Teasel Green Heart Clinic,Cardiology,AD-05192,SYN-93836900
+PR-0330,Wagtail Park Pharmacy,Pharmacy,AD-08706,SYN-40208304
+PR-0331,Gorse Bank Pharmacy,Pharmacy,AD-05917,SYN-52747035
+PR-0332,Thrush Mews Imaging Centre,Imaging,AD-07195,SYN-62045964
+PR-0333,Dunnock Row Health Centre,General practice,AD-06820,SYN-20655471
+PR-0334,Mill House Physiotherapy,Physiotherapy,AD-05756,SYN-11609121
+PR-0335,Cobble House Elderly Care Clinic,Geriatric medicine,AD-06453,SYN-59890876
+PR-0336,Sedge House Orthopaedic Clinic,Orthopaedics,AD-08194,SYN-61552082
+PR-0337,Yew Court Medical Clinic,Internal medicine,AD-05475,SYN-19324924
+PR-0338,Alder Field Medical Practice,General practice,AD-03743,SYN-88376936
+PR-0339,Lark Grove Medical Practice,General practice,AD-00128,SYN-18730780
+PR-0340,Kiln Court Physiotherapy,Physiotherapy,AD-03877,SYN-16142852
+PR-0341,Chalk Field Physiotherapy,Physiotherapy,AD-02029,SYN-30192249
+PR-0342,Brook Field Medical Practice,General practice,AD-04325,SYN-78092206
+PR-0343,Oak Square Laboratory,Laboratory,AD-00220,SYN-92568205
+PR-0344,Sedge Road Physiotherapy,Physiotherapy,AD-08748,SYN-47254248
+PR-0345,Dunnock Green Medical Practice,General practice,AD-08931,SYN-37251669
+PR-0346,Teasel Grove Physiotherapy,Physiotherapy,AD-02590,SYN-96488802
+PR-0347,Dunnock Gate Surgery,General practice,AD-09233,SYN-41673276
+PR-0348,Ember Square Pharmacy,Pharmacy,AD-08973,SYN-60356485
+PR-0349,Pippin Mews Medical Practice,General practice,AD-08249,SYN-85747230
+PR-0350,Brook Grove Counselling Service,Counselling,AD-00574,SYN-36339974
+PR-0351,Brook Grove Medical Practice,General practice,AD-12040,SYN-12400799
+PR-0352,Dove Grove Counselling Service,Counselling,AD-06343,SYN-32488852
+PR-0353,Ember Square Imaging Centre,Imaging,AD-10886,SYN-37264695
+PR-0354,Willow Lane Pain Clinic,Pain medicine,AD-11643,SYN-62233246
+PR-0355,Dunnock Hill Orthopaedic Clinic,Orthopaedics,AD-09973,SYN-30394430
+PR-0356,Flint Green Eye Clinic,Ophthalmology,AD-02392,SYN-27796402
+PR-0357,Plover House Pharmacy,Pharmacy,AD-02275,SYN-61114917
+PR-0358,Thrush Road Medical Practice,General practice,AD-10775,SYN-16530481
+PR-0359,Yew Field Oncology Centre,Oncology,AD-08786,SYN-78584573
+PR-0360,Rowan Gate Health Centre,General practice,AD-11728,SYN-95179749
+PR-0361,Sedge Row Medical Practice,General practice,AD-03082,SYN-31747051
+PR-0362,Rowan Gate Pharmacy,Pharmacy,AD-08265,SYN-93172814
+PR-0363,Rush Bank Physiotherapy,Physiotherapy,AD-05412,SYN-30900822
+PR-0364,Cobble Gate Physiotherapy,Physiotherapy,AD-03759,SYN-75163903
+PR-0365,Fern Hill Physiotherapy,Physiotherapy,AD-11722,SYN-17759929
+PR-0366,Flint Square Medical Practice,General practice,AD-02873,SYN-78498419
+PR-0367,Brook Road Pharmacy,Pharmacy,AD-10351,SYN-36617015
+PR-0368,Sedge Mews Physiotherapy,Physiotherapy,AD-05915,SYN-12591314
+PR-0369,Dunnock Row Oncology Centre,Oncology,AD-01553,
+PR-0370,Gorse Lane Counselling Service,Counselling,AD-11096,SYN-39165756
+PR-0371,Rowan Square Health Centre,General practice,AD-08806,SYN-95000370
+PR-0372,Brook Grove Psychiatry Practice,Psychiatry,AD-03161,SYN-88030736
+PR-0373,Rush Mews Foot Clinic,Podiatry,AD-08725,SYN-94864900
+PR-0374,Nettle Hill Skin Clinic,Dermatology,AD-01428,SYN-56714316
+PR-0375,Chalk Green Surgery,General practice,AD-07641,SYN-98021735
+PR-0376,Larch Road Heart Clinic,Cardiology,AD-01514,SYN-25424070
+PR-0377,Flint Lane Pharmacy,Pharmacy,AD-04628,SYN-81668163
+PR-0378,Plover Bank Medical Clinic,Internal medicine,AD-08457,SYN-23435212
+PR-0379,Willow Court Chemist,Pharmacy,AD-08024,SYN-82147306
+PR-0380,Kiln Mews Medical Practice,General practice,AD-05763,SYN-81807081
+PR-0381,Flint Road Surgery,General practice,AD-01772,SYN-66918850
+PR-0382,Quarry Lane Imaging Centre,Imaging,AD-07215,SYN-48035397
+PR-0383,Rowan Row Chemist,Pharmacy,AD-05407,SYN-63595485
+PR-0384,Dove Hill Chemist,Pharmacy,AD-06177,SYN-22958755
+PR-0385,Sedge Park Medical Practice,General practice,AD-05828,SYN-32554792
+PR-0386,Brook Road Surgery,General practice,AD-01103,SYN-45944399
+PR-0387,Bracken Bank Counselling Service,Counselling,AD-09013,SYN-47627642
+PR-0388,Jasper House Pharmacy,Pharmacy,AD-00894,SYN-13639380
+PR-0389,Gorse Mews Physiotherapy,Physiotherapy,AD-02928,SYN-90064940
+PR-0390,Jasper Mews Eye Clinic,Ophthalmology,AD-04709,SYN-84358794
+PR-0391,Hazel Park Health Centre,General practice,AD-12093,SYN-39412901
+PR-0392,Jasper Mews Psychiatry Practice,Psychiatry,AD-09292,SYN-32444901
+PR-0393,Willow Road Medical Clinic,Internal medicine,AD-11194,SYN-79359055
+PR-0394,Oak Road Physiotherapy,Physiotherapy,AD-05667,SYN-64163888
+PR-0395,Flint Mews Pharmacy,Pharmacy,AD-02007,SYN-55924610
+PR-0396,Wagtail Mews Medical Practice,General practice,AD-05635,SYN-33675709
+PR-0397,Rowan Road Physiotherapy,Physiotherapy,AD-05218,SYN-39250942
+PR-0398,Rush Park Psychiatry Practice,Psychiatry,AD-09545,SYN-75159758
+PR-0399,Brook Green Laboratory,Laboratory,AD-01348,SYN-47040848
+PR-0400,Fern Square Pharmacy,Pharmacy,AD-10444,SYN-61648000
+PR-0401,Teasel Green Skin Clinic,Dermatology,AD-07664,SYN-33975402
+PR-0402,Flint Mews Orthopaedic Clinic,Orthopaedics,AD-06537,SYN-63685642
+PR-0403,Moss Lane Physiotherapy,Physiotherapy,AD-10849,SYN-78929174
+PR-0404,Fern Hill Imaging Centre,Imaging,AD-11630,SYN-20886604
+PR-0405,Ember House Health Centre,General practice,AD-10286,SYN-88828499
+PR-0406,Thrush Park Laboratory,Laboratory,AD-03273,SYN-29540929
+PR-0407,Mill Green Chemist,Pharmacy,AD-02103,SYN-60727920
+PR-0408,Fern Square Medical Clinic,Internal medicine,AD-00459,SYN-40495588
+PR-0409,Hazel Mews Pharmacy,Pharmacy,AD-01408,SYN-46783676
+PR-0410,Rush Hill Chemist,Pharmacy,AD-07402,SYN-74043841
+PR-0411,Brook Gate Orthopaedic Clinic,Orthopaedics,AD-02307,SYN-66060718
+PR-0412,Plover Road Orthopaedic Clinic,Orthopaedics,AD-09387,SYN-81303659
+PR-0413,Alder Hill Foot Clinic,Podiatry,AD-02426,SYN-95712599
+PR-0414,Fern Hill Medical Clinic,Internal medicine,AD-11047,SYN-86891173
+PR-0415,Quarry Bank Physiotherapy,Physiotherapy,AD-06106,SYN-96759185
+PR-0416,Dunnock Gate Oncology Centre,Oncology,AD-01624,SYN-41987445
+PR-0417,Teasel Court Foot Clinic,Podiatry,AD-06396,SYN-61767854
+PR-0418,Cobble Park Pharmacy,Pharmacy,AD-12833,
+PR-0419,Elder Field Imaging Centre,Imaging,AD-03893,SYN-76758521
+PR-0420,Jasper Lane Heart Clinic,Cardiology,AD-05832,SYN-25244480
+PR-0421,Alder Row Medical Practice,General practice,AD-10094,SYN-36872122
+PR-0422,Plover Mews Chemist,Pharmacy,AD-03343,SYN-69798938
+PR-0423,Nettle Gate Health Centre,General practice,AD-00712,SYN-36442656
+PR-0424,Willow Bank Medical Practice,General practice,AD-11395,SYN-17830612
+PR-0425,Thrush Road Health Centre,General practice,AD-03722,SYN-44838834
+PR-0426,Hazel Mews Walk-in Clinic,Urgent care,AD-09406,SYN-27302173
+PR-0427,Yew Gate Surgery,General practice,AD-08934,SYN-83587744
+PR-0428,Iron Gate Foot Clinic,Podiatry,AD-07139,SYN-26557000
+PR-0429,Fern Row Health Centre,General practice,AD-09598,SYN-93408196
+PR-0430,Dunnock Gate Chemist,Pharmacy,AD-11936,SYN-39201886
+PR-0431,Elder Bank Counselling Service,Counselling,AD-03424,SYN-80635914
+PR-0432,Amber Bank Orthopaedic Clinic,Orthopaedics,AD-03229,SYN-66350921
+PR-0433,Elder Park Walk-in Clinic,Urgent care,AD-04751,SYN-67738709
+PR-0434,Oak Grove Heart Clinic,Cardiology,AD-10226,SYN-49494861
+PR-0435,Quarry Gate Foot Clinic,Podiatry,AD-06810,SYN-25241904
+PR-0436,Dunnock Road Skin Clinic,Dermatology,AD-12144,SYN-97108704
+PR-0437,Chalk Gate Foot Clinic,Podiatry,AD-06405,SYN-54133508
+PR-0438,Teasel Grove Medical Practice,General practice,AD-02786,SYN-29596494
+PR-0439,Lark Field Psychiatry Practice,Psychiatry,AD-05753,SYN-61256721
+PR-0440,Lark Row Foot Clinic,Podiatry,AD-10797,
+PR-0441,Thrush Lane Pharmacy,Pharmacy,AD-08531,SYN-57527684
+PR-0442,Mill Park Medical Clinic,Internal medicine,AD-09171,SYN-71012316
+PR-0443,Yew Court Health Centre,General practice,AD-09268,SYN-88122577
+PR-0444,Teasel Square Skin Clinic,Dermatology,AD-12643,SYN-71344774
+PR-0445,Willow Green Psychiatry Practice,Psychiatry,AD-12761,SYN-53607709
+PR-0446,Thrush Bank Health Centre,General practice,AD-04229,SYN-68836458
+PR-0447,Teasel Green Laboratory,Laboratory,AD-12307,SYN-67043351
+PR-0448,Oak Row Oncology Centre,Oncology,AD-07408,SYN-56718337
+PR-0449,Hazel Square Heart Clinic,Cardiology,AD-08455,SYN-41958416
+PR-0450,Plover Hill Eye Clinic,Ophthalmology,AD-11990,SYN-43483548
+PR-0451,Iron Road Eye Clinic,Ophthalmology,AD-00436,SYN-22552343
+PR-0452,Gorse Grove Medical Practice,General practice,AD-07573,SYN-34988846
+PR-0453,Vetch Row Foot Clinic,Podiatry,AD-05016,SYN-72813813
+PR-0454,Sorrel Grove Medical Clinic,Internal medicine,AD-03462,SYN-41165113
+PR-0455,Lark Green Skin Clinic,Dermatology,AD-10848,SYN-98105163
+PR-0456,Wagtail Green Counselling Service,Counselling,AD-07131,SYN-46762894
+PR-0457,Cobble Lane Pharmacy,Pharmacy,AD-07179,SYN-52882173
+PR-0458,Nettle Row Medical Clinic,Internal medicine,AD-03786,SYN-90004997
+PR-0459,Alder House Laboratory,Laboratory,AD-02027,SYN-16093858
+PR-0460,Alder Gate Imaging Centre,Imaging,AD-11215,SYN-26266581
+PR-0461,Vetch Road Surgery,General practice,AD-06944,SYN-54818329
+PR-0462,Moss Lane Orthopaedic Clinic,Orthopaedics,AD-04125,SYN-32899784
+PR-0463,Yew Bank Eye Clinic,Ophthalmology,AD-09629,SYN-82486343
+PR-0464,Amber House Medical Practice,General practice,AD-06960,SYN-55580530
+PR-0465,Gorse Green Pharmacy,Pharmacy,AD-07285,SYN-98234238
+PR-0466,Sedge Square Laboratory,Laboratory,AD-04168,SYN-86644161
+PR-0467,Sedge Grove Medical Practice,General practice,AD-06477,SYN-98955298
+PR-0468,Hazel Bank Surgery,General practice,AD-08224,SYN-15446049
+PR-0469,Chalk Field Chemist,Pharmacy,AD-03412,SYN-77031836
+PR-0470,Sorrel Court Physiotherapy,Physiotherapy,AD-02589,SYN-94138969
+PR-0471,Mill Bank Chemist,Pharmacy,AD-02943,SYN-40803933
+PR-0472,Rowan Green Medical Practice,General practice,AD-11440,SYN-84447216
+PR-0473,Plover Mews Surgery,General practice,AD-05398,SYN-78752824
+PR-0474,Jasper Bank Pharmacy,Pharmacy,AD-00513,SYN-42497180
+PR-0475,Sorrel Mews Health Centre,General practice,AD-05252,SYN-84562094
+PR-0476,Teasel Lane Counselling Service,Counselling,AD-01491,SYN-12097167
+PR-0477,Alder Lane Health Centre,General practice,AD-11865,SYN-40024473
+PR-0478,Bracken Gate Walk-in Clinic,Urgent care,AD-03188,SYN-62116782
+PR-0479,Elder Grove Imaging Centre,Imaging,AD-11858,SYN-46932381
+PR-0480,Cobble Field Imaging Centre,Imaging,AD-03986,SYN-29597066
+PR-0481,Quarry Square Elderly Care Clinic,Geriatric medicine,AD-10519,SYN-63746094
+PR-0482,Plover Grove Counselling Service,Counselling,AD-09073,SYN-63677745
+PR-0483,Plover Bank Surgery,General practice,AD-10673,SYN-94038193
+PR-0484,Rush Lane Health Centre,General practice,AD-10653,SYN-73363489
+PR-0485,Lark Court Medical Clinic,Internal medicine,AD-09020,SYN-17382508
+PR-0486,Mill Grove Foot Clinic,Podiatry,AD-07440,SYN-37675139
+PR-0487,Rush Bank Chemist,Pharmacy,AD-01582,SYN-84193764
+PR-0488,Alder House Health Centre,General practice,AD-05203,SYN-94426549
+PR-0489,Mill Lane Health Centre,General practice,AD-05860,SYN-94717100
+PR-0490,Vetch Square Pharmacy,Pharmacy,AD-00010,
+PR-0491,Vetch House Pharmacy,Pharmacy,AD-03418,SYN-47749581
+PR-0492,Rush Green Health Centre,General practice,AD-09673,SYN-51124311
+PR-0493,Kiln Grove Physiotherapy,Physiotherapy,AD-01633,SYN-88776043
+PR-0494,Mill Hill Pharmacy,Pharmacy,AD-12390,
+PR-0495,Elder Road Walk-in Clinic,Urgent care,AD-11399,SYN-83226080
+PR-0496,Moss Grove Health Centre,General practice,AD-05609,
+PR-0497,Vetch Court Chemist,Pharmacy,AD-07229,SYN-49949669
+PR-0498,Sedge Field Orthopaedic Clinic,Orthopaedics,AD-12349,SYN-87473539
+PR-0499,Hazel Mews Surgery,General practice,AD-03765,SYN-54971013
+PR-0500,Larch Square Surgery,General practice,AD-05652,SYN-39544031
+PR-0501,Alder Bank Health Centre,General practice,AD-07119,SYN-95600097
+PR-0502,Sedge Hill Imaging Centre,Imaging,AD-12107,SYN-66942363
+PR-0503,Teasel Road Chemist,Pharmacy,AD-11432,SYN-23894730
+PR-0504,Teasel Gate Pharmacy,Pharmacy,AD-09961,SYN-51413179
+PR-0505,Kiln Park Pharmacy,Pharmacy,AD-09119,SYN-42319186
+PR-0506,Kiln Road Eye Clinic,Ophthalmology,AD-08342,SYN-38716387
+PR-0507,Amber House Eye Clinic,Ophthalmology,AD-09426,SYN-42515753
+PR-0508,Gorse Field Health Centre,General practice,AD-05064,SYN-16458643
+PR-0509,Vetch Mews Orthopaedic Clinic,Orthopaedics,AD-03252,SYN-22598337
+PR-0510,Quarry Bank Walk-in Clinic,Urgent care,AD-05608,SYN-15908033
+PR-0511,Moss Row Walk-in Clinic,Urgent care,AD-00871,SYN-52934624
+PR-0512,Quarry Green Counselling Service,Counselling,AD-07225,SYN-66459758
+PR-0513,Fern Court Physiotherapy,Physiotherapy,AD-06167,SYN-73444962
+PR-0514,Jasper Mews Health Centre,General practice,AD-01742,SYN-74894423
+PR-0515,Quarry Bank Health Centre,General practice,AD-01273,SYN-40180786
+PR-0516,Oak Grove Medical Clinic,Internal medicine,AD-10382,SYN-33921324
+PR-0517,Yew Grove Chemist,Pharmacy,AD-07371,SYN-39379358
+PR-0518,Plover Field Chemist,Pharmacy,AD-11332,SYN-75385387
+PR-0519,Flint Grove Physiotherapy,Physiotherapy,AD-08229,SYN-13000399
+PR-0520,Iron Park Chemist,Pharmacy,AD-04247,SYN-97983798
+PR-0521,Hazel Field Pharmacy,Pharmacy,AD-05321,SYN-40892939
+PR-0522,Moss Green Imaging Centre,Imaging,AD-05805,SYN-94335158
+PR-0523,Thrush Mews Health Centre,General practice,AD-11108,SYN-80581629
+PR-0524,Nettle House Health Centre,General practice,AD-00700,
+PR-0525,Lark Lane Pharmacy,Pharmacy,AD-00059,SYN-23844304
+PR-0526,Dunnock Hill Physiotherapy,Physiotherapy,AD-01923,SYN-76967811
+PR-0527,Sorrel Hill Psychiatry Practice,Psychiatry,AD-01722,SYN-92365059
+PR-0528,Dove Park Health Centre,General practice,AD-05672,SYN-62988777
+PR-0529,Cobble Mews Medical Practice,General practice,AD-05687,SYN-76058924
+PR-0530,Sedge Green Medical Practice,General practice,AD-10071,SYN-33128414
+PR-0531,Willow Hill Eye Clinic,Ophthalmology,AD-12412,SYN-29483427
+PR-0532,Cobble Mews Surgery,General practice,AD-03387,SYN-75109973
+PR-0533,Flint Court Oncology Centre,Oncology,AD-02881,
+PR-0534,Jasper Hill Orthopaedic Clinic,Orthopaedics,AD-00287,SYN-81752724
+PR-0535,Quarry Road Chemist,Pharmacy,AD-12532,SYN-29378836
+PR-0536,Lark Gate Medical Practice,General practice,AD-05834,SYN-28643874
+PR-0537,Rush Green Surgery,General practice,AD-03898,SYN-64353107
+PR-0538,Teasel Gate Medical Practice,General practice,AD-11477,SYN-77218778
+PR-0539,Fern Lane Health Centre,General practice,AD-11032,
+PR-0540,Amber Square Walk-in Clinic,Urgent care,AD-05535,SYN-30320034
+PR-0541,Hazel House Surgery,General practice,AD-01821,SYN-47692788
+PR-0542,Nettle Hill Physiotherapy,Physiotherapy,AD-05601,SYN-57824011
+PR-0543,Moss Bank Pharmacy,Pharmacy,AD-09721,SYN-21716071
+PR-0544,Thrush Court Eye Clinic,Ophthalmology,AD-08947,SYN-52891605
+PR-0545,Mill Mews Physiotherapy,Physiotherapy,AD-07356,SYN-28240708
+PR-0546,Larch Square Counselling Service,Counselling,AD-02295,SYN-95700245
+PR-0547,Jasper Row Surgery,General practice,AD-12083,SYN-97326687
+PR-0548,Ember Field Chemist,Pharmacy,AD-02289,SYN-26327117
+PR-0549,Hazel Mews Medical Practice,General practice,AD-02036,SYN-16635656
+PR-0550,Teasel Hill Psychiatry Practice,Psychiatry,AD-11825,SYN-38311097
+PR-0551,Dunnock Grove Foot Clinic,Podiatry,AD-06064,
+PR-0552,Yew Court Medical Practice,General practice,AD-06406,SYN-49395924
+PR-0553,Cobble Mews Health Centre,General practice,AD-10127,SYN-53703557
+PR-0554,Yew Road Laboratory,Laboratory,AD-08566,SYN-45548383
+PR-0555,Nettle Court Medical Practice,General practice,AD-08326,SYN-15221252
+PR-0556,Elder Park Chemist,Pharmacy,AD-12469,SYN-59659844
+PR-0557,Ember Lane Surgery,General practice,AD-04216,SYN-36556135
+PR-0558,Sedge Square Health Centre,General practice,AD-08692,SYN-18826796
+PR-0559,Jasper Court Pharmacy,Pharmacy,AD-05936,SYN-82810653
+PR-0560,Rowan Lane Counselling Service,Counselling,AD-12095,SYN-27859343
+PR-0561,Brook Row Physiotherapy,Physiotherapy,AD-05265,SYN-21009226
+PR-0562,Yew Grove Health Centre,General practice,AD-12392,SYN-55020363
+PR-0563,Gorse Green Chemist,Pharmacy,AD-04669,SYN-71445848
+PR-0564,Lark Road Health Centre,General practice,AD-00676,SYN-88579686
+PR-0565,Brook Park Physiotherapy,Physiotherapy,AD-06586,SYN-84405917
+PR-0566,Iron Park Heart Clinic,Cardiology,AD-06886,
+PR-0567,Iron Bank Health Centre,General practice,AD-06976,SYN-52781759
+PR-0568,Ember Square Chemist,Pharmacy,AD-01094,SYN-18039736
+PR-0569,Fern Field Foot Clinic,Podiatry,AD-06082,SYN-68954643
+PR-0570,Teasel Bank Orthopaedic Clinic,Orthopaedics,AD-11254,SYN-79250154
+PR-0571,Fern Park Pharmacy,Pharmacy,AD-11243,SYN-57888165
+PR-0572,Teasel Row Surgery,General practice,AD-02178,SYN-21112371
+PR-0573,Alder Field Health Centre,General practice,AD-12063,SYN-75508465
+PR-0574,Dunnock Row Chemist,Pharmacy,AD-00937,SYN-11688327
+PR-0575,Brook Court Eye Clinic,Ophthalmology,AD-05248,SYN-29798567
+PR-0576,Plover Bank Physiotherapy,Physiotherapy,AD-09668,SYN-57899913
+PR-0577,Flint Road Chemist,Pharmacy,AD-04022,SYN-40536813
+PR-0578,Oak Field Foot Clinic,Podiatry,AD-09401,SYN-57129148
+PR-0579,Gorse Field Medical Clinic,Internal medicine,AD-02096,SYN-90015755
+PR-0580,Hazel Court Medical Practice,General practice,AD-10638,SYN-93803679
+PR-0581,Nettle Grove Foot Clinic,Podiatry,AD-00158,SYN-73940265
+PR-0582,Willow Gate Pharmacy,Pharmacy,AD-07306,SYN-62631928
+PR-0583,Cobble Hill Medical Practice,General practice,AD-01300,SYN-80060792
+PR-0584,Oak Grove Pharmacy,Pharmacy,AD-04819,SYN-41094872
+PR-0585,Moss Grove Physiotherapy,Physiotherapy,AD-02442,SYN-17733226
+PR-0586,Nettle Green Hospital,Hospital,AD-07332,
+PR-0587,Oak Field Chemist,Pharmacy,AD-07654,SYN-63095030
+PR-0588,Chalk Mews Physiotherapy,Physiotherapy,AD-00821,SYN-35796306
+PR-0589,Pippin Gate Skin Clinic,Dermatology,AD-05614,SYN-62075816
+PR-0590,Quarry Grove Skin Clinic,Dermatology,AD-07540,SYN-77004522
+PR-0591,Oak House Eye Clinic,Ophthalmology,AD-03820,SYN-73535553
+PR-0592,Alder Mews Medical Practice,General practice,AD-11887,SYN-87141601
+PR-0593,Thrush Gate Pharmacy,Pharmacy,AD-04887,SYN-89621003
+PR-0594,Larch Lane Pharmacy,Pharmacy,AD-12221,SYN-44643140
+PR-0595,Elder Green Health Centre,General practice,AD-12681,SYN-28060386
+PR-0596,Thrush Bank Physiotherapy,Physiotherapy,AD-04577,SYN-99569125
+PR-0597,Nettle Road Pharmacy,Pharmacy,AD-02531,SYN-98427901
+PR-0598,Lark Road Psychiatry Practice,Psychiatry,AD-01165,SYN-71007577
+PR-0599,Larch Field Surgery,General practice,AD-06112,SYN-68440469
+PR-0600,Sedge Field Physiotherapy,Physiotherapy,AD-10379,SYN-13677031
+PR-0601,Wagtail Lane Physiotherapy,Physiotherapy,AD-09604,SYN-46167222
+PR-0602,Bracken Grove Counselling Service,Counselling,AD-08876,SYN-14563987
+PR-0603,Gorse Lane Pharmacy,Pharmacy,AD-07300,SYN-61998082
+PR-0604,Gorse Lane Medical Practice,General practice,AD-04829,SYN-46425917
+PR-0605,Flint Green Orthopaedic Clinic,Orthopaedics,AD-09337,SYN-61305704
+PR-0606,Oak House Medical Practice,General practice,AD-09622,SYN-21134079
+PR-0607,Teasel Hill Health Centre,General practice,AD-02302,SYN-91562621
+PR-0608,Rowan Park Medical Practice,General practice,AD-01763,SYN-15796472
+PR-0609,Mill House Pharmacy,Pharmacy,AD-02572,SYN-67359437
+PR-0610,Fern Hill Foot Clinic,Podiatry,AD-09608,SYN-66591755
+PR-0611,Hazel Lane Medical Clinic,Internal medicine,AD-10147,SYN-15274335
+PR-0612,Flint Square Skin Clinic,Dermatology,AD-06507,SYN-26915159
+PR-0613,Cobble House Eye Clinic,Ophthalmology,AD-09972,SYN-39787485
+PR-0614,Larch Row Chemist,Pharmacy,AD-03506,SYN-65832690
+PR-0615,Amber Court Health Centre,General practice,AD-00893,SYN-51267606
+PR-0616,Jasper Green Health Centre,General practice,AD-01275,SYN-45369465
+PR-0617,Larch Road Pharmacy,Pharmacy,AD-08179,SYN-51245808
+PR-0618,Yew Mews Pain Clinic,Pain medicine,AD-03514,SYN-92630995
+PR-0619,Dunnock Grove Chemist,Pharmacy,AD-06180,SYN-81465464
+PR-0620,Fern Mews Elderly Care Clinic,Geriatric medicine,AD-09357,SYN-35488168
+PR-0621,Pippin Grove Health Centre,General practice,AD-08055,SYN-89796829
+PR-0622,Chalk Green Foot Clinic,Podiatry,AD-04871,SYN-49268257
+PR-0623,Flint Hill Health Centre,General practice,AD-10087,
+PR-0624,Mill Gate Medical Practice,General practice,AD-12310,SYN-35323927
+PR-0625,Wagtail Row Walk-in Clinic,Urgent care,AD-00032,SYN-11387683
+PR-0626,Rush Grove Orthopaedic Clinic,Orthopaedics,AD-11986,SYN-26446312
+PR-0627,Vetch Road Heart Clinic,Cardiology,AD-03518,SYN-69020311
+PR-0628,Amber Hill Heart Clinic,Cardiology,AD-11491,
+PR-0629,Mill Field Skin Clinic,Dermatology,AD-06436,SYN-58992740
+PR-0630,Dove Gate Chemist,Pharmacy,AD-12250,SYN-55914765
+PR-0631,Jasper Gate Health Centre,General practice,AD-01591,SYN-58162359
+PR-0632,Willowmere Physiotherapy,Physiotherapy,AD-02765,SYN-74008925
+PR-0633,Wagtail Square Health Centre,General practice,AD-10590,SYN-99471235
+PR-0634,Flint Court Eye Clinic,Ophthalmology,AD-11136,SYN-88915040
+PR-0635,Wagtail Gate Pharmacy,Pharmacy,AD-08639,SYN-44161872
+PR-0636,Gorse House Health Centre,General practice,AD-05385,
+PR-0637,Flint Gate Laboratory,Laboratory,AD-04869,SYN-10163794
+PR-0638,Gorse Court Health Centre,General practice,AD-09983,SYN-40504298
+PR-0639,Iron Row Medical Clinic,Internal medicine,AD-01793,SYN-23973010
+PR-0640,Fern Field Medical Practice,General practice,AD-02607,SYN-56115570
+PR-0641,Fern Field Health Centre,General practice,AD-10355,SYN-88265913
+PR-0642,Quarry Lane Pharmacy,Pharmacy,AD-10029,SYN-95711727
+PR-0643,Moss Park Medical Clinic,Internal medicine,AD-08287,SYN-34658674
+PR-0644,Kiln Field Counselling Service,Counselling,AD-11815,SYN-98119944
+PR-0645,Gorse Bank Foot Clinic,Podiatry,AD-10659,SYN-20905876
+PR-0646,Chalk Grove Imaging Centre,Imaging,AD-06202,SYN-59490147
+PR-0647,Elder Green Chemist,Pharmacy,AD-07688,SYN-98434760
+PR-0648,Ember Mews Health Centre,General practice,AD-01486,SYN-40407181
+PR-0649,Thrush Hill Counselling Service,Counselling,AD-12432,SYN-11279285
+PR-0650,Iron Court Physiotherapy,Physiotherapy,AD-04320,
+PR-0651,Amber Lane Physiotherapy,Physiotherapy,AD-01173,SYN-91655251
+PR-0652,Pippin Hill Counselling Service,Counselling,AD-06118,SYN-65104854
+PR-0653,Ember Hill Orthopaedic Clinic,Orthopaedics,AD-05432,SYN-59742827
+PR-0654,Chalk Grove Eye Clinic,Ophthalmology,AD-04976,SYN-73946850
+PR-0655,Thrush Row Physiotherapy,Physiotherapy,AD-10245,SYN-66404702
+PR-0656,Moss Grove Heart Clinic,Cardiology,AD-05427,SYN-33995351
+PR-0657,Jasper Road Medical Practice,General practice,AD-04814,SYN-95512185
+PR-0658,Dove Park Pharmacy,Pharmacy,AD-08283,SYN-91276257
+PR-0659,Jasper House Chemist,Pharmacy,AD-06685,SYN-67913233
+PR-0660,Iron Park Eye Clinic,Ophthalmology,AD-03613,SYN-56772148
+PR-0661,Bracken Bank Foot Clinic,Podiatry,AD-02110,SYN-69806712
+PR-0662,Dunnock House Skin Clinic,Dermatology,AD-06215,SYN-54520065
+PR-0663,Iron House Orthopaedic Clinic,Orthopaedics,AD-04946,SYN-87525785
+PR-0664,Sedge Court Counselling Service,Counselling,AD-12793,SYN-21504313
+PR-0665,Cobble Row Pharmacy,Pharmacy,AD-06049,SYN-22523237
+PR-0666,Elder Gate Health Centre,General practice,AD-02771,SYN-39323210
+PR-0667,Pippin Grove Physiotherapy,Physiotherapy,AD-07820,SYN-34019939
+PR-0668,Dove Square Chemist,Pharmacy,AD-12236,SYN-53001366
+PR-0669,Bracken Gate Chemist,Pharmacy,AD-11681,SYN-56484508
+PR-0670,Mill Mews Orthopaedic Clinic,Orthopaedics,AD-04014,SYN-84542521
+PR-0671,Rush Row Pharmacy,Pharmacy,AD-09484,SYN-71032089
+PR-0672,Chalk Lane Eye Clinic,Ophthalmology,AD-06452,SYN-20913675
+PR-0673,Elder Park Pharmacy,Pharmacy,AD-03593,SYN-28280604
+PR-0674,Alder Lane Psychiatry Practice,Psychiatry,AD-04294,SYN-24030615
+PR-0675,Jasper Park Chemist,Pharmacy,AD-05231,SYN-70838059
+PR-0676,Dunnock Lane Physiotherapy,Physiotherapy,AD-03781,SYN-72409537
+PR-0677,Flint Field Psychiatry Practice,Psychiatry,AD-02320,SYN-51012332
+PR-0678,Vetch Green Surgery,General practice,AD-02483,SYN-99858072
+PR-0679,Willow Grove Pharmacy,Pharmacy,AD-04037,SYN-20013291
+PR-0680,Kiln Road Medical Practice,General practice,AD-09304,SYN-98431817
+PR-0681,Rush Green Foot Clinic,Podiatry,AD-07764,SYN-19820107
+PR-0682,Cobble Gate Counselling Service,Counselling,AD-01212,SYN-55868011
+PR-0683,Brook Green Surgery,General practice,AD-10432,SYN-24828523
+PR-0684,Amber Green Health Centre,General practice,AD-09858,
+PR-0685,Dunnock Road Laboratory,Laboratory,AD-09442,SYN-45214254
+PR-0686,Mill Park Health Centre,General practice,AD-02732,SYN-31272538
+PR-0687,Rowan House Physiotherapy,Physiotherapy,AD-07691,SYN-39836771
+PR-0688,Sedge Lane Laboratory,Laboratory,AD-01232,SYN-92492495
+PR-0689,Elder Grove Chemist,Pharmacy,AD-10038,SYN-15784252
+PR-0690,Moss Gate Medical Clinic,Internal medicine,AD-03396,SYN-46977496
+PR-0691,Plover Grove Skin Clinic,Dermatology,AD-05579,
+PR-0692,Plover Court Pharmacy,Pharmacy,AD-09281,SYN-68184020
+PR-0693,Plover Grove Chemist,Pharmacy,AD-03973,SYN-27047055
+PR-0694,Yew Hill Heart Clinic,Cardiology,AD-11037,SYN-25772005
+PR-0695,Ember Hill Surgery,General practice,AD-07201,SYN-16187347
+PR-0696,Teasel Road Skin Clinic,Dermatology,AD-02840,SYN-72270010
+PR-0697,Amber Gate Pharmacy,Pharmacy,AD-12320,SYN-14615418
+PR-0698,Rowan Mews Medical Clinic,Internal medicine,AD-08866,SYN-24473851
+PR-0699,Moss Park Surgery,General practice,AD-00953,SYN-55516040
+PR-0700,Willow Gate Imaging Centre,Imaging,AD-11198,SYN-84458304
+PR-0701,Cobble Field Medical Clinic,Internal medicine,AD-05228,SYN-28893006
+PR-0702,Mill Lane Chemist,Pharmacy,AD-10997,SYN-10181291
+PR-0703,Willow Grove Imaging Centre,Imaging,AD-07524,SYN-70273024
+PR-0704,Brook Row Medical Practice,General practice,AD-06607,SYN-98085465
+PR-0705,Bracken Park Medical Practice,General practice,AD-06712,SYN-68766169
+PR-0706,Jasper Lane Laboratory,Laboratory,AD-07260,SYN-49374330
+PR-0707,Sorrel Court Chemist,Pharmacy,AD-01056,SYN-71787290
+PR-0708,Kiln Field Surgery,General practice,AD-04429,SYN-75178447
+PR-0709,Rush Mews Physiotherapy,Physiotherapy,AD-07344,SYN-45591218
+PR-0710,Sorrel Mews Medical Clinic,Internal medicine,AD-03221,
+PR-0711,Wagtail Green Health Centre,General practice,AD-00264,SYN-16709980
+PR-0712,Moss Grove Pharmacy,Pharmacy,AD-05983,SYN-46139917
+PR-0713,Yew Hill Pharmacy,Pharmacy,AD-07916,SYN-14974790
+PR-0714,Rush Field Health Centre,General practice,AD-06476,SYN-46130759
+PR-0715,Sorrel Grove Counselling Service,Counselling,AD-11387,SYN-72899503
+PR-0716,Vetch Bank Counselling Service,Counselling,AD-10873,SYN-45393324
+PR-0717,Bracken Lane Pharmacy,Pharmacy,AD-09444,SYN-97518600
+PR-0718,Elder House Orthopaedic Clinic,Orthopaedics,AD-02810,SYN-40093744
+PR-0719,Brook Park Eye Clinic,Ophthalmology,AD-06766,SYN-43857286
+PR-0720,Iron Grove Medical Practice,General practice,AD-12616,SYN-87572570
+PR-0721,Dunnock Court Eye Clinic,Ophthalmology,AD-12749,
+PR-0722,Pippin Lane Pharmacy,Pharmacy,AD-06040,SYN-84828607
+PR-0723,Cobble Bank Foot Clinic,Podiatry,AD-07351,SYN-21848024
+PR-0724,Teasel Road Medical Practice,General practice,AD-10013,SYN-38638024
+PR-0725,Iron Row Counselling Service,Counselling,AD-03169,SYN-61827757
+PR-0726,Hazel Park Pharmacy,Pharmacy,AD-01668,SYN-99764695
+PR-0727,Teasel Road Pharmacy,Pharmacy,AD-07892,SYN-31878209
+PR-0728,Iron Green Eye Clinic,Ophthalmology,AD-01334,SYN-17656887
+PR-0729,Pippin Lane Health Centre,General practice,AD-10881,SYN-46372281
+PR-0730,Bracken Road Counselling Service,Counselling,AD-02915,SYN-36263423
+PR-0731,Flint Bank Medical Clinic,Internal medicine,AD-11484,
+PR-0732,Rowan House Surgery,General practice,AD-07585,SYN-16971616
+PR-0733,Dunnock House Pharmacy,Pharmacy,AD-09416,SYN-43261042
+PR-0734,Brook Row Walk-in Clinic,Urgent care,AD-11176,SYN-63371720
+PR-0735,Oak Gate Medical Practice,General practice,AD-09410,SYN-71101972
+PR-0736,Rush Grove Imaging Centre,Imaging,AD-11511,SYN-10224870
+PR-0737,Willow Grove Physiotherapy,Physiotherapy,AD-06293,SYN-98423880
+PR-0738,Moss Square Medical Clinic,Internal medicine,AD-03767,SYN-40565967
+PR-0739,Brook Lane Physiotherapy,Physiotherapy,AD-01168,SYN-54057411
+PR-0740,Yew Grove Elderly Care Clinic,Geriatric medicine,AD-04154,SYN-71054161
+PR-0741,Gorse Mews Chemist,Pharmacy,AD-07843,SYN-69712849
+PR-0742,Yew Park Pharmacy,Pharmacy,AD-08917,SYN-58706654
+PR-0743,Nettle Road Counselling Service,Counselling,AD-09321,SYN-76819259
+PR-0744,Plover Gate Chemist,Pharmacy,AD-11650,SYN-67647163
+PR-0745,Moss Road Chemist,Pharmacy,AD-08129,SYN-60640192
+PR-0746,Teasel Lane Pain Clinic,Pain medicine,AD-06364,SYN-20108566
+PR-0747,Sedge Gate Health Centre,General practice,AD-09967,SYN-56426265
+PR-0748,Jasper Road Pharmacy,Pharmacy,AD-05443,SYN-19922921
+PR-0749,Moss Green Physiotherapy,Physiotherapy,AD-07123,SYN-97774509
+PR-0750,Bracken Bank Pharmacy,Pharmacy,AD-03655,SYN-89343291
+PR-0751,Hazel Court Surgery,General practice,AD-04522,SYN-33305184
+PR-0752,Dove Park Chemist,Pharmacy,AD-03741,SYN-69678590
+PR-0753,Nettle Lane Pharmacy,Pharmacy,AD-04064,SYN-71506449
+PR-0754,Mill Lane Surgery,General practice,AD-02435,SYN-80612816
+PR-0755,Gorse Grove Medical Clinic,Internal medicine,AD-07025,SYN-92336631
+PR-0756,Plover House Medical Practice,General practice,AD-05215,SYN-46016898
+PR-0757,Sedge Court Medical Clinic,Internal medicine,AD-02610,SYN-20456921
+PR-0758,Teasel Mews Surgery,General practice,AD-09400,SYN-88740473
+PR-0759,Quarry Grove Medical Practice,General practice,AD-05308,SYN-95205566
+PR-0760,Mill Square Pharmacy,Pharmacy,AD-10597,SYN-35063740
+PR-0761,Rowan Mews Pharmacy,Pharmacy,AD-01860,SYN-18684003
+PR-0762,Rowan Road Medical Clinic,Internal medicine,AD-11018,SYN-28723455
+PR-0763,Quarry Park Medical Clinic,Internal medicine,AD-08730,SYN-24736482
+PR-0764,Chalk Bank Foot Clinic,Podiatry,AD-02856,SYN-19604540
+PR-0765,Lark Square Physiotherapy,Physiotherapy,AD-00406,SYN-86264396
+PR-0766,Larch Bank Physiotherapy,Physiotherapy,AD-00157,SYN-75871453
+PR-0767,Dunnock Bank Walk-in Clinic,Urgent care,AD-11654,SYN-98151707
+PR-0768,Vetch Mews Surgery,General practice,AD-09493,SYN-48504919
+PR-0769,Wagtail Grove Medical Practice,General practice,AD-00921,SYN-14661580
+PR-0770,Teasel Square Foot Clinic,Podiatry,AD-03021,SYN-79688504
+PR-0771,Moss Square Health Centre,General practice,AD-00147,SYN-64108079
+PR-0772,Sorrel House Chemist,Pharmacy,AD-10604,SYN-20242762
+PR-0773,Fern Road Chemist,Pharmacy,AD-04838,SYN-72500074
+PR-0774,Sorrel Park Foot Clinic,Podiatry,AD-12164,SYN-22083517
+PR-0775,Amber Court Walk-in Clinic,Urgent care,AD-12699,SYN-44298283
+PR-0776,Elder Grove Skin Clinic,Dermatology,AD-04852,SYN-61107313
+PR-0777,Mill Bank Medical Practice,General practice,AD-06086,SYN-20068820
+PR-0778,Brook Court Skin Clinic,Dermatology,AD-02391,SYN-71416468
+PR-0779,Cobble Bank Medical Practice,General practice,AD-00568,SYN-23878112
+PR-0780,Larch Bank Chemist,Pharmacy,AD-03323,SYN-41675207
+PR-0781,Pippin Square Medical Clinic,Internal medicine,AD-11622,SYN-92619737
+PR-0782,Jasper Road Laboratory,Laboratory,AD-11240,SYN-59371526
+PR-0783,Lark Gate Physiotherapy,Physiotherapy,AD-08155,SYN-67098969
+PR-0784,Oak Square Chemist,Pharmacy,AD-07601,SYN-41805518
+PR-0785,Fern Lane Pharmacy,Pharmacy,AD-05131,SYN-52141531
+PR-0786,Yew Field Walk-in Clinic,Urgent care,AD-10616,SYN-78033858
+PR-0787,Kiln Green Physiotherapy,Physiotherapy,AD-12351,SYN-50590443
+PR-0788,Iron Field Health Centre,General practice,AD-11257,SYN-22347299
+PR-0789,Moss Green Psychiatry Practice,Psychiatry,AD-11392,SYN-22024780
+PR-0790,Rush Road Chemist,Pharmacy,AD-03492,SYN-15620901
+PR-0791,Thrush Square Pharmacy,Pharmacy,AD-06770,SYN-56083535
+PR-0792,Hazel Hill Medical Practice,General practice,AD-02761,SYN-13049451
+PR-0793,Dunnock Grove Pharmacy,Pharmacy,AD-11030,SYN-75479913
+PR-0794,Lark Gate Heart Clinic,Cardiology,AD-04032,SYN-78667661
+PR-0795,Mill Row Physiotherapy,Physiotherapy,AD-10186,SYN-99897809
+PR-0796,Gorse Square Imaging Centre,Imaging,AD-10350,SYN-60268832
+PR-0797,Lark Park Heart Clinic,Cardiology,AD-00973,SYN-38261906
+PR-0798,Willow Grove Walk-in Clinic,Urgent care,AD-10128,SYN-72905384
+PR-0799,Chalk Road Physiotherapy,Physiotherapy,AD-04131,SYN-82237112
+PR-0800,Mill Road Medical Practice,General practice,AD-04840,SYN-92952483
+PR-0801,Mill Court Imaging Centre,Imaging,AD-04776,SYN-80288916
+PR-0802,Hazel Bank Health Centre,General practice,AD-12019,SYN-17757601
+PR-0803,Sedge Gate Medical Practice,General practice,AD-03667,SYN-42095349
+PR-0804,Hazel Green Chemist,Pharmacy,AD-00262,SYN-86532442
+PR-0805,Fern Square Medical Practice,General practice,AD-00378,SYN-51312578
+PR-0806,Vetch Field Foot Clinic,Podiatry,AD-06224,SYN-19595583
+PR-0807,Willow Lane Surgery,General practice,AD-10747,SYN-90349935
+PR-0808,Bracken Bank Physiotherapy,Physiotherapy,AD-01915,SYN-87092114
+PR-0809,Sedge Grove Physiotherapy,Physiotherapy,AD-05050,SYN-37717257
+PR-0810,Kiln Hill Physiotherapy,Physiotherapy,AD-01544,SYN-52302656
+PR-0811,Wagtail Row Counselling Service,Counselling,AD-09300,SYN-11460604
+PR-0812,Wagtail Green Chemist,Pharmacy,AD-03956,SYN-30330493
+PR-0813,Chalk Mews Skin Clinic,Dermatology,AD-04696,
+PR-0814,Mill Gate Pharmacy,Pharmacy,AD-12097,
+PR-0815,Fern Mews Pharmacy,Pharmacy,AD-08690,SYN-98119967
+PR-0816,Sedge Hill Pain Clinic,Pain medicine,AD-04334,SYN-24061688
+PR-0817,Dove Green Chemist,Pharmacy,AD-01035,SYN-57732838
+PR-0818,Lark Lane Health Centre,General practice,AD-08886,SYN-67967511
+PR-0819,Bracken Row Surgery,General practice,AD-01426,SYN-19658923
+PR-0820,Plover Square Counselling Service,Counselling,AD-05062,SYN-17252657
+PR-0821,Quarry House Imaging Centre,Imaging,AD-04613,SYN-24223577
+PR-0822,Dove House Health Centre,General practice,AD-01457,SYN-49023904
+PR-0823,Dove Grove Physiotherapy,Physiotherapy,AD-01031,SYN-30424680
+PR-0824,Dunnock Gate Eye Clinic,Ophthalmology,AD-03426,SYN-43205749
+PR-0825,Hazel Grove Health Centre,General practice,AD-04510,SYN-62999125
+PR-0826,Quarry Row Pharmacy,Pharmacy,AD-11504,SYN-12492129
+PR-0827,Iron Square Heart Clinic,Cardiology,AD-04908,SYN-20179173
+PR-0828,Elder Grove Medical Practice,General practice,AD-03509,SYN-49033029
+PR-0829,Yew Green Walk-in Clinic,Urgent care,AD-12101,SYN-70043095
+PR-0830,Thrush Field Health Centre,General practice,AD-08264,SYN-16020096
+PR-0831,Jasper Field Surgery,General practice,AD-00649,SYN-26025898
+PR-0832,Alder House Skin Clinic,Dermatology,AD-12841,SYN-12402488
+PR-0833,Plover Row Walk-in Clinic,Urgent care,AD-05895,SYN-22044649
+PR-0834,Rush Row Oncology Centre,Oncology,AD-07475,SYN-58667336
+PR-0835,Amber Row Physiotherapy,Physiotherapy,AD-10489,SYN-70332241
+PR-0836,Rush Park Pharmacy,Pharmacy,AD-04383,SYN-59165177
+PR-0837,Bracken Hill Surgery,General practice,AD-04482,
+PR-0838,Cobble Hill Heart Clinic,Cardiology,AD-12011,SYN-43058038
+PR-0839,Plover Lane Foot Clinic,Podiatry,AD-09336,
+PR-0840,Bracken Field Counselling Service,Counselling,AD-04395,SYN-28709738
+PR-0841,Cobble Grove Medical Practice,General practice,AD-05896,SYN-56543327
+PR-0842,Amber Bank Pharmacy,Pharmacy,AD-04222,SYN-37457016
+PR-0843,Iron Grove Eye Clinic,Ophthalmology,AD-09873,SYN-45262014
+PR-0844,Willow Row Heart Clinic,Cardiology,AD-01882,SYN-84311693
+PR-0845,Pippin Road Pharmacy,Pharmacy,AD-05502,SYN-71787655
+PR-0846,Fern Row Skin Clinic,Dermatology,AD-04685,SYN-61451392
+PR-0847,Quarry Mews Foot Clinic,Podiatry,AD-10082,SYN-49014672
+PR-0848,Lark Green Physiotherapy,Physiotherapy,AD-00810,SYN-94811761
+PR-0849,Sorrel House Heart Clinic,Cardiology,AD-04093,SYN-96545420
+PR-0850,Dove Square Medical Clinic,Internal medicine,AD-02226,SYN-62430516
+PR-0851,Fern Green Surgery,General practice,AD-09420,SYN-57771341
+PR-0852,Amber Square Physiotherapy,Physiotherapy,AD-02330,SYN-22253490
+PR-0853,Jasper Grove Medical Clinic,Internal medicine,AD-09080,SYN-28609258
+PR-0854,Rush Court Medical Practice,General practice,AD-08451,SYN-37479722
+PR-0855,Sedge Lane Pharmacy,Pharmacy,AD-05748,SYN-58190878
+PR-0856,Sorrel Road Elderly Care Clinic,Geriatric medicine,AD-02389,SYN-62816309
+PR-0857,Wagtail Lane Pharmacy,Pharmacy,AD-05750,SYN-98230771
+PR-0858,Yew Mews Medical Clinic,Internal medicine,AD-08549,SYN-30226144
+PR-0859,Fern Lane Eye Clinic,Ophthalmology,AD-04437,SYN-74149230
+PR-0860,Rowan Grove Counselling Service,Counselling,AD-10214,SYN-54590316
+PR-0861,Pippin Bank Pharmacy,Pharmacy,AD-05927,SYN-90526097
+PR-0862,Plover Bank Chemist,Pharmacy,AD-02791,SYN-17292176
+PR-0863,Wagtail House Medical Clinic,Internal medicine,AD-12577,SYN-90747445
+PR-0864,Vetch House Eye Clinic,Ophthalmology,AD-08144,SYN-59363028
+PR-0865,Plover Lane Health Centre,General practice,AD-07198,SYN-47019442
+PR-0866,Mill Row Surgery,General practice,AD-07128,SYN-84043747
+PR-0867,Dunnock Mews Walk-in Clinic,Urgent care,AD-09631,SYN-69897437
+PR-0868,Fern Grove Medical Practice,General practice,AD-08095,
+PR-0869,Amber Mews Surgery,General practice,AD-09215,SYN-17090135
+PR-0870,Kiln Park Medical Clinic,Internal medicine,AD-06523,SYN-12502011
+PR-0871,Sorrel Grove Hospital,Hospital,AD-05792,SYN-89794518
+PR-0872,Amber Lane Chemist,Pharmacy,AD-05510,SYN-74393655
+PR-0873,Brook Field Imaging Centre,Imaging,AD-10438,SYN-68946722
+PR-0874,Brook Square Heart Clinic,Cardiology,AD-06069,SYN-84540906
+PR-0875,Cobble Bank Surgery,General practice,AD-12053,SYN-52576282
+PR-0876,Vetch Grove Surgery,General practice,AD-00289,SYN-52742854
+PR-0877,Iron Field Physiotherapy,Physiotherapy,AD-02630,SYN-76074171
+PR-0878,Wagtail Bank Surgery,General practice,AD-09197,SYN-49221450
+PR-0879,Oak Row Walk-in Clinic,Urgent care,AD-05040,SYN-30662392
+PR-0880,Alder Row Oncology Centre,Oncology,AD-02895,SYN-28783562
+PR-0881,Gorse Lane Medical Clinic,Internal medicine,AD-04075,SYN-93135446
+PR-0882,Vetch Green Counselling Service,Counselling,AD-10522,SYN-14707586
+PR-0883,Thrush Row Eye Clinic,Ophthalmology,AD-06451,SYN-25951864
+PR-0884,Larch Court Walk-in Clinic,Urgent care,AD-05786,SYN-86409989
+PR-0885,Wagtail Row Pharmacy,Pharmacy,AD-02457,SYN-64701633
+PR-0886,Teasel Park Surgery,General practice,AD-06908,SYN-27012043
+PR-0887,Lark Grove Chemist,Pharmacy,AD-05791,SYN-45056429
+PR-0888,Amber Gate Psychiatry Practice,Psychiatry,AD-04858,SYN-16425021
+PR-0889,Amber Court Medical Clinic,Internal medicine,AD-08607,SYN-52818925
+PR-0890,Rowan Green Heart Clinic,Cardiology,AD-09610,
+PR-0891,Chalk Square Surgery,General practice,AD-10501,SYN-83836754
+PR-0892,Sorrel Park Laboratory,Laboratory,AD-01210,SYN-76249299
+PR-0893,Lark Field Counselling Service,Counselling,AD-01438,SYN-30612375
+PR-0894,Ember Green Elderly Care Clinic,Geriatric medicine,AD-09248,SYN-32535945
+PR-0895,Brook Mews Foot Clinic,Podiatry,AD-05094,SYN-56159893
+PR-0896,Lark Lane Counselling Service,Counselling,AD-07352,SYN-28950172
+PR-0897,Chalk Park Eye Clinic,Ophthalmology,AD-05237,SYN-12371928
+PR-0898,Pippin Field Chemist,Pharmacy,AD-01181,SYN-64744532
+PR-0899,Fern Field Medical Clinic,Internal medicine,AD-09715,SYN-71762054
+PR-0900,Dunnock Park Surgery,General practice,AD-04768,SYN-99934874
+PR-0901,Plover Gate Pharmacy,Pharmacy,AD-12010,SYN-79674570
+PR-0902,Vetch Grove Medical Practice,General practice,AD-01927,SYN-90907245
+PR-0903,Bracken House Chemist,Pharmacy,AD-02547,SYN-68067768
+PR-0904,Pippin Square Pharmacy,Pharmacy,AD-09906,
+PR-0905,Rush Gate Medical Practice,General practice,AD-08834,SYN-27560719
+PR-0906,Amber Grove Foot Clinic,Podiatry,AD-03771,SYN-17488204
+PR-0907,Elder Square Orthopaedic Clinic,Orthopaedics,AD-08429,SYN-44872376
+PR-0908,Dunnock Field Chemist,Pharmacy,AD-00266,SYN-53594960
+PR-0909,Yew Row Counselling Service,Counselling,AD-09419,SYN-97911089
+PR-0910,Plover Row Health Centre,General practice,AD-03921,SYN-89151739
+PR-0911,Wagtail Field Heart Clinic,Cardiology,AD-07672,SYN-40138056
+PR-0912,Kiln Hill Imaging Centre,Imaging,AD-05761,SYN-76033993
+PR-0913,Teasel Gate Physiotherapy,Physiotherapy,AD-03101,SYN-84586162
+PR-0914,Nettle Field Counselling Service,Counselling,AD-00357,
+PR-0915,Cobble House Health Centre,General practice,AD-00545,
+PR-0916,Moss Lane Surgery,General practice,AD-08644,SYN-34186107
+PR-0917,Rowan Court Psychiatry Practice,Psychiatry,AD-04556,SYN-20721993
+PR-0918,Wagtail Field Medical Clinic,Internal medicine,AD-10768,SYN-17093566
+PR-0919,Oak Square Medical Clinic,Internal medicine,AD-00808,SYN-31398689
+PR-0920,Nettle Hill Psychiatry Practice,Psychiatry,AD-06426,SYN-45367069
+PR-0921,Nettle Court Counselling Service,Counselling,AD-06927,SYN-74377443
+PR-0922,Teasel Hill Physiotherapy,Physiotherapy,AD-09177,SYN-63151465
+PR-0923,Sedge Grove Walk-in Clinic,Urgent care,AD-00285,SYN-23967260
+PR-0924,Vetch Park Foot Clinic,Podiatry,AD-01563,SYN-93313849
+PR-0925,Kiln Field Pharmacy,Pharmacy,AD-05174,SYN-77006551
+PR-0926,Mill Gate Medical Clinic,Internal medicine,AD-07815,SYN-98351687
+PR-0927,Rush Court Health Centre,General practice,AD-10085,SYN-13601306
+PR-0928,Bracken Bank Medical Practice,General practice,AD-03125,SYN-73674610
+PR-0929,Rowan Field Pharmacy,Pharmacy,AD-07284,
+PR-0930,Flint Park Pharmacy,Pharmacy,AD-08604,SYN-71132157
+PR-0931,Larch Gate Chemist,Pharmacy,AD-07898,SYN-77198037
+PR-0932,Jasper Green Pharmacy,Pharmacy,AD-00709,SYN-74671345
+PR-0933,Cobble Park Chemist,Pharmacy,AD-10453,SYN-86773218
+PR-0934,Bracken Park Chemist,Pharmacy,AD-01467,SYN-53513408
+PR-0935,Quarry Square Chemist,Pharmacy,AD-05122,SYN-37589267
+PR-0936,Hazel Field Skin Clinic,Dermatology,AD-01645,SYN-65500616
+PR-0937,Flint Court Pain Clinic,Pain medicine,AD-05223,SYN-69032113
+PR-0938,Plover Court Physiotherapy,Physiotherapy,AD-03682,SYN-13841537
+PR-0939,Dove Lane Health Centre,General practice,AD-03036,SYN-52945540
+PR-0940,Jasper Grove Counselling Service,Counselling,AD-04761,SYN-42101829
+PR-0941,Hazel Field Surgery,General practice,AD-04562,SYN-27014852
+PR-0942,Kiln Square Foot Clinic,Podiatry,AD-01835,SYN-78910306
+PR-0943,Pippin Row Medical Clinic,Internal medicine,AD-12075,SYN-98606678
+PR-0944,Rowan Bank Chemist,Pharmacy,AD-04961,SYN-83507174
+PR-0945,Sorrel Lane Foot Clinic,Podiatry,AD-04528,SYN-59177109
+PR-0946,Alder Lane Heart Clinic,Cardiology,AD-12592,SYN-33627034
+PR-0947,Elder Hill Pain Clinic,Pain medicine,AD-04224,SYN-84494197
+PR-0948,Iron Square Surgery,General practice,AD-07146,SYN-52897665
+PR-0949,Larch Court Counselling Service,Counselling,AD-02707,SYN-83795281
+PR-0950,Vetch Lane Orthopaedic Clinic,Orthopaedics,AD-11382,SYN-34847029
+PR-0951,Elder Gate Imaging Centre,Imaging,AD-11798,SYN-63100384
+PR-0952,Willow Mews Counselling Service,Counselling,AD-08008,SYN-90345477
+PR-0953,Thrush Court Pharmacy,Pharmacy,AD-09838,SYN-11742415
+PR-0954,Mill Bank Pain Clinic,Pain medicine,AD-10408,SYN-16032051
+PR-0955,Oak Gate Health Centre,General practice,AD-08689,SYN-98614409
+PR-0956,Larch Gate Eye Clinic,Ophthalmology,AD-12103,SYN-18739837
+PR-0957,Iron Hill Medical Practice,General practice,AD-02789,SYN-10523309
+PR-0958,Ember Grove Imaging Centre,Imaging,AD-03069,SYN-53066066
+PR-0959,Chalk Bank Medical Clinic,Internal medicine,AD-05288,SYN-74824608
+PR-0960,Rush House Eye Clinic,Ophthalmology,AD-09384,SYN-27540882
+PR-0961,Nettle Grove Medical Practice,General practice,AD-01308,SYN-37742140
+PR-0962,Cobble Square Pharmacy,Pharmacy,AD-02227,SYN-58343728
+PR-0963,Plover Lane Psychiatry Practice,Psychiatry,AD-04356,SYN-95216115
+PR-0964,Thrush Grove Foot Clinic,Podiatry,AD-10657,SYN-21976553
+PR-0965,Lark Field Physiotherapy,Physiotherapy,AD-10417,SYN-33598198
+PR-0966,Alder Court Oncology Centre,Oncology,AD-00012,SYN-22849671
+PR-0967,Kiln Field Health Centre,General practice,AD-06195,
+PR-0968,Teasel Grove Surgery,General practice,AD-09702,SYN-40184325
+PR-0969,Quarry House Surgery,General practice,AD-00064,SYN-92761874
+PR-0970,Thrush Square Health Centre,General practice,AD-09819,SYN-14919084
+PR-0971,Elder Gate Foot Clinic,Podiatry,AD-05247,SYN-44393257
+PR-0972,Amber Square Medical Practice,General practice,AD-01400,SYN-73579859
+PR-0973,Chalk Lane Pharmacy,Pharmacy,AD-01578,SYN-72342460
+PR-0974,Larch Field Medical Clinic,Internal medicine,AD-11530,SYN-18620360
+PR-0975,Flint Gate Chemist,Pharmacy,AD-03009,SYN-63976985
+PR-0976,Hazel Lane Physiotherapy,Physiotherapy,AD-08849,SYN-19137857
+PR-0977,Lark Hill Medical Practice,General practice,AD-10792,SYN-93768426
+PR-0978,Chalk Road Chemist,Pharmacy,AD-06555,SYN-22390002
+PR-0979,Bracken House Eye Clinic,Ophthalmology,AD-08632,SYN-89627166
+PR-0980,Thrush Field Medical Clinic,Internal medicine,AD-00833,SYN-36889681
+PR-0981,Dove Grove Psychiatry Practice,Psychiatry,AD-12649,SYN-81363039
+PR-0982,Iron Hill Imaging Centre,Imaging,AD-10208,SYN-77058515
+PR-0983,Wagtail Road Medical Practice,General practice,AD-03605,SYN-93334881
+PR-0984,Teasel Square Chemist,Pharmacy,AD-00048,SYN-81800638
+PR-0985,Hazel House Medical Clinic,Internal medicine,AD-08521,SYN-91105047
+PR-0986,Cobble Court Chemist,Pharmacy,AD-03261,SYN-95306264
+PR-0987,Nettle Field Elderly Care Clinic,Geriatric medicine,AD-04186,SYN-56783517
+PR-0988,Willow Road Physiotherapy,Physiotherapy,AD-03158,SYN-68824031
+PR-0989,Gorse Gate Eye Clinic,Ophthalmology,AD-08385,SYN-21265909
+PR-0990,Brook Green Eye Clinic,Ophthalmology,AD-11177,SYN-70629256
+PR-0991,Nettle Bank Chemist,Pharmacy,AD-04056,SYN-25501857
+PR-0992,Kiln Grove Medical Practice,General practice,AD-12418,SYN-74128361
+PR-0993,Kiln Gate Surgery,General practice,AD-09555,SYN-87151301
+PR-0994,Lark Mews Pharmacy,Pharmacy,AD-01576,SYN-56883446
+PR-0995,Pippin Field Foot Clinic,Podiatry,AD-05739,SYN-95991673
+PR-0996,Pippin Bank Physiotherapy,Physiotherapy,AD-04525,SYN-27431493
+PR-0997,Jasper House Physiotherapy,Physiotherapy,AD-02062,SYN-23892992
+PR-0998,Gorse House Medical Clinic,Internal medicine,AD-09188,SYN-68702114
+PR-0999,Moss Lane Chemist,Pharmacy,AD-07535,SYN-65960692
+PR-1000,Bracken Park Hospital,Hospital,AD-03880,SYN-44359649
+PR-1001,Thrush Square Psychiatry Practice,Psychiatry,AD-04911,SYN-34250125
+PR-1002,Rush Bank Pharmacy,Pharmacy,AD-03556,SYN-98872003
+PR-1003,Brook Hill Physiotherapy,Physiotherapy,AD-06977,SYN-58597347
+PR-1004,Dunnock Park Foot Clinic,Podiatry,AD-00321,SYN-83458882
+PR-1005,Gorse House Chemist,Pharmacy,AD-01752,SYN-43857573
+PR-1006,Chalk Hill Eye Clinic,Ophthalmology,AD-09282,SYN-89518965
+PR-1007,Wagtail Field Counselling Service,Counselling,AD-09276,SYN-63367050
+PR-1008,Nettle Row Laboratory,Laboratory,AD-00727,SYN-41985357
+PR-1009,Oak Row Health Centre,General practice,AD-10179,SYN-26258138
+PR-1010,Wagtail Row Chemist,Pharmacy,AD-00758,SYN-72976210
+PR-1011,Yew Square Chemist,Pharmacy,AD-02511,SYN-67458768
+PR-1012,Hazel Road Chemist,Pharmacy,AD-10014,SYN-95406257
+PR-1013,Dunnock Lane Heart Clinic,Cardiology,AD-12007,SYN-51032903
+PR-1014,Pippin Green Heart Clinic,Cardiology,AD-11119,SYN-28305264
+PR-1015,Plover Row Medical Clinic,Internal medicine,AD-11535,SYN-61718930
+PR-1016,Kiln Road Pharmacy,Pharmacy,AD-11126,
+PR-1017,Mill Hill Medical Clinic,Internal medicine,AD-00095,SYN-96917592
+PR-1018,Rush Square Physiotherapy,Physiotherapy,AD-11994,SYN-73077507
+PR-1019,Quarry Grove Surgery,General practice,AD-05451,SYN-63537762
+PR-1020,Alder Court Surgery,General practice,AD-05710,SYN-72882622
+PR-1021,Alder Hill Walk-in Clinic,Urgent care,AD-01497,SYN-76564795
+PR-1022,Sedge Gate Pharmacy,Pharmacy,AD-00297,SYN-53327404
+PR-1023,Cobble Row Surgery,General practice,AD-01539,
+PR-1024,Iron Row Chemist,Pharmacy,AD-00998,SYN-62276789
+PR-1025,Kiln Square Walk-in Clinic,Urgent care,AD-00636,SYN-63305334
+PR-1026,Rush Court Surgery,General practice,AD-10549,SYN-98760746
+PR-1027,Teasel Mews Physiotherapy,Physiotherapy,AD-02573,SYN-43902761
+PR-1028,Willow Field Walk-in Clinic,Urgent care,AD-03607,SYN-64752928
+PR-1029,Teasel Mews Health Centre,General practice,AD-07783,SYN-58908521
+PR-1030,Mill Park Pharmacy,Pharmacy,AD-12530,SYN-18242671
+PR-1031,Yew House Laboratory,Laboratory,AD-02860,SYN-24644381
+PR-1032,Sedge House Chemist,Pharmacy,AD-05199,SYN-51081041
+PR-1033,Sorrel Road Medical Practice,General practice,AD-07911,SYN-90314449
+PR-1034,Plover Road Chemist,Pharmacy,AD-03530,SYN-49888541
+PR-1035,Rush Row Health Centre,General practice,AD-01190,SYN-31721899
+PR-1036,Chalk Lane Oncology Centre,Oncology,AD-03408,SYN-45268291
+PR-1037,Wagtail Square Surgery,General practice,AD-04411,SYN-59071271
+PR-1038,Rush Lane Psychiatry Practice,Psychiatry,AD-05812,SYN-39976664
+PR-1039,Thrush Mews Eye Clinic,Ophthalmology,AD-10629,SYN-86966713
+PR-1040,Plover Hill Foot Clinic,Podiatry,AD-05162,SYN-72460787
+PR-1041,Kiln Lane Pharmacy,Pharmacy,AD-06220,SYN-70397701
+PR-1042,Rowan Square Foot Clinic,Podiatry,AD-03763,SYN-35498134
+PR-1043,Rush Bank Heart Clinic,Cardiology,AD-05056,SYN-53528086
+PR-1044,Rowan Row Pharmacy,Pharmacy,AD-08304,SYN-78615188
+PR-1045,Gorse Hill Pharmacy,Pharmacy,AD-07877,SYN-84865329
+PR-1046,Dunnock House Laboratory,Laboratory,AD-05865,SYN-24380048
+PR-1047,Chalk Row Counselling Service,Counselling,AD-10581,SYN-45399616
+PR-1048,Gorse Mews Orthopaedic Clinic,Orthopaedics,AD-04388,SYN-14103296
+PR-1049,Nettle Gate Psychiatry Practice,Psychiatry,AD-12451,SYN-48190271
+PR-1050,Flint Row Pain Clinic,Pain medicine,AD-06358,SYN-28283194
+PR-1051,Kiln Park Psychiatry Practice,Psychiatry,AD-10062,SYN-13539940
+PR-1052,Rush House Orthopaedic Clinic,Orthopaedics,AD-07793,SYN-14149402
+PR-1053,Rowan Mews Surgery,General practice,AD-07569,SYN-88614467
+PR-1054,Rush Bank Hospital,Hospital,AD-07376,SYN-94989368
+PR-1055,Lark House Laboratory,Laboratory,AD-02365,SYN-93895280
+PR-1056,Rush Hill Eye Clinic,Ophthalmology,AD-12743,SYN-80841415
+PR-1057,Dunnock Square Skin Clinic,Dermatology,AD-12588,SYN-90795113
+PR-1058,Rowan Court Orthopaedic Clinic,Orthopaedics,AD-06614,SYN-64921075
+PR-1059,Moss Court Medical Practice,General practice,AD-10100,SYN-46460880
+PR-1060,Sedge Square Chemist,Pharmacy,AD-10916,SYN-33060885
+PR-1061,Iron Square Medical Clinic,Internal medicine,AD-11608,SYN-21909281
+PR-1062,Vetch Road Medical Clinic,Internal medicine,AD-02838,SYN-72864244
+PR-1063,Kiln House Chemist,Pharmacy,AD-09319,SYN-39479963
+PR-1064,Ember Field Oncology Centre,Oncology,AD-12651,SYN-12804092
+PR-1065,Ember Bank Physiotherapy,Physiotherapy,AD-04438,SYN-12466395
+PR-1066,Wagtail Square Foot Clinic,Podiatry,AD-00058,SYN-39956575
+PR-1067,Ember Road Chemist,Pharmacy,AD-07746,SYN-39544187
+PR-1068,Chalk Road Pain Clinic,Pain medicine,AD-02381,SYN-79821604
+PR-1069,Sedge Park Chemist,Pharmacy,AD-01803,SYN-79204710
+PR-1070,Elder Hill Pharmacy,Pharmacy,AD-09066,SYN-17829242
+PR-1071,Kiln Park Elderly Care Clinic,Geriatric medicine,AD-06117,SYN-25572540
+PR-1072,Dove Square Skin Clinic,Dermatology,AD-06454,SYN-85322736
+PR-1073,Brook Road Medical Practice,General practice,AD-10526,SYN-14537961
+PR-1074,Dove Mews Health Centre,General practice,AD-03375,SYN-23939787
+PR-1075,Larch Road Chemist,Pharmacy,AD-04730,SYN-35630386
+PR-1076,Hazel Road Health Centre,General practice,AD-00426,SYN-79588883
+PR-1077,Nettle Mews Medical Practice,General practice,AD-08321,SYN-74139735
+PR-1078,Sorrel Road Pharmacy,Pharmacy,AD-07533,SYN-40645577
+PR-1079,Cobble Field Orthopaedic Clinic,Orthopaedics,AD-09289,SYN-21267933
+PR-1080,Ember Mews Medical Clinic,Internal medicine,AD-04377,SYN-99042555
+PR-1081,Vetch Lane Health Centre,General practice,AD-02267,SYN-58714331
+PR-1082,Oak Road Oncology Centre,Oncology,AD-06673,SYN-86996563
+PR-1083,Alder Road Eye Clinic,Ophthalmology,AD-08888,SYN-62924435
+PR-1084,Gorse Green Elderly Care Clinic,Geriatric medicine,AD-08832,SYN-67710530
+PR-1085,Fern Park Medical Practice,General practice,AD-12802,SYN-39934408
+PR-1086,Rush Field Psychiatry Practice,Psychiatry,AD-05067,SYN-11185394
+PR-1087,Jasper Mews Walk-in Clinic,Urgent care,AD-03991,SYN-29630576
+PR-1088,Mill Lane Laboratory,Laboratory,AD-00613,SYN-52381807
+PR-1089,Yew House Medical Clinic,Internal medicine,AD-08383,SYN-59423201
+PR-1090,Vetch Field Health Centre,General practice,AD-05534,SYN-47943805
+PR-1091,Dunnock House Surgery,General practice,AD-06298,SYN-24342041
+PR-1092,Dunnock Row Psychiatry Practice,Psychiatry,AD-10834,SYN-75413175
+PR-1093,Ember Gate Walk-in Clinic,Urgent care,AD-08170,SYN-96994437
+PR-1094,Willow Green Eye Clinic,Ophthalmology,AD-08300,SYN-25254490
+PR-1095,Dove Court Medical Practice,General practice,AD-00506,SYN-58104711
+PR-1096,Teasel Row Pharmacy,Pharmacy,AD-06276,SYN-38271486
+PR-1097,Flint Mews Surgery,General practice,AD-11271,SYN-95148753
+PR-1098,Vetch Field Heart Clinic,Cardiology,AD-09671,SYN-69330944
+PR-1099,Oak Lane Pharmacy,Pharmacy,AD-08826,SYN-78631898
+PR-1100,Sedge Bank Heart Clinic,Cardiology,AD-06930,SYN-89227709
+PR-1101,Lark Row Physiotherapy,Physiotherapy,AD-07670,SYN-87208247
+PR-1102,Moss Mews Health Centre,General practice,AD-00537,SYN-57611616
+PR-1103,Rowan House Heart Clinic,Cardiology,AD-07487,SYN-45709851
+PR-1104,Vetch Row Oncology Centre,Oncology,AD-03806,
+PR-1105,Cobble Square Chemist,Pharmacy,AD-03582,SYN-12447303
+PR-1106,Oak Lane Orthopaedic Clinic,Orthopaedics,AD-01736,SYN-35889816
+PR-1107,Elder Park Health Centre,General practice,AD-09344,SYN-76394628
+PR-1108,Nettle Row Heart Clinic,Cardiology,AD-07269,SYN-31525732
+PR-1109,Cobble Lane Chemist,Pharmacy,AD-04707,SYN-12143242
+PR-1110,Gorse Field Walk-in Clinic,Urgent care,AD-12159,SYN-53539411
+PR-1111,Mill Row Heart Clinic,Cardiology,AD-07297,SYN-43705415
+PR-1112,Sorrel Grove Chemist,Pharmacy,AD-05982,SYN-25286412
+PR-1113,Sorrel Bank Psychiatry Practice,Psychiatry,AD-05143,SYN-31809501
+PR-1114,Lark Road Laboratory,Laboratory,AD-08922,SYN-40932968
+PR-1115,Alder Park Medical Practice,General practice,AD-06600,SYN-24928427
+PR-1116,Amber Hill Medical Clinic,Internal medicine,AD-12727,SYN-60392140
+PR-1117,Brook Grove Walk-in Clinic,Urgent care,AD-10488,SYN-47745148
+PR-1118,Hazel Lane Walk-in Clinic,Urgent care,AD-09327,SYN-40435705
+PR-1119,Elder Row Medical Clinic,Internal medicine,AD-11788,SYN-35956315
+PR-1120,Vetch Hill Health Centre,General practice,AD-02541,SYN-88812215
+PR-1121,Bracken Field Surgery,General practice,AD-11000,SYN-65007797
+PR-1122,Oak Gate Chemist,Pharmacy,AD-09931,
+PR-1123,Lark Green Foot Clinic,Podiatry,AD-08346,SYN-74827193
+PR-1124,Chalk Park Pain Clinic,Pain medicine,AD-07946,SYN-61679686
+PR-1125,Wagtail Grove Counselling Service,Counselling,AD-02779,SYN-19547835
+PR-1126,Gorse Court Medical Practice,General practice,AD-09462,SYN-54911510
+PR-1127,Willow Field Oncology Centre,Oncology,AD-00950,SYN-53831073
+PR-1128,Fern Court Skin Clinic,Dermatology,AD-03974,SYN-75448866
+PR-1129,Saltmere Bay Hospital,Hospital,AD-08580,SYN-14731044
+PR-1130,Cobble Road Pharmacy,Pharmacy,AD-01010,SYN-45262410
+PR-1131,Kiln Green Chemist,Pharmacy,AD-09038,SYN-23337232
+PR-1132,Bracken Green Chemist,Pharmacy,AD-04897,SYN-83176107
+PR-1133,Bracken Court Eye Clinic,Ophthalmology,AD-01595,SYN-70761199
+PR-1134,Oak Gate Heart Clinic,Cardiology,AD-07781,
+PR-1135,Alder Road Chemist,Pharmacy,AD-12637,SYN-88802786
+PR-1136,Brook Row Psychiatry Practice,Psychiatry,AD-12476,SYN-14755574
+PR-1137,Bracken Park Pharmacy,Pharmacy,AD-06339,SYN-88906716
+PR-1138,Mill Field Health Centre,General practice,AD-06388,
+PR-1139,Oak Mews Walk-in Clinic,Urgent care,AD-09884,SYN-65236697
+PR-1140,Oak Hill Psychiatry Practice,Psychiatry,AD-08764,SYN-92014789
+PR-1141,Cobble Road Chemist,Pharmacy,AD-11223,SYN-75048816
+PR-1142,Ember Row Psychiatry Practice,Psychiatry,AD-02016,SYN-42046685
+PR-1143,Dove Grove Orthopaedic Clinic,Orthopaedics,AD-04787,SYN-62751673
+PR-1144,Nettle Gate Pharmacy,Pharmacy,AD-07391,SYN-36491947
+PR-1145,Ember Road Physiotherapy,Physiotherapy,AD-10807,SYN-22687125
+PR-1146,Kiln Bank Medical Practice,General practice,AD-12139,SYN-41120427
+PR-1147,Alder Mews Health Centre,General practice,AD-05567,SYN-95661771
+PR-1148,Nettle Gate Medical Practice,General practice,AD-01605,SYN-68436555
+PR-1149,Vetch House Surgery,General practice,AD-07251,SYN-65826100
+PR-1150,Flintcross Pain Clinic,Pain medicine,AD-00437,SYN-95972439
+PR-1151,Bracken Road Eye Clinic,Ophthalmology,AD-01174,SYN-76069327
+PR-1152,Nettle Road Foot Clinic,Podiatry,AD-03132,SYN-15401356
+PR-1153,Chalk Mews Surgery,General practice,AD-10389,SYN-20423362
+PR-1154,Plover Hill Walk-in Clinic,Urgent care,AD-00561,SYN-55122440
+PR-1155,Larch Square Imaging Centre,Imaging,AD-10686,SYN-16969992
+PR-1156,Kiln Gate Eye Clinic,Ophthalmology,AD-10894,SYN-92573369
+PR-1157,Vetch Lane Chemist,Pharmacy,AD-10586,SYN-41929088
+PR-1158,Wagtail Gate Orthopaedic Clinic,Orthopaedics,AD-08408,SYN-17697436
+PR-1159,Dove Grove Skin Clinic,Dermatology,AD-08379,SYN-67049438
+PR-1160,Rush Court Physiotherapy,Physiotherapy,AD-07850,SYN-55529620
+PR-1161,Amber Field Medical Practice,General practice,AD-01151,SYN-39626084
+PR-1162,Mill Hill Counselling Service,Counselling,AD-06111,SYN-32412338
+PR-1163,Sedge Court Laboratory,Laboratory,AD-00486,SYN-58350736
+PR-1164,Teasel Green Psychiatry Practice,Psychiatry,AD-07782,SYN-91564273
+PR-1165,Quarry Field Foot Clinic,Podiatry,AD-10155,SYN-27858131
+PR-1166,Teasel Mews Orthopaedic Clinic,Orthopaedics,AD-07002,SYN-74100689
+PR-1167,Iron Gate Chemist,Pharmacy,AD-01967,SYN-56398946
+PR-1168,Rowan Gate Heart Clinic,Cardiology,AD-04326,SYN-18115654
+PR-1169,Hazel Court Chemist,Pharmacy,AD-09234,SYN-85396501
+PR-1170,Emberlea Imaging Centre,Imaging,AD-12205,SYN-90691602
+PR-1171,Moss Square Physiotherapy,Physiotherapy,AD-07735,SYN-87643563
+PR-1172,Cobble Gate Chemist,Pharmacy,AD-07233,SYN-61937442
+PR-1173,Jasper Road Counselling Service,Counselling,AD-11568,SYN-65439692
+PR-1174,Elder Court Chemist,Pharmacy,AD-02336,SYN-10200432
+PR-1175,Wagtail Row Elderly Care Clinic,Geriatric medicine,AD-08524,SYN-55460111
+PR-1176,Kiln Green Walk-in Clinic,Urgent care,AD-00991,SYN-69198559
+PR-1177,Lark Grove Surgery,General practice,AD-09993,SYN-54831810
+PR-1178,Jasper House Psychiatry Practice,Psychiatry,AD-05211,SYN-63811280
+PR-1179,Nettle Green Physiotherapy,Physiotherapy,AD-06464,SYN-30560963
+PR-1180,Lark Lane Walk-in Clinic,Urgent care,AD-01900,SYN-90553462
+PR-1181,Larch Square Pharmacy,Pharmacy,AD-00084,SYN-75000446
+PR-1182,Iron Row Surgery,General practice,AD-12531,SYN-15199902
+PR-1183,Hazel Grove Pharmacy,Pharmacy,AD-05235,SYN-88120354
+PR-1184,Vetch House Chemist,Pharmacy,AD-01979,SYN-17719996
+PR-1185,Plover Lane Heart Clinic,Cardiology,AD-08780,SYN-36484145
+PR-1186,Rowan Row Oncology Centre,Oncology,AD-03086,SYN-67758152
+PR-1187,Quarry Grove Chemist,Pharmacy,AD-02046,SYN-60386460
+PR-1188,Alder Gate Medical Practice,General practice,AD-08293,SYN-67354173
+PR-1189,Amber Bank Medical Practice,General practice,AD-07505,
+PR-1190,Larch Field Walk-in Clinic,Urgent care,AD-10900,SYN-81170617
+PR-1191,Moss Court Surgery,General practice,AD-01207,SYN-89663100
+PR-1192,Chalk Row Physiotherapy,Physiotherapy,AD-03881,
+PR-1193,Rush Square Chemist,Pharmacy,AD-00458,SYN-24239995
+PR-1194,Moss Road Health Centre,General practice,AD-02362,SYN-50447732
+PR-1195,Brook Court Orthopaedic Clinic,Orthopaedics,AD-02101,SYN-23761207
+PR-1196,Cobble Hill Medical Clinic,Internal medicine,AD-04361,SYN-43808224
+PR-1197,Dove Lane Physiotherapy,Physiotherapy,AD-11233,SYN-27859338
+PR-1198,Nettle Mews Orthopaedic Clinic,Orthopaedics,AD-04608,SYN-33634497
+PR-1199,Gorse Lane Heart Clinic,Cardiology,AD-10874,SYN-25401786
+PR-1200,Fern Gate Pharmacy,Pharmacy,AD-02729,SYN-28968448
+PR-1201,Moss Square Surgery,General practice,AD-11022,SYN-29327013
+PR-1202,Pippin Mews Health Centre,General practice,AD-08971,SYN-35820352
+PR-1203,Vetch Bank Physiotherapy,Physiotherapy,AD-03295,SYN-93198044
+PR-1204,Hazel Green Health Centre,General practice,AD-01890,SYN-29618349
+PR-1205,Thrush Field Walk-in Clinic,Urgent care,AD-07032,SYN-29114176
+PR-1206,Rowan Gate Medical Clinic,Internal medicine,AD-09209,SYN-63340712
+PR-1207,Jasper Row Walk-in Clinic,Urgent care,AD-09364,SYN-19039671
+PR-1208,Dunnock Green Eye Clinic,Ophthalmology,AD-09921,SYN-99629449
+PR-1209,Gorse Hill Physiotherapy,Physiotherapy,AD-04580,SYN-30720500
+PR-1210,Iron Lane Physiotherapy,Physiotherapy,AD-11175,SYN-80384995
+PR-1211,Flint Road Medical Practice,General practice,AD-00920,SYN-94397534
+PR-1212,Bracken Row Health Centre,General practice,AD-11602,
+PR-1213,Chalk Green Skin Clinic,Dermatology,AD-10561,SYN-33687090
+PR-1214,Mill Park Eye Clinic,Ophthalmology,AD-03612,
+PR-1215,Amber Hill Pain Clinic,Pain medicine,AD-01848,SYN-56292784
+PR-1216,Thrush House Eye Clinic,Ophthalmology,AD-02878,SYN-73880825
+PR-1217,Thrush House Pharmacy,Pharmacy,AD-06342,SYN-79168177
+PR-1218,Sedge Square Counselling Service,Counselling,AD-07349,SYN-22714536
+PR-1219,Elder Lane Surgery,General practice,AD-05689,SYN-50468310
+PR-1220,Bracken Grove Medical Practice,General practice,AD-03539,SYN-59061733
+PR-1221,Dunnock Hill Medical Clinic,Internal medicine,AD-07842,SYN-59860611
+PR-1222,Hazel Square Medical Practice,General practice,AD-05564,SYN-64670927
+PR-1223,Vetch Hill Psychiatry Practice,Psychiatry,AD-03827,SYN-72735359
+PR-1224,Amber Row Health Centre,General practice,AD-12161,SYN-41136711
+PR-1225,Alder Court Walk-in Clinic,Urgent care,AD-09350,SYN-18460767
+PR-1226,Amber Grove Surgery,General practice,AD-04399,SYN-28339131
+PR-1227,Jasper Grove Eye Clinic,Ophthalmology,AD-08203,SYN-44531231
+PR-1228,Nettle Row Foot Clinic,Podiatry,AD-11286,SYN-12423376
+PR-1229,Oak Mews Medical Clinic,Internal medicine,AD-04605,SYN-19163277
+PR-1230,Lark Hill Pharmacy,Pharmacy,AD-11348,SYN-98127696
+PR-1231,Rowan Park Hospital,Hospital,AD-03374,SYN-64642541
+PR-1232,Fern Road Skin Clinic,Dermatology,AD-00094,SYN-48443306
+PR-1233,Sedge Bank Medical Clinic,Internal medicine,AD-06173,SYN-56343410
+PR-1234,Rowan Mews Counselling Service,Counselling,AD-11604,SYN-46373700
+PR-1235,Alder Square Medical Clinic,Internal medicine,AD-09088,SYN-70896505
+PR-1236,Willow Square Counselling Service,Counselling,AD-02423,SYN-89585771
+PR-1237,Quarry Gate Surgery,General practice,AD-12759,SYN-81069316
+PR-1238,Elder Bank Health Centre,General practice,AD-04947,SYN-39868884
+PR-1239,Dove Bank Physiotherapy,Physiotherapy,AD-11781,SYN-67865495
+PR-1240,Plover House Heart Clinic,Cardiology,AD-03227,SYN-56965887
+PR-1241,Sedgefold Physiotherapy,Physiotherapy,AD-10587,SYN-82931416
+PR-1242,Nettle House Medical Practice,General practice,AD-00827,SYN-51269009
+PR-1243,Rowan Court Chemist,Pharmacy,AD-00845,SYN-96748900
+PR-1244,Fern Grove Medical Clinic,Internal medicine,AD-12831,SYN-48409270
+PR-1245,Rush Row Medical Practice,General practice,AD-10815,SYN-67337114
+PR-1246,Fern Green Hospital,Hospital,AD-09047,SYN-25006729
+PR-1247,Chalk Hill Foot Clinic,Podiatry,AD-07243,SYN-62487305
+PR-1248,Sedge Hill Skin Clinic,Dermatology,AD-07536,SYN-52376860
+PR-1249,Rowan Court Skin Clinic,Dermatology,AD-04198,SYN-54706224
+PR-1250,Lark Square Counselling Service,Counselling,AD-00579,SYN-54415262
+PR-1251,Quarry House Walk-in Clinic,Urgent care,AD-04940,SYN-36427686
+PR-1252,Alder Mews Surgery,General practice,AD-00524,SYN-75732891
+PR-1253,Dunnock Mews Chemist,Pharmacy,AD-10180,SYN-47097931
+PR-1254,Iron Hill Eye Clinic,Ophthalmology,AD-12066,SYN-78250170
+PR-1255,Bracken Hill Chemist,Pharmacy,AD-01509,SYN-99171495
+PR-1256,Oak Lane Physiotherapy,Physiotherapy,AD-05369,SYN-99871690
+PR-1257,Rowan Park Eye Clinic,Ophthalmology,AD-05448,SYN-42782327
+PR-1258,Amber Park Eye Clinic,Ophthalmology,AD-07919,SYN-80165471
+PR-1259,Mill Grove Health Centre,General practice,AD-06165,SYN-39066898
+PR-1260,Fern Lane Heart Clinic,Cardiology,AD-04087,SYN-32721339
+PR-1261,Quarry Grove Orthopaedic Clinic,Orthopaedics,AD-08694,SYN-17188908
+PR-1262,Sedge Lane Surgery,General practice,AD-05541,SYN-51349435
+PR-1263,Fern Grove Orthopaedic Clinic,Orthopaedics,AD-09886,SYN-26064293
+PR-1264,Larch Gate Health Centre,General practice,AD-03432,SYN-35878777
+PR-1265,Gorse Square Foot Clinic,Podiatry,AD-11717,SYN-20573249
+PR-1266,Pippin Field Hospital,Hospital,AD-10578,SYN-94319517
+PR-1267,Dunnock Grove Medical Clinic,Internal medicine,AD-02148,SYN-59989264
+PR-1268,Dunnock Hill Medical Practice,General practice,AD-02673,SYN-18720007
+PR-1269,Quarry Row Physiotherapy,Physiotherapy,AD-12408,SYN-27135271
+PR-1270,Ember Row Chemist,Pharmacy,AD-11289,SYN-90350025
+PR-1271,Moss Gate Physiotherapy,Physiotherapy,AD-04208,SYN-95332292
+PR-1272,Jasper Gate Physiotherapy,Physiotherapy,AD-12190,SYN-86103136
+PR-1273,Dunnock House Eye Clinic,Ophthalmology,AD-02149,SYN-99873165
+PR-1274,Brook Park Foot Clinic,Podiatry,AD-11384,SYN-66221315
+PR-1275,Mill Road Skin Clinic,Dermatology,AD-05467,SYN-54624038
+PR-1276,Gorse Grove Chemist,Pharmacy,AD-11880,SYN-46381954
+PR-1277,Rowan Grove Chemist,Pharmacy,AD-07671,SYN-25409961
+PR-1278,Quarry Lane Orthopaedic Clinic,Orthopaedics,AD-01642,SYN-84466083
+PR-1279,Pippin Grove Surgery,General practice,AD-02247,SYN-40282677
+PR-1280,Teasel Grove Pharmacy,Pharmacy,AD-00541,SYN-79352020
+PR-1281,Rush Green Medical Clinic,Internal medicine,AD-06595,SYN-58872547
+PR-1282,Nettle Hill Counselling Service,Counselling,AD-07342,SYN-57211354
+PR-1283,Iron Road Surgery,General practice,AD-12116,SYN-96210144
+PR-1284,Elder Square Eye Clinic,Ophthalmology,AD-10748,SYN-24554876
+PR-1285,Teasel Square Surgery,General practice,AD-02751,SYN-96121057
+PR-1286,Mill House Orthopaedic Clinic,Orthopaedics,AD-00874,SYN-69685272
+PR-1287,Dove Green Orthopaedic Clinic,Orthopaedics,AD-08741,SYN-31449615
+PR-1288,Rowan Court Eye Clinic,Ophthalmology,AD-11916,SYN-93876565
+PR-1289,Wagtail Grove Orthopaedic Clinic,Orthopaedics,AD-06610,SYN-11400082
+PR-1290,Pippin Green Pharmacy,Pharmacy,AD-02385,SYN-18288559
+PR-1291,Wagtail House Psychiatry Practice,Psychiatry,AD-04409,SYN-70827272
+PR-1292,Dunnock Square Pharmacy,Pharmacy,AD-02212,SYN-14089631
+PR-1293,Wagtail Hill Counselling Service,Counselling,AD-03089,
+PR-1294,Sorrel Field Health Centre,General practice,AD-04124,SYN-69485463
+PR-1295,Quarry Bank Counselling Service,Counselling,AD-09230,SYN-86915799
+PR-1296,Wagtail Lane Medical Clinic,Internal medicine,AD-10086,SYN-60042824
+PR-1297,Alder Road Health Centre,General practice,AD-11691,SYN-88498040
+PR-1298,Brook Grove Pharmacy,Pharmacy,AD-01397,SYN-47275655
+PR-1299,Teasel Park Medical Practice,General practice,AD-11027,SYN-48990789
+PR-1300,Kiln Lane Skin Clinic,Dermatology,AD-05933,SYN-48186449
+PR-1301,Moss Hill Counselling Service,Counselling,AD-03303,SYN-66451055
+PR-1302,Teasel House Medical Clinic,Internal medicine,AD-09867,SYN-44173040
+PR-1303,Sedge Grove Imaging Centre,Imaging,AD-08902,SYN-85480943
+PR-1304,Dunnock Road Pharmacy,Pharmacy,AD-11898,SYN-38737701
+PR-1305,Teasel Gate Health Centre,General practice,AD-01253,SYN-53582783
+PR-1306,Willow Park Skin Clinic,Dermatology,AD-11428,SYN-67134753
+PR-1307,Fern Road Medical Clinic,Internal medicine,AD-07390,SYN-95870664
+PR-1308,Fern Mews Physiotherapy,Physiotherapy,AD-12687,SYN-38287815
+PR-1309,Willow Hill Chemist,Pharmacy,AD-04244,SYN-33685194
+PR-1310,Nettle Park Health Centre,General practice,AD-05362,SYN-55360872
+PR-1311,Pippin Green Medical Clinic,Internal medicine,AD-08076,SYN-29826695
+PR-1312,Larch Park Heart Clinic,Cardiology,AD-00826,SYN-38243630
+PR-1313,Brook Hill Health Centre,General practice,AD-01611,SYN-82153794
+PR-1314,Wagtail Row Physiotherapy,Physiotherapy,AD-10623,SYN-89443156
+PR-1315,Alder Bank Eye Clinic,Ophthalmology,AD-04036,SYN-94340076
+PR-1316,Iron Square Health Centre,General practice,AD-10904,SYN-33301850
+PR-1317,Brook Mews Counselling Service,Counselling,AD-01991,SYN-45558752
+PR-1318,Mill Bank Pharmacy,Pharmacy,AD-09990,SYN-60193422
+PR-1319,Amber Square Pharmacy,Pharmacy,AD-11070,SYN-54486197
+PR-1320,Gorse Field Oncology Centre,Oncology,AD-11688,SYN-54856422
+PR-1321,Lark Square Walk-in Clinic,Urgent care,AD-06182,SYN-88144121
+PR-1322,Wagtail Square Medical Practice,General practice,AD-06479,SYN-67532912
+PR-1323,Iron Hill Pain Clinic,Pain medicine,AD-03177,SYN-77616309
+PR-1324,Sorrel Square Imaging Centre,Imaging,AD-04581,SYN-53600843
+PR-1325,Bracken Bank Surgery,General practice,AD-08738,SYN-42672138
+PR-1326,Wagtail Green Physiotherapy,Physiotherapy,AD-01241,SYN-51708582
+PR-1327,Rowan Field Eye Clinic,Ophthalmology,AD-12508,SYN-66459950
+PR-1328,Elder Bank Skin Clinic,Dermatology,AD-11560,SYN-72557116
+PR-1329,Nettle Green Medical Clinic,Internal medicine,AD-06091,SYN-29184678
+PR-1330,Bracken Bank Pain Clinic,Pain medicine,AD-10702,SYN-98692952
+PR-1331,Quarry Green Heart Clinic,Cardiology,AD-07980,SYN-10828460
+PR-1332,Jasper Lane Walk-in Clinic,Urgent care,AD-03871,
+PR-1333,Sedge Mews Surgery,General practice,AD-03746,SYN-97434874
+PR-1334,Oak House Medical Clinic,Internal medicine,AD-03040,SYN-79103568
+PR-1335,Cobble Mews Chemist,Pharmacy,AD-08395,SYN-80467652
+PR-1336,Mill House Eye Clinic,Ophthalmology,AD-04982,SYN-66739732
+PR-1337,Fern Bank Surgery,General practice,AD-05610,SYN-16034480
+PR-1338,Elder Grove Health Centre,General practice,AD-09318,SYN-33087812
+PR-1339,Thrush Gate Health Centre,General practice,AD-10890,SYN-85116088
+PR-1340,Elder Mews Medical Practice,General practice,AD-00610,SYN-58381679
+PR-1341,Elder Row Surgery,General practice,AD-04041,SYN-76578923
+PR-1342,Thrush Field Orthopaedic Clinic,Orthopaedics,AD-08498,SYN-78357345
+PR-1343,Mill Green Health Centre,General practice,AD-08228,SYN-47857950
+PR-1344,Bracken Row Chemist,Pharmacy,AD-06799,SYN-37794213
+PR-1345,Cobble House Medical Practice,General practice,AD-06020,SYN-83177189
+PR-1346,Wagtail Bank Walk-in Clinic,Urgent care,AD-06085,SYN-27089323
+PR-1347,Rush Hill Health Centre,General practice,AD-04698,SYN-55962531
+PR-1348,Quarry Grove Counselling Service,Counselling,AD-00782,SYN-30673094
+PR-1349,Yew Row Medical Practice,General practice,AD-01195,SYN-10040596
+PR-1350,Moss Green Medical Practice,General practice,AD-11152,
+PR-1351,Alder Grove Skin Clinic,Dermatology,AD-04134,SYN-15080356
+PR-1352,Sorrel Gate Physiotherapy,Physiotherapy,AD-12081,SYN-76825955
+PR-1353,Pippin Road Surgery,General practice,AD-01282,SYN-65525547
+PR-1354,Moss Hill Eye Clinic,Ophthalmology,AD-07933,SYN-25312711
+PR-1355,Willow Lane Chemist,Pharmacy,AD-01245,SYN-81924651
+PR-1356,Ember Hill Eye Clinic,Ophthalmology,AD-08597,SYN-78491830
+PR-1357,Alder Hill Health Centre,General practice,AD-07658,SYN-38382618
+PR-1358,Larch Park Health Centre,General practice,AD-09647,SYN-15661414
+PR-1359,Sedge House Walk-in Clinic,Urgent care,AD-00770,SYN-23652416
+PR-1360,Mill Field Pharmacy,Pharmacy,AD-12255,SYN-93758924
+PR-1361,Flint Bank Medical Practice,General practice,AD-02980,SYN-92900137
+PR-1362,Rowan Hill Medical Practice,General practice,AD-04750,SYN-69572300
+PR-1363,Willow Grove Medical Practice,General practice,AD-10651,SYN-79688694
+PR-1364,Brook Green Psychiatry Practice,Psychiatry,AD-10754,SYN-16642501
+PR-1365,Amber House Skin Clinic,Dermatology,AD-02507,SYN-19674590
+PR-1366,Cobble House Pharmacy,Pharmacy,AD-08658,SYN-90974819
+PR-1367,Plover Row Pharmacy,Pharmacy,AD-10588,SYN-54364381
+PR-1368,Dove Bank Psychiatry Practice,Psychiatry,AD-07597,SYN-21282617
+PR-1369,Teasel House Pharmacy,Pharmacy,AD-08202,SYN-37898240
+PR-1370,Plover Road Elderly Care Clinic,Geriatric medicine,AD-07069,SYN-32078762
+PR-1371,Gorse Gate Psychiatry Practice,Psychiatry,AD-02168,SYN-69961919
+PR-1372,Jasper Court Chemist,Pharmacy,AD-09272,SYN-35476903
+PR-1373,Brook Field Surgery,General practice,AD-05485,SYN-13081107
+PR-1374,Flint Mews Health Centre,General practice,AD-00119,SYN-12245997
+PR-1375,Fern Bank Psychiatry Practice,Psychiatry,AD-01277,SYN-36234091
+PR-1376,Brook Mews Orthopaedic Clinic,Orthopaedics,AD-06740,SYN-44446010
+PR-1377,Cobble Row Skin Clinic,Dermatology,AD-10032,SYN-75600851
+PR-1378,Ember Lane Health Centre,General practice,AD-05785,SYN-66840821
+PR-1379,Plover Row Physiotherapy,Physiotherapy,AD-07624,SYN-57179593
+PR-1380,Rush Square Surgery,General practice,AD-08763,SYN-42892489
+PR-1381,Lark Row Surgery,General practice,AD-06312,SYN-94785839
+PR-1382,Bracken Court Pharmacy,Pharmacy,AD-10899,SYN-92448285
+PR-1383,Kiln Row Chemist,Pharmacy,AD-02877,SYN-88409229
+PR-1384,Mill House Medical Practice,General practice,AD-01960,SYN-80042451
+PR-1385,Wagtail Green Walk-in Clinic,Urgent care,AD-00773,
+PR-1386,Plover House Foot Clinic,Podiatry,AD-09835,SYN-96272988
+PR-1387,Fern Bank Pharmacy,Pharmacy,AD-07055,SYN-62521310
+PR-1388,Pippin Field Medical Practice,General practice,AD-02266,SYN-45239884
+PR-1389,Pippin Hill Health Centre,General practice,AD-01834,SYN-96140438
+PR-1390,Fern Grove Counselling Service,Counselling,AD-00939,SYN-47904202
+PR-1391,Flint Grove Heart Clinic,Cardiology,AD-08079,SYN-62887707
+PR-1392,Kilnworth Medical Practice,General practice,AD-01388,SYN-92929913
+PR-1393,Brook Bank Chemist,Pharmacy,AD-08841,SYN-76811239
+PR-1394,Thrush House Physiotherapy,Physiotherapy,AD-12133,SYN-45660249
+PR-1395,Wagtail Court Chemist,Pharmacy,AD-07853,SYN-14494983
+PR-1396,Thrush Hill Psychiatry Practice,Psychiatry,AD-05421,SYN-63782239
+PR-1397,Dunnock Field Orthopaedic Clinic,Orthopaedics,AD-08277,SYN-66939351
+PR-1398,Rush Park Chemist,Pharmacy,AD-06933,SYN-80016897
+PR-1399,Pippin Grove Pain Clinic,Pain medicine,AD-01290,SYN-16108105
+PR-1400,Iron Hill Health Centre,General practice,AD-02946,SYN-72076676
+PR-1401,Nettle Road Psychiatry Practice,Psychiatry,AD-12041,SYN-30184828
+PR-1402,Wagtail Bank Physiotherapy,Physiotherapy,AD-04924,SYN-75666447
+PR-1403,Sedge House Physiotherapy,Physiotherapy,AD-02195,SYN-35331898
+PR-1404,Amber Road Medical Practice,General practice,AD-12832,SYN-62268442
+PR-1405,Larch Field Counselling Service,Counselling,AD-02560,
+PR-1406,Dunnock Hill Pharmacy,Pharmacy,AD-09592,SYN-77012208
+PR-1407,Ember Grove Orthopaedic Clinic,Orthopaedics,AD-00606,SYN-51628192
+PR-1408,Elder Green Eye Clinic,Ophthalmology,AD-04502,SYN-84215042
+PR-1409,Quarry Road Pharmacy,Pharmacy,AD-09254,SYN-78522231
+PR-1410,Nettle Green Chemist,Pharmacy,AD-09678,SYN-32819653
+PR-1411,Pippin Court Health Centre,General practice,AD-02162,SYN-17636853
+PR-1412,Willow Mews Surgery,General practice,AD-05425,SYN-99245853
+PR-1413,Dove Green Pharmacy,Pharmacy,AD-07718,SYN-25386624
+PR-1414,Cobble Square Health Centre,General practice,AD-00840,SYN-52655560
+PR-1415,Nettle Field Medical Practice,General practice,AD-09274,SYN-17295856
+PR-1416,Willow Gate Surgery,General practice,AD-09424,SYN-35023966
+PR-1417,Quarry Road Eye Clinic,Ophthalmology,AD-12507,SYN-27330987
+PR-1418,Flint Row Medical Practice,General practice,AD-09060,SYN-90576589
+PR-1419,Chalk Mews Chemist,Pharmacy,AD-11191,SYN-54467009
+PR-1420,Chalk Lane Skin Clinic,Dermatology,AD-09832,SYN-50414211
+PR-1421,Oak Grove Foot Clinic,Podiatry,AD-07409,SYN-67334972
+PR-1422,Thrush Park Counselling Service,Counselling,AD-04203,SYN-37678479
+PR-1423,Moss Grove Skin Clinic,Dermatology,AD-04656,SYN-68197851
+PR-1424,Dunnock Mews Pharmacy,Pharmacy,AD-03950,SYN-72466545
+PR-1425,Teasel Lane Health Centre,General practice,AD-00816,SYN-33140760
+PR-1426,Brackenmoor Surgery,General practice,AD-09032,SYN-31104136
+PR-1427,Cobble House Chemist,Pharmacy,AD-05034,SYN-72761670
+PR-1428,Hazel Court Health Centre,General practice,AD-10142,SYN-80070924
+PR-1429,Kiln Court Pharmacy,Pharmacy,AD-11600,SYN-41050044
+PR-1430,Mill Square Psychiatry Practice,Psychiatry,AD-01732,SYN-74348639
+PR-1431,Rush Park Eye Clinic,Ophthalmology,AD-03626,
+PR-1432,Pippin Square Psychiatry Practice,Psychiatry,AD-01376,SYN-76590648
+PR-1433,Sorrel Park Physiotherapy,Physiotherapy,AD-03230,SYN-42598881
+PR-1434,Fern Hill Chemist,Pharmacy,AD-10979,SYN-87362143
+PR-1435,Elder Grove Surgery,General practice,AD-05278,SYN-79898426
+PR-1436,Flint House Pharmacy,Pharmacy,AD-07265,SYN-73325667
+PR-1437,Sorrel Row Heart Clinic,Cardiology,AD-00447,SYN-52935957
+PR-1438,Amber Road Health Centre,General practice,AD-02793,SYN-85274756
+PR-1439,Lark Bank Medical Practice,General practice,AD-12189,SYN-43421866
+PR-1440,Nettle Mews Pharmacy,Pharmacy,AD-10450,SYN-60581180
+PR-1441,Larch Court Physiotherapy,Physiotherapy,AD-07394,SYN-63692319
+PR-1442,Mill Mews Foot Clinic,Podiatry,AD-03969,SYN-68348381
+PR-1443,Fern Row Psychiatry Practice,Psychiatry,AD-00687,
+PR-1444,Sorrel Hill Pharmacy,Pharmacy,AD-00597,SYN-34053021
+PR-1445,Dove Park Surgery,General practice,AD-02561,SYN-50438573
+PR-1446,Alder Field Surgery,General practice,AD-01458,SYN-87238027
+PR-1447,Alder Court Foot Clinic,Podiatry,AD-03283,SYN-28073178
+PR-1448,Bracken Gate Physiotherapy,Physiotherapy,AD-06978,SYN-47817926
+PR-1449,Sedge Row Eye Clinic,Ophthalmology,AD-03403,SYN-24340267
+PR-1450,Dunnock Court Surgery,General practice,AD-11510,SYN-30722083
+PR-1451,Hazel Gate Medical Practice,General practice,AD-11442,SYN-33780115
+PR-1452,Amber Hill Surgery,General practice,AD-09679,SYN-84884564
+PR-1453,Oak Row Chemist,Pharmacy,AD-00909,SYN-25802097
+PR-1454,Dunnock House Chemist,Pharmacy,AD-09772,SYN-27399684
+PR-1455,Yew Bank Health Centre,General practice,AD-00861,SYN-85376135
+PR-1456,Bracken Green Medical Clinic,Internal medicine,AD-03996,SYN-19884127
+PR-1457,Iron Mews Heart Clinic,Cardiology,AD-05001,SYN-74715971
+PR-1458,Amber Square Foot Clinic,Podiatry,AD-09916,SYN-53733109
+PR-1459,Mill Bank Laboratory,Laboratory,AD-09392,SYN-93632060
+PR-1460,Lark Mews Walk-in Clinic,Urgent care,AD-04790,SYN-34115783
+PR-1461,Sedge Row Counselling Service,Counselling,AD-10109,SYN-95842371
+PR-1462,Plover Park Medical Clinic,Internal medicine,AD-03691,SYN-58165309
+PR-1463,Larch Grove Counselling Service,Counselling,AD-09411,SYN-42058996
+PR-1464,Oak Park Physiotherapy,Physiotherapy,AD-04530,SYN-97541068
+PR-1465,Chalk Square Chemist,Pharmacy,AD-07411,SYN-41368495
+PR-1466,Dunnock Grove Physiotherapy,Physiotherapy,AD-07663,SYN-62266918
+PR-1467,Dove Park Walk-in Clinic,Urgent care,AD-02650,SYN-33023941
+PR-1468,Sorrel Field Pain Clinic,Pain medicine,AD-12719,SYN-71921316
+PR-1469,Kiln Park Surgery,General practice,AD-07395,SYN-56395143
+PR-1470,Jasper Gate Walk-in Clinic,Urgent care,AD-00599,SYN-18136207
+PR-1471,Bracken Green Surgery,General practice,AD-00864,SYN-18584990
+PR-1472,Plover Green Pharmacy,Pharmacy,AD-01600,SYN-32572590
+PR-1473,Thrush Gate Medical Practice,General practice,AD-07070,SYN-96877021
+PR-1474,Thrush Park Orthopaedic Clinic,Orthopaedics,AD-06460,SYN-64706062
+PR-1475,Thrush Row Heart Clinic,Cardiology,AD-12234,SYN-83090095
+PR-1476,Teasel Bank Surgery,General practice,AD-03315,SYN-19097964
+PR-1477,Moss Bank Surgery,General practice,AD-05696,SYN-13886117
+PR-1478,Elder Green Psychiatry Practice,Psychiatry,AD-12579,SYN-82571270
+PR-1479,Rowan Mews Health Centre,General practice,AD-07870,SYN-65869333
+PR-1480,Cobble Green Walk-in Clinic,Urgent care,AD-01138,SYN-24703694
+PR-1481,Kiln Court Medical Practice,General practice,AD-00316,SYN-62196810
+PR-1482,Pippin Court Medical Practice,General practice,AD-09367,
+PR-1483,Rush Park Medical Practice,General practice,AD-02634,SYN-20366827
+PR-1484,Nettle Green Foot Clinic,Podiatry,AD-04086,
+PR-1485,Iron Lane Counselling Service,Counselling,AD-11425,SYN-55234803
+PR-1486,Rush House Medical Practice,General practice,AD-06785,SYN-40914356
+PR-1487,Brook Field Pharmacy,Pharmacy,AD-07622,SYN-61232111
+PR-1488,Willow Hill Pharmacy,Pharmacy,AD-09258,SYN-86780461
+PR-1489,Hazel Field Physiotherapy,Physiotherapy,AD-07952,
+PR-1490,Flint Square Laboratory,Laboratory,AD-09403,SYN-28038563
+PR-1491,Thrush Field Pharmacy,Pharmacy,AD-10265,SYN-55150447
+PR-1492,Bracken Lane Eye Clinic,Ophthalmology,AD-01639,SYN-75591167
+PR-1493,Bracken Park Surgery,General practice,AD-07222,SYN-40417447
+PR-1494,Larch Bank Surgery,General practice,AD-01498,SYN-43860028
+PR-1495,Rush Green Medical Practice,General practice,AD-09408,SYN-11984245
+PR-1496,Lark Park Surgery,General practice,AD-06639,
+PR-1497,Amber Green Skin Clinic,Dermatology,AD-12395,SYN-19702316
+PR-1498,Flint House Medical Practice,General practice,AD-04223,SYN-71640838
+PR-1499,Fern Field Walk-in Clinic,Urgent care,AD-05495,SYN-92595888
+PR-1500,Oak Mews Physiotherapy,Physiotherapy,AD-07706,SYN-69928102

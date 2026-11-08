@@ -1,0 +1,36 @@
+name: prescription
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per filled prescription: prescriber and pharmacy (provider ids), member, drug class, quantity, whether the member paid cash (Y/N) and the fill date. One file per fill month (PRESCRIPTION_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/prescription
+  database:   data/prescription/database
+  backup:     data/prescription/backup
+  temp:       data/prescription/temp
+  errors:     data/prescription/errors
+  quarantine: data/prescription/quarantine
+  markers:    data/prescription/markers
+  status_dir: data/prescription/status
+  log_dir:    data/prescription/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: prescription_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,16 @@
+raw:
+  name: PROVIDER_OWNER
+  format: CSV
+  fields[2]{name,selector,type}:
+    provider_id,"0",VARCHAR
+    owner_id,"1",VARCHAR
+mapping:
+  canonicalName: provider_owner
+  rawName: PROVIDER_OWNER
+  fields[2]:
+    - name: provider_id
+      from: provider_id
+      fn: keep
+    - name: owner_id
+      from: owner_id
+      fn: keep

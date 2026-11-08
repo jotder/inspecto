@@ -1,0 +1,36 @@
+name: member
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per insured member: birth year, home address and date of death (blank while alive). One extract as of the end of the landed months (MEMBER_20260930.csv). Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/member
+  database:   data/member/database
+  backup:     data/member/backup
+  temp:       data/member/temp
+  errors:     data/member/errors
+  quarantine: data/member/quarantine
+  markers:    data/member/markers
+  status_dir: data/member/status
+  log_dir:    data/member/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: member_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

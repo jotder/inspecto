@@ -1,0 +1,40 @@
+raw:
+  name: PRESCRIPTION
+  format: CSV
+  fields[8]{name,selector,type}:
+    prescription_id,"0",VARCHAR
+    prescriber_id,"1",VARCHAR
+    pharmacy_id,"2",VARCHAR
+    member_id,"3",VARCHAR
+    drug_class,"4",VARCHAR
+    qty,"5",INTEGER
+    paid_cash,"6",VARCHAR
+    filled_on,"7",DATE
+mapping:
+  canonicalName: prescription
+  rawName: PRESCRIPTION
+  fields[8]:
+    - name: prescription_id
+      from: prescription_id
+      fn: keep
+    - name: prescriber_id
+      from: prescriber_id
+      fn: keep
+    - name: pharmacy_id
+      from: pharmacy_id
+      fn: keep
+    - name: member_id
+      from: member_id
+      fn: keep
+    - name: drug_class
+      from: drug_class
+      fn: keep
+    - name: qty
+      from: qty
+      fn: keep
+    - name: paid_cash
+      from: paid_cash
+      fn: keep
+    - name: filled_on
+      from: filled_on
+      fn: keep

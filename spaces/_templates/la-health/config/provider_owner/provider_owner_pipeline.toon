@@ -1,0 +1,36 @@
+name: provider_owner
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per provider and owner from the provider enrolment file (a provider can have two owners; an owner can own several providers). One extract (PROVIDER_OWNER_20260930.csv). Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/provider_owner
+  database:   data/provider_owner/database
+  backup:     data/provider_owner/backup
+  temp:       data/provider_owner/temp
+  errors:     data/provider_owner/errors
+  quarantine: data/provider_owner/quarantine
+  markers:    data/provider_owner/markers
+  status_dir: data/provider_owner/status
+  log_dir:    data/provider_owner/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: provider_owner_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

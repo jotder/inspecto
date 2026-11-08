@@ -1,0 +1,48 @@
+raw:
+  name: CLAIM_LINE
+  format: CSV
+  fields[10]{name,selector,type}:
+    claim_id,"0",VARCHAR
+    provider_id,"1",VARCHAR
+    member_id,"2",VARCHAR
+    service_date,"3",DATE
+    procedure_code,"4",VARCHAR
+    level,"5",INTEGER
+    billed,"6",DOUBLE
+    paid,"7",DOUBLE
+    received_on,"8",DATE
+    reverses,"9",VARCHAR
+mapping:
+  canonicalName: claim_line
+  rawName: CLAIM_LINE
+  fields[10]:
+    - name: claim_id
+      from: claim_id
+      fn: keep
+    - name: provider_id
+      from: provider_id
+      fn: keep
+    - name: member_id
+      from: member_id
+      fn: keep
+    - name: service_date
+      from: service_date
+      fn: keep
+    - name: procedure_code
+      from: procedure_code
+      fn: keep
+    - name: level
+      from: level
+      fn: keep
+    - name: billed
+      from: billed
+      fn: keep
+    - name: paid
+      from: paid
+      fn: keep
+    - name: received_on
+      from: received_on
+      fn: keep
+    - name: reverses
+      from: reverses
+      fn: keep

@@ -1,0 +1,23 @@
+name: health_upcoding
+description: "Top-level visit billing - every provider that bills the highest office-visit level at least 1.75 times as often as all providers, with its owner and everything that owner owns (via on owned_by = top_level_share, same_age_mix_share, ratio_to_same_age_mix, patients_80_plus). Elderly-care clinics bill as their patients' ages predict. Three urgent-care clinics in three cities share one owner and bill about 4 times what their patients' ages predict."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: health_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","upcoding"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

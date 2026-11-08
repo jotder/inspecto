@@ -1,0 +1,14 @@
+physicalRef: claim_line/database
+description: "Provider billing fraud Link Analysis showcase - One row per billed claim line: provider, member, service date, an invented procedure code (OFV office visit, SPV specialist visit, PHY physiotherapy session, LAB, IMG-XR / IMG-CT / IMG-MR imaging, INP hospital stay), the visit level 1-5 (office visits only), billed and paid amounts, the date received and, for a reversal line (negative amounts), the claim line it reverses. One file per service month (CLAIM_LINE_YYYYMM.csv); the next month is in data/staged. Landed by the claim_line Pipeline. Synthetic."
+eventDate: service_date
+columns[10]{name,type,classification}:
+  claim_id,string,
+  provider_id,string,
+  member_id,string,
+  service_date,date,
+  procedure_code,string,
+  level,number,
+  billed,number,
+  paid,number,
+  received_on,date,
+  reverses,string,

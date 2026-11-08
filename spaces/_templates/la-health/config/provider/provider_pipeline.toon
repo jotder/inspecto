@@ -1,0 +1,36 @@
+name: provider
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per enrolled provider (practices, clinics, imaging centres, laboratories, pharmacies, hospitals): name, specialty, premises address and the bank account payments go to (blank for about 4 %). One extract (PROVIDER_20260930.csv). Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/provider
+  database:   data/provider/database
+  backup:     data/provider/backup
+  temp:       data/provider/temp
+  errors:     data/provider/errors
+  quarantine: data/provider/quarantine
+  markers:    data/provider/markers
+  status_dir: data/provider/status
+  log_dir:    data/provider/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: provider_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

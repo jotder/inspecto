@@ -1,0 +1,8 @@
+physicalRef: address/database
+description: "Provider billing fraud Link Analysis showcase - One row per address the payer holds (members' homes, provider premises, owners' addresses): street, city and a map position (blank for about 3 % of homes). One extract (ADDRESS_20260930.csv). Landed by the address Pipeline. Synthetic."
+columns[5]{name,type,classification}:
+  address_id,string,
+  street,string,
+  city,string,
+  lat,number,
+  lon,number,

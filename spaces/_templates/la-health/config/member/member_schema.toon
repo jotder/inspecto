@@ -1,0 +1,24 @@
+raw:
+  name: MEMBER
+  format: CSV
+  fields[4]{name,selector,type}:
+    member_id,"0",VARCHAR
+    birth_year,"1",INTEGER
+    address_id,"2",VARCHAR
+    died_on,"3",DATE
+mapping:
+  canonicalName: member
+  rawName: MEMBER
+  fields[4]:
+    - name: member_id
+      from: member_id
+      fn: keep
+    - name: birth_year
+      from: birth_year
+      fn: keep
+    - name: address_id
+      from: address_id
+      fn: keep
+    - name: died_on
+      from: died_on
+      fn: keep

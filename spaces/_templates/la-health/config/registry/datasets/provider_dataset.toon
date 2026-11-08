@@ -1,0 +1,8 @@
+physicalRef: provider/database
+description: "Provider billing fraud Link Analysis showcase - One row per enrolled provider (practices, clinics, imaging centres, laboratories, pharmacies, hospitals): name, specialty, premises address and the bank account payments go to (blank for about 4 %). One extract (PROVIDER_20260930.csv). Landed by the provider Pipeline. Synthetic."
+columns[5]{name,type,classification}:
+  provider_id,string,
+  name,string,
+  specialty,string,
+  address_id,string,
+  bank_account,string,

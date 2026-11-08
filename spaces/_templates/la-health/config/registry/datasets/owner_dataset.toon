@@ -1,0 +1,7 @@
+physicalRef: owner/database
+description: "Provider billing fraud Link Analysis showcase - One row per owner of a provider from the provider enrolment file: a person or an organisation (a hospital trust, a pharmacy group, a laboratory company), with their address (a person's home). One extract (OWNER_20260930.csv). Landed by the owner Pipeline. Synthetic."
+columns[4]{name,type,classification}:
+  owner_id,string,
+  name,string,
+  owner_type,string,
+  address_id,string,

@@ -1,0 +1,36 @@
+name: referral
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per referral: the referring practice, the provider referred to, the member and the date. One file per month (REFERRAL_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/referral
+  database:   data/referral/database
+  backup:     data/referral/backup
+  temp:       data/referral/temp
+  errors:     data/referral/errors
+  quarantine: data/referral/quarantine
+  markers:    data/referral/markers
+  status_dir: data/referral/status
+  log_dir:    data/referral/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: referral_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

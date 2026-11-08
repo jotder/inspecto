@@ -1,0 +1,36 @@
+name: owner
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per owner of a provider from the provider enrolment file: a person or an organisation (a hospital trust, a pharmacy group, a laboratory company), with their address (a person's home). One extract (OWNER_20260930.csv). Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/owner
+  database:   data/owner/database
+  backup:     data/owner/backup
+  temp:       data/owner/temp
+  errors:     data/owner/errors
+  quarantine: data/owner/quarantine
+  markers:    data/owner/markers
+  status_dir: data/owner/status
+  log_dir:    data/owner/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: owner_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

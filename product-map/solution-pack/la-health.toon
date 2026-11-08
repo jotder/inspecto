@@ -1,0 +1,7 @@
+id: solution-pack.la-health
+kind: solution-pack
+title: Link Analysis provider billing fraud showcase
+template: la-health
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-health/index.md

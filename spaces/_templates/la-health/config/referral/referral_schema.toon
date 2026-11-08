@@ -1,0 +1,28 @@
+raw:
+  name: REFERRAL
+  format: CSV
+  fields[5]{name,selector,type}:
+    referral_id,"0",VARCHAR
+    from_provider,"1",VARCHAR
+    to_provider,"2",VARCHAR
+    member_id,"3",VARCHAR
+    referred_on,"4",DATE
+mapping:
+  canonicalName: referral
+  rawName: REFERRAL
+  fields[5]:
+    - name: referral_id
+      from: referral_id
+      fn: keep
+    - name: from_provider
+      from: from_provider
+      fn: keep
+    - name: to_provider
+      from: to_provider
+      fn: keep
+    - name: member_id
+      from: member_id
+      fn: keep
+    - name: referred_on
+      from: referred_on
+      fn: keep

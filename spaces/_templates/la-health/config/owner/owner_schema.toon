@@ -1,0 +1,24 @@
+raw:
+  name: OWNER
+  format: CSV
+  fields[4]{name,selector,type}:
+    owner_id,"0",VARCHAR
+    name,"1",VARCHAR
+    owner_type,"2",VARCHAR
+    address_id,"3",VARCHAR
+mapping:
+  canonicalName: owner
+  rawName: OWNER
+  fields[4]:
+    - name: owner_id
+      from: owner_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: owner_type
+      from: owner_type
+      fn: keep
+    - name: address_id
+      from: address_id
+      fn: keep

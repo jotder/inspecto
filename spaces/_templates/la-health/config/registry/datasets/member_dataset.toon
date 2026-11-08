@@ -1,0 +1,7 @@
+physicalRef: member/database
+description: "Provider billing fraud Link Analysis showcase - One row per insured member: birth year, home address and date of death (blank while alive). One extract as of the end of the landed months (MEMBER_20260930.csv). Landed by the member Pipeline. Synthetic."
+columns[4]{name,type,classification}:
+  member_id,string,
+  birth_year,number,
+  address_id,string,
+  died_on,date,

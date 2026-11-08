@@ -1,0 +1,36 @@
+name: claim_line
+active: true
+description: "Provider billing fraud Link Analysis showcase - One row per billed claim line: provider, member, service date, an invented procedure code (OFV office visit, SPV specialist visit, PHY physiotherapy session, LAB, IMG-XR / IMG-CT / IMG-MR imaging, INP hospital stay), the visit level 1-5 (office visits only), billed and paid amounts, the date received and, for a reversal line (negative amounts), the claim line it reverses. One file per service month (CLAIM_LINE_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-health-data.py."
+
+dirs:
+  poll:       data/inbox/claim_line
+  database:   data/claim_line/database
+  backup:     data/claim_line/backup
+  temp:       data/claim_line/temp
+  errors:     data/claim_line/errors
+  quarantine: data/claim_line/quarantine
+  markers:    data/claim_line/markers
+  status_dir: data/claim_line/status
+  log_dir:    data/claim_line/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: claim_line_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
