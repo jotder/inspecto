@@ -64,8 +64,6 @@ LAST = ["Abbott", "Bramley", "Calloway", "Denholm", "Ellery", "Fairbairn", "Gilc
         "Lindqvist", "McAllister", "Nightingale", "Ormsby", "Prentice", "Quarry", "Rowntree", "Stanhope", "Treadwell", "Upton",
         "Varga", "Wetherby", "Yelland", "Zamora", "Ashby", "Blackwood", "Crowther", "Dunbar", "Everley", "Fenwick", "Garside",
         "Hartigan", "Ivesley", "Jowett", "Kettering", "Loxley", "Marchbank", "Northcott", "Oddie", "Pemberton", "Radcliffe"]
-VARIANT = {"McAllister": "MacAllister", "Nightingale": "Nightengale", "Lindqvist": "Lindquist", "Holloway": "Halloway",
-           "Fairbairn": "Fairburn", "Rowntree": "Rountree", "Treadwell": "Tredwell", "Hartigan": "Hartegan"}
 STREET = ["Amber", "Bracken", "Chalk", "Dove", "Ember", "Flint", "Gorse", "Hazel", "Iron", "Jasper", "Kiln", "Larch", "Mill", "Oak",
           "Pippin", "Quarry", "Rowan", "Sorrel", "Teasel", "Willow", "Alder", "Brook", "Cobble", "Dunnock", "Elder", "Fern"]
 SUFFIX = {"Lane": "Ln", "Road": "Rd", "Close": "Cl", "Street": "St", "Avenue": "Ave", "Grove": "Gr"}
@@ -251,7 +249,6 @@ for _ in range(12):                                              # couples who b
 tenders, bids = [], []
 by_market = {m: [c for c in sorted(companies) if (companies[c]["main"] == m or companies[c]["second"] == m) and c not in STORY_COS]
              for m in cats}
-bid_ips = {}                                                     # company -> its usual author(s)
 authors_used = set()
 
 

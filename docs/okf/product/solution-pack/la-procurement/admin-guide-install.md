@@ -69,7 +69,7 @@ The Space folder holds only configuration; all runtime state (`data/`, `audit/`,
 
 Copy every file of `inspecto-la-data/la-procurement/data/staged/<feed>/` into
 `inspecto-la-data/la-procurement/data/inbox/<feed>/` (`tender`, `bid`, `contract_change`). The Pipelines land them
-and the Jobs rebuild the links. October's tenders are still open, so they carry bids but no award yet.
+and the Jobs rebuild the links. Most of October's tenders are still open, so they carry bids but no award yet.
 
 ## Reset
 

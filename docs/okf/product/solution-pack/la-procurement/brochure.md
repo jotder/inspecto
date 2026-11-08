@@ -15,7 +15,7 @@ Public-procurement integrity units and internal audit teams, and presales teams 
 - **Conflict of interest:** an official keeps approving contract changes for a firm whose director lives at the official's home.
 - **Phoenix firm:** a debarred firm's directors start a new company that is winning public contracts within weeks.
 
-Each story has an innocent look-alike that a rule alone would flag: three large firms that win often but compete honestly, the buyer's public help-desk kiosk that many small firms bid from, a busy contracts manager who approves many changes for many suppliers, and a director who joins an unrelated firm years after a debarment. The graph shows the difference.
+Each story has an innocent look-alike that a simple threshold check alone would flag: three large firms that win often but compete honestly, the buyer's public help-desk kiosk that many small firms bid from, a busy contracts manager who approves many changes for many suppliers, and a director who joins an unrelated firm years after a debarment. The graph shows the difference.
 
 ## What is included
 

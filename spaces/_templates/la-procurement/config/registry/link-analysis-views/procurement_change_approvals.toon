@@ -1,5 +1,5 @@
 name: procurement_change_approvals
-description: "Contract-change approvals - officials linked to the firms whose contracts they changed (amount = value added, via = number of changes), plus the homes that two or more of these officials and those firms' directors share (procurement_approval_links_dataset). Look for a thick link: one Parks official approved nine changes for one grounds firm, and a director of that firm lives at the official's address. A Facilities contracts manager approves far more changes, but spread thinly over many suppliers, and shares a home with none of them."
+description: "Contract-change approvals - officials linked to the firms whose contracts they changed (amount = value added, via = number of changes), plus the homes that two or more of these officials and those firms' directors share (procurement_approval_links_dataset). Only a few homes are on the canvas: one of them is shared by a Parks official and a director of a grounds firm, and the official's link to that firm reads changes:9 in via. A Facilities contracts manager approves far more changes, but spread thinly over many suppliers, and shares a home with none of them."
 sourceId: entity-projection
 layout: force
 query:

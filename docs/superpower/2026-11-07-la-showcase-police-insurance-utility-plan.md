@@ -69,7 +69,7 @@ Telecom), with the same template id.
 
 | Use case | Template | Stories | Status |
 |---|---|---|---|
-| Bid rigging and procurement fraud | `la-procurement` | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | planned |
+| Bid rigging and procurement fraud | `la-procurement` | Four firms winning in turn; cover bids from one IP address; an official approving changes for a relative's firm; a debarred firm reborn under its old directors | exists |
 | Benefits and tax fraud | `la-benefits` | 14 claimants at one address; payments to the deceased; claimants on an employer payroll; a tax preparer's refund ring | planned |
 
 ### Healthcare
@@ -91,8 +91,8 @@ Telecom), with the same template id.
 | Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
 | Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
 
-**Count: 18 Spaces in 9 industries.** On 2026-11-08, 9 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
-`la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`) and 9 are planned; the `la-claims`
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 10 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+`la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`) and 8 are planned; the `la-claims`
 additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
 2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
@@ -613,8 +613,8 @@ with a score).
 - **Stories as built:** rotation tenders are Highways North (24, two a month), the look-alike big three win 74 % of Highways South
   in the same market view; cover bids are 27 on 10 IT tenders, 16 (60 %) from the winner's IP 2-25 minutes after it, 20 with its
   estimator as author; the kiosk is `198.51.100.20` (14 firms, bids on one tender at least an hour apart); the conflict is
-  `P-00002` → `CO-0426` (9 changes; director `P-00003` at home `AD-00002`), the look-alike `P-00008` approves 34 changes, at most 2
-  per supplier; the phoenix is `CO-0815` (debarred 2026-01-15) → `CO-0899` (incorporated 2026-02-02, wins `T-00519` on
+  `P-00002` → `CO-0426` (9 changes; director `P-00003` at home `AD-00002`), the look-alike `P-00008` approves 34 changes (33 landed, 1 staged), at
+  most 2 per supplier; the phoenix is `CO-0815` (debarred 2026-01-15) → `CO-0899` (incorporated 2026-02-02, wins `T-00519` on
   2026-04-08), the look-alike director `P-00007` joins `CO-0233` 3.5 years after `CO-0640`'s debarment.
 - **Scale:** 900 companies, 2 000 people (300 officials), 1 445 directorships, 1 228 landed tenders, 6 001 landed bids, 834
   contract changes; about 11 000 link rows (the spec's row counts give far fewer than the shared plan's 20-60 k); data 0.5 MB.

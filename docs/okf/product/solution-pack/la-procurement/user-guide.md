@@ -53,8 +53,9 @@ link. Two derived Jobs feed the approvals and debarment views (`procurement_appr
 2. **Open `procurement_cover_bids`.** Only two IP addresses are shared by different bidders. One carries a firm
    and its three regular "competitors" (`same_tender_gap_min` in single figures), plus one document author they
    all share. The other carries 14 small firms, with no author in common.
-3. **Open `procurement_change_approvals`.** Officials and the firms whose contracts they changed. One link is far
-   thicker than the rest (`changes:9`), and it closes a triangle through a shared home address.
+3. **Open `procurement_change_approvals`.** Officials and the firms whose contracts they changed. Only a handful
+   of home addresses (`AD-…`) are on the canvas; one of them closes a triangle between an official and a firm, and
+   that official-to-firm link's `via` reads `changes:9`.
 4. **Open `procurement_debarred_directors`.** Every director of a debarred firm and where they went. Most stop at
    their old firm. Two people jump straight to a new firm that is already winning tenders.
 5. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (admin guide). The
@@ -92,13 +93,14 @@ hours or tenders apart, each with its own author; none of them touches the IT ri
 
 ### 3. Conflict of interest — which official favours which firm, and why?
 
-*Hint:* in `procurement_change_approvals`, sort or size links by `amount`, then expand the thickest link's ends.
+*Hint:* in `procurement_change_approvals`, find a home address (`AD-…`) that an official shares with a director,
+then read the `via` of the link between that official and the director's firm.
 
 **Answer:** **`P-00002` (Eben Rowntree), a Parks official,** approved **9 contract changes** (each adding 8–25 %)
 on six grounds-maintenance tenders won by **`CO-0426` Thistle Arboriculture Group**. A director of that firm,
 **`P-00003` (Tobin Rountree)**, lives at the official's home address **`AD-00002`**: a relative, the surname
 spelt differently. No other official approved more than 3 changes for one firm. **Not the story:** **`P-00008`
-(Zara Yelland)**, a Facilities contracts manager, approved **34 changes**, but for many different suppliers, never
+(Zara Yelland)**, a Facilities contracts manager, approved **33 changes** in the landed months (34 once the staged month is in), but for many different suppliers, never
 more than 2 for any one, and she shares a home with no director.
 
 ### 4. Phoenix firm — where did the debarred firm go?
@@ -112,7 +114,9 @@ Facility Hygiene Ltd**, incorporated **2026-02-02** with the old firm's phone nu
 address. It won cleaning tender **`T-00519`**, awarded **2026-04-08**: 83 days after the debarment. **Not the
 story:** **`P-00007` (Hana Garside)** directed **`CO-0640` Red Building Services Limited**, debarred in 2022, and
 joined **`CO-0233` Amber Travel Group**, a transport firm founded in 2009, in November 2025: years later, another
-trade, nothing carried over. The other eight debarred firms' directors never reappear.
+trade, nothing carried over. One more person in the view, `P-00384`, left `CO-0050` Linden Recycling Ltd when it
+was debarred in 2023 and has directed `CO-0543` Blue Surfacing LLP since 2014: a second seat held all along, not a
+move after the debarment. The other debarred firms' directors never reappear.
 
 ## Tester's checklist
 
