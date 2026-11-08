@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  crypto.analyst,Demo Crypto Compliance Analyst,Virtual-asset compliance analyst (lead),crypto-analyst
+  crypto.manager,Demo Crypto Compliance Manager,Virtual-asset compliance manager (second approver),crypto-manager
+  crypto.reviewer,Demo Crypto Compliance Reviewer,Reviewer (read-only),la-viewer
+  crypto.outsider,Demo Crypto Compliance Outsider,Not a member of the Investigation,la-viewer

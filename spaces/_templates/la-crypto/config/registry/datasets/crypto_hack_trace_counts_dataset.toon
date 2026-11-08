@@ -1,0 +1,6 @@
+physicalRef: crypto_hack_trace_counts
+description: "Crypto laundering Link Analysis showcase - one row of counts built by the crypto_hack_trace_counts Job: hacked_wallets (addresses labelled hacked with a transfer out), hack_traced_deposits (exchange deposit addresses the stolen funds reach within 5 transfers of the theft, the last transfer out of a hacked wallet) and deposits_from_earlier_payments (deposit addresses reached only from a hacked wallet's payments before the theft). Read by the Alert Rule crypto_deposit_traced_to_hack. Names no address or account. Synthetic."
+columns[3]{name,type,classification}:
+  hacked_wallets,number,
+  hack_traced_deposits,number,
+  deposits_from_earlier_payments,number,

@@ -27,7 +27,7 @@ Every address uses an invented `syn1…` format that cannot match a real blockch
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier is planned, with personas, an Alert Rule for a deposit whose funds trace to a labelled hack within 5 hops, and a seeding script.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead analyst, second approver, read-only reviewer, outsider), an Alert Rule for a deposit whose funds trace to a labelled hack within 5 hops, and a seeding script for the Investigation, a watch list of the exchange accounts the stolen coins reached, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 

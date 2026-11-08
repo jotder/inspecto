@@ -1,0 +1,7 @@
+name: crypto_deposit_traced_to_hack
+dataset: crypto_hack_trace_counts_dataset
+measure: max(hack_traced_deposits)
+comparator: gte
+threshold: 1
+severity: CRITICAL
+description: "A deposit whose funds trace to a labelled hack within 5 hops: an exchange deposit address that the funds stolen from a wallet labelled hacked reach within 5 transfers, the theft (the last transfer out of the hacked wallet) counting as the first. The Alert carries how many such deposit addresses there are; no address or account leaves crypto_hack_trace_counts, so open the hack_peel_chain view to find them. The hacked wallet's own payments before the theft are not traced (deposits_from_earlier_payments counts what they reach). Not grouped by address: crypto_hack_trace_counts is a Job output, so a by column cannot be checked when the Space is created."

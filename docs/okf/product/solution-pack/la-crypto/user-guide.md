@@ -137,3 +137,29 @@ are `tools/gen-la-crypto-data.test.mjs` and `CryptoLinksJobGoldenTest`.
 - [ ] Each saved view holds its story whole, with its look-alike beside it but apart, and draws without "Result cut
       short". The largest view, `hack_peel_chain`, is about 785 rows and 426 nodes; the 80-hop chain is one thin line of
       100 nodes in it. October adds one payroll run and no story activity.
+
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-hack-trace-alert-rule-and-the-seed)),
+after `node tools/seed-la-crypto.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`crypto.analyst` (lead):** **Alerts** lists `crypto_deposit_traced_to_hack` (CRITICAL) with the value 2: exchange
+   deposit addresses that the coins stolen from the wallet labelled hacked reach within 5 transfers of the theft. Open the
+   Investigation `hack-peel-chain`: it is seeded with the hacked wallet `syn15z47fslrxrnhuwm4dppk77s0z7` and the first hop
+   `syn1mdsja4svnugvd4chxrt2xnywxr`, and expanded once along `sent_to`, which brings in the second hop, the first deposit
+   address `syn1cpxfwce0udltzgxc65dk6a20xu` and the merchants the wallet's owner paid before the theft (exercise 1). The
+   Entity List `peel-chain-accounts` holds `XA-03111` to `XA-03116`. The Case "Peel chain from the hacked wallet …" is
+   linked to it.
+2. **Four-eyes:** an unbounded expand by `crypto.analyst` is held, not run. Sign in as **`crypto.manager`**: it is in the
+   approval inbox; approve or refuse it. `crypto.analyst` cannot approve its own request.
+3. **`crypto.reviewer`:** opens `hack-peel-chain` and reads every step; any change is refused.
+4. **`crypto.outsider`:** sees the Datasets, but `hack-peel-chain` is not found (404).
+5. **Draft:** `crypto.analyst` has one open Draft that annotates the first deposit address about its account `XA-03111`;
+   promote it, or leave it.
+
+**Why 2, not 6:** the chain peels into six deposit addresses, but only two lie within 5 transfers of the theft (the first
+hop's peel at transfer 2, the third hop's at transfer 4); the other four are further down the chain. The trace starts at
+the theft, the wallet's last transfer out: the wallet's owner paid four merchants before it, and those merchants' sweeps
+reach 3 more deposit addresses, which are ordinary spending and not counted. **Not the story:** the payroll wallet
+`syn1g6x78slgxx5zne6cwpmes8j554` runs a chain of the same shape every month, but nothing labelled hacked pays it, so it
+is never traced; without the hacked wallet, or with its label taken off, the rule would not fire at all.

@@ -1,0 +1,11 @@
+job:
+  name: crypto_hack_trace_counts
+  type: sql.template
+  description: "Runs each time the crypto_links Job produces its Dataset. One row of counts: hacked_wallets (addresses the wallet feed labels hacked, that is reported stolen from, with a transfer out), hack_traced_deposits (exchange deposit addresses, from the deposit_of links, that the stolen funds reach within max_hops transfers: the trace starts at the theft, the last transfer out of a hacked wallet, and follows each address's transfers made at or after the funds arrived, the theft itself counting as the first transfer) and deposits_from_earlier_payments (deposit addresses reached the same way only from a hacked wallet's payments before the theft: the owner's own spending, which the rule does not count). The feed gives no theft time, so the theft is taken as the last transfer out: a hacked wallet is emptied and its owner stops using it. A payroll wallet whose month-end run has the peel chain's shape is never traced, since nothing labelled hacked pays it. The Alert Rule crypto_deposit_traced_to_hack reads hack_traced_deposits; no address or account leaves this Job, they are found in the Investigation."
+  sql: "WITH RECURSIVE t AS (SELECT from_address AS fa, to_address AS ta, CAST(tx_at AS TIMESTAMP) AS tat FROM transfer), hk AS (SELECT t.fa AS a, max(t.tat) AS theft_at FROM t JOIN wallet w ON w.address = t.fa WHERE w.label = 'hacked' GROUP BY t.fa), tr(a, rt, h, stolen) AS (SELECT t.ta, t.tat, 1, t.tat = hk.theft_at FROM t JOIN hk ON hk.a = t.fa UNION SELECT t.ta, t.tat, tr.h + 1, tr.stolen FROM tr JOIN t ON t.fa = tr.a AND t.tat >= tr.rt WHERE tr.h < CAST($max_hops AS INTEGER)), dep AS (SELECT DISTINCT src AS a FROM crypto_links WHERE kind = 'deposit_of'), hit AS (SELECT DISTINCT tr.a, tr.stolen FROM tr JOIN dep ON dep.a = tr.a) SELECT (SELECT count(*) FROM hk) AS hacked_wallets, (SELECT count(*) FROM hit WHERE stolen) AS hack_traced_deposits, (SELECT count(*) FROM hit WHERE NOT stolen AND a NOT IN (SELECT a FROM hit WHERE stolen)) AS deposits_from_earlier_payments"
+  sources: crypto_links,transfer,wallet
+  sink_dataset: crypto_hack_trace_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == crypto_links"
+  max_hops: "5"
+  enabled: true

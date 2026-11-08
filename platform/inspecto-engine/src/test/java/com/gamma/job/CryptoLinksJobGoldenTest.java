@@ -40,13 +40,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole, shows the
  * look-alike beside it and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts behind each story in the files
  * themselves are pinned by {@code tools/gen-la-crypto-data.test.mjs}.
+ * The Advanced tier's {@code crypto_hack_trace_counts} Job runs on the same signal: its Alert Rule fires on the deposits the stolen
+ * funds reach within 5 transfers of the theft, would not without the hacked wallet or its label, never counts what the owner paid
+ * before the theft, and never traces the payroll wallet whose month-end run has the peel chain's shape.
  */
 class CryptoLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-crypto");
     private static final List<String> FEEDS = List.of("wallet", "transfer", "cluster_hint", "exchange_account", "kyc_person", "cashout");
-    private static final List<String> JOBS = List.of("crypto_links", "crypto_screen_links");
+    private static final String COUNTS = "crypto_hack_trace_counts";
+    // the Advanced tier's counts Job is fired by the same crypto_links signal; its one row of counts is no link Dataset
+    private static final List<String> JOBS = List.of("crypto_links", "crypto_screen_links", COUNTS);
 
     @TempDir static Path tmp;
     private static Path data;
@@ -101,13 +106,97 @@ class CryptoLinksJobGoldenTest {
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/" + COUNTS + "_job.toon",
+                "config/jobs/crypto_hack_trace_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/crypto_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(COUNTS + "_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), COUNTS + " is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet(COUNTS);
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: one hacked wallet; the stolen funds reach 2 exchange deposit addresses within 5
+        // transfers of the theft (the first hop's peel at transfer 2, the third hop's at transfer 4); the owner's 4 payments to
+        // merchants before the theft reach 3 more through the merchants' sweeps, which the rule does not count
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(1L, ((Number) row.get("hacked_wallets")).longValue());
+        assertEquals(2L, ((Number) row.get("hack_traced_deposits")).longValue());
+        assertEquals(3L, ((Number) row.get("deposits_from_earlier_payments")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+        // the same 2 read off the link Dataset by hand: the deposits the first four hops peel into (hacked -> hop 1 is transfer 1,
+        // so hop 4's peel is transfer 5), every one of them a planted peel deposit
+        JsonNode p = truth.get("peel_chain");
+        List<String> firstFour = new ArrayList<>();
+        for (int i = 0; i < 4; i++) firstFour.add("'" + p.get("hops").get(i).asText() + "'");
+        assertEquals(2, count("SELECT count(DISTINCT dst) FROM " + bl + " WHERE kind = 'sent_to' AND src IN (" + String.join(", ", firstFour)
+                + ") AND dst IN " + in(p.get("deposits"))));
+        assertEquals(0, count("SELECT count(*) FROM " + bl + " WHERE kind = 'sent_to' AND src IN (" + String.join(", ", firstFour)
+                + ") AND dst NOT IN " + in(p.get("deposits")) + " AND dst NOT IN " + in(p.get("hops"))), "a hop pays only a deposit and the next hop");
+        // "within 5 hops" is what keeps the rest of the chain out: at 7 transfers the trace reaches a third peel deposit
+        assertEquals(3L, ((Number) countsOver("true", "label", "7").get("hack_traced_deposits")).longValue());
+    }
+
+    @Test
+    void withoutTheHackedWalletOrItsLabelTheRuleWouldNotFire() throws Exception {
+        String hacked = truth.get("peel_chain").get("hacked").asText();
+        com.gamma.alert.AlertRule rule = rule();
+        // the counts Job's own SQL over the same feeds with the hacked wallet's transfers taken out
+        Map<String, Object> without = countsOver("from_address <> '" + hacked + "'", "label", "5");
+        assertEquals(0L, ((Number) without.get("hack_traced_deposits")).longValue(), "without " + hacked + ": " + without);
+        assertTrue(((Number) without.get("hack_traced_deposits")).doubleValue() < rule.threshold(), "it would not fire");
+        assertEquals(0L, ((Number) without.get("hacked_wallets")).longValue(), without.toString());
+        // and the label is what starts the trace: the same transfers with no wallet reported stolen from count nothing
+        Map<String, Object> unlabelled = countsOver("true", "CASE WHEN label = 'hacked' THEN 'unknown' ELSE label END", "5");
+        assertEquals(0L, ((Number) unlabelled.get("hack_traced_deposits")).longValue(), unlabelled.toString());
+    }
+
+    @Test
+    void thePayrollChainHasThePeelShapeYetIsNeverTraced() throws Exception {
+        JsonNode p = truth.get("peel_chain");
+        List<String> payroll = new ArrayList<>(List.of("'" + p.get("lookalike_wallet").asText() + "'"));
+        p.get("lookalike_staff").forEach(s -> payroll.add("'" + s.asText() + "'"));
+        String set = "(" + String.join(", ", payroll) + ")";
+        // every transfer of the payroll wallet and its 25 staff taken out: the counts do not move, so none of them was traced
+        Map<String, Object> noPayroll = countsOver("from_address NOT IN " + set + " AND to_address NOT IN " + set, "label", "5");
+        assertEquals(List.of(1L, 2L, 3L), List.of(((Number) noPayroll.get("hacked_wallets")).longValue(),
+                ((Number) noPayroll.get("hack_traced_deposits")).longValue(), ((Number) noPayroll.get("deposits_from_earlier_payments")).longValue()),
+                noPayroll.toString());
+        // and the shape alone is not what the rule counts: even reported stolen from in place of the real wallet, the payroll's last
+        // month-end run reaches staff wallets, not exchange deposit addresses, within 5 transfers
+        String company = p.get("lookalike_wallet").asText();
+        Map<String, Object> asIfHacked = countsOver("true", "CASE WHEN address = '" + company + "' THEN 'hacked' WHEN label = 'hacked' THEN 'unknown' ELSE label END", "5");
+        assertEquals(1L, ((Number) asIfHacked.get("hacked_wallets")).longValue(), asIfHacked.toString());
+        assertEquals(0L, ((Number) asIfHacked.get("hack_traced_deposits")).longValue(), asIfHacked.toString());
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/crypto_deposit_traced_to_hack.toon").toString()));
+    }
+
+    /** The counts Job's own SQL (max_hops substituted as the Job does) over the real link Dataset and feeds, transfers narrowed, labels rewritten. */
+    private static Map<String, Object> countsOver(String transferFilter, String labelExpr, String maxHops) throws Exception {
+        JobConfig job = JobConfig.load(TEMPLATE.resolve("config/jobs/" + COUNTS + "_job.toon").toString());
+        assertEquals("5", job.require("max_hops"));
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("max_hops", maxHops));
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW crypto_links AS SELECT * FROM " + bl);
+            st.execute("CREATE VIEW transfer AS SELECT * FROM " + parquet("transfer/database", "/**/*.parquet") + " WHERE " + transferFilter);
+            st.execute("CREATE VIEW wallet AS SELECT address, first_seen, " + labelExpr + " AS label FROM " + parquet("wallet/database", "/**/*.parquet"));
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

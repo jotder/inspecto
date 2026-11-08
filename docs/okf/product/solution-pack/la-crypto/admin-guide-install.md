@@ -73,6 +73,59 @@ run. There is no new hack, mixer hop or cash-out ring: the planted stories stay 
 Stop the product, delete `inspecto-la-data/la-crypto/`, and unzip the data download again. The Space configuration is
 untouched.
 
+## Advanced tier: personas, the hack-trace Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `crypto_deposit_traced_to_hack` is loaded but not armed, and the
+`crypto_hack_trace_counts` and `crypto_hack_trace_alerts` Jobs run after each `crypto_links` build; the second finds no
+armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs people in by name with
+no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the six Pipelines have landed and `crypto_links` has run (a minute or two), create the runtime state from a checkout
+of the repository:
+
+```bash
+node tools/seed-la-crypto.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `hack-peel-chain` (seeded
+with the hacked wallet `syn15z47fslrxrnhuwm4dppk77s0z7` and the first hop `syn1mdsja4svnugvd4chxrt2xnywxr`, expanded once
+along `sent_to` to the second hop, the first deposit address and the wallet's earlier payees; annotated, narrowed to
+14-18 March 2026, snapshotted), its members, the Entity List `peel-chain-accounts` (`XA-03111` to `XA-03116`), a Case
+assigned to `crypto.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a
+second person, and one open Draft. To lay the Space out offline instead of unzipping the downloads, `node
+tools/seed-la-crypto.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `crypto.analyst` | `crypto-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `crypto.manager` | `crypto-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `crypto.reviewer` | `la-viewer`, member as reviewer | reads `hack-peel-chain`; any change is refused (403) |
+| `crypto.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `crypto_deposit_traced_to_hack` (CRITICAL) reads the one row of `crypto_hack_trace_counts` and fires
+when the coins stolen from a wallet labelled `hacked` (reported stolen from) reach one or more exchange deposit addresses
+**within 5 transfers** of the theft. The wallet feed carries no theft time, so the Job takes the theft to be the hacked
+wallet's **last transfer out** (a hacked wallet is emptied, and its owner stops using it) and follows each address's
+transfers made at or after the coins arrived. On the shipped data the Alert carries **2**: the deposit addresses of
+`XA-03111` (the first hop's peel, transfer 2) and `XA-03115` (the third hop's, transfer 4); the chain's other four deposit
+addresses are 7 or more transfers out. `deposits_from_earlier_payments` is **3**: the wallet's owner paid four merchants
+before the theft and their sweeps reach three deposit addresses; tracing from every transfer out of the wallet would have
+counted them too. The payroll wallet's month-end run has the peel chain's shape but nothing labelled hacked pays it, so
+it is never traced. The count is a running total over every landed transfer, so the rule stays met after every build (one
+open Alert, not one per build). It names no address; `hack_peel_chain` shows the chain. The rule is not grouped by
+address, because `crypto_hack_trace_counts` is a Job output: a `by` column cannot be checked against its Schema when the
+Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash

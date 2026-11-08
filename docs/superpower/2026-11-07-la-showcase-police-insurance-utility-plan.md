@@ -1684,6 +1684,85 @@ deviations:
      checked: the Link Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build, and
      the packed downloads of a commit holding this tier (the packer reads HEAD).
 
+   **`la-crypto` BUILT 2026-11-09** (the `la-card` pattern; spec 13's "a deposit whose funds trace to a labelled hack within
+   5 hops"). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`crypto.analyst` lead, `crypto.manager`
+     second approver, `crypto.reviewer` read-only, `crypto.outsider` not a member, and `admin` byte-identical to every other
+     showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`crypto-analyst`, `fraud-analyst` as in `la-card`,
+     `crypto-manager` with `canApproveLinkExpansions` and `canOperateRuns`, `la-viewer`, `la-settings`), and
+     `four_eyes_fan_out_above: 2000` plus Drafts (10 / 60 min / 14 days) in `link-analysis.toon`, the values every
+     *Banking and finance* use case states, since the packer refuses a setting or a roster entry two use cases state
+     differently. No `masking_mode`; no Entity Type masked.
+   - **Alert Rule as a registry rule over a counts Job:** `crypto_hack_trace_counts` (`sql.template` on `crypto_links`'
+     `job.dataset.produced`, sources `crypto_links`, `transfer`, `wallet`, `max_hops: "5"`) writes one row: `hacked_wallets`
+     (addresses labelled `hacked` with a transfer out), `hack_traced_deposits` (exchange deposit addresses, the `src` of a
+     `deposit_of` link, that the stolen funds reach within 5 transfers: a `WITH RECURSIVE` walk over `transfer` from the
+     theft, each step a transfer made at or after the funds arrived, the theft itself transfer 1) and
+     `deposits_from_earlier_payments` (deposit addresses reached the same way only from the hacked wallet's payments before
+     the theft); `crypto_hack_trace_alerts` (`alert.evaluate`) runs after it; `crypto_deposit_traced_to_hack` is
+     `max(hack_traced_deposits) gte 1`, CRITICAL, not grouped (a Job output). The Job sends no address or account; the
+     Alert carries a count.
+   - **Decided while building:**
+     - **The theft is the hacked wallet's last transfer out.** The wallet feed labels a wallet `hacked` (the label the
+       Basic tier added for this rule) but carries no theft time, and the wallet had an owner before it was robbed: on the
+       shipped data it paid four merchants between November 2025 and February 2026 before the 412.5 SYC theft on
+       2026-03-14, and those merchants' weekly sweeps reach 3 exchange deposit addresses within 5 transfers. Tracing every
+       transfer out of the wallet would count them (5 instead of 2), and a time-respecting path alone does not exclude
+       them (the sweeps come after the payments). A robbed wallet is emptied and its owner stops using it, so the Job
+       takes its last transfer out as the theft and reports the owner's earlier reach in `deposits_from_earlier_payments`
+       rather than hiding it. A feed with a reported theft time would replace this heuristic.
+     - **"Within 5 hops" counts transfers from the hacked wallet to the deposit address, the theft included** (hacked
+       wallet → hop 1 is hop 1, hop 1's peel is hop 2). The trace follows `transfer`, not the `sent_to` links, because a
+       `sent_to` row aggregates a pair and keeps only its first time; the deposit addresses come from `crypto_links`.
+     - **A running total, not "new" deposits** (as `la-police`, `la-trade`, `la-ownership` decided): a `sql.template` Job
+       keeps no watermark, and an Alert stays one open Alert while the breach lasts, so a running total gives one Alert for
+       the hack, not one per build; a later deposit raises the value.
+   - **Real figures on the shipped data** (first computed with DuckDB over the CSV files, then the Job run after
+     `crypto_links` in `CryptoLinksJobGoldenTest`): hacked_wallets **1**; hack_traced_deposits **2** (the deposit addresses
+     of `XA-03111`, hop 1's peel at transfer 2, and `XA-03115`, hop 3's peel at transfer 4; hops 2 and 4 peel into
+     `XA-03111` again); deposits_from_earlier_payments **3** (`XA-03057`, `XA-03073`, `XA-03104`, merchants' sweep
+     accounts). The chain's other four deposit addresses are 7 (`XA-03114`), 9, 10 and 12 transfers out, so `max_hops` 6
+     still gives 2 and 7 gives 3. With the staged month landed too: unchanged (1 / 2 / 3, checked over the CSV files, not
+     pinned). Without the hacked wallet's transfers, or with its label taken off: 0. With every transfer of the payroll
+     wallet and its 25 staff taken out: unchanged. With the payroll wallet labelled hacked in place of the real one: 0
+     traced (its last month-end run reaches staff wallets, not deposit addresses, within 5 transfers), 8 from its earlier
+     payments.
+   - **Seed** `tools/seed-la-crypto.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `hack-peel-chain` over `crypto_links_dataset` (Entity Type `crypto_entity`; seeds the hacked wallet
+     `syn15z47fslrxrnhuwm4dppk77s0z7` and hop 1 `syn1mdsja4svnugvd4chxrt2xnywxr`; a bounded expand over `sent_to`,
+     `maxFanOut` 20, to hop 2, the first deposit address and the wallet's earlier payees and senders; annotate, threshold 1,
+     window 2026-03-14 to 2026-03-19, resolve, snapshot), members (`crypto.reviewer` and `crypto.manager` reviewers, `admin`
+     lead; not `crypto.outsider`), Entity List `peel-chain-accounts` (`XA-03111`..`XA-03116`), a Case from the hacked
+     wallet assigned to `crypto.manager` and linked, an Investigation template, one unbounded expand held for four-eyes,
+     one open Draft annotating the first deposit address `syn1cpxfwce0udltzgxc65dk6a20xu` (in the Working Set: hop 1 paid
+     it) about `XA-03111`, which is two hops out (hop 1 → deposit address → account), so annotating the account would be
+     refused. The payroll wallet is in no step.
+   - **Tests:** `LaCryptoTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst` as in `la-utility`, and `fraud-analyst`, `la-viewer`, `la-settings` as in `la-card`; the shared `admin`;
+     the rule through `AlertRoutes.parseContent`; `max_hops` 5; the Jobs' signals); `CryptoLinksJobGoldenTest`
+     (`theTemplateIsBasicTierOnly` replaced: the counts Job runs after `crypto_links`; the figures above, cross-checked by
+     hand against the deposits the first four hops pay; the rule's own measure and threshold fire; 7 hops would give 3;
+     without the hacked wallet or its label it would not fire; the payroll's transfers change nothing, and the payroll
+     labelled hacked traces to no deposit); the gallery test pins `la-crypto` creatable with no missing feature and no
+     Demo Auth; `tools/seed-la-crypto.test.mjs` (mocked fetch, 12 tests; the theft and the first peel read from the landed
+     transfer files). `node --test tools/package-la-showcase.test.mjs` composes *Banking and finance* from the working tree
+     with this roster.
+   - **Falsified, each then restored:** the trace started from every transfer out of the hacked wallet, not the theft
+     (traced 5; the figures test and the payroll test go red); the hack condition widened to `merchant`-labelled wallets
+     (163 "hacked" wallets; all three Advanced-tier engine tests red, the would-not-fire one with 102 traced); in the
+     template `masking_mode: typed`, `crypto-analyst` given the approve capability, `admin` given `crypto-analyst`,
+     `fraud-analyst` removed, `la-viewer` given a capability, `la-crypto` out of the gallery's Basic-tier set; in the
+     packer a differing `la-viewer`, `max_open: 11` and a differing `admin` (each refuses *Banking and finance*); in the seed
+     the outsider made a member, the Draft annotating `XA-03111`, the payroll wallet added to the seeds, the first expand
+     unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 2, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `crypto_hack_trace_alerts` reporting no breach, 0 rejected);
+     the expand's `linkKinds`, the window and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the recursive trace's cost on data much larger than the shipped 44 559 transfers, the Link Analysis UI, the
+     composed *Banking and finance* Space booted with this roster, an OIDC build, and the packed downloads of a commit
+     holding this tier (the packer reads HEAD).
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),
