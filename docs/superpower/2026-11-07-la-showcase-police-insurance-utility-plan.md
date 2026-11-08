@@ -719,7 +719,7 @@ with a score).
   alone does not find the ring.
 - **Background deaths:** notices arrive 0-60 days after the death (60 % within a week); the claim stops 0-5 days after the notice and
   85 % of overpayments are recovered in full. A death notified in the staged month is never a current claimant: the staged month
-  carries new claims only, not updates to landed ones.
+  carries new claims only, not updates to landed ones; as generated, the staged death-register file is empty.
 - **Scale:** 12 000 people at 5 245 occupied addresses of 6 500, 7 534 landed claims (spec: 9 000; the working-age claim rates were
   kept realistic rather than raised), 300 deaths, 36 479 landed payroll rows (39 537 with October), 8 000 returns (7 736 landed),
   5 258 household declarations (spec: 6 000; one per household). About 39 000 link rows; data 3.4 MB.

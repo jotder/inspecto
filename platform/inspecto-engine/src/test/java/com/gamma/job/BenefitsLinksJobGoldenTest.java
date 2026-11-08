@@ -192,9 +192,28 @@ class BenefitsLinksJobGoldenTest {
             missing.removeAll(nodes);
             assertTrue(missing.isEmpty(), view + " is missing story entities " + missing);
             assertEquals(1, groups(members, vl), view + ": the story is one connected piece inside the view");
-            for (String a : ids(story.get("lookalikes")))
+            for (String a : ids(story.get("lookalikes"))) {
                 assertTrue(nodes.contains(a), view + ": the look-alike " + a + " is on the canvas beside the story");
+                Set<String> beside = componentOf(a, vl);
+                beside.retainAll(members);
+                assertTrue(beside.isEmpty(), view + ": the look-alike " + a + " stays apart from the story, yet reaches " + beside);
+            }
         }
+    }
+
+    /** Every node reachable from {@code start} over the given links (either direction). */
+    private static Set<String> componentOf(String start, List<String[]> ls) {
+        Map<String, List<String>> adj = new HashMap<>();
+        for (String[] l : ls) {
+            adj.computeIfAbsent(l[0], k -> new ArrayList<>()).add(l[1]);
+            adj.computeIfAbsent(l[1], k -> new ArrayList<>()).add(l[0]);
+        }
+        Set<String> seen = new TreeSet<>(List.of(start));
+        List<String> todo = new ArrayList<>(List.of(start));
+        while (!todo.isEmpty())
+            for (String n : adj.getOrDefault(todo.remove(todo.size() - 1), List.of()))
+                if (seen.add(n)) todo.add(n);
+        return seen;
     }
 
     @Test

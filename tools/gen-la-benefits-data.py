@@ -22,7 +22,7 @@ tools/gen-la-benefits-data.test.mjs over the files and BenefitsLinksJobGoldenTes
   3 UNDECLARED WORK     20 people on Jobseeker benefit appear on the payroll of 2 employers (4 of them on both) for 6 months
                         or more, earning 1 100-1 900 a month while claiming
                         look-alike: a jobseeker with permitted part-time earnings under the 200-a-month limit (and about 30
-                        more like them, plus about 40 people whose claim closed in the month they started work)
+                        more like them, plus about 30 people whose claim closed in the month they started work)
   4 TAX-PREPARER RING   preparer P-12 files 80 returns in January-February 2026 with refunds of 1 800-3 400 (the median
                         refund is about 330), all paid into 6 accounts the preparer controls
                         look-alike: P-03, a large preparer whose 250 clients' refunds go to each client's own account

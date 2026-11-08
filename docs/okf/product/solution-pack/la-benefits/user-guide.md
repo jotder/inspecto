@@ -137,4 +137,4 @@ golden tests are `tools/gen-la-benefits-data.test.mjs` and `BenefitsLinksJobGold
       their Jobseeker claims; `P-12`, its 80 taxpayers and the 6 accounts.
 - [ ] No look-alike links to its story: `AD-00412`, `AD-02718`, `AD-05077`; `CIT-05289`; `CIT-02003`; `P-03`.
 - [ ] Each saved view holds its story whole and its look-alike beside it, and draws without "Result cut short"
-      (each is under 600 rows and 600 nodes).
+      (the largest, `benefits_refund_concentration`, is about 600 rows and 520 nodes; a little more with October in).

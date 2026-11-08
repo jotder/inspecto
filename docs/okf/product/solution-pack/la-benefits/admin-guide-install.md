@@ -69,9 +69,9 @@ The Space folder holds only configuration; all runtime state (`data/`, `audit/`,
 
 Copy every file of `inspecto-la-data/la-benefits/data/staged/<feed>/` into
 `inspecto-la-data/la-benefits/data/inbox/<feed>/` (`claim`, `death_register`, `payroll`, `tax_return`). The
-Pipelines land them and the Jobs rebuild the links. October brings about 100 new claims, its death notices (none of
-them a current claimant), another month of payroll in which the twenty working jobseekers are still paid, and a few hundred
-late tax returns. The planted stories stay as they are.
+Pipelines land them and the Jobs rebuild the links. October brings about 100 new claims, another month of payroll
+(12 of the twenty working jobseekers are still paid) and a few hundred late tax returns; its death-register file is
+empty. The planted stories stay as they are.
 
 ## Reset
 
