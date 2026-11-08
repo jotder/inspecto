@@ -1,0 +1,36 @@
+entity_types[7]:
+  - id: provider
+    label: Provider
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PROVIDER
+  - id: member
+    label: Member
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: MEMBER
+  - id: owner
+    label: Owner
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: OWNER
+  - id: address
+    label: Address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ADDRESS
+  - id: claim
+    label: Claim
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CLAIM
+  - id: bank_account
+    label: Bank account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BANK_ACCOUNT
+  - id: health_entity
+    label: Health entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: HEALTH_ENTITY

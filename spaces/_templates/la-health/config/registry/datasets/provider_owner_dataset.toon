@@ -1,5 +1,9 @@
 physicalRef: provider_owner/database
 description: "Provider billing fraud Link Analysis showcase - One row per provider and owner from the provider enrolment file (a provider can have two owners; an owner can own several providers). One extract (PROVIDER_OWNER_20260930.csv). Landed by the provider_owner Pipeline. Synthetic."
+primaryEntityType: provider
 columns[2]{name,type,classification}:
-  provider_id,string,
-  owner_id,string,
+  provider_id,string,PROVIDER
+  owner_id,string,OWNER
+defaultLinkMapping:
+  from: provider_id
+  to: owner_id

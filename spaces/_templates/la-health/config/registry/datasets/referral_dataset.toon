@@ -1,9 +1,14 @@
 physicalRef: referral/database
 description: "Provider billing fraud Link Analysis showcase - One row per referral: the referring practice, the provider referred to, the member and the date. One file per month (REFERRAL_YYYYMM.csv); the next month is in data/staged. Landed by the referral Pipeline. Synthetic."
 eventDate: referred_on
+primaryEntityType: provider
 columns[5]{name,type,classification}:
   referral_id,string,
-  from_provider,string,
-  to_provider,string,
-  member_id,string,
+  from_provider,string,PROVIDER
+  to_provider,string,PROVIDER
+  member_id,string,MEMBER
   referred_on,date,
+defaultLinkMapping:
+  from: from_provider
+  to: to_provider
+  primaryTime: referred_on

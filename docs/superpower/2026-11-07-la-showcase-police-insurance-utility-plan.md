@@ -785,8 +785,8 @@ with a score).
   specialties, which would join the look-alike to the story. `health_links` also runs on `cron: "*/5 * * * *"`
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000
   nodes, the story whole and connected, and the look-alike on the canvas but in another component:
-  `health_referral_concentration` 22 rows, 23 nodes; `health_phantom_billing` 70 rows, 87 nodes; `health_pill_mill` 385
-  rows, 149 nodes; `health_upcoding` 8 rows, 12 nodes.
+  `referral_kickbacks` 22 rows, 23 nodes; `phantom_billing` 70 rows, 87 nodes; `pill_mill` 385
+  rows, 149 nodes; `upcoding_clinics` 8 rows, 12 nodes.
 - **Stories as built:** kickbacks: `PR-1426` Brackenmoor Surgery (68 of 79 referrals) and `PR-1392` Kilnworth Medical
   Practice (182 of 216) to `PR-1170` Emberlea Imaging Centre, York; its owner `OW-0434` shares home `AD-05150` with
   `OW-1270`, owner of `PR-1426`; look-alike `PR-0828` (38 of 44 to `PR-1129` Saltmere Bay Hospital, Scarborough's only
@@ -808,7 +808,7 @@ with a score).
   after a death.
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (the screens were recomputed over landed plus staged files outside the engine with DuckDB: stories and
-  look-alikes unchanged, `health_upcoding` gains a few elderly-care clinics).
+  look-alikes unchanged, `upcoding_clinics` gains a few elderly-care clinics).
 
 #### 10. `la-telco-ra` — telecom revenue assurance
 
