@@ -18,7 +18,7 @@ beats, and every script below is written to them:
 | Beat | What the viewer sees | What the voice does |
 |---|---|---|
 | **Raw** | The records as they really are: the actual file, unformatted. A corner tag *Example · synthetic data*. | Says in one short, blunt sentence what the records are, and why nobody can read the answer off them. |
-| **Map** | The one screen where someone says what each column holds: *What does each column hold?* when onboarding a file, or the Dataset's *Entities* on the Data page. | Says it is done once, in plain words. |
+| **Map** | The one screen where someone says what each column holds: *What does each column hold?* when onboarding a file, or the Dataset's *Entities* on the Data page. Where a Space's links come from a Job instead (no Entity Types set), the link Dataset that Job builds. | Says it is done once, in plain words. |
 | **Ask** | One analysis, its name on screen as the click happens. | Says the question, never the button. |
 | **Outcome** | The finding, held, with its key ids and numbers on screen. | Says what it means and what the investigator does next: a lead to check, never a verdict. |
 | **Your data** | *Your data · same steps* on screen, over the raw file turning into the graph. | Says the records were an example and the steps are the same on the viewer's own. |
@@ -46,7 +46,7 @@ Telecom, its banking stories under Banking and finance.
 | 3.1 | Telecom | Mobile money · MFS · Telco fraud · Revenue assurance | 85 s | Advanced | 2 of 4 segments (MFS, revenue assurance planned) |
 | 3.2 | Banking and finance | First look · Financial crime · Ownership and sanctions · Card fraud · Trade finance · Crypto | 1 min 50 s | Advanced | 4 of 6 segments (trade, crypto planned) |
 | 3.3 | Insurance | Claims fraud | 50 s | Advanced | Yes |
-| 3.4 | Utilities | Electricity revenue protection | 50 s | Basic | Yes |
+| 3.4 | Utilities | Electricity revenue protection | 70 s | Basic | Yes |
 | 3.5 | Law enforcement | Criminal investigation | 50 s | Basic | Yes |
 | 3.6 | Public sector | Procurement · Benefits and tax | 60 s | Basic | 1 of 2 segments (procurement planned) |
 | 3.7 | Healthcare | Provider billing | 50 s | Basic | No: Space planned |
@@ -131,7 +131,7 @@ shows Standard features and carries their edition labels instead.
   Advanced*) while it is visible. Geo Views are among them: they are inert on Basic. Untagged shots show features
   every edition has.
 
-**Capture.** 1920 × 1080 screen capture at 60 fps, browser at 100 % zoom, light theme, a clean browser profile
+**Capture.** 1920 × 1080 screen capture at 60 fps, browser at 100 % zoom, the product's own theme (the LA application is dark only), a clean browser profile
 with no bookmarks bar or extensions. Hide the mouse pointer except where a shot calls for a click. Slow,
 deliberate pointer moves. This is for the masters; drafts are captured as *Draft round (480p)* says.
 
@@ -164,8 +164,8 @@ agency films from. Drafts are for internal review only: never published, never s
 | Who | Presales or product, not the agency. |
 | Install | One Basic install holding the showcase Spaces the round needs and, for video 7, the new Space made from its prepared files. Basic shows identifiers unmasked, so the ids read as the script says. Synthetic showcase Spaces only, as in the filming rules. |
 | Resolution | 480p: **854 × 480** (16:9 SD, the same shape as the master), 30 fps, H.264 MP4. If a WVGA copy (800 × 480, 5:3) is needed, scale the 16:9 frame to 800 × 450 and letterbox it; never stretch. |
-| Capture | A browser window of 1280 × 720 at 100 % zoom, scaled down to 854 × 480. A 1920 × 1080 capture shrinks 2.25 times and node labels blur; 1280 × 720 shrinks 1.5 times. Check that the screen still lays out as on a desktop, and push in on the reveal wherever an id must be read. |
-| Voice and sound | A scratch voice-over (a team member reading the script) and burned-in captions; no music. |
+| Capture | A browser window of 1280 × 720 at 100 % zoom, scaled down to 854 × 480. A 1920 × 1080 capture shrinks 2.25 times and node labels blur; 1280 × 720 shrinks 1.5 times. Check that the screen still lays out as on a desktop, and push in on the reveal wherever an id must be read. At this width the Link Analysis toolbox starts folded into the right rail: open it on camera before the first analysis. Fold the legend and graph-count panels and dismiss the banner between beats, so the graph shows. |
+| Voice and sound | A scratch voice-over (a team member reading the script, or the Windows offline voice) and burned-in captions; no music. The offline voice reads slowly, so a draft runs longer than its estimate (3.4: about 73 s against about 50 s). |
 | Edition | Every draft ends with the edition close: everything it shows is in Basic. A shot above Basic (video 5 shot 7, the Utilities Geo View) is left out of the draft. |
 | Review | Each draft is checked for the six beats, the muted test, and every id and number against the Space's ground truth. Product signs off its claims; the agency then receives it with the script. |
 | Files | `la-video-<number>-draft-480p.mp4`, kept outside the repository (they are large binary files). |
@@ -175,7 +175,7 @@ agency films from. Drafts are for internal review only: never published, never s
 | Order | Video | Spaces (all with a Basic tier) | Notes |
 |---|---|---|---|
 | 1 | 2 · Zero to graph | `la-sample` | Its run is timed for the title as it is drafted. |
-| 2 | 3.4 · Utilities | `la-utility` | Without the optional Geo View shot. |
+| 2 | 3.4 · Utilities | `la-utility` | Without the optional Geo View shot. Draft 1 recorded on 2026-11-08, waiting for review; drafted first, ahead of video 2, to prove the pipeline in the browser alone. |
 | 3 | 3.5 · Law enforcement | `la-police` | |
 | 4 | 3.6 · Public sector | `la-benefits` | Segment B only, until `la-procurement` is built. |
 | 5 | 3.2 · Banking and finance | `la-sample`, `la-ownership`, `la-card` | Segments A, C and D. B needs `la-showcase` (an Advanced install today); E and F wait for their Spaces. |
@@ -397,28 +397,33 @@ The opening, map and close are the same in every multi-segment video:
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 6 | 4 | End card. | *For Special Investigations Units.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.4 · Utilities (about 50 s)
+### 3.4 · Utilities (about 70 s)
 
 | | |
 |---|---|
 | Audience | Revenue-protection teams at electricity utilities. |
 | Film on | Basic install. |
-| Ready | Now. |
+| Ready | Now. Draft 1 (480p) was recorded on 2026-11-08 from this script, at about 73 s with the slow offline scratch voice. |
 | Optional shot | The loss-by-transformer Geo View, `TX-007` and `TX-019` over 15 %: label it *Inspecto LA Standard* (Geo Views are inert on Basic) and film it on a Standard or higher install. |
+| As filmed | `la-utility` sets no Entity Types: its links come from the `utility_links` Job, which joins the files into one link Dataset. So the Map beat shows that Dataset, and the own-data line names the join. The ask starts from the 22 low meters, not from the contractor-network saved view: there, *Busiest nodes* ranks the busy contractors `C-27` and `C-21` first, and volume alone is not the story. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
-| A | Electricity revenue protection | `la-utility` (built) | Meter reads and a log of field visits. | 22 premises under transformers `TX-007` and `TX-019` drop 40–70 % within 2 weeks of a visit by contractor `C-14`; transformer supply stays flat. | Contractor-network saved view, *Busiest nodes*: `C-14` at the centre of the 22. | 22 premises to inspect, one contractor to question. | A holiday home whose use drops every winter, with no visit. |
+| A | Electricity revenue protection | `la-utility` (built) | Meter reads and a log of field visits. | 22 premises under transformers `TX-007` and `TX-019` drop 40–70 % within 2 weeks of a visit by contractor `C-14`; transformer supply stays flat. | *Start a graph* ▸ *Pasted values*: the 22 low meters, drawn with their links. *Busiest nodes*: `C-14` first with 22 links, then `TX-007` and `TX-019` with 11 each. *Show on graph* on `C-14`. | 22 premises to inspect, one contractor to question. | A holiday home whose use drops every winter, with no visit (`PRM-0773`, not among the 22 pasted). |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
-| 1 | 6 | Meter reads as they landed, the field-visit log beside them. | Utilities · *Example · synthetic data* | Meter reads and a log of field visits. Twenty-two meters started reading low; the transformers didn't. |
-| 2 | 5 | The Data page: a Dataset at *Entities*. | *Entities* | Say once what the columns hold: premises, visits, contractors. |
-| 3 | 5 | The contractor-network saved view, wide; *Busiest nodes*. | *Busiest nodes* | Ask what the low meters have in common. |
-| 4 | 7 | A beat of quiet; `C-14` and the 22 premises held. | *C-14 · 22 premises* | One contractor visited them all, two weeks before each drop. Twenty-two premises to inspect, one contractor to question. |
-| 5 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
-| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
-| 6 | 4 | End card. | *For revenue protection.* · *Try it on your own data.* | Inspecto LA. |
+| 1 | 9 | `METER_READ_202602.csv` and `FIELD_VISIT_20260930.csv` side by side in a plain viewer, scrolling slowly. | Utilities · *Example · synthetic data* | Meter reads and a log of field visits. Twenty-two meters started reading low; the transformers didn't. |
+| 2 | 11 | The Data page: open `utility_links_dataset`; its card says the `utility_links` Job builds it from the files, and lists its columns. | *One link Dataset · built by one Job* | One Job, set up once, joins these files into a single list of links: what supplies each premise, and who visited it. |
+| 3 | 9 | *Start a graph* ▸ *Start from* ▸ *Pasted values*; paste the 22 premise ids; *Start from these*. The 22 premises draw with their links. | *Pasted values · 22 low meters* | Paste the twenty-two low meters, and draw their links. |
+| 4 | 6 | Open the toolbox from the right rail; *Busiest nodes*. The list: `C-14` 22 links, `TX-007` 11, `TX-019` 11. | *Busiest nodes* | Ask what they have in common. |
+| 5 | 12 | *Show on graph* on `C-14`; a gentle push-in on it, the premises around it. | *C-14 · 22 links · TX-007 and TX-019* | One contractor visited every one of them, all under two transformers. Twenty-two premises to inspect, one contractor to question. |
+| 6 | 10 | The raw files dissolving into the graph. | *Your data · same questions* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| Close | 11 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
+| 7 | 4 | End card. | *For revenue protection.* · *Try it on your own data.* | Inspecto LA. |
+
+The list under `C-14` also offers *Add to exclusion list* (the product's standard hint for any busy node). The voice-over
+passes over it; product decides whether that hint should stay on a node the analyst is looking at.
 
 ### 3.5 · Law enforcement (about 50 s)
 
@@ -713,7 +718,7 @@ edition close draw on.
 | The *Entities* page: Entity Types and *Compare values as* | 7, and the Map beat of every video |
 | The Data page: Datasets, what their columns hold, and Mappings | The Map beats; video 7's alternative cut |
 | *Watch this folder* and *What changed in your data* | 5 |
-| *Start a graph*, saved views and *My work* | 1, 5, the industry videos |
+| *Start a graph* (including *Pasted values*), saved views and *My work* | 1, 5, the industry videos (3.4 starts from pasted values) |
 | *Busiest nodes* and *Tight groups* (graph algorithms in the browser) | 1, the industry videos |
 | *Exclude…* | 1 |
 | *Route from A to B* (find paths) | 2, 4, the industry videos |
@@ -746,9 +751,12 @@ Standard and Advanced include by default; sign-in, roles and enforced masking co
 - Video 2: time the run on the final build and the filming laptop; use the median wherever a time is said or shown.
 - **Own-data line, per story:** product confirms that each story's outcome can be reached from its raw files with
   *Add data* and the analysis shown. Where a Space also relies on something set up once (a Job that derives links, a
-  prepared saved view), that story's line names it (*…plus one Job, set up once*) instead of "same steps".
+  prepared saved view), that story's line names it (*…plus one Job, set up once*) instead of "same steps". 3.4 is
+  checked: `la-utility` relies on its `utility_links` Job, and its line says so.
 - **Raw beats:** pick, per story, the landed file and the rows to show (ideally rows holding the story's ids), and
   check that the Data page's *Entities* shows what the Map beat's voice-over says for each Dataset filmed.
+- Industry videos: try every segment's ask on the live Space before filming, not only on paper. In 3.4 the scripted
+  *Busiest nodes* on the contractor-network view would have named the wrong contractor; the draft found it.
 - Industry videos: check every reveal against the Space's ground truth file before filming. Segments on planned
   Spaces (3.1 B and D, 3.2 E and F, 3.6 A, 3.7, 3.8, 3.9 B) are filmed only after their Spaces are built, and
   re-read against the Space as built. Decide per industry whether to publish with built segments only or wait.
