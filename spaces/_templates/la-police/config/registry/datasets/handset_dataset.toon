@@ -1,6 +1,10 @@
 physicalRef: handset/database
 description: "Police Link Analysis showcase - One row per handset number: IMEI and the person it is attributed to (often blank). Landed by the handset Pipeline. Synthetic."
+primaryEntityType: phone
 columns[3]{name,type,classification}:
-  number,string,
-  imei,string,
-  attributed_person_id,string,
+  number,string,PHONE
+  imei,string,HANDSET_ID
+  attributed_person_id,string,PERSON
+defaultLinkMapping:
+  from: attributed_person_id
+  to: number

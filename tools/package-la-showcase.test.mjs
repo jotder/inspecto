@@ -79,3 +79,19 @@ test('a recipe naming a template that does not exist is refused, not skipped', (
   assert.throws(() => composeSources([{ tpl: 'la-utility', files: ['template.toon', 'config/a.toon'] }, { tpl: 'la-utlity', files: [] }]),
     /'la-utlity' has no committed template.toon/);
 });
+
+test('a path two use cases ship with the same bytes is one file; different bytes are refused', () => {
+  const t = [{ tpl: 'a', files: ['template.toon', 'config/shared/x.toon'] }, { tpl: 'b', files: ['template.toon', 'config/shared/x.toon'] }];
+  assert.equal(composeSources(t, () => true).get('config/shared/x.toon'), 'a');
+  assert.throws(() => composeSources(t, () => false), /shipped by both a and b/);
+});
+
+test('every use case may ship its own config/examples/*.md; several are joined, one ships as is', async () => {
+  const { isJoined, joinExamples } = await import('./package-la-showcase.mjs');
+  assert.ok(isJoined('config/examples/sla-escalation-examples.md') && isJoined(MERGED) && !isJoined('config/examples/x.toon') && !isJoined('config/shared/x.toon'));
+  const owner = composeSources([
+    { tpl: 'a', files: ['template.toon', 'config/examples/sla.md'] }, { tpl: 'b', files: ['template.toon', 'config/examples/sla.md'] },
+  ]);
+  assert.deepEqual(owner.get('config/examples/sla.md'), ['a', 'b']);
+  assert.equal(joinExamples(['# A\nx\n', '# B\ny']), '# A\nx\n\n---\n\n# B\ny\n');
+});
