@@ -1,0 +1,5 @@
+name: Logistics
+tagline: "Cargo theft on synthetic data - losses recurring with one driver pair and one night-shift scanner, an unscheduled-stop hotspot and a fictitious carrier taking high-value loads, every Dataset mapped."
+minEdition: basic
+icon: heroicons_outline:truck
+useCases[1]: la-logistics

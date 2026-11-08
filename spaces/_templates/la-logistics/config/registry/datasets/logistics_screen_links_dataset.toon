@@ -1,12 +1,19 @@
 physicalRef: logistics_screen_links
 description: "Logistics cargo theft Link Analysis showcase - Derived from logistics_links each time it is produced, for the three saved views: the links each cargo-security screen selects, tagged in screen (inside_job, stop_hotspot, new_carrier). A link selected by two screens appears once in each. Same columns as logistics_links plus screen. Synthetic."
 eventDate: event_date
+primaryEntityType: logistics_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,LOGISTICS_ENTITY
+  dst,string,LOGISTICS_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   screen,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount
