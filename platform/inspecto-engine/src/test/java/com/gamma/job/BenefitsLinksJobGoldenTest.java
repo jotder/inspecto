@@ -39,7 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * generator's ground truth ({@code tools/gen-la-benefits-data.ground-truth.json}): every story's entities form one connected group,
  * no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole, shows the
  * look-alike beside it and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts behind each story in the files
- * themselves are pinned by {@code tools/gen-la-benefits-data.test.mjs}.
+ * themselves are pinned by {@code tools/gen-la-benefits-data.test.mjs}. The Advanced tier's {@code benefits_deceased_counts} Job is
+ * then run over the real output: its Alert Rule fires on the nine pensions still paid after the death notices, would not without
+ * them, and never counts the death notified 40 days late.
  */
 class BenefitsLinksJobGoldenTest {
 
@@ -47,6 +49,7 @@ class BenefitsLinksJobGoldenTest {
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-benefits");
     private static final List<String> FEEDS = List.of("address", "person", "household", "claim", "death_register", "payroll", "tax_return");
     private static final List<String> JOBS = List.of("benefits_links", "benefits_screen_links");
+    private static final String COUNTS = "benefits_deceased_counts";
 
     @TempDir static Path tmp;
     private static Path data;
@@ -71,8 +74,17 @@ class BenefitsLinksJobGoldenTest {
             assertFalse(hasFiles(Path.of(pc.dirs().errors())), feed + ": nothing in the corpus is an error");
         }
         data = space.resolve("data");
+        runJobs(space, JOBS);
+        // then the Advanced tier's counts Job in a service of its own, so no signal-fired run races a read
+        runJobs(space, List.of(COUNTS));
+        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-benefits-data.ground-truth.json").toFile());
+        bl = parquet("benefits_links");
+        links = triples("SELECT src, dst, kind FROM " + bl);
+    }
+
+    private static void runJobs(Path space, List<String> names) throws Exception {
         List<JobConfig> jobs = new ArrayList<>();
-        for (String j : JOBS) jobs.add(JobConfig.load(space.resolve("config/jobs/" + j + "_job.toon").toString()));
+        for (String j : names) jobs.add(JobConfig.load(space.resolve("config/jobs/" + j + "_job.toon").toString()));
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
         // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
         for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
@@ -86,28 +98,109 @@ class BenefitsLinksJobGoldenTest {
                      space.resolve("audit").toString(), null, null, data.toString(), null, platform)) {
             js.eventLog(com.gamma.event.EventLog.current());
             js.start();
-            for (String j : JOBS) {
+            for (String j : names) {
                 // the derived Job may already be running off the main Job's produced signal; a trigger then is a no-op
-                if (j.equals(JOBS.get(0))) assertTrue(js.triggerRun(j, null, Map.of()).isPresent(), j);
+                if (j.equals(names.get(0))) assertTrue(js.triggerRun(j, null, Map.of()).isPresent(), j);
                 else js.triggerRun(j, null, Map.of());
                 JobRun r = awaitRun(js, j);
                 assertNotNull(r, j + " never ran");
                 assertEquals("SUCCESS", r.status(), j + " failed: " + r.message());
             }
         }
-        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-benefits-data.ground-truth.json").toFile());
-        bl = parquet("benefits_links");
-        links = triples("SELECT src, dst, kind FROM " + bl);
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/benefits_deceased_counts_job.toon",
+                "config/jobs/benefits_deceased_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/benefits_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("benefits_deceased_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "benefits_deceased_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet(COUNTS);
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: the nine pensions still paid months after their notices, into three accounts that
+        // also take the three claims of one living person; 314 claims paid after a death stopped 0-5 days after the notice
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        JsonNode d = truth.get("payments_to_the_deceased");
+        assertEquals(9L, ((Number) row.get("deceased_claims_paid_after_notice")).longValue());
+        assertEquals((long) d.get("deceased").size(), ((Number) row.get("deceased_claims_paid_after_notice")).longValue());
+        assertEquals(3L, ((Number) row.get("accounts_paid_after_notice")).longValue());
+        assertEquals(3L, ((Number) row.get("living_claims_into_those_accounts")).longValue());
+        assertEquals((long) d.get("controller_claims").size(), ((Number) row.get("living_claims_into_those_accounts")).longValue());
+        assertEquals(314L, ((Number) row.get("overpayments_stopped_after_notice")).longValue());
+        assertEquals(5L, ((Number) row.get("slowest_stop_after_notice_days")).longValue());
+        assertTrue(((Number) row.get("slowest_stop_after_notice_days")).intValue() < graceDays(), "a normal stop stays inside the grace");
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+    }
+
+    @Test
+    void withoutTheNineDeceasedTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same output with the story's nine deaths taken off the register: nothing counts
+        String nine = in(truth.get("payments_to_the_deceased").get("deceased"));
+        Map<String, Object> without = countsOver("person_id NOT IN " + nine);
+        assertEquals(0L, ((Number) without.get("deceased_claims_paid_after_notice")).longValue(), without.toString());
+        assertTrue(((Number) without.get("deceased_claims_paid_after_notice")).doubleValue() < rule().threshold(), "it would not fire: " + without);
+        assertEquals(0L, ((Number) without.get("accounts_paid_after_notice")).longValue());
+        assertEquals(314L, ((Number) without.get("overpayments_stopped_after_notice")).longValue(), "the normal overpayments are not the story's");
+        // and with ONLY the nine on the register, the nine are exactly what counts
+        Map<String, Object> only = countsOver("person_id IN " + nine);
+        assertEquals(9L, ((Number) only.get("deceased_claims_paid_after_notice")).longValue(), only.toString());
+        assertEquals(0L, ((Number) only.get("overpayments_stopped_after_notice")).longValue(), only.toString());
+    }
+
+    @Test
+    void theDeathNotifiedFortyDaysLateNeverCounts() throws Exception {
+        JsonNode d = truth.get("payments_to_the_deceased");
+        String lookalike = d.get("lookalike").asText();
+        // paid 42 days after the death: a rule counting from the death (30 days, as the paid_after_death screen) would flag it ...
+        String via = (String) rows("SELECT via FROM " + bl + " WHERE kind = 'paid_into' AND src = '" + d.get("lookalike_claim").asText() + "'").get(0).get("via");
+        assertTrue(via.contains("|paid_after_death_days:42|") && 42 > graceDays(), via);
+        // ... and so would 33 background deaths: notices arrive up to 60 days late
+        assertEquals(34, count("SELECT count(*) FROM " + bl + " WHERE kind = 'paid_into' AND TRY_CAST(regexp_extract(via, 'paid_after_death_days:([0-9]+)', 1) AS INTEGER) >= "
+                + graceDays()), "claims stopped 30 or more days after the death, every one within days of its notice");
+        // ... but the counts Job counts from the notice: with only the look-alike on the register it is a normal overpayment
+        Map<String, Object> only = countsOver("person_id = '" + lookalike + "'");
+        assertEquals(0L, ((Number) only.get("deceased_claims_paid_after_notice")).longValue(), lookalike + " " + only);
+        assertEquals(1L, ((Number) only.get("overpayments_stopped_after_notice")).longValue(), lookalike + " " + only);
+        assertEquals(2L, ((Number) only.get("slowest_stop_after_notice_days")).longValue(), "stopped 2 days after the notice");
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/benefits_paid_to_the_deceased_after_notice.toon").toString()));
+    }
+
+    private static JobConfig countsJob() throws Exception {
+        return JobConfig.load(TEMPLATE.resolve("config/jobs/" + COUNTS + "_job.toon").toString());
+    }
+
+    private static int graceDays() throws Exception {
+        return Integer.parseInt(countsJob().require("grace_days_after_notice"));
+    }
+
+    /** The counts Job's own SQL (its params substituted as the Job does) over the real Job output and feeds, the death register narrowed. */
+    private static Map<String, Object> countsOver(String deathFilter) throws Exception {
+        JobConfig job = countsJob();
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("grace_days_after_notice", job.require("grace_days_after_notice")));
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW benefits_links AS SELECT * FROM " + bl);
+            st.execute("CREATE VIEW claim AS SELECT * FROM " + parquet("claim/database", "/**/*.parquet"));
+            st.execute("CREATE VIEW death_register AS SELECT * FROM " + parquet("death_register/database", "/**/*.parquet") + " WHERE " + deathFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

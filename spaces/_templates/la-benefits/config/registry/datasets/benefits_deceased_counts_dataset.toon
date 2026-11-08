@@ -1,0 +1,8 @@
+physicalRef: benefits_deceased_counts
+description: "Benefits and tax fraud Link Analysis showcase - one row of counts built by the benefits_deceased_counts Job: deceased_claims_paid_after_notice (claims of people on the death register still paid more than 30 days after the notice), accounts_paid_after_notice (the accounts they are paid into), living_claims_into_those_accounts (claims of people not on the death register paid into those accounts), overpayments_stopped_after_notice (claims paid after a death that stopped within 30 days of the notice) and slowest_stop_after_notice_days (the most days one of those ran past its notice). Read by the Alert Rule benefits_paid_to_the_deceased_after_notice. Names no person. Synthetic."
+columns[5]{name,type,classification}:
+  deceased_claims_paid_after_notice,number,
+  accounts_paid_after_notice,number,
+  living_claims_into_those_accounts,number,
+  overpayments_stopped_after_notice,number,
+  slowest_stop_after_notice_days,number,

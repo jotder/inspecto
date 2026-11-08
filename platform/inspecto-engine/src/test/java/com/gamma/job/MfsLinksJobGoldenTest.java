@@ -39,14 +39,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ({@code tools/gen-la-mfs-data.ground-truth.json}): every story's entities form one connected group,
  * no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole, shows the
  * look-alike beside it and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts behind each story in the files
- * themselves are pinned by {@code tools/gen-la-mfs-data.test.mjs}.
+ * themselves are pinned by {@code tools/gen-la-mfs-data.test.mjs}. The Advanced tier's {@code mfs_swap_drain_counts} Job runs over
+ * the real {@code mfs_links} too: the Alert Rule {@code mfs_wallet_drained_after_sim_swap} fires on the takeover wallets, would not
+ * without them, and never counts the store's SIM upgrade drive.
  */
 class MfsLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-mfs");
     private static final List<String> FEEDS = List.of("agent", "merchant", "wallet", "wallet_txn", "sim_event", "device_login", "agent_commission");
-    private static final List<String> JOBS = List.of("mfs_links", "mfs_screen_links");
+    // the link Job, its derived screens and the Advanced tier's counts Job (both derived Jobs fire on mfs_links' produced signal)
+    private static final List<String> JOBS = List.of("mfs_links", "mfs_screen_links", "mfs_swap_drain_counts");
 
     @TempDir static Path tmp;
     private static Path data;
@@ -101,13 +104,85 @@ class MfsLinksJobGoldenTest {
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/mfs_swap_drain_counts_job.toon",
+                "config/jobs/mfs_swap_drain_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/mfs_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("mfs_swap_drain_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "mfs_swap_drain_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet("mfs_swap_drain_counts");
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: the 30 takeover wallets, all swapped by one login (S-41); no other wallet paid out
+        // more than 98.14 within 2 hours of a swap
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(30L, ((Number) row.get("drained_after_swap")).longValue());
+        assertEquals(1L, ((Number) row.get("logins_behind_drains")).longValue());
+        assertEquals(98.14, ((Number) row.get("largest_other_out_within_2h")).doubleValue(), 0.005);
+        assertTrue(((Number) row.get("largest_other_out_within_2h")).doubleValue() < minOutWithin2h(), "a genuine customer stays below the threshold");
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+        // the wallets it counts are exactly the generator's 30 victims, and the login behind them is the story's
+        JsonNode s = truth.get("sim_swap_takeover");
+        String drained = "kind = 'swapped_by' AND TRY_CAST(regexp_extract(via, 'out_within_2h:([0-9.]+)', 1) AS DOUBLE) >= " + minOutWithin2h();
+        assertEquals(ids(s.get("victims")), new TreeSet<>(rows("SELECT DISTINCT src FROM " + bl + " WHERE " + drained).stream().map(r -> (String) r.get("src")).toList()));
+        assertEquals(Set.of(s.get("login").asText()), new TreeSet<>(rows("SELECT DISTINCT dst FROM " + bl + " WHERE " + drained).stream().map(r -> (String) r.get("dst")).toList()));
+    }
+
+    @Test
+    void withoutTheTakeoverWalletsTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same output with the 30 victims' swap links taken out: nothing drained, no Alert
+        Map<String, Object> without = countsOver("NOT (kind = 'swapped_by' AND src IN " + in(truth.get("sim_swap_takeover").get("victims")) + ")");
+        assertEquals(0L, ((Number) without.get("logins_behind_drains")).longValue(), without.toString());
+        assertTrue(((Number) without.get("drained_after_swap")).doubleValue() < rule().threshold(), "without the takeover it would not fire: " + without);
+    }
+
+    @Test
+    void theStoresSimUpgradeDriveIsNeverCounted() throws Exception {
+        JsonNode s = truth.get("sim_swap_takeover");
+        String store = s.get("lookalike_login").asText();
+        // the store swaps far more SIMs than the call-centre login: a count of swaps would flag it
+        assertTrue(count("SELECT max(TRY_CAST(regexp_extract(via, 'login_max_swaps_10d:([0-9]+)', 1) AS INTEGER)) FROM " + bl
+                + " WHERE kind = 'swapped_by' AND dst = '" + store + "'") >= 15, store + " bursts too");
+        assertEquals(ids(s.get("lookalike_customers")).size(), count("SELECT count(DISTINCT src) FROM " + bl + " WHERE kind = 'swapped_by' AND dst = '" + store + "'"));
+        // the counts Job's own SQL over only the store's swaps: its customers keep their balances, so nobody is drained
+        Map<String, Object> only = countsOver("kind = 'swapped_by' AND dst = '" + store + "'");
+        assertEquals(0L, ((Number) only.get("drained_after_swap")).longValue(), store + " " + only);
+        assertEquals(0L, ((Number) only.get("logins_behind_drains")).longValue(), store + " " + only);
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/mfs_wallet_drained_after_sim_swap.toon").toString()));
+    }
+
+    private static JobConfig countsJob() throws Exception {
+        return JobConfig.load(TEMPLATE.resolve("config/jobs/mfs_swap_drain_counts_job.toon").toString());
+    }
+
+    private static double minOutWithin2h() throws Exception {
+        return Double.parseDouble(countsJob().require("min_out_within_2h"));
+    }
+
+    /** The counts Job's own SQL (its params substituted as the Job does) over the real mfs_links output, narrowed. */
+    private static Map<String, Object> countsOver(String linkFilter) throws Exception {
+        JobConfig job = countsJob();
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("min_out_within_2h", job.require("min_out_within_2h")));
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW mfs_links AS SELECT * FROM " + bl + " WHERE " + linkFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

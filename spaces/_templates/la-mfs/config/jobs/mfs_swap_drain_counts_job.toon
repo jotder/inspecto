@@ -1,0 +1,11 @@
+job:
+  name: mfs_swap_drain_counts
+  type: sql.template
+  description: "Runs each time the mfs_links Job produces its Dataset. One row of counts from the swapped_by links (a wallet to the staff login that swapped its SIM; via out_within_2h is what the wallet paid out - P2P, merchant payments and cash-outs - within 2 hours after the swap): drained_after_swap (distinct wallets that paid out min_out_within_2h or more within 2 hours of a SIM swap), logins_behind_drains (distinct staff logins that made those swaps) and largest_other_out_within_2h (the most any other wallet paid out within 2 hours of a swap, the margin a genuine customer keeps below the threshold). A store swapping many SIMs in an upgrade drive whose customers keep their balances is never counted: the count reads money out, not how many swaps a login made. No balance is computed (the corpus has no opening balances), so drained means paid out. The Alert Rule mfs_wallet_drained_after_sim_swap reads it; no wallet or login id leaves this Job, they are found in the Investigation."
+  sql: "WITH s AS (SELECT src, dst, TRY_CAST(regexp_extract(via, 'out_within_2h:([0-9.]+)', 1) AS DOUBLE) AS o2 FROM mfs_links WHERE kind = 'swapped_by'), d AS (SELECT src, dst FROM s WHERE o2 >= CAST($min_out_within_2h AS DOUBLE)) SELECT (SELECT count(DISTINCT src) FROM d) AS drained_after_swap, (SELECT count(DISTINCT dst) FROM d) AS logins_behind_drains, (SELECT coalesce(max(o2), 0) FROM s WHERE o2 < CAST($min_out_within_2h AS DOUBLE)) AS largest_other_out_within_2h"
+  sources: mfs_links
+  sink_dataset: mfs_swap_drain_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == mfs_links"
+  min_out_within_2h: "300"
+  enabled: true

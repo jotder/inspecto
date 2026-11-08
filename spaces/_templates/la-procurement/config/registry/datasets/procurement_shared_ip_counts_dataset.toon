@@ -1,0 +1,6 @@
+physicalRef: procurement_shared_ip_counts
+description: "Bid rigging and procurement fraud Link Analysis showcase - one row of counts built by the procurement_shared_ip_counts Job over the landed bids: same_tender_ip_bids (bids sent from an IP address another bidder had already used for its own bid on the same tender), same_tender_ip_tenders (the tenders they are on) and ips_shared_across_tenders_only (IP addresses two or more bidders use, but never two on one tender). Read by the Alert Rule procurement_same_tender_shared_ip. Names no bidder. Synthetic."
+columns[3]{name,type,classification}:
+  same_tender_ip_bids,number,
+  same_tender_ip_tenders,number,
+  ips_shared_across_tenders_only,number,

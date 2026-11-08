@@ -43,7 +43,7 @@ Telecom), with the same template id.
 | Financial crime tour | `la-showcase` | Mule ring and shell loop; TILL-06 takes 80 % of cash-out; SKIMMER-01 skims benefit payments; geo route of the ring | exists |
 | Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
 | Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
-| Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
+| Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | exists |
 | Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | exists (Basic tier) |
 
 ### Insurance
@@ -1513,6 +1513,290 @@ deviations:
      `--apply`, the persona probes) and no Basic bundle (rule unarmed, `card_compromise_alerts` reporting no breach, 0
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
+
+   **`la-mfs` BUILT 2026-11-09** (the `la-card` pattern: personas, four-eyes, a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`mfs.analyst` lead, `mfs.manager`
+     second approver, `mfs.reviewer` read-only, `mfs.outsider` not a member, and `admin` exactly as in `la-showcase`:
+     `admin;fraud-analyst;la-settings`), `config/roles.toon` (`mfs-analyst`, `mfs-manager`, and `fraud-analyst`,
+     `la-viewer`, `la-settings` line for line as in `la-card`), `four_eyes_fan_out_above: 2000` plus the Drafts limits in
+     `link-analysis.toon`, the same values as `la-card` (the *Telecom* industry Space composes `la-mfs` with `la-telco-ra`,
+     and the packer refuses a setting two use cases state differently). No `masking_mode`; no Entity Type masked.
+   - **Alert Rule "a wallet drained within 2 hours of a SIM swap", as a registry rule over a counts Job:**
+     `mfs_swap_drain_counts` (`sql.template` on `mfs_links`' `job.dataset.produced`, `min_out_within_2h: "300"`) reads the
+     `out_within_2h:` evidence on each `swapped_by` link (what the wallet paid out, P2P, merchant payments and cash-outs,
+     within 2 hours after the swap; the Basic tier put it there for this rule) and writes one row: `drained_after_swap`
+     (distinct wallets with 300 or more), `logins_behind_drains` (distinct staff logins that made those swaps) and
+     `largest_other_out_within_2h` (the margin); `mfs_swap_drain_alerts` (`alert.evaluate`) runs after it;
+     `mfs_wallet_drained_after_sim_swap` is `max(drained_after_swap) gte 1`, WARNING, not grouped (a Job output, as in
+     `la-utility` and `la-card`).
+   - **Decided while building:**
+     - **"Drained" means paid out 300 or more within 2 hours.** The corpus has no opening balances (Basic tier note), so no
+       share of a balance can be computed. 300 sits between the two populations with room on both sides: the 30 takeover
+       wallets paid out 463.26 to 1 837.18, every other swapped wallet 98.14 at most (`S-32`'s customer; the store's
+       largest is 76.83). A rule on how many swaps a login makes would fire on the store's upgrade drive (`S-72`, 51 in 10
+       days); the rule reads money out only, so the look-alike cannot reach it.
+     - **Running total, not "new".** The count is over every `swapped_by` link in the Dataset, so the rule stays met after
+       every build (the open Alert is not raised again). The staged October month adds 60 `swapped_by` links and leaves the figures at
+       30 / 1 / 98.14 (checked with DuckDB over landed plus staged). A per-build "new drains" count is a later refinement.
+     - The Draft step annotates `S-41` (the seed) about the mules: a mule is two hops out (`S-41` to victim wallet to mule),
+       so annotating one would be refused.
+   - **Real figures on the shipped data** (the counts Job's SQL over the real `mfs_links`; pinned by
+     `MfsLinksJobGoldenTest`): drained_after_swap **30** (exactly the ground truth's `victims`), logins_behind_drains **1**
+     (`S-41`), largest_other_out_within_2h **98.14**. With the victims' `swapped_by` links taken out: 0 / 0, no Alert. Over
+     only `S-72`'s 160 swaps: 0 / 0.
+   - **Seed** `tools/seed-la-mfs.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `sim-swap-takeover` over `mfs_links_dataset` (Entity Type `telecom_entity`; seed `S-41`; a bounded
+     expand over `swapped_by`, `maxFanOut` 80, to its 40 swapped wallets, the 30 victims and its ten ordinary swaps;
+     annotate, threshold, window, resolve, snapshot), members (`mfs.reviewer` and `mfs.manager` reviewers, `admin` lead;
+     not `mfs.outsider`), Entity List `mule-wallets` (the five mules), a Case from `S-41` assigned to `mfs.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft.
+   - **Tests:** `LaMfsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000; no masked type; persona capabilities; every persona role defined and `fraud-analyst`, `la-viewer`,
+     `la-settings` equal to `la-card`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs'
+     signals); `MfsLinksJobGoldenTest` (the counts Job runs after `mfs_links`; `theTemplateIsBasicTierOnly` became
+     `theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts`: the real figures, the rule's own measure and
+     threshold fire, the counted wallets are the victims and the login is `S-41`;
+     `withoutTheTakeoverWalletsTheRuleWouldNotFire`; `theStoresSimUpgradeDriveIsNeverCounted`); the gallery test pins
+     `la-mfs` creatable with no missing feature and no Demo Auth; `tools/seed-la-mfs.test.mjs` (mocked fetch, 11 tests).
+     Falsified, each then restored: the counts Job counting the swaps of a bursting login instead of money out (200
+     wallets, `S-72`'s 160 counted, all three engine tests fail), the "without" filter keeping the victims, `masking_mode:
+     typed`, `mfs-analyst` given the approve capability, `admin` given `mfs-analyst`, `fraud-analyst` removed, `la-mfs` out
+     of the gallery's Basic-tier set, and in the seed: the outsider made a member, the Draft annotating a mule, `S-72`
+     added to the seed.
+   - ***Telecom* composition:** the packer joins `config/demo-users.toon` (users by id) and `config/roles.toon` (roles
+     by name) since the `la-ownership` lane, so `la-telco-ra`'s roster composes with this one; `admin`, `fraud-analyst`,
+     `la-viewer` and `la-settings` are byte-identical to la-card's.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 30, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `mfs_swap_drain_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Telecom* industry Space with this tier, an OIDC build.
+
+   **`la-health` BUILT 2026-11-09** (the `la-card` pattern). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`health.analyst` lead, `health.manager`
+     second approver, `health.reviewer` read-only, `health.outsider` not a member, and `admin` exactly as in
+     `la-showcase`), `config/roles.toon` (`health-analyst`, `health-manager`, and `fraud-analyst`, `la-viewer`,
+     `la-settings` byte-identical to `la-card`'s, although `la-health` is the only use case of *Healthcare*),
+     `four_eyes_fan_out_above: 2000` plus the same Drafts limits in `link-analysis.toon` (no `masking_mode`; no Entity
+     Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `health_phantom_counts` (`sql.template` on `health_links`'
+     `job.dataset.produced`, reading only `health_links`) writes one row from the `treated` links' `via`:
+     `lines_in_admission`, `lines_after_death`, `lines_in_admission_or_after_death`, `members_billed`,
+     `providers_billing` and `corrected_lines`; `health_phantom_alerts` (`alert.evaluate`) runs after it;
+     `health_billed_in_admission_or_after_death` is `max(lines_in_admission_or_after_death) gte 1`, WARNING, not grouped
+     (a Job output). It is the spec's rule as written: one service billed in a stay or after a death is enough.
+   - **Real figures on the shipped data** (the Job's SQL over the real `health_links`; pinned by
+     `HealthLinksJobGoldenTest`): lines_in_admission **89**, lines_after_death **70**, lines_in_admission_or_after_death
+     **159**, members_billed **40**, providers_billing **1** (`PR-1241`), corrected_lines **30** (15 at the look-alike
+     `PR-0632`, 15 single errors elsewhere, all reversed). With `PR-1241` taken out: 0 / 0 / 0 / 0 / 0 / 30. Only
+     `PR-0632`'s links: 0 open, 15 corrected.
+   - **Decided while building:**
+     - **The measure counts open lines, not corrected ones.** `health_links` already reads a line as `in_admission` only
+       when the stay is at ANOTHER hospital (`ad.hospital_id <> o.provider_id`) and not reversed; the counts Job reads
+       that, so the look-alike's date errors (reversed in 2-6 days) never count.
+     - **The busy look-alike hospital.** `PR-1129` (Saltmere Bay Hospital) is the first node on *Busiest nodes* in
+       `referral_kickbacks` (degree 8 in the screen). It also bills 2 unreversed lines inside its OWN stays, so a naive
+       "any line dated inside a stay" count would name it. The rule leaves the admitting hospital out, and the golden test
+       pins it: `PR-1129` is the referral view's busiest node, a naive in-a-stay count of its lines is above 0, and the
+       counts Job over its links (and over the kickback ring's `PR-1426`, `PR-1392`, `PR-1170`) counts 0. The lane brief
+       asked that the measure separate the kickback ring from that hospital; the spec's named rule is about phantom
+       billing, not kickbacks, so neither the ring nor the hospital is counted; a kickback Alert Rule was not added (one
+       rule per Space). If a kickback rule is wanted, the separating fact is the shared home (`lives_at` to `AD-05150`),
+       which the trust-owned hospital lacks.
+     - **Running total**, as in `la-police` and `la-card`: `health_links` is rebuilt over everything landed, so the rule
+       stays met after every build and an open Alert is not raised again. The staged October bills nothing in a stay or
+       after a death, so the figures do not move.
+   - **Seed** `tools/seed-la-health.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `phantom-billing` (seed `PR-1241`; a bounded expand over `treated`, `maxFanOut` 80, to its 53
+     patients, the 40 among them; annotate, threshold, window, resolve, snapshot), members (`health.reviewer` and
+     `health.manager` reviewers, `admin` lead; not `health.outsider`), Entity List
+     `billed-in-hospital-or-after-death` (the 40), a Case from `PR-1241` assigned to `health.manager` and linked, an
+     Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `PR-1241` (the admitting
+     hospitals are two hops out, hospital to member to clinic).
+   - **Tests:** `LaHealthTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000; Drafts; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst` equal to `la-utility`'s and `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the
+     shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs' signals); `HealthLinksJobGoldenTest` (runs
+     the counts Job after `health_links`; `theTemplateIsBasicTierOnly` became
+     `theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts`; plus
+     `withoutThePhantomBillingClinicTheRuleWouldNotFire` and
+     `theLookAlikeClinicTheBusyHospitalAndTheKickbackRingAreNeverCounted`); the gallery test pins `la-health` creatable
+     with no missing feature and no Demo Auth; `tools/seed-la-health.test.mjs` (mocked fetch, 11 tests).
+     Falsified, each then restored: the without-`PR-1241` filter dropped (fails: 1 provider); reversed lines counted
+     in the measure (189, the look-alike 15, without `PR-1241` 30: three tests fail); the admitting-hospital exclusion
+     removed from `health_links` (`PR-1129` counts 2: four tests fail, the busy-hospital pin among them);
+     `masking_mode: typed`; `la-settings` given a second capability (differs from `la-card`); `health-analyst` given
+     the approve capability; `admin`'s title changed; `la-health` out of the gallery's Basic-tier set; and in the seed:
+     the outsider made a member, the Draft annotating an admitting hospital (`PR-0199`), the look-alike `PR-0632` added
+     to the seed.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 159, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `health_phantom_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Healthcare* industry Space (`la-healthcare`) with this tier, an OIDC
+     build, the full reactor gate.
+
+   **`la-benefits` BUILT 2026-11-09** (the `la-card` pattern). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`benefits.analyst` lead,
+     `benefits.manager` second approver, `benefits.reviewer` read-only, `benefits.outsider` not a member, and `admin`
+     byte-identical to `la-showcase` and `la-card`), `config/roles.toon` (`benefits-analyst`, `benefits-manager`, and
+     `fraud-analyst`, `la-viewer`, `la-settings` byte-identical to `la-card`'s, since the *Public sector* industry Space
+     composes `la-benefits` with `la-procurement` and a merge of `roles.toon` refuses a role defined twice differently),
+     `four_eyes_fan_out_above: 2000` plus the Drafts limits (10 / 60 / 14) in `link-analysis.toon` (no `masking_mode`; no
+     Entity Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `benefits_deceased_counts` (`sql.template` on `benefits_links`'
+     `job.dataset.produced`, sources `benefits_links`, `claim`, `death_register`, `grace_days_after_notice: "30"`) writes one
+     row: `deceased_claims_paid_after_notice`, `accounts_paid_after_notice` (from the `paid_into` links),
+     `living_claims_into_those_accounts`, `overpayments_stopped_after_notice`, `slowest_stop_after_notice_days`;
+     `benefits_deceased_alerts` (`alert.evaluate`) runs after it; `benefits_paid_to_the_deceased_after_notice` is
+     `max(deceased_claims_paid_after_notice) gte 1`, WARNING, not grouped (a Job output).
+   - **Decided: days are counted from the notice, not the death.** The spec's rule ("a payment to an account linked to a
+     death-register entry") taken literally fires on 259 accounts (every account a dead claimant was ever paid into; 65
+     of them also take a living person's claims, the joint accounts of widows and widowers), and "paid 30 or more days after
+     the death" (the `paid_after_death` screen) fires on 34 claims, the look-alike `CIT-05289` (42 days) among them, because
+     notices arrive 0–60 days late. Every background claim stops 0–5 days after its notice, so the faithful version is a
+     claim still paid more than 30 days after the agency was told. A running claim is measured to the latest date any feed
+     reports (`greatest(max(notified_on), max(start_date))`, 2026-09-30 on the landed data), so a death notified yesterday
+     with its claim still open does not count. The account linkage is kept in the counts (accounts, and who else is paid
+     into them) and in the Investigation, not in the measure.
+   - **Running total, not "new":** the Job recomputes one row from everything landed and holds no prior-run state; a claim
+     paid long after its notice is an overpayment to recover whether or not it has since stopped, so it keeps counting and
+     the rule stays met after every build while the claims are in the data.
+   - **Real figures on the shipped data** (the Job's SQL over the real `benefits_links`, `claim`, `death_register`; pinned by
+     `BenefitsLinksJobGoldenTest`): deceased_claims_paid_after_notice **9** (the nine pensions, 197–327 days past their
+     notices), accounts_paid_after_notice **3** (the story's accounts), living_claims_into_those_accounts **3**
+     (`CIT-08276`'s), overpayments_stopped_after_notice **314** (look-alike included), slowest_stop_after_notice_days **5**.
+     With the nine taken off the death register the Job yields 0 / 0 / 0 / 314 / 5; with only the look-alike on it, 0 / 0 /
+     0 / 1 / 2.
+   - **Seed** `tools/seed-la-benefits.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `paid-after-death` (seeded with the 3 accounts; bounded expands over `paid_into` then `claims`,
+     `maxFanOut` 20 each, to the 12 claims and 10 claimants; annotate `CIT-08276`, threshold, window, resolve, snapshot),
+     members (`benefits.reviewer` and `benefits.manager` reviewers, `admin` lead; not `benefits.outsider`), Entity List
+     `deceased-still-paid` (the 9), a Case from `CIT-08276` assigned to `benefits.manager` and linked, an Investigation
+     template, one unbounded expand held for four-eyes, one open Draft annotating `CIT-08276` (in the Working Set; the
+     expands follow no `lives_at` link, so an address is outside it). The look-alike is in no step.
+   - **Tests:** `LaBenefitsTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts equal to `la-card`'s; no masked type; persona capabilities; every persona
+     role defined; `fraud-analyst`, `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals); `BenefitsLinksJobGoldenTest` (`theTemplateIsBasicTierOnly` replaced:
+     runs the counts Job after the two link Jobs; the real figures above and the rule fires; without the nine it would not;
+     the late notice never counts, while a count from the death would catch 34); the gallery test pins `la-benefits`
+     creatable with no missing feature and no Demo Auth; `tools/seed-la-benefits.test.mjs` (mocked fetch, 12 tests).
+     Falsified, each then restored: the counts Job counting from the death instead of the notice (38 claims; the look-alike
+     counts; 29 without the nine), the Job counting every post-death payment regardless of the grace (323; 314 without the
+     nine), `masking_mode: typed`, *Bank account* masked, `benefits-analyst` given the approve capability,
+     `benefits.outsider` given `benefits-manager`, `admin` given `benefits-analyst` instead of `fraud-analyst`,
+     `fraud-analyst` without `canRevealLinkEntities`, `la-benefits` out of the gallery's Basic-tier set, and in the seed:
+     the outsider made a member, the Draft annotating an address, the look-alike added to the Entity List.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 9, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `benefits_deceased_alerts` reporting no breach, 0 rejected);
+     the expands' `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
+     Link Analysis UI, the composed *Public sector* industry Space booted (it packs: the packer merges both rosters), the
+     staged month landing (it adds new claims only, starting 2026-10-01 to 2026-10-31, which moves the running-claim
+     cut-off to 2026-10-31 and changes no figure: re-run in DuckDB at integration, 9 / 314 / 5), an OIDC build.
+
+   **`la-procurement` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`procurement.analyst` lead,
+     `procurement.manager` second approver, `procurement.reviewer` read-only, `procurement.outsider` not a member, and
+     `admin` exactly as in `la-showcase`: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`procurement-analyst`,
+     `fraud-analyst` as in `la-card`, `procurement-manager` with `canApproveLinkExpansions` and `canOperateRuns`,
+     `la-viewer`, `la-settings`), and `four_eyes_fan_out_above: 2000` plus Drafts (10 / 60 min / 14 days) in
+     `link-analysis.toon`, the same values as every showcase because the *Public sector* industry Space merges this file
+     with `la-benefits`' by key. No `masking_mode`; no Entity Type masked.
+   - **Alert Rule as a registry rule over a counts Job:** `procurement_shared_ip_counts` (`sql.template` on
+     `procurement_links`' `job.dataset.produced`, source `bid`) writes one row: `same_tender_ip_bids` (bids sent from
+     an IP address another bidder had already used, strictly earlier, for its own bid on the same tender; a blank IP
+     never matches), `same_tender_ip_tenders` and `ips_shared_across_tenders_only` (addresses two or more bidders use
+     but never two on one tender: the kiosk's margin); `procurement_shared_ip_alerts` (`alert.evaluate`) runs after
+     it; `procurement_same_tender_shared_ip` is `max(same_tender_ip_bids) gte 1`, WARNING, not grouped (a Job output).
+   - **The spec's rule as written, no time window.** The spec's look-alike reads "bids sent from a buyer's public
+     help-desk kiosk", and a window ("within N minutes") looked needed to keep it out. The data says otherwise: no two
+     firms ever bid on one tender from the kiosk (20 landed bids on 20 tenders, 12 firms; 23 bids and 14 firms with the
+     staged month), so the literal rule already never counts it, and a window would only add a number to defend.
+     "Already used" is strict (`<`): the winner's own first bid never counts, and the two covers that bid in the same
+     second on `T-00017` both count, since the winner's bid came 14 minutes before them.
+   - **Real figures on the shipped data** (the Job's SQL over the real landed `bid`; pinned by
+     `ProcurementLinksJobGoldenTest`): same_tender_ip_bids **16**, every one by `CO-0153`, `CO-0309` or `CO-0702` from
+     `100.64.73.61`, equal to the ground truth's `from_winner_ip`; same_tender_ip_tenders **8** (two of the story's 10
+     tenders carry no cover bid from the office); ips_shared_across_tenders_only **1** (`198.51.100.20`). The staged
+     month adds no such bid (16 with it landed). With the three covers taken out the Job yields 0; over the kiosk's bids
+     alone, 0 bids and 1 shared address. **Running total**, as `la-police` and `la-card`: the rule stays met after every
+     build and a new cover bid does not raise a second Alert while the first is open; a per-build "new bids" count is a
+     later refinement if the demo needs it.
+   - **Seed** `tools/seed-la-procurement.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground
+     truth): Investigation `cover-bids` over `procurement_links_dataset` (Entity Type `public_entity`; seed
+     `100.64.73.61`; a bounded expand over `same_ip`, `maxFanOut` 20, to `CO-0074` and its three covers; annotate,
+     threshold, window, resolve, snapshot), members (`procurement.reviewer` and `procurement.manager` reviewers, `admin`
+     lead; not `procurement.outsider`), Entity List `cover-bidders` (the three covers), a Case from `CO-0074` assigned to
+     `procurement.manager` and linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft
+     annotating `CO-0074` (in the Working Set) about its estimator `y.fenwick`, who is two hops out (IP to `CO-0074` to
+     author), so annotating `y.fenwick` would be refused. The kiosk is in no step.
+   - **Tests:** `LaProcurementTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts; no masked type; persona capabilities; every persona role defined and
+     `fraud-analyst` equal to `la-utility`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs'
+     signals); `ProcurementLinksJobGoldenTest` (`theTemplateIsBasicTierOnly` replaced: the counts Job runs after
+     `procurement_links`, the figures above, the rule's own measure and threshold fire, every counted bid is a cover
+     bid from the office on a story tender; the Job's own SQL without the covers yields 0, and the winner alone never
+     matches itself; the kiosk is shared by 12 firms yet never counts); the gallery test pins `la-procurement`
+     creatable with no missing feature and no Demo Auth; `tools/seed-la-procurement.test.mjs` (mocked fetch, 11 tests).
+   - ***Public sector* industry Space:** the roster files compose with `la-benefits`' once it has its own, because the
+     packer joins `config/demo-users.toon` (users by id) and `config/roles.toon` (roles by name) since the
+     `la-ownership` lane; `admin`, `fraud-analyst`, `la-viewer` and `la-settings` are byte-identical to la-card's.
+   - **Not checked:** any live run (no Preview build with Demo Auth: the rule armed and firing at 16, the seed's
+     `--apply`, the persona probes; no Basic bundle: rule unarmed, `procurement_shared_ip_alerts` reporting no breach);
+     the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
+     Link Analysis UI, the composed *Public sector* industry Space with this tier, an OIDC build.
+
+   **`la-trade` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`trade.analyst` lead, `trade.manager`
+     second approver, `trade.reviewer` read-only, `trade.outsider` not a member, and `admin` byte-identical to every other
+     showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`trade-analyst`, `fraud-analyst` as in `la-card`,
+     `trade-manager` with `canApproveLinkExpansions`, `la-viewer`, `la-settings`), `four_eyes_fan_out_above: 2000` plus
+     Drafts limits (10 / 60 min / 14 days) in `link-analysis.toon`, the same values as `la-card`, since `la-trade` is composed
+     with it into *Banking and finance* and the packer refuses a setting two use cases state differently. No `masking_mode`;
+     no Entity Type masked.
+   - **The Alert Rule is the spec's "unit price over 3× the reference" between companies that share a director.**
+     The price test alone would fire on the look-alike: the specialty supplier `CO-02169` prices 28 trades at a steady 3.31
+     to 3.89 times the reference. The story's other half, the director shared by exporter and importer, tells them apart,
+     as the user guide's exercise 1 already says. `trade_over_reference_counts` (`sql.template` on `trade_links`'
+     `job.dataset.produced`, `price_ratio_alert: "3.0"`, equal to the link Job's) reads `trade`, `price_reference` and the
+     `directed_by` links of `trade_links` and writes one row: `trades_over_reference`, `shared_director_trades_over_reference`,
+     `shared_director_pairs_over_reference`. `trade_over_reference_alerts` (`alert.evaluate`) runs after it;
+     `trade_unit_price_over_reference` is `max(shared_director_trades_over_reference) gte 1`, WARNING, not grouped (a Job
+     output, as in `la-utility`). The Job sends no company or person id; the Alert carries a count.
+   - **Running total, not "new".** The count covers every landed trade, so the rule stays met after every build. A
+     `sql.template` Job keeps no watermark of what it counted last time, and the Alert stays one open Alert while the
+     breach lasts (an Alert is de-duplicated while a non-terminal one exists), so a running total gives one Alert for the
+     story, not one per build.
+   - **Real figures on the shipped data** (the counts Job over the real `trade_links`, `trade`, `price_reference`; pinned by
+     `TradeLinksJobGoldenTest`, first computed with DuckDB over the CSV files): trades_over_reference **42** (the pair's 14
+     plus the specialty supplier's 28); shared_director_trades_over_reference **14** (exactly the ground truth's 14 trades,
+     `CO-02275` to `CO-01461`, director `PER-00291`); shared_director_pairs_over_reference **1**. Eight trading pairs
+     share a director in all; the other seven never trade over 1.46 times the reference. Without `CO-02275` the Job yields
+     28 / 0 / 0; with the `directed_by` links removed, 0 related trades; the specialty supplier's trades alone, 28 / 0 / 0.
+   - **Seed** `tools/seed-la-trade.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `over-invoicing` (seed `CO-02275`; one bounded expand over `traded_with` and `directed_by`, `maxFanOut` 20,
+     to its 4 buyers and 2 directors, `CO-01461` and `PER-00291` among them; annotate, threshold, window, resolve, snapshot),
+     members (`trade.reviewer` and `trade.manager` reviewers, `admin` lead; not `trade.outsider`), Entity List
+     `related-party-traders` (`CO-02275`, `CO-01461`, `PER-00291`), a Case from `CO-02275` assigned to `trade.manager` and
+     linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft annotating `CO-01461` (in
+     the Working Set after the expand; its six other suppliers are two hops out). The specialty supplier is in no step.
+   - **Tests:** `LaTradeTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined and `fraud-analyst`
+     equal to `la-utility`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs' signals and the
+     shared `price_ratio_alert`); `TradeLinksJobGoldenTest` (the counts Job fired by the `trade_links` signal with the view
+     Jobs; the real figures above and the rule's own measure and threshold fire; the Job's own SQL without `CO-02275`, and
+     without `directed_by`, would not fire; the specialty supplier is over 3× yet never counted; the old "Basic tier only"
+     test replaced); the gallery test pins `la-trade` creatable with no missing feature and no Demo Auth;
+     `tools/seed-la-trade.test.mjs` (mocked fetch, 11 tests). Falsified, each then restored: the counts Job without the
+     shared-director join (42 counted; the positive, the no-exporter and the specialty-supplier tests all go red; the
+     no-`directed_by` assertion was broken by the same mutation but sits behind the no-exporter one in its method),
+     `masking_mode: typed`, `trade-analyst` given the approve capability, `la-trade` out of the gallery's Basic-tier set,
+     `fraud-analyst` removed, `admin` given `trade-analyst`, and in the seed: the outsider made a member, the Draft
+     annotating a company two hops out, the specialty supplier added to the seed, the first expand unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 14, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `trade_over_reference_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
+     Also not checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier (its other
+     packs' Advanced tiers are other lanes), the staged month, an OIDC build.
 
    **`la-ownership` BUILT 2026-11-09** (the `la-card` pattern; spec 5's "a new ownership path that reaches a listed person
    within 3 hops"). As built:

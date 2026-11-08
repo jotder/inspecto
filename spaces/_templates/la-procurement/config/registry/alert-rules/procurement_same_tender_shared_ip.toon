@@ -1,0 +1,7 @@
+name: procurement_same_tender_shared_ip
+dataset: procurement_shared_ip_counts_dataset
+measure: max(same_tender_ip_bids)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A bid from an IP address already used by another bidder on the same tender: a bid sent from an address that a competitor had used, earlier, for its own bid on that tender. The Alert carries how many such bids there are; no bidder, tender or IP address leaves procurement_shared_ip_counts, so open the cover_bids_shared_ip view to find the address. A public terminal shared by many firms on different tenders (the buyer's help-desk kiosk) never counts. Not grouped by tender: procurement_shared_ip_counts is a Job output, so a by column cannot be checked when the Space is created."
