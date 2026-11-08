@@ -1,0 +1,9 @@
+physicalRef: vendor_change/database
+description: "Insider threat Link Analysis showcase - One row per change to the vendor master: the vendor, the field changed (address, phone, contact_email, bank_account, payment_terms), who changed it and when. One landed file (VENDOR_CHANGE_20260930.csv); October's changes are in data/staged. Landed by the vendor_change Pipeline. Synthetic."
+eventDate: changed_at
+columns[5]{name,type,classification}:
+  change_id,string,
+  vendor_id,string,
+  field_name,string,
+  changed_by,string,
+  changed_at,timestamp,

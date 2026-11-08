@@ -1,0 +1,36 @@
+name: access_daily
+active: true
+description: "Insider threat Link Analysis showcase - DAILY COUNTS, never record-level: one row per employee, record-holding system (AP, CRM, CUSTARCH, HRIS, PAYROLL, TREASURY) and day with the number of records read that day; days with no reads have no row. One file per month (ACCESS_DAILY_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-insider-data.py."
+
+dirs:
+  poll:       data/inbox/access_daily
+  database:   data/access_daily/database
+  backup:     data/access_daily/backup
+  temp:       data/access_daily/temp
+  errors:     data/access_daily/errors
+  quarantine: data/access_daily/quarantine
+  markers:    data/access_daily/markers
+  status_dir: data/access_daily/status
+  log_dir:    data/access_daily/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: access_daily_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

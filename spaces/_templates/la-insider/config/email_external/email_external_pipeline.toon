@@ -1,0 +1,36 @@
+name: email_external
+active: true
+description: "Insider threat Link Analysis showcase - Aggregated external mail, never message-level: one row per employee, external domain and day with the messages sent and the attachment megabytes. Every domain is invented (.example). One file per month (EMAIL_EXTERNAL_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-insider-data.py."
+
+dirs:
+  poll:       data/inbox/email_external
+  database:   data/email_external/database
+  backup:     data/email_external/backup
+  temp:       data/email_external/temp
+  errors:     data/email_external/errors
+  quarantine: data/email_external/quarantine
+  markers:    data/email_external/markers
+  status_dir: data/email_external/status
+  log_dir:    data/email_external/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: email_external_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

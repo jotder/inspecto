@@ -183,6 +183,16 @@ With one use case the industry Space could be that template itself, or take anot
 | `ap_vendor_identity` | `vendor_employee_conflict` |
 | `gl_intercompany` | `intercompany_round_trip` |
 
+**Enterprise** (`la-insider`, built 2026-11-08 with these names)
+
+| Today | Proposed |
+|---|---|
+| `leaver_exfiltration` | `leaver_exfiltration` |
+| `access_creep` | `access_creep` |
+| `mutual_approvals` | `mutual_approvals` |
+
+No view, Dataset or Pipeline name collides with `la-audit` (its HR feed is `employee_master`, this one's `employee`).
+
 **Decisions this table needs:**
 
 - **`la-showcase` spans two industries.** Its telecom view (and its eight telecom feeds) belong to *Telecom*, its mule
