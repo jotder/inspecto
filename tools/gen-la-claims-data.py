@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate the `la-claims` Space Template's insurance-claims corpus - SYNTHETIC, deterministic (one seeded Random).
 
-Writes spaces/_templates/la-claims/data/inbox/<feed>/<FEED>_20260930.csv for six feeds:
-  claim, claim_party, policy, provider_bill, accident_location, provider_directory
+Writes spaces/_templates/la-claims/data/inbox/<feed>/<FEED>_20260930.csv for seven feeds:
+  claim, claim_party, policy, provider_bill, accident_location, provider_directory, repair_invoice
 
 Planted stories (ground truth pinned by LaClaimsGoldenTest; plan: docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md, 2.C):
   1 staged-accident RING   12 claimants over 9 claims share 4 phones and 3 addresses; one garage GAR-03, one clinic CLI-04, one lawyer LAW-02
@@ -12,6 +12,11 @@ Planted stories (ground truth pinned by LaClaimsGoldenTest; plan: docs/archived-
   5 EARLY-CLAIM POLICIES   7 policies claimed on within 20 days of inception, all bought through broker BRK-05
   6 NEAR-DUPLICATE         one claimant is the ring member CL-ring[11] under a one-letter-different name, same date of birth and phone
   7 BENIGN look-alikes     a family of four sharing one phone and address (two claims in 18 months) and the busy GP clinic CLI-01
+  8 PARTS-SUPPLIER RING    SUP-07 invoices parts on 30 claims across all 9 garages and not one of those parts is fitted;
+                           look-alike: SUP-01 supplies all 9 garages on about 45 % of invoices, every part fitted
+  9 GHOST BROKER           25 policies sold through BRK-07 to holders on no claim, at addresses on streets found nowhere else,
+                           premiums paid from 2 bank accounts; look-alike: the family pays its 4 policies from one account at a real address
+Stories 8-9 draw from a second Random after everything else, so the rows of stories 1-7 are unchanged (policy gains two columns).
 Also: blank / placeholder phones and addresses (must NOT make links) and 40ish two-vehicle accidents (same_accident links).
 Every name, id, phone, address and coordinate is invented; cities are city centroids plus jitter. Nothing derives from a real source.
 """
@@ -292,6 +297,73 @@ for i, prov in enumerate(GARAGES + CLINICS + LAWYERS):
     kind = {"GAR": "garage", "CLI": "clinic", "LAW": "lawyer"}[prov[:3]]
     directory.append([prov, f"{pick(LAST)} {NAMES[prov[:3]]}", kind, city, f"{lat:.5f}", f"{lon:.5f}"])
 
+# ---- additions (plan docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 2) -------------------------
+# A SECOND seeded Random, drawn only after everything above, so every row of stories 1-7 is unchanged.
+rng2 = random.Random(20261107)
+SUPPLIERS = [f"SUP-{i:02d}" for i in range(1, 11)]
+BIG_SUP, RING_SUP, GHOST_BROKER = "SUP-01", "SUP-07", "BRK-07"
+PARTS = [f"PRT-{i:04d}" for i in range(1001, 1061)]
+special = set(RING_CLAIM_IDS) | set(EXTRA_IDS) | set(EARLY_CLAIM.values()) | {DUP_CLAIM}
+special |= {p[0] for p in parties if p[1] in FAMILY}
+# 8) PARTS-SUPPLIER RING: SUP-07 invoices parts on 30 claims across all nine garages and none of them is fitted.
+#    Look-alike: SUP-01 supplies every garage on about 45 % of invoices and every part it sells is fitted.
+SMALL_SUP = [s for s in SUPPLIERS if s not in (BIG_SUP, RING_SUP)]
+# each small supplier serves two ordinary garages; the ring's garage buys only from SUP-01 (a small supplier shared by GAR-03
+# and one other garage would be drawn into the ring's community)
+regulars = {g: [SMALL_SUP[i], SMALL_SUP[(i + 3) % 8]] for i, g in enumerate(ORD_GAR)}
+regulars[RING_GAR] = [BIG_SUP]
+by_garage = {}
+for c in claims:
+    if c[6] and c[0] not in special:
+        by_garage.setdefault(c[6], []).append(c[0])
+RING_SUP_CLAIMS = set()
+for g, n in zip(GARAGES, [4, 4, 2, 4, 3, 3, 4, 3, 3]):     # 30; GAR-03 has few ordinary claims
+    RING_SUP_CLAIMS.update(rng2.sample(by_garage[g], n))
+returned = set(rng2.sample(sorted(cid for g, ids_ in by_garage.items() if g != RING_GAR for cid in ids_ if cid not in RING_SUP_CLAIMS), 3))
+invoices = []
+
+
+def invoice(cid, garage, supplier, n, fitted, lo, hi):
+    inv = f"INV-{len(invoices) + 1:05d}"
+    for part in rng2.sample(PARTS, n):
+        invoices.append([inv, cid, garage, supplier, part, fitted, f"{round(rng2.uniform(lo, hi), 2):.2f}"])
+
+
+for c in claims:
+    cid, garage = c[0], c[6]
+    if not garage:
+        continue
+    sup = BIG_SUP if rng2.random() < .45 else rng2.choice(regulars[garage])
+    invoice(cid, garage, sup, rng2.randint(1, 3), "Y", 40, 420)
+    if cid in returned:                                       # an ordinary return: one part on its own invoice, not fitted
+        invoice(cid, garage, rng2.choice(regulars[garage]), 1, "N", 40, 420)
+    if cid in RING_SUP_CLAIMS:
+        invoice(cid, garage, RING_SUP, rng2.randint(1, 3), "N", 180, 640)
+# 9) GHOST BROKER: 25 policies sold through BRK-07 to holders who are on no claim, at addresses on streets that exist nowhere
+#    else in the corpus, all premiums paid from two bank accounts. Look-alike: the family of four pays its four policies from
+#    one account at their real address. Every other policy is paid from the holder's own account (or blank: paid by card).
+GHOST_STREETS = ["Quarry", "Saltmarsh", "Tollgate", "Wyvern"]
+for i, pid in enumerate(ids):
+    row = policies[i]
+    row.append("" if rng2.random() < .05 else f"BA-{40000000 + i * 37:08d}")
+    row.append(P[pid]["addr"])
+family_account = "BA-71000001"
+for i, pid in enumerate(ids):
+    if pid in FAMILY:
+        policies[i][5] = family_account
+GHOST_ACCOUNTS = ["BA-93000017", "BA-93000029"]
+ghost_addr = set()
+for k in range(25):
+    pol, pid = f"POL-{N_PERSONS + k + 1:04d}", f"CL-{N_PERSONS + k + 1:04d}"
+    while True:
+        a = f"{rng2.randint(1, 240)} {rng2.choice(GHOST_STREETS)} Road, {rng2.choice(list(CITY))}"
+        if a not in ghost_addr:
+            ghost_addr.add(a)
+            break
+    inception = date(2026, 1, 5) + timedelta(days=rng2.randrange(0, 200))
+    policies.append([pol, pid, GHOST_BROKER, inception.isoformat(), f"{round(rng2.uniform(210, 340), 2):.2f}",
+                     GHOST_ACCOUNTS[0] if k < 13 else GHOST_ACCOUNTS[1], a])
+
 
 def write(feed, header, rows):
     out = ROOT / feed
@@ -307,7 +379,8 @@ def write(feed, header, rows):
 write("claim", ["claim_id", "policy_id", "accident_id", "loss_date", "reported_date", "claim_amount", "garage_id", "clinic_id",
                 "lawyer_id", "referred_by", "status"], claims)
 write("claim_party", ["claim_id", "party_id", "role", "full_name", "dob", "phone", "address"], parties)
-write("policy", ["policy_id", "holder_id", "broker_id", "inception_date", "premium"], policies)
+write("policy", ["policy_id", "holder_id", "broker_id", "inception_date", "premium", "payer_account", "holder_address"], policies)
+write("repair_invoice", ["invoice_id", "claim_id", "garage_id", "supplier_id", "part_code", "fitted", "amount"], invoices)
 write("provider_bill", ["bill_id", "claim_id", "provider_id", "bill_date", "amount", "service"], bills)
 write("accident_location", ["accident_id", "city", "lat", "lon", "accident_at", "police_report_ref"], accidents)
 write("provider_directory", ["provider_id", "provider_name", "provider_type", "city", "lat", "lon"], directory)

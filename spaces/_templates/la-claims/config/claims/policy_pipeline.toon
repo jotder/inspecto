@@ -1,6 +1,6 @@
 name: policy
 active: true
-description: "Insurance-claims Link Analysis showcase - One row per policy: holder, broker, inception day and premium. The early-claim story reads inception against the claim loss date. One extract (POLICY_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
+description: "Insurance-claims Link Analysis showcase - One row per policy: holder, broker, inception day, premium, payer account and holder address. The early-claim story reads inception against the claim loss date; the ghost-broker story reads the payer account and address. One extract (POLICY_20260930.csv). Synthetic; regenerate with tools/gen-la-claims-data.py."
 
 dirs:
   poll:       data/inbox/policy

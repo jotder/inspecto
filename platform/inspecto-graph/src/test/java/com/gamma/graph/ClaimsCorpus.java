@@ -18,7 +18,8 @@ import java.util.TreeSet;
 
 /**
  * The shipped {@code la-claims} corpus ({@code spaces/_templates/la-claims/data/inbox}, read in place) and an INDEPENDENT Java fold of it
- * into the link graph the {@code claims_links} Job builds in SQL. The two are held equal by the per-kind row counts both tests pin
+ * into the link graph the {@code claims_links} Job builds in SQL (all nine link kinds; {@link #graph()} draws every one of them, as the
+ * {@code claims_network} saved view does). The two are held equal by the per-kind row counts both tests pin
  * ({@code LaClaimsLinksJobTest} in inspecto-engine, {@code LaClaimsGoldenTest} here).
  */
 final class ClaimsCorpus {
@@ -32,7 +33,8 @@ final class ClaimsCorpus {
                  String referredBy) {}
     record Accident(String id, String city, double lat, double lon, String at, String report) {}
     record Bill(String claim, String provider, double amount) {}
-    record Policy(String id, String holder, String broker, String inception) {}
+    record Policy(String id, String holder, String broker, String inception, double premium, String payer, String address) {}
+    record Invoice(String id, String claim, String garage, String supplier, String part, boolean fitted, double amount) {}
     /** {@code kind} is the link kind; the pair is stored once (src &lt; dst) for the symmetric kinds. */
     record Link(String src, String dst, String kind) {}
 
@@ -41,6 +43,7 @@ final class ClaimsCorpus {
     final Map<String, Accident> accidents = new LinkedHashMap<>();
     final List<Bill> bills = new ArrayList<>();
     final Map<String, Policy> policies = new LinkedHashMap<>();
+    final List<Invoice> invoices = new ArrayList<>();
     final Set<Link> links = new LinkedHashSet<>();
 
     static ClaimsCorpus load() throws Exception {
@@ -49,7 +52,8 @@ final class ClaimsCorpus {
         for (String[] r : rows("claim_party")) c.parties.add(new Party(r[0], r[1], r[2], r[3], r[4], r[5], r[6]));
         for (String[] r : rows("accident_location")) c.accidents.put(r[0], new Accident(r[0], r[1], Double.parseDouble(r[2]), Double.parseDouble(r[3]), r[4], r[5]));
         for (String[] r : rows("provider_bill")) c.bills.add(new Bill(r[1], r[2], Double.parseDouble(r[4])));
-        for (String[] r : rows("policy")) c.policies.put(r[0], new Policy(r[0], r[1], r[2], r[3]));
+        for (String[] r : rows("policy")) c.policies.put(r[0], new Policy(r[0], r[1], r[2], r[3], Double.parseDouble(r[4]), r[5], r[6]));
+        for (String[] r : rows("repair_invoice")) c.invoices.add(new Invoice(r[0], r[1], r[2], r[3], r[4], r[5].equals("Y"), Double.parseDouble(r[6])));
         c.fold();
         return c;
     }
@@ -130,6 +134,13 @@ final class ClaimsCorpus {
         }
         shared(phone, "shares_phone");
         shared(address, "shares_address");
+        for (Invoice i : invoices)
+            if (!i.supplier().isEmpty() && !i.garage().isEmpty()) add(i.supplier(), i.garage(), "supplied_parts", false);
+        Map<String, Set<String>> payerOf = new TreeMap<>();
+        for (Policy p : policies.values())
+            if (!p.payer().isBlank()) payerOf.computeIfAbsent(p.payer().trim(), k -> new TreeSet<>()).add(p.id());
+        for (Policy p : policies.values())
+            if (!p.payer().isBlank() && payerOf.get(p.payer().trim()).size() >= 2) add(p.holder(), p.payer().trim(), "paid_by", false);
     }
 
     private void shared(Map<String, Set<String>> holders, String kind) {

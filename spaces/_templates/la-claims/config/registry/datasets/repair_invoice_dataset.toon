@@ -1,0 +1,17 @@
+physicalRef: repair_invoice/database
+description: "Insurance-claims Link Analysis showcase - One row per part a parts supplier invoiced on a claim's repair: the garage, the part, its price and whether the garage fitted it (fitted Y or N). The parts-supplier ring story reads it. Landed by the repair_invoice Pipeline. Synthetic."
+columns[7]{name,type,classification}:
+  invoice_id,string,
+  claim_id,string,
+  garage_id,string,
+  supplier_id,string,
+  part_code,string,
+  fitted,string,
+  amount,number,
+owner: siu.analyst
+shares[5]{subjectType,subjectId,access}:
+  user,admin,view
+  user,siu.analyst,view
+  user,siu.manager,view
+  user,partner.reviewer,view
+  user,outsider,view

@@ -54,7 +54,7 @@ class LaClaimsTemplateTest {
         assertEquals(List.of("src", "dst", "kind", "ts", "amount", "event_date", "via"), cols.stream().map(c -> c.get("name")).toList());
         assertEquals("PARTY", cols.get(0).get("classification"));
         assertEquals("PARTY", cols.get(1).get("classification"));
-        for (String view : List.of("claims_network", "claims_provider_money", "claims_shared_identity")) {
+        for (String view : List.of("claims_network", "claims_provider_money", "claims_shared_identity", "claims_parts_suppliers", "claims_premium_payers")) {
             Map<String, Object> v = ToonHelper.load(CFG.resolve("registry/link-analysis-views/" + view + ".toon").toString());
             Map<String, Object> p = (Map<String, Object>) ((Map<String, Object>) v.get("query")).get("projection");
             assertEquals("claims_links_dataset", p.get("datasetId"));
@@ -121,7 +121,7 @@ class LaClaimsTemplateTest {
 
     @Test
     void everyFeedHasAPipelineASchemaAndADatasetAndTheTemplateShipsItsExtract() throws Exception {
-        for (String feed : List.of("claim", "claim_party", "policy", "provider_bill", "accident_location", "provider_directory")) {
+        for (String feed : List.of("claim", "claim_party", "policy", "provider_bill", "accident_location", "provider_directory", "repair_invoice")) {
             Map<String, Object> p = ToonHelper.load(CFG.resolve("claims/" + feed + "_pipeline.toon").toString());
             assertEquals(feed, p.get("name"));
             assertTrue(Files.exists(CFG.resolve("claims/" + feed + "_schema.toon")), feed + " schema");
