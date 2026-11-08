@@ -84,7 +84,7 @@ attachments to **`postmail.example`**, a personal webmail domain they had used o
 No new grant or ticket explains the reads. **Not the story:** **`EMP-0386`**, a data migration engineer, read about
 **22 times their normal** in the customer archive **`SYS-CUSTARCH`** from 2026-04-06 to 04-24. That read follows a
 grant on 2026-04-02 under change ticket **`CHG-163782`**, the engineer has given no notice, and mailed nothing large
-and nothing personal. The two never share a system, a domain or a manager.
+and nothing personal. In the view the two never meet: they share no customer system, mail domain or manager.
 
 ### 2. Access creep — who is handing out finance access?
 
@@ -111,7 +111,7 @@ other finance staff in the view each picked up a second finance system from thei
 `EMP-0040` approved 19 of `EMP-0022`'s: **40 approvals, every one between 455 and 498**, just under the 500 limit
 (`near_limit:` equals `approvals:`), and **32 submitted at a weekend**. They are the only pair in the company who
 approve each other. **Not the story:** **`EMP-1613`**, a sales team lead, approved about **520 claims** from a team of
-20 field sales representatives, 19 of them 20 times or more. The claims were on weekdays, spread over amounts up to
+20 field sales representatives, 19 of them 20 times or more. The claims were almost all on weekdays (12 at a weekend), spread over amounts up to
 480 (only 3 near the limit), and nobody in the team ever approves the team lead (`approved_back:0`).
 
 ## Tester's checklist
