@@ -961,8 +961,8 @@ later). Deliberate deviations:
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (only recomputed outside the engine).
 - **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5, approved 2026-11-08): no
-  Space or industry prefix. The template id `la-logistics` is the one this spec gives; D2 of that plan gives the same id to the
-  *Logistics* industry Space, so the operator decides whether that Space is this template or takes another id.
+  Space or industry prefix. The template id `la-logistics` is the one this spec gives; the *Logistics* industry Space took
+  the id `la-logistics-industry` (that plan, D2), so the two no longer collide.
 
 **Advanced tier BUILT 2026-11-09:** see step 8, "`la-logistics` BUILT 2026-11-09".
 

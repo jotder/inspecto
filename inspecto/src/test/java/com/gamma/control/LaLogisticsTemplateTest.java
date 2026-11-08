@@ -126,7 +126,7 @@ class LaLogisticsTemplateTest {
         String age = "TRY_CAST(regexp_extract(via, 'carrier_age_days:([0-9]+)', 1) AS INTEGER) < 60";
         assertTrue(counts.require("sql").contains(age), "counts Job");
         assertTrue(JobConfig.load(CFG.resolve("jobs/logistics_screen_links_job.toon").toString()).require("sql").contains(age), "new_carrier screen");
-        assertFalse(counts.require("sql").contains("'lost'"), "read at assignment: no loss report");
+        assertFalse(counts.require("sql").toLowerCase(java.util.Locale.ROOT).contains("lost"), "read at assignment: no loss report");
         JobConfig evaluate = JobConfig.load(CFG.resolve("jobs/logistics_new_carrier_alerts_job.toon").toString());
         assertEquals("alert.evaluate", evaluate.type());
         assertEquals("job.dataset.produced", evaluate.onSignal());
