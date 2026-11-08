@@ -140,17 +140,35 @@ export function composeSources(byTemplate, sameBytes = () => false) {
   return owner;
 }
 
-/** Merge several link-analysis.toon files that hold only `entity_types`, by id; a differing re-declaration is refused. */
+/**
+ * Merge several link-analysis.toon files: `entity_types` by id (a differing re-declaration is refused), and every other
+ * top-level setting (`four_eyes_fan_out_above: 2000`, a `drafts:` block, ...) by key - carried once, refused when two use
+ * cases state it differently. entity_types comes first, then the settings in first-seen order.
+ */
 export function mergeEntityTypes(texts) {
   const byId = new Map();
+  const settings = new Map();
   for (const text of texts) {
-    const body = text.replace(/\r/g, '').split('\n');
-    if (!/^entity_types\[\d+\]:\s*$/.test(body[0] ?? '')) throw new Error('only an entity_types-only link-analysis.toon can be merged');
     const blocks = [];
-    for (const line of body.slice(1)) {
-      if (line.startsWith('  - ')) blocks.push([line]);
-      else if (line.trim() && blocks.length) blocks[blocks.length - 1].push(line);
-      else if (line.trim()) throw new Error(`unexpected line in link-analysis.toon: ${line}`);
+    let section = null; // 'entity_types' or a setting key
+    for (const line of text.replace(/\r/g, '').split('\n')) {
+      if (!line.trim()) continue;
+      if (!line.startsWith(' ')) {
+        if (/^entity_types\[\d+\]:\s*$/.test(line)) { section = 'entity_types'; continue; }
+        const key = (line.match(/^([A-Za-z_][\w-]*)\s*:/) ?? [])[1];
+        if (!key) throw new Error(`unexpected line in link-analysis.toon: ${line}`);
+        section = key;
+        settings.set(key, [...(settings.get(key) ?? []), [line]]);
+        continue;
+      }
+      if (section === 'entity_types') {
+        if (line.startsWith('  - ')) blocks.push([line]);
+        else if (blocks.length) blocks[blocks.length - 1].push(line);
+        else throw new Error(`unexpected line in link-analysis.toon: ${line}`);
+      } else if (section) {
+        const seen = settings.get(section);
+        seen[seen.length - 1].push(line);
+      } else throw new Error(`unexpected line in link-analysis.toon: ${line}`);
     }
     for (const b of blocks) {
       const id = (b[0].match(/- id:\s*(\S+)/) ?? [])[1];
@@ -160,7 +178,13 @@ export function mergeEntityTypes(texts) {
       byId.set(id, block);
     }
   }
-  return `entity_types[${byId.size}]:\n${[...byId.values()].join('\n')}\n`;
+  let out = `entity_types[${byId.size}]:\n${[...byId.values()].join('\n')}\n`;
+  for (const [key, stated] of settings) {
+    const all = stated.map((s) => s.join('\n'));
+    if (new Set(all).size > 1) throw new Error(`setting '${key}' is stated differently in two use cases`);
+    out += all[0] + '\n';
+  }
+  return out;
 }
 
 /** The use-case template ids a recipe names. */
@@ -198,7 +222,7 @@ function main() {
     files = [...owner.keys()];
     templateToon = recipe;
     // link-analysis.toon from ONE use case ships verbatim (it may hold more than entity_types, as la-claims' does);
-    // from several it is merged, which today accepts entity_types only.
+    // from several it is merged: entity_types by id, other top-level settings by key (mergeEntityTypes).
     const text = (t, rel) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' });
     show = (rel) => {
       if (!isJoined(rel)) return git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);

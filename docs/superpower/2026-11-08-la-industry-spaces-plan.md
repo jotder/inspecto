@@ -267,7 +267,10 @@ The operator approved this plan and the spike on 2026-11-08 ("Approve, start spi
 - **Verified independently (PASS, 2026-11-08).** The review's fix landed: a recipe naming a missing use case is now
   refused, where it was silently skipped. Its notes for steps 2–5:
   - `mergeEntityTypes` accepts only an `entity_types`-only `link-analysis.toon`; `la-claims` also states
-    `four_eyes_fan_out_above` and `index:`, so composing it needs those keys handled first.
+    `four_eyes_fan_out_above` and `index:`, so composing it needs those keys handled first. **Handled 2026-11-09**
+    (la-card Advanced tier, which put `four_eyes_fan_out_above` and `drafts:` into a Banking and finance use case): other
+    top-level keys are carried once and refused when two use cases state them differently; a test composes every
+    committed recipe from the real templates (`tools/package-la-showcase.test.mjs`).
   - The same classification claimed under two type ids by two use cases is caught only at boot (`EntityTypes.validate`),
     not by the packer.
   - No test checks a template's Dataset entries against `DatasetEntryRules` and the declared types; add one with the

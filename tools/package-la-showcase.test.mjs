@@ -1,6 +1,9 @@
 // Unit tests for tools/package-la-showcase.mjs (LA-SHOWCASE-DIST-1): the Space / data split and the space.toon it writes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { egressToon, parseArgs, plan, spaceToon, toonValue } from './package-la-showcase.mjs';
 
 test('the Space ships an empty egress allowlist, as a Space created from a template gets', () => {
@@ -73,6 +76,25 @@ test('entity types merge by id; the same id declared differently is refused', ()
   const b = 'entity_types[2]:\n  - id: party\n    label: Party\n  - id: box\n    label: Container\n';
   assert.equal(mergeEntityTypes([a, b]), 'entity_types[2]:\n  - id: party\n    label: Party\n  - id: box\n    label: Container\n');
   assert.throws(() => mergeEntityTypes([a, 'entity_types[1]:\n  - id: party\n    label: Other\n']), /declared differently/);
+});
+
+test('top-level settings (four-eyes, drafts) are carried once; stated differently in two use cases is refused', () => {
+  const adv = 'four_eyes_fan_out_above: 2000\ndrafts:\n  max_open: 10\nentity_types[1]:\n  - id: card\n    label: Card\n';
+  const plain = 'entity_types[1]:\n  - id: box\n    label: Container\n';
+  assert.equal(mergeEntityTypes([plain, adv]),
+    'entity_types[2]:\n  - id: box\n    label: Container\n  - id: card\n    label: Card\nfour_eyes_fan_out_above: 2000\ndrafts:\n  max_open: 10\n');
+  assert.equal(mergeEntityTypes([adv, adv]).match(/four_eyes/g).length, 1, 'the same setting twice ships once');
+  assert.throws(() => mergeEntityTypes([adv, 'four_eyes_fan_out_above: 500\n' + plain]), /'four_eyes_fan_out_above' is stated differently/);
+  assert.throws(() => mergeEntityTypes([adv, 'drafts:\n  max_open: 3\n' + plain]), /'drafts' is stated differently/);
+});
+
+test('every committed industry recipe composes from the real templates (link-analysis.toon merges)', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  for (const r of readdirSync(join(root, 'spaces', '_industries')).filter((f) => f.endsWith('.toon'))) {
+    const texts = recipeUseCases(readFileSync(join(root, 'spaces', '_industries', r), 'utf8'))
+      .map((t) => join(root, 'spaces', '_templates', t, MERGED)).filter((p) => existsSync(p)).map((p) => readFileSync(p, 'utf8'));
+    if (texts.length > 1) assert.match(mergeEntityTypes(texts), /^entity_types\[\d+\]:/, r);
+  }
 });
 
 test('a recipe naming a template that does not exist is refused, not skipped', () => {
