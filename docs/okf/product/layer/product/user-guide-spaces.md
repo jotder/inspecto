@@ -35,7 +35,9 @@ each gallery entry carries `creatable` and `missingFeatures[{feature, message}]`
   `minEdition: basic` (the shipped `la-showcase`) ships its Alert Rules unarmed where `alert.dispatch` is absent. The
   gallery lists it creatable, `POST /spaces` creates it with each rule's content still judged
   (`AlertRoutes.parseContent`), and the boot leaves every rule unarmed with a WARN. A Decision Rule's `create-alert`
-  still counts (`ControlApiSpaceTemplatesTest.aBasicTierTemplateShipsItsAlertRulesUnarmedOnBasic`).
+  still counts (`ControlApiSpaceTemplatesTest.aBasicTierTemplateShipsItsAlertRulesUnarmedOnBasic`; the deferred
+  `pending/alert-rules/` and the `create-alert` limit:
+  `aBasicTierTemplateShipsItsPendingAlertRulesUnarmedButNotACreateAlertDecisionRule`).
 - **Pipeline features:** a Pipeline's archive or DuckLake use, through `EditionFeatures.pipelineRefusals`.
 - **Demo User sign-in** (`demo-auth`, `LA-SAMPLE-GALLERY-DEMOAUTH-1`, 2026-10-23): a template carrying
   `config/demo-users.toon` (the shipped `la-showcase-off`) needs an installed Authenticator that names its principals from a Space's config - only Demo

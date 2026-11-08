@@ -198,6 +198,68 @@ class ControlApiSpaceTemplatesTest {
     }
 
     /**
+     * The same rule ("A: allow, unarmed") for a DEFERRED Alert Rule ({@code pending/alert-rules/}) and its limit for a Decision
+     * Rule. On a Basic build the shipped {@code payment-fraud} template, its registry rules removed so only the pending one
+     * is left, is creatable from the gallery and through {@code POST /spaces} (the pending rule ships) when it says
+     * {@code minEdition: basic}, and refused by both while it says {@code standard}. A Basic-tier template whose Decision Rule
+     * has a {@code create-alert} consequence is still marked uncreatable for {@code alert.dispatch}: that is not an Alert Rule
+     * the boot can leave unarmed. Falsified: without the minEdition check in {@code TemplateSeedGate.requirePendingAlertRules}
+     * the basic create answers 422; without it in {@code SpaceManager.missingFeatures} the basic entry is uncreatable.
+     */
+    @Test
+    void aBasicTierTemplateShipsItsPendingAlertRulesUnarmedButNotACreateAlertDecisionRule(@TempDir Path root) throws Exception {
+        seedTemplate(root);
+        Path src = Path.of("..", "spaces", "_templates", "payment-fraud");
+        for (String edition : java.util.List.of("basic", "standard")) {
+            Path tpl = root.resolve("_templates").resolve("pf-" + edition);
+            try (java.util.stream.Stream<Path> walk = Files.walk(src)) {
+                for (Path p : walk.sorted().toList()) {
+                    Path t = tpl.resolve(src.relativize(p).toString());
+                    if (Files.isDirectory(p)) Files.createDirectories(t);
+                    else Files.copy(p, t);
+                }
+            }
+            try (java.util.stream.Stream<Path> s = Files.list(tpl.resolve("config/registry/alert-rules"))) {
+                for (Path f : s.toList()) Files.delete(f);   // only the pending rule is left
+            }
+            Path meta = tpl.resolve("template.toon");
+            Files.writeString(meta, Files.readString(meta).replace("minEdition: standard", "minEdition: " + edition));
+            assertTrue(Files.isRegularFile(tpl.resolve("config").resolve(PendingAlertRules.DIR).resolve("pf_high_risk_account.toon")));
+        }
+        Path dr = root.resolve("_templates").resolve("dr-basic");
+        Files.createDirectories(dr.resolve("config/registry/decision-rules"));
+        Files.writeString(dr.resolve("template.toon"), "name: Decides\nminEdition: basic\n");
+        Files.writeString(dr.resolve("config/registry/decision-rules/breach.toon"), com.gamma.config.io.ConfigCodec.toToon(
+                java.util.Map.of("name", "breach", "enabled", true, "consequences", java.util.List.of(java.util.Map.of(
+                        "action", "create-alert", "params", java.util.Map.of("rule", "r3", "metric", "error_rate",
+                                "comparator", "gt", "threshold", 0.1, "window", "1h"))))));
+        try {
+            com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of());   // Basic
+            try (Ctx c = open(root)) {
+                JsonNode all = json(send(c.port, "GET", "/spaces/templates", null));
+                JsonNode basic = find(all, "pf-basic"), standard = find(all, "pf-standard"), decides = find(all, "dr-basic");
+                for (JsonNode m : basic.get("missingFeatures"))
+                    assertFalse("alert.dispatch".equals(m.get("feature").asText()), basic.toString());
+                boolean refused = false;
+                for (JsonNode m : standard.get("missingFeatures")) refused |= "alert.dispatch".equals(m.get("feature").asText());
+                assertTrue(refused && !standard.get("creatable").asBoolean(), standard.toString());
+                assertFalse(decides.get("creatable").asBoolean(), decides.toString());
+                assertEquals("alert.dispatch", decides.get("missingFeatures").get(0).get("feature").asText(), decides.toString());
+
+                HttpResponse<String> made = send(c.port, "POST", "/spaces", "{\"id\":\"pfb\",\"template\":\"pf-basic\"}");
+                assertTrue(made.statusCode() / 100 == 2, "a Basic-tier template's pending rule ships unarmed: " + made.body());
+                assertTrue(Files.isRegularFile(root.resolve("pfb/config").resolve(PendingAlertRules.DIR).resolve("pf_high_risk_account.toon")));
+                HttpResponse<String> refusedCreate = send(c.port, "POST", "/spaces", "{\"id\":\"pfs\",\"template\":\"pf-standard\"}");
+                assertEquals(422, refusedCreate.statusCode(), refusedCreate.body());
+                assertTrue(refusedCreate.body().contains("pending alert-rule 'pf_high_risk_account' is refused"), refusedCreate.body());
+                assertFalse(Files.exists(root.resolve("pfs")), "a refused create leaves nothing");
+            }
+        } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
+        }
+    }
+
+    /**
      * Plan wave B step 5 (operator 2026-11-08, "allow on Basic"): with no Demo User sign-in installed, the SAME roster refuses a
      * template whose {@code minEdition} is {@code advanced} (or unstated) and does not refuse one whose {@code minEdition} is
      * {@code basic}, whose roster is its inert Advanced tier. Falsified: without the minEdition check the basic one is
