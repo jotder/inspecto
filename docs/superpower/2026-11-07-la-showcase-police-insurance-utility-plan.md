@@ -1567,9 +1567,9 @@ deviations:
    - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 9, the seed's `--apply`,
      the persona probes) and no Basic bundle (rule unarmed, `benefits_deceased_alerts` reporting no breach, 0 rejected);
      the expands' `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
-     Link Analysis UI, the composed *Public sector* industry Space with this tier (it also needs the packer to merge
-     `demo-users.toon` and `roles.toon`, a parallel lane), the staged month landing (it adds new claims only, which moves
-     the running-claim cut-off to 2026-10-01 and changes no figure), an OIDC build.
+     Link Analysis UI, the composed *Public sector* industry Space booted (it packs: the packer merges both rosters), the
+     staged month landing (it adds new claims only, starting 2026-10-01 to 2026-10-31, which moves the running-claim
+     cut-off to 2026-10-31 and changes no figure: re-run in DuckDB at integration, 9 / 314 / 5), an OIDC build.
 
    **`la-procurement` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`procurement.analyst` lead,
