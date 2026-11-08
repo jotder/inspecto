@@ -1,0 +1,7 @@
+name: police_repeat_seller_serial_matches
+dataset: police_serial_match_counts_dataset
+measure: max(repeat_seller_matches)
+comparator: gte
+threshold: 2
+severity: WARNING
+description: "Stolen serials resurfacing through one seller: 2 or more serial matches by a seller who has sold stolen items from 2 or more incidents"

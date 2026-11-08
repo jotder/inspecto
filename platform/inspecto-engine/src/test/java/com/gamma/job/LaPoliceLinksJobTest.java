@@ -77,7 +77,7 @@ class LaPoliceLinksJobTest {
         data = space.resolve("data");
         // the link Job first, then the derived Jobs in a service of their own, so no signal-fired run races a read
         run(space, List.of("police_links"));
-        run(space, DERIVED);
+        run(space, union(DERIVED, List.of("police_serial_match_counts")).stream().toList());
         for (String sink : union(List.of("police_links"), DERIVED)) links.put(sink, rows("SELECT * FROM " + parquet(sink)));
     }
 
@@ -161,6 +161,27 @@ class LaPoliceLinksJobTest {
         Set<String> story = union(incidents, sellers, Set.of(plate, b.get("keeper").asText(), b.get("home").asText()), strings(b.get("dealers")));
         assertTrue(reach(view, plate).containsAll(story), "the series joins up: " + minus(story, reach(view, plate)));
         assertEquals(incidents, union(matched, strings(b.get("vehicle_scenes"))), "every scene has a serial match or a vehicle read");
+    }
+
+    /** The Advanced tier's Alert Rule police_repeat_seller_serial_matches (max(repeat_seller_matches) >= 2) reads this one row. */
+    @Test
+    void theSerialMatchCountsSeeOnlyTheSeriesSellersAsRepeatSellers() throws Exception {
+        Map<String, Object> counts = rows("SELECT * FROM " + parquet("police_serial_match_counts")).get(0);
+        Map<String, Integer> perSeller = new TreeMap<>();
+        for (Map<String, Object> l : links.get("police_links"))
+            if (l.get("kind").equals("item_match")) perSeller.merge((String) l.get("dst"), 1, Integer::sum);
+        Set<String> repeat = new TreeSet<>();
+        int repeatMatches = 0, oneOff = 0;
+        for (Map.Entry<String, Integer> e : perSeller.entrySet())
+            if (e.getValue() >= 2) { repeat.add(e.getKey()); repeatMatches += e.getValue(); } else oneOff += e.getValue();
+        assertFalse(repeat.isEmpty(), "the series has repeat sellers");
+        assertTrue(strings(truth.get("burglary_series").get("sellers")).containsAll(repeat),
+                "every repeat seller is a series seller; the one-off sellers of ordinary stolen goods are not: " + repeat);
+        assertEquals(repeatMatches, ((Number) counts.get("repeat_seller_matches")).intValue());
+        assertEquals(repeat.size(), ((Number) counts.get("repeat_sellers")).intValue());
+        assertEquals(oneOff, ((Number) counts.get("one_off_matches")).intValue());
+        assertTrue(repeatMatches >= 2, "the rule's threshold (2) is met by the series");
+        assertTrue(oneOff >= 1, "there are one-off matches for the rule to leave alone");
     }
 
     @Test

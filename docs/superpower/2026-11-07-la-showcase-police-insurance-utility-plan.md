@@ -1369,6 +1369,48 @@ deviations:
 
 8. **Advanced tier** for every new Space (personas, Alert Rule, seed script) → verify on a Preview build with
    demo sign-in.
+   **`la-police` BUILT 2026-11-08.** As built:
+   - **In the template, inert on Basic** (the Edition rule as settled 2026-11-08): `config/demo-users.toon` (`admin`,
+     `police.analyst` lead, `police.sio` second approver, `police.reviewer` read-only, `police.outsider` not a member),
+     `config/roles.toon` (`police-analyst`, `police-sio`, `la-viewer`, `la-settings`), and `four_eyes_fan_out_above: 2000`
+     plus Drafts added to the industry lane's `link-analysis.toon` (its Entity Types kept; none masked, no `masking_mode`).
+   - **Alert Rule on new serial matches, as a registry rule** (the la-showcase telecom pattern, not an Investigation-bound
+     one): the `police_serial_match_counts` Job (on `police_links` produced) writes one row, `repeat_seller_matches` (the
+     `item_match` links of a seller with 2 or more), `repeat_sellers` and `one_off_matches`; the `police_serial_match_alerts`
+     Job (`alert.evaluate`) runs after it; `police_repeat_seller_serial_matches` is `max(repeat_seller_matches) gte 2`,
+     WARNING. Decided: "new serial matches" alone would fire on any resold stolen item, and the data carries six of
+     those on purpose; the story is the same seller again and again, so the rule counts repeat sellers only. On the
+     shipped data: 12 repeat-seller matches (`P-00476` 9, `P-04874` 3), 7 one-off (six ordinary items, and `P-00785`'s
+     single series item, which the rule does not see). The Alert names a count, never a person. The measure is a running
+     total, so the rule stays met after every build; the staged month's 13th match does not by itself raise a second
+     Alert while the first is open. A per-build "new matches" count is a later refinement if the demo needs it.
+   - **Seed** `tools/seed-la-police.mjs` (sibling of `seed-la-claims.mjs`): Investigation `burglary-series` over
+     `police_links_dataset` (seed `ZX 9117 X` + `P-00476`, bounded expand, annotate, window, snapshot), members (reviewer,
+     sio as reviewer, admin as lead; not the outsider), Entity List `series-sellers`, a Case assigned to `police.sio` and
+     linked, one held four-eyes expand, one open Draft. The Draft step annotates `DLR-09`: the first draft named
+     `P-04874`, who is two hops from the seeds and not in the Working Set (422).
+   - **Tests:** `LaPoliceTemplateTest` (inspecto: masking unset, four-eyes 2000, no masked type, personas hold exactly
+     their capabilities, the rule passes `AlertRoutes.parseContent`, the Jobs' signals);
+     `LaPoliceLinksJobTest.theSerialMatchCountsSeeOnlyTheSeriesSellersAsRepeatSellers` (the counts equal the per-seller
+     tally of the real `item_match` output, and every repeat seller is a series seller); `ControlApiSpaceTemplatesTest.
+     galleryCountsTheDemoUserSignInATemplateNeeds` now copies `la-police` too and pins it creatable with no missing feature
+     and no Demo Auth installed; `tools/seed-la-police.test.mjs` (mocked fetch, 9 tests; the ids pinned to the ground truth).
+   - **Live, Preview** (`package.ps1 -Edition Preview -DemoAuth -NoUi -NoBakeDemo`, Space laid down with
+     `seed-la-police.mjs --scaffold`, `serve-demo`): 11 Pipelines, 0 rejected; the rule armed at boot; after the cron
+     `police_links` (22 434 rows) the counts Job wrote 12 / 2 / 7 and `police_serial_match_alerts` reported 1 breach,
+     an OPEN WARNING with value 12. `seed-la-police.mjs --apply` created every step, none failed. Persona checks 19/19:
+     analyst, sio, reviewer read the Working Set and the outsider gets 404; reviewer and outsider cannot add a step
+     (403); the analyst has no approval inbox (403) and cannot approve the held expand, nor can the reviewer (403); the sio
+     sees it and approves it, and it runs; the Working Set holds `ZX 9117 X`, `P-00476`, `P-05167`, `ADR-1377`, `DLR-04`;
+     no id is masked. 0 ERROR lines in the server log.
+   - **Live, Basic** (`package.ps1 -Edition Basic -NoUi`, Space and data split with the packer's helpers, `SPACES_ROOT` +
+     `SPACES_DATA_ROOT`): 11 Pipelines, 0 rejected; all six Jobs succeed; one WARN "Not arming alert rule
+     'police_repeat_seller_serial_matches'"; `police_serial_match_alerts` "no rule breached"; the three views' projections
+     unchanged (61, 736, 751 nodes, not cut short, `masking: none`); 0 ERROR lines.
+   - **Not checked:** the gallery on a live Basic bundle (`la-police` is in no Offering's `contentPacks`, so no bundle's
+     gallery lists it. `ControlApiSpaceTemplatesTest` runs its gallery with the Advanced features; the verification
+     agent re-ran it with no features, as on Basic, and `la-police` was creatable with no missing feature), the Link Analysis UI (both bundles were `-NoUi`; checked through the
+     API), an OIDC sign-in build, and the staged month on either build.
 
 **Docs, with each Space**
 

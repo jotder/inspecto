@@ -39,8 +39,11 @@ shop. The graph shows the difference.
 ## How it fits with the Editions
 
 Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations
-are needed. The saved Geo View needs the Geo map (Standard and above). An Advanced tier (personas, an Alert Rule on
-new serial matches, a seeding script that opens an Investigation and a Case) is planned.
+are needed. The saved Geo View needs the Geo map (Standard and above). The same download carries an Advanced tier for
+builds where people sign in: an analyst, a senior investigating officer who approves large expands, a read-only
+reviewer and an outsider; an Alert Rule that raises a warning when stolen serials keep resurfacing through the same
+seller; and a seeding script that opens the Investigation, an Entity List of the sellers and a Case. On Basic it stays
+inert.
 
 ## How it works
 

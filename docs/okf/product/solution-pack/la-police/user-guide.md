@@ -137,10 +137,55 @@ witnessed an incident whose suspect they had been arrested with. **Not the story
 witness to **6** incidents outside a shop in Bradford East over the year, and
 has no custody record at all.
 
+## Advanced tier: Investigation, four-eyes and the serial-match Alert Rule
+
+The same Space carries an Advanced tier. It works only on a build where people sign in (Standard and above; the
+showcase is demonstrated on a Preview build with Demo Auth). On Basic it stays inert: nothing in it runs or refuses to
+load. Setting it up is in the [admin guide](admin-guide-install.md#advanced-tier-preview-with-demo-sign-in).
+
+| Persona (Demo User) | Role in the story | What they can do |
+|---|---|---|
+| `police.analyst` | intelligence analyst, lead of the Investigation | runs the analysis, adds steps, asks for a large expand, authors Alert Rules; cannot approve their own request |
+| `police.sio` | senior investigating officer, second approver | a member of the Investigation (reviewer); approves or denies a held expand; runs Jobs; owns the Case |
+| `police.reviewer` | reviewer, read-only | a member: reads the Investigation, adds nothing, approves nothing |
+| `police.outsider` | not a member | cannot open the Investigation |
+| `admin` | platform administrator | lead member; edits the Link Analysis settings |
+
+No Entity Type is masked: every id is synthetic and names no real person, so no persona needs a Reveal.
+
+**The Investigation** `burglary-series` (over `police_links_dataset`) starts from the plate `ZX 9117 X` and the seller
+`P-00476`, expands one step, notes the plate, and narrows the time to February to May 2026. The Entity List
+`series-sellers` holds the three sellers. The Case *Burglary series, Leeds North and East, Feb-Apr 2026* is linked to
+it and assigned to `police.sio`.
+
+**Four-eyes:** an expand with no fan-out limit (or a fan-out above 2 000) does not run; it waits in
+`police.sio`'s approval inbox. Try it: as `police.analyst`, expand with no limit, then sign in as `police.sio` and
+approve it.
+
+**The Alert Rule** `police_repeat_seller_serial_matches` watches the stolen-property matches. After each build of
+`police_links_dataset`, the `police_serial_match_counts` Job counts the `item_match` links, split into matches by a
+seller who has sold stolen items from 2 or more incidents and one-off matches. The rule raises a WARNING when the first
+count is 2 or more. On the shipped data it reads **12**: the series sellers `P-00476` (9) and `P-04874` (3). The **7
+one-off matches** (six ordinary stolen items resold once each, and `P-00785`'s single series item) never count: one
+stolen item at a dealer is everyday, the same seller again and again is a pattern. The Alert names the count, not a
+person; find the sellers in the Investigation. The staged month brings one more match by `P-04874`, so the count
+rises to 13. The count is a running total: while the first Alert is open, the 13th match does not raise
+a second one.
+
+### 5. Advanced tier — who may see and do what?
+
+*Hint:* sign in as each persona and open `burglary-series`; as `police.analyst`, expand with no limit.
+
+**Answer:** `police.analyst`, `police.sio`, `police.reviewer` and `admin` can open it; `police.outsider` gets "not
+found". Only `police.analyst` and `admin` add steps. The unlimited expand is held; `police.analyst` and
+`police.reviewer` cannot approve it; `police.sio` approves it and it runs. **Not the story:** the one-off sellers
+of ordinary stolen goods never raise the Alert, however many of them there are.
+
 ## Tester's checklist
 
 The ground truth is `tools/la-police-ground-truth.json` (repository only, not in the download); the golden tests
-are `tools/gen-la-police-data.test.mjs` and `LaPoliceLinksJobTest`.
+are `tools/gen-la-police-data.test.mjs` and `LaPoliceLinksJobTest`; the Advanced tier's are `LaPoliceTemplateTest`
+and `tools/seed-la-police.test.mjs`.
 
 - [ ] All eleven Pipelines land with nothing rejected, quarantined or in errors.
 - [ ] `police_links_dataset` has nine kinds and one row per pair and kind.
@@ -150,3 +195,7 @@ are `tools/gen-la-police-data.test.mjs` and `LaPoliceLinksJobTest`.
       base numbers, their residents and addresses; `P-01956` with `P-00954` and `INC-02159`.
 - [ ] No look-alike links to a story entity: `ZX 3465 D` and `P-05203`, `+447700900260` and `P-00371`, `ADR-0264`
       and its residents and numbers, `P-01231`.
+- [ ] Advanced tier, on a Demo Auth build: the Alert Rule is armed and raises one WARNING with value 12; the seed runs
+      with nothing failed; the outsider cannot open `burglary-series`; only `police.sio` can approve the held expand.
+- [ ] Basic: the log says "Not arming alert rule 'police_repeat_seller_serial_matches'", `police_serial_match_alerts`
+      finds no rule breached, and nothing errors.

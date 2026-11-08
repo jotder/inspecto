@@ -1,0 +1,11 @@
+job:
+  name: police_serial_match_counts
+  type: sql.template
+  description: "Runs each time the police_links Job produces its Dataset. One row of counts over its item_match links (an incident to the seller of an item with a stolen serial): repeat_seller_matches (matches whose seller has matched at least min_matches_per_seller incidents), repeat_sellers (those sellers) and one_off_matches (the rest). One stolen item at a dealer is everyday; the same seller again and again is a pattern. The Alert Rule police_repeat_seller_serial_matches reads it; no person id leaves this Job, the sellers are found in the Investigation."
+  sql: "WITH m AS (SELECT src, dst FROM police_links WHERE kind = 'item_match'), per AS (SELECT dst AS seller, count(*) AS n FROM m GROUP BY dst) SELECT count(*) FILTER (WHERE p.n >= CAST($min_matches_per_seller AS INTEGER)) AS repeat_seller_matches, count(DISTINCT m.dst) FILTER (WHERE p.n >= CAST($min_matches_per_seller AS INTEGER)) AS repeat_sellers, count(*) FILTER (WHERE p.n < CAST($min_matches_per_seller AS INTEGER)) AS one_off_matches FROM m JOIN per p ON p.seller = m.dst"
+  sources: police_links
+  sink_dataset: police_serial_match_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == police_links"
+  min_matches_per_seller: "2"
+  enabled: true

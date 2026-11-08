@@ -244,7 +244,7 @@ class ControlApiSpaceTemplatesTest {
     void galleryCountsTheDemoUserSignInATemplateNeeds(@TempDir Path root) throws Exception {
         seedTemplate(root);
         Files.writeString(root.resolve("_templates/starter/config/demo-users.toon"), "users[0]:\n");
-        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-sample", "la-showcase")) {
+        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-police", "la-sample", "la-showcase")) {
             Path src = Path.of("..", "spaces", "_templates", shipped);
             Path dst = root.resolve("_templates").resolve(shipped);
             Files.createDirectories(dst);
@@ -261,7 +261,7 @@ class ControlApiSpaceTemplatesTest {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
                     // la-sample has no roster; the shipped showcases with a Basic tier keep theirs inert, so it does not refuse them
-                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase");
+                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase", "la-police");
                     String id = t.get("id").asText();
                     boolean needsDemo = !"la-sample".equals(id) && !basicTier.contains(id);
                     boolean named = false;

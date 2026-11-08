@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-72 test file(s). Run one, or all:
+73 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -87,6 +87,7 @@ node --test tools/
 | `tools/seed-la-audit.test.mjs` | node --test tools/seed-la-audit.test.mjs  -  request building of the la-audit seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-claims.test.mjs` | node --test tools/seed-la-claims.test.mjs  -  request building of the claims seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-mm.test.mjs` | node --test tools/seed-la-mm.test.mjs  -  request building of the mobile-money seed script against a MOCKED fetch (no server). |
+| `tools/seed-la-police.test.mjs` | node --test tools/seed-la-police.test.mjs  -  request building of the police seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-showcase.test.mjs` | node --test tools/seed-la-showcase.test.mjs  -  request building of the seed script against a MOCKED fetch (no server). |
 | `tools/seed-telco-fraud-demo.test.mjs` | node --test tools/seed-telco-fraud-demo.test.mjs |
 | `tools/unreadable-dirs.test.mjs` | Fixture test: the two whole-tree walkers that a local, permission-locked folder used to crash |
