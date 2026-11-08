@@ -1,7 +1,8 @@
 physicalRef: kyc_person/database
 description: "Crypto laundering Link Analysis showcase - One row per person the exchanges identified (KYC): invented name, birth year (blank for a few) and country. One extract (KYC_PERSON_20260930.csv); October's new people are in data/staged. Landed by the kyc_person Pipeline. Synthetic."
+primaryEntityType: person
 columns[4]{name,type,classification}:
-  person_id,string,
+  person_id,string,PERSON
   name,string,
   birth_year,number,
   country,string,

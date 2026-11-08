@@ -1,4 +1,4 @@
-name: ownership_circular
+name: circular_ownership
 description: "Circular ownership - Ownership and money - stakes, customers and the payments between them (amount summed, payment count in via). Look for companies that own each other in a circle and pay each other round the same circle every month. A group with a clear parent at the top that charges its subsidiaries a monthly fee has no circle."
 sourceId: entity-projection
 layout: force

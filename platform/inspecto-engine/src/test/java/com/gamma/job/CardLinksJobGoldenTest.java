@@ -167,8 +167,8 @@ class CardLinksJobGoldenTest {
 
     @Test
     void eachSavedViewsKindsMakeItsHubTheBusiestNode() throws Exception {
-        Map<String, String> viewHub = Map.of("card_testing", "card_testing", "card_takeover_ring", "account_takeover",
-                "card_merchant_disputes", "colluding_merchant", "card_common_point", "common_point_of_purchase");
+        Map<String, String> viewHub = Map.of("card_testing", "card_testing", "account_takeover_ring", "account_takeover",
+                "colluding_merchant_refunds", "colluding_merchant", "common_point_of_purchase", "common_point_of_purchase");
         for (Map.Entry<String, String> v : viewHub.entrySet()) {
             String toon = Files.readString(TEMPLATE.resolve("config/registry/link-analysis-views/" + v.getKey() + ".toon"));
             Set<String> kinds = new TreeSet<>();

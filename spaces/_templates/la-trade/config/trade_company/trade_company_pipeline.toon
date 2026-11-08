@@ -1,17 +1,17 @@
-name: company
+name: trade_company
 active: true
 description: "Trade-based money-laundering Link Analysis showcase - One row per registered company: invented name, country (ISO code), registered address (blank on about 4 %; a formation-agent address and a business centre each host many companies), incorporation date and the company's bank account. One extract (COMPANY_20260930.csv). Synthetic; regenerate with tools/gen-la-trade-data.py."
 
 dirs:
-  poll:       data/inbox/company
-  database:   data/company/database
-  backup:     data/company/backup
-  temp:       data/company/temp
-  errors:     data/company/errors
-  quarantine: data/company/quarantine
-  markers:    data/company/markers
-  status_dir: data/company/status
-  log_dir:    data/company/logs
+  poll:       data/inbox/trade_company
+  database:   data/trade_company/database
+  backup:     data/trade_company/backup
+  temp:       data/trade_company/temp
+  errors:     data/trade_company/errors
+  quarantine: data/trade_company/quarantine
+  markers:    data/trade_company/markers
+  status_dir: data/trade_company/status
+  log_dir:    data/trade_company/logs
 
 output:
   format: PARQUET
@@ -24,7 +24,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: company_schema.toon
+  schema_file: trade_company_schema.toon
   csv_settings:
     delimiter: ","
     has_header: true

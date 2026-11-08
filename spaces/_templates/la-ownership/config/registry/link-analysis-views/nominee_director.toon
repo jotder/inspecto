@@ -1,4 +1,4 @@
-name: ownership_nominee_director
+name: nominee_director
 description: "Nominee director - Officers - people linked to the companies they are director or secretary of (role and registered address in via). Look for one person who directs far more companies than anyone else, all at one formation-agent address written in more than one way. An accountant who directs a handful of family firms at their own addresses is ordinary."
 sourceId: entity-projection
 layout: force

@@ -1,4 +1,4 @@
-name: trade_shell_importers
+name: shell_importers
 description: "Shell importers - addresses that host many companies, with those companies' directors, payments out and the trades shipped to them. Look for newly incorporated importers at one formation-agent address, run by two directors, that pay one exporter far more than it ever shipped them (compare paid with traded_with). Long-standing companies at a large business centre, each with its own directors and its own trading partners, are ordinary."
 sourceId: entity-projection
 layout: force

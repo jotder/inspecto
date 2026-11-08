@@ -1,4 +1,4 @@
-name: card_common_point
+name: common_point_of_purchase
 description: "Common point of purchase - each card with card-not-present fraud linked to every merchant it paid at in the 45 days before (via = days before the fraud). Look for the one merchant most of the defrauded cards passed through in the same few weeks. A busy supermarket that hundreds of cards use is not here at all: none of its customers was defrauded."
 sourceId: entity-projection
 layout: force

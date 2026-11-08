@@ -41,8 +41,8 @@ never matched.
 
 ## Five-minute tour
 
-1. The **Inspecto LA** home page lists the four saved views, one per story: `ownership_hidden_owner`,
-   `ownership_sanctions_path`, `ownership_nominee_director` and `ownership_circular`. Each keeps only the kinds of link
+1. The **Inspecto LA** home page lists the four saved views, one per story: `hidden_beneficial_owner`,
+   `sanctioned_owner_path`, `nominee_director` and `circular_ownership`. Each keeps only the kinds of link
    its story needs, and its description says what to look for. Opening one draws the whole Dataset through that filter,
    cut to the busiest 1 000 nodes: a picture of the register, not yet of a story. To find a story, start small.
 2. **File ▸ New** shows **Start a graph**: Dataset `ownership_links_dataset`, start from **One entity**, Entity Type
@@ -64,7 +64,7 @@ The exercises below take each story in turn. Try them blind first; the answers f
 *Four of the bank's customers, `CUS-00349`, `CUS-00379`, `CUS-00591` and `CUS-01477`, each list three corporate
 shareholders and no person above 25 %. Who really stands behind them, and how much of each do they control?*
 
-- **Hint:** saved view `ownership_hidden_owner`. Start from one of the four customers and expand **upwards**
+- **Hint:** saved view `hidden_beneficial_owner`. Start from one of the four customers and expand **upwards**
   (*Incoming* `owns`) one degree at a time. Read `percent` and the jurisdiction in `via` on each link.
 - **Answer:** `PER-02104` (Rosa Vickers). She holds 24 % of `CO-05396` (Cyprus), which holds 24 % of `CO-04888`
   (British Virgin Islands), which holds 24 % of `CO-01476` (UAE), which holds 24 % of `CO-02850` (Cyprus), which holds
@@ -80,7 +80,7 @@ shareholders and no person above 25 %. Who really stands behind them, and how mu
 
 *Is any customer owned, directly or indirectly, by someone on the sanctions list?*
 
-- **Hint:** saved view `ownership_sanctions_path`. There is exactly one `name_match` link in the Dataset; start from
+- **Hint:** saved view `sanctioned_owner_path`. There is exactly one `name_match` link in the Dataset; start from
   its list entry and walk down the `owns` links to a customer.
 - **Answer:** `SL-0137`, listed as *Corvin Tammask* (alias *C. Tammask*), born 1971, nationality CY, matches
   `PER-03904` *Corvin Tamask* (one letter shorter; same birth year and nationality; score 0.986). `PER-03904` owns
@@ -95,7 +95,7 @@ shareholders and no person above 25 %. Who really stands behind them, and how mu
 
 *Which person directs far more companies than anyone else, and what do those companies have in common?*
 
-- **Hint:** saved view `ownership_nominee_director`; the preset **Reaching many** on `officer_of`. Read `via` on the
+- **Hint:** saved view `nominee_director`; the preset **Reaching many** on `officer_of`. Read `via` on the
   links: it carries the role and the registered address.
 - **Answer:** `PER-01592` (Dora Upton) is director of **120** companies, all incorporated in 2023–2024 and all
   registered at one formation-agent address, *Suite 4, 18 Quayside Lane, London*, written three ways (*Ste 4, 18
@@ -109,7 +109,7 @@ shareholders and no person above 25 %. Who really stands behind them, and how mu
 
 *Do any companies own each other in a circle, and does money go round the same circle?*
 
-- **Hint:** saved view `ownership_circular`; the preset **Short loops**, or the toolbox's **Cycles** on the drawn graph.
+- **Hint:** saved view `circular_ownership`; the preset **Short loops**, or the toolbox's **Cycles** on the drawn graph.
   Then look at the `paid` links between the same companies' customers.
 - **Answer:** `CO-03975` (GB) owns 40 % of `CO-05331` (NL), which owns 35 % of `CO-04219` (LU), which owns 30 % of
   `CO-03975`. All three are customers (`CUS-00851`, `CUS-00363`, `CUS-00209`) and every month each pays the next one

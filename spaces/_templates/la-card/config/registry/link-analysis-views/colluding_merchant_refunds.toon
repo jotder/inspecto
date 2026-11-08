@@ -1,4 +1,4 @@
-name: card_merchant_disputes
+name: colluding_merchant_refunds
 description: "Merchant disputes - cards linked to merchants by chargebacks (via = reason@month) and refunds (via counts the sales that card made there). Look for a merchant that refunds cards it never sold to (sales:0) and whose chargebacks run through the whole year far above its category. A travel merchant whose chargebacks all arrive in one strike month is the innocent version."
 sourceId: entity-projection
 layout: force

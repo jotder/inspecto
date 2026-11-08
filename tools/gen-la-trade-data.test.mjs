@@ -50,8 +50,8 @@ test('generator twice = the committed bytes; seven feeds; 12 landed months; unde
   const before = snapshot();
   const truth = sha(TRUTH);
   assert.deepEqual([...new Set(Object.keys(before).map((k) => k.split('/')[1]))].sort(),
-    ['bill_of_lading', 'company', 'director', 'payment', 'price_reference', 'trade', 'vessel_position']);
-  for (const f of ['trade', 'bill_of_lading', 'payment', 'vessel_position', 'price_reference'])
+    ['bill_of_lading', 'director', 'price_reference', 'trade', 'trade_company', 'trade_payment', 'vessel_position']);
+  for (const f of ['trade', 'bill_of_lading', 'trade_payment', 'vessel_position', 'price_reference'])
     assert.equal(Object.keys(before).filter((k) => k.startsWith(`inbox/${f}/`)).length, 12, `${f}: 12 landed months`);
   assert.equal(Object.keys(before).filter((k) => k.startsWith('staged/')).length, 5, 'October 2026 staged for the five monthly feeds');
   assert.ok(Object.keys(before).reduce((n, k) => n + statSync(join(DATA, k)).size, 0) < 12_000_000, 'the corpus is under 12 MB');
@@ -64,8 +64,8 @@ test('generator twice = the committed bytes; seven feeds; 12 landed months; unde
 
 const T = JSON.parse(readFileSync(TRUTH, 'utf8'));
 const S = T.stories;
-const co = Object.fromEntries(feed('company').map((c) => [c.company_id, c]));
-const dir = feed('director'), trade = feed('trade'), bl = feed('bill_of_lading'), pay = feed('payment');
+const co = Object.fromEntries(feed('trade_company').map((c) => [c.company_id, c]));
+const dir = feed('director'), trade = feed('trade'), bl = feed('bill_of_lading'), pay = feed('trade_payment');
 const pos = new Map(feed('vessel_position').map((p) => [`${p.vessel}|${p.pos_date}`, p.port_or_area]));
 const ref = new Map(feed('price_reference').map((r) => [`${r.hs_code}|${r.month}`, Number(r.median_unit_price)]));
 const ownerOf = Object.fromEntries(Object.values(co).map((c) => [c.account_id, c.company_id]));

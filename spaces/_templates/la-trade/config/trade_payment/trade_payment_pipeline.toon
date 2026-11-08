@@ -1,17 +1,17 @@
-name: payment
+name: trade_payment
 active: true
 description: "Trade-based money-laundering Link Analysis showcase - One row per payment between company accounts: amount, time and the trade it settles (trade_ref, blank for payments that settle no trade). One file per month (PAYMENT_YYYYMM.csv), October 2026 staged. Synthetic; regenerate with tools/gen-la-trade-data.py."
 
 dirs:
-  poll:       data/inbox/payment
-  database:   data/payment/database
-  backup:     data/payment/backup
-  temp:       data/payment/temp
-  errors:     data/payment/errors
-  quarantine: data/payment/quarantine
-  markers:    data/payment/markers
-  status_dir: data/payment/status
-  log_dir:    data/payment/logs
+  poll:       data/inbox/trade_payment
+  database:   data/trade_payment/database
+  backup:     data/trade_payment/backup
+  temp:       data/trade_payment/temp
+  errors:     data/trade_payment/errors
+  quarantine: data/trade_payment/quarantine
+  markers:    data/trade_payment/markers
+  status_dir: data/trade_payment/status
+  log_dir:    data/trade_payment/logs
 
 output:
   format: PARQUET
@@ -24,7 +24,7 @@ processing:
     enabled: true
     marker_extension: .processed
     retention_days: 30
-  schema_file: payment_schema.toon
+  schema_file: trade_payment_schema.toon
   csv_settings:
     delimiter: ","
     has_header: true

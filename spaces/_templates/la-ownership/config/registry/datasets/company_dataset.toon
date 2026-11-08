@@ -1,7 +1,8 @@
 physicalRef: company/database
 description: "Beneficial-ownership and sanctions Link Analysis showcase - One row per registered company: invented name, jurisdiction (country code), incorporation date and registered address (blank on about 5 %; one formation-agent address is written three ways). Landed by the company Pipeline. Synthetic."
+primaryEntityType: company
 columns[5]{name,type,classification}:
-  company_id,string,
+  company_id,string,COMPANY
   name,string,
   jurisdiction,string,
   incorporated_at,date,

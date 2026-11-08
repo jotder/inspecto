@@ -83,3 +83,19 @@ node tools/package-la-showcase.mjs la-crypto
 
 The generator is deterministic (seed 20261113) and writes the ground truth to `tools/gen-la-crypto-data.ground-truth.json`,
 which is not part of any download. The packer reads committed content only, so commit first.
+
+## As part of the *Banking and finance* industry Space
+
+This use case also ships inside the industry Space *Banking and finance* (`la-banking`), with the sample, ownership,
+card, trade and crypto showcases. The recipe is `spaces/_industries/la-banking.toon`; `node tools/package-la-showcase.mjs
+la-banking` composes one Space download and one data download.
+
+To share one Space, trade's `company` and `payment` feeds are called `trade_company` and `trade_payment` (Pipelines,
+Datasets, inbox folders). *Account*, *Company* and *Person* are declared identically by every pack that uses them, so
+they merge. Every Dataset says what its id columns hold, and each Dataset of events has its own Mapping. In each link
+Dataset, the ends mixing kinds keep the pack's own generic type: *Party* (ownership), *Card entity*, *Trade entity* or
+*Crypto entity*.
+
+Views carry use-case names, for example `hidden_beneficial_owner`, `sanctioned_owner_path`, `common_point_of_purchase`,
+`circular_trade` and `hack_peel_chain`. The sample's `mule_layering_ring` keeps its name, because the first-run page
+and *Follow the money* open it by that id.

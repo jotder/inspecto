@@ -1,4 +1,4 @@
-name: ownership_hidden_owner
+name: hidden_beneficial_owner
 description: "Hidden owner - Ownership chains - people and companies linked by shareholdings (with the percent and the owned company's jurisdiction in via) and bank customers linked to the company they are. Every stake on one chain is 24 %, just under a 25 % disclosure threshold; follow it upwards from a customer to find who really stands behind it. A listed company that holds 61 % of its subsidiaries, with its own shares spread thinly, is the honest pattern to compare."
 sourceId: entity-projection
 layout: force

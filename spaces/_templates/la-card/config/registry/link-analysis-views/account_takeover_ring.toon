@@ -1,4 +1,4 @@
-name: card_takeover_ring
+name: account_takeover_ring
 description: "Account takeover - online accounts linked to the devices their changes came from and to their ship-to addresses (via shows when an address was set and from which device). Look for a handful of devices that reach many accounts and move them onto a few shared addresses within a few weeks. A family tablet that four accounts at one address sign in from is the innocent version."
 sourceId: entity-projection
 layout: force

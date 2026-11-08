@@ -1,0 +1,36 @@
+entity_types[7]:
+  - id: payment_card
+    label: Payment card
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PAYMENT_CARD
+  - id: merchant
+    label: Merchant
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: MERCHANT_ID
+  - id: device
+    label: Device
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DEVICE_ID
+  - id: ip_address
+    label: IP address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: IP
+  - id: cardholder
+    label: Cardholder
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CARDHOLDER
+  - id: online_account
+    label: Online account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ONLINE_ACCOUNT
+  - id: card_entity
+    label: Card entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CARD_ENTITY

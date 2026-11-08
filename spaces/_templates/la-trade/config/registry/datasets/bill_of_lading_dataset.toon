@@ -1,13 +1,18 @@
 physicalRef: bill_of_lading/database
 description: "Trade-based money-laundering Link Analysis showcase - One row per bill of lading: the trade it documents, vessel, container, shipper, consignee, port from, port to and the shipped-on-board date. A transhipped trade has one B/L per leg; a multi-container trade one per container. Landed by the bill_of_lading Pipeline. Synthetic."
 eventDate: bl_date
+primaryEntityType: container
 columns[9]{name,type,classification}:
   bl_id,string,
-  trade_id,string,
-  vessel,string,
-  container,string,
-  shipper,string,
-  consignee,string,
+  trade_id,string,TRADE_ID
+  vessel,string,VESSEL
+  container,string,CONTAINER
+  shipper,string,COMPANY
+  consignee,string,COMPANY
   port_from,string,
   port_to,string,
   bl_date,date,
+defaultLinkMapping:
+  from: shipper
+  to: consignee
+  primaryTime: bl_date

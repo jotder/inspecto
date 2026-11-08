@@ -1,11 +1,18 @@
 physicalRef: card_links
 description: "Card and e-commerce fraud Link Analysis showcase - ONE link Dataset built by the card_links Job from card_auth, chargeback and online_account. kind is one of used_at, refunded, used_device, from_ip, account_card, ships_to, charged_back, visited_before_fraud; one row per pair; via names the evidence. Ids say what an endpoint is: CRD- card, M- merchant, DEV- device, OA- online account, a /24 network, or an upper-cased address. Synthetic."
 eventDate: event_date
+primaryEntityType: card_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,CARD_ENTITY
+  dst,string,CARD_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount
