@@ -53,7 +53,7 @@ On start-up the seven Pipelines land the twelve months in `data/inbox`; the `pro
 load (and every 5 minutes, so the last load is never missed), and each time it finishes the two derived Jobs run.
 Within a minute or two:
 
-- `inspecto-la-data/la-procurement/data/<feed>/database/` holds Parquet files for `company`, `director`, `person`,
+- `inspecto-la-data/la-procurement/data/<feed>/database/` holds Parquet files for `company`, `director`, `procurement_person`,
   `official`, `tender`, `bid` and `contract_change`, and nothing is under any `<feed>/quarantine` or
   `<feed>/errors`.
 - `inspecto-la-data/la-procurement/data/procurement_links/` holds the link Dataset (about 11 000 rows, seven kinds);

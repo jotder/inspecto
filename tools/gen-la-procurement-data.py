@@ -3,7 +3,7 @@
 
 Writes spaces/_templates/la-procurement/data/inbox/<feed>/ (12 months landed, tenders published 2025-10-01..2026-09-30) and
 data/staged/<feed>/ (the next month, 2026-10, for the "new data arrives" step) for seven feeds:
-  company, director, person, official (one extract each, landed only), tender and bid (one file per month of publication),
+  company, director, procurement_person, official (one extract each, landed only), tender and bid (one file per month of publication),
   contract_change (one landed extract, one staged month)
 and tools/gen-la-procurement-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
