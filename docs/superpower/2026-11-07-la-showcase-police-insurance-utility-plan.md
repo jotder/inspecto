@@ -210,9 +210,12 @@ and be explorable on a Basic build; that is the acceptance test. The Advanced ti
 download and stays inert on Basic.
 
 **The existing four Advanced-only templates** (`la-showcase`, `la-mobile-money`, `la-claims`, `la-audit`, all
-`minEdition: advanced` today) get the same split: `minEdition` drops to `basic` and anything a Basic build refuses
+`minEdition: advanced` until wave B; `la-claims` flipped to `basic` on 2026-11-08) get the same split: `minEdition` drops to `basic` and anything a Basic build refuses
 moves into the Advanced tier. Whether the Advanced tier really is inert on Basic (personas, Alert Rules, seed
-scripts present but unused) is **not yet proven**; wave B proves it on `la-claims` first.
+scripts present but unused) was **proven on `la-claims` on 2026-11-08** (step 5 as built). One product change came with it
+(operator 2026-11-08, "A: allow on Basic"): the template gallery no longer refuses a template for its Demo User roster
+(`config/demo-users.toon`) when its `template.toon` says `minEdition: basic`. Without that change the gallery would list
+the template on Basic and refuse to create it. A stated `masking_mode` is the other trap: leave it unset (see step 5).
 
 ### Play, learn, test
 
@@ -860,6 +863,51 @@ business and its customers. All data is invented. It shares no data, names or id
    `minEdition: basic`; move whatever Basic refuses into the Advanced tier → verify: each loads, lands its data
    and is explorable on a Basic build, and still passes its smoke (`la-claims-smoke`, `la-mm-smoke`,
    `la-audit-smoke`) on Preview.
+   **`la-claims` BUILT 2026-11-08.** As built:
+   - **What Basic refused: two things, neither a load error.** Every file in the template loads on a Basic build: no
+     config error, no failed Run, no ERROR in the log. But (1) the stated `masking_mode: typed` made the graph unreadable
+     on Basic, and (2) the template gallery refused the template, because `SpaceManager.missingFeatures`
+     (`LA-SAMPLE-GALLERY-DEMOAUTH-1`) marks any template carrying `config/demo-users.toon` `creatable: false` (missing
+     `demo-auth`) where no Demo Auth is installed. The API and the unzipped Space download were never refused. The rest
+     only had to be confirmed inert:
+
+     | Template part | On a Basic build (seen live) | Where it went |
+     |---|---|---|
+     | `link-analysis.toon` `masking_mode: typed` | **accepted, and it made the Basic tier unusable**: every id came back `masked:…`, and Basic has no Reveal (no sign-in, no Investigations) | line removed; the edition default holds (`EditionMaskingDefault`: `typed` wherever people sign in, `none` on Basic). The Preview smoke still sees typed masking |
+     | `link-analysis.toon` Entity Type `party` (masked), four-eyes threshold, Drafts, embed origins | loaded; used only by masking and Investigations | stays; inert on Basic |
+     | `la_index_build` Job (`la.index.build`, on `claims_links` produced) | **runs and succeeds**: `built (full) - index version 1 published` | stays in the Basic tier |
+     | `la_detect` Job (`la.detect`, every 5 minutes) | runs and succeeds, `no Investigation rule breached` (nothing to evaluate) | stays; Advanced tier, inert |
+     | `demo-users.toon` | the Space ignores it (no sign-in; only the demo-auth module reads it), **but the gallery refused the template** ("Not available in this edition") | stays; **decision (operator 2026-11-08, "A: allow on Basic")**: `missingFeatures` skips the `demo-auth` refusal when the template's `template.toon` says `minEdition: basic`, so the roster is the template's inert Advanced tier. Pinned by `ControlApiSpaceTemplatesTest` (`aBasicTierTemplateKeepsItsDemoUserRosterAsAnInertAdvancedTier`, falsified; `la-claims` creatable, `la-audit` and `la-mobile-money` not until their lanes flip `minEdition`) |
+     | `roles.toon` | read on every edition; without sign-in it grants nothing extra | stays; Advanced tier, inert |
+     | 3 saved Geo Views | listed; the Geo map is Standard and above | stay |
+     | seed script, smoke | not run on Basic; they need Demo Auth | unchanged |
+
+   - **What the la-showcase, la-mobile-money and la-audit lanes should do:** flipping `minEdition` to `basic` is
+     what makes the gallery accept the template's `demo-users.toon`. Then check `masking_mode`. A stated `typed` (or any
+     masking) masks a Basic graph that nobody can reveal, so leave it unset and let the edition default decide. The
+     `la.index.build` and `la.detect` Job types are built in on every edition and their Platform Services (`link-index`,
+     `alerts`) exist on Basic, so these Jobs run there and succeed. A Job whose type's module is missing is listed as
+     `hosted: false` and never fires, which is also inert.
+   - **Offerings:** `la-claims` moved from `offerings/preview.toon` to `offerings/basic.toon` contentPacks. Preview still
+     carries it through its includes.
+   - **Tests:** `LaClaimsTemplateTest` pins `masking_mode` as unset, with an effective mode of `none` without sign-in and
+     `typed` with `auth.mode=demo`.
+   - **Live proof on Basic** (`package.ps1 -Edition Basic -NoUi`; `node tools/package-la-showcase.mjs la-claims`, 43 Space
+     files and 7 data files, unzipped side by side, `SPACES_ROOT` + `SPACES_DATA_ROOT`): all seven Pipelines landed with 0
+     rejected (520 claims, 1 071 parties, 405 policies, 901 bills, 449 locations, 25 providers, 1 056 invoices). Then
+     `claims_links` produced 2 637 rows, `claims_policy_timing` 520, and `la_index_build` and `la_detect` ran as in the
+     table above. Each of the five saved views' projections (`POST /inv/projection` with the view's filter) returned
+     200, not cut short, 0 masked ids: network 426 nodes, shared identity 227, provider money 321, parts suppliers 19,
+     premium payers 32. The ring's garage, clinic and lawyer, `SUP-07`/`SUP-01`, the ghost broker's two accounts and the
+     family's account are on the views that carry them.
+   - **Preview still passes** (`package.ps1 -Edition Preview -DemoAuth -NoUi -NoBakeDemo`, the Space scaffolded from the
+     edited template with `seed-la-claims.mjs --scaffold`): the seed (`--apply`) created every step and none failed.
+     `la-claims-smoke.mjs --embed` passed 32 of 32, including "typed masking: the Working Set carries no raw claimant id"
+     and the admin's audited Reveal, so the edition default still masks on a sign-in build.
+   - **Not checked:** the template gallery on Basic with the gallery fix (the fix came after the live Basic boot; it is
+     covered by `ControlApiSpaceTemplatesTest`), the Link Analysis UI on Basic (the bundle had no UI; the views were checked through their
+     projections), the Geo Views on Standard, and an OIDC sign-in build (Demo Auth stands in for it: both make
+     `EditionMaskingDefault` answer `typed`).
 6. **Pack and boot-test all five** with `tools/package-la-showcase.mjs`. `la-sample` keeps its files in
    `data/samples` for the in-app *Load samples*; check that this still works from a data root.
 

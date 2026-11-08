@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link Analysis claims showcase — features
 
-**Product Map Item:** [`solution-pack.la-claims`](../../../../../product-map/solution-pack/la-claims.toon) · **Status:** preview · **Availability:** not billable; Space Template `la-claims`, needs an Advanced or Preview build with Demo Auth.
+**Product Map Item:** [`solution-pack.la-claims`](../../../../../product-map/solution-pack/la-claims.toon) · **Status:** preview · **Availability:** not billable; Space Template `la-claims` (`minEdition: basic`). Its Basic tier (data, Jobs, saved views, exercises) runs on every edition. Its Advanced tier (personas, typed masking and Reveal, Investigations, four-eyes approval, the seed script) needs an Advanced or Preview build with sign-in, and does nothing on Basic.
 
 ## What it is
 

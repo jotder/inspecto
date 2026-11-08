@@ -620,6 +620,22 @@ public final class SpaceManager implements AutoCloseable {
     }
 
     /**
+     * Whether the template that owns {@code config} has a Basic tier: its {@code template.toon} says {@code minEdition: basic}.
+     * Its Demo User roster is then the template's Advanced tier, inert where nobody signs in (the showcase plan's Edition
+     * rule, operator 2026-11-08: "allow on Basic"), so the gallery does not refuse it for the missing Demo Auth. A Space
+     * (no template.toon) or an unreadable template.toon has no Basic tier.
+     */
+    private static boolean hasBasicTier(Path config) {
+        Path tpl = config.getParent() == null ? null : config.getParent().resolve("template.toon");
+        if (tpl == null || !Files.isRegularFile(tpl)) return false;
+        try {
+            return "basic".equalsIgnoreCase(String.valueOf(com.gamma.util.ToonHelper.load(tpl.toString()).get("minEdition")).trim());
+        } catch (Exception unreadable) {
+            return false;
+        }
+    }
+
+    /**
      * The edition features a template's {@code config/} uses that THIS build lacks — the same refusals the seed
      * gate answers with a 422 on {@code POST /spaces}, so the gallery can say so before the operator names a
      * Space: a registry Alert Rule or a Decision Rule {@code create-alert} consequence ({@code alert.dispatch}),
@@ -629,12 +645,14 @@ public final class SpaceManager implements AutoCloseable {
      * runtime (only registry {@code alert-rules/} are armed) and the seed gate does not refuse one, so counting it
      * would mark a creatable template uncreatable. A template carrying a Demo User roster ({@code demo-users.toon}) needs
      * the Demo Auth sign-in ({@code demo-auth}, {@code LA-SAMPLE-GALLERY-DEMOAUTH-1}); the gallery alone reports that one -
-     * the seed gate does not refuse it, so such a Space can still be created through the API without its sign-in.
+     * the seed gate does not refuse it, so such a Space can still be created through the API without its sign-in. A
+     * template with a Basic tier ({@code minEdition: basic}) is not refused for its roster: {@link #hasBasicTier}.
      */
     static List<Map<String, String>> missingFeatures(Path config) throws IOException {
         java.util.TreeMap<String, String> missing = new java.util.TreeMap<>();
         if (!Files.isDirectory(config)) return List.of();
-        if (Files.isRegularFile(config.resolve(DEMO_USERS)) && !demoUsersSignIn(config))   // LA-SAMPLE-GALLERY-DEMOAUTH-1
+        if (Files.isRegularFile(config.resolve(DEMO_USERS)) && !demoUsersSignIn(config)   // LA-SAMPLE-GALLERY-DEMOAUTH-1
+                && !hasBasicTier(config))
             missing.put(DEMO_AUTH, "Demo User sign-in (config/" + DEMO_USERS + ") needs a demo build with Demo Auth — "
                     + "this server does not include it");
         String alert = com.gamma.etl.EditionFeatures.ALERT_DISPATCH;

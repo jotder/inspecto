@@ -39,9 +39,10 @@ Telecom, its banking stories under Banking and finance.
 | 3.9 | Enterprise | Internal audit · Insider threat | 35 s | Advanced | 1 of 2 segments (insider planned) |
 
 *Features shown* is the lowest edition that has every feature on screen. *Film on* is the install the video must be
-captured on: `la-mobile-money`, `la-claims`, `la-showcase` and `la-audit` are templates that need an Advanced install
-(`minEdition: advanced`) today, even where every feature shown is in Basic. The plan's wave B gives those four a Basic
-tier; when it lands, re-film or keep them on Advanced. The planned Spaces are specified with a Basic tier first.
+captured on: `la-mobile-money`, `la-showcase` and `la-audit` are templates that need an Advanced install
+(`minEdition: advanced`) today, even where every feature shown is in Basic. The plan's wave B gives those three a Basic
+tier; when it lands, re-film or keep them on Advanced. `la-claims` got its Basic tier on 2026-11-08: its saved views
+run on Basic with unmasked ids, while its Investigation, Reveal and Case segments still need an Advanced install. The planned Spaces are specified with a Basic tier first.
 
 ---
 
@@ -171,7 +172,7 @@ template and reuses it everywhere.
 | Shape | Opening (the industry in one line, 5 s) → one segment per use case (10–12 s each) → end card with the industry line (5 s). |
 | Segment | The use-case label on screen; the Space's graph or saved view; one click (the analysis named); the reveal, held at least 2 s. Its voice-over is the hook and the finding in two short sentences. |
 | Modular | Segments are filmed separately. A video whose Spaces are all built is filmed now; a planned Space's segment is filmed when the Space is built and cut in. Until then, publish the video with its built segments only, or hold it (the owner decides per industry). |
-| Film on | One install per video: an **Advanced** install if any of its segments needs one (`la-mobile-money`, `la-claims`, `la-showcase`, `la-audit` need one today), otherwise Basic. On Advanced, film as a user who can reveal identifiers. |
+| Film on | One install per video: an **Advanced** install if any of its segments needs one (`la-mobile-money`, `la-showcase`, `la-audit` need one today; `la-claims` only for its Investigation, Reveal and Case segments), otherwise Basic. On Advanced, film as a user who can reveal identifiers. |
 | Must show | Each reveal exactly as the Space's ground truth file lists it: the same entities, nothing added. |
 | Must not | Use real place, company or person names. Show a story's look-alike as suspicious. |
 | Before filming | Check each reveal against the Space's ground truth file. For a planned Space, re-read its segment against the Space as built: ids and figures can move during the build. |
