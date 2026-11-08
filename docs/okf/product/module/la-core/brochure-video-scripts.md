@@ -1,6 +1,6 @@
 # Inspecto LA short videos — scripts and agency briefs
 
-> **Six concept videos and nine industry videos, filmed on the real product over synthetic data. Each one is an example: raw records become an investigation outcome in a few steps that anyone can repeat on their own data. For each video: a one-page brief for the agency, then a shot-by-shot script with voice-over.**
+> **Six concept videos and nine industry videos, filmed on the real product over synthetic data. Each one is an example: raw records become an investigation outcome in a few steps that anyone can repeat on their own data. Each ends by saying that what it showed is in Basic, and what Standard and above add. For each video: a one-page brief for the agency, then a shot-by-shot script with voice-over; a 480p draft round on a Basic install comes before the agency's masters.**
 
 *Audience: marketing, presales and the video agency. Product Map Item `module.la-core`. Draft of 2026-11-08, not
 yet reviewed by product or legal. Every product claim below is taken from the
@@ -12,7 +12,7 @@ reference for anything wider.*
 ## The series in one line
 
 Every video is an **example**: raw records go in, an investigation outcome comes out, in a few steps anyone can
-repeat. A viewer should finish thinking *I could do that with my own records*. Every story follows the same five
+repeat. A viewer should finish thinking *I could do that with my own records*. Every video follows the same six
 beats, and every script below is written to them:
 
 | Beat | What the viewer sees | What the voice does |
@@ -22,6 +22,7 @@ beats, and every script below is written to them:
 | **Ask** | One analysis, its name on screen as the click happens. | Says the question, never the button. |
 | **Outcome** | The finding, held, with its key ids and numbers on screen. | Says what it means and what the investigator does next: a lead to check, never a verdict. |
 | **Your data** | *Your data · same steps* on screen, over the raw file turning into the graph. | Says the records were an example and the steps are the same on the viewer's own. |
+| **Edition** | *Everything shown: Inspecto LA Basic*, then a short card of what Standard and above add. | Says the viewer has just explored Basic, and in one sentence what Standard and above add. |
 
 ## Contents
 
@@ -29,12 +30,12 @@ beats, and every script below is written to them:
 
 | # | Title | Length (about) | Features shown | Film on | Data | Ready to film |
 |---|---|---|---|---|---|---|
-| 1 | The ring nobody saw | 50 s | Basic | Advanced install | `la-mobile-money` | Yes |
-| 2 | Zero to graph | 65 s | Basic | Basic install | *Try the sample* | After the timing check |
-| 4 | Retire the red string | 35 s | Basic | Advanced install | `la-mobile-money` | Yes |
-| 5 | It stays current | 55 s | Basic, plus one Advanced shot | Basic install | `la-police` + its staged month | Yes (shot 7 later) |
+| 1 | The ring nobody saw | 60 s | Basic | Advanced install | `la-mobile-money` | Yes |
+| 2 | Zero to graph | 75 s | Basic | Basic install | *Try the sample* | After the timing check |
+| 4 | Retire the red string | 40 s | Basic | Advanced install | `la-mobile-money` | Yes |
+| 5 | It stays current | 65 s | Basic, plus one Advanced shot | Basic install | `la-police` + its staged month | Yes (shot 7 later) |
 | 6 | The analyst (dramatization) | 65 s | Standard | Standard or Advanced install | `la-mobile-money` | After casting |
-| 7 | One graph for any data (introduces the industry videos) | 90 s | Basic | Basic install | Two prepared synthetic files, telecom and mobile money | After data preparation |
+| 7 | One graph for any data (introduces the industry videos) | 100 s | Basic | Basic install | Two prepared synthetic files, telecom and mobile money | After data preparation |
 
 **Industry videos (video 3)** — one video per industry, nine in all, grouped as the showcase catalogue in the plan
 is. Each holds every use case of its industry as a segment. `la-showcase` appears in two: its telecom rings under
@@ -42,15 +43,15 @@ Telecom, its banking stories under Banking and finance.
 
 | # | Industry | Use cases (segments) | Length (about) | Film on | Ready to film |
 |---|---|---|---|---|---|
-| 3.1 | Telecom | Mobile money · MFS · Telco fraud · Revenue assurance | 75 s | Advanced | 2 of 4 segments (MFS, revenue assurance planned) |
-| 3.2 | Banking and finance | First look · Financial crime · Ownership and sanctions · Card fraud · Trade finance · Crypto | 1 min 40 s | Advanced | 4 of 6 segments (trade, crypto planned) |
-| 3.3 | Insurance | Claims fraud | 40 s | Advanced | Yes |
-| 3.4 | Utilities | Electricity revenue protection | 40 s | Basic | Yes |
-| 3.5 | Law enforcement | Criminal investigation | 40 s | Basic | Yes |
-| 3.6 | Public sector | Procurement · Benefits and tax | 50 s | Basic | 1 of 2 segments (procurement planned) |
-| 3.7 | Healthcare | Provider billing | 40 s | Basic | No: Space planned |
-| 3.8 | Logistics | Cargo theft | 40 s | Basic | No: Space planned |
-| 3.9 | Enterprise | Internal audit · Insider threat | 50 s | Advanced | 1 of 2 segments (insider planned) |
+| 3.1 | Telecom | Mobile money · MFS · Telco fraud · Revenue assurance | 85 s | Advanced | 2 of 4 segments (MFS, revenue assurance planned) |
+| 3.2 | Banking and finance | First look · Financial crime · Ownership and sanctions · Card fraud · Trade finance · Crypto | 1 min 50 s | Advanced | 4 of 6 segments (trade, crypto planned) |
+| 3.3 | Insurance | Claims fraud | 50 s | Advanced | Yes |
+| 3.4 | Utilities | Electricity revenue protection | 50 s | Basic | Yes |
+| 3.5 | Law enforcement | Criminal investigation | 50 s | Basic | Yes |
+| 3.6 | Public sector | Procurement · Benefits and tax | 60 s | Basic | 1 of 2 segments (procurement planned) |
+| 3.7 | Healthcare | Provider billing | 50 s | Basic | No: Space planned |
+| 3.8 | Logistics | Cargo theft | 50 s | Basic | No: Space planned |
+| 3.9 | Enterprise | Internal audit · Insider threat | 60 s | Advanced | 1 of 2 segments (insider planned) |
 
 *Features shown* is the lowest edition that has every feature on screen. *Film on* is the install the video must be
 captured on: `la-mobile-money`, `la-claims`, `la-showcase` and `la-audit` are templates that need an Advanced install
@@ -88,6 +89,21 @@ links, a prepared saved view), that story's line says so: *…plus one Job, set 
 (*one contractor to question, 22 premises to inspect*). It is a lead, never a verdict. No "fraudster", "criminal",
 "caught" or "proven". The analyst finds it; the product points at it.
 
+**The edition close (binding).** Every video except 6 ends, after *Your data* and before the end card, by saying that
+what the viewer just explored is in **Inspecto LA Basic**, then what Standard and above add:
+
+| Beat | ≈ s | Picture | On-screen text | Voice-over |
+|---|---|---|---|---|
+| Basic | 3 | The video's last graph, smaller, with an edition badge. | *Everything shown: Inspecto LA Basic* | Everything you just explored is in Inspecto LA Basic. |
+| More | 6 | The Standard-and-above card, its five lines appearing one at a time. | *More in Standard and above* | Standard and above turn a finding into evidence a team can share and defend. |
+
+The card's five lines: *Investigations: every step recorded, replayable* · *A sealed Dossier to hand over* ·
+*Sign-in, roles, four-eyes, audited reveal* · *Geo map, routes and co-location* · *Alert Rules and scheduled feeds*.
+An industry video may lead with the line that matters most to its audience (Utilities and Law enforcement: the Geo
+map). The full list is in the last section, *What these videos show, and what Standard and above add*. A video that
+includes a shot above Basic (its edition label on screen) says *Everything else shown: Inspecto LA Basic*. Video 6
+shows Standard features and carries their edition labels instead.
+
 **Picture and voice (binding).** They complement each other; neither repeats the other.
 - **Picture leads, voice follows.** The viewer sees the thing, then hears what it means, half a beat later.
 - **The voice says what the picture can't:** what the records are, why they are hard, what the finding means, what
@@ -117,7 +133,7 @@ links, a prepared saved view), that story's line says so: *…plus one Job, set 
 
 **Capture.** 1920 × 1080 screen capture at 60 fps, browser at 100 % zoom, light theme, a clean browser profile
 with no bookmarks bar or extensions. Hide the mouse pointer except where a shot calls for a click. Slow,
-deliberate pointer moves.
+deliberate pointer moves. This is for the masters; drafts are captured as *Draft round (480p)* says.
 
 **Length and pace.** Every length in this document is an estimate, and the ≈ seconds in the scripts are a guide for
 the edit, not a limit. Pace the voice for clarity (around 2.5 words a second reads well) and give the picture the time
@@ -137,7 +153,44 @@ industry video adds its industry line) · `[CTA URL — to be supplied]`.
 
 ---
 
-## 1 · The ring nobody saw (about 50 s)
+## Draft round (480p)
+
+Before the agency films the 1080p masters, each video is drafted in-house at 480p on a **Basic** install. A draft
+proves the story, the order of the beats, the timing and the wording on the real product, and it is the reference the
+agency films from. Drafts are for internal review only: never published, never sent to a prospect.
+
+| | |
+|---|---|
+| Who | Presales or product, not the agency. |
+| Install | One Basic install holding the showcase Spaces the round needs and, for video 7, the new Space made from its prepared files. Basic shows identifiers unmasked, so the ids read as the script says. Synthetic showcase Spaces only, as in the filming rules. |
+| Resolution | 480p: **854 × 480** (16:9 SD, the same shape as the master), 30 fps, H.264 MP4. If a WVGA copy (800 × 480, 5:3) is needed, scale the 16:9 frame to 800 × 450 and letterbox it; never stretch. |
+| Capture | A browser window of 1280 × 720 at 100 % zoom, scaled down to 854 × 480. A 1920 × 1080 capture shrinks 2.25 times and node labels blur; 1280 × 720 shrinks 1.5 times. Check that the screen still lays out as on a desktop, and push in on the reveal wherever an id must be read. |
+| Voice and sound | A scratch voice-over (a team member reading the script) and burned-in captions; no music. |
+| Edition | Every draft ends with the edition close: everything it shows is in Basic. A shot above Basic (video 5 shot 7, the Utilities Geo View) is left out of the draft. |
+| Review | Each draft is checked for the six beats, the muted test, and every id and number against the Space's ground truth. Product signs off its claims; the agency then receives it with the script. |
+| Files | `la-video-<number>-draft-480p.mp4`, kept outside the repository (they are large binary files). |
+
+**The Basic round, in order.** Simplest first, so the first draft also gives video 2 its timing check.
+
+| Order | Video | Spaces (all with a Basic tier) | Notes |
+|---|---|---|---|
+| 1 | 2 · Zero to graph | `la-sample` | Its run is timed for the title as it is drafted. |
+| 2 | 3.4 · Utilities | `la-utility` | Without the optional Geo View shot. |
+| 3 | 3.5 · Law enforcement | `la-police` | |
+| 4 | 3.6 · Public sector | `la-benefits` | Segment B only, until `la-procurement` is built. |
+| 5 | 3.2 · Banking and finance | `la-sample`, `la-ownership`, `la-card` | Segments A, C and D. B needs `la-showcase` (an Advanced install today); E and F wait for their Spaces. |
+| 6 | 7 · One graph for any data | A new Space from the two prepared files | After the files are generated and product's confirmations are in. |
+| 7 | 5 · It stays current | `la-police` and its staged month; the video 7 Space for shot 8 | Without shot 7. |
+
+**Drafted later.** Videos 1 and 4 and industry videos 3.1, 3.3 and 3.9 use templates that need an Advanced install
+today (`la-mobile-money`, `la-showcase`, `la-claims`, `la-audit`). They join the Basic round when the plan's wave B gives
+those templates a Basic tier, or are drafted on an Advanced install, signed in as a user who can reveal identifiers.
+Video 6 shows Standard features and is drafted after casting, on a Standard or Advanced install. A planned Space's
+segment is drafted when its Space is built.
+
+---
+
+## 1 · The ring nobody saw (about 60 s)
 
 **Brief**
 
@@ -165,11 +218,12 @@ industry video adds its industry line) · `[CTA URL — to be supplied]`.
 | 7 | 6 | *Tight groups*: *Show on graph* on the first group. Nine wallets light up, tightly knotted; everything else dims. | *Tight groups* | Then ask who moves money only among themselves. |
 | 8 | 6 | A beat of quiet on the nine, then slow push-in. | *9 wallets · shared devices* | Nine wallets on shared devices. One group to review, every link behind it on screen. |
 | 9 | 7 | The raw file for a second, dissolving into the graph. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
 ---
 
-## 2 · Zero to graph (about 65 s)
+## 2 · Zero to graph (about 75 s)
 
 **Brief**
 
@@ -198,6 +252,7 @@ industry video adds its industry line) · `[CTA URL — to be supplied]`.
 | 7 | 7 | Back on the graph: *Route from A to B* from a smurf account to `OFFSHORE-77`; the path lights through `MULE-HUB-01` and a relay. | *Route from A to B* | Ask where a small account's money ends up… |
 | 8 | 5 | A beat of quiet on the route. | *Smurf → hub → relay → OFFSHORE-77* | …offshore, through one hub and a relay. That's your first lead. |
 | 9 | 6 | Click the light bulb: *What can I do next?* opens with its suggestions. | *Your data · same steps* | The sample is an example. Next, add your own file; it shows you each step. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
 ---
@@ -216,7 +271,7 @@ industry as a segment**. The agency builds one segment template and reuses it ev
 | Audience | Named per video below. |
 | Channel | Sales email, LinkedIn targeted by industry, trade-show loop per stand. |
 | Message | Different cases, the same few steps: raw records, one question, a lead to act on. Your records work the same way. |
-| Shape | **Opening** (the industry in one line, over its raw records) → **Map**, once per video (one of its Datasets at *Entities*) → **one segment per use case** → **Your data** → end card with the industry line. The length follows the number of segments. |
+| Shape | **Opening** (the industry in one line, over its raw records) → **Map**, once per video (one of its Datasets at *Entities*) → **one segment per use case** → **Your data** → **edition close** → end card with the industry line. The length follows the number of segments. |
 | Segment | Three beats, roughly 12–15 s in all: **Raw** (that use case's file as it landed, the use-case label on screen, one blunt sentence), **Ask** (the Space's graph or saved view and the one analysis named), **Outcome** (the finding held at least 2 s, its ids and numbers on screen; the voice says the finding and the next step). |
 | Modular | Segments are filmed separately. A video whose Spaces are all built is filmed now; a planned Space's segment is filmed when the Space is built and cut in. Until then, publish the video with its built segments only, or hold it (the owner decides per industry). |
 | Film on | One install per video: an **Advanced** install if any of its segments needs one (`la-mobile-money`, `la-claims`, `la-showcase`, `la-audit` need one today), otherwise Basic. On Advanced, film as a user who can reveal identifiers. |
@@ -239,9 +294,10 @@ The opening, map and close are the same in every multi-segment video:
 | Opening | 5 | The raw files of every segment flash past, unformatted. | [Industry] · *Example · synthetic data* | [The industry in one line] |
 | Map | 5 | The Data page: one of the industry's Datasets open at *Entities*, each column and what it holds. | *Entities* | Each of these began as a raw export. You say once what each column holds; then you ask. |
 | Your data | 7 | One raw file dissolving into its graph. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Edition close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | End card | 4 | End card. | [Industry line] · *Try it on your own data.* | Inspecto LA. |
 
-### 3.1 · Telecom (about 75 s)
+### 3.1 · Telecom (about 85 s)
 
 | | |
 |---|---|
@@ -273,9 +329,10 @@ The opening, map and close are the same in every multi-segment video:
 | D2 | 5 | *Busiest nodes* over activations. | *Busiest nodes* | Ask who is behind the SIMs that top up once and go quiet. |
 | D3 | 5 | The dealer and its 3 devices, held. | *1 dealer · 3 devices · 400 SIMs* | One dealer, three devices: commissions to audit. |
 | 3 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 4 | 4 | End card. | *For telecom fraud and revenue assurance.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.2 · Banking and finance (about 1 min 40 s)
+### 3.2 · Banking and finance (about 1 min 50 s)
 
 | | |
 |---|---|
@@ -315,9 +372,10 @@ The opening, map and close are the same in every multi-segment video:
 | F2 | 5 | *Tight groups*. | *Tight groups* | Ask which of these accounts move together. |
 | F3 | 5 | One cluster in, the 40 accounts, 3 bank accounts out, held. | *1 cluster · 40 accounts · 3 bank accounts* | One pool of funds in, three bank accounts out: where to follow the money next. |
 | 3 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 4 | 4 | End card. | *For financial crime and compliance.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.3 · Insurance (about 40 s)
+### 3.3 · Insurance (about 50 s)
 
 | | |
 |---|---|
@@ -336,9 +394,10 @@ The opening, map and close are the same in every multi-segment video:
 | 3 | 5 | The claims graph, wide; *Tight groups*. | *Tight groups* | Ask which claims belong together. |
 | 4 | 8 | A beat of quiet; the ring held. | *12 claimants · 4 phones · 3 addresses* | Twelve claimants sharing four phones, three addresses, one garage, one clinic and one lawyer. One ring to refer. |
 | 5 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 6 | 4 | End card. | *For Special Investigations Units.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.4 · Utilities (about 40 s)
+### 3.4 · Utilities (about 50 s)
 
 | | |
 |---|---|
@@ -358,9 +417,10 @@ The opening, map and close are the same in every multi-segment video:
 | 3 | 5 | The contractor-network saved view, wide; *Busiest nodes*. | *Busiest nodes* | Ask what the low meters have in common. |
 | 4 | 7 | A beat of quiet; `C-14` and the 22 premises held. | *C-14 · 22 premises* | One contractor visited them all, two weeks before each drop. Twenty-two premises to inspect, one contractor to question. |
 | 5 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 6 | 4 | End card. | *For revenue protection.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.5 · Law enforcement (about 40 s)
+### 3.5 · Law enforcement (about 50 s)
 
 | | |
 |---|---|
@@ -380,9 +440,10 @@ The opening, map and close are the same in every multi-segment video:
 | 3 | 5 | The stolen-property saved view, wide; *Tight groups*. | *Tight groups* | Ask what connects the scenes. |
 | 4 | 7 | A beat of quiet; two dealers, three sellers, one vehicle held. | *2 dealers · 3 sellers · 1 vehicle* | Two dealers, three sellers, and one car seen near eleven of the scenes. Three lines of enquiry. |
 | 5 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 6 | 4 | End card. | *For intelligence analysts.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.6 · Public sector (about 50 s)
+### 3.6 · Public sector (about 60 s)
 
 | | |
 |---|---|
@@ -407,9 +468,10 @@ The opening, map and close are the same in every multi-segment video:
 | B2 | 6 | Saved view `benefits_shared_addresses`: four addresses; three draw as big stars. | *Saved view* | Ask which addresses hold eight or more claimants. Three are care homes, each resident paid into their own account. |
 | B3 | 6 | Click `AD-03141`: its node detail; then its 14 claims meeting in 3 accounts, held. | *AD-03141 · 14 claimants · 3 accounts* | The fourth is a house: fourteen people, each living alone, paid into three accounts. Claims to review. |
 | 3 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 4 | 4 | End card. | *For public-sector integrity.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.7 · Healthcare (about 40 s)
+### 3.7 · Healthcare (about 50 s)
 
 | | |
 |---|---|
@@ -428,9 +490,10 @@ The opening, map and close are the same in every multi-segment video:
 | 3 | 5 | Doctors, referrals, providers and owners as a graph; *Expand* from the imaging centre. | *Expand* | Ask who owns the imaging centre. |
 | 4 | 6 | A beat of quiet; the owner held, beside the doctor. | *Owner: a referring doctor's spouse* | The spouse of one of the doctors: a conflict of interest to look into. |
 | 5 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 6 | 4 | End card. | *For program integrity.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.8 · Logistics (about 40 s)
+### 3.8 · Logistics (about 50 s)
 
 | | |
 |---|---|
@@ -449,9 +512,10 @@ The opening, map and close are the same in every multi-segment video:
 | 3 | 5 | Trips, drivers and scanners as a graph; *Tight groups*. | *Tight groups* | Ask what the losses share. |
 | 4 | 6 | A beat of quiet; the 2 drivers and the scanner held. | *12 losses · 2 drivers · 1 scanner* | The same two drivers, and the same night-shift scanner on ten of them: three people to interview. |
 | 5 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 6 | 4 | End card. | *For cargo security.* · *Try it on your own data.* | Inspecto LA. |
 
-### 3.9 · Enterprise (about 50 s)
+### 3.9 · Enterprise (about 60 s)
 
 | | |
 |---|---|
@@ -475,11 +539,12 @@ The opening, map and close are the same in every multi-segment video:
 | B2 | 5 | *Route from A to B* from the bank-detail edit back to `M-7`. | *Route from A to B* | Ask how the person who changed a vendor's bank details got the access. |
 | B3 | 5 | The route held, through the grant with no ticket. | *M-7 · 4 grants · no ticket* | One manager, four grants, no ticket: an access review to start. |
 | 3 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 4 | 4 | End card. | *For internal audit and investigations.* · *Try it on your own data.* | Inspecto LA. |
 
 ---
 
-## 4 · Retire the red string (about 35 s)
+## 4 · Retire the red string (about 40 s)
 
 **Brief**
 
@@ -503,11 +568,12 @@ The opening, map and close are the same in every multi-segment video:
 | 3 | 8 | Left: hands hunt for the next string. Right: *Route from A to B* ▸ *Find route*. | *Route from A to B* | From the first wallet to whoever cashed out… |
 | 4 | 6 | Right: the chain to `AG-39` lights up, link by link. Left: the hands stop. | *AG-39* | …one click. That agent is your next call. |
 | 5 | 4 | Left fades out; the graph holds. | *Your data · same steps* | Bring your own records. |
+| Close | 4 | The graph holds; the edition badge, then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | *(no voice-over)* |
 | 6 | 4 | End card. | *Retire the red string.* · *Try it on your own data.* | Inspecto LA. |
 
 ---
 
-## 5 · It stays current (about 55 s)
+## 5 · It stays current (about 65 s)
 
 **Brief**
 
@@ -535,6 +601,7 @@ The opening, map and close are the same in every multi-segment video:
 | 6 | 5 | Click it: the node detail dialog. | — | Same question, fresh answer: one more item for the series. |
 | 7 | 4 | **Advanced, when built:** an Alert raised by the Alert Rule on new serial matches. | *Inspecto LA Advanced* | Or let an Alert Rule ask it for you. |
 | 8 | 6 | The Data page: a Dataset's *Inbox*, *Watch this folder* switched on. | *Watch this folder* · *Your data · same steps* | Your own files work the same way: point it at the folder they land in. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* (with shot 7 in: *Everything else shown: Inspecto LA Basic*) · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 9 | 4 | End card. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
 ---
@@ -572,7 +639,7 @@ The B-roll shows the step; the analyst's line says why it matters. The analyst n
 
 ---
 
-## 7 · One graph for any data (about 90 s)
+## 7 · One graph for any data (about 100 s)
 
 The introduction to the industry videos, and the one that shows the own-data steps in full: whatever the industry, a
 messy raw export is mapped onto the product the same way, and the same questions then work on it. It ends on an index
@@ -607,6 +674,7 @@ of the nine industries, each leading to its video.
 | 8 | 10 | **Graph model ▸ Entity/Link (several Datasets)**: both Datasets; *Run query*. Calls and transfers draw as one graph; click a shared number: one node, listing both Datasets. | *One node, two Datasets* | …so a number is one node, whichever system it came from and however it was written. |
 | 9 | 6 | A beat of quiet on the shared number: a call link to the suspect, a transfer link from the suspect's side. | *Calls the suspect · receives the money* | The number that calls the suspect is the one that gets the money. That's the lead. |
 | 10 | 8 | Three fast cuts from the industry videos: *Busiest nodes*, *Tight groups*, *Route from A to B*, each on a different industry's graph. | — | And the same questions work on any data. Who is busiest. Who belongs together. How A reaches B. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 11 | 6 | **Industry index**: nine tiles (Telecom, Banking and finance, Insurance, Utilities, Law enforcement, Public sector, Healthcare, Logistics, Enterprise), each lighting in turn. | *Find your industry* | Each is an example. See one on your industry's records, then try it on yours. |
 | 12 | 4 | End card, with the index still visible. | *See who is connected.* · *Try it on your own data.* | Inspecto LA. |
 
@@ -631,9 +699,50 @@ the data. For analysts who already have their data in; not part of the main cut.
 
 ---
 
+## What these videos show, and what Standard and above add
+
+[EDITIONS.md](../../../../EDITIONS.md) is the reference for editions; this is the summary that the scripts and the
+edition close draw on.
+
+**Basic: the features these videos explore.** Every feature below is in every edition, Basic included.
+
+| Feature (every edition) | Explored in |
+|---|---|
+| *Try the sample*, *Getting started* and *What can I do next?* | 2 |
+| *Add data* ▸ *Onboard a file*: detected columns, *A guess*, *What does each column hold?*, *Create and run* with what was kept and set aside | 7 |
+| The *Entities* page: Entity Types and *Compare values as* | 7, and the Map beat of every video |
+| The Data page: Datasets, what their columns hold, and Mappings | The Map beats; video 7's alternative cut |
+| *Watch this folder* and *What changed in your data* | 5 |
+| *Start a graph*, saved views and *My work* | 1, 5, the industry videos |
+| *Busiest nodes* and *Tight groups* (graph algorithms in the browser) | 1, the industry videos |
+| *Exclude…* | 1 |
+| *Route from A to B* (find paths) | 2, 4, the industry videos |
+| *Expand* (neighbours) | 3.7, 3.9 |
+| *Pattern match* (patterns) | 3.2 |
+| The node detail dialog | 3.6, 5 |
+| Graph model ▸ *Entity/Link (several Datasets)* | 7 (product to confirm it is on Basic) |
+
+**Standard and above add.** The Investigate rows and everything below them need the Investigations add-on, which
+Standard and Advanced include by default; sign-in, roles and enforced masking come with the edition itself.
+
+| Area | Standard and above |
+|---|---|
+| Data | *Keep this up to date* on a schedule (a watched folder or an SFTP feed); a retention policy; enrichment on the Dataset page; another database or a remote system, through a Pipeline. |
+| Explore | The Geo map, routes and co-location; entity profile pages; Link analysis and Geo map widgets on dashboards. |
+| Investigate | Investigations: a sealed history of every step, replay, compare, temporal findings. The Dossier and Dossier bundle, with verification. Templates and external references. Data trust: the data strip, Files, coverage and delivery Alerts. |
+| Team | Sign-in, members and roles; four-eyes approval; enforced masking with audited reveal; drafts, so several analysts can work in parallel. |
+| Share | Embed links (a read-only view of an Investigation); Case linking, and Case history beside a node. |
+| Scale | Graph runs on the server, the link index and daily ingestion. |
+| Operate | Alert Rules on Investigations and standing detection; the Assistant's proposed column mappings. |
+| Integrate | Third-party integration (case managers, fraud products). |
+| Advanced only | Investigations stored on PostgreSQL and shared by several servers; Access Policies (attribute-based, only ever narrowing what roles allow). |
+
+---
+
 ## Open points before filming
 
 - Supply the CTA URL for the end card.
+- Draft round: name who records the 480p drafts and where the files are kept, outside the repository.
 - Video 2: time the run on the final build and the filming laptop; use the median wherever a time is said or shown.
 - **Own-data line, per story:** product confirms that each story's outcome can be reached from its raw files with
   *Add data* and the analysis shown. Where a Space also relies on something set up once (a Job that derives links, a
