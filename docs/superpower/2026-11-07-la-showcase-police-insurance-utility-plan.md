@@ -89,11 +89,11 @@ Telecom), with the same template id.
 | Use case | Template | Stories | Status |
 |---|---|---|---|
 | Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
-| Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
+| Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | exists |
 
-**Count: 18 Spaces in 9 industries.** On 2026-11-08, 15 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 17 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
 `la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`, `la-trade`, `la-benefits`,
-`la-health`, `la-telco-ra`, `la-logistics`) and 3 are planned; the `la-claims`
+`la-health`, `la-telco-ra`, `la-logistics`, `la-mfs`, `la-insider`) and 1 is planned (`la-crypto`); the `la-claims`
 additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
 2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
@@ -972,6 +972,57 @@ later). Deliberate deviations:
   weekends — a team lead approving the team's expenses in the normal way.
 
 **Alert Rule:** a grant without a ticket to a finance system.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-insider-data.py` (seed 20261112; ground truth
+`tools/gen-la-insider-data.ground-truth.json`), `tools/gen-la-insider-data.test.mjs`, `InsiderLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-insider/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-insider/`. No Geo View (nothing here has a place). Deliberate deviations:
+- **Privacy, as the realism review requires:** people are ids only (`EMP-`), with no names at all; `access_daily` holds one count
+  per employee, system and day (a day with no reads has no row), never a record; `email_external` holds one row per employee,
+  domain and day. Systems are generic upper-case names (`CRM`, `CUSTARCH`, `HRIS`, `AP`, `PAYROLL`, `TREASURY`, `ERP`, `DWH`,
+  `CODE`, `CONTRACTS`, `MAIL`, `WIKI`, `TICKETS`); vendors are `VEN-` ids; every mail domain ends in `.example`.
+- **Scale:** 3 000 employees, about 12 200 landed grants, 106 000 landed daily counts (only the record-holding systems `AP`,
+  `CRM`, `CUSTARCH`, `HRIS`, `PAYROLL`, `TREASURY` are logged), 28 700 mail-days, 18 100 landed expenses (about 19 700 with
+  October; spec: 20 000), 569 landed vendor changes (600 with October). About 26 000 link rows; data 6.8 MB.
+- **Feeds and columns:** `employee` gains `role_since` (the HR record of a role change the access-creep look-alike needs);
+  `access_daily.date` is `read_date` and `email_external` gains `sent_date` (the day it aggregates); `vendor_change.field` is
+  `field_name` and it gains `change_id`. The access-grant and vendor-change extracts are one landed file plus one staged file;
+  the other three are monthly. The finance systems are `AP`, `PAYROLL`, `TREASURY`; the personal webmail domains are
+  `inboxly.example`, `mailnest.example`, `postmail.example` (a list in the Job SQL); the single-approver expense limit is 500.
+- **Link kinds:** one row per pair. `granted_by` is grantee → approver with the grant counts in `via` (`no_ticket:`,
+  `finance_after_onboarding:` = finance grants more than 30 days after the hire date, `finance_no_ticket:`, last finance grant
+  and ticket). `accessed` is employee → `SYS-<system>` for every system held, with the daily median and the largest 21-day
+  average of daily reads over windows of 5 read days or more (`peak_ratio:`). `approved_for` carries `near_limit:` (450 up to
+  500), `weekend:` and `approved_back:`; `changed_vendor` carries `bank_changes:` and `vendor_editors:`. Every grant in the
+  background is approved by the employee's own manager, so `granted_by` pairs match `reports_to` pairs (2 999 each).
+- **Views and the canvas cap:** one derived Job, `insider_screen_links` (on `job.dataset.produced`), writes three screens:
+  `leaver_exfiltration` (`accessed` with `peak_ratio:` 10 or more, plus that person's `mailed_domain` links of 100 MB or more),
+  `access_creep` (`granted_by` with a finance grant after onboarding, plus those employees' bank-detail vendor changes) and
+  `mutual_approvals` (`approved_for` approved back, or 20 approvals or more). Systems are nodes, so a view that kept every read of
+  a spiking person would bridge the look-alike to the story through `SYS-MAIL` and the like: each screen keeps only the links
+  that carry its evidence. `insider_links` also runs on `cron: "*/5 * * * *"`. The golden test reads each view with its own
+  filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the look-alike on the canvas but in
+  another component: `leaver_exfiltration` 3 rows, 5 nodes; `access_creep` 18 rows, 26 nodes; `mutual_approvals` 101 rows, 129
+  nodes.
+- **Stories as built:** leaver exfiltration: `EMP-0031`, customer account specialist, notice 2026-06-01, left 2026-06-30; daily
+  median 43 in `SYS-CRM`, 860-960 on all 15 working days 2026-06-02..06-22 (`peak_ratio:20.0`); 1 228.8 MB to `postmail.example`
+  on 9 of those days (3 small mails there earlier in the year). Look-alike `EMP-0386`, data migration engineer: median 25 in
+  `SYS-CUSTARCH`, 500-600 on 2026-04-06..04-24 (`peak_ratio:22.1`) after a grant under `CHG-163782` on 2026-04-02; no notice, no
+  CRM grant, no personal or large mail. Access creep: `EMP-0007` (operations manager; the spec's M-7) granted `PAYROLL` and
+  `TREASURY` with no ticket to `EMP-0482`, `EMP-0636`, `EMP-1059`, `EMP-1415` (operations roles) on 2026-01-12..02-10, the only 8
+  finance grants without a ticket; `EMP-0482` changed the bank account of `VEN-0264` on 2026-05-14, the only person ever to touch
+  that vendor (everywhere else only accounts payable changes vendors). Look-alike `EMP-0062`, payroll officer since 2026-03-02
+  (hired 2013), granted `PAYROLL` by the payroll manager `EMP-1802` on 2026-03-03 under `REQ-163776`; 12 finance staff picking
+  up a second finance system from their own manager, ticketed, share the view. Mutual approvals: account managers `EMP-0022` and
+  `EMP-0040` (different teams) approved each other 21 + 19 times, 455-498 against the 500 limit, 32 at weekends, 2025-10-21..
+  2026-08-29; the only pair in the company that approves back. Look-alike `EMP-1613`, sales team lead of 20 field sales
+  representatives: about 520 approvals, 19 reports at 20 or more, weekdays, 3 near the limit, never approved back.
+- **Staged month:** October adds about 9 600 daily counts, 3 100 mail-days, 1 560 expenses, 22 grants and 31 vendor changes;
+  no HR re-extract; the screens recomputed over landed plus staged with DuckDB show the same stories.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (only recomputed outside the engine).
+- **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5): no Space or industry
+  prefix; the *Enterprise* table there lists them.
 
 #### 13. `la-crypto` — crypto laundering
 

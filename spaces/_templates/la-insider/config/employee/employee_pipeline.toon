@@ -1,0 +1,36 @@
+name: employee
+active: true
+description: "Insider threat Link Analysis showcase - One row per employee on the HR record: department, role, manager, hire date, the date the current role began (role_since; later than the hire date after an internal move), and for a leaver the day notice was given and the last day. Ids only - no names. One extract (EMPLOYEE_20260930.csv). Synthetic; regenerate with tools/gen-la-insider-data.py."
+
+dirs:
+  poll:       data/inbox/employee
+  database:   data/employee/database
+  backup:     data/employee/backup
+  temp:       data/employee/temp
+  errors:     data/employee/errors
+  quarantine: data/employee/quarantine
+  markers:    data/employee/markers
+  status_dir: data/employee/status
+  log_dir:    data/employee/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: employee_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

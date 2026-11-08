@@ -1,0 +1,23 @@
+name: leaver_exfiltration
+description: "Leaver exfiltration - every employee and system where the largest 21-day average of daily reads is 10 or more times the person's daily median (via on accessed = read days, daily median, peak average and ratio, the window's last day, the last grant and its ticket, notice and leaving dates), with that person's external mail domains that received 100 MB of attachments or more (via on mailed_domain = domain type, attachment MB and those sent after notice). A ticketed bulk read for a migration is work; a spike that starts the day after notice, with a gigabyte mailed to a personal domain, is another thing."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: insider_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","leaver_exfiltration"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

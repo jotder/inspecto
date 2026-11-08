@@ -1,0 +1,28 @@
+raw:
+  name: EMAIL_EXTERNAL
+  format: CSV
+  fields[5]{name,selector,type}:
+    employee_id,"0",VARCHAR
+    domain,"1",VARCHAR
+    sent_date,"2",DATE
+    messages,"3",INTEGER
+    attachment_mb,"4",DOUBLE
+mapping:
+  canonicalName: email_external
+  rawName: EMAIL_EXTERNAL
+  fields[5]:
+    - name: employee_id
+      from: employee_id
+      fn: keep
+    - name: domain
+      from: domain
+      fn: keep
+    - name: sent_date
+      from: sent_date
+      fn: keep
+    - name: messages
+      from: messages
+      fn: keep
+    - name: attachment_mb
+      from: attachment_mb
+      fn: keep
