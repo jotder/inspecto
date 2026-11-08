@@ -1,0 +1,36 @@
+name: payroll
+active: true
+description: "Benefits and tax fraud Link Analysis showcase - One row per person per employer per month from employers' payroll returns: the pay period (the first of the month) and the wages paid. One file per pay period (PAYROLL_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-benefits-data.py."
+
+dirs:
+  poll:       data/inbox/payroll
+  database:   data/payroll/database
+  backup:     data/payroll/backup
+  temp:       data/payroll/temp
+  errors:     data/payroll/errors
+  quarantine: data/payroll/quarantine
+  markers:    data/payroll/markers
+  status_dir: data/payroll/status
+  log_dir:    data/payroll/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: payroll_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

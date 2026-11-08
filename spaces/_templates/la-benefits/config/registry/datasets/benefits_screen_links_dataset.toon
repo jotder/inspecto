@@ -1,0 +1,12 @@
+physicalRef: benefits_screen_links
+description: "Benefits and tax fraud Link Analysis showcase - Derived from benefits_links each time it is produced, for the four saved views: the links each integrity screen selects, tagged in screen (shared_address, after_death, work_while_claiming, refund_concentration). A link selected by two screens appears once in each. Same columns as benefits_links plus screen. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+  screen,string,

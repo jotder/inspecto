@@ -1,0 +1,36 @@
+name: household
+active: true
+description: "Benefits and tax fraud Link Analysis showcase - One row per household declaration: the address, the person who declared it (blank for a care home, which the home declares) and how many members were declared. One extract (HOUSEHOLD_20260930.csv). Synthetic; regenerate with tools/gen-la-benefits-data.py."
+
+dirs:
+  poll:       data/inbox/household
+  database:   data/household/database
+  backup:     data/household/backup
+  temp:       data/household/temp
+  errors:     data/household/errors
+  quarantine: data/household/quarantine
+  markers:    data/household/markers
+  status_dir: data/household/status
+  log_dir:    data/household/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: household_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

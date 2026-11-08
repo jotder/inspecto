@@ -1,0 +1,23 @@
+name: benefits_refund_concentration
+description: "Refund concentration - the clients of the two preparers who filed 60 or more returns, and every refund account shared by 3 or more taxpayers (amount on refund_to = the refund). A large preparer's 250 clients are each refunded into their own account. Another preparer's 80 clients are refunded into 6 shared accounts, with refunds several times the usual size."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: benefits_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","refund_concentration"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

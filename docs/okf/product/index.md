@@ -29,6 +29,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (75 open rows
 * [Industry pack mobile-money](solution-pack/industry-mobile-money/index.md) - `solution-pack.industry-mobile-money` · 5 doc(s) · 0 open row(s)
 * [Industry pack telecom](solution-pack/industry-telecom/index.md) - `solution-pack.industry-telecom` · 6 doc(s) · 3 open row(s)
 * [Link Analysis audit showcase](solution-pack/la-audit/index.md) - `solution-pack.la-audit` · 5 doc(s) · 2 open row(s)
+* [Link Analysis benefits and tax fraud showcase](solution-pack/la-benefits/index.md) - `solution-pack.la-benefits` · 3 doc(s) · 1 open row(s)
 * [Link Analysis card fraud showcase](solution-pack/la-card/index.md) - `solution-pack.la-card` · 3 doc(s) · 1 open row(s)
 * [Link Analysis claims showcase](solution-pack/la-claims/index.md) - `solution-pack.la-claims` · 5 doc(s) · 3 open row(s)
 * [Link Analysis daily feed](solution-pack/la-daily-feed/index.md) - `solution-pack.la-daily-feed` · 5 doc(s) · 1 open row(s)

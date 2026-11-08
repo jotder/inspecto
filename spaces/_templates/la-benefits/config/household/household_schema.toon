@@ -1,0 +1,24 @@
+raw:
+  name: HOUSEHOLD
+  format: CSV
+  fields[4]{name,selector,type}:
+    household_id,"0",VARCHAR
+    address_id,"1",VARCHAR
+    declared_by,"2",VARCHAR
+    declared_members,"3",VARCHAR
+mapping:
+  canonicalName: household
+  rawName: HOUSEHOLD
+  fields[4]:
+    - name: household_id
+      from: household_id
+      fn: keep
+    - name: address_id
+      from: address_id
+      fn: keep
+    - name: declared_by
+      from: declared_by
+      fn: keep
+    - name: declared_members
+      from: declared_members
+      fn: keep
