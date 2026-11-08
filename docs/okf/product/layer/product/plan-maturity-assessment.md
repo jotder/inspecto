@@ -1438,7 +1438,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 | Requirement | Stance | Evidence or caveat |
 |---|---|---|
 | Organised-ring detection across claims/parties/providers | Comply (demo) | `LaClaimsGoldenTest`; smoke 29/29 |
-| Geo clustering of incidents | Comply (demo) | `claims_junction_cluster_map` verified live |
+| Geo clustering of incidents | Comply (demo) | `staged_accident_junction_map` verified live |
 | Duplicate identity resolution | Partial | asserted merge only; fuzzy suggestions retired (D-M1) |
 | Real-time scoring at first notice of loss | Not offered | batch link Jobs on cron |
 | Integration with claims system / case handoff | Partial | inbound/outbound integration routes exist (Standard+); not shown in this pack |

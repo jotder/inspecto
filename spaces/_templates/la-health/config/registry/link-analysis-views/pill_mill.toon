@@ -1,0 +1,23 @@
+name: pill_mill
+description: "Strong-opioid prescribers - every prescriber with 40 or more strong-opioid patients, those patients (via on prescribed = strong_opioid_scripts, strong_opioid_qty, cash_scripts, distance_km) and the pharmacies where they filled them. One centre's patients are local and insured. Another prescriber's patients live over 50 km away, take large quantities, pay cash and fill at the same 2 pharmacies."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: health_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","pill_mill"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

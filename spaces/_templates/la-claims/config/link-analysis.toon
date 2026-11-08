@@ -1,10 +1,30 @@
 four_eyes_fan_out_above: 2000
-entity_types[1]:
+entity_types[5]:
   - id: party
     label: Party
     normaliser: upper-trim
     masked: true
     classifications[1]: PARTY
+  - id: claim
+    label: Claim
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CLAIM
+  - id: policy
+    label: Policy
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: POLICY
+  - id: broker
+    label: Broker
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BROKER
+  - id: accident
+    label: Accident
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ACCIDENT
 index:
   enabled: true
 embed:

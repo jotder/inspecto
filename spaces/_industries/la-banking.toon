@@ -1,0 +1,5 @@
+name: Banking and finance
+tagline: "Financial crime on synthetic data - a first-look mule ring, hidden owners and a sanctioned person two hops up, card testing, account takeover and a common point of purchase, circular trade and phantom shipments, and a crypto peel chain cashing out, every Dataset mapped. The financial-crime tour joins when its pack gets a Basic tier."
+minEdition: basic
+icon: heroicons_outline:banknotes
+useCases[5]: la-sample,la-ownership,la-card,la-trade,la-crypto

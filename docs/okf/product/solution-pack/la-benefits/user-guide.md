@@ -45,25 +45,25 @@ saved view reads one screen, so every view draws whole, under the canvas's 1 000
 
 | `screen` | Picks | Saved view |
 |---|---|---|
-| `shared_address` | every address with 8 or more claimants, its residents, their claims and the accounts those are paid into | `benefits_shared_addresses` |
-| `after_death` | every account that took a claim paid 30 or more days after the claimant's death (or still paid), every claim paid into those accounts, and its claimant | `benefits_paid_after_death` |
-| `work_while_claiming` | everyone paid by an employer while on Jobseeker benefit, and their Jobseeker claims | `benefits_work_while_claiming` |
-| `refund_concentration` | the clients of every preparer who filed 60 or more returns, and every refund account shared by 3 or more taxpayers | `benefits_refund_concentration` |
+| `shared_address` | every address with 8 or more claimants, its residents, their claims and the accounts those are paid into | `address_farm` |
+| `after_death` | every account that took a claim paid 30 or more days after the claimant's death (or still paid), every claim paid into those accounts, and its claimant | `paid_after_death` |
+| `work_while_claiming` | everyone paid by an employer while on Jobseeker benefit, and their Jobseeker claims | `undeclared_work` |
+| `refund_concentration` | the clients of every preparer who filed 60 or more returns, and every refund account shared by 3 or more taxpayers | `tax_preparer_refund_ring` |
 
 ## Five-minute tour
 
-1. **File ▸ Open… ▸ Saved views ▸ `benefits_shared_addresses`.** Four addresses. Three are care homes, each one
+1. **File ▸ Open… ▸ Saved views ▸ `address_farm`.** Four addresses. Three are care homes, each one
    big star: one declaration, 24–31 residents, every resident's claim paid into their own account. The fourth looks
    like a house, yet 14 people live there, each declaring a household of one, and their claims meet again in only
    three accounts.
-2. **Open `benefits_paid_after_death`.** About 50 deaths. Most are small stars: a pension paid for a month or two
+2. **Open `paid_after_death`.** About 50 deaths. Most are small stars: a pension paid for a month or two
    after a late death notice, `recovered:` set. One cluster is different: nine pensions with
    `paid_after_death_days:ongoing`, three accounts, and one living person whose own three claims land in the same
    accounts.
-3. **Open `benefits_work_while_claiming`.** About 80 people paid while on Jobseeker benefit. Most are single links
+3. **Open `undeclared_work`.** About 80 people paid while on Jobseeker benefit. Most are single links
    with `over_limit_months:0` (permitted part-time earnings) or `over_limit_months:1` (they started work in the
    month their claim closed). Two employers each hold a crowd of claimants paid full wages for months.
-4. **Open `benefits_refund_concentration`.** Two preparers. `P-03` has over 240 clients, and their refunds fan out
+4. **Open `tax_preparer_refund_ring`.** Two preparers. `P-03` has over 240 clients, and their refunds fan out
    to as many accounts. `P-12` has 80 clients whose refunds, several times the usual size, converge on six
    accounts.
 5. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (admin guide). The
@@ -75,7 +75,7 @@ Work blind first: each has a hint, then the answer. The answers are not in the d
 
 ### 1. Address farm — which address is not what it claims to be?
 
-*Hint:* in `benefits_shared_addresses`, compare `households_declared:` with `residents:` on the `lives_at` links
+*Hint:* in `address_farm`, compare `households_declared:` with `residents:` on the `lives_at` links
 of each address, then follow the claims to the accounts.
 
 **Answer:** **`AD-03141` (100 Cobble Lane, Bristol)** has **14 residents, all claimants, and 14 household
@@ -87,7 +87,7 @@ claims (mostly Housing) started between May 2025 and June 2026, and all 14 are p
 
 ### 2. Payments to the deceased — who is collecting the pensions of the dead?
 
-*Hint:* in `benefits_paid_after_death`, find the `paid_into` links whose `via` reads
+*Hint:* in `paid_after_death`, find the `paid_into` links whose `via` reads
 `paid_after_death_days:ongoing`, then look at what else is paid into the same accounts.
 
 **Answer:** **nine pensioners** who died between November 2025 and April 2026 (`CIT-00329`, `CIT-01771`,
@@ -101,7 +101,7 @@ the view are the same honest shape, only shorter.
 
 ### 3. Undeclared work — which jobseekers are working, and for whom?
 
-*Hint:* in `benefits_work_while_claiming`, sort out the `employed_by` links whose `over_limit_months:` is more than
+*Hint:* in `undeclared_work`, sort out the `employed_by` links whose `over_limit_months:` is more than
 1, then look at which employers they point to.
 
 **Answer:** **20 people on Jobseeker benefit** are paid **1 100–2 000 a month for 6 months or more** while
@@ -113,7 +113,7 @@ people were paid in the month their claim closed because they had just started w
 
 ### 4. Tax-preparer ring — whose refunds are going where?
 
-*Hint:* in `benefits_refund_concentration`, compare the two preparers: how many accounts do their clients'
+*Hint:* in `tax_preparer_refund_ring`, compare the two preparers: how many accounts do their clients'
 refunds go to, and how large are they?
 
 **Answer:** preparer **`P-12`** filed **80 returns** in January and February 2026, each claiming a refund of
@@ -137,4 +137,4 @@ golden tests are `tools/gen-la-benefits-data.test.mjs` and `BenefitsLinksJobGold
       their Jobseeker claims; `P-12`, its 80 taxpayers and the 6 accounts.
 - [ ] No look-alike links to its story: `AD-00412`, `AD-02718`, `AD-05077`; `CIT-05289`; `CIT-02003`; `P-03`.
 - [ ] Each saved view holds its story whole and its look-alike beside it, and draws without "Result cut short"
-      (the largest, `benefits_refund_concentration`, is about 600 rows and 520 nodes; a little more with October in).
+      (the largest, `tax_preparer_refund_ring`, is about 600 rows and 520 nodes; a little more with October in).

@@ -1,6 +1,7 @@
 physicalRef: ownership_links
 description: "Beneficial-ownership and sanctions Link Analysis showcase - ONE link Dataset built by the ownership_links Job from company, person, ownership, officer, customer, payment and sanctions_list. kind is one of owns, officer_of, customer_is, paid, name_match; one row per pair; percent is the stake (owns), score the name similarity (name_match), amount the payments summed (paid); via names the evidence. Ids say what an endpoint is: PER- person, CO- company, CUS- bank customer, SL- entry on the invented sanctions list. Synthetic."
 eventDate: event_date
+primaryEntityType: party
 columns[9]{name,type,classification}:
   src,string,PARTY
   dst,string,PARTY
@@ -11,3 +12,9 @@ columns[9]{name,type,classification}:
   score,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

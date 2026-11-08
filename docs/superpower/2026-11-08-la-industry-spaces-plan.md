@@ -272,10 +272,42 @@ The operator approved this plan and the spike on 2026-11-08 ("Approve, start spi
     not by the packer.
   - No test checks a template's Dataset entries against `DatasetEntryRules` and the declared types; add one with the
     next pack.
-  - A real collision exists today: `config/examples/sla-escalation-examples.md` ships in both `la-utility` and
-    `la-claims`.
+  - A real collision existed: every template must ship `config/examples/sla-escalation-examples.md`, each titled
+    for its own Space. Settled in step 3: the packer joins several such files into one.
 - **Not done in the spike:** the bundle's in-app template gallery (`package.ps1` stages only `spaces/_templates`, so
   `la-utilities` is not in the gallery yet), and the D2 choice to hide the per-use-case template.
+
+### Step 3, first lane as built (2026-11-08) — *Insurance*
+
+- **Packer rules added in this lane** (`tools/package-la-showcase.mjs`, unit-tested):
+  - a lone `config/link-analysis.toon` ships verbatim;
+  - a path several use cases ship with the same bytes ships once;
+  - several use cases' `config/examples/*.md` are joined into one document;
+  - a path whose copies differ is still refused, and so is a recipe naming a missing use case.
+
+- Recipe `spaces/_industries/la-insurance.toon` (use case `la-claims`).
+- The packer ships a lone use case's `config/link-analysis.toon` verbatim. `la-claims`' file also holds four-eyes,
+  index, embed and drafts settings, which a merge would refuse. Merging still applies only when several use cases
+  ship one.
+- Mapping:
+  - Claimants and providers stay the one masked *Party*.
+  - *Claim*, *Policy*, *Broker* and *Accident* are new and unmasked: they name no person.
+  - Seven Datasets of events got their own Mapping; the three accident Datasets and the provider directory are typed
+    only. `LaClaimsTemplateTest` now pins the five types.
+- Views renamed per the step 2 table (`claims_network` kept as the overview), in the templates, three tests'
+  references, `tools/la-claims-smoke.mjs` and the docs.
+- Proved on the Basic install: the Space boots as *Insurance* and all seven feeds land with 0 rejected.
+  `claim_party_dataset` reads "`claim_id` holds Claim" and "`party_id` holds Party".
+  - `claims_links` runs on its 10-minute schedule, so the link views stay empty until its first run after boot (as
+    before).
+- Targeted tests PASS:
+  - entity-store, engine and graph: `IndustryPacksTest`, `LaClaimsLinksJobTest`, `LaClaimsGoldenTest`;
+  - processor: `LaClaimsTemplateTest`, `RepoSpacesConfigValidationTest`, `ControlApiSpaceTemplatesTest`,
+    `ControlApiSpaceTemplateSeedGateTest`, `SpaceManagerTemplateGateTest`,
+    `ShippedPipelinesWriteUnderTheirSpaceDirectoryTest`;
+  - geo-link: `ControlApiLaClaimsGeoSceneTest`.
+
+  The full gate was NOT run.
 
 ## Open questions for the operator
 

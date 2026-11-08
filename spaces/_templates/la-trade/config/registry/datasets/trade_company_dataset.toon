@@ -1,0 +1,13 @@
+physicalRef: trade_company/database
+description: "Trade-based money-laundering Link Analysis showcase - One row per registered company: invented name, country (ISO code), registered address (blank on about 4 %; a formation-agent address and a business centre each host many companies), incorporation date and the company's bank account. Landed by the trade_company Pipeline. Synthetic."
+primaryEntityType: company
+columns[6]{name,type,classification}:
+  company_id,string,COMPANY
+  name,string,
+  country,string,
+  reg_address,string,
+  incorporated_at,date,
+  account_id,string,ACCOUNT
+defaultLinkMapping:
+  from: company_id
+  to: account_id

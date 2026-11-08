@@ -1,12 +1,19 @@
 physicalRef: telco_ra_screen_links
 description: "Telecom revenue assurance Link Analysis showcase - Derived from telco_ra_links each time it is produced, for the three saved views: the links each revenue-assurance screen selects, tagged in screen (unbilled_usage, commission_spike, pbx_off_hours). A link selected by two screens appears once in each. Same columns as telco_ra_links plus screen. Synthetic."
 eventDate: event_date
+primaryEntityType: telecom_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,TELECOM_ENTITY
+  dst,string,TELECOM_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   screen,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

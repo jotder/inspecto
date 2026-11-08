@@ -55,8 +55,8 @@ load. Within a minute or two:
 - `inspecto-la-data/la-card/data/<feed>/database/` holds Parquet files for `cardholder`, `card`, `merchant`,
   `card_auth`, `chargeback` and `online_account`, and nothing is under any `<feed>/quarantine` or `<feed>/errors`.
 - `inspecto-la-data/la-card/data/card_links/` holds the link Dataset (about 38 000 rows, eight kinds).
-- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `card_testing`, `card_takeover_ring`,
-  `card_merchant_disputes` and `card_common_point`. The [user guide](user-guide.md) has the tour and the exercises.
+- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `card_testing`, `account_takeover_ring`,
+  `colluding_merchant_refunds` and `common_point_of_purchase`. The [user guide](user-guide.md) has the tour and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
 `inspecto-la-data/la-card/`.
@@ -82,3 +82,19 @@ node tools/package-la-showcase.mjs la-card
 The generator is deterministic (seed 20261107) and writes the ground truth to
 `tools/gen-la-card-data.ground-truth.json`, which is not part of any download. The packer reads committed content
 only, so commit first.
+
+## As part of the *Banking and finance* industry Space
+
+This use case also ships inside the industry Space *Banking and finance* (`la-banking`), with the sample, ownership,
+card, trade and crypto showcases. The recipe is `spaces/_industries/la-banking.toon`; `node tools/package-la-showcase.mjs
+la-banking` composes one Space download and one data download.
+
+To share one Space, trade's `company` and `payment` feeds are called `trade_company` and `trade_payment` (Pipelines,
+Datasets, inbox folders). *Account*, *Company* and *Person* are declared identically by every pack that uses them, so
+they merge. Every Dataset says what its id columns hold, and each Dataset of events has its own Mapping. In each link
+Dataset, the ends mixing kinds keep the pack's own generic type: *Party* (ownership), *Card entity*, *Trade entity* or
+*Crypto entity*.
+
+Views carry use-case names, for example `hidden_beneficial_owner`, `sanctioned_owner_path`, `common_point_of_purchase`,
+`circular_trade` and `hack_peel_chain`. The sample's `mule_layering_ring` keeps its name, because the first-run page
+and *Follow the money* open it by that id.

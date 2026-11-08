@@ -1,6 +1,26 @@
-entity_types[1]:
+entity_types[5]:
   - id: party
     label: Party
     normaliser: upper-trim
     masked: false
     classifications[1]: PARTY
+  - id: customer
+    label: Bank customer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CUSTOMER
+  - id: sanctions_entry
+    label: Sanctions list entry
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SANCTIONS_ENTRY
+  - id: company
+    label: Company
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: COMPANY
+  - id: person
+    label: Person
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PERSON

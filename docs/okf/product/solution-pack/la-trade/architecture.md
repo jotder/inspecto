@@ -25,13 +25,13 @@ data/inbox/<feed>/*.csv  --7 Collectors + Pipelines-->  data/<feed>/database (Pa
 
 | Feed | Rows landed | Columns |
 |---|---|---|
-| `company` | 2 500 | company_id, name, country, reg_address, incorporated_at, account_id |
+| `trade_company` | 2 500 | company_id, name, country, reg_address, incorporated_at, account_id |
 | `director` | 3 514 | company_id, person_id, person_name |
 | `trade` | 11 896 in 12 monthly files (+1 staged) | trade_id, instrument (LC, collection), applicant, beneficiary, hs_code (VARCHAR, keeps its leading zero), qty, unit_price, value, port_load, port_discharge, vessel, ship_date |
 | `bill_of_lading` | 11 955 (+1 staged) | bl_id, trade_id, vessel, container, shipper, consignee, port_from, port_to, bl_date |
 | `vessel_position` | 109 500 = 300 vessels × 365 days (+1 staged) | vessel, pos_date, port_or_area (a port, or `At sea - <area>`) |
 | `price_reference` | 744 = 62 HS codes × 12 months (+1 staged) | hs_code, month (`YYYY-MM`), median_unit_price |
-| `payment` | 28 993 (+1 staged) | payment_id, from_account, to_account, amount, paid_at, trade_ref |
+| `trade_payment` | 28 993 (+1 staged) | payment_id, from_account, to_account, amount, paid_at, trade_ref |
 
 ## The link Job
 

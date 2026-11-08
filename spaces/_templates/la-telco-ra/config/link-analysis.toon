@@ -1,0 +1,41 @@
+entity_types[8]:
+  - id: subscriber_number
+    label: Subscriber number
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SUBSCRIBER_NUMBER
+  - id: dealer
+    label: Dealer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DEALER
+  - id: device
+    label: Device
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DEVICE
+  - id: shop
+    label: Shop
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: POS
+  - id: trunk
+    label: Enterprise trunk
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TRUNK
+  - id: customer
+    label: Enterprise customer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CUSTOMER
+  - id: country
+    label: Destination country
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: COUNTRY
+  - id: telecom_entity
+    label: Telecom entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TELECOM_ENTITY

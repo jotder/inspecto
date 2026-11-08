@@ -1,7 +1,8 @@
 physicalRef: accident_location/database
 description: "Insurance-claims Link Analysis showcase - One row per accident: city, invented coordinates, the accident instant and the police report reference (blank when none). Landed by the accident_location Pipeline. Synthetic."
+primaryEntityType: accident
 columns[6]{name,type,classification}:
-  accident_id,string,
+  accident_id,string,ACCIDENT
   city,string,
   lat,number,
   lon,number,

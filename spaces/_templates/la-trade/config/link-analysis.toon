@@ -1,6 +1,36 @@
-entity_types[1]:
+entity_types[7]:
   - id: trade_entity
     label: Trade entity
     normaliser: upper-trim
     masked: false
     classifications[1]: TRADE_ENTITY
+  - id: trade
+    label: Trade
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TRADE_ID
+  - id: container
+    label: Container
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CONTAINER
+  - id: vessel
+    label: Vessel
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: VESSEL
+  - id: account
+    label: Account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ACCOUNT
+  - id: company
+    label: Company
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: COMPANY
+  - id: person
+    label: Person
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PERSON

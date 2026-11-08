@@ -1,11 +1,16 @@
 physicalRef: online_account/database
 description: "Card and e-commerce fraud Link Analysis showcase - One row per change to an online shopping account: the card on file, e-mail, phone, the device the change came from and the ship-to address; the first row of an account is its creation. One landed extract; the next month is in data/staged. Landed by the online_account Pipeline. Synthetic."
 eventDate: changed_at
+primaryEntityType: online_account
 columns[7]{name,type,classification}:
-  account_id,string,
-  card_id,string,
+  account_id,string,ONLINE_ACCOUNT
+  card_id,string,PAYMENT_CARD
   email,string,
   phone,string,
-  device_id,string,
+  device_id,string,DEVICE_ID
   ship_to_address,string,
   changed_at,timestamp,
+defaultLinkMapping:
+  from: account_id
+  to: device_id
+  primaryTime: changed_at

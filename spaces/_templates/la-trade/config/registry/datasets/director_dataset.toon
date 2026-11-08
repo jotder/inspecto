@@ -1,6 +1,10 @@
 physicalRef: director/database
 description: "Trade-based money-laundering Link Analysis showcase - One row per company and director: the person's id and invented name (a few people are registered twice with a spelling variant). Landed by the director Pipeline. Synthetic."
+primaryEntityType: person
 columns[3]{name,type,classification}:
-  company_id,string,
-  person_id,string,
+  company_id,string,COMPANY
+  person_id,string,PERSON
   person_name,string,
+defaultLinkMapping:
+  from: person_id
+  to: company_id

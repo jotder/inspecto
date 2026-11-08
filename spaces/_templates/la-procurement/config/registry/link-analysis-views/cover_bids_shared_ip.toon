@@ -1,0 +1,24 @@
+name: cover_bids_shared_ip
+description: "Cover bids - bidders linked to the IP addresses and document authors they share with another bidder (via = bids, tenders and, for an IP, the fewest minutes to another bidder's bid from it on the same tender). One IT firm's office address carries bids from three competitors minutes after its own, and its estimator is the author of most of their documents. The buyer's public help-desk kiosk is also shared by many small firms, but hours or tenders apart and with their own authors. A blank or Administrator author is never a link."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: procurement_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,market
+  filter:
+    kind: group
+    op: OR
+    items[2]{kind,field,operator,value}:
+      condition,kind,"=","same_ip"
+      condition,kind,"=","same_author"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

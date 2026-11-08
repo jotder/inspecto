@@ -1,8 +1,13 @@
 physicalRef: card/database
 description: "Card and e-commerce fraud Link Analysis showcase - One row per issued card: an invented card id (never a card number), its BIN group, holder and issue date. One extract (CARD_20260930.csv). Landed by the card Pipeline. Synthetic."
 eventDate: issued_at
+primaryEntityType: payment_card
 columns[4]{name,type,classification}:
-  card_id,string,
+  card_id,string,PAYMENT_CARD
   bin,string,
-  holder_id,string,
+  holder_id,string,CARDHOLDER
   issued_at,date,
+defaultLinkMapping:
+  from: holder_id
+  to: card_id
+  primaryTime: issued_at

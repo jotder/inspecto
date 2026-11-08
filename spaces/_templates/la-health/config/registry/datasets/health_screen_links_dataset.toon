@@ -1,12 +1,19 @@
 physicalRef: health_screen_links
 description: "Provider billing fraud Link Analysis showcase - Derived from health_links each time it is produced, for the four saved views: the links each program-integrity screen selects, tagged in screen (referral_concentration, phantom_billing, pill_mill, upcoding). A link selected by two screens appears once in each. Same columns as health_links plus screen. Synthetic."
 eventDate: event_date
+primaryEntityType: health_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,HEALTH_ENTITY
+  dst,string,HEALTH_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   screen,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

@@ -308,7 +308,7 @@
    "lookalikes": [
     "PR-0632"
    ],
-   "view": "health_phantom_billing"
+   "view": "phantom_billing"
   },
   "pill_mill": {
    "entities": [
@@ -390,7 +390,7 @@
    "lookalikes": [
     "PR-0031"
    ],
-   "view": "health_pill_mill"
+   "view": "pill_mill"
   },
   "referral_kickbacks": {
    "entities": [
@@ -406,7 +406,7 @@
    "lookalikes": [
     "PR-0828"
    ],
-   "view": "health_referral_concentration"
+   "view": "referral_kickbacks"
   },
   "upcoding": {
    "entities": [
@@ -419,7 +419,7 @@
    "lookalikes": [
     "PR-0277"
    ],
-   "view": "health_upcoding"
+   "view": "upcoding_clinics"
   }
  },
  "upcoding": {

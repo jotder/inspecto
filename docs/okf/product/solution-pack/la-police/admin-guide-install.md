@@ -61,8 +61,8 @@ runs every five minutes, and each time it builds its Dataset the three derived J
 - `inspecto-la-data/la-police/data/police_links/` holds the link Dataset (about 22 000 rows, nine kinds), and
   `police_property_links/`, `police_call_links/` and `police_witness_links/` hold the three derived ones (about 70,
   1 300 and 700 rows).
-- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `police_burglary_series`, `police_handset_network` and
-  `police_witness_link`, and each draws without "Result cut short". The [user guide](user-guide.md) has the tour and
+- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `burglary_series`, `drug_supply_handset_network` and
+  `suspicious_witness`, and each draws without "Result cut short". The [user guide](user-guide.md) has the tour and
   the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
@@ -90,3 +90,30 @@ node tools/package-la-showcase.mjs la-police
 
 The generator is deterministic (seed 20261107) and writes the ground truth to `tools/la-police-ground-truth.json`,
 which is not part of any download. The packer reads committed content only, so commit first.
+
+## As the *Law enforcement* industry Space
+
+The same use case also ships as the industry Space *Law enforcement* (`la-law-enforcement`). Its recipe is
+`spaces/_industries/la-law-enforcement.toon` (use case `la-police`). `node tools/package-la-showcase.mjs
+la-law-enforcement` composes it into `inspecto-la-space-la-law-enforcement-<version>.zip` and its data zip. Install
+them as above, with `la-law-enforcement` in place of `la-police`.
+
+Every Dataset says what its id columns hold: *Person*, *Address*, *Incident*, *Dealer*, *Item serial*, *Phone number*,
+*Handset* and *Vehicle*. The four link Datasets mix kinds in one `src` and one `dst` column, so their ends hold the
+generic *Police entity*. Phone numbers and handsets are kept as written (upper-trim), so the ids the links join on
+never change. Each Dataset of events has its own Mapping:
+
+| Dataset | Mapping |
+|---|---|
+| `call_record_dataset` | Phone number → Phone number (when `start_at`, measure `duration_s`) |
+| `dealer_sale_dataset` | Person (seller) → Dealer (when `sold_at`) |
+| `handset_dataset` | Person → Phone number |
+| `incident_person_dataset` | Person → Incident (kind `role`) |
+| `incident_report_dataset` | Person (reporter) → Incident (kind `offence_type`, when `start_at`) |
+| `person_dataset` | Person → Address |
+| `property_stolen_dataset` | Incident → Item serial |
+| `vehicle_dataset` | Person (keeper) → Vehicle |
+| the four `police_*links_dataset` | Police entity → Police entity (kind `kind`, when `ts`, measure `amount`) |
+
+The views carry use-case names: `burglary_series`, `drug_supply_handset_network`, `suspicious_witness`, and the Geo View
+`incident_map`.

@@ -1,7 +1,12 @@
 physicalRef: mule_transfers/database
 description: "Invented account-to-account transfers carrying a planted money-mule layering ring - the Link Analysis sample. Synthetic."
 eventDate: BOOKED_DATE
+primaryEntityType: account
 columns[3]{name,type,classification}:
   PAYER_ACCOUNT,string,ACCOUNT
   PAYEE_ACCOUNT,string,ACCOUNT
   BOOKED_DATE,date,
+defaultLinkMapping:
+  from: PAYER_ACCOUNT
+  to: PAYEE_ACCOUNT
+  primaryTime: BOOKED_DATE

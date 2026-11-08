@@ -3,7 +3,7 @@
 
 Writes spaces/_templates/la-procurement/data/inbox/<feed>/ (12 months landed, tenders published 2025-10-01..2026-09-30) and
 data/staged/<feed>/ (the next month, 2026-10, for the "new data arrives" step) for seven feeds:
-  company, director, person, official (one extract each, landed only), tender and bid (one file per month of publication),
+  company, director, procurement_person, official (one extract each, landed only), tender and bid (one file per month of publication),
   contract_change (one landed extract, one staged month)
 and tools/gen-la-procurement-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
@@ -535,7 +535,7 @@ write("inbox/company/COMPANY_20260930.csv", ["company_id", "name", "reg_address"
       [[c["id"], c["name"], c["address"], c["phone"], c["bank"], iso(c["inc"]), iso(c["debarred"])] for c in companies.values()])
 write("inbox/director/DIRECTOR_20260930.csv", ["company_id", "person_id", "from_date", "to_date"],
       sorted([[c, p, iso(f), iso(t)] for c, p, f, t in directors]))
-write("inbox/person/PERSON_20260930.csv", ["person_id", "name", "address_id"],
+write("inbox/procurement_person/PERSON_20260930.csv", ["person_id", "name", "address_id"],
       [[p["id"], p["name"], p["address"]] for p in sorted(people.values(), key=lambda p: p["id"])])
 write("inbox/official/OFFICIAL_20260930.csv", ["person_id", "buyer_unit"], sorted([[p, u] for p, u in officials.items()]))
 for y, m in months:
@@ -561,12 +561,12 @@ truth = {
                "tender_landed": len(landed_t), "bid_landed": sum(1 for b in bids if b["tender"]["published"] <= LANDED_END),
                "contract_change": len(changes)},
     "stories": {
-        "bid_rotation": {"hub": R[0], "view": "procurement_bid_rotation", "entities": sorted(R + [t["id"] for t in rotation] + [P_SHARED]),
+        "bid_rotation": {"hub": R[0], "view": "bid_rotation", "entities": sorted(R + [t["id"] for t in rotation] + [P_SHARED]),
                          "lookalikes": sorted(L)},
-        "cover_bids": {"hub": W_IP, "view": "procurement_cover_bids", "entities": sorted([W, *C, W_IP, W_AUTHOR]), "lookalikes": [KIOSK_IP]},
-        "conflict_of_interest": {"hub": F, "view": "procurement_change_approvals", "entities": sorted([O, F, D_REL, people[O]["address"]]),
+        "cover_bids": {"hub": W_IP, "view": "cover_bids_shared_ip", "entities": sorted([W, *C, W_IP, W_AUTHOR]), "lookalikes": [KIOSK_IP]},
+        "conflict_of_interest": {"hub": F, "view": "official_approving_relative_firm", "entities": sorted([O, F, D_REL, people[O]["address"]]),
                                  "lookalikes": [O2]},
-        "phoenix_firm": {"hub": D_NEW, "view": "procurement_debarred_directors", "entities": sorted([D_OLD, D_NEW, P1, P2, d_new_win["id"]]),
+        "phoenix_firm": {"hub": D_NEW, "view": "debarred_firm_reborn", "entities": sorted([D_OLD, D_NEW, P1, P2, d_new_win["id"]]),
                          "lookalikes": sorted([U, PX])},
     },
     "bid_rotation": {"firms": R, "shared_director": P_SHARED, "shared_by": [R[1], R[3]], "unit": "Highways North",

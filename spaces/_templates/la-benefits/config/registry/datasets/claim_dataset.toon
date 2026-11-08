@@ -1,12 +1,19 @@
 physicalRef: claim/database
 description: "Benefits and tax fraud Link Analysis showcase - One row per benefit claim open at some point in the window: claimant, benefit type, start and end dates (end blank while it runs), monthly amount, the account it is paid into and, for a claim stopped after a death, the overpayment recovered. One extract of the landed months (CLAIM_20260930.csv); the claims that start in the next month are in data/staged. Landed by the claim Pipeline. Synthetic."
 eventDate: start_date
+primaryEntityType: claim
 columns[8]{name,type,classification}:
-  claim_id,string,
-  person_id,string,
+  claim_id,string,CLAIM
+  person_id,string,PERSON
   benefit_type,string,
   start_date,date,
   end_date,date,
   monthly_amount,number,
-  bank_account,string,
+  bank_account,string,BANK_ACCOUNT
   overpaid_recovered,number,
+defaultLinkMapping:
+  from: person_id
+  to: claim_id
+  kind: benefit_type
+  primaryTime: start_date
+  primaryMeasure: monthly_amount

@@ -1,12 +1,19 @@
 physicalRef: procurement_debarment_links
-description: "Bid rigging and procurement fraud Link Analysis showcase - Derived from procurement_links each time it is produced, for the saved view procurement_debarred_directors: every directorship of every person who directed a debarred firm (directed_by; via names the dates and the debarment), and the tenders those firms won (won). Same columns as procurement_links. Synthetic."
+description: "Bid rigging and procurement fraud Link Analysis showcase - Derived from procurement_links each time it is produced, for the saved view debarred_firm_reborn: every directorship of every person who directed a debarred firm (directed_by; via names the dates and the debarment), and the tenders those firms won (won). Same columns as procurement_links. Synthetic."
 eventDate: event_date
+primaryEntityType: public_entity
 columns[8]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,PUBLIC_ENTITY
+  dst,string,PUBLIC_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
   market,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

@@ -1,8 +1,9 @@
 physicalRef: network_usage/database
 description: "Telecom revenue assurance Link Analysis showcase - One row per subscriber per month, summed from the switch's call and data records: the period (the first of the month), voice minutes and data MB. One file per month (NETWORK_USAGE_YYYYMM.csv); the next month is in data/staged. Landed by the network_usage Pipeline. Synthetic."
 eventDate: period
+primaryEntityType: subscriber_number
 columns[4]{name,type,classification}:
-  msisdn,string,
+  msisdn,string,SUBSCRIBER_NUMBER
   period,date,
   minutes,number,
   mb,number,
