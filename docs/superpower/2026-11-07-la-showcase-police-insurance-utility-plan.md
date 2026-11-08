@@ -1632,6 +1632,66 @@ deviations:
      checked: the Link Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build, and
      the packed downloads of a commit holding this tier (the packer reads HEAD).
 
+   **`la-insider` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job; spec 12's rule as written). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`insider.analyst` lead, `insider.manager`
+     second approver, `insider.reviewer` read-only, `insider.outsider` not a member, and `admin` byte-identical to every
+     other showcase: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`insider-analyst`, `fraud-analyst`,
+     `la-viewer` and `la-settings` as in `la-card`, `insider-manager` with `canApproveLinkExpansions`; the analyst does not
+     hold it), `four_eyes_fan_out_above: 2000` plus Drafts limits (10 / 60 min / 14 days) in `link-analysis.toon`, the
+     values every showcase states. `la-insider` is the only use case in *Enterprise* today, but `la-audit` is to join it, so
+     the shared roles and settings read as elsewhere. No `masking_mode`; no Entity Type masked.
+   - **The Alert Rule is the spec's "a grant without a ticket to a finance system", unchanged.**
+     `insider_ticketless_grant_counts` (`sql.template` on `insider_links`' `job.dataset.produced`) reads the landed
+     `access_grant` feed itself (a grant is a row there; the link Dataset folds grants into one `granted_by` row per pair)
+     and writes one row: `grants_without_ticket`, `finance_grants_without_ticket`, `finance_grantees_without_ticket`,
+     `finance_approvers_without_ticket`. A blank ticket is `nullif(trim(ticket_id), '')`, and the finance systems are
+     `system IN ('AP', 'PAYROLL', 'TREASURY')`, both written as in `insider_links` (`LaInsiderTemplateTest` pins the shared
+     list). `insider_ticketless_grant_alerts` (`alert.evaluate`) runs after it; `insider_finance_grant_without_ticket` is
+     `max(finance_grants_without_ticket) gte 1`, WARNING, not grouped (a Job output, as in `la-utility`). **Privacy:** the
+     Job sends no employee id; the Alert carries a count, and the people are found in the `access_creep` view or the
+     Investigation. The look-alike needs no extra clause: the payroll mover's grant has its ticket.
+   - **Running total, not "new".** The count covers every landed grant, so the rule stays met after every build. A
+     `sql.template` Job keeps no watermark of what it counted last time, and the Alert stays one open Alert while the
+     breach lasts (an Alert is de-duplicated while a non-terminal one exists), so a running total gives one Alert for the
+     story, not one per build. The staged October brings 22 grants, all ticketed, so the count stays 8.
+   - **Real figures on the shipped data** (the counts Job over the real landed `access_grant`; pinned by
+     `InsiderLinksJobGoldenTest`, first counted over the CSV): grants_without_ticket **258** (every one has an approver;
+     all but the 8 are to ordinary systems: `WIKI` 60, `MAIL` 59, `TICKETS` 43, `CODE` 26, `ERP` 23, `DWH` 21, `CRM` 11,
+     `CONTRACTS` 7); finance_grants_without_ticket **8** (exactly the ground truth's 8 `PAYROLL` and `TREASURY` grants to
+     `EMP-0482`, `EMP-0636`, `EMP-1059`, `EMP-1415`); finance_grantees_without_ticket **4**; finance_approvers_without_ticket
+     **1** (`EMP-0007`). Without `EMP-0007`'s grants the Job yields 249 / 0 / 0 / 0 (it also made one ordinary ticketless
+     grant, `MAIL` to `EMP-2957`); without the four reports' grants, 0 finance; the mover `EMP-0062`'s grants alone (its
+     `PAYROLL` under `REQ-163776`), 0. A rule on the ticket alone would count 258, on the finance system alone 134.
+   - **Seed** `tools/seed-la-insider.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth's
+     `access_creep`): Investigation `access-creep` (seed `EMP-0007`; one bounded expand over `granted_by`, `maxFanOut` 20, to
+     the 11 reports whose grants it approved, the four among them, and its own approver `EMP-1096`, 12 neighbours counted
+     over the CSV; annotate, threshold, window, resolve, snapshot), members (`insider.reviewer` and `insider.manager`
+     reviewers, `admin` lead; not `insider.outsider`), Entity List `finance-access-review` (the four reports), a Case from
+     `EMP-0007` assigned to `insider.manager` and linked, an Investigation template, one unbounded expand held for four-eyes,
+     one open Draft annotating `EMP-0482` (in the Working Set after the expand; `VEN-0264`, whose bank account it changed,
+     is two hops out). The mover is in no step. The access-creep story was chosen as the Investigation's because the
+     Alert Rule is about it.
+   - **Tests:** `LaInsiderTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000 and Drafts 10; no masked type; persona capabilities; every persona role defined and `fraud-analyst`,
+     `la-viewer`, `la-settings` equal to `la-card`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the
+     Jobs' signals and the finance list shared with `insider_links`); `InsiderLinksJobGoldenTest` (the counts Job loaded
+     with the link and screen Jobs and fired by the same signal; the real figures above and the rule's own measure and
+     threshold fire; the Job's own SQL without `EMP-0007`, and without the four reports, would not fire; the mover is
+     granted `PAYROLL` with its ticket yet never counted; the old "Basic tier only" test replaced); the gallery test pins
+     `la-insider` creatable with no missing feature and no Demo Auth; `tools/seed-la-insider.test.mjs` (mocked fetch, 11
+     tests). Falsified, each then restored: the counts Job counting every finance grant, ticket or not (134 counted; the
+     positive, the no-manager and the mover tests go red; the no-reports assertion sits behind the no-manager one in its
+     method), the counts Job counting ticketless grants to any system (258; the positive and no-manager tests go red),
+     `masking_mode: typed`, `insider-analyst` given the approve capability, `admin` given `insider-analyst`, `la-insider`
+     out of the gallery's Basic-tier set, `fraud-analyst` removed, and in the seed: the outsider made a member, the Draft
+     annotating `VEN-0264`, the mover added to the Entity List, the first expand unbounded.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 8, the seed's `--apply`,
+     the persona probes) and no Basic bundle (rule unarmed, `insider_ticketless_grant_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
+     Also not checked: the Link Analysis UI, the composed *Enterprise* industry Space booted with this tier, the staged
+     month landing through the Pipelines, an OIDC build, and the packed downloads of a commit holding this tier (the packer
+     reads HEAD).
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),

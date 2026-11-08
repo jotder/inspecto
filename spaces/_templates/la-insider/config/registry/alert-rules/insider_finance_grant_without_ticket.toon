@@ -1,0 +1,7 @@
+name: insider_finance_grant_without_ticket
+dataset: insider_ticketless_grant_counts_dataset
+measure: max(finance_grants_without_ticket)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A grant without a ticket to a finance system: an access grant to AP, PAYROLL or TREASURY with no access request or change ticket behind it. The Alert carries how many such grants there are; no employee id leaves insider_ticketless_grant_counts, so open the access_creep view to find who granted them and to whom. A grant to a finance system with a ticket (an employee moved into a finance role, say) is not counted, nor is a ticketless grant to any other system (grants_without_ticket counts those). Not grouped by approver: insider_ticketless_grant_counts is a Job output, so a by column cannot be checked when the Space is created."

@@ -29,7 +29,7 @@ Insider-risk data is sensitive, so the showcase holds only what such a team woul
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier is planned, with personas, an Alert Rule for a grant without a ticket to a finance system, and a seeding script.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead investigator, second approver, read-only reviewer, outsider), an Alert Rule for a grant without a ticket to a finance system that names a count, never a person, and a seeding script for the Investigation, a list of the finance access to review, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 

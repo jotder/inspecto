@@ -1,0 +1,7 @@
+physicalRef: insider_ticketless_grant_counts
+description: "Insider threat Link Analysis showcase - one row of counts built by the insider_ticketless_grant_counts Job: grants_without_ticket (landed access grants with no ticket, any system), finance_grants_without_ticket (those to AP, PAYROLL or TREASURY), finance_grantees_without_ticket (employees who received one) and finance_approvers_without_ticket (people who approved one). Read by the Alert Rule insider_finance_grant_without_ticket. Names no employee. Synthetic."
+columns[4]{name,type,classification}:
+  grants_without_ticket,number,
+  finance_grants_without_ticket,number,
+  finance_grantees_without_ticket,number,
+  finance_approvers_without_ticket,number,

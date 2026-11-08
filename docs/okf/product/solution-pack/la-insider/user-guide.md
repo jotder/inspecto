@@ -114,6 +114,28 @@ approve each other. **Not the story:** **`EMP-1613`**, a sales team lead, approv
 20 field sales representatives, 19 of them 20 times or more. The claims were almost all on weekdays (12 at a weekend), spread over amounts up to
 480 (only 3 near the limit), and nobody in the team ever approves the team lead (`approved_back:0`).
 
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-finance-grant-alert-rule-and-the-seed)),
+after `node tools/seed-la-insider.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`insider.analyst` (lead):** **Alerts** lists `insider_finance_grant_without_ticket` (WARNING) with the value 8:
+   grants to a finance system with no ticket. The Alert names no one. Open the Investigation `access-creep`: it is seeded
+   with `EMP-0007` and expanded once over `granted_by` to the people whose access it approved, the four reports of
+   exercise 2 among them. The Entity List `finance-access-review` holds `EMP-0482`, `EMP-0636`, `EMP-1059` and
+   `EMP-1415`. The Case "Finance access granted without a ticket by EMP-0007" is linked to it.
+2. **Four-eyes:** an unbounded expand by `insider.analyst` is held, not run. Sign in as **`insider.manager`**: it is in
+   the approval inbox; approve or refuse it. `insider.analyst` cannot approve its own request.
+3. **`insider.reviewer`:** opens `access-creep` and reads every step; any change is refused.
+4. **`insider.outsider`:** sees the Datasets, but `access-creep` is not found (404).
+5. **Draft:** `insider.analyst` has one open Draft that annotates `EMP-0482` about its change to the bank account of
+   `VEN-0264`; promote it, or leave it. The vendor itself is two hops from the seed, so a step on it is refused until an
+   expand brings it in.
+
+**Not the story:** `EMP-0062` was granted `PAYROLL` after moving into payroll, but under ticket `REQ-163776`, so the rule
+does not count it; 250 grants to ordinary systems also have no ticket and are not counted. Without `EMP-0007`'s grants
+the rule would not fire at all.
+
 ## Tester's checklist
 
 The ground truth is `tools/gen-la-insider-data.ground-truth.json` (repository only, not in the download). The golden
