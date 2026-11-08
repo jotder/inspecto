@@ -31,10 +31,10 @@ The Space has two tiers.
 
 ## A working day
 
-1. **Start small.** Open `claims_shared_identity` (or `claims_network`) and seed a claimant such as `CL-0134`; expand. Always seed first.
+1. **Start small.** Open `claimant_ring_shared_identity` (or `claims_network`) and seed a claimant such as `CL-0134`; expand. Always seed first.
 2. **Find the ring.** Toolbox > Communities (Louvain), then Cliques and Triangle count. Client run first, then **Run on server**.
-3. **Look at providers.** HITS and PageRank on the working set; open `claims_provider_money`.
-4. **Where did it happen?** Geo page > load `claims_junction_cluster_map`.
+3. **Look at providers.** HITS and PageRank on the working set; open `provider_money_trail`.
+4. **Where did it happen?** Geo page > load `staged_accident_junction_map`.
 5. **Two records, one person.** Seed both records in an Investigation, expand, then **Resolve** on the identity assertion.
 6. **Entity profile.** The Entities page lists type Party; a masked type is opened through its alias. Reveal is `admin` only and audited.
 7. **Close out.** Build the Dossier and Verify; external references (police-report requests) are listed as untrusted pointers. The seed opens a Case; a partner can be given a masked read-only embed link.
@@ -45,7 +45,7 @@ Try each one before you read its answer. The answers are the tester's checklist 
 
 ### Exercise 1: the parts that were never fitted
 
-Open the saved view `claims_parts_suppliers`. It shows only `supplied_parts` links, from a parts supplier to each garage it
+Open the saved view `parts_supplier_ring`. It shows only `supplied_parts` links, from a parts supplier to each garage it
 invoiced parts through. A link's `amount` is the value of the parts that the garage did **not** fit. Two suppliers reach every
 garage. Which one is a fraud ring, and how do you prove it from the Dataset `repair_invoice_dataset`?
 
@@ -58,7 +58,7 @@ unfitted part (ordinary returns through `SUP-02` and `SUP-03`).
 
 ### Exercise 2: the broker nobody can find
 
-Open the saved view `claims_premium_payers`. It shows only `paid_by` links, from a policyholder to a bank account that pays the
+Open the saved view `ghost_broker_premium_payers`. It shows only `paid_by` links, from a policyholder to a bank account that pays the
 premiums of two or more policies. `via` names the policies. Three accounts appear. Which two are a ghost broker's, and what in
 `policy_dataset` gives them away?
 

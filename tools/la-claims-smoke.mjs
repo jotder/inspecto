@@ -21,7 +21,7 @@ export const PERSONAS = ['admin', 'siu.analyst', 'siu.manager', 'partner.reviewe
 export const LINK_COLUMNS = ['src', 'dst', 'kind', 'ts', 'amount', 'event_date', 'via'];
 export const JOBS = [['claims_links', 'claims_links_dataset'], ['claims_policy_timing', 'claims_policy_timing_dataset']];
 /** The nine Algorithms the plan assigns to the claims showcase (ids as the server catalogue names them). */
-export const GEO_VIEWS = ['claims_accidents_map', 'claims_junction_cluster_map', 'claims_providers_map'];
+export const GEO_VIEWS = ['accidents_map', 'staged_accident_junction_map', 'providers_map'];
 export const ALGORITHMS = ['louvainCommunities', 'detectCommunities', 'cliques', 'triangleCount', 'pageRank', 'hits', 'eigenvectorCentrality',
   'katzCentrality', 'closenessCentrality'];
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);

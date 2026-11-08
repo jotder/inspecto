@@ -357,7 +357,7 @@ The existing template and `tools/gen-la-claims-data.py` stay. Changes:
   more for every genuine policy) to holders on no claim, on four streets found on no other record, paid from `BA-93000017`
   (13) and `BA-93000029` (12). Look-alike: story 7's family pays its four policies from `BA-71000001` at the address on its claims.
 - **Job and views:** `claims_links` reads `repair_invoice` and `policy` too; nine kinds, 2 637 rows (`supplied_parts` 34,
-  `paid_by` 29). Saved views `claims_parts_suppliers` and `claims_premium_payers`; `claims_shared_identity` excludes
+  `paid_by` 29). Saved views `parts_supplier_ring` and `ghost_broker_premium_payers`; `claimant_ring_shared_identity` excludes
   `supplied_parts`.
 - **Decided while building:**
   - `policy` also gains `holder_address`: "an address that does not exist" needs an address on the policy. There is no
@@ -785,8 +785,8 @@ with a score).
   specialties, which would join the look-alike to the story. `health_links` also runs on `cron: "*/5 * * * *"`
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000
   nodes, the story whole and connected, and the look-alike on the canvas but in another component:
-  `health_referral_concentration` 22 rows, 23 nodes; `health_phantom_billing` 70 rows, 87 nodes; `health_pill_mill` 385
-  rows, 149 nodes; `health_upcoding` 8 rows, 12 nodes.
+  `referral_kickbacks` 22 rows, 23 nodes; `phantom_billing` 70 rows, 87 nodes; `pill_mill` 385
+  rows, 149 nodes; `upcoding_clinics` 8 rows, 12 nodes.
 - **Stories as built:** kickbacks: `PR-1426` Brackenmoor Surgery (68 of 79 referrals) and `PR-1392` Kilnworth Medical
   Practice (182 of 216) to `PR-1170` Emberlea Imaging Centre, York; its owner `OW-0434` shares home `AD-05150` with
   `OW-1270`, owner of `PR-1426`; look-alike `PR-0828` (38 of 44 to `PR-1129` Saltmere Bay Hospital, Scarborough's only
@@ -808,7 +808,7 @@ with a score).
   after a death.
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (the screens were recomputed over landed plus staged files outside the engine with DuckDB: stories and
-  look-alikes unchanged, `health_upcoding` gains a few elderly-care clinics).
+  look-alikes unchanged, `upcoding_clinics` gains a few elderly-care clinics).
 
 #### 10. `la-telco-ra` — telecom revenue assurance
 

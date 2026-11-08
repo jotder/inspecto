@@ -52,22 +52,22 @@ it fits on the canvas (under 1 000 nodes):
 
 | Saved view | Link Dataset | What it keeps |
 |---|---|---|
-| `police_burglary_series` | `police_property_links_dataset` | every `item_match`, the matched sellers' `sold_item`, `lives_at` and `keeper_of` of the sellers and everyone at their addresses, `seen_near` of the plates they keep |
-| `police_handset_network` | `police_call_links_dataset` | the calls of every number with 6 or more call partners, `uses_number` of those numbers, `lives_at` of their people |
-| `police_witness_link` | `police_witness_links_dataset` | people who witnessed 2 or more incidents, everyone on those incidents, and those witnesses' co-arrests |
+| `burglary_series` | `police_property_links_dataset` | every `item_match`, the matched sellers' `sold_item`, `lives_at` and `keeper_of` of the sellers and everyone at their addresses, `seen_near` of the plates they keep |
+| `drug_supply_handset_network` | `police_call_links_dataset` | the calls of every number with 6 or more call partners, `uses_number` of those numbers, `lives_at` of their people |
+| `suspicious_witness` | `police_witness_links_dataset` | people who witnessed 2 or more incidents, everyone on those incidents, and those witnesses' co-arrests |
 
 ## Five-minute tour
 
-1. **File ▸ Open… ▸ Saved views ▸ `police_burglary_series`.** A few small groups, and one large one: thirteen
+1. **File ▸ Open… ▸ Saved views ▸ `burglary_series`.** A few small groups, and one large one: thirteen
    burglaries point at three sellers, the sellers point at two dealers, and a plate in the middle is seen near a
    string of burglaries.
-2. **Open `police_handset_network`.** Most groups are small: one handset and its handful of contacts. Look for
+2. **Open `drug_supply_handset_network`.** Most groups are small: one handset and its handful of contacts. Look for
    numbers with dozens of partners: a few of them share most of their partners and all call the same four numbers.
    Set the time range to March to July 2026 and play it: the busy number changes, its callers do not.
-3. **Open `police_witness_link`.** People who witnessed more than one incident, with everyone on those incidents.
+3. **Open `suspicious_witness`.** People who witnessed more than one incident, with everyone on those incidents.
    Most are a witness and two incidents. One witness has a `co_arrested` link to a suspect.
 4. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (admin guide). The
-   Pipelines land November 2026 and the next Job run rebuilds the links; reopen `police_burglary_series` to see one
+   Pipelines land November 2026 and the next Job run rebuilds the links; reopen `burglary_series` to see one
    more serial match.
 
 ## Exercises
@@ -76,7 +76,7 @@ Work blind first: each has a hint, then the answer. The answers are not in the d
 
 ### 1. Burglary series — which burglaries, which sellers, and which vehicle?
 
-*Hint:* in `police_burglary_series`, find the seller with the most `item_match` links. Follow `lives_at` from that
+*Hint:* in `burglary_series`, find the seller with the most `item_match` links. Follow `lives_at` from that
 seller, then `keeper_of` and `seen_near`.
 
 **Answer:** **18 burglaries** in **Leeds North and Leeds East** between **2026-02-04 and 2026-04-27**, from
@@ -91,7 +91,7 @@ it is not in this view, and in `police_links_dataset` it has no link to any seri
 
 ### 2. Drug-supply network — which numbers controlled it, and in what order?
 
-*Hint:* in `police_handset_network`, take a number with about 30 partners that calls four numbers again and again.
+*Hint:* in `drug_supply_handset_network`, take a number with about 30 partners that calls four numbers again and again.
 Run **Link prediction** or compare its partners with those of the other busy numbers.
 
 **Answer:** five controller numbers took over from one another, every 3 to 5 weeks:
@@ -115,7 +115,7 @@ customer.
 
 (In the UK this is called "cuckooing".)
 
-*Hint:* in `police_handset_network`, follow the four runner numbers to numbers that are not controllers, then
+*Hint:* in `drug_supply_handset_network`, follow the four runner numbers to numbers that are not controllers, then
 `uses_number` and `lives_at`.
 
 **Answer:** the runners rang three numbers again and again between March and July 2026: `+447700900191`,
@@ -128,7 +128,7 @@ runner, controller or customer.
 
 ### 4. A witness linked to the suspect — who?
 
-*Hint:* in `police_witness_link`, look for a `co_arrested` link between two people on the same incident.
+*Hint:* in `suspicious_witness`, look for a `co_arrested` link between two people on the same incident.
 
 **Answer:** **`P-01956`** is a witness to two unrelated incidents: an assault, **`INC-02159`** (Leeds West,
 2026-05-14 22:41), and a theft, **`INC-03169`** (Sheffield South, 2026-08-21). The suspect in the assault,

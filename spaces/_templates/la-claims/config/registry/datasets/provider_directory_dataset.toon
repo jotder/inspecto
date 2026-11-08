@@ -1,5 +1,6 @@
 physicalRef: provider_directory/database
 description: "Insurance-claims Link Analysis showcase - The 25 providers (garages, clinics, lawyers) with an invented name and city-level coordinates. Landed by the provider_directory Pipeline. Synthetic."
+primaryEntityType: party
 columns[6]{name,type,classification}:
   provider_id,string,PARTY
   provider_name,string,

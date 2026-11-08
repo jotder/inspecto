@@ -1,11 +1,18 @@
 physicalRef: police_links
 description: "Police Link Analysis showcase - ONE link Dataset built by the police_links Job from the eleven feeds. kind is one of called, co_arrested, involved_in, keeper_of, seen_near, lives_at, uses_number, sold_item, item_match; src and dst hold people, incidents, addresses, plates, numbers and dealers; amount is the number of records behind the link; via names the roles, cameras, sales, serials or calls; event_date is the day of ts. Synthetic."
 eventDate: event_date
+primaryEntityType: police_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,POLICE_ENTITY
+  dst,string,POLICE_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

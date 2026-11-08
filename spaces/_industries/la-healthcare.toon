@@ -1,0 +1,5 @@
+name: Healthcare
+tagline: "Provider billing fraud on synthetic data - referral kickbacks to an imaging centre whose owner shares a home with a referring practice's owner, phantom billing, a pill mill and upcoding clinics, every Dataset mapped."
+minEdition: basic
+icon: heroicons_outline:heart
+useCases[1]: la-health
