@@ -185,9 +185,11 @@ function main() {
     const owner = composeSources(byTemplate);
     files = [...owner.keys()];
     templateToon = recipe;
-    show = (rel) => rel === MERGED
+    // link-analysis.toon from ONE use case ships verbatim (it may hold more than entity_types, as la-claims' does);
+    // from several it is merged, which today accepts entity_types only.
+    show = (rel) => rel === MERGED && owner.get(rel).length > 1
       ? Buffer.from(mergeEntityTypes(owner.get(rel).map((t) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }))))
-      : git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
+      : git(['show', `HEAD:${TEMPLATES}/${rel === MERGED ? owner.get(rel)[0] : owner.get(rel)}/${rel}`]);
     console.log(`  composing ${opts.id} from ${byTemplate.map((b) => b.tpl).join(', ')}`);
   } else {
     const tplDir = `${TEMPLATES}/${opts.id}`;

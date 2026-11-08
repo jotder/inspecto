@@ -1,4 +1,4 @@
-name: claims_shared_identity
+name: claimant_ring_shared_identity
 description: "Claims shared identity - only links that carry NO money (amount 0): shared phone, shared address, same accident (a parts supplier whose parts were all fitted also carries 0 and is left out). The ring shares 4 phones and 3 addresses; the benign family of four shares one of each and stays its own small group. Run Cliques and Triangle count."
 sourceId: entity-projection
 layout: force

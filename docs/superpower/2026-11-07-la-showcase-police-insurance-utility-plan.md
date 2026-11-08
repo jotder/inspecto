@@ -356,7 +356,7 @@ The existing template and `tools/gen-la-claims-data.py` stay. Changes:
   more for every genuine policy) to holders on no claim, on four streets found on no other record, paid from `BA-93000017`
   (13) and `BA-93000029` (12). Look-alike: story 7's family pays its four policies from `BA-71000001` at the address on its claims.
 - **Job and views:** `claims_links` reads `repair_invoice` and `policy` too; nine kinds, 2 637 rows (`supplied_parts` 34,
-  `paid_by` 29). Saved views `claims_parts_suppliers` and `claims_premium_payers`; `claims_shared_identity` excludes
+  `paid_by` 29). Saved views `parts_supplier_ring` and `ghost_broker_premium_payers`; `claimant_ring_shared_identity` excludes
   `supplied_parts`.
 - **Decided while building:**
   - `policy` also gains `holder_address`: "an address that does not exist" needs an address on the policy. There is no

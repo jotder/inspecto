@@ -1,4 +1,4 @@
-name: claims_provider_money
+name: provider_money_trail
 description: "Claims money trail - only links that carry value (amount of 1500 or more): provider bills against claims, the lawyer to clinic referral, and parts invoiced but never fitted. Compare clinic bills per claim: CLI-04 is about three times its peers. Run HITS or PageRank on the working set."
 sourceId: entity-projection
 layout: force

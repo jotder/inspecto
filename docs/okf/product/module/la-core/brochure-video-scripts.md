@@ -449,24 +449,24 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 |---|---|
 | Audience | Special Investigations Units at insurers. |
 | Film on | Basic install (`la-claims` has a Basic tier since 2026-11-08; ids show unmasked there). |
-| Ships as | *Link Analysis claims showcase* (`la-claims`); saved views `claims_network`, `claims_shared_identity`, `claims_provider_money`, `claims_parts_suppliers`, `claims_premium_payers`. |
+| Ships as | *Insurance* (`la-insurance`, the industry Space composed from the `la-claims` use case, every Dataset mapped); saved views `claims_network`, `claimant_ring_shared_identity`, `provider_money_trail`, `parts_supplier_ring`, `ghost_broker_premium_payers`. |
 | Ready | Now. A second segment can follow from the shipped parts-supplier or ghost-broker stories (exercises in the user guide), about 45 s each. |
-| As built | The ring has no user-guide exercise; its path is the showcase runbook's. The whole `claims_network` is a dust cloud, and the busy clinic `CLI-01` tops every centrality: start from `claims_shared_identity` and a seed. |
+| As built | The ring has no user-guide exercise; its path is the showcase runbook's. The whole `claims_network` is a dust cloud, and the busy clinic `CLI-01` tops every centrality: start from `claimant_ring_shared_identity` and a seed. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
-| A | Claims fraud | `la-claims` (built) | Claim parties and claims (`CLAIM_PARTY_20260930.csv`, `CLAIM_20260930.csv`). | 12 claimants on 9 claims share 4 phones and 3 addresses, with garage `GAR-03`, clinic `CLI-04` and lawyer `LAW-02`; `CL-0134` is a passenger on 6 claims with 6 drivers. | Saved view `claims_shared_identity`; seed `CL-0134`, *Expand* twice (about 23 entities); toolbox ▸ *Communities*: one community of the 12 claimants with `GAR-03`, `CLI-04` and `LAW-02`. | One ring of 12 claims to refer to the investigators. | A family of four (`CL-0103`, `CL-0217`, `CL-0218`, `CL-0249`) on one phone and address, in a community of its own; the busy GP clinic `CLI-01`. |
+| A | Claims fraud | `la-claims` (built) | Claim parties and claims (`CLAIM_PARTY_20260930.csv`, `CLAIM_20260930.csv`). | 12 claimants on 9 claims share 4 phones and 3 addresses, with garage `GAR-03`, clinic `CLI-04` and lawyer `LAW-02`; `CL-0134` is a passenger on 6 claims with 6 drivers. | Saved view `claimant_ring_shared_identity`; seed `CL-0134`, *Expand* twice (about 23 entities); toolbox ▸ *Communities*: one community of the 12 claimants with `GAR-03`, `CLI-04` and `LAW-02`. | One ring of 12 claims to refer to the investigators. | A family of four (`CL-0103`, `CL-0217`, `CL-0218`, `CL-0249`) on one phone and address, in a community of its own; the busy GP clinic `CLI-01`. |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
 | 1 | 9 | The claims list under the title. | Insurance · *Example · synthetic data* | Organised claims fraud looks like bad luck spread across many people. Each claim is small and plausible; the ring only shows when you see what the claimants share. |
 | 2 | 6 | `CLAIM_PARTY_20260930.csv` as it landed. | — | Claim parties: names, birth dates, phones, addresses. Read row by row, every claim looks like its own. |
 | 3 | 8 | The Data page: `claims_links_dataset`, built by the `claims_links` Job. | *One link Dataset · built by one Job* | One Job, set up once, turns the claims into links: who claimed together, who shares a phone or an address, which garage, clinic and lawyer. |
-| 4 | 9 | Saved view `claims_shared_identity`; seed `CL-0134`; *Expand* twice. Legend open. | *claims_shared_identity · CL-0134* | Start from one claimant and widen out twice. Each circle is a person, a phone, an address or a provider; each line is a claim, a shared phone or a shared address. |
+| 4 | 9 | Saved view `claimant_ring_shared_identity`; seed `CL-0134`; *Expand* twice. Legend open. | *claimant_ring_shared_identity · CL-0134* | Start from one claimant and widen out twice. Each circle is a person, a phone, an address or a provider; each line is a claim, a shared phone or a shared address. |
 | 5 | 8 | Toolbox ▸ *Communities*. | *Communities* | Ask which of them belong together. Communities finds the groups that link mostly among themselves. |
 | 6 | 10 | A beat of quiet; the community held. | *12 claimants · 4 phones · 3 addresses* | Twelve claimants sharing four phones and three addresses, one garage, one clinic and one lawyer. One ring to refer to the investigators. |
 | 7 | 8 | The family of four in its own small group, beside the ring. | — | A family sharing one phone forms a group too, but a small one, with its own garage. The links tell a household from a ring. |
-| 8 | 10 | The Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Link Analysis claims showcase* | This example ships with Inspecto LA. Open the claims showcase and explore it yourself: a parts-supplier ring and a ghost broker are planted in the same claims. |
+| 8 | 10 | The Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Insurance* | This example ships with Inspecto LA. Open the Insurance Space and explore it yourself: a parts-supplier ring and a ghost broker are planted in the same claims. |
 | 9 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 10 | 4 | End card. | *For Special Investigations Units.* · *Try it on your own data.* | Inspecto LA. |
