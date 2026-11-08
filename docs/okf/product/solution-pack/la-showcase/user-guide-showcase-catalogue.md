@@ -156,11 +156,10 @@ A peer plan, [Link Analysis industry Spaces](../../../../superpower/2026-11-08-l
 enforcement*, *Public sector*, *Healthcare*, *Logistics*, *Enterprise*) from the use-case templates above, with every
 Dataset mapped and saved views named after their use case. It is in progress: a recipe for each of the nine is in
 `spaces/_industries/<id>.toon`, and `node tools/package-la-showcase.mjs <industry id>` composes it into a Space
-download and a data download (for example `la-utilities`, `la-law-enforcement`, `la-telecom`). The industry Spaces are
-not in the in-app template gallery yet, and some industry lanes are still open. Where an industry Space can be
-installed, the use case's install guide says so in its *As the … industry Space* section (today: `la-police`,
-`la-utility`, `la-health`, `la-logistics`, `la-telco-ra`, `la-insider`). The use-case templates on this page stay as
-they are, so everything here still holds as the industry Spaces land.
+download and a data download (for example `la-utilities`, `la-law-enforcement`, `la-telecom`). Every *install* guide
+linked above, and the `la-claims` runbook, has a section on installing that use case's industry Space. The industry Spaces are not in the
+in-app template gallery yet. The use-case templates on this page stay as they are, so everything here still holds as
+the industry Spaces land.
 
 ## References
 
