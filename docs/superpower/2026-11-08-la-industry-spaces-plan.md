@@ -130,6 +130,16 @@ The operator approved this plan and the spike on 2026-11-08 ("Approve, start spi
     `TemplateGovernanceExamplesTest`. The full gate was NOT run.
 - **Gotcha for the next packs:** mapped Datasets add *Preset queries* to the Start box and change its default Dataset, so
   a script or recorder must pick the link Dataset explicitly.
+- **Verified independently (PASS, 2026-11-08).** The review's fix landed: a recipe naming a missing use case is now
+  refused, where it was silently skipped. Its notes for steps 2–5:
+  - `mergeEntityTypes` accepts only an `entity_types`-only `link-analysis.toon`; `la-claims` also states
+    `four_eyes_fan_out_above` and `index:`, so composing it needs those keys handled first.
+  - The same classification claimed under two type ids by two use cases is caught only at boot (`EntityTypes.validate`),
+    not by the packer.
+  - No test checks a template's Dataset entries against `DatasetEntryRules` and the declared types; add one with the
+    next pack.
+  - A real collision exists today: `config/examples/sla-escalation-examples.md` ships in both `la-utility` and
+    `la-claims`.
 - **Not done in the spike:** the bundle's in-app template gallery (`package.ps1` stages only `spaces/_templates`, so
   `la-utilities` is not in the gallery yet), and the D2 choice to hide the per-use-case template.
 
