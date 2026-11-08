@@ -1,0 +1,6 @@
+physicalRef: telco_ra_unbilled_counts
+description: "Telecom revenue assurance Link Analysis showcase - one row of counts built by the telco_ra_unbilled_counts Job: unbilled_subscribers (subscribers not on the known list with network usage in 2 or more months that reached no billing record, still unbilled in the latest month whose billing has landed), known_list_subscribers (the network test team's SIMs with unbilled usage, expected and never counted) and other_unbilled_subscribers (a single dropped month, or a provisioning lag since billed). Read by the Alert Rule telco_ra_usage_without_billing. Names no subscriber. Synthetic."
+columns[3]{name,type,classification}:
+  unbilled_subscribers,number,
+  known_list_subscribers,number,
+  other_unbilled_subscribers,number,

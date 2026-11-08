@@ -1,0 +1,6 @@
+physicalRef: mfs_swap_drain_counts
+description: "Mobile financial services fraud Link Analysis showcase - one row of counts built by the mfs_swap_drain_counts Job from the swapped_by links: drained_after_swap (wallets that paid out 300 or more within 2 hours of a SIM swap), logins_behind_drains (the staff logins that made those swaps) and largest_other_out_within_2h (the most any other wallet paid out within 2 hours of a swap). Read by the Alert Rule mfs_wallet_drained_after_sim_swap. Names no wallet. Synthetic."
+columns[3]{name,type,classification}:
+  drained_after_swap,number,
+  logins_behind_drains,number,
+  largest_other_out_within_2h,number,

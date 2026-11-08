@@ -79,6 +79,55 @@ re-sent, and nothing in October bills inside a stay or after a death: the plante
 Stop the product, delete `inspecto-la-data/la-health/`, and unzip the data download again. The Space configuration
 is untouched.
 
+## Advanced tier: personas, the billed-in-hospital-or-after-death Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `health_billed_in_admission_or_after_death` is loaded but not armed, and
+the `health_phantom_counts` and `health_phantom_alerts` Jobs run after each `health_links` build; the second finds no
+armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs people in by name
+with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the nine Pipelines have landed and `health_links` has run (a minute or two), create the runtime state from a
+checkout of the repository:
+
+```bash
+node tools/seed-la-health.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `phantom-billing`
+(seeded with `PR-1241`, expanded once over `treated` to its patients, annotated, snapshotted), its members, the Entity
+List `billed-in-hospital-or-after-death` (the 40 patients `PR-1241` billed while they were in hospital elsewhere or
+after they died), a Case assigned to `health.manager` and linked to the Investigation, an Investigation template, one
+unbounded expand held for a second person, and one open Draft. To lay the Space out offline instead of unzipping the
+downloads, `node tools/seed-la-health.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `health.analyst` | `health-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `health.manager` | `health-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `health.reviewer` | `la-viewer`, member as reviewer | reads `phantom-billing`; any change is refused (403) |
+| `health.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `health_billed_in_admission_or_after_death` (WARNING) reads the one row of `health_phantom_counts`
+and fires when any open claim line is dated inside the member's stay at another hospital or after the member died. On
+the shipped data the Alert carries **159**: 89 lines in a stay and 70 after a death, for 40 members, all billed by one
+provider, `PR-1241`. The 30 lines that fell in a stay but were reversed within days (15 at the look-alike `PR-0632`, 15
+single errors elsewhere) are counted apart in `corrected_lines` and never fire it. A hospital's own lines inside its
+own stays are not "in a stay elsewhere", so the busy seaside hospital `PR-1129` (the busiest node of
+`referral_kickbacks`) is never counted. The count is a running total, so the rule stays met after every build; the
+October month adds nothing to it. It names no member or provider; `phantom_billing` shows the clinic. The rule is not
+grouped by provider, because `health_phantom_counts` is a Job output: a `by` column cannot be checked against its
+Schema when the Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash

@@ -40,13 +40,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole, shows the
  * look-alike beside it and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts behind each story in the files
  * themselves are pinned by {@code tools/gen-la-logistics-data.test.mjs}.
+ * The Advanced tier's {@code logistics_new_carrier_counts} Job runs on the same signal: its Alert Rule fires on the fictitious
+ * carrier's loads, would not without it, and never counts the new insured owner-operator's high-value loads.
  */
 class LogisticsLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-logistics");
     private static final List<String> FEEDS = List.of("carrier", "driver", "place", "shipment", "trip", "stop", "warehouse_scan", "loss_report");
-    private static final List<String> JOBS = List.of("logistics_links", "logistics_screen_links");
+    private static final String COUNTS = "logistics_new_carrier_counts";
+    // the Advanced tier's counts Job is fired by the same logistics_links signal; its one row of counts is no link Dataset
+    private static final List<String> JOBS = List.of("logistics_links", "logistics_screen_links", COUNTS);
 
     @TempDir static Path tmp;
     private static Path data;
@@ -101,10 +105,30 @@ class LogisticsLinksJobGoldenTest {
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/" + COUNTS + "_job.toon",
+                "config/jobs/logistics_new_carrier_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(COUNTS + "_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), COUNTS + " is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet(COUNTS);
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: 16 high-value trips given to a carrier under 60 days old (the fictitious carrier's
+        // 5, the owner-operator's 9 and 2 background loads), the very carried_by rows the new_carrier screen shows; only the 5 are
+        // of an uninsured carrier, all of one carrier
+        JsonNode f = truth.get("fictitious_carrier");
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(16L, ((Number) row.get("new_carrier_high_value_trips")).longValue());
+        assertEquals(count("SELECT count(*) FROM " + parquet("logistics_screen_links") + " WHERE screen = 'new_carrier' AND kind = 'carried_by'"),
+                ((Number) row.get("new_carrier_high_value_trips")).longValue(), "the new_carrier screen's loads");
+        assertEquals(5L, ((Number) row.get("uninsured_new_carrier_high_value_trips")).longValue());
+        assertEquals(f.get("trips").size(), ((Number) row.get("uninsured_new_carrier_high_value_trips")).intValue(), "every planted load, nothing else");
+        assertEquals(1L, ((Number) row.get("uninsured_new_carriers")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/logistics_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
@@ -222,6 +246,36 @@ class LogisticsLinksJobGoldenTest {
     }
 
     @Test
+    void withoutTheFictitiousCarrierTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same output with the fictitious carrier taken out: no uninsured new carrier on a high-value load
+        String carrier = truth.get("fictitious_carrier").get("carrier").asText();
+        Map<String, Object> without = countsOver("dst <> '" + carrier + "'");
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals(0L, ((Number) without.get("uninsured_new_carrier_high_value_trips")).longValue(), "without " + carrier + ": " + without);
+        assertTrue(((Number) without.get("uninsured_new_carrier_high_value_trips")).doubleValue() < rule.threshold(), "it would not fire");
+        assertEquals(11L, ((Number) without.get("new_carrier_high_value_trips")).longValue(), "the spec's rule read literally still fires on 11 loads");
+        // the 1-in-400 background losses: a rule on a new carrier's LOST high-value loads would also count a background loss
+        String age = "TRY_CAST(regexp_extract(via, 'carrier_age_days:([0-9]+)', 1) AS INTEGER) < 60";
+        Set<String> lostYoung = new TreeSet<>(rows("SELECT src FROM " + bl + " WHERE kind = 'carried_by' AND via LIKE '%|high_value:Y|%' AND " + age
+                + " AND via NOT LIKE '%|lost:N|%' AND dst <> '" + carrier + "'").stream().map(r -> (String) r.get("src")).toList());
+        assertEquals(1, lostYoung.size(), lostYoung.toString());
+        assertTrue(ids(truth.get("background").get("lost_trips")).containsAll(lostYoung), "a background loss: " + lostYoung);
+        // and the age test keeps the established uninsured carriers out: 56 high-value trips are uninsured, 51 of them background
+        assertEquals(56, count("SELECT count(*) FROM " + bl + " WHERE kind = 'carried_by' AND via LIKE '%|high_value:Y|%' AND via LIKE '%|insured:N|%'"));
+    }
+
+    @Test
+    void theNewInsuredOwnerOperatorHasHighValueLoadsButIsNeverCounted() throws Exception {
+        JsonNode f = truth.get("fictitious_carrier");
+        String lookalike = f.get("lookalike_carrier").asText();
+        // the counts Job's own SQL over the real output with only the owner-operator's loads: the spec's rule read literally fires
+        Map<String, Object> only = countsOver("dst = '" + lookalike + "'");
+        assertEquals((long) f.get("lookalike_high_value_trips").size(), ((Number) only.get("new_carrier_high_value_trips")).longValue(), lookalike + " " + only);
+        assertEquals(0L, ((Number) only.get("uninsured_new_carrier_high_value_trips")).longValue(), lookalike + " is insured: " + only);
+        assertEquals(0L, ((Number) only.get("uninsured_new_carriers")).longValue(), lookalike + " " + only);
+    }
+
+    @Test
     void theTeamLosesTwelveLoadsAndTheNightScannerTenWhileTheBusyDriverLosesTwo() throws Exception {
         JsonNode j = truth.get("inside_job");
         String losses = "TRY_CAST(regexp_extract(via, 'driver_losses:([0-9]+)', 1) AS INTEGER)";
@@ -296,6 +350,26 @@ class LogisticsLinksJobGoldenTest {
         assertEquals(0, count("SELECT count(*) FROM " + bl + " WHERE kind = 'carried_by' AND dst = '" + f.get("lookalike_carrier").asText() + "' AND via NOT LIKE '%|lost:N|%'"));
         assertEquals(List.of(f.get("lookalike_driver").asText()), rows("SELECT dst FROM " + bl + " WHERE kind = 'same_phone' AND src = '" + f.get("lookalike_carrier").asText() + "'")
                 .stream().map(r -> (String) r.get("dst")).toList(), "an owner-operator: its phone is its own driver's");
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/logistics_high_value_trip_new_carrier.toon").toString()));
+    }
+
+    /** The counts Job's own SQL over the real link Dataset, narrowed. */
+    private static Map<String, Object> countsOver(String linkFilter) throws Exception {
+        String sql = JobConfig.load(TEMPLATE.resolve("config/jobs/" + COUNTS + "_job.toon").toString()).require("sql");
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW logistics_links AS SELECT * FROM " + bl + " WHERE " + linkFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     private static Set<String> dsts(String sql) throws Exception {

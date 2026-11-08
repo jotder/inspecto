@@ -39,7 +39,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * pins the generator's ground truth ({@code tools/gen-la-health-data.ground-truth.json}): every story's entities form one connected
  * group, no benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole,
  * shows the look-alike beside it but apart from the story, and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts
- * behind each story in the files themselves are pinned by {@code tools/gen-la-health-data.test.mjs}.
+ * behind each story in the files themselves are pinned by {@code tools/gen-la-health-data.test.mjs}. The Advanced tier's
+ * {@code health_phantom_counts} Job runs after them: its Alert Rule fires on the real counts only because of the phantom-billing
+ * clinic, and never counts the look-alike clinic, the busy seaside hospital or the kickback ring.
  */
 class HealthLinksJobGoldenTest {
 
@@ -71,8 +73,17 @@ class HealthLinksJobGoldenTest {
             assertFalse(hasFiles(Path.of(pc.dirs().errors())), feed + ": nothing in the corpus is an error");
         }
         data = space.resolve("data");
+        runJobs(space, JOBS);
+        // the Advanced tier's counts Job in a service of its own, after the link Job, so no signal-fired run races a read
+        runJobs(space, List.of("health_phantom_counts"));
+        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-health-data.ground-truth.json").toFile());
+        hl = parquet("health_links");
+        links = triples("SELECT src, dst, kind FROM " + hl);
+    }
+
+    private static void runJobs(Path space, List<String> names) throws Exception {
         List<JobConfig> jobs = new ArrayList<>();
-        for (String j : JOBS) jobs.add(JobConfig.load(space.resolve("config/jobs/" + j + "_job.toon").toString()));
+        for (String j : names) jobs.add(JobConfig.load(space.resolve("config/jobs/" + j + "_job.toon").toString()));
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
         // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
         for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
@@ -86,28 +97,100 @@ class HealthLinksJobGoldenTest {
                      space.resolve("audit").toString(), null, null, data.toString(), null, platform)) {
             js.eventLog(com.gamma.event.EventLog.current());
             js.start();
-            for (String j : JOBS) {
+            for (String j : names) {
                 // the derived Job may already be running off the main Job's produced signal; a trigger then is a no-op
-                if (j.equals(JOBS.get(0))) assertTrue(js.triggerRun(j, null, Map.of()).isPresent(), j);
+                if (j.equals(names.get(0))) assertTrue(js.triggerRun(j, null, Map.of()).isPresent(), j);
                 else js.triggerRun(j, null, Map.of());
                 JobRun r = awaitRun(js, j);
                 assertNotNull(r, j + " never ran");
                 assertEquals("SUCCESS", r.status(), j + " failed: " + r.message());
             }
         }
-        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-health-data.ground-truth.json").toFile());
-        hl = parquet("health_links");
-        links = triples("SELECT src, dst, kind FROM " + hl);
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/health_phantom_counts_job.toon",
+                "config/jobs/health_phantom_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/health_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("health_phantom_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "health_phantom_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet("health_phantom_counts");
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: the clinic's 89 open lines in another hospital's stay and 70 after a death, for 40
+        // members, one provider; the 30 reversed date errors (15 at the look-alike clinic, 15 elsewhere) are never counted
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(89L, ((Number) row.get("lines_in_admission")).longValue());
+        assertEquals(70L, ((Number) row.get("lines_after_death")).longValue());
+        assertEquals(159L, ((Number) row.get("lines_in_admission_or_after_death")).longValue());
+        assertEquals(40L, ((Number) row.get("members_billed")).longValue());
+        assertEquals(1L, ((Number) row.get("providers_billing")).longValue());
+        assertEquals(30L, ((Number) row.get("corrected_lines")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+    }
+
+    @Test
+    void withoutThePhantomBillingClinicTheRuleWouldNotFire() throws Exception {
+        String clinic = truth.get("phantom_billing").get("clinic").asText();
+        Map<String, Object> without = countsOver("src <> '" + clinic + "' AND dst <> '" + clinic + "'");
+        assertEquals(0L, ((Number) without.get("providers_billing")).longValue(), "no other provider bills an open line in a stay or after a death: " + without);
+        assertTrue(((Number) without.get("lines_in_admission_or_after_death")).doubleValue() < rule().threshold(), "without " + clinic + " it would not fire: " + without);
+        assertEquals(30L, ((Number) without.get("corrected_lines")).longValue(), "the reversed date errors are all still there, and none counts");
+    }
+
+    @Test
+    void theLookAlikeClinicTheBusyHospitalAndTheKickbackRingAreNeverCounted() throws Exception {
+        JsonNode p = truth.get("phantom_billing");
+        JsonNode k = truth.get("referral_kickbacks");
+        // the look-alike clinic's 15 date errors fall in a stay too, but each was reversed within a week
+        Map<String, Object> lookalike = countsOver("src = '" + p.get("lookalike_clinic").asText() + "'");
+        assertEquals(15L, ((Number) lookalike.get("corrected_lines")).longValue(), lookalike.toString());
+        assertEquals(0L, ((Number) lookalike.get("lines_in_admission_or_after_death")).longValue(), lookalike.toString());
+        // the seaside hospital is the busiest node of the referral_kickbacks view (Busiest nodes ranks it first), and a naive count of
+        // every open line dated inside any stay would name it for inpatient lines inside its OWN stays; the counts leave the admitting
+        // hospital out, so it - and the kickback ring (two practices, the imaging centre) - count nothing
+        String hospital = k.get("lookalike_hospital").asText();
+        Map<String, Object> top = rows("WITH r AS (SELECT * FROM " + parquet("health_screen_links") + " WHERE screen = 'referral_concentration'), e AS (SELECT src AS n FROM r "
+                + "UNION ALL SELECT dst FROM r) SELECT n, count(*) AS d FROM e GROUP BY n ORDER BY d DESC LIMIT 1").get(0);
+        assertEquals(hospital, top.get("n"), "the busiest node of the referral view: " + top);
+        long naive = count("SELECT count(*) FROM " + parquet("claim_line/database", "/**/*.parquet") + " cl JOIN " + parquet("admission/database", "/**/*.parquet")
+                + " ad ON ad.member_id = cl.member_id AND CAST(cl.service_date AS DATE) > CAST(ad.from_date AS DATE) AND CAST(cl.service_date AS DATE) < CAST(ad.to_date AS DATE)"
+                + " WHERE cl.provider_id = '" + hospital + "' AND (cl.reverses IS NULL OR trim(CAST(cl.reverses AS VARCHAR)) = '')");
+        assertTrue(naive > 0, hospital + " bills lines inside its own stays, which a naive in-a-stay count would flag");
+        List<String> ring = new ArrayList<>(ids(k.get("practices")));
+        ring.add(k.get("imaging_centre").asText());
+        ring.add(hospital);
+        for (String provider : ring) {
+            Map<String, Object> only = countsOver("src = '" + provider + "'");
+            assertEquals(0L, ((Number) only.get("lines_in_admission_or_after_death")).longValue(), provider + " " + only);
+        }
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/health_billed_in_admission_or_after_death.toon").toString()));
+    }
+
+    /** The counts Job's own SQL over the real health_links, narrowed. */
+    private static Map<String, Object> countsOver(String linkFilter) throws Exception {
+        String sql = JobConfig.load(TEMPLATE.resolve("config/jobs/health_phantom_counts_job.toon").toString()).require("sql");
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW health_links AS SELECT * FROM " + hl + " WHERE " + linkFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

@@ -1,0 +1,7 @@
+name: mfs_wallet_drained_after_sim_swap
+dataset: mfs_swap_drain_counts_dataset
+measure: max(drained_after_swap)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A wallet drained within 2 hours of a SIM swap: a wallet that paid out 300 or more (P2P, merchant payments and cash-outs) within 2 hours after its SIM was swapped. The Alert carries how many such wallets there are; no wallet or staff login id leaves mfs_swap_drain_counts, so open the mfs_sim_swap_bursts view to find the login and the wallets. A store swapping many SIMs whose customers keep their balances is not counted. Not grouped by login: mfs_swap_drain_counts is a Job output, so a by column cannot be checked when the Space is created."

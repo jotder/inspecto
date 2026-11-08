@@ -138,3 +138,24 @@ golden tests are `tools/gen-la-benefits-data.test.mjs` and `BenefitsLinksJobGold
 - [ ] No look-alike links to its story: `AD-00412`, `AD-02718`, `AD-05077`; `CIT-05289`; `CIT-02003`; `P-03`.
 - [ ] Each saved view holds its story whole and its look-alike beside it, and draws without "Result cut short"
       (the largest, `tax_preparer_refund_ring`, is about 600 rows and 520 nodes; a little more with October in).
+
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-payments-to-the-deceased-alert-rule-and-the-seed)),
+after `node tools/seed-la-benefits.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`benefits.analyst` (lead):** **Alerts** lists `benefits_paid_to_the_deceased_after_notice` (WARNING) with the
+   value 9: claims of people on the death register still paid more than 30 days after the notice. Open the
+   Investigation `paid-after-death`: it is seeded with the three accounts of exercise 2 and expanded to the 12 claims
+   paid into them and their 10 claimants. The Entity List `deceased-still-paid` holds the 9 pensioners. The Case
+   "Pensions paid after death into accounts of CIT-08276" is linked to it.
+2. **Four-eyes:** an unbounded expand by `benefits.analyst` is held, not run. Sign in as **`benefits.manager`**: it is
+   in the approval inbox; approve or refuse it. `benefits.analyst` cannot approve its own request.
+3. **`benefits.reviewer`:** opens `paid-after-death` and reads every step; any change is refused.
+4. **`benefits.outsider`:** sees the Datasets, but `paid-after-death` is not found (404).
+5. **Draft:** `benefits.analyst` has one open Draft that annotates `CIT-08276`, asking who else lives at that address;
+   promote it, or leave it.
+
+**Not the story:** `CIT-05289` was paid for 42 days after the death, longer than many, but the notice arrived 40 days
+late and the pension stopped two days after it, so the rule never counts it, nor the 313 other claims stopped within
+days of their notice; without the nine pensioners the rule would not fire at all.

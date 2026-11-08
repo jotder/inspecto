@@ -1,0 +1,7 @@
+name: telco_ra_usage_without_billing
+dataset: telco_ra_unbilled_counts_dataset
+measure: max(unbilled_subscribers)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "Usage without billing: a subscriber with network usage in 2 or more months that reached no billing record, still unbilled in the latest month whose billing has landed, and not on the known list of test SIMs (plan Internal test). The spec's 'over 1 day' reads 'over one period' here: the feeds are monthly. The Alert carries how many such subscribers there are; no subscriber or dealer id leaves telco_ra_unbilled_counts, so open the unbilled_usage view to find the dealer. Not grouped by subscriber: telco_ra_unbilled_counts is a Job output, so a by column cannot be checked when the Space is created."

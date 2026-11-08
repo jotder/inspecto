@@ -1,0 +1,7 @@
+job:
+  name: logistics_new_carrier_alerts
+  type: alert.evaluate
+  description: "Evaluates the Alert Rules each time the logistics_new_carrier_counts Job produces its Dataset, so logistics_high_value_trip_new_carrier sees the new counts without anyone pressing Evaluate. On a build without Alert Rules (Basic) the rule is not armed and this Job finds nothing to evaluate."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == logistics_new_carrier_counts"
+  enabled: true

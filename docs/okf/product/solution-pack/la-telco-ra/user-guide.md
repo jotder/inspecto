@@ -129,3 +129,25 @@ golden tests are `tools/gen-la-telco-ra-data.test.mjs` and `TelcoRaLinksJobGolde
 - [ ] Each saved view holds its story whole, with its look-alike beside it, and draws without "Result cut short".
       The largest view, `dealer_commission_fraud`, is about 2 400 rows and 770 nodes. October adds no SIMs to it:
       both spikes are in the landed months.
+
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-usage-without-billing-alert-rule-and-the-seed)),
+after `node tools/seed-la-telco-ra.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`telcora.analyst` (lead):** **Alerts** lists `telco_ra_usage_without_billing` (WARNING) with the value 300:
+   subscribers not on the known list whose usage reached no billing record in 2 or more months and is still unbilled.
+   Open the Investigation `unbilled-usage`: it is seeded with `DL-047` and expanded once over `activated_by` to the
+   dealer's 336 subscribers, the 300 SIMs of exercise 1 among them. The Entity List `unbilled-sims` holds the 300. The
+   Case "Unbilled usage at DL-047" is linked to it.
+2. **Four-eyes:** an unbounded expand by `telcora.analyst` is held, not run. Sign in as **`telcora.manager`**: it is in
+   the approval inbox; approve or refuse it. `telcora.analyst` cannot approve its own request.
+3. **`telcora.reviewer`:** opens `unbilled-usage` and reads every step; any change is refused.
+4. **`telcora.outsider`:** sees the Datasets, but `unbilled-usage` is not found (404).
+5. **Draft:** `telcora.analyst` has one open Draft that annotates `DL-047` about its activation device `DEV-00086`.
+   The device itself is two hops out (dealer, SIM, device) and not in the Working Set, so the note goes on the dealer.
+   Promote it, or leave it.
+
+**Not the story:** the network test team's 40 SIMs are used and never billed too, but their plan `Internal test` puts
+them on the known list, so the rule never counts them; nor the dozen SIMs billed late in their first two months, nor
+the 50 single months a dropped batch never billed. Without `DL-047`'s SIMs the rule would not fire at all.
