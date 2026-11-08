@@ -788,7 +788,7 @@ with a score).
 - **Stories as built:** kickbacks: `PR-1426` Brackenmoor Surgery (68 of 79 referrals) and `PR-1392` Kilnworth Medical
   Practice (182 of 216) to `PR-1170` Emberlea Imaging Centre, York; its owner `OW-0434` shares home `AD-05150` with
   `OW-1270`, owner of `PR-1426`; look-alike `PR-0828` (38 of 44 to `PR-1129` Saltmere Bay Hospital, Scarborough's only
-  hospital, owned by the trust `OW-0263`), beside six more Scarborough practices (shares 0.68-0.86). Phantom billing:
+  hospital, owned by the trust `OW-0263`), beside six more Scarborough practices (shares 0.68-0.82). Phantom billing:
   `PR-1241` Sedgefold Physiotherapy, Hull, 89 open session lines for 28 patients in another hospital and 70 for 12
   patients who died 2026-01..05; look-alike `PR-0632` Willowmere Physiotherapy, Leeds, 15 patients with one line each in a
   stay, reversed in 2-6 days, plus 15 single corrected errors at other providers. Pill mill: `PR-1150` Flintcross Pain

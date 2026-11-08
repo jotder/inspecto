@@ -91,7 +91,7 @@ The centre is owned by **`OW-0434` Nell Dunbar**, who lives at **`AD-05150` (135
 `OW-1286` Sela Ellery, has no such tie; the referral pattern alone joins that practice. **Not the story:**
 **`PR-0828` Elder Grove Medical Practice** sends 38 of 44 referrals (`share:0.86`) to **`PR-1129` Saltmere Bay
 Hospital**, the only hospital in Scarborough, owned by **`OW-0263` Saltmere Health Trust**; the other six
-Scarborough practices in the view do the same (`share:0.68`–`0.86`). Concentration alone is not the finding; the
+Scarborough practices in the view do the same (`share:0.68`–`0.82`). Concentration alone is not the finding; the
 shared home is.
 
 ### 2. Phantom billing — who bills patients who could not have been there?

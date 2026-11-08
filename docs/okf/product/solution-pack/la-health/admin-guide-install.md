@@ -69,7 +69,7 @@ The Space folder holds only configuration; all runtime state (`data/`, `audit/`,
 
 Copy every file of `inspecto-la-data/la-health/data/staged/<feed>/` into
 `inspecto-la-data/la-health/data/inbox/<feed>/` (`claim_line`, `admission`, `referral`, `prescription`). The
-Pipelines land them and the Jobs rebuild the links. October brings about 9 000 claim lines, about 190 hospital
+Pipelines land them and the Jobs rebuild the links. October brings about 6 500 claim lines, about 190 hospital
 stays, about 1 100 referrals and about 2 400 prescriptions. The member, provider and owner extracts are not
 re-sent, and nothing in October bills inside a stay or after a death: the planted stories stay as they are (the
 `health_upcoding` view gains a few elderly-care clinics as their visit counts pass 150).
