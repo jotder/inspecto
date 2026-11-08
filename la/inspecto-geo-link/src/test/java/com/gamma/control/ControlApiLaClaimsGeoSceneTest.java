@@ -104,18 +104,18 @@ class ControlApiLaClaimsGeoSceneTest {
                     accidents = lines.count() - 1;
                 }
 
-                JsonNode all = project(api.port(), projection("claims_accidents_map", "claims_accidents_dataset"));
+                JsonNode all = project(api.port(), projection("accidents_map", "claims_accidents_dataset"));
                 assertEquals(0, all.get("skipped").asInt(), "every accident has a place");
                 assertEquals(accidents, all.get("points").size(), "one point per accident");
                 int stacked = 0;
                 for (JsonNode p : all.get("points")) if (metres(p.get("lat").asDouble(), p.get("lon").asDouble()) <= 400) stacked++;
                 assertEquals(11, stacked, "eleven accidents within 400 m of the junction");
 
-                JsonNode night = project(api.port(), projection("claims_junction_cluster_map", "claims_night_unreported_dataset"));
+                JsonNode night = project(api.port(), projection("staged_accident_junction_map", "claims_night_unreported_dataset"));
                 int nightStacked = 0;
                 for (JsonNode p : night.get("points")) if (metres(p.get("lat").asDouble(), p.get("lon").asDouble()) <= 400) nightStacked++;
                 assertEquals(11, nightStacked, "all eleven are in the 02:00-03:59 no-police-report subset");
-                JsonNode providers = project(api.port(), projection("claims_providers_map", "provider_directory_dataset"));
+                JsonNode providers = project(api.port(), projection("providers_map", "provider_directory_dataset"));
                 assertEquals(25, providers.get("points").size(), "all 25 providers are placed");
                 assertEquals(0, providers.get("skipped").asInt());
                 assertTrue(night.get("points").size() >= 11 && night.get("points").size() < accidents / 4, "the subset is small: " + night.get("points").size());

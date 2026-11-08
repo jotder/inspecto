@@ -1,0 +1,5 @@
+name: Insurance
+tagline: "Insurance claims fraud on synthetic data - a ring of claimants sharing phones and addresses, a parts-supplier ring, a ghost broker and staged night-time accidents, every Dataset mapped."
+minEdition: basic
+icon: heroicons_outline:shield-check
+useCases[1]: la-claims

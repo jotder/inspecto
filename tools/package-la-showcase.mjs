@@ -109,20 +109,31 @@ export function plan(id, files) {
 /**
  * LA-INDUSTRY-SPACES-1: an industry Space is composed from use-case templates named by a recipe
  * (`spaces/_industries/<id>.toon`, `useCases[n]: a,b`). Every file comes from exactly one use case: a path two use cases
- * both ship is refused, so a collision is renamed in its template on purpose. The one exception is
- * `config/link-analysis.toon`, whose `entity_types` are merged by id (the same id must be declared the same way).
+ * both ship with different content is refused, so a real collision is renamed in its template on purpose. Three
+ * exceptions: the same bytes in several use cases ship once; `config/link-analysis.toon` is merged by entity-type id
+ * (the same id must be declared the same way); and `config/examples/*.md` are joined. A lone copy of either joined
+ * file ships verbatim.
  * @param byTemplate  [{ tpl, files: [paths relative to the template folder] }]
  * @returns Map path -> template that ships it (link-analysis.toon maps to every template that has one)
  */
 export const MERGED = 'config/link-analysis.toon';
-export function composeSources(byTemplate) {
+/** Files every use case may ship, joined in the composed Space: link-analysis.toon (merged) and the inert examples
+ *  (config/examples/*.md, which every template must carry under the same name, each titled for its own Space). */
+export const isJoined = (f) => f === MERGED || (f.startsWith('config/examples/') && f.endsWith('.md'));
+/** Inert example documents from several use cases, one after the other. */
+export const joinExamples = (texts) => texts.map((t) => t.replace(/\s+$/, '')).join('\n\n---\n\n') + '\n';
+export function composeSources(byTemplate, sameBytes = () => false) {
   const owner = new Map();
   for (const { tpl, files } of byTemplate) {
     if (!files.includes('template.toon')) throw new Error(`use case '${tpl}' has no committed template.toon: not a Space template (a typo in the recipe?)`);
     for (const f of files) {
       if (f === 'template.toon' || f.startsWith('portal/')) continue;
-      if (f === MERGED) { owner.set(f, [...(owner.get(f) ?? []), tpl]); continue; }
-      if (owner.has(f)) throw new Error(`'${f}' is shipped by both ${owner.get(f)} and ${tpl}: rename it in one template`);
+      if (isJoined(f)) { owner.set(f, [...(owner.get(f) ?? []), tpl]); continue; }
+      if (owner.has(f)) {
+        // The same bytes in both (a shared governance example, for one) is one file; anything else is a real clash.
+        if (sameBytes(f, owner.get(f), tpl)) continue;
+        throw new Error(`'${f}' is shipped by both ${owner.get(f)} and ${tpl}: rename it in one template`);
+      }
       owner.set(f, tpl);
     }
   }
@@ -182,12 +193,20 @@ function main() {
     // An industry Space: compose it from the use-case templates its recipe names.
     const recipe = git(['show', `HEAD:${recipePath}`], { encoding: 'utf8' });
     const byTemplate = recipeUseCases(recipe).map((tpl) => ({ tpl, files: listed(`${TEMPLATES}/${tpl}`) }));
-    const owner = composeSources(byTemplate);
+    const blob = (t, rel) => git(['rev-parse', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }).trim();
+    const owner = composeSources(byTemplate, (rel, a, b) => blob(a, rel) === blob(b, rel));
     files = [...owner.keys()];
     templateToon = recipe;
-    show = (rel) => rel === MERGED
-      ? Buffer.from(mergeEntityTypes(owner.get(rel).map((t) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }))))
-      : git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
+    // link-analysis.toon from ONE use case ships verbatim (it may hold more than entity_types, as la-claims' does);
+    // from several it is merged, which today accepts entity_types only.
+    const text = (t, rel) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' });
+    show = (rel) => {
+      if (!isJoined(rel)) return git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
+      const from = owner.get(rel);
+      if (from.length === 1) return git(['show', `HEAD:${TEMPLATES}/${from[0]}/${rel}`]);
+      const texts = from.map((t) => text(t, rel));
+      return Buffer.from(rel === MERGED ? mergeEntityTypes(texts) : joinExamples(texts));
+    };
     console.log(`  composing ${opts.id} from ${byTemplate.map((b) => b.tpl).join(', ')}`);
   } else {
     const tplDir = `${TEMPLATES}/${opts.id}`;
