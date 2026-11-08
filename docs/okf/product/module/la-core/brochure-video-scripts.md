@@ -48,15 +48,15 @@ Telecom, its banking stories under Banking and finance.
 
 | # | Industry | Use cases (segments) | Length (about) | Film on | Ready to film |
 |---|---|---|---|---|---|
-| 3.1 | Telecom | Mobile money · MFS · Telco fraud · Revenue assurance | 3 min 30 s | Advanced | 3 of 4 segments (MFS planned) |
-| 3.2 | Banking and finance | First look · Financial crime · Ownership and sanctions · Card fraud · Trade finance · Crypto | 4 min 45 s | Advanced | 5 of 6 segments (crypto planned) |
+| 3.1 | Telecom | Mobile money · MFS · Telco fraud · Revenue assurance | 3 min 30 s | Advanced | Yes (B and D also on Basic, in the *Telecom* Space) |
+| 3.2 | Banking and finance | First look · Financial crime · Ownership and sanctions · Card fraud · Trade finance · Crypto | 4 min 45 s | Advanced | Yes (all but B also on Basic, in the *Banking and finance* Space) |
 | 3.3 | Insurance | Claims fraud | 2 min | Basic | Yes |
 | 3.4 | Utilities | Electricity revenue protection | 2 min | Basic | Yes |
 | 3.5 | Law enforcement | Criminal investigation | 2 min | Basic | Yes |
 | 3.6 | Public sector | Procurement · Benefits and tax | 2 min 30 s | Basic | Yes |
 | 3.7 | Healthcare | Provider billing | 2 min | Basic | Yes |
-| 3.8 | Logistics | Cargo theft | 2 min | Basic | No: Space planned |
-| 3.9 | Enterprise | Internal audit · Insider threat | 2 min 30 s | Advanced | 1 of 2 segments (insider planned) |
+| 3.8 | Logistics | Cargo theft | 2 min | Basic | Yes |
+| 3.9 | Enterprise | Internal audit · Insider threat | 2 min 30 s | Advanced | Yes (B also on Basic, in the *Enterprise* Space) |
 
 *Features shown* is the lowest edition that has every feature on screen. *Film on* is the install the video must be
 captured on: `la-mobile-money`, `la-showcase` and `la-audit` are templates that need an Advanced install
@@ -333,7 +333,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | Beat | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
 | Opening | 8 | The raw files of every segment flash past, unformatted. | [Industry] · *Example · synthetic data* | [The industry and its problems, in two sentences] |
-| Map | 8 | The Data page: one of the industry's Datasets open at *Entities*, or the link Dataset its Job builds. | *Entities* or *One link Dataset · built by one Job* | Each of these began as a raw export. You say once how the records link up; then you ask. |
+| Map | 8 | The Data page: one of the industry's Datasets open, each id column and what it holds, and its own Mapping. | *What each column holds* | Each of these began as a raw export. You say once what each column holds and how a row links two of them; then you ask. |
 | Explore it | 10 | Each Space's home page in turn, its saved views under *My work*. | *Ships with Inspecto LA* · [Space names] | Every example here ships with Inspecto LA. Open the Spaces and explore them yourself: each comes with a short tour, and an exercise for every story, with the answers. |
 | Your data | 7 | One raw file dissolving into its graph. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
 | Edition close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
@@ -345,28 +345,33 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 |---|---|
 | Audience | Fraud, risk and revenue-assurance teams at mobile operators and their mobile financial services (MFS) businesses. |
 | Film on | Advanced install (`la-mobile-money`, `la-showcase`); film as a user who can reveal identifiers. |
-| Ships as | *Link Analysis mobile money* (`la-mobile-money`, Advanced), *Link Analysis showcase* (`la-showcase`, Advanced), *Telecom* (`la-telecom`, the industry Space, today composed from `la-telco-ra`, every Dataset mapped; Basic). `la-mfs` is planned. |
-| Ready | Segments A, C and D now; B when `la-mfs` is built. |
+| Ships as | *Telecom* (`la-telecom`, the industry Space composed from `la-telco-ra` and `la-mfs`, every Dataset mapped; Basic). Mobile money (`la-mobile-money`) and telco fraud (`la-showcase`) are Advanced packs that join *Telecom* when wave B gives them a Basic tier. |
+| Ready | All four segments now: A and C on an Advanced install, B and D in the *Telecom* Space on Basic. |
 | As built | All three Spaces build their links with a Job (`mm_links`, `telecom_links`, `telco_ra_links`), so the Map beat shows a Job-built link Dataset. *Busiest nodes* is not the ask in A: there the busiest node is the benign biller `MER-ELECTRIC`. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
 | A | Mobile money | `la-mobile-money` (built) | Wallet transactions (`WALLET_TXN_20261006.csv`). | Agent `AG-18` cashes in for 25 wallets (`STRUCT-01`…`25`) within 36 hours, every amount between 4 750 and 5 000 (the limit is 5 000); each wallet pays `HUB-01`. | Saved view `mm_structuring_band`; *Value Measures* ▸ *structuring*, 4 750 to 5 000: one wallet, `HUB-01`, with 25 legs from 25 payers; the cash-in agent is `AG-18`. | An agent to review; the 25 wallets and the hub as the evidence. | `MER-ELECTRIC`, a biller 300 wallets pay, one way only: it tops degree and the default suspicion score, and is not the story. |
-| B | MFS | `la-mfs` (planned) | SIM-swap events and wallet transfers. | SIM-swap wallet takeover: 30 SIMs swapped through one call-centre login, `S-41`, in 10 days; each wallet drained within 2 hours to 5 mule wallets. | Written when the Space is built, from its user guide. | A login to investigate; 5 mule wallets to trace. | A busy store doing many genuine SIM swaps for customers who keep their balances. |
+| B | MFS | `la-mfs` (built) | SIM swaps, device logins and wallet transfers (`SIM_EVENT_202606.csv`, `DEVICE_LOGIN_202606.csv`, `WALLET_TXN_202606.csv`). | Call-centre login `S-41` swapped the SIMs of 30 customers in 10 days (2026-06-08 to 06-17). Within the hour each wallet logged in from one of six new handsets (`HS-08913` to `HS-08918`); within 2 hours it was drained to five mule wallets (`WL-07936` to `WL-07940`), cashed out at agents `A-088` and `A-093`. | Saved view `mfs_sim_swap_bursts`: read `channel:`, `new_device_minutes:` and `out_within_2h:` on each login's `swapped_by` links; follow the handsets and the payments. | A login to investigate; five mule wallets and two agents to trace. | Store login `S-72`: 160 swaps in a SIM upgrade drive, customers on their own new handsets, nobody paid out more than 100 within 2 hours. |
 | C | Telco fraud | `la-showcase` (built) | Call records (`VOICE_CDR_20260929.csv`). | One operation behind several typologies: the Wangiri number `99979100001` forwards to the premium number `99891000001`, which links to an IRSF ring, a subscription-fraud identity and, at degree 4, the SIM box. | Saved view `telecom_fraud_network`; seed `99979100001`; *Expand* one degree at a time to 4, busy numbers held. Degree 1 also draws its roughly 400 call-back victims (about 400 nodes, a star). | One operation, not four cases: the chain, link by link, for the report. | The taxi-dispatch number `99970000100` (650 callers): reached at degree 2 and held, never expanded. |
 | D | Revenue assurance | `la-telco-ra` (built) | SIM activations and top-ups (`SUBSCRIBER_20260930.csv`, `TOPUP_202602.csv`). | Dealer `DL-112` (Copperfield Talk, Leeds) activates 400 SIMs on `DEV-00204`, `DEV-00205` and `DEV-00206` in six weeks from 2026-02-02; each is topped up once, with 5.00, at the dealer's own shop `POS-0008`, then never used again. | Saved view `dealer_commission_fraud`: two dealers with weeks of 50 or more commission-earning SIMs; follow each dealer's `topped_up` links: one fans out to ten shops, the other converges on `POS-0008`. | A dealer's commissions to audit. | `DL-163` (Yardley Handsets, Sheffield), 350 SIMs at the start of a university term: students top up by app or at ten shops and use the SIMs every month. |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
 | 1 | 8 | Opening: top-ups, call records and activations flash past, raw. | Telecom · *Example · synthetic data* | On a mobile network, money leaks out through laundering, scams and commissions. Each trick hides in a different system, and each team sees only its own. |
-| 2 | 8 | Map: the Data page, one Space's link Dataset open, built by its Job. | *One link Dataset · built by one Job* | Each of these began as a raw export. A Job, set up once, joins each Space's files into one list of links. |
+| 2 | 8 | Map: the Data page, `sim_event_dataset` open: `msisdn` holds *Subscriber number*, `staff_login` holds *Staff login*; its Mapping reads staff login → subscriber number. | *What each column holds* | Each of these began as a raw export. You say once what each column holds and how a row links two of them; then you ask. |
 | A1 | 8 | Wallet transactions under the title. | *Mobile money* | Mobile money has a reporting limit. Launderers stay under it by splitting cash into many small deposits, often with an agent's help. |
 | A2 | 5 | `WALLET_TXN_20261006.csv` as it landed. | — | A day of wallet transactions: two wallet ids, an amount, a time. |
 | A3 | 8 | Saved view `mm_structuring_band`, legend open. | *mm_structuring_band* | This view keeps only the deposits just under the limit. Each circle is a wallet or an agent; each line is a cash-in or a payment. |
 | A4 | 7 | Toolbox ▸ *Value Measures* ▸ *structuring*, 4 750 to 5 000. | *Value Measures · structuring* | Ask which wallet collects many deposits inside that band. The structuring measure counts them for every wallet. |
 | A5 | 10 | A beat of quiet; `HUB-01`, its 25 payers and `AG-18`, held. | *AG-18 · 25 wallets · HUB-01* | Twenty-five wallets, every cash-in just under five thousand, all through one agent, AG-18, and all paying the same hub. An agent to review, with the wallets as evidence. |
 | A6 | 7 | The raw rows beside the graph. | — | Each deposit is legal on its own. Only the links show twenty-five of them meeting in one place. |
-| B | 45 | Segment B, filmed when `la-mfs` is built. | *MFS* | Written from its user guide when the Space ships. |
+| B1 | 8 | SIM swaps under the title. | *MFS* | A SIM swap moves a phone number to a new card. A criminal who gets one through a shop or a call centre gets the customer's wallet with it. |
+| B2 | 5 | `SIM_EVENT_202606.csv` and `WALLET_TXN_202606.csv` as they landed. | — | SIM swaps in one file, wallet logins and payments in others. |
+| B3 | 9 | Saved view `mfs_sim_swap_bursts`, legend open. | *mfs_sim_swap_bursts* | This view keeps the logins that made bursts of swaps. Each circle is a staff login, a number, a wallet, a handset or an agent; each line is a swap, a login or a payment. |
+| B4 | 8 | Hover the `swapped_by` links of `S-41`: `channel: call_centre`, `new_device_minutes:`, `out_within_2h:`. | *swapped_by* | Ask what happened after each swap: how soon a new handset logged in, and how much left the wallet within two hours. |
+| B5 | 10 | A beat of quiet; `S-41`, its 30 numbers, six handsets and five mule wallets, held. | *S-41 · 30 swaps · 6 handsets · 5 mules* | One call-centre login swapped thirty numbers in ten days; each wallet was emptied within two hours, to the same five mules. A login to investigate, five wallets to trace. |
+| B6 | 7 | `S-41` beside the busy store login `S-72`. | — | A store doing a hundred and sixty swaps in an upgrade drive looks busier. Only the links to the money tell a takeover from a sale. |
 | C1 | 8 | Call records under the title. | *Telco fraud* | Fraud on a phone network is rarely one trick. A missed-call scam, a premium-rate number, a fake subscription and a SIM box can be one operation. |
 | C2 | 5 | `VOICE_CDR_20260929.csv` as it landed. | — | Sixty days of call records: who called whom, when, and for how long. |
 | C3 | 9 | Saved view `telecom_fraud_network`, seeded with `99979100001`; degree 1 draws a star of call-back victims. Legend open. | *telecom_fraud_network* | Start from one suspect number. Each circle is a number; each line is a call, a text, a forwarded call, or a device, identity or payment card two numbers share. |
@@ -379,7 +384,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | D4 | 8 | Follow each dealer's `topped_up` links; hover an `activated_by` link to read `topups:1`, `usage_months:1`. | *topped_up* | Ask where each dealer's SIMs were topped up. One dealer's fan out to ten shops near a university; the other's all converge on one shop. |
 | D5 | 10 | A beat of quiet; `DL-112`, its three devices and `POS-0008`, held. | *DL-112 · 400 SIMs · POS-0008* | Four hundred SIMs from three devices, each topped up once with five, at the dealer's own shop, and then never used. A dealer's commissions to audit. |
 | D6 | 7 | The two dealers side by side. | — | In the commission report both dealers look the same: a spike of new SIMs. The links show who paid for them. |
-| 3 | 10 | Explore it: each Space's home page, its saved views under *My work*. | *Ships with Inspecto LA* · *Link Analysis mobile money* · *Link Analysis showcase* · *Telecom* | Every example here ships with Inspecto LA. Open them and explore: each comes with a short tour, and an exercise for every story, with the answers. |
+| 3 | 10 | Explore it: the *Telecom* Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Telecom* | Every example here ships with Inspecto LA. Open the Telecom Space and explore: each story comes with a short tour and an exercise, with the answers. |
 | 4 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card, one line at a time. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 5 | 4 | End card. | *For telecom fraud and revenue assurance.* · *Try it on your own data.* | Inspecto LA. |
@@ -391,7 +396,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | Audience | Fraud, AML, KYC, sanctions and trade-finance compliance teams at banks, payment providers and virtual-asset service providers. |
 | Film on | Advanced install (`la-showcase`); film as a user who can reveal identifiers. Without segment B, a Basic install. |
 | Ships as | *Banking and finance* (`la-banking`, the industry Space composed from `la-sample`, `la-ownership`, `la-card`, `la-trade` and `la-crypto`, every Dataset mapped; Basic). The sample also opens on its own with *Try the sample*. The financial-crime tour (`la-showcase`, Advanced) joins when wave B gives it a Basic tier. |
-| Ready | Segments A–E now; F when `la-crypto` is built. |
+| Ready | All six segments now: B on an Advanced install, the rest in the *Banking and finance* Space on Basic. |
 | As built | `TILL-06` takes **97 %** of the cash-out from 8 payers (the shipped data and `ControlApiLaShowcaseFiguresTest`; the old plan said 80 %). `la-sample` and the mule part of `la-showcase` mark their account columns as accounts; `la-ownership` and `la-trade` also set one Entity Type over a Job-built link Dataset; `la-card` builds its links with a Job only. The circular trade runs twice round between 18 March and 27 June 2026. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
@@ -401,7 +406,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | C | Ownership and sanctions | `la-ownership` (built) | An ownership register and an (invented) sanctions list (`OWNERSHIP_20260930.csv`, `SANCTIONS_LIST_20260930.csv`). | List entry `SL-0137` *Corvin Tammask* (1971, CY) matches person `PER-03904` *Corvin Tamask* (score 0.986). `PER-03904` owns 60 % of `CO-04431`, which owns 50 % of `CO-04313`, the company of bank customer `CUS-00528`. | *Start a graph* ▸ *One entity*, Entity Type *Party*, `SL-0137`, *Draw*; open the `name_match` link (score, why); *Expand*, Degrees 3: six nodes. | A customer to escalate for review. | `PER-02226` *Anselm Pelivane* against listed `SL-0289` *Anselm Pellivane*: different birth year and nationality, so no match; his customer is clean. |
 | D | Card fraud | `la-card` (built) | Card authorisations and chargebacks (`CARD_AUTH_202603.csv`, `CHARGEBACK_20260930.csv`). | 60 cards that paid at merchant `M-317` (Kestrel Fuel Parkway, Sheffield) between 2026-03-02 and 2026-03-22 suffered card-not-present fraud 1 to 6 weeks later. | Saved view `common_point_of_purchase` (each defrauded card linked to the merchants it paid before the fraud); *Busiest nodes*: `M-317` far ahead, linked to 60 cards. | The likely point of compromise to investigate. | `M-052` (Harvest Fair Superstore): about 940 cards, none defrauded; not in the view at all. |
 | E | Trade finance | `la-trade` (built) | Bills of lading (`BILL_OF_LADING_202603.csv`). | Six containers (`KLNU7238600` and five more) go twice round `CO-00941` (UAE) → `CO-00388` (India) → `CO-00213` (Malaysia) → `CO-00941`, 18 March to 27 June 2026: the same 1 100 laptops, invoiced at 450 681 rising to 788 128. | Saved view `circular_trade`: six boxes tied to the same three shippers stand apart; hover a box: `relayed`, its consignees and relays; then the `traded_with` links between the three companies. | Three companies and six trades to look at. | The leasing pool's boxes (`PWCU…`), each loaded by 10 different shippers, never back to a company that sent it. |
-| F | Crypto | `la-crypto` (planned) | Exchange deposits and withdrawals. | Converging cash-out: 40 KYC accounts at 2 exchanges deposit from one cluster and cash out to 3 bank accounts. | Written when the Space is built, from its user guide. | Three bank accounts where the money goes next. | An over-the-counter desk whose many customers deposit their own funds. |
+| F | Crypto | `la-crypto` (built) | Exchange accounts and cash-outs (`EXCHANGE_ACCOUNT_20260930.csv`, `CASHOUT_202605.csv`). | Cluster `CL-01125` (30 addresses, one owner) paid 40 exchange accounts (`XA-03119` to `XA-03158`) at two exchanges, opened in 40 different names; every one cashes out to one of three bank accounts (`BK-49804167`, `BK-77665088`, `BK-95284540`). | Saved view `converging_cash_out`: compare the two clusters; read `accounts_to_this_bank:` on the `cashed_out_to` links. | One controller behind 40 straw accounts: three bank accounts to follow. | Cluster `CL-01126`, an over-the-counter desk paying 60 customers' own accounts, each cashing out to a bank account of its own. |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
@@ -437,7 +442,12 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | E4 | 8 | Hover a box: `relayed`, its consignees and relays; then the `traded_with` links between the three companies. | *circular_trade* | Six boxes stand apart, tied to the same three companies. Ask where they went. |
 | E5 | 10 | The loop held: UAE → India → Malaysia → UAE, twice. | *6 containers · twice round · 450 681 → 788 128* | The same six containers, the same laptops, twice round three companies in three months, invoiced higher every time. Three companies to look at. |
 | E6 | 7 | The loop beside a leasing pool box. | — | Each bill of lading is ordinary. Only the links show the goods going nowhere while the invoices grow. |
-| F | 45 | Segment F, filmed when `la-crypto` is built. | *Crypto* | Written from its user guide when the Space ships. |
+| F1 | 8 | Exchange accounts under the title. | *Crypto* | Crypto launderers cash out through accounts opened in other people's names, many of them, so no one account looks large. |
+| F2 | 5 | `EXCHANGE_ACCOUNT_20260930.csv` and `CASHOUT_202605.csv` as they landed. | — | Exchange accounts, who holds them, and where each one cashes out. |
+| F3 | 9 | Saved view `converging_cash_out`, legend open. | *converging_cash_out* | Each circle is an address cluster, an exchange account, a person or a bank account; each line is a deposit, a holder or a cash-out. |
+| F4 | 8 | Compare the two clusters; hover `cashed_out_to` links: `accounts_to_this_bank:`. | *cashed_out_to* | Ask how many accounts each cluster paid, how many people hold them, and how many bank accounts the money ends in. |
+| F5 | 10 | A beat of quiet; `CL-01125`, its 40 accounts and the three bank accounts, held. | *CL-01125 · 40 accounts · 3 bank accounts* | Forty accounts in forty names, all paid by one cluster, all cashing out to the same three bank accounts. One controller; three bank accounts to follow. |
+| F6 | 7 | The cluster beside the over-the-counter desk. | — | A desk paying sixty customers looks the same from the chain. Only the links to the cash-outs show one hand behind the straw accounts. |
 | 3 | 10 | Explore it: each Space's home page. | *Ships with Inspecto LA · Banking and finance* | Every example here ships with Inspecto LA; the sample opens with one click. Explore them yourself: each comes with a short tour, and an exercise for every story, with the answers. |
 | 4 | 7 | Your data. | *Your data · same steps* | These records are examples. Drop in your own, say what each column holds, and ask the same questions. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
@@ -461,7 +471,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 |---|---|---|---|---|
 | 1 | 9 | The claims list under the title. | Insurance · *Example · synthetic data* | Organised claims fraud looks like bad luck spread across many people. Each claim is small and plausible; the ring only shows when you see what the claimants share. |
 | 2 | 6 | `CLAIM_PARTY_20260930.csv` as it landed. | — | Claim parties: names, birth dates, phones, addresses. Read row by row, every claim looks like its own. |
-| 3 | 8 | The Data page: `claims_links_dataset`, built by the `claims_links` Job. | *One link Dataset · built by one Job* | One Job, set up once, turns the claims into links: who claimed together, who shares a phone or an address, which garage, clinic and lawyer. |
+| 3 | 8 | The Data page: open `claim_party_dataset`: `party_id` holds *Party*, `claim_id` holds *Claim*; its own Mapping reads party → claim, kind `role`. | *What each column holds* | Say once what each column holds: people and claims, and who was on which claim. Every file in the Space is mapped the same way; one Job then joins them into a single list of links. |
 | 4 | 9 | Saved view `claimant_ring_shared_identity`; seed `CL-0134`; *Expand* twice. Legend open. | *claimant_ring_shared_identity · CL-0134* | Start from one claimant and widen out twice. Each circle is a person, a phone, an address or a provider; each line is a claim, a shared phone or a shared address. |
 | 5 | 8 | Toolbox ▸ *Communities*. | *Communities* | Ask which of them belong together. Communities finds the groups that link mostly among themselves. |
 | 6 | 10 | A beat of quiet; the community held. | *12 claimants · 4 phones · 3 addresses* | Twelve claimants sharing four phones and three addresses, one garage, one clinic and one lawyer. One ring to refer to the investigators. |
@@ -516,15 +526,15 @@ passes over it; product decides whether that hint should stay on a node the anal
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
-| A | Criminal investigation | `la-police` (built) | Incident reports, stolen property, dealer sales and number-plate reads (`INCIDENT_REPORT_20261031.csv`, `DEALER_SALE_20261031.csv`). | 18 burglaries in Leeds North and Leeds East, 2026-02-04 to 2026-04-27; 21 of 53 stolen items sold to dealers `DLR-04` and `DLR-09` by sellers `P-00476`, `P-04874` and `P-00785`, the serial recorded on 13. `P-00476` lives at `ADR-1377` with `P-05167`, keeper of the car `ZX 9117 X`, read by cameras near 11 of the 18 scenes. | Saved view `burglary_series`: burglaries point at three sellers, the sellers at two dealers. Find the seller with the most `item_match` links (`P-00476`); follow `lives_at`, then `keeper_of` and `seen_near`. | Three lines of enquiry: the dealers, the sellers, the car. | The black taxi `ZX 3465 D`, seen near 54 incidents across the year and the city, none in the series; not in the view, no link to the series. |
+| A | Criminal investigation | `la-police` (built) | Incident reports, stolen property, dealer sales and number-plate reads (`INCIDENT_REPORT_20261031.csv`, `DEALER_SALE_20261031.csv`). | 18 burglaries in Leeds North and Leeds East, 2026-02-04 to 2026-04-27; 21 of 53 stolen items sold to dealers `DLR-04` and `DLR-09` by sellers `P-00476`, `P-04874` and `P-00785`, the serial recorded on 13. `P-00476` lives at `ADR-1377` with `P-05167`, keeper of the car `ZX 9117 X`, read by cameras near 11 of the 18 scenes. | Saved view `burglary_series`; *Busiest nodes*: the car `ZX 9117 X` (15 links), the seller `P-00476` (12), the seller `P-04874` and the dealer `DLR-04`; *Show on graph* on the car. Filmed so in draft 1 (2026-11-08). The user guide's exercise reaches the same people by following `item_match`, `lives_at`, `keeper_of` and `seen_near`. | Three lines of enquiry: the dealers, the sellers, the car. | The black taxi `ZX 3465 D`, seen near 54 incidents across the year and the city, none in the series; not in the view, no link to the series. |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
 | 1 | 9 | Incident reports under the title. | Law enforcement · *Example · synthetic data* | A burglary series rarely leaves a suspect at the scene. But stolen goods have to be sold, and the people selling them have homes and cars. |
 | 2 | 6 | `INCIDENT_REPORT_20261031.csv` and `DEALER_SALE_20261031.csv` as they landed. | — | Incident reports, stolen property with serial numbers, second-hand dealers' purchase logs, and number-plate camera reads. Different systems, different teams. |
-| 3 | 8 | The Data page: `police_links_dataset`, built by the `police_links` Job. | *One link Dataset · built by one Job* | One Job, set up once, joins them into links: which item was stolen where, who sold it, who lives where, and which car was seen near which scene. |
+| 3 | 8 | The Data page: open `dealer_sale_dataset`: `seller_person_id` holds *Person*, `dealer_id` holds *Dealer*; its own Mapping reads seller → dealer, when `sold_at`. | *What each column holds* | Say once what each column holds: a seller is a person, a dealer is a dealer, and each sale links the two. Every file is mapped the same way; one Job then joins them into a single list of links. |
 | 4 | 9 | Saved view `burglary_series`, legend open. | *burglary_series* | Each circle is a burglary, an item, a person, a dealer, an address or a car. Burglaries point at three sellers; the sellers point at two dealers. |
-| 5 | 9 | The seller with the most `item_match` links; follow `lives_at`, then `keeper_of` and `seen_near`. | *item_match · lives_at · seen_near* | Ask who sold the most matching items, and follow that seller home. Who lives there, and what do they drive? |
+| 5 | 9 | Fold the legend; open the toolbox; *Busiest nodes*. The list: `ZX 9117 X` 15 links, `P-00476` 12, `P-04874` 6, `DLR-04` 5. | *Busiest nodes* | Ask who sits in the middle. Busiest nodes counts each circle's lines, so whatever ties the series together rises to the top. |
 | 6 | 10 | A beat of quiet; the series held as one group, the car joining it. | *2 dealers · 3 sellers · 1 car · 11 of 18 scenes* | Two dealers, three sellers, and a car kept at the seller's address, seen near eleven of the eighteen scenes. Three lines of enquiry. |
 | 7 | 8 | The group held. | — | A taxi was seen near more incidents than that car, all over the city, and none in this series. The links tell a busy car from a connected one. |
 | 8 | 10 | The Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Law enforcement* | This example ships with Inspecto LA. Open the Law enforcement Space and explore it yourself: a drug-supply phone network and a suspicious witness are planted in the same data. |
@@ -550,7 +560,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
 | 1 | 8 | Opening: tender awards and benefit claims flash past, raw. | Public sector · *Example · synthetic data* | Public money leaks two ways: contracts won by firms that agree not to compete, and benefits paid to claims that are not what they say. |
-| 2 | 8 | Map: the Data page, a Job-built link Dataset. | *One link Dataset · built by one Job* | Each of these began as a raw export. A Job, set up once, joins each Space's files into one list of links. |
+| 2 | 8 | Map: The Data page: open `bid_dataset`: `bidder_id` holds *Company*, `tender_id` holds *Tender*; its own Mapping reads company → tender, when `submitted_at`. | *What each column holds* | Each of these began as a raw export. You say once what each column holds and how a row links two of them; then you ask. |
 | A1 | 8 | Tenders under the title. | *Procurement* | When firms take turns to win, every tender looks competitive and the public still pays too much. |
 | A2 | 5 | `TENDER_202601.csv` and `BID_202601.csv` as they landed. | — | Tenders, bids and amounts, and a register of company directors. |
 | A3 | 9 | Saved view `bid_rotation`, legend open. | *bid_rotation* | This is the whole road-maintenance market. Each circle is a tender, a firm or a director; each line is a bid, a win or a directorship. |
@@ -586,7 +596,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 |---|---|---|---|---|
 | 1 | 9 | Referral counts under the title. | Healthcare · *Example · synthetic data* | When a doctor profits from where patients are sent, the referrals stop following need. Payers see the claims, not the owners behind them. |
 | 2 | 6 | `REFERRAL_202604.csv` and `OWNER_20260930.csv` as they landed. | — | Referrals: which practice sent which patient where. And the enrolment file: who owns each provider, and where they live. |
-| 3 | 8 | The Data page: `health_links_dataset`, built by the `health_links` Job. | *One link Dataset · built by one Job* | One Job, set up once, joins them into links: who referred to whom, who owns what, and who lives where. |
+| 3 | 8 | The Data page: open `referral_dataset`: `from_provider` and `to_provider` hold *Provider*, `member_id` holds *Member*; its own Mapping reads provider → provider, when `referred_on`. | *What each column holds* | Say once what each column holds: practices and providers, and who referred to whom. Every file is mapped the same way; one Job then joins them into a single list of links. |
 | 4 | 9 | Saved view `referral_kickbacks`, legend open. | *referral_kickbacks* | This view keeps every practice that sends most of its referrals to one place. Each circle is a practice, a provider, an owner or a home. |
 | 5 | 9 | Seven practices pointing at the town hospital; two at the imaging centre; follow `owned_by`, then `lives_at`. | *owned_by · lives_at* | Seven practices send nearly everyone to the only hospital in town: that's geography. Two send theirs to a private imaging centre. Ask who owns each end. |
 | 6 | 10 | A beat of quiet; the two owners meeting at `AD-05150`, held. | *Emberlea · Brackenmoor · one home* | The imaging centre's owner and the owner of one referring practice share a home. A conflict of interest to look into. |
@@ -602,14 +612,26 @@ passes over it; product decides whether that hint should stay on a node the anal
 |---|---|
 | Audience | Logistics security teams and cargo insurers. |
 | Film on | Basic install. |
-| Ready | When `la-logistics` is built: write its script from the Space's user guide then, with the same beats as 3.5. |
+| Ships as | *Logistics* (`la-logistics-industry`, the industry Space composed from `la-logistics`, every Dataset mapped); saved views `driver_team_inside_job`, `theft_stop_hotspot`, `fictitious_carrier`. |
+| Ready | Now. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
-| A | Cargo theft | `la-logistics` (planned) | Trip logs, scan logs and loss reports. | Inside job: 12 losses share one driver pair, and one night-shift scanner is on 10 of them. | Written when the Space is built, from its user guide. | Three people to interview. | A high-volume driver on the busiest route with 2 losses in a year. |
+| A | Cargo theft | `la-logistics` (built) | Trips, warehouse scans and loss reports (`TRIP_202602.csv`, `WAREHOUSE_SCAN_202602.csv`, `LOSS_REPORT_20260930.csv`). | The two-driver team `DRV-0892` and `DRV-0893` of carrier `CAR-052` drove 12 loads that arrived short in 107 trips (2025-10-10 to 2026-08-20); night-shift scanner `EMP-0123` at `WH-06` scanned 10 of them onto the truck, between 00:50 and 03:30. | Saved view `driver_team_inside_job`; *Busiest nodes*: `DRV-0892` and `DRV-0893` (12 links each), then the night-shift scanner `EMP-0123` (10); *Show on graph* on the first. Filmed so in draft 1 (2026-11-08). The user guide's exercise reads `driver_losses:` and `shift:` on the same links. | Three people to interview. | `DRV-0894`, the busiest driver on the busiest route: 318 trips and 2 thefts, none scanned out by `EMP-0123`, nothing shared with the team. |
 
-Problem line to start from: *Cargo goes missing on different routes in different months, and each loss is filed on its
-own. An inside job only shows when the losses are put side by side.*
+| # | ≈ s | Picture | On-screen text | Voice-over |
+|---|---|---|---|---|
+| 1 | 9 | Loss reports under the title. | Logistics · *Example · synthetic data* | Cargo goes missing on different routes in different months, and each loss is filed on its own. An inside job only shows when the losses are put side by side. |
+| 2 | 6 | `TRIP_202602.csv` and `WAREHOUSE_SCAN_202602.csv` as they landed. | — | Trip logs: who drove which load. Scan logs: who scanned it onto the truck, and when. |
+| 3 | 8 | The Data page: open `trip_dataset`: `driver_id` holds *Driver*, `shipment_id` holds *Shipment*; its own Mapping reads driver → shipment, when `depart_at`. | *What each column holds* | Say once what each column holds: drivers, loads, scanners, and which row links which. Every file in the Space is mapped the same way. |
+| 4 | 9 | Saved view `driver_team_inside_job`, legend open. | *driver_team_inside_job* | Each circle is a driver, a load, a scanner or a warehouse; each line is a trip, a scan or a loss. |
+| 5 | 9 | Fold the legend; open the toolbox; *Busiest nodes*. The list: `DRV-0892` 12 links, `DRV-0893` 12, `EMP-0123` 10. | *Busiest nodes* | Ask who keeps turning up. Busiest nodes counts each circle's lines across the lost loads. |
+| 6 | 10 | A beat of quiet; the two drivers, `EMP-0123` and the 12 losses, held. | *2 drivers · 12 losses · 1 night scanner* | The same two drivers on twelve short loads, and the same night-shift scanner on ten of them. Three people to interview. |
+| 7 | 8 | The team beside the busiest driver. | — | The busiest driver on the busiest route lost two loads too, but shares nothing with them. The links tell bad luck from a team. |
+| 8 | 10 | The *Logistics* Space's home page, its saved views under *My work*. | *Ships with Inspecto LA · Logistics* | This example ships with Inspecto LA. Open the Logistics Space and explore it yourself: a theft hotspot and a fictitious carrier are planted in the same data. |
+| 9 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
+| Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
+| 10 | 4 | End card. | *For cargo security.* · *Try it on your own data.* | Inspecto LA. |
 
 ### 3.9 · Enterprise (about 2 min 30 s)
 
@@ -617,14 +639,14 @@ own. An inside job only shows when the losses are put side by side.*
 |---|---|
 | Audience | Internal audit, accounts-payable control, security, HR and internal investigations. All people and systems are invented. |
 | Film on | Advanced install (`la-audit`); identifiers are masked there, so film as a user who can reveal them. |
-| Ships as | *Link Analysis audit showcase* (`la-audit`, Advanced); saved views `ap_approval_graph`, `ap_vendor_identity`, `gl_intercompany`. `la-insider` is planned. |
-| Ready | Segment A now; B when `la-insider` is built. |
+| Ships as | *Enterprise* (`la-enterprise`, the industry Space composed from `la-insider`, every Dataset mapped; Basic; saved views `leaver_exfiltration`, `access_creep`, `mutual_approvals`). Internal audit (`la-audit`, Advanced; saved views `invoice_approvals`, `vendor_employee_conflict`, `intercompany_round_trip` once renamed) joins *Enterprise* when wave B gives it a Basic tier. |
+| Ready | Both segments now: A on an Advanced install, B in the *Enterprise* Space on Basic. |
 | As built | The busy vendor `V-001` and the CFO `E-01` lead betweenness and are not findings: seed first, never start from a whole-graph ranking. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
 |---|---|---|---|---|---|---|---|
 | A | Internal audit | `la-audit` (built) | Vendor master and employee master (`VENDOR_MASTER_20260930.csv`, `EMPLOYEE_MASTER_20260930.csv`). | Vendor `V-117` shares bank account `BA-9031` and address `AD-9031` with employee `E-31`; its 14 invoices were all approved by `E-31`'s manager, `E-15`. | Saved view `ap_vendor_identity`; seed `V-117`, *Expand*: `E-31` joined by both `shares_account` and `shares_address`; *Connect seeds* between `V-117` and `E-31`; then `ap_approval_graph`: the only approver is `E-15`. | A conflict of interest to investigate. | The busy utilities vendor `V-001` and the CFO `E-01`: they lead betweenness and are not findings. |
-| B | Insider threat | `la-insider` (planned) | Access grants and a change log. | Access creep: manager `M-7` grants payroll and treasury access to 4 reports with no ticket; one later edits a vendor's bank details. | Written when the Space is built, from its user guide. | An access review to start with one manager. | A role change with an HR record and a ticket. |
+| B | Insider threat | `la-insider` (built) | Access grants and a vendor change log (`ACCESS_GRANT_20260930.csv`, `VENDOR_CHANGE_20260930.csv`). | Operations manager `EMP-0007` granted `PAYROLL` and `TREASURY` to four of their own reports in January and February 2026, none in finance and none with a ticket; on 2026-05-14 one of them, `EMP-0482`, changed the bank account of vendor `VEN-0264`, which nobody else has ever changed. | Saved view `access_creep`: compare `dept:`, `role:` and `role_since:` with `finance_no_ticket:` on each `granted_by` link; then read the `changed_vendor` link. | An access review to start with one manager, and a vendor payment to stop and check. | `EMP-0062`, moved into payroll and granted `PAYROLL` the next day by the payroll manager under ticket `REQ-163776`. |
 
 | # | ≈ s | Picture | On-screen text | Voice-over |
 |---|---|---|---|---|
@@ -636,8 +658,13 @@ own. An inside job only shows when the losses are put side by side.*
 | A4 | 8 | *Connect seeds* between `V-117` and `E-31`; then `ap_approval_graph`. | *Connect seeds* | Ask how the vendor connects to this employee, and who approved its invoices. |
 | A5 | 10 | A beat of quiet; `V-117`, `E-31` and `E-15`, held. | *V-117 · E-31 · BA-9031 · AD-9031* | The same bank account and the same address as one of your own employees, and fourteen invoices, all approved by that employee's manager. A conflict to investigate. |
 | A6 | 7 | The two masters side by side. | — | Neither file says it alone. The shared account and address only meet in the links. |
-| B | 45 | Segment B, filmed when `la-insider` is built. | *Insider threat* | Written from its user guide when the Space ships. |
-| 3 | 10 | Explore it: the Space's home page. | *Ships with Inspecto LA · Link Analysis audit showcase* | This example ships with Inspecto LA. Open the audit showcase and explore it yourself: split invoices, duplicate payments and intercompany money are planted in the same books. |
+| B1 | 8 | Access grants under the title. | *Insider threat* | Fraud from inside often starts with access nobody should have: granted quietly, then used once. |
+| B2 | 5 | `ACCESS_GRANT_20260930.csv` and `VENDOR_CHANGE_20260930.csv` as they landed. | — | Access grants, and a log of changes to vendor records. |
+| B3 | 9 | Saved view `access_creep`, legend open. | *access_creep* | Each circle is an employee, a system or a vendor; each line is a grant, or a change to a vendor. |
+| B4 | 8 | Hover `EMP-0007`'s `granted_by` links: `finance_no_ticket:`, `last_finance_ticket: none`; then the `changed_vendor` link. | *granted_by · changed_vendor* | Ask who handed out finance access without a ticket, and what one of them did with it. |
+| B5 | 10 | A beat of quiet; `EMP-0007`, the four reports and vendor `VEN-0264`, held. | *EMP-0007 · 4 grants · no ticket · VEN-0264* | One manager gave payroll and treasury to four people outside finance; one of them changed a vendor's bank account. An access review to start, a payment to stop and check. |
+| B6 | 7 | The grants beside a normal one with a ticket. | — | A role change with a ticket looks the same in the access log. Only the links show who granted what to whom, and why. |
+| 3 | 10 | Explore it: the *Enterprise* Space's home page. | *Ships with Inspecto LA · Enterprise* | This example ships with Inspecto LA. Open the Enterprise Space and explore it yourself: a leaver taking data and two colleagues approving each other's expenses are planted in the same data. |
 | 4 | 7 | Your data. | *Your data · same steps* | These records are examples. With your own, you set up the join once, then ask the same questions. |
 | Close | 9 | The last graph, smaller, with an edition badge; then the Standard-and-above card. | *Everything shown: Inspecto LA Basic* · *More in Standard and above* | Everything you just explored is in Inspecto LA Basic. Standard and above turn a finding into evidence a team can share and defend. |
 | 5 | 4 | End card. | *For internal audit and investigations.* · *Try it on your own data.* | Inspecto LA. |
@@ -861,9 +888,9 @@ Standard and Advanced include by default; sign-in, roles and enforced masking co
   contractor-network view would have named the wrong contractor; the draft found it. The asks for 3.1–3.9 now follow
   each Space's user guide or showcase runbook; confirm on Basic that *Communities* (3.3) and *Value Measures* (3.1 A,
   3.2 B) behave as described, and that *Tight groups* finds the device farm in video 1 (else use `mm_device_farm`).
-- Industry videos: check every reveal against the Space's ground truth file before filming. Segments on planned
-  Spaces (3.1 B, 3.2 F, 3.8, 3.9 B) are filmed only after their Spaces are built, and scripted from their user guides
-  then. Decide per industry whether to publish with built segments only or wait.
+- Industry videos: check every reveal against the Space's ground truth file before filming. Every segment's Space is
+  built. Segments on `la-mobile-money`, `la-showcase` and `la-audit` (3.1 A and C, 3.2 B, 3.9 A) still need an Advanced
+  install until wave B gives those packs a Basic tier; then they join their industry Space.
 - Segment 3.2 A has no look-alike in the sample; confirm with its owner that nothing else on screen reads as suspect.
 - Video 5: shot 7 waits for the `la-police` Advanced tier (its Alert Rule); shot 8 is filmed on the video 7 Space.
 - Video 7: generate the two synthetic files with the planted mess (a number written two ways, gaps, a repeat, a
