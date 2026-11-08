@@ -1,6 +1,7 @@
 physicalRef: trade_circular_trade_links
-description: "Trade-based money-laundering Link Analysis showcase - The link Dataset of the saved view trade_circular_trade, derived from trade_links by the trade_circular_trade_links Job: the containers. shipped_in links of boxes flagged relayed (each leg's consignee ships the box on) or many_shippers, and the traded_with links between their shippers. Same columns as trade_links. Synthetic."
+description: "Trade-based money-laundering Link Analysis showcase - The link Dataset of the saved view circular_trade, derived from trade_links by the trade_circular_trade_links Job: the containers. shipped_in links of boxes flagged relayed (each leg's consignee ships the box on) or many_shippers, and the traded_with links between their shippers. Same columns as trade_links. Synthetic."
 eventDate: event_date
+primaryEntityType: trade_entity
 columns[8]{name,type,classification}:
   src,string,TRADE_ENTITY
   dst,string,TRADE_ENTITY
@@ -10,3 +11,9 @@ columns[8]{name,type,classification}:
   event_date,date,
   via,string,
   flag,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

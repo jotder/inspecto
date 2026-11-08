@@ -1,0 +1,46 @@
+entity_types[9]:
+  - id: shipment
+    label: Shipment
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SHIPMENT
+  - id: trip
+    label: Trip
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TRIP
+  - id: driver
+    label: Driver
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DRIVER
+  - id: carrier
+    label: Carrier
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CARRIER
+  - id: place
+    label: Place
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PLACE
+  - id: warehouse
+    label: Warehouse
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: WAREHOUSE
+  - id: employee
+    label: Employee
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: EMPLOYEE
+  - id: vehicle
+    label: Vehicle
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: VEHICLE
+  - id: logistics_entity
+    label: Logistics entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: LOGISTICS_ENTITY

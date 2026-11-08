@@ -1,0 +1,31 @@
+entity_types[6]:
+  - id: crypto_address
+    label: Crypto address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CRYPTO_ADDRESS
+  - id: exchange_account
+    label: Exchange account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: EXCHANGE_ACCOUNT
+  - id: cluster
+    label: Address cluster
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CLUSTER
+  - id: crypto_entity
+    label: Crypto entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CRYPTO_ENTITY
+  - id: bank_account
+    label: Bank account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BANK_ACCOUNT
+  - id: person
+    label: Person
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PERSON

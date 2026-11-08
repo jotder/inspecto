@@ -1,0 +1,46 @@
+entity_types[9]:
+  - id: company
+    label: Company
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: COMPANY
+  - id: tender
+    label: Tender
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TENDER
+  - id: buyer_unit
+    label: Buyer unit
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BUYER_UNIT
+  - id: ip_address
+    label: IP address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: IP
+  - id: document_author
+    label: Document author
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DOC_AUTHOR
+  - id: person
+    label: Person
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PERSON
+  - id: address
+    label: Address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ADDRESS
+  - id: bank_account
+    label: Bank account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BANK_ACCOUNT
+  - id: public_entity
+    label: Public-sector entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PUBLIC_ENTITY

@@ -1,7 +1,8 @@
 physicalRef: incident_report/database
 description: "Police Link Analysis showcase - One row per reported incident: offence type, the start and end of the window it happened in, district, city, a city-level invented location and the reporting person (blank when the police raised it). Landed by the incident_report Pipeline. Synthetic."
+primaryEntityType: incident
 columns[9]{name,type,classification}:
-  incident_id,string,
+  incident_id,string,INCIDENT
   offence_type,string,
   start_at,timestamp,
   end_at,timestamp,
@@ -9,4 +10,9 @@ columns[9]{name,type,classification}:
   city,string,
   lat,number,
   lon,number,
-  reporting_person_id,string,
+  reporting_person_id,string,PERSON
+defaultLinkMapping:
+  from: reporting_person_id
+  to: incident_id
+  kind: offence_type
+  primaryTime: start_at

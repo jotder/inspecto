@@ -1,6 +1,7 @@
 physicalRef: claims_links
 description: "Insurance-claims Link Analysis showcase - ONE link Dataset built by the claims_links Job from claim, claim_party, provider_bill, accident_location, repair_invoice and policy. kind is one of claimed_with, same_accident, serviced_by, represented_by, referred_to, shares_phone, shares_address, supplied_parts, paid_by; via names the claim, accident, policy or shared value; event_date is the day of ts. src and dst hold claimants, providers, parts suppliers and bank accounts: an endpoint column carries ONE Entity Type, so both are the masked type party. Planted stories: docs/okf/product/solution-pack/la-claims/admin-guide-showcase-runbook.md. Synthetic."
 eventDate: event_date
+primaryEntityType: party
 columns[7]{name,type,classification}:
   src,string,PARTY
   dst,string,PARTY
@@ -9,6 +10,12 @@ columns[7]{name,type,classification}:
   amount,number,
   event_date,date,
   via,string,PII
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount
 owner: siu.analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view

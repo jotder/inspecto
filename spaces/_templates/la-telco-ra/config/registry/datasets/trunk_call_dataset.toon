@@ -1,10 +1,17 @@
 physicalRef: trunk_call/database
 description: "Telecom revenue assurance Link Analysis showcase - One row per enterprise trunk, international destination and day, summed from the switch's records: the destination country, the number type (geographic, mobile or premium), minutes and the hour (local time) the day's calls to it started. One file per month (TRUNK_CALL_YYYYMM.csv); the next month is in data/staged. Landed by the trunk_call Pipeline. Synthetic."
 eventDate: call_date
+primaryEntityType: trunk
 columns[6]{name,type,classification}:
-  trunk_id,string,
+  trunk_id,string,TRUNK
   call_date,date,
-  destination_country,string,
+  destination_country,string,COUNTRY
   number_type,string,
   minutes,number,
   start_hour,number,
+defaultLinkMapping:
+  from: trunk_id
+  to: destination_country
+  kind: number_type
+  primaryTime: call_date
+  primaryMeasure: minutes

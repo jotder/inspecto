@@ -1,5 +1,9 @@
 physicalRef: enterprise_trunk/database
 description: "Telecom revenue assurance Link Analysis showcase - One row per enterprise voice trunk (a business customer's PBX connection): the trunk and the customer it belongs to. One extract (ENTERPRISE_TRUNK_20260930.csv). Landed by the enterprise_trunk Pipeline. Synthetic."
+primaryEntityType: trunk
 columns[2]{name,type,classification}:
-  trunk_id,string,
-  customer_id,string,
+  trunk_id,string,TRUNK
+  customer_id,string,CUSTOMER
+defaultLinkMapping:
+  from: customer_id
+  to: trunk_id

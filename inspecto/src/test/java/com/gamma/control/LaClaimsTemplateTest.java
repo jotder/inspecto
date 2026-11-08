@@ -49,11 +49,13 @@ class LaClaimsTemplateTest {
         assertEquals(Boolean.TRUE, s.index().enabled());
         assertEquals(10, s.drafts().maxOpen());
         assertEquals(List.of("http://127.0.0.1:8099", "http://localhost:8099"), s.embed().frameAncestorsInForce(), "the partner portal origin may frame the embed link");
+        // LA-INDUSTRY-SPACES-1: claimants and providers stay the one masked Party type; the claim, policy, broker and
+        // accident ids each say what they hold, unmasked (they name no person).
         List<EntityTypes.EntityType> types = s.effectiveEntityTypes();
-        assertEquals(1, types.size());
-        assertEquals("party", types.get(0).id());
+        assertEquals(List.of("party", "claim", "policy", "broker", "accident"), types.stream().map(EntityTypes.EntityType::id).toList());
         assertTrue(types.get(0).masked());
         assertEquals(List.of("PARTY"), types.get(0).classifications());
+        assertTrue(types.stream().skip(1).noneMatch(EntityTypes.EntityType::masked), "only Party ids name a person");
     }
 
     @Test
@@ -66,7 +68,7 @@ class LaClaimsTemplateTest {
         assertEquals(List.of("src", "dst", "kind", "ts", "amount", "event_date", "via"), cols.stream().map(c -> c.get("name")).toList());
         assertEquals("PARTY", cols.get(0).get("classification"));
         assertEquals("PARTY", cols.get(1).get("classification"));
-        for (String view : List.of("claims_network", "claims_provider_money", "claims_shared_identity", "claims_parts_suppliers", "claims_premium_payers")) {
+        for (String view : List.of("claims_network", "provider_money_trail", "claimant_ring_shared_identity", "parts_supplier_ring", "ghost_broker_premium_payers")) {
             Map<String, Object> v = ToonHelper.load(CFG.resolve("registry/link-analysis-views/" + view + ".toon").toString());
             Map<String, Object> p = (Map<String, Object>) ((Map<String, Object>) v.get("query")).get("projection");
             assertEquals("claims_links_dataset", p.get("datasetId"));
@@ -74,7 +76,7 @@ class LaClaimsTemplateTest {
             assertEquals("dst", p.get("targetCol"));
             assertEquals("kind", p.get("linkKindCol"));
         }
-        Map<String, Object> money = ToonHelper.load(CFG.resolve("registry/link-analysis-views/claims_provider_money.toon").toString());
+        Map<String, Object> money = ToonHelper.load(CFG.resolve("registry/link-analysis-views/provider_money_trail.toon").toString());
         assertEquals("force", money.get("layout"), "dagre drew this wide, shallow graph as a vertical sliver");
     }
 

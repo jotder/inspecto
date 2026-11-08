@@ -1,9 +1,14 @@
 physicalRef: exchange_account/database
 description: "Crypto laundering Link Analysis showcase - One row per customer account at one of five invented exchanges: the KYC person who holds it, the deposit address the exchange gave it and when it was opened. One extract (EXCHANGE_ACCOUNT_20260930.csv); October's new accounts are in data/staged. Landed by the exchange_account Pipeline. Synthetic."
 eventDate: opened_at
+primaryEntityType: exchange_account
 columns[5]{name,type,classification}:
-  account_id,string,
+  account_id,string,EXCHANGE_ACCOUNT
   exchange,string,
-  kyc_person_id,string,
-  deposit_address,string,
+  kyc_person_id,string,PERSON
+  deposit_address,string,CRYPTO_ADDRESS
   opened_at,timestamp,
+defaultLinkMapping:
+  from: kyc_person_id
+  to: account_id
+  primaryTime: opened_at

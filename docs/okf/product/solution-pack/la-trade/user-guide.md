@@ -22,11 +22,11 @@ two-letter code after each port name), and HS codes are real codes of the public
 
 | Node looks like | Is a | Comes from |
 |---|---|---|
-| `CO-01461` | company (name, country, registered address, incorporation date, bank account) | `company` |
+| `CO-01461` | company (name, country, registered address, incorporation date, bank account) | `trade_company` |
 | `PER-00291` | director (a person; a few people are registered twice under a spelling variant) | `director` |
 | `MV TAMARIND SPIRIT` | vessel | `bill_of_lading`, `vessel_position` |
 | `KLNU7238600` | container: four letters and seven digits | `bill_of_lading` |
-| `SUITE 9, 41 LARKSPUR ROW, LONDON` | registered address, upper-cased | `company` |
+| `SUITE 9, 41 LARKSPUR ROW, LONDON` | registered address, upper-cased | `trade_company` |
 
 One link Dataset, `trade_links_dataset`, joins them with six kinds of link, one link per pair:
 
@@ -51,16 +51,16 @@ on the ship date, but each leg's B/L matches its own vessel.
 
 ## Five-minute tour
 
-1. The **Inspecto LA** home page lists the four saved views, one per story: `trade_over_invoicing`,
-   `trade_phantom_shipment`, `trade_circular_trade` and `trade_shell_importers`. Each reads its own small Dataset
+1. The **Inspecto LA** home page lists the four saved views, one per story: `over_invoicing`,
+   `phantom_shipment`, `circular_trade` and `shell_importers`. Each reads its own small Dataset
    (between 23 and about 200 links), so it draws in full, and each shows its story beside a look-alike. The
    description of each view says what to look for.
-2. Open `trade_over_invoicing`. Two shapes appear: a star of one German supplier and its eight buyers, and a small
+2. Open `over_invoicing`. Two shapes appear: a star of one German supplier and its eight buyers, and a small
    group of two companies joined through one person they share as director. Open a `traded_with` link and read `max_x_reference` in `via`.
-3. Open `trade_phantom_shipment`. Most of it is transhipments: a shipper linked to two vessels. One shipper is linked
+3. Open `phantom_shipment`. Most of it is transhipments: a shipper linked to two vessels. One shipper is linked
    to a single vessel by a link whose `flag` is `vessel_elsewhere`; its `via` lists five B/Ls and where the vessel
    really was on each date.
-4. Open `trade_circular_trade`. Six boxes linked to the same three shippers stand apart from a looser web of six boxes,
+4. Open `circular_trade`. Six boxes linked to the same three shippers stand apart from a looser web of six boxes,
    each loaded by ten different shippers.
 5. To follow a node out of a view into the whole Dataset, use **File ▸ New**, **Start a graph**: Dataset
    `trade_links_dataset`, start from **One entity**, Entity Type **Trade entity**, type an id such as `CO-00597` and
@@ -74,7 +74,7 @@ The exercises below take each story in turn. Try them blind first; the answers f
 
 *Which two companies trade one product at several times its market price, and what ties them together?*
 
-- **Hint:** saved view `trade_over_invoicing`. Compare the two shapes: who the buyers are, how many there are, how
+- **Hint:** saved view `over_invoicing`. Compare the two shapes: who the buyers are, how many there are, how
   far above the reference the prices go, and whether a director links seller and buyer.
 - **Answer:** `CO-02275` Kingfisher Marine Ltd (Hong Kong) shipped **14** consignments of integrated circuits
   (HS `854231`) to `CO-01461` Bluefin Trading Ltd (UK) between October 2025 and August 2026, at **3.6 to 7.8 times**
@@ -91,7 +91,7 @@ The exercises below take each story in turn. Try them blind first; the answers f
 
 *Which letters of credit were paid on bills of lading for goods that cannot have sailed?*
 
-- **Hint:** saved view `trade_phantom_shipment`. Look for a link with `flag` `vessel_elsewhere` and read its `via`.
+- **Hint:** saved view `phantom_shipment`. Look for a link with `flag` `vessel_elsewhere` and read its `via`.
   Then check the vessel in `vessel_position_dataset` on those dates.
 - **Answer:** `CO-01200` Dunmore Resources A.S. (Türkiye, incorporated January 2024) presented **5** B/Ls for copper
   cathodes (HS `740311`) loading at *Marbleport (TR)* on **`MV TAMARIND SPIRIT`**: `BL-0004138` (12 Feb 2026),
@@ -111,7 +111,7 @@ The exercises below take each story in turn. Try them blind first; the answers f
 
 *Which containers keep coming back to the company that first shipped them, and what happens to the value?*
 
-- **Hint:** saved view `trade_circular_trade`. Look for boxes flagged `relayed` and read `consignees` and
+- **Hint:** saved view `circular_trade`. Look for boxes flagged `relayed` and read `consignees` and
   `box_relays` in `via`; then compare the `traded_with` links between the same companies.
 - **Answer:** the six boxes `KLNU7238600`, `KLNU0722138`, `KLNU9605085`, `KLNU6490823`, `KLNU5682691` and
   `KLNU7946736` travel together **twice round** `CO-00941` Moonridge Holdings FZE (UAE) → `CO-00388` Moonridge
@@ -128,7 +128,7 @@ The exercises below take each story in turn. Try them blind first; the answers f
 
 *Which importers were set up together and pay an exporter far more than it ever shipped them?*
 
-- **Hint:** saved view `trade_shell_importers`. Two addresses host many companies. Compare the incorporation dates in
+- **Hint:** saved view `shell_importers`. Two addresses host many companies. Compare the incorporation dates in
   `via` on `registered_at`, the directors, and the `paid` amounts with the `traded_with` amounts.
 - **Answer:** six importers registered at **Suite 9, 41 Larkspur Row, London** and incorporated between **2 March and
   24 April 2026**: `CO-01501`, `CO-02455`, `CO-00780`, `CO-01014`, `CO-01087` and `CO-02491`. Two directors run them,

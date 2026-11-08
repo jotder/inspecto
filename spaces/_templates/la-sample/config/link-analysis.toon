@@ -1,0 +1,6 @@
+entity_types[1]:
+  - id: account
+    label: Account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ACCOUNT

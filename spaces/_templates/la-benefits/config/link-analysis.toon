@@ -1,0 +1,41 @@
+entity_types[8]:
+  - id: claim
+    label: Benefit claim
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: CLAIM
+  - id: household
+    label: Household
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: HOUSEHOLD
+  - id: employer
+    label: Employer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: EMPLOYER
+  - id: tax_preparer
+    label: Tax preparer
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TAX_PREPARER
+  - id: person
+    label: Person
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PERSON
+  - id: address
+    label: Address
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: ADDRESS
+  - id: bank_account
+    label: Bank account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: BANK_ACCOUNT
+  - id: public_entity
+    label: Public-sector entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: PUBLIC_ENTITY

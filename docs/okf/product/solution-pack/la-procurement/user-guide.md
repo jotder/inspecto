@@ -20,7 +20,7 @@ invented; only city names are real.
 |---|---|---|
 | `company` | 900 | a firm on the supplier register: name, registered address, phone, bank account, incorporated, debarred (blank for most) |
 | `director` | 1 445 | a directorship: company, person, `from_date`, `to_date` (blank while serving) |
-| `person` | 2 000 | a person: name and home address id (`AD-…`) |
+| `procurement_person` | 2 000 | a person: name and home address id (`AD-…`) |
 | `official` | 300 | a buying official: person and buyer unit |
 | `tender` | 1 228 (one file a month) | a tender: buyer unit, category, estimate, published, awarded, winner, award value |
 | `bid` | about 6 000 (one file a month) | a bid: tender, bidder, amount, time, IP address, document author |
@@ -47,16 +47,16 @@ link. Two derived Jobs feed the approvals and debarment views (`procurement_appr
 
 ## Five-minute tour
 
-1. **File ▸ Open… ▸ Saved views ▸ `procurement_bid_rotation`.** The whole Road maintenance market. One block of
+1. **File ▸ Open… ▸ Saved views ▸ `bid_rotation`.** The whole Road maintenance market. One block of
    tenders is bid on by the same four firms and nobody else; hover the `bid_on` links and every loser is 5–12 %
    above the award. Elsewhere three firms win most tenders, but the field changes from tender to tender.
-2. **Open `procurement_cover_bids`.** Only two IP addresses are shared by different bidders. One carries a firm
+2. **Open `cover_bids_shared_ip`.** Only two IP addresses are shared by different bidders. One carries a firm
    and its three regular "competitors" (`same_tender_gap_min` in single figures), plus one document author they
    all share. The other carries 14 small firms, with no author in common.
-3. **Open `procurement_change_approvals`.** Officials and the firms whose contracts they changed. Only a handful
+3. **Open `official_approving_relative_firm`.** Officials and the firms whose contracts they changed. Only a handful
    of home addresses (`AD-…`) are on the canvas; one of them closes a triangle between an official and a firm, and
    that official-to-firm link's `via` reads `changes:9`.
-4. **Open `procurement_debarred_directors`.** Every director of a debarred firm and where they went. Most stop at
+4. **Open `debarred_firm_reborn`.** Every director of a debarred firm and where they went. Most stop at
    their old firm. Two people jump straight to a new firm that is already winning tenders.
 5. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (admin guide). The
    Pipelines land October 2026 and the Jobs rebuild the links; reopen a view to see them.
@@ -67,7 +67,7 @@ Work blind first: each has a hint, then the answer. The answers are not in the d
 
 ### 1. Bid rotation — which firms take turns, for which buyer, and how do they keep it neat?
 
-*Hint:* in `procurement_bid_rotation`, find tenders with exactly four bidders who always appear together; then
+*Hint:* in `bid_rotation`, find tenders with exactly four bidders who always appear together; then
 read `won` in date order.
 
 **Answer:** **`CO-0117` Aire Paving Ltd, `CO-0242` Thistle Roadworks LLP, `CO-0388` Wren Highways Ltd and
@@ -81,7 +81,7 @@ to over 20 %. They never bid on a Highways North rotation tender and share no di
 
 ### 2. Cover bids — who sends their bids from the winner's office?
 
-*Hint:* in `procurement_cover_bids`, look at the `via` of each IP address's links: which one has a gap of minutes
+*Hint:* in `cover_bids_shared_ip`, look at the `via` of each IP address's links: which one has a gap of minutes
 on the same tender?
 
 **Answer:** IP address **`100.64.73.61`** is the office of **`CO-0074` Orchard Systems Group**, which wins **10 IT
@@ -93,7 +93,7 @@ hours or tenders apart, each with its own author; none of them touches the IT ri
 
 ### 3. Conflict of interest — which official favours which firm, and why?
 
-*Hint:* in `procurement_change_approvals`, find a home address (`AD-…`) that an official shares with a director,
+*Hint:* in `official_approving_relative_firm`, find a home address (`AD-…`) that an official shares with a director,
 then read the `via` of the link between that official and the director's firm.
 
 **Answer:** **`P-00002` (Eben Rowntree), a Parks official,** approved **9 contract changes** (each adding 8–25 %)
@@ -105,7 +105,7 @@ more than 2 for any one, and she shares a home with no director.
 
 ### 4. Phoenix firm — where did the debarred firm go?
 
-*Hint:* in `procurement_debarred_directors`, find a `directed_by` link whose `to:` date is days after a
+*Hint:* in `debarred_firm_reborn`, find a `directed_by` link whose `to:` date is days after a
 `company_debarred:` date, and follow that person.
 
 **Answer:** **`CO-0815` North Cleaning Ltd** was debarred on **2026-01-15**. Its directors **`P-00004` (Kira

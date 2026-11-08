@@ -1,0 +1,5 @@
+name: Law enforcement
+tagline: "Police intelligence on synthetic data - a burglary series traced through second-hand dealers and one car, a drug-supply handset network, and a witness who was arrested with the suspect, every Dataset mapped."
+minEdition: basic
+icon: heroicons_outline:finger-print
+useCases[1]: la-police

@@ -1,6 +1,7 @@
 physicalRef: trade_shell_importers_links
-description: "Trade-based money-laundering Link Analysis showcase - The link Dataset of the saved view trade_shell_importers, derived from trade_links by the trade_shell_importers_links Job: the shared addresses. registered_at links flagged shared_address (min_shared_address or more companies at one address), the directors and outgoing payments of those companies, and the trades into them. Same columns as trade_links. Synthetic."
+description: "Trade-based money-laundering Link Analysis showcase - The link Dataset of the saved view shell_importers, derived from trade_links by the trade_shell_importers_links Job: the shared addresses. registered_at links flagged shared_address (min_shared_address or more companies at one address), the directors and outgoing payments of those companies, and the trades into them. Same columns as trade_links. Synthetic."
 eventDate: event_date
+primaryEntityType: trade_entity
 columns[8]{name,type,classification}:
   src,string,TRADE_ENTITY
   dst,string,TRADE_ENTITY
@@ -10,3 +11,9 @@ columns[8]{name,type,classification}:
   event_date,date,
   via,string,
   flag,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

@@ -1,9 +1,14 @@
 physicalRef: admission/database
 description: "Provider billing fraud Link Analysis showcase - One row per hospital stay: member, hospital (a provider id) and the admission and discharge dates. One file per admission month (ADMISSION_YYYYMM.csv); the next month is in data/staged. Landed by the admission Pipeline. Synthetic."
 eventDate: from_date
+primaryEntityType: member
 columns[5]{name,type,classification}:
   admission_id,string,
-  member_id,string,
-  hospital_id,string,
+  member_id,string,MEMBER
+  hospital_id,string,PROVIDER
   from_date,date,
   to_date,date,
+defaultLinkMapping:
+  from: member_id
+  to: hospital_id
+  primaryTime: from_date

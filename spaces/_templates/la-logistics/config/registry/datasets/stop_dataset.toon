@@ -1,8 +1,14 @@
 physicalRef: stop/database
 description: "Logistics cargo theft Link Analysis showcase - Stop-level GPS from the carriers' telematics: one row per time a truck stood still on the road - the place, when the stop started and how many minutes it lasted. Not every ping; a carrier that sends no telematics has no rows. One file per month of departure (STOP_YYYYMM.csv); the next month is in data/staged. Landed by the stop Pipeline. Synthetic."
 eventDate: start_at
+primaryEntityType: trip
 columns[4]{name,type,classification}:
-  trip_id,string,
-  place_id,string,
+  trip_id,string,TRIP
+  place_id,string,PLACE
   start_at,timestamp,
   minutes,number,
+defaultLinkMapping:
+  from: trip_id
+  to: place_id
+  primaryTime: start_at
+  primaryMeasure: minutes

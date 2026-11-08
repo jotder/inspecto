@@ -1,0 +1,36 @@
+name: procurement_person
+active: true
+description: "Bid rigging and procurement fraud Link Analysis showcase - One row per person known to the integrity unit (directors, officials and the people who share their homes): name and home address id. One extract (PERSON_20260930.csv). Synthetic; regenerate with tools/gen-la-procurement-data.py."
+
+dirs:
+  poll:       data/inbox/procurement_person
+  database:   data/procurement_person/database
+  backup:     data/procurement_person/backup
+  temp:       data/procurement_person/temp
+  errors:     data/procurement_person/errors
+  quarantine: data/procurement_person/quarantine
+  markers:    data/procurement_person/markers
+  status_dir: data/procurement_person/status
+  log_dir:    data/procurement_person/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: procurement_person_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

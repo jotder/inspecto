@@ -1,7 +1,7 @@
 job:
   name: police_property_links
   type: sql.template
-  description: "Derived from police_links each time it is produced: the stolen-property circle. Every item_match (an incident to the seller of an item with a stolen serial), those sellers' sold_item links to dealers, lives_at and keeper_of for the sellers and everyone living at their addresses, and seen_near for the plates those people keep. Read by the saved view police_burglary_series."
+  description: "Derived from police_links each time it is produced: the stolen-property circle. Every item_match (an incident to the seller of an item with a stolen serial), those sellers' sold_item links to dealers, lives_at and keeper_of for the sellers and everyone living at their addresses, and seen_near for the plates those people keep. Read by the saved view burglary_series."
   sql: "WITH l AS (SELECT * FROM police_links), sellers AS (SELECT DISTINCT dst AS p FROM l WHERE kind = 'item_match'), homes AS (SELECT DISTINCT dst AS a FROM l WHERE kind = 'lives_at' AND src IN (SELECT p FROM sellers)), circle AS (SELECT p FROM sellers UNION SELECT src FROM l WHERE kind = 'lives_at' AND dst IN (SELECT a FROM homes)), plates AS (SELECT DISTINCT dst AS v FROM l WHERE kind = 'keeper_of' AND src IN (SELECT p FROM circle)) SELECT src, dst, kind, ts, amount, event_date, via FROM l WHERE kind = 'item_match' OR (kind = 'sold_item' AND src IN (SELECT p FROM sellers)) OR (kind IN ('lives_at', 'keeper_of') AND src IN (SELECT p FROM circle)) OR (kind = 'seen_near' AND src IN (SELECT v FROM plates)) ORDER BY kind, src, dst"
   sources: police_links
   sink_dataset: police_property_links

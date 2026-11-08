@@ -45,8 +45,8 @@ class TradeLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-trade");
-    private static final List<String> FEEDS = List.of("company", "director", "trade", "bill_of_lading", "vessel_position",
-            "price_reference", "payment");
+    private static final List<String> FEEDS = List.of("trade_company", "director", "trade", "bill_of_lading", "vessel_position",
+            "price_reference", "trade_payment");
     private static final List<String> VIEWS = List.of("over_invoicing", "phantom_shipment", "circular_trade", "shell_importers");
 
     @TempDir static Path tmp;

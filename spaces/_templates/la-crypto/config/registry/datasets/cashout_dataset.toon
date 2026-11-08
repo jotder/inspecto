@@ -1,9 +1,15 @@
 physicalRef: cashout/database
 description: "Crypto laundering Link Analysis showcase - One row per fiat withdrawal from an exchange account to a bank account (amount in fiat, no currency). One file per month (CASHOUT_YYYYMM.csv); the next month is in data/staged. Landed by the cashout Pipeline. Synthetic."
 eventDate: cashout_at
+primaryEntityType: exchange_account
 columns[5]{name,type,classification}:
   cashout_id,string,
-  account_id,string,
-  bank_account,string,
+  account_id,string,EXCHANGE_ACCOUNT
+  bank_account,string,BANK_ACCOUNT
   amount,number,
   cashout_at,timestamp,
+defaultLinkMapping:
+  from: account_id
+  to: bank_account
+  primaryTime: cashout_at
+  primaryMeasure: amount

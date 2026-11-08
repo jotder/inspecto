@@ -1,7 +1,8 @@
 physicalRef: custody/database
 description: "Police Link Analysis showcase - One row per person per arrest; people arrested together share a co_arrest_group. Landed by the custody Pipeline. Synthetic."
+primaryEntityType: person
 columns[4]{name,type,classification}:
   custody_id,string,
-  person_id,string,
+  person_id,string,PERSON
   arrested_at,timestamp,
   co_arrest_group,string,

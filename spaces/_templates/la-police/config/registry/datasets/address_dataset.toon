@@ -1,7 +1,8 @@
 physicalRef: address/database
 description: "Police Link Analysis showcase - One row per address: invented street, district, city and a city-level invented location. Landed by the address Pipeline. Synthetic."
+primaryEntityType: address
 columns[6]{name,type,classification}:
-  address_id,string,
+  address_id,string,ADDRESS
   street,string,
   district,string,
   city,string,

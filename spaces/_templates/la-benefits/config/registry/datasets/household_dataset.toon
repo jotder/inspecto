@@ -1,7 +1,11 @@
 physicalRef: household/database
 description: "Benefits and tax fraud Link Analysis showcase - One row per household declaration: the address, the person who declared it (blank for a care home, which the home declares) and how many members were declared. One extract (HOUSEHOLD_20260930.csv). Landed by the household Pipeline. Synthetic."
+primaryEntityType: household
 columns[4]{name,type,classification}:
-  household_id,string,
-  address_id,string,
-  declared_by,string,
+  household_id,string,HOUSEHOLD
+  address_id,string,ADDRESS
+  declared_by,string,PERSON
   declared_members,string,
+defaultLinkMapping:
+  from: household_id
+  to: address_id

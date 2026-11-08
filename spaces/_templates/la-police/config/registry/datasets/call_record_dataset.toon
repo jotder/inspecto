@@ -1,7 +1,13 @@
 physicalRef: call_record/database
 description: "Police Link Analysis showcase - One row per call from seized or lawfully obtained handsets: caller, callee, start and duration. Landed by the call_record Pipeline. Synthetic."
+primaryEntityType: phone
 columns[4]{name,type,classification}:
-  caller,string,
-  callee,string,
+  caller,string,PHONE
+  callee,string,PHONE
   start_at,timestamp,
   duration_s,number,
+defaultLinkMapping:
+  from: caller
+  to: callee
+  primaryTime: start_at
+  primaryMeasure: duration_s

@@ -1,7 +1,8 @@
 physicalRef: address/database
 description: "Benefits and tax fraud Link Analysis showcase - One row per address the agency holds: street, city and a map position (blank for about 3 %). One extract (ADDRESS_20260930.csv). Landed by the address Pipeline. Synthetic."
+primaryEntityType: address
 columns[5]{name,type,classification}:
-  address_id,string,
+  address_id,string,ADDRESS
   street,string,
   city,string,
   lat,number,
