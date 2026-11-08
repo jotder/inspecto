@@ -26,7 +26,7 @@ Each story has an innocent look-alike that a simple threshold check alone would 
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier (personas, an Alert Rule for a payment into an account linked to a death-register entry, a seeding script) is planned.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead analyst, second approver, read-only reviewer, outsider), an Alert Rule for benefits still paid to the dead well after their deaths were notified, and a seeding script for the Investigation, the list of deceased claimants still paid, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 

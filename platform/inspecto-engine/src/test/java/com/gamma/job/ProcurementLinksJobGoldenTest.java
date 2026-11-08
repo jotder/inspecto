@@ -41,7 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ground truth ({@code tools/gen-la-procurement-data.ground-truth.json}): every story's entities form one connected group, no
  * benign look-alike has a link to any of them, and every saved view, read with its own filter, holds its story whole, shows the
  * look-alike beside it and fits the canvas (under 1 000 nodes, under 4 000 rows). The facts behind each story in the files
- * themselves are pinned by {@code tools/gen-la-procurement-data.test.mjs}.
+ * themselves are pinned by {@code tools/gen-la-procurement-data.test.mjs}. The Advanced tier's counts Job runs after the link Job:
+ * its Alert Rule (a bid from an IP address already used by another bidder on the same tender) fires on the real counts only
+ * because of the cover bids, and the help-desk kiosk never counts.
  */
 class ProcurementLinksJobGoldenTest {
 
@@ -96,18 +98,100 @@ class ProcurementLinksJobGoldenTest {
                 assertEquals("SUCCESS", r.status(), j + " failed: " + r.message());
             }
         }
+        // then the Advanced tier's counts Job in a service of its own, so its signal-fired run cannot race the derived Jobs' awaits
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(JobConfig.load(space.resolve("config/jobs/procurement_shared_ip_counts_job.toon").toString())),
+                     new ConsignmentEventBus(), s, null, space.resolve("audit").toString(), null, null, data.toString(), null, platform)) {
+            js.eventLog(com.gamma.event.EventLog.current());
+            js.start();
+            assertTrue(js.triggerRun("procurement_shared_ip_counts", null, Map.of()).isPresent());
+            JobRun r = awaitRun(js, "procurement_shared_ip_counts");
+            assertNotNull(r, "procurement_shared_ip_counts never ran");
+            assertEquals("SUCCESS", r.status(), "procurement_shared_ip_counts failed: " + r.message());
+        }
         truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-procurement-data.ground-truth.json").toFile());
         links = triples("SELECT src, dst, kind FROM " + parquet("procurement_links"));
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/procurement_shared_ip_counts_job.toon",
+                "config/jobs/procurement_shared_ip_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/procurement_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
         assertTrue(Files.isRegularFile(TEMPLATE.resolve("config/examples/sla-escalation-examples.md")));
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("procurement_shared_ip_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "procurement_shared_ip_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet("procurement_shared_ip_counts");
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: 16 bids on 8 tenders came from an address a competitor had already used on that
+        // tender (all of them the cover bids from the winner's office); one other address is shared, the kiosk, never on one tender
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(truth.get("cover_bids").get("from_winner_ip").asLong(), ((Number) row.get("same_tender_ip_bids")).longValue());
+        assertEquals(16L, ((Number) row.get("same_tender_ip_bids")).longValue());
+        assertEquals(8L, ((Number) row.get("same_tender_ip_tenders")).longValue());
+        assertEquals(1L, ((Number) row.get("ips_shared_across_tenders_only")).longValue());
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+        // every bid it counts is a cover bid sent from the winner's office, on one of the story's tenders
+        JsonNode cb = truth.get("cover_bids");
+        String bids = parquet("bid/database", "/**/*.parquet");
+        List<Map<String, Object>> counted = rows("SELECT y.bidder_id, y.ip, y.tender_id FROM " + bids + " y WHERE nullif(trim(y.ip), '') IS NOT NULL AND EXISTS (SELECT 1 FROM "
+                + bids + " x WHERE x.tender_id = y.tender_id AND x.ip = y.ip AND x.bidder_id <> y.bidder_id AND x.submitted_at < y.submitted_at)");
+        assertEquals(16, counted.size());
+        Set<String> covers = ids(cb.get("covers")), tenders = ids(cb.get("tenders"));
+        for (Map<String, Object> b : counted) {
+            assertEquals(cb.get("winner_ip").asText(), b.get("ip"), b.toString());
+            assertTrue(covers.contains((String) b.get("bidder_id")), b + " is a cover bidder");
+            assertTrue(tenders.contains((String) b.get("tender_id")), b + " is on a cover-bid tender");
+        }
+    }
+
+    @Test
+    void withoutTheCoverBiddersTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same landed bids with the three cover bidders taken out: nothing counts
+        Map<String, Object> without = countsOver("bidder_id NOT IN " + in(truth.get("cover_bids").get("covers")));
+        assertEquals(0L, ((Number) without.get("same_tender_ip_bids")).longValue(), without.toString());
+        assertTrue(((Number) without.get("same_tender_ip_bids")).doubleValue() < rule().threshold(), "without the cover bids it would not fire: " + without);
+        // and with only the winner's own bids from its office, the winner alone never matches itself
+        Map<String, Object> winner = countsOver("bidder_id = '" + truth.get("cover_bids").get("winner").asText() + "'");
+        assertEquals(0L, ((Number) winner.get("same_tender_ip_bids")).longValue(), winner.toString());
+    }
+
+    @Test
+    void theHelpDeskKioskIsSharedButNeverCounts() throws Exception {
+        String kiosk = truth.get("cover_bids").get("kiosk_ip").asText();
+        String bids = parquet("bid/database", "/**/*.parquet");
+        long firms = count("SELECT count(DISTINCT bidder_id) FROM " + bids + " WHERE ip = '" + kiosk + "'");
+        assertTrue(firms >= 10, kiosk + " is shared by many firms (" + firms + "): a count of shared addresses would flag it");
+        // the counts Job's own SQL over only the kiosk's bids: shared across tenders, never by two bidders on one tender
+        Map<String, Object> only = countsOver("ip = '" + kiosk + "'");
+        assertEquals(0L, ((Number) only.get("same_tender_ip_bids")).longValue(), kiosk + " " + only);
+        assertEquals(1L, ((Number) only.get("ips_shared_across_tenders_only")).longValue(), kiosk + " " + only);
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/procurement_same_tender_shared_ip.toon").toString()));
+    }
+
+    /** The counts Job's own SQL (it has no params) over the real landed bids, narrowed. */
+    private static Map<String, Object> countsOver(String bidFilter) throws Exception {
+        String sql = JobConfig.load(TEMPLATE.resolve("config/jobs/procurement_shared_ip_counts_job.toon").toString()).require("sql");
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW bid AS SELECT * FROM " + parquet("bid/database", "/**/*.parquet") + " WHERE " + bidFilter);
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

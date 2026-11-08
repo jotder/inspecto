@@ -1,0 +1,6 @@
+physicalRef: ownership_sanctions_counts
+description: "Beneficial-ownership and sanctions Link Analysis showcase - one row of counts built by the ownership_sanctions_counts Job: listed_paths (ownership paths of 1 to 3 owns hops from a bank customer's company up to a person matched to the sanctions list), customers_exposed (distinct customers with such a path) and matched_persons (people with any name_match). Read by the Alert Rule ownership_path_to_listed_person. Names no customer or person. Synthetic."
+columns[3]{name,type,classification}:
+  listed_paths,number,
+  customers_exposed,number,
+  matched_persons,number,

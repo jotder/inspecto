@@ -1,0 +1,7 @@
+name: trade_unit_price_over_reference
+dataset: trade_over_reference_counts_dataset
+measure: max(shared_director_trades_over_reference)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "A unit price over 3 times the reference between related parties: a trade priced over 3 times the month's reference median between an exporter and an importer that share a director. The Alert carries how many such trades there are; no company or person id leaves trade_over_reference_counts, so open the over_invoicing view to find the pair. A supplier priced steadily over 3 times the reference to unrelated buyers is not counted (trades_over_reference counts every trade over it). Not grouped by pair: trade_over_reference_counts is a Job output, so a by column cannot be checked when the Space is created."

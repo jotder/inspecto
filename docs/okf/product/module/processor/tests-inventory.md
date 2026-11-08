@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-386 test class(es): 145 unit, 241 real-HTTP control-plane, 0 IT.
+390 test class(es): 149 unit, 241 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -276,12 +276,16 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `JobWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/JobWritersTest.java` | ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 2: <b>every route that can write a {@code job} passes |
 | `KpiCompletenessWidgetTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/KpiCompletenessWidgetTest.java` | The completeness tile (§8-D, operator 2026-10-09: Signals behind a Dataset). The shipped {@code telco-ra} Space |
 | `LaAuditTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaAuditTemplateTest.java` | The {@code la-audit} Space Template (vertical B of the multi-vertical showcase plan): settings, Jobs, personas, |
+| `LaBenefitsTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaBenefitsTemplateTest.java` | The {@code la-benefits} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaCardTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaCardTemplateTest.java` | The {@code la-card} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaClaimsTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaClaimsTemplateTest.java` | The {@code la-claims} Space Template's settings, Jobs, personas, Datasets and saved views, read with the REAL loaders |
 | `LaHealthTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaHealthTemplateTest.java` | The {@code la-health} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaMobileMoneyTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaMobileMoneyTemplateTest.java` | The {@code la-mobile-money} Space Template's settings, Jobs, personas and saved views, read with the REAL loaders |
+| `LaOwnershipTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaOwnershipTemplateTest.java` | The {@code la-ownership} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaPoliceTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaPoliceTemplateTest.java` | The {@code la-police} Space Template's Advanced tier (showcase plan step 8): settings, personas, the serial-match Alert Rule |
+| `LaProcurementTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaProcurementTemplateTest.java` | The {@code la-procurement} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaShowcaseTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaShowcaseTemplateTest.java` | LA-DEMO-SEED-1 (DR-S2, S3, S6, S7): the {@code la-showcase} Space Template's settings, Jobs, personas and its |
+| `LaTradeTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaTradeTemplateTest.java` | The {@code la-trade} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaUtilityTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaUtilityTemplateTest.java` | The {@code la-utility} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LinkAnalysisRateClassCoverageTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LinkAnalysisRateClassCoverageTest.java` | Every Link Analysis route must have an explicit rate-limit class: EXPENSIVE (throttled) or EXEMPT (listed |
 | `ModuleDisabledJobTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ModuleDisabledJobTest.java` | {@code MODULE-REORG-1 P4e} - the Space's module gate reaches background work. The test class path installs no |
