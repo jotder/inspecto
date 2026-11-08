@@ -63,8 +63,8 @@ minute or two:
   under any `<feed>/quarantine` or `<feed>/errors` (30 files, 0 rejected rows).
 - `inspecto-la-data/la-utility/data/utility_links/` holds the link Dataset (about 4 300 rows, six kinds),
   `transformer_loss/` the monthly energy balance (144 rows) and `utility_bank_links/` the churn view's links.
-- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `utility_contractor_network`, `utility_churn_by_bank` and
-  `utility_vendor_network`. The [user guide](user-guide.md) has the tour and the exercises.
+- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `meter_tampering_contractor`, `account_churn_by_bank_account` and
+  `prepaid_token_fraud_vendor`. The [user guide](user-guide.md) has the tour and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
 `inspecto-la-data/la-utility/`.
@@ -91,3 +91,31 @@ node tools/package-la-showcase.mjs la-utility
 The generator is deterministic (seed 20261107) and writes the ground truth to
 `tools/gen-la-utility-data.ground-truth.json`, which is not part of any download. The packer reads committed content
 only, so commit first.
+
+## As the *Utilities* industry Space
+
+The same use case also ships as the industry Space *Utilities* (`la-utilities`). Its recipe,
+`spaces/_industries/la-utilities.toon`, names the use-case templates it is composed from; today that is `la-utility`
+alone. The packer composes it from committed content:
+
+```bash
+node tools/package-la-showcase.mjs la-utilities
+```
+
+That writes `inspecto-la-space-la-utilities-<version>.zip` and `inspecto-la-data-la-utilities-<version>.zip`. Install
+them as above, with `la-utilities` in place of `la-utility`. A file two use cases would both ship is refused. Entity
+types in `config/link-analysis.toon` are merged by id. Every Dataset says what its id columns hold, and each Dataset
+of events has its own Mapping:
+
+| Dataset | Mapping |
+|---|---|
+| `premise_dataset` | Premise → Transformer |
+| `customer_account_dataset` | Account → Premise |
+| `payment_dataset` | Account → Bank account (when `paid_at`, measure `amount`) |
+| `field_visit_dataset` | Premise → Contractor (kind `visit_type`, when `visit_at`) |
+| `service_order_dataset` | Premise → Contractor (kind `order_type`, when `closed_at`) |
+| `prepaid_vend_dataset` | Premise → Vending point (when `vend_at`, measure `amount`) |
+| `utility_links_dataset`, `utility_bank_links_dataset` | Utility entity → Utility entity (kind `kind`, when `ts`, measure `amount`) |
+
+The link Datasets mix premises, contractors, accounts and the rest in one `src` and one `dst` column, so their ends
+hold the one generic type *Utility entity*. In the Start box, picking `utility_links_dataset` sets that type.

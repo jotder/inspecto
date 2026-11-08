@@ -419,8 +419,8 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
   its premises' meter reads per month (144 rows, `loss_band` over 15 % / over 9 % / normal). A third Job,
   `utility_bank_links` (on `utility_links`' `job.dataset.produced`), keeps the account links of bank accounts shared by
   three or more accounts and of premises that changed holder (441 rows, 531 nodes) for the churn view. Three saved
-  views: `utility_contractor_network` and `utility_vendor_network` filter the link Dataset by kind,
-  `utility_churn_by_bank` reads `utility_bank_links`; one
+  views: `meter_tampering_contractor` and `prepaid_token_fraud_vendor` filter the link Dataset by kind,
+  `account_churn_by_bank_account` reads `utility_bank_links`; one
   saved Geo View (`utility_transformer_loss_map`), inert on Basic. No `link-analysis.toon`. Ships
   `config/examples/sla-escalation-examples.md` like every template (`TemplateGovernanceExamplesTest`).
 - **Generator** `tools/gen-la-utility-data.py` (seed 20261107, standard library, byte-identical on a re-run) writes the
@@ -443,7 +443,7 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
     accounts), all 18 accounts on one bank account, so the story is one connected group, not 12 separate pairs.
   - C-22 is tied to C-14 by three joint visits at tampered premises ("C-14's colleague").
   - `tamper_flag` is VARCHAR (0, 1 or blank): a declared INTEGER lands as VARCHAR anyway.
-- **Canvas cap (fixed 2026-11-08):** `utility_churn_by_bank` first filtered the whole link Dataset to `account_at` and
+- **Canvas cap (fixed 2026-11-08):** `account_churn_by_bank_account` first filtered the whole link Dataset to `account_at` and
   `paid_from`: 1 954 rows but 2 932 nodes, over the 1 000-node canvas cap. It now reads the derived
   `utility_bank_links` (441 rows, 531 nodes): the two hub bank accounts and every premise that changed holder, so the
   genuine tenant changes still sit beside the churn as its look-alike. The heat-pump look-alike (one account, its own

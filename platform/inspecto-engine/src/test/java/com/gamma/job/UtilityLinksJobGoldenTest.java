@@ -181,8 +181,8 @@ class UtilityLinksJobGoldenTest {
     void everySavedViewFitsOneCanvasAndShowsItsStories() throws Exception {
         // a saved view draws its whole (filtered) Dataset; past the canvas's projection_node_cap (1 000 nodes) or the explorer's
         // default read (traversal.rows_default, 4 000 rows) it is cut short and a story may not be on screen
-        Map<String, List<String>> stories = Map.of("utility_contractor_network", List.of("meter_tampering", "illegal_reconnection"),
-                "utility_churn_by_bank", List.of("account_churn", "commercial_load"), "utility_vendor_network", List.of("prepaid_token_fraud"));
+        Map<String, List<String>> stories = Map.of("meter_tampering_contractor", List.of("meter_tampering", "illegal_reconnection"),
+                "account_churn_by_bank_account", List.of("account_churn", "commercial_load"), "prepaid_token_fraud_vendor", List.of("prepaid_token_fraud"));
         Path dir = TEMPLATE.resolve("config/registry/link-analysis-views");
         try (Stream<Path> w = Files.list(dir)) {
             assertEquals(stories.keySet(), w.map(p -> p.getFileName().toString().replace(".toon", "")).collect(java.util.stream.Collectors.toSet()));
@@ -210,7 +210,7 @@ class UtilityLinksJobGoldenTest {
             assertTrue(nodes.size() < 1_000, v.getKey() + " fits the canvas: " + nodes.size());
             for (String s : v.getValue())
                 for (String e : ids(truth.get("stories").get(s).get("entities")))
-                    if (!(e.startsWith("TX-") && v.getKey().equals("utility_contractor_network")))   // transformers are in the loss Dataset
+                    if (!(e.startsWith("TX-") && v.getKey().equals("meter_tampering_contractor")))   // transformers are in the loss Dataset
                         assertTrue(nodes.contains(e), v.getKey() + " shows " + s + " entity " + e);
         }
     }

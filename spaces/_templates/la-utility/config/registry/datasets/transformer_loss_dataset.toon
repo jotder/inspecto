@@ -1,8 +1,9 @@
 physicalRef: transformer_loss
 description: "Electricity revenue-protection Link Analysis showcase - energy balance per metered transformer per month, built by the transformer_loss Job: kWh supplied, kWh metered at its premises, loss_pct and loss_band. TX-007 and TX-019 climb over 15 % after the tampering visits. Synthetic."
 eventDate: month
+primaryEntityType: transformer
 columns[10]{name,type,classification}:
-  transformer_id,string,
+  transformer_id,string,TRANSFORMER
   month,date,
   city,string,
   lat,number,

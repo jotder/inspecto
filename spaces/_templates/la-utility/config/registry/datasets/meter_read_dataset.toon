@@ -1,8 +1,9 @@
 physicalRef: meter_read/database
 description: "Electricity revenue-protection Link Analysis showcase - One row per premise per day: the kWh the meter registered and its tamper flag (0, 1, blank when the meter does not report one). Twelve monthly files METER_READ_yyyyMM.csv landed; the next month is in data/staged. Landed by the meter_read Pipeline. Synthetic."
 eventDate: read_date
+primaryEntityType: premise
 columns[4]{name,type,classification}:
-  premise_id,string,
+  premise_id,string,PREMISE
   read_date,date,
   kwh,number,
   tamper_flag,string,
