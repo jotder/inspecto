@@ -1,0 +1,6 @@
+physicalRef: police_serial_match_counts
+description: "Police Link Analysis showcase - one row of counts over the item_match links of police_links, built by the police_serial_match_counts Job: repeat_seller_matches (matches by a seller with 2 or more), repeat_sellers, one_off_matches. Read by the Alert Rule police_repeat_seller_serial_matches. Names no person. Synthetic."
+columns[3]{name,type,classification}:
+  repeat_seller_matches,number,
+  repeat_sellers,number,
+  one_off_matches,number,

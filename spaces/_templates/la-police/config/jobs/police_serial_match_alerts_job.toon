@@ -1,0 +1,7 @@
+job:
+  name: police_serial_match_alerts
+  type: alert.evaluate
+  description: "Evaluates the Alert Rules each time the police_serial_match_counts Job produces its Dataset, so police_repeat_seller_serial_matches sees the new counts without anyone pressing Evaluate. On a build without Alert Rules (Basic) the rule is not armed and this Job finds nothing to evaluate."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == police_serial_match_counts"
+  enabled: true

@@ -91,6 +91,42 @@ node tools/package-la-showcase.mjs la-police
 The generator is deterministic (seed 20261107) and writes the ground truth to `tools/la-police-ground-truth.json`,
 which is not part of any download. The packer reads committed content only, so commit first.
 
+## Advanced tier (Preview with demo sign-in)
+
+The Space download also carries the Advanced tier: `config/demo-users.toon` and `config/roles.toon` (the personas
+`police.analyst`, `police.sio`, `police.reviewer`, `police.outsider` and `admin`), four-eyes above a fan-out of 2 000
+and Drafts in `config/link-analysis.toon`, and the Alert Rule `police_repeat_seller_serial_matches` with its two Jobs
+(`police_serial_match_counts`, `police_serial_match_alerts`). What each persona does is in the
+[user guide](user-guide.md#advanced-tier-investigation-four-eyes-and-the-serial-match-alert-rule).
+
+**On Basic it is inert.** The personas and roles are ignored (no sign-in), the log says once "Not arming alert rule
+'police_repeat_seller_serial_matches'", and `police_serial_match_alerts` runs after each build and finds no rule
+breached. Nothing errors and nothing is refused.
+
+**To show it**, run a Demo Auth build (`package.ps1 -Edition Preview -DemoAuth`, started with `bin\serve-demo.bat`),
+which binds to 127.0.0.1 only:
+
+1. Lay the Space down from the template before the first start, or unzip the Space and data downloads as above:
+
+   ```bash
+   node tools/seed-la-police.mjs --scaffold <spacesRoot>
+   ```
+
+2. Start the demo build with `SPACES_ROOT` pointing at `<spacesRoot>` (add `SPACES_DATA_ROOT` if you unzipped the data
+   download). The Alert Rule is armed at boot. Within five minutes `police_links` builds its Dataset, the counts Job runs
+   and the rule raises one WARNING (value 12).
+3. Seed the runtime state, as the right personas:
+
+   ```bash
+   node tools/seed-la-police.mjs --base http://127.0.0.1:<port>            # dry run: prints every call
+   node tools/seed-la-police.mjs --base http://127.0.0.1:<port> --apply
+   ```
+
+   It presses Run on `police_links` if the Dataset is not built yet, then creates the Investigation `burglary-series`
+   and its steps, the members, the Entity List `series-sellers`, the Case (assigned to `police.sio`), one held four-eyes
+   expand and one open Draft. It is safe to re-run: anything already there is skipped. It sends only `demo:<id>` sign-in
+   codes, never a password.
+
 ## As the *Law enforcement* industry Space
 
 The same use case also ships as the industry Space *Law enforcement* (`la-law-enforcement`). Its recipe is
