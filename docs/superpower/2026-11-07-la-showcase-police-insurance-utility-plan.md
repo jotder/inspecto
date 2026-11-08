@@ -44,7 +44,7 @@ Telecom), with the same template id.
 | Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
 | Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
 | Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | exists |
-| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | exists (Basic tier) |
+| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | exists |
 
 ### Insurance
 
@@ -93,8 +93,8 @@ Telecom), with the same template id.
 
 **Count: 18 Spaces in 9 industries.** On 2026-11-08, 17 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
 `la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`, `la-trade`, `la-benefits`,
-`la-health`, `la-telco-ra`, `la-logistics`, `la-mfs`, `la-insider`) and 1 is planned (`la-crypto`); the `la-claims`
-additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
+`la-health`, `la-telco-ra`, `la-logistics`, `la-mfs`, `la-insider`) and `la-crypto` followed the same day, so all 18
+exist; on 2026-11-09 every one has its Advanced tier (step 8). The `la-claims` additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
 2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
 ## Realism review
@@ -1375,6 +1375,24 @@ deviations:
 
 8. **Advanced tier** for every new Space (personas, Alert Rule, seed script) → verify on a Preview build with
    demo sign-in.
+   **ALL 13 BUILT by 2026-11-09** (`la-police` 2026-11-08; `la-utility`, `la-card`, `la-ownership`, `la-trade`,
+   `la-procurement`, `la-benefits`, `la-health`, `la-mfs`, `la-telco-ra`, `la-logistics`, `la-insider`, `la-crypto`
+   2026-11-09; one section each below). Shared as built:
+   - Every Space's `admin` and its `fraud-analyst`, `la-viewer` and `la-settings` roles are byte-identical (a user id
+     defined differently in two Spaces is a 409 `ROSTER_CONFLICT`; `la-police` was brought in line on 2026-11-09), and
+     every `link-analysis.toon` states `four_eyes_fan_out_above: 2000` and the same Drafts limits.
+   - The industry packer (`tools/package-la-showcase.mjs`) merges `link-analysis.toon` settings by key and
+     `demo-users.toon` / `roles.toon` by id / name across the use cases of one industry Space, refusing a differing
+     definition; a test composes every committed recipe from the real templates.
+   - Each Alert Rule is a registry rule over a one-row counts Job (no `by:`, since a Job output has no Schema when the Space
+     is created), names a count and never an entity, is a running total, and is pinned against its story's benign
+     look-alike. Four rules are narrower than the spec's wording, each to keep its look-alike out: `la-trade` (shared
+     director), `la-logistics` (uninsured carrier), `la-benefits` (days from the death notice), `la-telco-ra` (two or
+     more unbilled months, the latest still unbilled).
+   - Each lane was verified independently on its integration commit (targeted tests, one falsification by the
+     verifier); the full reactor gate was not run per lane.
+   - **Not checked for any of the twelve 2026-11-09 Spaces:** a live Preview build with Demo Auth (rule armed and firing,
+     the seed's `--apply`, persona probes), a Basic bundle boot of the Advanced tier, the Link Analysis UI, an OIDC build.
    **`la-police` BUILT 2026-11-08.** As built:
    - **In the template, inert on Basic** (the Edition rule as settled 2026-11-08): `config/demo-users.toon` (`admin`,
      `police.analyst` lead, `police.sio` second approver, `police.reviewer` read-only, `police.outsider` not a member),
@@ -2148,8 +2166,9 @@ deviations:
 
 ## Open questions
 
-- Version scheme for Space and Data downloads: follow the product version, or each Space on its own?
-- Where downloads are published (internal share, website, release page)?
+- ~~Version scheme for Space and Data downloads~~ — **decided (operator 2026-11-09): the product version**; every zip is
+  built from the same commit as the product.
+- ~~Where downloads are published~~ — **decided (operator 2026-11-09): built locally only**; the operator publishes them.
 - Police wording for the target market (UK, US, India)? Default is neutral wording with local terms only in the
   user guide.
 - Water-utility variant later?

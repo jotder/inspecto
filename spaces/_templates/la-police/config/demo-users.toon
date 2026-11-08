@@ -1,5 +1,5 @@
 users[5]{id,displayName,title,roles}:
-  admin,Demo Admin,Platform administrator,admin;police-analyst;la-settings
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
   police.analyst,Demo Police Analyst,Intelligence analyst (lead),police-analyst
   police.sio,Demo Senior Investigating Officer,Senior investigating officer (second approver),police-sio
   police.reviewer,Demo Police Reviewer,Reviewer (read-only),la-viewer

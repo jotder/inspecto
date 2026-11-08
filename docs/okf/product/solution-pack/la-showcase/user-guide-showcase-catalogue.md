@@ -69,7 +69,7 @@ the real ids on the canvas. Saved Geo Views need the Geo map (Standard and above
 
 An **Advanced tier** adds Demo Users (sign-in personas), typed masking with the admin's Reveal, Investigations,
 four-eyes approval, Alert Rules and a seeded Case. It ships in the same Space download and stays inert on Basic (Alert
-Rules ship unarmed). Four showcases have one today; for the other thirteen it is planned (wave D of the plan).
+Rules ship unarmed). Every showcase but `la-sample` has one (the last thirteen since 2026-11-09).
 
 ## Sizes
 

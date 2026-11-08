@@ -75,6 +75,19 @@ class LaPoliceTemplateTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void theSharedAdminIsDefinedExactlyAsInLaShowcase() throws Exception {
+        // DemoUsers refuses a user id defined differently in two Spaces (409 ROSTER_CONFLICT), so `admin` must read the same;
+        // it was admin;police-analyst;la-settings until 2026-11-09
+        Path other = Path.of("..", "spaces", "_templates", "la-showcase", "config", "demo-users.toon");
+        List<Map<String, Object>> mine = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
+        List<Map<String, Object>> theirs = (List<Map<String, Object>>) ToonHelper.load(other.toString()).get("users");
+        assertEquals(theirs.stream().filter(u -> "admin".equals(u.get("id"))).findFirst().orElseThrow(),
+                mine.stream().filter(u -> "admin".equals(u.get("id"))).findFirst().orElseThrow());
+        assertTrue(Roles.effective(CFG).containsKey("fraud-analyst"), "every role a persona names is defined here");
+    }
+
+    @Test
     void theSerialMatchRuleIsAValidDatasetRuleOverTheCountsTheChainBuilds(@TempDir Path data) throws Exception {
         Map<String, Object> body = ToonHelper.load(CFG.resolve("registry/alert-rules/police_repeat_seller_serial_matches.toon").toString());
         AlertRule rule = AlertRoutes.parseContent(CFG, () -> data, body);
