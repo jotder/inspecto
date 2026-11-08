@@ -1,0 +1,7 @@
+job:
+  name: utility_loss_alerts
+  type: alert.evaluate
+  description: "Evaluates the Alert Rules each time the transformer_loss Job produces its Dataset, so utility_transformer_loss sees the new monthly balance without anyone pressing Evaluate. On Basic no Alert Rule is armed and the run reports no rule breached."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == transformer_loss"
+  enabled: true

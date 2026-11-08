@@ -27,7 +27,7 @@ Each story has an innocent look-alike that a threshold alone would flag: a holid
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The saved Geo View needs the Geo map (Standard and above); on Basic the same figures are in the `transformer_loss` Dataset. An Advanced tier (personas, an Alert Rule on a transformer's loss going over 15 %, a seeding script) is planned.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The saved Geo View needs the Geo map (Standard and above); on Basic the same figures are in the `transformer_loss` Dataset. The same download carries an Advanced tier for builds with sign-in: four personas (lead analyst, second approver, read-only reviewer, outsider), an Alert Rule when a transformer's loss goes over 15 %, and a seeding script for the Investigation, Case and four-eyes approval. It is inert on Basic.
 
 ## How it works
 

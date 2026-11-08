@@ -1,0 +1,6 @@
+users[5]{id,displayName,title,roles}:
+  admin,Demo Admin,Platform administrator,admin;fraud-analyst;la-settings
+  rp.analyst,Demo RP Analyst,Revenue-protection analyst (lead),rp-analyst
+  rp.manager,Demo RP Manager,Revenue-protection manager (second approver),rp-manager
+  rp.reviewer,Demo RP Reviewer,Loss-reduction reviewer (read-only),la-viewer
+  rp.outsider,Demo RP Outsider,Not a member of the Investigation,la-viewer

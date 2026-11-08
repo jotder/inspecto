@@ -80,6 +80,50 @@ Copy every file of `inspecto-la-data/la-utility/data/staged/<feed>/` into
 Stop the product, delete `inspecto-la-data/la-utility/`, and unzip the data download again. The Space configuration
 is untouched.
 
+## Advanced tier: personas, the loss Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `utility_transformer_loss` is loaded but not armed (a WARN, "Not arming
+alert rule"), and the `utility_loss_alerts` Job runs and reports no rule breached. On a build with sign-in it comes to
+life. To show it, use the demo build, which signs people in by name with no password (Preview, Demo Auth, loopback
+only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the eight Pipelines have landed (a minute or two), create the runtime state from a checkout of the repository:
+
+```bash
+node tools/seed-la-utility.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `tampering-case`
+(seeded with `C-14`, `TX-007` and `TX-019`, expanded once, annotated, snapshotted), its members, the Entity Lists
+`tampered-premises` (the 22 premises) and `revenue-protection-watch` (`C-14`, `C-22`, `V-08`), a Case assigned to
+`rp.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
+person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
+`node tools/seed-la-utility.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `rp.analyst` | `rp-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `rp.manager` | `rp-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `rp.reviewer` | `la-viewer`, member as reviewer | reads `tampering-case`; any change is refused (403) |
+| `rp.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces |
+
+**The Alert Rule.** `utility_transformer_loss` fires (CRITICAL) when a metered transformer's monthly loss in
+`transformer_loss` reaches 15 %. The Alert carries the highest monthly loss. It fires while the months land, because
+TX-019 reaches 15 % from March 2026 (TX-007 from July); with all twelve months in, the loss is 24.7 % on TX-019 and 17.9 % on TX-007, and every
+other metered transformer, the holiday home's included, stays under 7 %. Open `transformer_loss` (`loss_band = loss over
+threshold`) to see which transformer. The rule is not grouped by transformer, because `transformer_loss` is a Job
+output: a `by` column cannot be checked against its Schema when the Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash

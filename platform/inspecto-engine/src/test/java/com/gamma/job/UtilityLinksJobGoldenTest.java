@@ -99,10 +99,32 @@ class UtilityLinksJobGoldenTest {
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsLossRuleBreachesOnlyTheTwoTamperedTransformers() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (plan step 5)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/utility_loss_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
+        com.gamma.alert.AlertRule rule = com.gamma.alert.AlertRule.fromMap(ToonHelper.load(TEMPLATE.resolve("config/registry/alert-rules/utility_transformer_loss.toon").toString()));
+        assertEquals("transformer_loss_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "transformer_loss is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        // the rule's own measure and threshold over the real transformer_loss output: it fires, and only because of the two
+        // tampered transformers - without them every other transformer (the holiday home's included) stays under the threshold
+        String t = parquet("transformer_loss");
+        Set<String> tampered = new TreeSet<>(ids(truth.get("stories").get("meter_tampering").get("entities")).stream().filter(e -> e.startsWith("TX-")).toList());
+        String in = "('" + String.join("', '", tampered) + "')";
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + t + ") WHERE v >= " + rule.threshold()), "the rule fires");
+        assertEquals(0, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + t + " WHERE transformer_id NOT IN " + in + ") WHERE v >= " + rule.threshold()),
+                "without TX-007 and TX-019 it would not");
+        Set<String> over = new TreeSet<>();
+        for (Map<String, Object> r : rows("SELECT DISTINCT transformer_id FROM " + t + " WHERE loss_pct >= " + rule.threshold()))
+            over.add((String) r.get("transformer_id"));
+        assertEquals(tampered, over, "transformer_loss names the two the Alert is about");
+        // the look-alike (the holiday home, empty every winter) sits on another transformer
+        String home = truth.get("stories").get("meter_tampering").get("lookalikes").get(0).asText();
+        String homeTx = (String) rows("SELECT transformer_id FROM " + parquet("premise/database", "/**/*.parquet") + " WHERE premise_id = '" + home + "'")
+                .get(0).get("transformer_id");
+        assertFalse(over.contains(homeTx), home + " on " + homeTx);
     }
 
     @Test

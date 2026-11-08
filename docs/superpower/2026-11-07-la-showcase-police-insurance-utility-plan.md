@@ -1369,6 +1369,54 @@ deviations:
 
 8. **Advanced tier** for every new Space (personas, Alert Rule, seed script) → verify on a Preview build with
    demo sign-in.
+   **`la-utility` BUILT 2026-11-08** (the first new Space with its Advanced tier; the pattern for the others). As built:
+   - **In the template** (`minEdition` stays `basic`, per the Edition rule): `config/demo-users.toon` (`rp.analyst` lead,
+     `rp.manager` second approver, `rp.reviewer` read-only, `rp.outsider` not a member, and `admin` defined exactly as in
+     `la-showcase`, since a user id defined differently in two Spaces is a roster conflict), `config/roles.toon`
+     (`rp-analyst`, `rp-manager`, `la-viewer`, `la-settings`, `fraud-analyst` for `admin`), the Alert Rule
+     `registry/alert-rules/utility_transformer_loss.toon`, the Job `utility_loss_alerts` (`alert.evaluate` on
+     `transformer_loss`' `job.dataset.produced`), and `four_eyes_fan_out_above: 2000` plus Drafts limits in
+     `link-analysis.toon`. `masking_mode` stays unset (the edition default: `none` on Basic, `typed` with sign-in; every
+     utility Entity Type is unmasked, so nothing is hidden).
+   - **Seed** `tools/seed-la-utility.mjs` (sibling of `seed-la-claims.mjs`; `--scaffold`, dry run, `--apply`, idempotent;
+     story ids read from the ground truth): Investigation `tampering-case` (seeded with `C-14`, `TX-007`, `TX-019`;
+     bounded expand, annotate, threshold, window, resolve, snapshot), members (`rp.reviewer` and `rp.manager` reviewers,
+     `admin` lead; `rp.outsider` not a member), Entity Lists `tampered-premises` (22) and `revenue-protection-watch`
+     (`C-14`, `C-22`, `V-08`), a Case from `C-14` assigned to `rp.manager` and linked, an Investigation template, one
+     unbounded expand held for four-eyes, one open Draft. Test: `tools/seed-la-utility.test.mjs` (mocked fetch).
+   - **Decided while building:**
+     - **The Alert Rule is not grouped by transformer.** A `by: [transformer_id]` rule is refused when the Space is created
+       (`POST /spaces` 422, `ControlApiSpaceTemplateSeedGateTest.everyShippedTemplateApplies`): the `by` column is checked
+       against the Dataset's Schema, and `transformer_loss` is a Job output with no Schema yet. The deferred
+       `pending/alert-rules/` only waits for score-model outputs (`afterScore`), not Job outputs. So the rule is
+       `max(loss_pct) gte 15` over the whole Dataset, as `la-showcase`'s telecom rules count over a Job output: the Alert
+       carries the highest monthly loss, and `transformer_loss` names the transformer. A deferral for Job outputs would
+       allow one Alert per transformer; not built.
+     - **`transformer_loss` balances a month only once both sides have landed** (`JOIN`, was `LEFT JOIN`). On the first
+       Preview boot a month's `transformer_read` file landed before its `meter_read` file, the month read as 100 % loss, and
+       the Alert fired at 100. Now it fires at the first real crossing (15.2 % on TX-019).
+     - The Draft step annotates `C-14` (in the Working Set) about `C-22`: `C-22` is two hops out, and annotating it was
+       refused ("not in the Working Set").
+   - **Tests:** `LaUtilityTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
+     four-eyes 2000; each persona's capabilities; the shared `admin`; the rule and its evaluate Job, real loaders);
+     `UtilityLinksJobGoldenTest` (the rule's own measure and threshold over the real `transformer_loss`: it fires, and
+     with `TX-007` and `TX-019` removed it would not; the holiday home's transformer is never over); the gallery test
+     `galleryCountsTheDemoUserSignInATemplateNeeds` now also pins `la-utility` creatable with no missing feature and no
+     Demo Auth installed.
+   - **Live proof on Preview** (`package.ps1 -Edition Preview -DemoAuth -NoUi -NoBakeDemo`, the Space laid out with
+     `seed-la-utility.mjs --scaffold`, `serve-demo`): 30 files landed, 0 rejected; the rule was armed at boot and fired
+     once (CRITICAL, 15.2 %, state OPEN). `seed-la-utility.mjs --apply` created every step (the Draft on the second run,
+     after the fix above), none failed. Probes, 11 of 11: the five personas sign in; `rp.analyst` reads `tampering-case`;
+     `rp.outsider` gets 404 on it; `rp.reviewer` reads it (200) and a write is refused (403); `rp.manager`'s approval
+     inbox holds the expand (`rp.analyst`'s inbox is 403); the Alert is listed. Every persona, `rp.outsider` included, reads
+     the Datasets (they carry no `owner`/`shares`). 0 ERROR lines.
+   - **Live proof on Basic** (`package.ps1 -Edition Basic -NoUi`, the same scaffold, `serve.bat`): 30 files landed, 0
+     rejected; "Not arming alert rule 'utility_transformer_loss'" (WARN); `utility_loss_alerts` ran and reported no rule
+     breached; the three data Jobs produced 4 301, 144 and 441 rows; the gallery lists `la-utility` creatable with no
+     missing feature; masking in force `none`. 0 ERROR lines.
+   - **Not checked:** the Link Analysis UI (no UI in either bundle; the personas were checked through the API), the
+     packed downloads on Preview (the Space was scaffolded; the downloads carry the same `config/`), the Investigation's
+     embed link, and an OIDC sign-in build.
 
 **Docs, with each Space**
 

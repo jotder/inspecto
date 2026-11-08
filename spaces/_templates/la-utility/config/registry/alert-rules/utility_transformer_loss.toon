@@ -1,0 +1,7 @@
+name: utility_transformer_loss
+dataset: transformer_loss_dataset
+measure: max(loss_pct)
+comparator: gte
+threshold: 15
+severity: CRITICAL
+description: "Transformer loss over 15 %: a metered transformer supplied at least 15 % more energy in a month than the meters of its premises registered (technical loss is 4-7 %). The Alert carries the highest monthly loss; open transformer_loss (loss_band = loss over threshold) to see which transformer, then the contractor visits to its premises. Not grouped by transformer: transformer_loss is a Job output, so a by column cannot be checked when the Space is created."

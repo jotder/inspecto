@@ -235,7 +235,7 @@ class ControlApiSpaceTemplatesTest {
      * {@code demo-auth}; the test's own {@code starter} is such a template and {@code la-sample} has no roster.
      * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
      * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims},
-     * {@code la-mobile-money}, {@code la-audit} and {@code la-showcase} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
+     * {@code la-mobile-money}, {@code la-audit}, {@code la-showcase} and {@code la-utility} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
      * none of them needing Demo Auth. With an
      * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
      * without the roster check every one of them lists {@code creatable: true}.
@@ -244,7 +244,7 @@ class ControlApiSpaceTemplatesTest {
     void galleryCountsTheDemoUserSignInATemplateNeeds(@TempDir Path root) throws Exception {
         seedTemplate(root);
         Files.writeString(root.resolve("_templates/starter/config/demo-users.toon"), "users[0]:\n");
-        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-sample", "la-showcase")) {
+        for (String shipped : java.util.List.of("la-audit", "la-claims", "la-mobile-money", "la-sample", "la-showcase", "la-utility")) {
             Path src = Path.of("..", "spaces", "_templates", shipped);
             Path dst = root.resolve("_templates").resolve(shipped);
             Files.createDirectories(dst);
@@ -261,7 +261,7 @@ class ControlApiSpaceTemplatesTest {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
                     // la-sample has no roster; the shipped showcases with a Basic tier keep theirs inert, so it does not refuse them
-                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase");
+                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money", "la-audit", "la-showcase", "la-utility");
                     String id = t.get("id").asText();
                     boolean needsDemo = !"la-sample".equals(id) && !basicTier.contains(id);
                     boolean named = false;
