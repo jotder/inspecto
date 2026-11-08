@@ -1,0 +1,36 @@
+name: network_usage
+active: true
+description: "Telecom revenue assurance Link Analysis showcase - One row per subscriber per month, summed from the switch's call and data records: the period (the first of the month), voice minutes and data MB. One file per month (NETWORK_USAGE_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-telco-ra-data.py."
+
+dirs:
+  poll:       data/inbox/network_usage
+  database:   data/network_usage/database
+  backup:     data/network_usage/backup
+  temp:       data/network_usage/temp
+  errors:     data/network_usage/errors
+  quarantine: data/network_usage/quarantine
+  markers:    data/network_usage/markers
+  status_dir: data/network_usage/status
+  log_dir:    data/network_usage/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: network_usage_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

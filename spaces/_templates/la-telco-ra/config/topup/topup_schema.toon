@@ -1,0 +1,28 @@
+raw:
+  name: TOPUP
+  format: CSV
+  fields[5]{name,selector,type}:
+    msisdn,"0",VARCHAR
+    amount,"1",DOUBLE
+    topped_up_at,"2",TIMESTAMP
+    channel,"3",VARCHAR
+    pos_id,"4",VARCHAR
+mapping:
+  canonicalName: topup
+  rawName: TOPUP
+  fields[5]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: topped_up_at
+      from: topped_up_at
+      fn: keep
+    - name: channel
+      from: channel
+      fn: keep
+    - name: pos_id
+      from: pos_id
+      fn: keep

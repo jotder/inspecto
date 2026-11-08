@@ -1,0 +1,36 @@
+name: enterprise_trunk
+active: true
+description: "Telecom revenue assurance Link Analysis showcase - One row per enterprise voice trunk (a business customer's PBX connection): the trunk and the customer it belongs to. One extract (ENTERPRISE_TRUNK_20260930.csv). Synthetic; regenerate with tools/gen-la-telco-ra-data.py."
+
+dirs:
+  poll:       data/inbox/enterprise_trunk
+  database:   data/enterprise_trunk/database
+  backup:     data/enterprise_trunk/backup
+  temp:       data/enterprise_trunk/temp
+  errors:     data/enterprise_trunk/errors
+  quarantine: data/enterprise_trunk/quarantine
+  markers:    data/enterprise_trunk/markers
+  status_dir: data/enterprise_trunk/status
+  log_dir:    data/enterprise_trunk/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: enterprise_trunk_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -33,7 +33,7 @@ Telecom), with the same template id.
 | Mobile money (anti-money-laundering) | `la-mobile-money` | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
 | MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | planned |
 | Telco fraud | `la-showcase` | Telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode | exists |
-| Revenue assurance | `la-telco-ra` | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | planned |
+| Revenue assurance | `la-telco-ra` | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | exists |
 
 ### Banking and finance
 
@@ -91,8 +91,9 @@ Telecom), with the same template id.
 | Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
 | Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
 
-**Count: 18 Spaces in 9 industries.** On 2026-11-08, 10 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
-`la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`) and 8 are planned; the `la-claims`
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 13 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+`la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`, `la-trade`, `la-benefits`,
+`la-telco-ra`) and 5 are planned; the `la-claims`
 additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
 2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
@@ -778,6 +779,50 @@ with a score).
   with a real overseas office calling during that office's working hours.
 
 **Alert Rule:** usage without billing over 1 day for a subscriber.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-telco-ra-data.py` (seed 20261110; ground truth
+`tools/gen-la-telco-ra-data.ground-truth.json`), `tools/gen-la-telco-ra-data.test.mjs`, `TelcoRaLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-telco-ra/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-telco-ra/`. The non-LA `spaces/_templates/telco-ra` is a separate template and is untouched.
+Deliberate deviations:
+- **Scale:** 7 500 subscribers (spec: 15 000), 200 dealers (`DL-000` is the operator's network test team), 357 dealer devices, 369
+  points of sale, 150 trunks of 120 customers. `network_usage` and `billing_record` are **monthly** per subscriber (spec: daily),
+  so the two feeds are about 67 000 and 65 000 landed rows, not millions; top-ups are about 30 000 landed (spec: 60 000, scaled
+  with the subscribers); `trunk_call` is about 14 000 trunk-days. About 21 000 link rows; data 7.3 MB (the largest showcase so far).
+- **Columns:** `network_usage` and `billing_record` carry `period` (the first of the month) and `billing_record` `billed_minutes` /
+  `billed_mb`; `topup.at` is `topped_up_at` (`AT` is SQL) and `topup` gains `pos_id` (the retail point of sale, blank for app and
+  card); `trunk_call` gains `call_date` and `number_type` (`geographic`, `mobile`, `premium`); `dealer` has no other column.
+- **Link kinds:** `activated_by`, `activated_on`, `topped_up` (subscriber → point of sale, retail only), `trunk_of`,
+  `called_country`. A destination node is a country and number type (`CTRY-LT-PRN`), not the bare country, so a firm calling a
+  country's ordinary numbers never touches the premium-rate story. Evidence is in `via`: `activated_by` carries plan, device,
+  `topups:`, `first_topup_days:`, `usage_months:`, `unbilled_months:` (usage months with no billing record), usage and billed
+  minutes; `called_country` carries `off_hours_minutes:` (start before 07:00 or from 21:00, or a weekend), `night_minutes:`,
+  `weekend_minutes:`.
+- **Views and the canvas cap:** one derived Job, `telco_ra_screen_links` (on `job.dataset.produced`, la-benefits style), writes the
+  three screens into one Dataset with a `screen` column: `unbilled_usage` (2 or more unbilled months), `commission_spike` (SIMs
+  activated and topped up in a dealer-week of 50 or more) and `pbx_off_hours` (300 or more off-hours minutes to one destination).
+  `telco_ra_links` also runs on `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own
+  filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the look-alike on the canvas but in another
+  component: `telco_ra_unbilled_usage` 704 rows, 380 nodes; `telco_ra_commission_spikes` 2 404 rows, 768 nodes;
+  `telco_ra_pbx_off_hours` 20 rows, 19 nodes.
+- **Stories as built:** unbilled usage is `DL-047` (Manchester), 300 SIMs on `DEV-00086` on 2026-03-17, 800-2 500 minutes and
+  20-60 GB a month from March, no billing record and no top-up; the look-alike is `DL-000`'s 40 SIMs on `DEV-00001`/`DEV-00002`
+  with plan `Internal test` (the known list), plus 12 ordinary SIMs whose first two months reached billing late (`unbilled_months:2`)
+  and 50 single dropped subscriber-months (`unbilled_months:1`, below the screen). Commission fraud is `DL-112` (Leeds), 400 SIMs on
+  `DEV-00204`..`00206` over the six weeks from 2026-02-02, each topped up once with 5.00 at its shop `POS-0008` within 2 days, one
+  month of a few test minutes, then nothing; the look-alike `DL-163` (Sheffield) activates 350 SIMs on 2025-10-01..10-12 whose
+  students top up every 20-40 days (app or ten campus shops) and use them every month. PBX hacking is `TRK-025`, `TRK-040`,
+  `TRK-087`, `TRK-147` (customers `ENT-0087`, `-0040`, `-0057`, `-0045`) calling premium ranges in LT, SK and SI on six weekends
+  2026-04-03..06-22, every minute off hours; the look-alike `TRK-027` (`ENT-0108`) calls `CTRY-SG-GEO` on working days at
+  01:00-03:00 (that office's day), and `TRK-017`, `TRK-082` call `CTRY-US-GEO` in the evening. Background trunks call premium
+  ranges only in IE and NL, in daytime.
+- **Identifiers:** MSISDNs `9996…` (the unassigned +999 range, as la-showcase), IMSIs `00101…` (the 001-01 test network), dealer
+  names invented, real cities at city level, countries only as destinations. No dealer-name spelling variants: nothing here
+  resolves identity by name.
+- **Staged month:** October adds 137 activations and a month of usage, billing, top-ups and trunk calls, and never updates a
+  landed fact; the stories stay as they are (the 300 SIMs stay unbilled, the 400 stay dormant, no new attack).
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (the screens were recomputed over landed plus staged files outside the engine: no story changes).
 
 #### 11. `la-logistics` — cargo theft
 

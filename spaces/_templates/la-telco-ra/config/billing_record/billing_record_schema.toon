@@ -1,0 +1,24 @@
+raw:
+  name: BILLING_RECORD
+  format: CSV
+  fields[4]{name,selector,type}:
+    msisdn,"0",VARCHAR
+    period,"1",DATE
+    billed_minutes,"2",DOUBLE
+    billed_mb,"3",DOUBLE
+mapping:
+  canonicalName: billing_record
+  rawName: BILLING_RECORD
+  fields[4]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: period
+      from: period
+      fn: keep
+    - name: billed_minutes
+      from: billed_minutes
+      fn: keep
+    - name: billed_mb
+      from: billed_mb
+      fn: keep

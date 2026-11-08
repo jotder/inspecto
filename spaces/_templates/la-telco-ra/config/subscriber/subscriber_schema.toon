@@ -1,0 +1,32 @@
+raw:
+  name: SUBSCRIBER
+  format: CSV
+  fields[6]{name,selector,type}:
+    msisdn,"0",VARCHAR
+    imsi,"1",VARCHAR
+    dealer_id,"2",VARCHAR
+    activated_at,"3",TIMESTAMP
+    plan,"4",VARCHAR
+    activation_device,"5",VARCHAR
+mapping:
+  canonicalName: subscriber
+  rawName: SUBSCRIBER
+  fields[6]:
+    - name: msisdn
+      from: msisdn
+      fn: keep
+    - name: imsi
+      from: imsi
+      fn: keep
+    - name: dealer_id
+      from: dealer_id
+      fn: keep
+    - name: activated_at
+      from: activated_at
+      fn: keep
+    - name: plan
+      from: plan
+      fn: keep
+    - name: activation_device
+      from: activation_device
+      fn: keep

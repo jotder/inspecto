@@ -1,0 +1,16 @@
+raw:
+  name: ENTERPRISE_TRUNK
+  format: CSV
+  fields[2]{name,selector,type}:
+    trunk_id,"0",VARCHAR
+    customer_id,"1",VARCHAR
+mapping:
+  canonicalName: enterprise_trunk
+  rawName: ENTERPRISE_TRUNK
+  fields[2]:
+    - name: trunk_id
+      from: trunk_id
+      fn: keep
+    - name: customer_id
+      from: customer_id
+      fn: keep

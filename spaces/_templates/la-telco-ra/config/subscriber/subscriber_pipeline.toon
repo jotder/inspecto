@@ -1,0 +1,36 @@
+name: subscriber
+active: true
+description: "Telecom revenue assurance Link Analysis showcase - One row per subscriber (SIM) from the activation register: MSISDN, IMSI, the dealer that activated it, when, the plan (prepaid, postpaid, or Internal test for the network test team's known list of test SIMs) and the dealer device it was activated on (blank for some older activations). One extract of every SIM activated by 2026-09-30 (SUBSCRIBER_20260930.csv); the October activations are in data/staged. Synthetic; regenerate with tools/gen-la-telco-ra-data.py."
+
+dirs:
+  poll:       data/inbox/subscriber
+  database:   data/subscriber/database
+  backup:     data/subscriber/backup
+  temp:       data/subscriber/temp
+  errors:     data/subscriber/errors
+  quarantine: data/subscriber/quarantine
+  markers:    data/subscriber/markers
+  status_dir: data/subscriber/status
+  log_dir:    data/subscriber/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: subscriber_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

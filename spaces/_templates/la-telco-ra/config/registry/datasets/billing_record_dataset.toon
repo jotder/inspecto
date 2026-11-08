@@ -1,0 +1,8 @@
+physicalRef: billing_record/database
+description: "Telecom revenue assurance Link Analysis showcase - One row per subscriber per month, summed from the rated records the billing system charged: the period (the first of the month), billed minutes and billed MB. A month of network usage with no billing record is usage that was never charged. One file per month (BILLING_RECORD_YYYYMM.csv); the next month is in data/staged. Landed by the billing_record Pipeline. Synthetic."
+eventDate: period
+columns[4]{name,type,classification}:
+  msisdn,string,
+  period,date,
+  billed_minutes,number,
+  billed_mb,number,

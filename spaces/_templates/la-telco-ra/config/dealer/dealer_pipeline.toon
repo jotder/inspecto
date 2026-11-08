@@ -1,0 +1,36 @@
+name: dealer
+active: true
+description: "Telecom revenue assurance Link Analysis showcase - One row per dealer (retail shops and franchises that activate SIMs, plus the operator's internal network test team, DL-000): name and city. One extract (DEALER_20260930.csv). Synthetic; regenerate with tools/gen-la-telco-ra-data.py."
+
+dirs:
+  poll:       data/inbox/dealer
+  database:   data/dealer/database
+  backup:     data/dealer/backup
+  temp:       data/dealer/temp
+  errors:     data/dealer/errors
+  quarantine: data/dealer/quarantine
+  markers:    data/dealer/markers
+  status_dir: data/dealer/status
+  log_dir:    data/dealer/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: dealer_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

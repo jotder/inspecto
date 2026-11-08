@@ -1,0 +1,32 @@
+raw:
+  name: TRUNK_CALL
+  format: CSV
+  fields[6]{name,selector,type}:
+    trunk_id,"0",VARCHAR
+    call_date,"1",DATE
+    destination_country,"2",VARCHAR
+    number_type,"3",VARCHAR
+    minutes,"4",DOUBLE
+    start_hour,"5",INTEGER
+mapping:
+  canonicalName: trunk_call
+  rawName: TRUNK_CALL
+  fields[6]:
+    - name: trunk_id
+      from: trunk_id
+      fn: keep
+    - name: call_date
+      from: call_date
+      fn: keep
+    - name: destination_country
+      from: destination_country
+      fn: keep
+    - name: number_type
+      from: number_type
+      fn: keep
+    - name: minutes
+      from: minutes
+      fn: keep
+    - name: start_hour
+      from: start_hour
+      fn: keep

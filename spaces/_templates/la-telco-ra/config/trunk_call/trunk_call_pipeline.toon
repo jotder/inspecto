@@ -1,0 +1,36 @@
+name: trunk_call
+active: true
+description: "Telecom revenue assurance Link Analysis showcase - One row per enterprise trunk, international destination and day, summed from the switch's records: the destination country, the number type (geographic, mobile or premium), minutes and the hour (local time) the day's calls to it started. One file per month (TRUNK_CALL_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-telco-ra-data.py."
+
+dirs:
+  poll:       data/inbox/trunk_call
+  database:   data/trunk_call/database
+  backup:     data/trunk_call/backup
+  temp:       data/trunk_call/temp
+  errors:     data/trunk_call/errors
+  quarantine: data/trunk_call/quarantine
+  markers:    data/trunk_call/markers
+  status_dir: data/trunk_call/status
+  log_dir:    data/trunk_call/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: trunk_call_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

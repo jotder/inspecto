@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-381 test class(es): 381 unit, 0 real-HTTP control-plane, 0 IT.
+382 test class(es): 382 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -246,6 +246,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `SqlTemplateJobSandboxTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlTemplateJobSandboxTest.java` | {@code SQL-TEMPLATE-SANDBOX-1} — a {@code sql.template} job's authored SQL reaches DuckDB only through |
 | `SqlTemplateJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlTemplateJobTest.java` | P3b end-to-end: the {@code sql.template} Job Type runs an authored template (its {@code $event_date} |
 | `SqlTemplateJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlTemplateJobTypeTckTest.java` | {@link SqlTemplateJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
+| `TelcoRaLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TelcoRaLinksJobGoldenTest.java` | The {@code la-telco-ra} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped |
 | `TelecomLinksGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TelecomLinksGoldenTest.java` | The {@code la-showcase} Space Template's TELECOM corpus RUN end to end from a verbatim copy: the eight telecom |
 | `TradeLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TradeLinksJobGoldenTest.java` | The {@code la-trade} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped |
 | `TriggerVocabularyContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/TriggerVocabularyContractTest.java` | The last of Sprint 3's five failure classes: <b>a served descriptor drifts from its own |
