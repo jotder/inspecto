@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-378 test class(es): 378 unit, 0 real-HTTP control-plane, 0 IT.
+379 test class(es): 379 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -225,6 +225,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PostgresPublishJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PostgresPublishJobTypeTckTest.java` | {@link PostgresPublishJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `PostgresPublishPgTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PostgresPublishPgTest.java` | ASSURE-BI-PUBLICATION-1 against a REAL Postgres: full refresh (with column comments read back from |
 | `ProcessorCatalogTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ProcessorCatalogTest.java` | {@code PROCESSOR-CATALOG-ROUTE-1} — {@link JobService#processorCatalog(int)}, the vocabulary behind |
+| `ProcurementLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ProcurementLinksJobGoldenTest.java` | The {@code la-procurement} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the |
 | `PublishTlsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PublishTlsTest.java` | ASSURE-BI-PUBLICATION-1 TLS fix: {@link PublishPinnedSocketFactory} dials the checked address whatever host the |
 | `RecipeExecutionParityTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RecipeExecutionParityTest.java` | The Phase-3 parity gate (S4), execution half — deferred 2026-08-06 ("lands with S3's executor |
 | `ReferenceCompactorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReferenceCompactorTest.java` | Reference Phase-2 P3 verify: {@link ReferenceCompactor} collapses an append-only versioned Reference |

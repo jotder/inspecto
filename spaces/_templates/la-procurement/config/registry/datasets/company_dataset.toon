@@ -1,0 +1,11 @@
+physicalRef: company/database
+description: "Bid rigging and procurement fraud Link Analysis showcase - One row per company on the supplier register: name, registered address, phone, an invented SYN- bank account, the day it was incorporated and, for a debarred firm, the day it was debarred (blank otherwise). One extract (COMPANY_20260930.csv). Landed by the company Pipeline. Synthetic."
+eventDate: incorporated_at
+columns[7]{name,type,classification}:
+  company_id,string,
+  name,string,
+  reg_address,string,
+  phone,string,
+  bank_account,string,
+  incorporated_at,date,
+  debarred_at,date,

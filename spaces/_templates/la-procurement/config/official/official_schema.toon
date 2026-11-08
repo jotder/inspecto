@@ -1,0 +1,16 @@
+raw:
+  name: OFFICIAL
+  format: CSV
+  fields[2]{name,selector,type}:
+    person_id,"0",VARCHAR
+    buyer_unit,"1",VARCHAR
+mapping:
+  canonicalName: official
+  rawName: OFFICIAL
+  fields[2]:
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: buyer_unit
+      from: buyer_unit
+      fn: keep

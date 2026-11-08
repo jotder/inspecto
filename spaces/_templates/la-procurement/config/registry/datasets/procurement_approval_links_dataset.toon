@@ -1,0 +1,12 @@
+physicalRef: procurement_approval_links
+description: "Bid rigging and procurement fraud Link Analysis showcase - Derived from procurement_links each time it is produced, for the saved view procurement_change_approvals: every approved_change link (official to the firm that won the tender), the home addresses that two or more of those officials and those firms' directors share (lives_at), and the directorships of the people at those homes (directed_by). Same columns as procurement_links. Synthetic."
+eventDate: event_date
+columns[8]{name,type,classification}:
+  src,string,
+  dst,string,
+  kind,string,
+  ts,timestamp,
+  amount,number,
+  event_date,date,
+  via,string,
+  market,string,

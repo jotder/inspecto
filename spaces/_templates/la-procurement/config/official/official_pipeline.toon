@@ -1,0 +1,36 @@
+name: official
+active: true
+description: "Bid rigging and procurement fraud Link Analysis showcase - One row per buying official: the person and the buyer unit they work in. One extract (OFFICIAL_20260930.csv). Synthetic; regenerate with tools/gen-la-procurement-data.py."
+
+dirs:
+  poll:       data/inbox/official
+  database:   data/official/database
+  backup:     data/official/backup
+  temp:       data/official/temp
+  errors:     data/official/errors
+  quarantine: data/official/quarantine
+  markers:    data/official/markers
+  status_dir: data/official/status
+  log_dir:    data/official/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: official_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

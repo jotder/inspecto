@@ -1,0 +1,28 @@
+raw:
+  name: CONTRACT_CHANGE
+  format: CSV
+  fields[5]{name,selector,type}:
+    change_id,"0",VARCHAR
+    tender_id,"1",VARCHAR
+    change_value,"2",DOUBLE
+    approved_by,"3",VARCHAR
+    approved_at,"4",DATE
+mapping:
+  canonicalName: contract_change
+  rawName: CONTRACT_CHANGE
+  fields[5]:
+    - name: change_id
+      from: change_id
+      fn: keep
+    - name: tender_id
+      from: tender_id
+      fn: keep
+    - name: change_value
+      from: change_value
+      fn: keep
+    - name: approved_by
+      from: approved_by
+      fn: keep
+    - name: approved_at
+      from: approved_at
+      fn: keep

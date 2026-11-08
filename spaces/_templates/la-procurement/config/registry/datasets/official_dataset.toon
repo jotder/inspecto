@@ -1,0 +1,5 @@
+physicalRef: official/database
+description: "Bid rigging and procurement fraud Link Analysis showcase - One row per buying official: the person and the buyer unit they work in. One extract (OFFICIAL_20260930.csv). Landed by the official Pipeline. Synthetic."
+columns[2]{name,type,classification}:
+  person_id,string,
+  buyer_unit,string,

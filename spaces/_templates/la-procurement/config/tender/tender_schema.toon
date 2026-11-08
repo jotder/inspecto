@@ -1,0 +1,40 @@
+raw:
+  name: TENDER
+  format: CSV
+  fields[8]{name,selector,type}:
+    tender_id,"0",VARCHAR
+    buyer_unit,"1",VARCHAR
+    category,"2",VARCHAR
+    estimate,"3",DOUBLE
+    published_at,"4",DATE
+    awarded_at,"5",DATE
+    awarded_to,"6",VARCHAR
+    award_value,"7",DOUBLE
+mapping:
+  canonicalName: tender
+  rawName: TENDER
+  fields[8]:
+    - name: tender_id
+      from: tender_id
+      fn: keep
+    - name: buyer_unit
+      from: buyer_unit
+      fn: keep
+    - name: category
+      from: category
+      fn: keep
+    - name: estimate
+      from: estimate
+      fn: keep
+    - name: published_at
+      from: published_at
+      fn: keep
+    - name: awarded_at
+      from: awarded_at
+      fn: keep
+    - name: awarded_to
+      from: awarded_to
+      fn: keep
+    - name: award_value
+      from: award_value
+      fn: keep

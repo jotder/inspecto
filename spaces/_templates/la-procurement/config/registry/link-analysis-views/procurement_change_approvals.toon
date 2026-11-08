@@ -1,0 +1,18 @@
+name: procurement_change_approvals
+description: "Contract-change approvals - officials linked to the firms whose contracts they changed (amount = value added, via = number of changes), plus the homes that two or more of these officials and those firms' directors share (procurement_approval_links_dataset). Look for a thick link: one Parks official approved nine changes for one grounds firm, and a director of that firm lives at the official's address. A Facilities contracts manager approves far more changes, but spread thinly over many suppliers, and shares a home with none of them."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: procurement_approval_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,market
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

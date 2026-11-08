@@ -1,0 +1,12 @@
+physicalRef: tender/database
+description: "Bid rigging and procurement fraud Link Analysis showcase - One row per tender: buyer unit, category, estimate, the day it was published and, once decided, the day it was awarded, the winner and the award value (blank while open). One file per month of publication (TENDER_YYYYMM.csv); the next month is in data/staged. Landed by the tender Pipeline. Synthetic."
+eventDate: published_at
+columns[8]{name,type,classification}:
+  tender_id,string,
+  buyer_unit,string,
+  category,string,
+  estimate,number,
+  published_at,date,
+  awarded_at,date,
+  awarded_to,string,
+  award_value,number,

@@ -1,0 +1,36 @@
+raw:
+  name: BID
+  format: CSV
+  fields[7]{name,selector,type}:
+    bid_id,"0",VARCHAR
+    tender_id,"1",VARCHAR
+    bidder_id,"2",VARCHAR
+    amount,"3",DOUBLE
+    submitted_at,"4",TIMESTAMP
+    ip,"5",VARCHAR
+    doc_author,"6",VARCHAR
+mapping:
+  canonicalName: bid
+  rawName: BID
+  fields[7]:
+    - name: bid_id
+      from: bid_id
+      fn: keep
+    - name: tender_id
+      from: tender_id
+      fn: keep
+    - name: bidder_id
+      from: bidder_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: submitted_at
+      from: submitted_at
+      fn: keep
+    - name: ip
+      from: ip
+      fn: keep
+    - name: doc_author
+      from: doc_author
+      fn: keep

@@ -1,0 +1,24 @@
+raw:
+  name: DIRECTOR
+  format: CSV
+  fields[4]{name,selector,type}:
+    company_id,"0",VARCHAR
+    person_id,"1",VARCHAR
+    from_date,"2",DATE
+    to_date,"3",DATE
+mapping:
+  canonicalName: director
+  rawName: DIRECTOR
+  fields[4]:
+    - name: company_id
+      from: company_id
+      fn: keep
+    - name: person_id
+      from: person_id
+      fn: keep
+    - name: from_date
+      from: from_date
+      fn: keep
+    - name: to_date
+      from: to_date
+      fn: keep
