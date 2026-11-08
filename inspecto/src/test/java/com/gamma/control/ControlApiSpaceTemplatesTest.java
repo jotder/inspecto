@@ -173,9 +173,10 @@ class ControlApiSpaceTemplatesTest {
     /**
      * LA-SAMPLE-GALLERY-DEMOAUTH-1: a template whose people sign in as Demo Users ({@code config/demo-users.toon}) is NOT
      * creatable on a server without that sign-in (Basic, or OIDC, which cannot name its principals), naming
-     * {@code demo-auth}; the shipped {@code la-audit} and {@code la-mobile-money} are such templates and {@code la-sample} is not.
+     * {@code demo-auth}; the test's own {@code starter} is such a template and {@code la-sample} has no roster.
      * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
-     * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims}. With an
+     * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims} and
+     * {@code la-mobile-money}, none of them needing Demo Auth. With an
      * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
      * without the roster check every one of them lists {@code creatable: true}.
      */
@@ -199,13 +200,18 @@ class ControlApiSpaceTemplatesTest {
         try {
             try (Ctx c = open(root)) {
                 for (JsonNode t : json(send(c.port, "GET", "/spaces/templates", null))) {
-                    // la-sample has no roster; la-claims has a Basic tier, so its roster does not refuse it
-                    boolean needsDemo = !java.util.Set.of("la-sample", "la-claims").contains(t.get("id").asText());
+                    // la-sample has no roster; the shipped showcases with a Basic tier keep theirs inert, so it does not refuse them
+                    java.util.Set<String> basicTier = java.util.Set.of("la-claims", "la-mobile-money");
+                    String id = t.get("id").asText();
+                    boolean needsDemo = !"la-sample".equals(id) && !basicTier.contains(id);
                     boolean named = false;
                     for (JsonNode m : t.get("missingFeatures")) named |= "demo-auth".equals(m.get("feature").asText());
                     assertEquals(needsDemo, named, t.toString());
                     if (needsDemo) assertFalse(t.get("creatable").asBoolean(), t.toString());
-                    if ("la-claims".equals(t.get("id").asText())) assertTrue(t.get("creatable").asBoolean(), t.toString());
+                    if (basicTier.contains(id)) {
+                        assertTrue(t.get("creatable").asBoolean(), t.toString());
+                        assertEquals(0, t.get("missingFeatures").size(), t.toString());
+                    }
                 }
             }
             // OIDC: an Authenticator that cannot say who exists is not a Demo User sign-in

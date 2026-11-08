@@ -21,7 +21,7 @@ Presales teams and mobile-money operators evaluating Link Analysis.
 
 ## How it fits with the Editions
 
-Needs an [Advanced](../../edition/advanced/brochure.md) or [Preview](../../edition/preview/brochure.md) build with demo sign-in. Built on the [Mobile money industry pack](../../solution-pack/industry-mobile-money/brochure.md).
+The data, the link Job, the three saved views and the stories run on every edition, [Basic](../../edition/basic/brochure.md) included. The investigator's day needs an [Advanced](../../edition/advanced/brochure.md) or [Preview](../../edition/preview/brochure.md) build with sign-in: the demo users, masked wallets with an audited Reveal, Investigations, four-eyes approval, the bound Alert Rule and the seeded Case. Built on the [Mobile money industry pack](../../solution-pack/industry-mobile-money/brochure.md).
 
 ## How it works
 

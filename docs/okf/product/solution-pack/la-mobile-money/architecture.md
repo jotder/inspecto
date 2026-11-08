@@ -21,6 +21,7 @@ Placeholder handsets (`UNKNOWN`, blank, all-zero) are excluded explicitly by the
 
 ## Settings and access
 
-- `config/link-analysis.toon`: masking `typed`, four-eyes fan-out threshold 100, link index ON, Drafts.
+- `config/link-analysis.toon`: four-eyes fan-out threshold 100, link index ON, Drafts. `masking_mode` is **not stated** (plan wave B, step 5, Basic tier). The edition default holds (`EditionMaskingDefault`): `typed` on any build where people sign in, `none` on Basic, where nobody can reveal and a masked graph would be unreadable.
+- **Tiers.** The Basic tier is the three Pipelines, `mm_links`, `la_index_build`, the Datasets and the saved views. The Advanced tier is masking, four-eyes, Drafts, `la_detect`, the roster and roles, the portal and the seed script's runtime state. On Basic the Advanced tier is inert, never an error: the Space ignores `demo-users.toon` (demo sign-in is not in the build), `la_detect` has no bound Alert Rule to evaluate, and the template gallery accepts the template despite its roster, because `minEdition: basic` marks the roster as the inert Advanced tier (`SpaceManager.missingFeatures`, operator 2026-11-08).
 - Saved views: `mm_money_trail`, `mm_structuring_band`, `mm_device_farm`.
 - Demo Users: `mm.analyst`, `mm.manager`, `mm.reviewer`, `mm.outsider`, `admin`. `portal/regulator-portal.html` is the embed host page.

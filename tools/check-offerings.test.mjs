@@ -83,12 +83,14 @@ test('parsePom separates default modules from profile modules, ignoring comments
 });
 test('the real repository offerings are GREEN', () => assert.deepEqual(check(gather('.')), []));
 
-test('placement (OFFERING-DECLARATION-DRIFT-1): Basic lists no business-assurance, Standard does, Preview lists the Advanced-only LA showcase templates and not la-showcase-off', () => {
+test('placement (OFFERING-DECLARATION-DRIFT-1): Basic lists no business-assurance, Standard does, Preview lists the Advanced-only LA showcase templates and nobody lists la-showcase-off', () => {
     const o = gather('.').offerings;
     assert.ok(!o.basic.contentPacks.includes('business-assurance'));
     assert.ok(o.standard.contentPacks.includes('business-assurance'));
-    for (const t of ['la-showcase', 'la-audit', 'la-mobile-money']) assert.ok(o.preview.contentPacks.includes(t), t);
-    // la-claims has a Basic tier (plan wave B, step 5): Basic lists it and Preview carries it through its includes
-    assert.ok(o.basic.contentPacks.includes('la-claims') && !o.preview.contentPacks.includes('la-claims'));
-    assert.ok(!o.preview.contentPacks.includes('la-showcase-off'));
+    // the LA showcases with a Basic tier (plan wave B, step 5): Basic lists it and Preview carries it through its includes
+    const preview = o.preview.contentPacks ?? [];
+    for (const t of ['la-showcase', 'la-audit']) assert.ok(preview.includes(t), t);
+    for (const t of ['la-claims', 'la-mobile-money'])
+        assert.ok(o.basic.contentPacks.includes(t) && !preview.includes(t), t);
+    assert.ok(!preview.includes('la-showcase-off') && !o.basic.contentPacks.includes('la-showcase-off'));
 });
