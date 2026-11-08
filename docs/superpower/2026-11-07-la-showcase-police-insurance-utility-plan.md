@@ -1015,11 +1015,11 @@ deviations:
   `mfs_split_deposits` 609 rows, 372 nodes; `mfs_merchant_quick_pay` 385 rows, 287 nodes.
 - **Stories as built:** SIM-swap takeover: `S-41` swaps 30 numbers on 2026-06-08..06-17; each wallet is logged into within the hour
   from one of `HS-08913`..`HS-08918` (five victims each) and drained of 460-1 840 within 2 hours to mules `WL-07936`..`WL-07940`
-  (opened in the app in May), which cash everything out the same day at `A-088` and `A-093` (Eastfield); each customer gets the number
+  (opened in the app in May), which cash everything out within hours at `A-088` and `A-093` (Eastfield); each customer gets the number
   back at another store 1-3 days later, and nothing of theirs moves in between; `S-41` also makes ten ordinary swaps in other months.
   Look-alike `S-72` (Riverside store) makes 160 swaps, 110 in a SIM upgrade drive in March 2026; about three in four customers move
   to a new handset of their own within a day; nobody pays out more than 100 within 2 hours. Split deposits: `A-052` (Brickfield)
-  registers `WL-07816`..`WL-07935` (KYC 1, 2025-12..2026-01) and splits each deposit of 60-180 into 4-15 cash-ins of 5-25 a few
+  registers `WL-07816`..`WL-07935` (KYC 1, 2025-12..2026-01) and splits each deposit of about 55-180 into 3-13 cash-ins of 5-25 a few
   minutes apart (6 267 cash-ins averaging 16.8, all of its cash-ins), with an occasional cash-out at `A-052`, no merchant payment
   and at most one P2P; it earns 2 897 commission against a median of 48. Look-alike `A-131` (Old Market) takes 2 779 small cash-ins
   from 250 traders, about one a visit, who also pay merchants and each other. Merchant cash-out: `MR-077`, opened 2026-09-07, paid

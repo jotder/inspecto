@@ -54,7 +54,7 @@ view draws whole, under the canvas's 1 000 nodes:
 ## Five-minute tour
 
 1. **File ▸ Open… ▸ Saved views ▸ `mfs_sim_swap_bursts`.** Two staff logins swapped SIMs in bursts. One is a store,
-   `S-72`, with about 160 customers. Most of them moved to a new handset within a day, and nobody's money moved. The other
+   `S-72`, with about 160 customers. Most of them moved to a new handset within a day, and no wallet was emptied. The other
    is a call-centre login, `S-41`. Behind it, handsets are shared between customers, payments converge on a few wallets,
    and two agents sit at the end.
 2. **Open `mfs_split_deposits`.** Two agents took 1 000 or more small cash-ins. Compare `per_day:` on their
@@ -78,12 +78,12 @@ each login. Then follow the handsets and the payments.
 hour (`new_device_minutes:` 60 or less) each wallet was logged into from one of **six handsets it had never used,
 `HS-08913` to `HS-08918`**, each shared by five victims. Within 2 hours it was drained (`out_within_2h:` 460 to 1 840) by
 P2P payments to **five mule wallets, `WL-07936` to `WL-07940`**. The mules were opened in the app in May 2026 and paid by
-nobody else. They cashed everything out the same day at two agents, **`A-088` (Willow Agency) and `A-093` (Pebble Cash
+nobody else. They cashed everything out within hours at two agents, **`A-088` (Willow Agency) and `A-093` (Pebble Cash
 Hub), both in Eastfield**. Each customer got the number back at a store 1 to 3 days later; those swaps are not in the
 view. `S-41` also made ten ordinary swaps in other months; those wallets lost nothing. **Not the story:** store login
 **`S-72`** in Riverside made **160 swaps**, 110 of them during a SIM upgrade drive in March 2026. About three in four of
-those customers moved to a new handset of their own within a day, which is what people do with a new SIM. Nobody's
-money moved (`out_within_2h:0.0`), and no handset or payee is shared with anyone else.
+those customers moved to a new handset of their own within a day, which is what people do with a new SIM. Nobody
+paid out more than 100 within 2 hours (`out_within_2h:` is 0.0 for almost all), and no handset or payee is shared with anyone else.
 
 ### 2. Agent split deposits — which agent is earning commission on deposits it splits?
 
@@ -92,7 +92,7 @@ money moved (`out_within_2h:0.0`), and no handset or payee is shared with anyone
 
 **Answer:** agent **`A-052` (Hawthorn Express, Brickfield)** registered **120 wallets itself** between December 2025 and
 January 2026, all at KYC level 1. Every cash-in into them, 6 267 in all averaging about 17, happened at `A-052`. On each
-visit a deposit of 60 to 180 was split into 4 to 15 cash-ins of 5 to 25 a few minutes apart (`per_day:` 5 or more). A
+visit a deposit of about 55 to 180 was split into 3 to 13 cash-ins of 5 to 25 a few minutes apart (`per_day:` 5 or more). A
 commission is paid on each one, so `A-052` earned about 2 900 in commission over the year, against a median of about 50
 an agent (see `agent_commission`). The wallets do little else: an occasional cash-out at `A-052`, never a merchant
 payment (`merchant_pays:0`), and at most one P2P. **Not the story:** **`A-131` (Old Market Traders Cash Point)** took

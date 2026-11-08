@@ -18,7 +18,7 @@ and shares no data, names or ids with it.
                         wallets, which cash out at 2 agents; each customer gets the number back at a store 1-3 days later
                         look-alike: a busy store login (S-72) running a SIM upgrade drive - 160 genuine swaps, most followed by a
                         new handset of the customer's own, and every customer keeps the balance
-  2 SPLIT DEPOSITS      agent A-052 registers 120 wallets itself (2025-12..2026-01) and splits each of their deposits into 4-15
+  2 SPLIT DEPOSITS      agent A-052 registers 120 wallets itself (2025-12..2026-01) and splits each of their deposits into 3-13
                         small cash-ins minutes apart, earning the per-transaction commission on each; the wallets do little else
                         look-alike: a market agent (A-131) whose 250 traders make many small cash-ins - one a visit - and also pay
                         merchants and each other
@@ -27,7 +27,7 @@ and shares no data, names or ids with it.
                         look-alike: a popular grocery (MR-214) with steady payments from 200 wallets all year, 50 of whom often pay
                         it right after a cash-in next door, settling weekly
 Scale: 8 000 wallets (spec: 20 000 - with every pair a link the plan's 20-60 k link rows needed fewer), 300 agents under 12 super
-agents, 400 merchants, about 110 000 landed transactions. MSISDNs are in the unassigned +999 range; names and areas are invented;
+agents, 400 merchants, about 101 000 landed transactions. MSISDNs are in the unassigned +999 range; names and areas are invented;
 no real operator, agent, merchant or bank. Nothing derives from a real source.
 """
 from __future__ import annotations
@@ -395,7 +395,7 @@ held = {v["wallet"]: (v["swap"], v["back"]) for v in takeover}
 drains = {id(r) for r in txns if r[0] in held and r[5] in attacker}
 txns = [r for r in txns if id(r) in drains or not any(k in held and held[k][0] <= r[4] <= held[k][1] for k in (r[0], r[1]))]
 logins = [l for l in logins if l[1] in attacker or not (l[0] in held and held[l[0]][0] <= l[2] <= held[l[0]][1])]
-for m in mules:   # each mule cashes its takings out the same day at the two agents, in chunks of up to 500
+for m in mules:   # each mule cashes its takings out within hours at the two agents, in chunks of up to 500
     for tt, amt in sorted(mule_in[m["id"]]):
         left, t2 = amt, tt
         while left > 0.005:
@@ -404,7 +404,7 @@ for m in mules:   # each mule cashes its takings out the same day at the two age
             wallet_txn(m, m["id"], rng.choice(A_MULE_OUT), "cash_out", piece, t2)
             left = round(left - piece, 2)
 
-# story 2: A-052 splits each deposit of the 120 wallets it registered into 4-15 small cash-ins minutes apart
+# story 2: A-052 splits each deposit of the 120 wallets it registered into 3-13 small cash-ins minutes apart
 for w in split:
     logins.append((w["id"], w["devices"][0][0], w["opened"] + timedelta(minutes=rng.randint(5, 60))))
     t = w["opened"] + timedelta(days=rng.randint(2, 10))
