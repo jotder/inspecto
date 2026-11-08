@@ -118,6 +118,7 @@ export const MERGED = 'config/link-analysis.toon';
 export function composeSources(byTemplate) {
   const owner = new Map();
   for (const { tpl, files } of byTemplate) {
+    if (!files.includes('template.toon')) throw new Error(`use case '${tpl}' has no committed template.toon: not a Space template (a typo in the recipe?)`);
     for (const f of files) {
       if (f === 'template.toon' || f.startsWith('portal/')) continue;
       if (f === MERGED) { owner.set(f, [...(owner.get(f) ?? []), tpl]); continue; }

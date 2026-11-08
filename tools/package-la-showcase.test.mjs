@@ -64,7 +64,7 @@ test('composing takes each file from one use case and refuses a path two use cas
   assert.deepEqual(owner.get(MERGED), ['la-card', 'la-trade']);
   assert.ok(!owner.has('template.toon') && !owner.has('portal/p.html'));
   assert.throws(() => composeSources([
-    { tpl: 'la-card', files: ['config/company/c.toon'] }, { tpl: 'la-trade', files: ['config/company/c.toon'] },
+    { tpl: 'la-card', files: ['template.toon', 'config/company/c.toon'] }, { tpl: 'la-trade', files: ['template.toon', 'config/company/c.toon'] },
   ]), /shipped by both la-card and la-trade/);
 });
 
@@ -73,4 +73,9 @@ test('entity types merge by id; the same id declared differently is refused', ()
   const b = 'entity_types[2]:\n  - id: party\n    label: Party\n  - id: box\n    label: Container\n';
   assert.equal(mergeEntityTypes([a, b]), 'entity_types[2]:\n  - id: party\n    label: Party\n  - id: box\n    label: Container\n');
   assert.throws(() => mergeEntityTypes([a, 'entity_types[1]:\n  - id: party\n    label: Other\n']), /declared differently/);
+});
+
+test('a recipe naming a template that does not exist is refused, not skipped', () => {
+  assert.throws(() => composeSources([{ tpl: 'la-utility', files: ['template.toon', 'config/a.toon'] }, { tpl: 'la-utlity', files: [] }]),
+    /'la-utlity' has no committed template.toon/);
 });
