@@ -37,8 +37,8 @@ This page helps you pick one. The screens are the shared studio ones, described 
    | Logistics | `la-logistics` |
    | Enterprise | `la-insider` |
 
-3. **Testers:** each user guide that has exercises ends with a tester's checklist (or *For testers*): the answers,
-   including the look-alikes that must **not** appear. The answers are in the guide, not in the data, so you can work
+3. **Testers:** the exercise answers are the tester's checklist, including the look-alikes that must **not** appear;
+   most guides also end with a *Tester's checklist* or *For testers* section. The answers are in the guide, not in the data, so you can work
    blind.
 
 ## How to install a showcase
@@ -53,8 +53,8 @@ product can be upgraded without touching any Space or its data:
 | Data | `inspecto-la-data-<id>-<version>.zip` | `<parent>/inspecto-la-data/` |
 
 Start the product with `SPACES_ROOT` pointing at the Spaces folder and `SPACES_DATA_ROOT` at the data folder
-(relative to the bundle: `..\inspecto-la-spaces` and `..\inspecto-la-data`). The Pipelines land the data on start;
-deleting a Space's data folder resets the showcase. Install the product once and add as many showcases as you like.
+(relative to the bundle: `..\inspecto-la-spaces` and `..\inspecto-la-data`). The Pipelines land the data on start.
+To reset a showcase, stop the product, delete the Space's data folder and unzip its data download again. Install the product once and add as many showcases as you like.
 
 The full steps, the start command and the checks are in each Space's install guide; see the *Install* column below.
 The variables are in the [configuration reference](../../module/config/admin-guide-configuration-reference.md).
@@ -64,7 +64,7 @@ The variables are in the [configuration reference](../../module/config/admin-gui
 ## Editions
 
 Every showcase has a **Basic tier**: Collectors, Pipelines, Datasets, the link Dataset Job, saved views and saved Geo
-Views. It loads and can be explored on every edition, Basic included. Nobody signs in, so masking is off and you read
+Views (`la-sample` is smaller: one Pipeline, one Dataset and one saved view, no Jobs). It loads and can be explored on every edition, Basic included. Nobody signs in, so masking is off and you read
 the real ids on the canvas. Saved Geo Views need the Geo map (Standard and above).
 
 An **Advanced tier** adds Demo Users (sign-in personas), typed masking with the admin's Reveal, Investigations,
@@ -86,7 +86,7 @@ Telecom and under Banking and finance.
 
 | Template | What it teaches | Stories | Edition | Data | Guide |
 |---|---|---|---|---|---|
-| `la-mobile-money` | Anti-money-laundering on mobile-money wallets: structuring, pass-through and cash-out | Agent-assisted structuring through agent `AG-18`; a pass-through mule chain to `AG-39`; a nine-wallet device farm; a four-wallet directed cycle; a dormant wallet waking up; look-alike: the benign biller hub `MER-ELECTRIC` | Basic; **Advanced tier:** four Demo Users, typed masking, Investigations, four-eyes, the Dossier, a bound Alert Rule and a seeded Case | 0.1 MB | [user guide](../la-mobile-money/user-guide.md) (a working day) · [runbook with expected values](../la-mobile-money/admin-guide-showcase-runbook.md) |
+| `la-mobile-money` | Anti-money-laundering on mobile-money wallets: structuring, pass-through and cash-out | Agent-assisted structuring through agent `AG-18`; a pass-through mule chain to `AG-39`; a nine-wallet device farm; a four-wallet directed cycle; a dormant wallet waking up; look-alike: the benign biller hub `MER-ELECTRIC` | Basic; **Advanced tier:** five Demo Users, typed masking, Investigations, four-eyes, Drafts, the Dossier, a bound Alert Rule and a seeded Case | 0.1 MB | [user guide](../la-mobile-money/user-guide.md) (a working day) · [runbook with expected values](../la-mobile-money/admin-guide-showcase-runbook.md) |
 | `la-mfs` | Mobile financial services fraud: who controls a wallet, an agent or a merchant | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion | Basic; Advanced tier: planned | 2.9 MB | [user guide, 3 exercises](../la-mfs/user-guide.md#exercises) · [install](../la-mfs/admin-guide-install.md) |
 | `la-showcase` | The full studio tour, telecom side: telecom fraud rings and a supernode | Telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode (its banking stories are under Banking and finance) | Basic; **Advanced tier:** five Demo Users, typed masking, Investigations, four-eyes, the Suspicion score's factors, three telecom Alert Rules (unarmed on Basic) and a seeded Case | 0.8 MB | [user guide](../la-showcase/user-guide.md) (walk-through) · [variants runbook](admin-guide-variants-runbook.md) |
 | `la-telco-ra` | Telecom revenue assurance: usage, dealers and enterprise trunks | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | Basic; Advanced tier: planned | 2.0 MB | [user guide, 3 exercises](../la-telco-ra/user-guide.md#exercises) · [install](../la-telco-ra/admin-guide-install.md) |
@@ -143,19 +143,24 @@ Telecom and under Banking and finance.
 
 | Template | What it teaches | Stories | Edition | Data | Guide |
 |---|---|---|---|---|---|
-| `la-audit` | Internal audit of accounts payable and the journal: vendors, approvers and intercompany money | Vendor `V-117` shares a bank account and address with employee `E-31`; 5 vendors on one bank account; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | Basic; **Advanced tier:** Demo Users, typed masking of parties, Investigations, four-eyes, Drafts, the Dossier, the committee portal, a bound Alert Rule and a seeded Case | 0.06 MB | [user guide](../la-audit/user-guide.md) (a working day) · [runbook with expected values](../la-audit/admin-guide-showcase-runbook.md) |
+| `la-audit` | Internal audit of accounts payable and the journal: vendors, approvers and intercompany money | Vendor `V-117` shares a bank account and address with employee `E-31`; 5 vendors on one bank account; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate-payment pairs | Basic; **Advanced tier:** Demo Users, typed masking of parties, Investigations, four-eyes, Drafts, the Dossier, the committee portal, a bound Alert Rule and a seeded Case | 0.06 MB | [user guide](../la-audit/user-guide.md) (a working day) · [runbook with expected values](../la-audit/admin-guide-showcase-runbook.md) |
 | `la-insider` | Insider threat for HR and security: access, mail and approvals | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | Basic; Advanced tier: planned | 1.3 MB | [user guide, 3 exercises](../la-insider/user-guide.md#exercises) · [install](../la-insider/admin-guide-install.md) |
 
 The four older showcases (`la-showcase`, `la-mobile-money`, `la-claims`, `la-audit`) install the same way; their
 runbooks cover the Advanced-tier demo (seed script and smoke) on a build where people sign in.
 
-## Industry Spaces (planned)
+## Industry Spaces (in progress)
 
 A peer plan, [Link Analysis industry Spaces](../../../../superpower/2026-11-08-la-industry-spaces-plan.md) (approved
 2026-11-08), composes **one Space per industry** (*Telecom*, *Banking and finance*, *Insurance*, *Utilities*, *Law
 enforcement*, *Public sector*, *Healthcare*, *Logistics*, *Enterprise*) from the use-case templates above, with every
-Dataset mapped and saved views named after their use case. They are planned and not yet built. The use-case templates
-on this page stay as they are, so everything here still holds when the industry Spaces land.
+Dataset mapped and saved views named after their use case. It is in progress: a recipe for each of the nine is in
+`spaces/_industries/<id>.toon`, and `node tools/package-la-showcase.mjs <industry id>` composes it into a Space
+download and a data download (for example `la-utilities`, `la-law-enforcement`, `la-telecom`). The industry Spaces are
+not in the in-app template gallery yet, and some industry lanes are still open. Where an industry Space can be
+installed, the use case's install guide says so in its *As the … industry Space* section (today: `la-police`,
+`la-utility`, `la-health`, `la-logistics`, `la-telco-ra`, `la-insider`). The use-case templates on this page stay as
+they are, so everything here still holds as the industry Spaces land.
 
 ## References
 
