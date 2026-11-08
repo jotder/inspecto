@@ -297,7 +297,7 @@ class ControlApiSpaceTemplatesTest {
      * {@code demo-auth}; the test's own {@code starter} is such a template and {@code la-sample} has no roster.
      * A template with a Basic tier ({@code minEdition: basic}, the showcase plan's Edition rule, operator 2026-11-08 "allow on
      * Basic") keeps its roster as an inert Advanced tier and stays creatable: the shipped {@code la-claims},
-     * {@code la-mobile-money}, {@code la-audit}, {@code la-showcase}, {@code la-utility}, {@code la-card} and {@code la-tradela-ownership} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
+     * {@code la-mobile-money}, {@code la-audit}, {@code la-showcase}, {@code la-utility}, {@code la-card}, {@code la-ownership} and {@code la-trade} (whose Alert Rules ship unarmed, "A: allow, unarmed"),
      * none of them needing Demo Auth. With an
      * Authenticator that names its principals from a Space's config (Demo Auth) the same template is creatable. Falsified:
      * without the roster check every one of them lists {@code creatable: true}.
