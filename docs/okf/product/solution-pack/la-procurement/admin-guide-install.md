@@ -76,6 +76,54 @@ and the Jobs rebuild the links. Most of October's tenders are still open, so the
 Stop the product, delete `inspecto-la-data/la-procurement/`, and unzip the data download again. The Space
 configuration is untouched.
 
+## Advanced tier: personas, the shared-IP Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `procurement_same_tender_shared_ip` is loaded but not armed, and the
+`procurement_shared_ip_counts` and `procurement_shared_ip_alerts` Jobs run after each `procurement_links` build; the
+second finds no armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs
+people in by name with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the seven Pipelines have landed and `procurement_links` has run (a minute or two), create the runtime state
+from a checkout of the repository:
+
+```bash
+node tools/seed-la-procurement.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `cover-bids` (seeded
+with the IP address `100.64.73.61`, expanded once over `same_ip` to the four firms that bid from it, annotated,
+snapshotted), its members, the Entity List `cover-bidders` (`CO-0153`, `CO-0309`, `CO-0702`), a Case on `CO-0074`
+assigned to `procurement.manager` and linked to the Investigation, an Investigation template, one unbounded expand
+held for a second person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
+`node tools/seed-la-procurement.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `procurement.analyst` | `procurement-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `procurement.manager` | `procurement-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `procurement.reviewer` | `la-viewer`, member as reviewer | reads `cover-bids`; any change is refused (403) |
+| `procurement.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `procurement_same_tender_shared_ip` (WARNING) reads the one row of
+`procurement_shared_ip_counts`: it fires when any bid was sent from an IP address that another bidder had already
+used, earlier, for its own bid on the same tender. On the shipped data the Alert carries **16**: 16 bids on 8 tenders,
+every one a cover bid by `CO-0153`, `CO-0309` or `CO-0702` from `CO-0074`'s office address. The help-desk kiosk
+`198.51.100.20` is the only other address two or more firms use, and no two of them ever bid on one tender from it, so
+it never counts. The staged month adds no such bid. The count is a running total over every landed bid, so the rule
+stays met after every build. It names no bidder or address; `cover_bids_shared_ip` shows them. The rule is not grouped
+by tender, because `procurement_shared_ip_counts` is a Job output: a `by` column cannot be checked against its Schema
+when the Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash
@@ -96,7 +144,10 @@ public-sector showcase. The recipe is `spaces/_industries/la-public-sector.toon`
 data download. Install them as above, with `la-public-sector` in place of this Space's id.
 
 Composing refuses a file both use cases would ship, so procurement's people feed is called `procurement_person` (its
-Pipeline, Dataset and inbox folder); benefits keeps `person`. The two packs declare the shared types *Person*,
+Pipeline, Dataset and inbox folder); benefits keeps `person`. The same rule applies to this Space's Advanced tier:
+`config/demo-users.toon` and `config/roles.toon` ship in the industry Space only while `la-benefits` has none of its
+own; two different copies are refused until the packer joins rosters. The four-eyes and Drafts settings in
+`link-analysis.toon` are merged by key, so both use cases state the same values. The two packs declare the shared types *Person*,
 *Address*, *Bank account* and *Public-sector entity* identically, so they merge into one. Every Dataset says what its
 id columns hold, and each Dataset of events has its own Mapping. In each link Dataset, the ends mixing kinds hold
 *Public-sector entity*.

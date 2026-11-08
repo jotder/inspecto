@@ -1510,6 +1510,60 @@ deviations:
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
 
+   **`la-procurement` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`procurement.analyst` lead,
+     `procurement.manager` second approver, `procurement.reviewer` read-only, `procurement.outsider` not a member, and
+     `admin` exactly as in `la-showcase`: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`procurement-analyst`,
+     `fraud-analyst` as in `la-card`, `procurement-manager` with `canApproveLinkExpansions` and `canOperateRuns`,
+     `la-viewer`, `la-settings`), and `four_eyes_fan_out_above: 2000` plus Drafts (10 / 60 min / 14 days) in
+     `link-analysis.toon`, the same values as every showcase because the *Public sector* industry Space merges this file
+     with `la-benefits`' by key. No `masking_mode`; no Entity Type masked.
+   - **Alert Rule as a registry rule over a counts Job:** `procurement_shared_ip_counts` (`sql.template` on
+     `procurement_links`' `job.dataset.produced`, source `bid`) writes one row: `same_tender_ip_bids` (bids sent from
+     an IP address another bidder had already used, strictly earlier, for its own bid on the same tender; a blank IP
+     never matches), `same_tender_ip_tenders` and `ips_shared_across_tenders_only` (addresses two or more bidders use
+     but never two on one tender: the kiosk's margin); `procurement_shared_ip_alerts` (`alert.evaluate`) runs after
+     it; `procurement_same_tender_shared_ip` is `max(same_tender_ip_bids) gte 1`, WARNING, not grouped (a Job output).
+   - **The spec's rule as written, no time window.** The spec's look-alike reads "bids sent from a buyer's public
+     help-desk kiosk", and a window ("within N minutes") looked needed to keep it out. The data says otherwise: no two
+     firms ever bid on one tender from the kiosk (20 landed bids on 20 tenders, 12 firms; 23 bids and 14 firms with the
+     staged month), so the literal rule already never counts it, and a window would only add a number to defend.
+     "Already used" is strict (`<`): the winner's own first bid never counts, and the two covers that bid in the same
+     second on `T-00017` both count, since the winner's bid came 14 minutes before them.
+   - **Real figures on the shipped data** (the Job's SQL over the real landed `bid`; pinned by
+     `ProcurementLinksJobGoldenTest`): same_tender_ip_bids **16**, every one by `CO-0153`, `CO-0309` or `CO-0702` from
+     `100.64.73.61`, equal to the ground truth's `from_winner_ip`; same_tender_ip_tenders **8** (two of the story's 10
+     tenders carry no cover bid from the office); ips_shared_across_tenders_only **1** (`198.51.100.20`). The staged
+     month adds no such bid (16 with it landed). With the three covers taken out the Job yields 0; over the kiosk's bids
+     alone, 0 bids and 1 shared address. **Running total**, as `la-police` and `la-card`: the rule stays met after every
+     build and a new cover bid does not raise a second Alert while the first is open; a per-build "new bids" count is a
+     later refinement if the demo needs it.
+   - **Seed** `tools/seed-la-procurement.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground
+     truth): Investigation `cover-bids` over `procurement_links_dataset` (Entity Type `public_entity`; seed
+     `100.64.73.61`; a bounded expand over `same_ip`, `maxFanOut` 20, to `CO-0074` and its three covers; annotate,
+     threshold, window, resolve, snapshot), members (`procurement.reviewer` and `procurement.manager` reviewers, `admin`
+     lead; not `procurement.outsider`), Entity List `cover-bidders` (the three covers), a Case from `CO-0074` assigned to
+     `procurement.manager` and linked, an Investigation template, one unbounded expand held for four-eyes, one open Draft
+     annotating `CO-0074` (in the Working Set) about its estimator `y.fenwick`, who is two hops out (IP to `CO-0074` to
+     author), so annotating `y.fenwick` would be refused. The kiosk is in no step.
+   - **Tests:** `LaProcurementTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000 and Drafts; no masked type; persona capabilities; every persona role defined and
+     `fraud-analyst` equal to `la-utility`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs'
+     signals); `ProcurementLinksJobGoldenTest` (`theTemplateIsBasicTierOnly` replaced: the counts Job runs after
+     `procurement_links`, the figures above, the rule's own measure and threshold fire, every counted bid is a cover
+     bid from the office on a story tender; the Job's own SQL without the covers yields 0, and the winner alone never
+     matches itself; the kiosk is shared by 12 firms yet never counts); the gallery test pins `la-procurement`
+     creatable with no missing feature and no Demo Auth; `tools/seed-la-procurement.test.mjs` (mocked fetch, 11 tests).
+   - **Open for the *Public sector* industry Space:** `composeSources` refuses a path two use cases ship with
+     different bytes, and only `link-analysis.toon` and `config/examples/*.md` are joined. Today `la-benefits` has no
+     roster, so this tier composes; once its Advanced tier adds its own `config/demo-users.toon` and
+     `config/roles.toon`, packing `la-public-sector` is refused until the packer joins rosters and role tables (the
+     same holds for `la-card` in *Banking and finance*). Not changed here: it is the packer's lane.
+   - **Not checked:** any live run (no Preview build with Demo Auth: the rule armed and firing at 16, the seed's
+     `--apply`, the persona probes; no Basic bundle: rule unarmed, `procurement_shared_ip_alerts` reporting no breach);
+     the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
+     Link Analysis UI, the composed *Public sector* industry Space with this tier, an OIDC build.
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),

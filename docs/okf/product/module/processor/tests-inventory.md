@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-385 test class(es): 144 unit, 241 real-HTTP control-plane, 0 IT.
+386 test class(es): 145 unit, 241 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -280,6 +280,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `LaClaimsTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaClaimsTemplateTest.java` | The {@code la-claims} Space Template's settings, Jobs, personas, Datasets and saved views, read with the REAL loaders |
 | `LaMobileMoneyTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaMobileMoneyTemplateTest.java` | The {@code la-mobile-money} Space Template's settings, Jobs, personas and saved views, read with the REAL loaders |
 | `LaPoliceTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaPoliceTemplateTest.java` | The {@code la-police} Space Template's Advanced tier (showcase plan step 8): settings, personas, the serial-match Alert Rule |
+| `LaProcurementTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaProcurementTemplateTest.java` | The {@code la-procurement} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaShowcaseTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaShowcaseTemplateTest.java` | LA-DEMO-SEED-1 (DR-S2, S3, S6, S7): the {@code la-showcase} Space Template's settings, Jobs, personas and its |
 | `LaUtilityTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaUtilityTemplateTest.java` | The {@code la-utility} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LinkAnalysisRateClassCoverageTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LinkAnalysisRateClassCoverageTest.java` | Every Link Analysis route must have an explicit rate-limit class: EXPENSIVE (throttled) or EXEMPT (listed |

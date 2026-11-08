@@ -124,7 +124,7 @@ Telecom and under Banking and finance.
 
 | Template | What it teaches | Stories | Edition | Data | Guide |
 |---|---|---|---|---|---|
-| `la-procurement` | Bid rigging and procurement fraud: tenders, bidders, officials and directors | Bid rotation among four firms; cover bids from one IP address; an official favouring a relative's firm; a debarred firm reborn under its old directors | Basic; Advanced tier: planned | 0.25 MB | [user guide, 4 exercises](../la-procurement/user-guide.md#exercises) · [install](../la-procurement/admin-guide-install.md) |
+| `la-procurement` | Bid rigging and procurement fraud: tenders, bidders, officials and directors | Bid rotation among four firms; cover bids from one IP address; an official favouring a relative's firm; a debarred firm reborn under its old directors | Basic; **Advanced tier:** five Demo Users, Investigations, four-eyes, Drafts, an Alert Rule on a bid sent from an IP address another bidder already used on the same tender (unarmed on Basic), and a seed script for the cover-bids Investigation, an Entity List of the cover bidders and a Case | 0.25 MB | [user guide, 4 exercises](../la-procurement/user-guide.md#exercises) · [install](../la-procurement/admin-guide-install.md) |
 | `la-benefits` | Benefits and tax fraud: claimants, addresses, payroll and preparers | An address farm of 14 claimants; payments to the deceased; jobseekers on an employer's payroll; a tax preparer's refund ring | Basic; Advanced tier: planned | 0.9 MB | [user guide, 4 exercises](../la-benefits/user-guide.md#exercises) · [install](../la-benefits/admin-guide-install.md) |
 
 ### Healthcare

@@ -132,3 +132,25 @@ golden tests are `tools/gen-la-procurement-data.test.mjs` and `ProcurementLinksJ
 - [ ] No look-alike links to its story: `CO-0021`, `CO-0055`, `CO-0090`; `198.51.100.20`; `P-00008`;
       `CO-0233`, `P-00007`.
 - [ ] Each saved view holds its story whole and its look-alike beside it, and draws without "Result cut short".
+
+## Advanced tier: the same stories with sign-in
+
+On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-shared-ip-alert-rule-and-the-seed)),
+after `node tools/seed-la-procurement.mjs --apply`, sign in as each persona and check what each one sees:
+
+1. **`procurement.analyst` (lead):** **Alerts** lists `procurement_same_tender_shared_ip` (WARNING) with the value
+   16: bids sent from an IP address that another bidder had already used for its own bid on the same tender. Open the
+   Investigation `cover-bids`: it is seeded with `100.64.73.61` and expanded once over `same_ip` to the four firms
+   that bid from it (`CO-0074` and its three covers) of exercise 2. The Entity List `cover-bidders` holds
+   `CO-0153`, `CO-0309` and `CO-0702`. The Case "Cover bids for CO-0074" is linked to it.
+2. **Four-eyes:** an unbounded expand by `procurement.analyst` is held, not run. Sign in as
+   **`procurement.manager`**: it is in the approval inbox; approve or refuse it. `procurement.analyst` cannot approve
+   its own request.
+3. **`procurement.reviewer`:** opens `cover-bids` and reads every step; any change is refused.
+4. **`procurement.outsider`:** sees the Datasets, but `cover-bids` is not found (404).
+5. **Draft:** `procurement.analyst` has one open Draft that annotates `CO-0074` about its estimator `y.fenwick`;
+   promote it, or leave it.
+
+**Not the story:** the help-desk kiosk `198.51.100.20` is shared by more firms than any other address, but no two of
+them ever bid on the same tender from it, so it never counts; without the three cover bidders the rule would not
+fire at all.
