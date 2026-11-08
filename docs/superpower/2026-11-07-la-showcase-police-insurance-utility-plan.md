@@ -859,8 +859,8 @@ Deliberate deviations:
   activated and topped up in a dealer-week of 50 or more) and `pbx_off_hours` (300 or more off-hours minutes to one destination).
   `telco_ra_links` also runs on `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own
   filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the look-alike on the canvas but in another
-  component: `telco_ra_unbilled_usage` 704 rows, 380 nodes; `telco_ra_commission_spikes` 2 404 rows, 768 nodes;
-  `telco_ra_pbx_off_hours` 20 rows, 19 nodes.
+  component: `unbilled_usage` 704 rows, 380 nodes; `dealer_commission_fraud` 2 404 rows, 768 nodes;
+  `pbx_hacking_off_hours` 20 rows, 19 nodes.
 - **Stories as built:** unbilled usage is `DL-047` (Manchester), 300 SIMs on `DEV-00086` on 2026-03-17, 800-2 500 minutes and
   20-60 GB in each full month from April (less in March), no billing record and no top-up; the look-alike is `DL-000`'s 40 SIMs on `DEV-00001`/`DEV-00002`
   with plan `Internal test` (the known list), plus 12 ordinary SIMs whose first two months reached billing late (`unbilled_months:2`)

@@ -1,0 +1,5 @@
+name: Telecom
+tagline: "Telecom revenue assurance on synthetic data - unbilled usage from one dealer's SIMs, dealer commission fraud with SIMs that go dormant, and PBX hacking at night, every Dataset mapped. Mobile money and telco fraud join when their packs get a Basic tier."
+minEdition: basic
+icon: heroicons_outline:signal
+useCases[1]: la-telco-ra

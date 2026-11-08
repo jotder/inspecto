@@ -1,4 +1,4 @@
-name: telco_ra_pbx_off_hours
+name: pbx_hacking_off_hours
 description: "PBX off-hours calls - every enterprise trunk's international calls to a destination with 300 or more off-hours minutes (calls starting before 07:00 or from 21:00 or at a weekend), with the customer the trunk belongs to (via on called_country = number type, days, minutes, off-hours, night and weekend minutes). Destinations read CTRY-<country>-GEO, -MOB or -PRN (premium rate). Some firms call overseas offices whose working day is the night here; four trunks of four unrelated firms call the same premium-rate ranges in three countries over a few weekends."
 sourceId: entity-projection
 layout: force

@@ -1,11 +1,18 @@
 physicalRef: telco_ra_links
 description: "Telecom revenue assurance Link Analysis showcase - ONE link Dataset built by the telco_ra_links Job from subscriber, network_usage, billing_record, topup, enterprise_trunk and trunk_call. kind is one of activated_by, activated_on, topped_up, trunk_of, called_country; one row per pair; via names the evidence. Ids say what an endpoint is: 9996... subscriber, DL- dealer, DEV- dealer device, POS- point of sale, TRK- trunk, ENT- enterprise customer, CTRY- destination (country and number type). Synthetic."
 eventDate: event_date
+primaryEntityType: telecom_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,TELECOM_ENTITY
+  dst,string,TELECOM_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount
