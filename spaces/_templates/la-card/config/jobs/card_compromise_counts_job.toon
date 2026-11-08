@@ -1,0 +1,11 @@
+job:
+  name: card_compromise_counts
+  type: sql.template
+  description: "Runs each time the card_links Job produces its Dataset. One row of counts: compromised_terminals (merchants that min_defrauded_cards or more cards with card-not-present fraud paid at in the 45 days before it, from the visited_before_fraud links), cards_seen_since_compromise (distinct cards approved at one of those merchants on or after the first such visit that have not been defrauded yet: the cards to reissue) and busiest_other_merchant (the most defrauded cards any other merchant saw, the margin a busy shop keeps below the threshold). A busy supermarket whose customers are never defrauded is never a compromised terminal. The Alert Rule card_new_cards_at_compromised_terminal reads it; no card or merchant id leaves this Job, they are found in the Investigation."
+  sql: "WITH v AS (SELECT dst AS merchant_id, count(*) AS n, min(ts) AS since FROM card_links WHERE kind = 'visited_before_fraud' GROUP BY dst), cp AS (SELECT merchant_id, since FROM v WHERE n >= CAST($min_defrauded_cards AS INTEGER)), fr AS (SELECT DISTINCT a.card_id FROM chargeback c JOIN card_auth a ON a.auth_id = c.auth_id WHERE c.reason = 'fraud_card_not_present'), seen AS (SELECT DISTINCT a.card_id FROM card_auth a JOIN cp ON cp.merchant_id = a.merchant_id WHERE a.result = 'approved' AND a.auth_at >= cp.since AND NOT EXISTS (SELECT 1 FROM fr WHERE fr.card_id = a.card_id)) SELECT (SELECT count(*) FROM cp) AS compromised_terminals, (SELECT count(*) FROM seen) AS cards_seen_since_compromise, (SELECT coalesce(max(n), 0) FROM v WHERE n < CAST($min_defrauded_cards AS INTEGER)) AS busiest_other_merchant"
+  sources: card_links,card_auth,chargeback
+  sink_dataset: card_compromise_counts
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == card_links"
+  min_defrauded_cards: "10"
+  enabled: true

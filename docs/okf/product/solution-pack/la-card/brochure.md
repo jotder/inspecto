@@ -26,7 +26,7 @@ Each story has an innocent look-alike that a rule alone would flag: a corporate 
 
 ## How it fits with the Editions
 
-Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. An Advanced tier (personas, an Alert Rule for new cards at the compromised pump, a seeding script) is planned.
+Runs on every edition, [Basic](../../edition/basic/brochure.md) included: no sign-in, Alert Rules or Investigations are needed. The same download carries an Advanced tier for builds with sign-in: four personas (lead analyst, second approver, read-only reviewer, outsider), an Alert Rule for cards still in use at the compromised pump, and a seeding script for the Investigation, the list of cards to reissue, a Case and a four-eyes approval. It is inert on Basic.
 
 ## How it works
 

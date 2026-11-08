@@ -1465,6 +1465,51 @@ deviations:
      packed downloads on Preview (the Space was scaffolded; the downloads carry the same `config/`), the Investigation's
      embed link, and an OIDC sign-in build.
 
+   **`la-card` BUILT 2026-11-09** (finishing a half-done lane; the `la-utility` pattern, the `la-police` counts-Job rule). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`card.analyst` lead, `card.manager`
+     second approver, `card.reviewer` read-only, `card.outsider` not a member, and `admin` defined exactly as in
+     `la-showcase`: `admin;fraud-analyst;la-settings`), `config/roles.toon` (`card-analyst`, `fraud-analyst` for `admin`
+     with `la-utility`'s six capabilities, `card-manager`, `la-viewer`, `la-settings`), `four_eyes_fan_out_above: 2000`
+     plus Drafts limits in `link-analysis.toon` (no `masking_mode`; no Entity Type masked). The first draft gave `admin`
+     `card-analyst`, which would have been a roster conflict with every other demo Space (409 `ROSTER_CONFLICT`).
+   - **Alert Rule as a registry rule over a counts Job** (the `la-police` pattern): `card_compromise_counts`
+     (`sql.template` on `card_links`' `job.dataset.produced`, `min_defrauded_cards: "10"`) writes one row:
+     `compromised_terminals` (merchants with 10 or more `visited_before_fraud` links), `cards_seen_since_compromise`
+     (distinct cards approved at one of them on or after its first defrauded card's visit, with no
+     `fraud_card_not_present` chargeback) and `busiest_other_merchant`; `card_compromise_alerts` (`alert.evaluate`) runs
+     after it; `card_new_cards_at_compromised_terminal` is `max(cards_seen_since_compromise) gte 1`, WARNING, not
+     grouped (a Job output, as in `la-utility`).
+   - **Real figures on the shipped data** (the counts Job's SQL over the real `card_links`, `card_auth`, `chargeback`;
+     pinned by `CardLinksJobGoldenTest`): compromised_terminals **1** (`M-317`, first defrauded card's visit
+     2026-03-02 14:31); cards_seen_since_compromise **60**; busiest_other_merchant **4** (`M-832`). The 60 are NOT the
+     story's 60 defrauded cards (those are left out): they are `M-317`'s 60 other customers, every one of whom paid there
+     again after the compromise began: the ground truth's 10 `in_window_not_defrauded` cards in the window, 50 more
+     after it (120 cards have an approved payment at `M-317` in all). Equal numbers by coincidence; the template description and the
+     guides now say which 60. `M-052` has 0 `visited_before_fraud` links and 925 cards with an approved payment there. With `M-317` taken
+     out of the inputs the Job yields 0 / 0 / 4.
+   - **Seed** `tools/seed-la-card.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `compromised-terminal` (seed `M-317`; a bounded expand over `visited_before_fraud`, `maxFanOut` 80,
+     to the 60 defrauded cards; annotate, threshold, window, resolve, snapshot), members (`card.reviewer` and
+     `card.manager` reviewers, `admin` lead; not `card.outsider`), Entity List `cards-to-reissue` (the 10 window cards),
+     a Case from `M-317` assigned to `card.manager` and linked, an Investigation template, one unbounded expand held for
+     four-eyes, one open Draft annotating `M-317` (a card to reissue is two hops out, card to `M-317` to card, so
+     annotating it would be refused). The card-testing device is not seeded: it belongs to another story.
+   - **Tests:** `LaCardTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000; no masked type; persona capabilities; every persona role defined and
+     `fraud-analyst` equal to `la-utility`'s; the shared `admin`; the rule through `AlertRoutes.parseContent`; the Jobs'
+     signals); `CardLinksJobGoldenTest` (runs the counts Job after `card_links`; the real figures above and the rule's own
+     measure and threshold fire; the Job's own SQL without `M-317` yields no compromised terminal and would not fire;
+     `M-052` is busy yet never a compromised terminal); the gallery test pins `la-card` creatable with no missing
+     feature and no Demo Auth; `tools/seed-la-card.test.mjs` (mocked fetch, 11 tests). Falsified, each then restored:
+     no `M-317` filter, the counts Job counting `used_at` instead of `visited_before_fraud` (`M-052` becomes a terminal,
+     383 terminals in all), `masking_mode: typed`, `fraud-analyst` removed, `card-analyst` given the approve capability,
+     `admin` back to `card-analyst`, `la-card` out of the gallery's Basic-tier set, and in the seed: the outsider made a
+     member, the Draft annotating a card to reissue, `M-052` added to the seed.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 60, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `card_compromise_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
+
 **Docs, with each Space**
 
 9. **Product hub** `docs/okf/product/solution-pack/<id>/`: brochure, user guide (tour, exercises with answers),

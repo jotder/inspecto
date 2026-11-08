@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-384 test class(es): 143 unit, 241 real-HTTP control-plane, 0 IT.
+385 test class(es): 144 unit, 241 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -276,6 +276,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `JobWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/JobWritersTest.java` | ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 2: <b>every route that can write a {@code job} passes |
 | `KpiCompletenessWidgetTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/KpiCompletenessWidgetTest.java` | The completeness tile (§8-D, operator 2026-10-09: Signals behind a Dataset). The shipped {@code telco-ra} Space |
 | `LaAuditTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaAuditTemplateTest.java` | The {@code la-audit} Space Template (vertical B of the multi-vertical showcase plan): settings, Jobs, personas, |
+| `LaCardTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaCardTemplateTest.java` | The {@code la-card} Space Template's Advanced tier (showcase plan step 8), read with the REAL loaders |
 | `LaClaimsTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaClaimsTemplateTest.java` | The {@code la-claims} Space Template's settings, Jobs, personas, Datasets and saved views, read with the REAL loaders |
 | `LaMobileMoneyTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaMobileMoneyTemplateTest.java` | The {@code la-mobile-money} Space Template's settings, Jobs, personas and saved views, read with the REAL loaders |
 | `LaPoliceTemplateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/LaPoliceTemplateTest.java` | The {@code la-police} Space Template's Advanced tier (showcase plan step 8): settings, personas, the serial-match Alert Rule |

@@ -71,6 +71,54 @@ Copy every file of `inspecto-la-data/la-card/data/staged/<feed>/` into `inspecto
 Stop the product, delete `inspecto-la-data/la-card/`, and unzip the data download again. The Space configuration is
 untouched.
 
+## Advanced tier: personas, the compromised-terminal Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `card_new_cards_at_compromised_terminal` is loaded but not armed, and the
+`card_compromise_counts` and `card_compromise_alerts` Jobs run after each `card_links` build; the second finds no
+armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs people in by name
+with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the six Pipelines have landed and `card_links` has run (a minute or two), create the runtime state from a
+checkout of the repository:
+
+```bash
+node tools/seed-la-card.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `compromised-terminal`
+(seeded with `M-317`, expanded once over `visited_before_fraud` to the 60 defrauded cards, annotated, snapshotted), its
+members, the Entity List `cards-to-reissue` (the 10 cards that paid at `M-317` in the compromise window and were not
+defrauded), a Case assigned to `card.manager` and linked to the Investigation, an Investigation template, one
+unbounded expand held for a second person, and one open Draft. To lay the Space out offline instead of unzipping the
+downloads, `node tools/seed-la-card.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `card.analyst` | `card-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `card.manager` | `card-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `card.reviewer` | `la-viewer`, member as reviewer | reads `compromised-terminal`; any change is refused (403) |
+| `card.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `card_new_cards_at_compromised_terminal` (WARNING) reads the one row of `card_compromise_counts`:
+a merchant is a compromised terminal when 10 or more cards with card-not-present fraud paid there in the 45 days before
+it, and the rule fires when any card approved there since the first of those visits has not been defrauded yet. On the
+shipped data there is one compromised terminal, `M-317`, and the Alert carries **60**: the 10 cards of the compromise
+window and 50 regular customers who paid there after it (not the 60 defrauded cards, which the count leaves out). The
+busiest other merchant saw 4 defrauded cards, and the busy supermarket `M-052` none, so neither is a compromised
+terminal. The count is a running total, so the rule stays met after every build. It names no card or merchant;
+`common_point_of_purchase` shows the terminal. The rule is not grouped by merchant, because `card_compromise_counts`
+is a Job output: a `by` column cannot be checked against its Schema when the Space is created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash

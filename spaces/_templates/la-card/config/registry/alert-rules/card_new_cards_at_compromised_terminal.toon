@@ -1,0 +1,7 @@
+name: card_new_cards_at_compromised_terminal
+dataset: card_compromise_counts_dataset
+measure: max(cards_seen_since_compromise)
+comparator: gte
+threshold: 1
+severity: WARNING
+description: "New cards at a compromised terminal: a card paid at a merchant that 10 or more later-defrauded cards passed through, on or after the first of those visits, and has not been defrauded yet. The Alert carries how many such cards there are (the cards to reissue); no card or merchant id leaves card_compromise_counts, so open the common_point_of_purchase view to find the terminal. Not grouped by merchant: card_compromise_counts is a Job output, so a by column cannot be checked when the Space is created."

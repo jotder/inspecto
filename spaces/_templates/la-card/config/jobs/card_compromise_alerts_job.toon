@@ -1,0 +1,7 @@
+job:
+  name: card_compromise_alerts
+  type: alert.evaluate
+  description: "Evaluates the Alert Rules each time the card_compromise_counts Job produces its Dataset, so card_new_cards_at_compromised_terminal sees the new counts without anyone pressing Evaluate. On a build without Alert Rules (Basic) the rule is not armed and this Job finds nothing to evaluate."
+  on_signal: job.dataset.produced
+  when: "$signal.dataset == card_compromise_counts"
+  enabled: true

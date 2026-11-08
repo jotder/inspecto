@@ -68,7 +68,17 @@ class CardLinksJobGoldenTest {
             assertFalse(hasFiles(Path.of(pc.dirs().errors())), feed + ": nothing in the corpus is an error");
         }
         data = space.resolve("data");
-        JobConfig job = JobConfig.load(space.resolve("config/jobs/card_links_job.toon").toString());
+        // the link Job first, then the Advanced tier's counts Job in a service of its own, so no signal-fired run races a read
+        runJob(space, "card_links");
+        runJob(space, "card_compromise_counts");
+        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-card-data.ground-truth.json").toFile());
+        links = new ArrayList<>();
+        for (Map<String, Object> r : rows("SELECT src, dst, kind FROM " + parquet("card_links")))
+            links.add(new String[]{(String) r.get("src"), (String) r.get("dst"), (String) r.get("kind")});
+    }
+
+    private static void runJob(Path space, String name) throws Exception {
+        JobConfig job = JobConfig.load(space.resolve("config/jobs/" + name + "_job.toon").toString());
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
         // the built-in Job Types that declare these grants must validate at registration; this test sends nothing
         for (Map.Entry<String, String> e : Map.of("mail", "com.gamma.notify.MailAccess",
@@ -87,19 +97,97 @@ class CardLinksJobGoldenTest {
             assertNotNull(r, job.name() + " never ran");
             assertEquals("SUCCESS", r.status(), job.name() + " failed: " + r.message());
         }
-        truth = new ObjectMapper().readTree(REPO.resolve("tools/gen-la-card-data.ground-truth.json").toFile());
-        links = new ArrayList<>();
-        for (Map<String, Object> r : rows("SELECT src, dst, kind FROM " + parquet("card_links")))
-            links.add(new String[]{(String) r.get("src"), (String) r.get("dst"), (String) r.get("kind")});
     }
 
     @Test
-    void theTemplateIsBasicTierOnly() throws Exception {
+    void theAdvancedTierShipsInTheBasicTemplateAndItsRuleFiresOnTheRealCounts() throws Exception {
+        // Edition rule (operator 2026-11-08): a minEdition: basic template carries its roster and Alert Rules, inert / unarmed on Basic
         assertEquals("basic", ToonHelper.load(TEMPLATE.resolve("template.toon").toString()).get("minEdition"));
-        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/registry/alert-rules"))
-            assertFalse(Files.exists(TEMPLATE.resolve(advanced)), advanced + " belongs to the Advanced tier (wave D)");
+        for (String advanced : List.of("config/demo-users.toon", "config/roles.toon", "config/jobs/card_compromise_counts_job.toon",
+                "config/jobs/card_compromise_alerts_job.toon"))
+            assertTrue(Files.exists(TEMPLATE.resolve(advanced)), advanced);
         assertEquals("*/5 * * * *", JobConfig.load(TEMPLATE.resolve("config/jobs/card_links_job.toon").toString()).cron(),
                 "a commit landing while the Job runs is skipped (JOB-SIGNAL-OVERLAP-SKIP-1); the cron catches it up");
+        com.gamma.alert.AlertRule rule = rule();
+        assertEquals("card_compromise_counts_dataset", rule.dataset());
+        assertEquals(List.of(), rule.by(), "card_compromise_counts is a Job output: a by column cannot be checked when the Space is created");
+        assertEquals("gte", rule.comparator());
+        String c = parquet("card_compromise_counts");
+        assertEquals(1, count("SELECT count(*) FROM " + c), "one row of counts");
+        // the real figures on the shipped data: one compromised terminal (M-317); 60 cards approved there since its first
+        // defrauded-card visit and not defrauded (10 in the 3-week window, 50 after it); the busiest other merchant saw 4
+        Map<String, Object> row = rows("SELECT * FROM " + c).get(0);
+        assertEquals(1L, ((Number) row.get("compromised_terminals")).longValue());
+        assertEquals(60L, ((Number) row.get("cards_seen_since_compromise")).longValue());
+        assertEquals(4L, ((Number) row.get("busiest_other_merchant")).longValue());
+        assertTrue(((Number) row.get("busiest_other_merchant")).intValue() < minDefraudedCards(), "a busy shop stays below the threshold");
+        assertEquals(1, count("SELECT count(*) FROM (SELECT " + rule.measure() + " AS v FROM " + c + ") WHERE v >= " + rule.threshold()), "the rule fires");
+    }
+
+    @Test
+    void withoutTheCompromisedFuelStationTheRuleWouldNotFire() throws Exception {
+        // the counts Job's own SQL over the same output with M-317 taken out: no compromised terminal, no card to reissue
+        String terminal = truth.get("stories").get("common_point_of_purchase").get("hub").asText();
+        Map<String, Object> without = countsOver("dst <> '" + terminal + "' AND src <> '" + terminal + "'", "merchant_id <> '" + terminal + "'");
+        assertEquals(0L, ((Number) without.get("compromised_terminals")).longValue(), "no other merchant (the busy supermarket included) is one");
+        com.gamma.alert.AlertRule rule = rule();
+        assertTrue(((Number) without.get("cards_seen_since_compromise")).doubleValue() < rule.threshold(), "without " + terminal + " it would not fire: " + without);
+        // and the cards the rule counts on the real data include the ten the generator planted in the window, none of the defrauded
+        Set<String> seen = new TreeSet<>();
+        for (Map<String, Object> r : rows("SELECT DISTINCT card_id FROM " + parquet("card_auth/database", "/**/*.parquet")
+                + " WHERE merchant_id = '" + terminal + "' AND result = 'approved' AND auth_at >= (SELECT min(ts) FROM " + parquet("card_links")
+                + " WHERE kind = 'visited_before_fraud' AND dst = '" + terminal + "')"))
+            seen.add((String) r.get("card_id"));
+        Set<String> inWindow = ids(truth.get("common_point_of_purchase").get("in_window_not_defrauded"));
+        assertTrue(seen.containsAll(inWindow), "the ten cards paid there in the window and not defrauded");
+        Set<String> defrauded = ids(truth.get("common_point_of_purchase").get("cards"));
+        seen.retainAll(defrauded);
+        assertEquals(defrauded.size(), seen.size(), "the defrauded cards also paid there since the compromise; the Job leaves them out");
+    }
+
+    @Test
+    void theBusySupermarketIsNeverACompromisedTerminal() throws Exception {
+        String supermarket = truth.get("stories").get("common_point_of_purchase").get("lookalikes").get(0).asText();
+        long customers = count("SELECT count(DISTINCT card_id) FROM " + parquet("card_auth/database", "/**/*.parquet")
+                + " WHERE merchant_id = '" + supermarket + "' AND result = 'approved'");
+        assertTrue(customers >= 10L * minDefraudedCards(), supermarket + " is busy (" + customers + " cards): a count of traffic would flag it");
+        assertEquals(0, count("SELECT count(*) FROM " + parquet("card_links") + " WHERE kind = 'visited_before_fraud' AND dst = '" + supermarket + "'"),
+                "none of its customers was defrauded");
+        // the counts Job's own SQL over the real output with only the supermarket's traffic: it is not a compromised terminal
+        Map<String, Object> only = countsOver("dst = '" + supermarket + "' OR src = '" + supermarket + "'", "merchant_id = '" + supermarket + "'");
+        assertEquals(0L, ((Number) only.get("compromised_terminals")).longValue(), supermarket + " " + only);
+        assertEquals(0L, ((Number) only.get("cards_seen_since_compromise")).longValue(), supermarket + " " + only);
+    }
+
+    private static com.gamma.alert.AlertRule rule() throws Exception {
+        return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
+                TEMPLATE.resolve("config/registry/alert-rules/card_new_cards_at_compromised_terminal.toon").toString()));
+    }
+
+    private static JobConfig countsJob() throws Exception {
+        return JobConfig.load(TEMPLATE.resolve("config/jobs/card_compromise_counts_job.toon").toString());
+    }
+
+    private static int minDefraudedCards() throws Exception {
+        return Integer.parseInt(countsJob().require("min_defrauded_cards"));
+    }
+
+    /** The counts Job's own SQL (its params substituted as the Job does) over the real Job output and feeds, each narrowed. */
+    private static Map<String, Object> countsOver(String linkFilter, String authFilter) throws Exception {
+        JobConfig job = countsJob();
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("min_defrauded_cards", job.require("min_defrauded_cards")));
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW card_links AS SELECT * FROM " + parquet("card_links") + " WHERE " + linkFilter);
+            st.execute("CREATE VIEW card_auth AS SELECT * FROM " + parquet("card_auth/database", "/**/*.parquet") + " WHERE " + authFilter);
+            st.execute("CREATE VIEW chargeback AS SELECT * FROM " + parquet("chargeback/database", "/**/*.parquet"));
+            try (ResultSet rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "one row of counts");
+                Map<String, Object> r = new LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                return r;
+            }
+        }
     }
 
     @Test

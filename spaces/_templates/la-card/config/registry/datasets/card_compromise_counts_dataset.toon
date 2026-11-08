@@ -1,0 +1,6 @@
+physicalRef: card_compromise_counts
+description: "Card and e-commerce fraud Link Analysis showcase - one row of counts built by the card_compromise_counts Job: compromised_terminals (merchants that 10 or more cards with card-not-present fraud paid at in the 45 days before it), cards_seen_since_compromise (cards approved at one of them on or after the first of those visits and not defrauded) and busiest_other_merchant (the most defrauded cards any other merchant saw). Read by the Alert Rule card_new_cards_at_compromised_terminal. Names no card. Synthetic."
+columns[3]{name,type,classification}:
+  compromised_terminals,number,
+  cards_seen_since_compromise,number,
+  busiest_other_merchant,number,
