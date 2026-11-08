@@ -1,0 +1,36 @@
+name: device_login
+active: true
+description: "Mobile financial services fraud Link Analysis showcase - One row per wallet, handset and day the wallet app was used on it: the first login of the day. One file per month (DEVICE_LOGIN_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-mfs-data.py."
+
+dirs:
+  poll:       data/inbox/device_login
+  database:   data/device_login/database
+  backup:     data/device_login/backup
+  temp:       data/device_login/temp
+  errors:     data/device_login/errors
+  quarantine: data/device_login/quarantine
+  markers:    data/device_login/markers
+  status_dir: data/device_login/status
+  log_dir:    data/device_login/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: device_login_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,23 @@
+name: mfs_sim_swap_bursts
+description: "SIM swap bursts - every SIM swap by a staff login that made 15 or more swaps within 10 days (via on swapped_by = channel, new_device_minutes, out_within_2h), the handsets those wallets were first used on within 24 hours after the swap, the wallets they first paid within 24 hours after it, and where any payee of two or more of them cashed out. A busy store login swaps many SIMs during an upgrade drive and its customers move to new phones; one call-centre login swapped 30 numbers in 10 days whose wallets were emptied within 2 hours."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: mfs_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","swap_burst"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

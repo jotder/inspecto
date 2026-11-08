@@ -1,0 +1,36 @@
+name: merchant
+active: true
+description: "Mobile financial services fraud Link Analysis showcase - One row per merchant that takes wallet payments: name, category, the date it opened and the bank account it settles to. One extract (MERCHANT_20260930.csv). Synthetic; regenerate with tools/gen-la-mfs-data.py."
+
+dirs:
+  poll:       data/inbox/merchant
+  database:   data/merchant/database
+  backup:     data/merchant/backup
+  temp:       data/merchant/temp
+  errors:     data/merchant/errors
+  quarantine: data/merchant/quarantine
+  markers:    data/merchant/markers
+  status_dir: data/merchant/status
+  log_dir:    data/merchant/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: merchant_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

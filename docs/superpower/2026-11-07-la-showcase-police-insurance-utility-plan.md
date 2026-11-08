@@ -31,7 +31,7 @@ Telecom), with the same template id.
 | Use case | Template | Stories | Status |
 |---|---|---|---|
 | Mobile money (anti-money-laundering) | `la-mobile-money` | Agent-assisted structuring (25 wallets via AG-18); 98 % pass-through mule chain to AG-39; nine-wallet device farm; four-wallet directed cycle; dormant wallet awakening; benign biller hub MER-ELECTRIC | exists |
-| MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | planned |
+| MFS (mobile financial services fraud) | `la-mfs` | SIM-swap wallet takeover through one call-centre login; agent split-deposit commission fraud; merchant cash-out collusion (spec 14) | exists |
 | Telco fraud | `la-showcase` | Telecom rings for Wangiri, IRSF, SIM box, subscription fraud and mules; a 650-caller supernode | exists |
 | Revenue assurance | `la-telco-ra` | Unbilled usage from one dealer's SIMs; dealer commission fraud with SIMs that go dormant; PBX hacking at night | exists |
 
@@ -127,6 +127,7 @@ data such a team really holds; and it is not trivially visible without Link Anal
 | Benefits: address farms, deceased payments, undeclared work | Real; agencies match death registers and payroll data. | Death notices arrive 0–60 days late, so a short overpayment is normal (the look-alike). |
 | Health: referral kickbacks, phantom billing, pill mill, upcoding | Real (payer program-integrity patterns). Distinct from `la-claims`, which is motor-injury claims. | Upcoding is shown against peers with the same patient mix; the pill mill's patients travel over 50 km. |
 | Telecom revenue assurance | SIM box, Wangiri and IRSF are already in `la-showcase`. | `la-telco-ra` takes unbilled usage, dealer commission fraud and PBX hacking instead. |
+| MFS: SIM-swap takeover, split deposits, merchant cash-out | Real; MFS fraud teams hold the SIM register (swaps with the staff login and channel), app logins by handset, agent and merchant transactions and commission statements. Stores really do swap many SIMs in upgrade drives, and market agents really do take many small deposits. Distinct from `la-mobile-money`, which is wallet anti-money-laundering. | A takeover drains within 2 hours from a handset the wallet never used, and the customer gets the number back days later; the split deposits show as several cash-ins per visit into wallets the agent registered itself, not as small amounts alone; the colluding merchant is matched on payments within 60 minutes of a cash-in, which many genuine shoppers also make. |
 | Logistics: cargo theft | Real; shippers and carriers hold trip, GPS-stop and warehouse-scan data. Fictitious carriers (double brokering) are a known pattern. | GPS is stop-level (place, start, minutes), not every ping; losses are 1 in 400 trips in the background. |
 | Insider: leaver exfiltration, access creep, mutual approvals | Real; security and HR teams hold access logs, grants and approvals. Privacy is sensitive. | All people are invented; access logs are daily counts per system, not record-level. |
 | Crypto: peel chain, mixer hop, converging cash-out | Real (blockchain-analytics patterns). | Addresses use an invented format (`syn1…`) that cannot match a real chain; the mixer exit is matched by timing and amount with noise, not exactly. |
@@ -981,6 +982,56 @@ business and its customers. All data is invented. It shares no data, names or id
   with steady payments from many wallets over months.
 
 **Alert Rule:** a wallet drained within 2 hours of a SIM swap.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-mfs-data.py` (seed 20261111; ground truth
+`tools/gen-la-mfs-data.ground-truth.json`), `tools/gen-la-mfs-data.test.mjs`, `MfsLinksJobGoldenTest` (inspecto-engine), template
+`spaces/_templates/la-mfs/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub `docs/okf/product/solution-pack/la-mfs/`.
+`la-mobile-money` and `mobile-money` are separate templates and are untouched; `la-mfs` shares no ids, names or data with them
+(wallets `WL-`, agents `A-`, merchants `MR-`, handsets `HS-`, staff logins `S-`, bank accounts `BA-`; MSISDNs `9997…`). Deliberate
+deviations:
+- **Scale:** 8 000 wallets (spec: 20 000), 300 agents under 12 super agents (spec: 600), 400 merchants (spec: 800), about 101 000
+  landed transactions (spec: 200 000), 1 146 SIM events (spec: 8 000), about 69 000 logins (spec: 60 000), 3 600 commission rows. With
+  every pair a link row the spec's sizes would pass 100 000 links; these give about 47 000 link rows and 10.9 MB of data.
+- **Columns:** `at` is a SQL keyword, so `wallet_txn.txn_at`, `sim_event.event_at` and `device_login.login_at`. `wallet_txn` gains
+  type `settlement` (a merchant's sweep to its bank account), which is how daily settlement shows; `device_id` is blank on a cash-in
+  (the agent's till starts it) and on a settlement. `device_login` is one row per wallet, handset and day (the day's first login).
+  `agent_commission.month` is the first of the month; the commission is 0.40 a cash-in or cash-out up to 50, 0.80 up to 200, 1.50
+  above, so splitting a deposit pays. Ids are zero-padded (`A-052`, `MR-077`; the spec's `A-52`, `MR-77`); `S-41` is as specified.
+- **Link kinds:** as specified, with `swapped_by` from the **wallet** on that MSISDN to the staff login (an MSISDN node would need a
+  wallet-to-number link to reach the money), and port-outs kept as rows, not links. Evidence in `via`: `registered_by` carries the
+  wallet's cash-ins, those at its registrar, cash-outs, P2P and merchant payments; `paid` carries `within_60m_of_cash_in:`;
+  `cashed_in_at` carries `per_day:`, `average:` and `merchant_pay_within_60m:`; `swapped_by` carries `new_device_minutes:`,
+  `out_within_2h:` (also its `amount`, for the wave D Alert Rule "drained within 2 hours of a SIM swap") and
+  `login_max_swaps_10d:`; `settles_to` carries `merchant_opened:`, `settlements:` and `settlement_days:`. No balance is
+  computed: the corpus has no opening balances, so "drained" is the amount paid out within 2 hours.
+- **Views and the canvas cap:** one derived Job, `mfs_screen_links` (on `job.dataset.produced`, la-benefits style), writes three
+  screens with a `screen` column. `swap_burst`: swaps by a login with 15 or more swaps in any 10 days, plus the handsets first used
+  within 24 hours after each swap, the payees first paid within 24 hours, and the cash-outs of any payee of two or more of those
+  wallets. `split_deposit`: cash-ins at an agent with 1 000 or more averaging under 25, plus its own registrations of those wallets.
+  `merchant_quick_pay`: payments to a merchant with 30 or more payers paying within 60 minutes after a cash-in, its settlement
+  account, and the agents where those quick payers were cashed in. `mfs_links` also runs on `cron: "*/5 * * * *"`
+  (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the
+  story whole and connected, and the look-alike on the canvas but in another component: `mfs_sim_swap_bursts` 409 rows, 327 nodes;
+  `mfs_split_deposits` 609 rows, 372 nodes; `mfs_merchant_quick_pay` 385 rows, 287 nodes.
+- **Stories as built:** SIM-swap takeover: `S-41` swaps 30 numbers on 2026-06-08..06-17; each wallet is logged into within the hour
+  from one of `HS-08913`..`HS-08918` (five victims each) and drained of 460-1 840 within 2 hours to mules `WL-07936`..`WL-07940`
+  (opened in the app in May), which cash everything out the same day at `A-088` and `A-093` (Eastfield); each customer gets the number
+  back at another store 1-3 days later, and nothing of theirs moves in between; `S-41` also makes ten ordinary swaps in other months.
+  Look-alike `S-72` (Riverside store) makes 160 swaps, 110 in a SIM upgrade drive in March 2026; about three in four customers move
+  to a new handset of their own within a day; nobody pays out more than 100 within 2 hours. Split deposits: `A-052` (Brickfield)
+  registers `WL-07816`..`WL-07935` (KYC 1, 2025-12..2026-01) and splits each deposit of 60-180 into 4-15 cash-ins of 5-25 a few
+  minutes apart (6 267 cash-ins averaging 16.8, all of its cash-ins), with an occasional cash-out at `A-052`, no merchant payment
+  and at most one P2P; it earns 2 897 commission against a median of 48. Look-alike `A-131` (Old Market) takes 2 779 small cash-ins
+  from 250 traders, about one a visit, who also pay merchants and each other. Merchant cash-out: `MR-077`, opened 2026-09-07, paid
+  from 09-09 by `WL-07941`..`WL-08000`, each opened in the three weeks before at and funded by one of `A-207`, `A-208`, `A-219`
+  (Station Road), 3-25 minutes after each cash-in of 150-480, passing on 95-100 %; 22 settlements on 22 days to `BA-4194142`.
+  Look-alike `MR-214` (Hillcrest grocery, since 2023) with 200 regulars all year, 52 of whom sometimes pay within an hour of a
+  cash-in at their local agent; weekly settlement to `BA-3034434`. Areas keep each look-alike apart by design: background wallets
+  use agents and merchants of their own area only, and `A-052`, `A-131` and the three Station Road agents serve no background wallet.
+- **Staged month:** October adds 92 wallets and a month of transactions, SIM events, logins and commissions; no story activity
+  (the screens recomputed over landed plus staged with DuckDB are unchanged).
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (checked outside the engine only).
 
 ## Steps
 

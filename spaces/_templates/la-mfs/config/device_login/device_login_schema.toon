@@ -1,0 +1,20 @@
+raw:
+  name: DEVICE_LOGIN
+  format: CSV
+  fields[3]{name,selector,type}:
+    wallet_id,"0",VARCHAR
+    device_id,"1",VARCHAR
+    login_at,"2",TIMESTAMP
+mapping:
+  canonicalName: device_login
+  rawName: DEVICE_LOGIN
+  fields[3]:
+    - name: wallet_id
+      from: wallet_id
+      fn: keep
+    - name: device_id
+      from: device_id
+      fn: keep
+    - name: login_at
+      from: login_at
+      fn: keep

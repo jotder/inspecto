@@ -1,0 +1,28 @@
+raw:
+  name: AGENT
+  format: CSV
+  fields[5]{name,selector,type}:
+    agent_id,"0",VARCHAR
+    name,"1",VARCHAR
+    area,"2",VARCHAR
+    super_agent_id,"3",VARCHAR
+    float_account,"4",VARCHAR
+mapping:
+  canonicalName: agent
+  rawName: AGENT
+  fields[5]:
+    - name: agent_id
+      from: agent_id
+      fn: keep
+    - name: name
+      from: name
+      fn: keep
+    - name: area
+      from: area
+      fn: keep
+    - name: super_agent_id
+      from: super_agent_id
+      fn: keep
+    - name: float_account
+      from: float_account
+      fn: keep

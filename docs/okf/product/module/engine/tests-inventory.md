@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-383 test class(es): 383 unit, 0 real-HTTP control-plane, 0 IT.
+384 test class(es): 384 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -212,6 +212,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `MaintenanceTaskContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MaintenanceTaskContractTest.java` | Pins {@link MaintenanceJob#BUILT_IN_TASKS} against the {@code switch} it claims to describe, and pins |
 | `MaterializeColumnMergeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MaterializeColumnMergeTest.java` | The merge rule for derived dataset columns (`TYPEFLOW-DATASET-COLUMNS-1` step 4, design §5). |
 | `MaterializeTaskTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MaterializeTaskTest.java` | DAT-4 Matrix materialization, end-to-end on real DuckDB: the {@code materialize} task compiles a |
+| `MfsLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MfsLinksJobGoldenTest.java` | The {@code la-mfs} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped extracts |
 | `MmLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/MmLinksJobGoldenTest.java` | The {@code la-mobile-money} Space Template RUN end to end from a verbatim copy: the three Pipelines ingest the shipped |
 | `NoBackupTaskShipsInThePersonalBuildTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/NoBackupTaskShipsInThePersonalBuildTest.java` | EDG-01 cell 2 — the assertion that makes the OPS-06 gating REAL rather than claimed. |
 | `ObjectStoreExportJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ObjectStoreExportJobTypeTckTest.java` | {@link ObjectStoreExportJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |

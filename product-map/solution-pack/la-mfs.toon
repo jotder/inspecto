@@ -1,0 +1,7 @@
+id: solution-pack.la-mfs
+kind: solution-pack
+title: Link Analysis mobile financial services fraud showcase
+template: la-mfs
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/la-mfs/index.md

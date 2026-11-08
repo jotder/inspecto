@@ -1,0 +1,36 @@
+raw:
+  name: WALLET_TXN
+  format: CSV
+  fields[7]{name,selector,type}:
+    txn_id,"0",VARCHAR
+    from_id,"1",VARCHAR
+    to_id,"2",VARCHAR
+    type,"3",VARCHAR
+    amount,"4",DOUBLE
+    txn_at,"5",TIMESTAMP
+    device_id,"6",VARCHAR
+mapping:
+  canonicalName: wallet_txn
+  rawName: WALLET_TXN
+  fields[7]:
+    - name: txn_id
+      from: txn_id
+      fn: keep
+    - name: from_id
+      from: from_id
+      fn: keep
+    - name: to_id
+      from: to_id
+      fn: keep
+    - name: type
+      from: type
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: txn_at
+      from: txn_at
+      fn: keep
+    - name: device_id
+      from: device_id
+      fn: keep
