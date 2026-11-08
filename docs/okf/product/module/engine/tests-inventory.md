@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-377 test class(es): 377 unit, 0 real-HTTP control-plane, 0 IT.
+378 test class(es): 378 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -166,6 +166,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ApprovalFingerprintTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ApprovalFingerprintTest.java` | The shared approval mechanism: every fail-closed branch of {@link ApprovalFingerprint}. |
 | `ApprovalGoldenVectorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ApprovalGoldenVectorTest.java` | GOLDEN VECTORS: fingerprints of fixed inputs, recorded from the code as it stood BEFORE |
 | `AttachApprovalsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/AttachApprovalsTest.java` | ASSURE-XLSX-ATTACHMENTS-1 round 5: what the attachment fingerprint hashes. |
+| `CardLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/CardLinksJobGoldenTest.java` | The {@code la-card} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped |
 | `ConfigOnlyParametersTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConfigOnlyParametersTest.java` | "Run with parameters" offers only the parameters a Run honours. A Job that reads a key from its SAVED config |
 | `ConsignmentProcessJobTypeTckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTckTest.java` | {@link ConsignmentProcessJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `ConsignmentProcessJobTypeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTest.java` | §14.4 step 3 — the adapter. Proves the "author doesn't think about it" promise from the <em>processor's</em> |

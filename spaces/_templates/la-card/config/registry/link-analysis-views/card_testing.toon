@@ -1,0 +1,24 @@
+name: card_testing
+description: "Card testing - cards linked to the devices and /24 networks of their online purchases (via counts authorisations and declines). Look for the one device and one network that share hundreds of cards in a single night, almost all declined; then open used_at for those cards to see the three small shops and the 1.00 amounts. The corporate proxy network also carries hundreds of cards, but each card on its own device, on weekdays, with almost no declines."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: card_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[3]: ts,amount,via
+  filter:
+    kind: group
+    op: OR
+    items[2]{kind,field,operator,value}:
+      condition,kind,"=","used_device"
+      condition,kind,"=","from_ip"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

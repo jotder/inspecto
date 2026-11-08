@@ -1,0 +1,24 @@
+raw:
+  name: CHARGEBACK
+  format: CSV
+  fields[4]{name,selector,type}:
+    chargeback_id,"0",VARCHAR
+    auth_id,"1",VARCHAR
+    reason,"2",VARCHAR
+    filed_at,"3",DATE
+mapping:
+  canonicalName: chargeback
+  rawName: CHARGEBACK
+  fields[4]:
+    - name: chargeback_id
+      from: chargeback_id
+      fn: keep
+    - name: auth_id
+      from: auth_id
+      fn: keep
+    - name: reason
+      from: reason
+      fn: keep
+    - name: filed_at
+      from: filed_at
+      fn: keep

@@ -1,0 +1,8 @@
+physicalRef: card/database
+description: "Card and e-commerce fraud Link Analysis showcase - One row per issued card: an invented card id (never a card number), its BIN group, holder and issue date. One extract (CARD_20260930.csv). Landed by the card Pipeline. Synthetic."
+eventDate: issued_at
+columns[4]{name,type,classification}:
+  card_id,string,
+  bin,string,
+  holder_id,string,
+  issued_at,date,

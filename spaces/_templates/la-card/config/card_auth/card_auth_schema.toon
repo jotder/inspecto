@@ -1,0 +1,40 @@
+raw:
+  name: CARD_AUTH
+  format: CSV
+  fields[8]{name,selector,type}:
+    auth_id,"0",VARCHAR
+    card_id,"1",VARCHAR
+    merchant_id,"2",VARCHAR
+    amount,"3",DOUBLE
+    auth_at,"4",TIMESTAMP
+    device_id,"5",VARCHAR
+    ip,"6",VARCHAR
+    result,"7",VARCHAR
+mapping:
+  canonicalName: card_auth
+  rawName: CARD_AUTH
+  fields[8]:
+    - name: auth_id
+      from: auth_id
+      fn: keep
+    - name: card_id
+      from: card_id
+      fn: keep
+    - name: merchant_id
+      from: merchant_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: auth_at
+      from: auth_at
+      fn: keep
+    - name: device_id
+      from: device_id
+      fn: keep
+    - name: ip
+      from: ip
+      fn: keep
+    - name: result
+      from: result
+      fn: keep
