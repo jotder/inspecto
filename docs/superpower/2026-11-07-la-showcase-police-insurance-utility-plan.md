@@ -1927,9 +1927,8 @@ deviations:
    - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 300, the seed's
      `--apply`, the persona probes) and no Basic bundle (rule unarmed, `telco_ra_unbilled_alerts` reporting no breach, 0
      rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the Link Analysis UI, the composed *Telecom* Space with `la-mfs`'s roster (its Advanced tier is a parallel
-     lane; the merge was checked with `la-card`'s and `la-ownership`'s rosters through the packer's `mergeDemoUsers` /
-     `mergeRoles`), an OIDC build, and the packed downloads of a commit holding this tier (the packer reads HEAD).
+     checked: the Link Analysis UI, the composed *Telecom* Space booted (it packs from the integration commit with
+     both rosters merged: 9 users, 7 roles, both Alert Rules), and an OIDC build.
 
 **Docs, with each Space**
 
