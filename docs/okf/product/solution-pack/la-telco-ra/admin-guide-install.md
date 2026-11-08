@@ -17,7 +17,7 @@ and the [configuration reference](../../module/config/admin-guide-configuration-
 |---|---|---|
 | Product | `inspecto-deploy-<platform>.zip` | `<parent>/inspecto-la/` |
 | Space | `inspecto-la-space-la-telco-ra-<version>.zip` | `<parent>/inspecto-la-spaces/` |
-| Data | `inspecto-la-data-la-telco-ra-<version>.zip` (about 7.5 MB unzipped) | `<parent>/inspecto-la-data/` |
+| Data | `inspecto-la-data-la-telco-ra-<version>.zip` (about 7.3 MB unzipped) | `<parent>/inspecto-la-data/` |
 
 ## Install and start
 

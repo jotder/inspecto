@@ -80,7 +80,7 @@ look at `plan:` and at when each dealer's SIMs were activated (`ts`).
 
 **Answer:** dealer **`DL-047` (Lantern Wireless, Manchester)** activated **300 SIMs on one device, `DEV-00086`, on
 one day, 2026-03-17**, between 10:00 and about 16:40. Every one of them is used heavily every month from March
-(800–2 500 minutes and 20–60 GB a month, against a median of about 150 minutes and 3.3 GB). Not one month reached
+(800–2 500 minutes and 20–60 GB in each full month from April, less in March, against a median of about 150 minutes and 3.3 GB). Not one month reached
 billing (`unbilled_months:7`, `billed_minutes:0`), and none was ever topped up. **Not the story:** the network test
 team **`DL-000`** has **40 SIMs on `DEV-00001` and `DEV-00002`**. They are used and never billed too, but their
 `plan:` is `Internal test`, which is the known list of test SIMs. The dozen single SIMs at other dealers reached
@@ -107,10 +107,10 @@ at ten shops near the campus, and use their SIMs every month (`usage_months:12`,
 **Answer:** four trunks of four unrelated firms, **`TRK-025` (`ENT-0087`), `TRK-040` (`ENT-0040`), `TRK-087`
 (`ENT-0057`) and `TRK-147` (`ENT-0045`)**, call **premium-rate numbers in three countries: `CTRY-LT-PRN`,
 `CTRY-SK-PRN` and `CTRY-SI-PRN`**. Every minute is off hours: from Friday 22:00 to Monday morning, over six weekends
-between 2026-04-03 and 2026-06-22. That is 1 600–5 000 minutes per trunk and destination, from trunks that otherwise
+between 2026-04-03 and 2026-06-22. That is about 1 400–5 700 minutes per trunk and destination, from trunks that otherwise
 make a few daytime calls abroad. Nobody else calls those ranges. **Not the story:** **`TRK-027` (`ENT-0108`)** calls
 **`CTRY-SG-GEO`**, a geographic number at its Singapore office, almost every working day. The calls start at
-01:00–03:00 here, which is the office's working day, and never at a weekend (`weekend_minutes:0`). `TRK-017`
+01:00–03:00 here on most days (07:00–08:00 on the rest), which is the office's working day, and never at a weekend (`weekend_minutes:0`). `TRK-017`
 (`ENT-0080`) and `TRK-082` (`ENT-0114`) call North American offices in the evening (`CTRY-US-GEO`).
 
 ## Tester's checklist

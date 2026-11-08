@@ -806,7 +806,7 @@ Deliberate deviations:
   component: `telco_ra_unbilled_usage` 704 rows, 380 nodes; `telco_ra_commission_spikes` 2 404 rows, 768 nodes;
   `telco_ra_pbx_off_hours` 20 rows, 19 nodes.
 - **Stories as built:** unbilled usage is `DL-047` (Manchester), 300 SIMs on `DEV-00086` on 2026-03-17, 800-2 500 minutes and
-  20-60 GB a month from March, no billing record and no top-up; the look-alike is `DL-000`'s 40 SIMs on `DEV-00001`/`DEV-00002`
+  20-60 GB in each full month from April (less in March), no billing record and no top-up; the look-alike is `DL-000`'s 40 SIMs on `DEV-00001`/`DEV-00002`
   with plan `Internal test` (the known list), plus 12 ordinary SIMs whose first two months reached billing late (`unbilled_months:2`)
   and 50 single dropped subscriber-months (`unbilled_months:1`, below the screen). Commission fraud is `DL-112` (Leeds), 400 SIMs on
   `DEV-00204`..`00206` over the six weeks from 2026-02-02, each topped up once with 5.00 at its shop `POS-0008` within 2 days, one
@@ -814,7 +814,7 @@ Deliberate deviations:
   students top up every 20-40 days (app or ten campus shops) and use them every month. PBX hacking is `TRK-025`, `TRK-040`,
   `TRK-087`, `TRK-147` (customers `ENT-0087`, `-0040`, `-0057`, `-0045`) calling premium ranges in LT, SK and SI on six weekends
   2026-04-03..06-22, every minute off hours; the look-alike `TRK-027` (`ENT-0108`) calls `CTRY-SG-GEO` on working days at
-  01:00-03:00 (that office's day), and `TRK-017`, `TRK-082` call `CTRY-US-GEO` in the evening. Background trunks call premium
+  01:00-03:00 on most days, 07:00-08:00 on the rest (that office's day), and `TRK-017`, `TRK-082` call `CTRY-US-GEO` in the evening. Background trunks call premium
   ranges only in IE and NL, in daytime.
 - **Identifiers:** MSISDNs `9996…` (the unassigned +999 range, as la-showcase), IMSIs `00101…` (the 001-01 test network), dealer
   names invented, real cities at city level, countries only as destinations. No dealer-name spelling variants: nothing here
