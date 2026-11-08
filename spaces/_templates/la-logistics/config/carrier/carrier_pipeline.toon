@@ -1,0 +1,36 @@
+name: carrier
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per haulage carrier on the shipper's approved register: name, phone (as the carrier gave it, so the same number can be written several ways), when it registered and whether it showed insurance (Y or N). One extract (CARRIER_20260930.csv). Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/carrier
+  database:   data/carrier/database
+  backup:     data/carrier/backup
+  temp:       data/carrier/temp
+  errors:     data/carrier/errors
+  quarantine: data/carrier/quarantine
+  markers:    data/carrier/markers
+  status_dir: data/carrier/status
+  log_dir:    data/carrier/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: carrier_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

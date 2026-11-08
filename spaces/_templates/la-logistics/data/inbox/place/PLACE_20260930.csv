@@ -1,0 +1,146 @@
+place_id,name,place_type,area,lat,lon
+WH-01,Harbourgate Distribution Centre,warehouse,Southampton,50.91,-1.4
+WH-02,Thamesmead Park Distribution Centre,warehouse,London,51.51,-0.13
+WH-03,Avonside Distribution Centre,warehouse,Bristol,51.45,-2.59
+WH-04,Taff Vale Distribution Centre,warehouse,Cardiff,51.48,-3.18
+WH-05,Midland Cross Distribution Centre,warehouse,Birmingham,52.49,-1.89
+WH-06,Trentfield Distribution Centre,warehouse,Nottingham,52.95,-1.15
+WH-07,Irwell Park Distribution Centre,warehouse,Manchester,53.48,-2.24
+WH-08,Merseyway Distribution Centre,warehouse,Liverpool,53.41,-2.98
+WH-09,Airedale Distribution Centre,warehouse,Leeds,53.8,-1.55
+WH-10,Donside Distribution Centre,warehouse,Doncaster,53.52,-1.13
+WH-11,Tyneholme Distribution Centre,warehouse,Newcastle,54.98,-1.61
+WH-12,Clydebank Road Distribution Centre,warehouse,Glasgow,55.86,-4.25
+PL-001,Sandyford Fuel,fuel_station,London,52.0207,-0.5044
+PL-002,Lay-by at Tanners Cross,layby,Birmingham,52.0649,-0.944
+PL-003,Edgecote Truck Stop,truck_park,London,51.6555,-0.4412
+PL-004,Lay-by at Whinfell,layby,Liverpool,54.2751,-3.3653
+PL-005,Lay-by at Stoneleigh,layby,Leeds,53.7398,-1.8103
+PL-006,Lay-by at Beacon End,layby,Glasgow,55.1296,-3.3315
+PL-007,Lay-by at Ridgeway,layby,Birmingham,52.6456,-1.9977
+PL-008,Briar Hill Fuel,fuel_station,Glasgow,55.2014,-3.3431
+PL-009,Longmoor Services,services,London,51.5112,-0.678
+PL-010,Greenhithe Lane Services,services,Newcastle,54.5469,-1.6442
+PL-011,Upwood Services,services,Birmingham,52.9211,-2.0055
+PL-012,Lay-by at Waterloo Farm,layby,London,51.8484,-0.732
+PL-013,Ravensdale Fuel,fuel_station,London,51.8203,-1.2866
+PL-014,Thornbury Wood Fuel,fuel_station,London,51.8607,-0.8893
+PL-015,Lay-by at Wheatsheaf,layby,London,52.1386,-0.7895
+PL-016,Glebe Farm Services,services,Leeds,53.772,-1.1811
+PL-017,Rookwood Fuel,fuel_station,Nottingham,53.0045,-1.502
+PL-018,Dovecote Fuel,fuel_station,Bristol,51.6747,-1.6286
+PL-019,Lay-by at Yewtree,layby,Liverpool,52.9674,-2.5136
+PL-020,Stonecross Fuel,fuel_station,Leeds,53.7299,-1.6251
+PL-021,Lay-by at Valley Farm,layby,Glasgow,54.7849,-3.6876
+PL-022,Pennyford Fuel,fuel_station,Leeds,53.7103,-1.9847
+PL-023,Gorsebrook Services,services,Manchester,53.0201,-2.01
+PL-024,Birchover Services,services,Nottingham,53.1224,-1.149
+PL-025,Cobblers Cross Fuel,fuel_station,Nottingham,52.3881,-0.7023
+PL-026,Lay-by at Goldthorn,layby,London,51.4186,-0.3966
+PL-027,Eastfield Services,services,Birmingham,52.0722,-1.2587
+PL-028,Elmstead Fuel,fuel_station,Glasgow,55.449,-3.7799
+PL-029,Moorgate Fuel,fuel_station,Leeds,53.8442,-1.2825
+PL-030,Lay-by at Crossways,layby,London,52.1736,-0.4498
+PL-031,Lay-by at Tollgate,layby,Cardiff,51.7181,-2.9178
+PL-032,Ridgehill Services,services,Glasgow,55.3693,-3.8848
+PL-033,Keyham Truck Stop,truck_park,Nottingham,52.9872,-0.7599
+PL-034,Lay-by at Hartwell,layby,Manchester,53.5034,-2.194
+PL-035,Oldfield Fuel,fuel_station,Bristol,51.9212,-2.209
+PL-036,Lay-by at Ivybridge Lane,layby,Southampton,51.2906,-1.4572
+PL-037,Gilmorton Fuel,fuel_station,Birmingham,52.0551,-1.7591
+PL-038,Hollin Bank Truck Stop,truck_park,Birmingham,52.2246,-1.5021
+PL-039,Lay-by at Ingleby,layby,Nottingham,52.8132,-1.4085
+PL-040,Lay-by at Saltcote,layby,Newcastle,55.2458,-2.4097
+PL-041,Lay-by at Shepherds Cross,layby,Birmingham,52.8805,-2.0274
+PL-042,Lay-by at Walden Cross,layby,Birmingham,52.7762,-1.7788
+PL-043,Highmoor Fuel,fuel_station,Southampton,51.0691,-1.1074
+PL-044,Old Toll Fuel,fuel_station,London,51.9137,-0.3911
+PL-045,Lowfield Fuel,fuel_station,London,51.2352,-0.7271
+PL-046,Lay-by at Flaxmoor,layby,Manchester,53.5119,-1.9974
+PL-047,Ketley Bank Services,services,Southampton,51.3509,-1.3766
+PL-048,Lay-by at Woodhouse Gap,layby,Leeds,54.1377,-1.7358
+PL-049,Kingsmere Services,services,London,51.5274,-1.1136
+PL-050,Yatesbury Services,services,Southampton,51.0301,-1.6572
+PL-051,Lay-by at Ironstone,layby,Southampton,51.3511,-1.5359
+PL-052,Elderfield Fuel,fuel_station,Leeds,53.6963,-1.3967
+PL-053,Thistledown Fuel,fuel_station,Cardiff,51.5122,-3.0437
+PL-054,Lay-by at Millbrook,layby,London,51.7274,-1.284
+PL-055,Fiveways Services,services,Birmingham,52.3275,-3.0745
+PL-056,Hawksmoor Truck Stop,truck_park,Bristol,51.7593,-1.9542
+PL-057,Blackthorn Services,services,Manchester,53.2515,-1.7374
+PL-058,Lay-by at Oakhanger,layby,Newcastle,54.5179,-2.8496
+PL-059,Lay-by at Sheepwash,layby,Birmingham,52.3452,-2.7408
+PL-060,Lay-by at Knightsbridge Farm,layby,Newcastle,54.9035,-3.3718
+PL-061,Lay-by at Orchard Gate,layby,Liverpool,52.9227,-2.5492
+PL-062,Lay-by at Gallows Hill,layby,Liverpool,53.4543,-2.6437
+PL-063,Lay-by at Ashby Gap,layby,Birmingham,52.8337,-1.8509
+PL-064,Coldharbour Services,services,Manchester,53.3358,-1.6913
+PL-065,Lay-by at Larchfield,layby,Liverpool,53.4791,-2.7909
+PL-066,Lay-by at Wychwood,layby,Leeds,53.7206,-1.8253
+PL-067,Lay-by at Whitmoor,layby,Bristol,51.7882,-1.669
+PL-068,Kilnhurst Fuel,fuel_station,Manchester,53.4689,-2.5735
+PL-069,Fallowfield Fuel,fuel_station,Birmingham,52.2235,-1.7423
+PL-070,Fordwells Services,services,Doncaster,53.3011,-1.2456
+PL-071,Kestrel Hill Fuel,fuel_station,Leeds,53.7258,-1.7498
+PL-072,Lay-by at Wildmoor,layby,Leeds,53.7474,-1.3653
+PL-073,Lay-by at Calder Moor,layby,Birmingham,52.0081,-1.822
+PL-074,Easterby Truck Stop,truck_park,Birmingham,51.9338,-1.698
+PL-075,Lay-by at Copse End,layby,London,51.3442,-0.4144
+PL-076,Foxhollow Fuel,fuel_station,Manchester,53.4815,-1.9156
+PL-077,Lay-by at Woodgate,layby,Leeds,53.6933,-1.3951
+PL-078,Redlands Fuel,fuel_station,Birmingham,52.1467,-1.8063
+PL-079,Pinfold Services,services,Birmingham,51.9312,-1.7893
+PL-080,Lay-by at Carrow Hill,layby,Southampton,51.4098,-1.5979
+PL-081,Lay-by at Wolds Edge,layby,Nottingham,53.0756,-1.5418
+PL-082,Nethercote Truck Stop,truck_park,Manchester,53.1218,-2.2892
+PL-083,Lay-by at Sandhurst Gap,layby,Nottingham,53.0794,-1.5095
+PL-084,Lay-by at Quarry Bank,layby,Nottingham,53.1966,-1.6172
+PL-085,Starling Bank Fuel,fuel_station,Leeds,53.506,-1.6859
+PL-086,Lay-by at Langham Gap,layby,Birmingham,52.251,-2.4424
+PL-087,Whitecross Services,services,London,51.9076,-0.6112
+PL-088,Lay-by at Yarrow Bank,layby,Cardiff,51.8085,-3.0641
+PL-089,Parkgate Truck Stop,truck_park,Bristol,51.7925,-1.6743
+PL-090,Lay-by at Barrowden,layby,Birmingham,52.8183,-2.0256
+PL-091,Lapwing Moor Fuel,fuel_station,Nottingham,53.0517,-1.7173
+PL-092,Windmill Hill Fuel,fuel_station,Bristol,51.7464,-1.6556
+PL-093,Zeal Cross Services,services,Doncaster,53.6217,-1.3888
+PL-094,Lay-by at Cinderford Gap,layby,Doncaster,53.3239,-1.3332
+PL-095,Warren End Fuel,fuel_station,Southampton,51.2512,-1.4291
+PL-096,Lay-by at Mossley Hill,layby,Manchester,53.4543,-2.3364
+PL-097,Lay-by at Ambergate,layby,Newcastle,54.5102,-1.5527
+PL-098,Ashcombe Services,services,Bristol,51.7597,-2.3784
+PL-099,Hopwell Fuel,fuel_station,London,51.8454,-0.3395
+PL-100,Lay-by at Holmewood,layby,Liverpool,53.4492,-2.7167
+PL-101,Upperton Services,services,Leeds,53.6351,-1.8496
+PL-102,Lay-by at Sallowmere,layby,Doncaster,53.4971,-1.3653
+PL-103,Lay-by at Sunnyside,layby,Bristol,51.6808,-1.9963
+PL-104,Quernmore Fuel,fuel_station,Birmingham,52.7491,-2.1966
+PL-105,Marshgate Fuel,fuel_station,Doncaster,53.6106,-1.2698
+PL-106,Lay-by at Juniper Hill,layby,Southampton,51.4568,-1.2085
+PL-107,Lay-by at Marlow Heath,layby,Liverpool,53.6962,-2.7143
+PL-108,Fernleigh Truck Stop,truck_park,Manchester,53.5593,-2.64
+PL-109,Lay-by at Bellhouse,layby,Bristol,51.5965,-1.6224
+PL-110,Heathcote Truck Stop,truck_park,Nottingham,52.3847,-0.5701
+PL-111,Rushmere Services,services,Manchester,53.1084,-2.1364
+PL-112,Northwold Fuel,fuel_station,Manchester,53.0925,-2.4569
+PL-113,Skylark Hill Fuel,fuel_station,Birmingham,52.1945,-1.717
+PL-114,Pebblecombe Services,services,Nottingham,53.2244,-1.1695
+PL-115,Brackenhurst Fuel,fuel_station,Bristol,51.6213,-1.6076
+PL-116,Meadowcroft Truck Stop,truck_park,Nottingham,52.9825,-1.5494
+PL-117,Weston Moor Truck Stop,truck_park,Manchester,53.5024,-2.4237
+PL-118,Lay-by at Rowley Gap,layby,Birmingham,52.7921,-1.6578
+PL-119,Hallaton Fuel,fuel_station,Southampton,51.148,-0.8434
+PL-120,Lay-by at Deerleap,layby,Bristol,51.6037,-1.6302
+PL-121,Owlcotes Truck Stop,truck_park,Doncaster,53.5081,-1.375
+PL-122,Lay-by at Westcombe,layby,Cardiff,51.9102,-2.8881
+PL-123,Lay-by at Willowbrook,layby,Liverpool,53.4521,-2.775
+PL-124,Lay-by at Medbourne,layby,Liverpool,53.4493,-2.6764
+PL-125,Underwood Fuel,fuel_station,Nottingham,52.8123,-1.402
+PL-126,Dunsford Fuel,fuel_station,Bristol,51.821,-2.3625
+PL-127,Inglemire Services,services,Birmingham,52.43,-2.785
+PL-128,Silverdale Services,services,Birmingham,52.215,-2.165
+PL-129,Harrowden Services,services,Liverpool,53.67,-3.715
+PL-130,Twyford Bank Services,services,Manchester,52.95,-2.435
+PL-131,Lamberhurst Services,services,Leeds,54.195,-2.295
+PL-132,Normanton Gap Services,services,Newcastle,54.69,-2.69
+PL-133,Alderholt Services,services,Newcastle,55.42,-2.93

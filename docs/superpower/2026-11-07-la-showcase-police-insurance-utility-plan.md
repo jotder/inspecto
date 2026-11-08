@@ -82,7 +82,7 @@ Telecom), with the same template id.
 
 | Use case | Template | Stories | Status |
 |---|---|---|---|
-| Cargo theft | `la-logistics` | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | planned |
+| Cargo theft | `la-logistics` | Losses recurring with one driver pair and one night-shift scanner; an unscheduled-stop hotspot; a fictitious carrier taking high-value loads | exists |
 
 ### Enterprise
 
@@ -91,9 +91,9 @@ Telecom), with the same template id.
 | Internal audit, accounts payable | `la-audit` | Vendor V-117 shares bank account and address with employee E-31; 5 vendors on one bank account plus an unlinked sixth; 30 invoices just under the 10 000 limit; one approver bridging the approval graph; intercompany money at quarter ends; 13 duplicate payments | exists |
 | Insider threat (HR and security) | `la-insider` | A leaver's bulk reads and mail to a personal domain; access creep granted by one manager; two employees approving each other's expenses | planned |
 
-**Count: 18 Spaces in 9 industries.** On 2026-11-08, 13 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
+**Count: 18 Spaces in 9 industries.** On 2026-11-08, 15 exist (`la-sample`, `la-showcase`, `la-mobile-money`,
 `la-claims`, `la-audit`, `la-ownership`, `la-police`, `la-utility`, `la-card`, `la-procurement`, `la-trade`, `la-benefits`,
-`la-telco-ra`) and 5 are planned; the `la-claims`
+`la-health`, `la-telco-ra`, `la-logistics`) and 3 are planned; the `la-claims`
 additions land inside `la-claims`. The plan began on 2026-11-07 with 17 (5 existing, 12 new); `la-mfs` was added on
 2026-11-08 (operator: Telecom must cover mobile money, MFS and other telco fraud as separate use cases).
 
@@ -903,6 +903,52 @@ Deliberate deviations:
   5 high-value loads that never arrive — a new, insured carrier that delivers.
 
 **Alert Rule:** a high-value trip assigned to a carrier under 60 days old.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-logistics-data.py` (seed 20261111; ground truth
+`tools/gen-la-logistics-data.ground-truth.json`), `tools/gen-la-logistics-data.test.mjs`, `LogisticsLinksJobGoldenTest`
+(inspecto-engine), template `spaces/_templates/la-logistics/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-logistics/`. No Geo View (the stories read from the graph; `place` carries `lat` / `lon` for one
+later). Deliberate deviations:
+- **Scale:** 14 000 trips and shipments over 13 months, 12 872 landed (spec: 25 000), 900 drivers, 120 carriers, 12 warehouses, 133
+  places on the road; about 13 400 landed GPS stops (spec: 90 000) and 46 000 landed scans (spec: 100 000); 63 landed loss reports
+  (spec: 80). The link budget set the scale: one `drove`, `carried_by` and `scanned_by` per trip is already 3 rows a trip, so 25 000
+  trips would pass 60 000 link rows. About 45 000 link rows; data 5.9 MB.
+- **Feeds and columns:** a ninth source, `place` (place_id, name, `place_type` warehouse / services / truck_park / fuel_station /
+  layby, `area` = nearest city, lat, lon), names the warehouses (`WH-`) and the stop places (`PL-`). `shipment` gains `booked_at`;
+  `driver` gains `left_on`; `warehouse_scan.at` is `scanned_at` and `loss_report.type` is `loss_type` (SQL keywords); `loss_report`
+  gains `loss_id`. `trip.route` is `<origin city>-<destination city>`; `arrive_at` is blank when the truck never got there. Scan types
+  are `inbound`, `putaway`, `outbound` (loaded onto the truck) and `arrived`. Phones are in the UK drama ranges, written three ways
+  (`07700 900123`, `07700900123`, `+44 7700 900123`) so `same_phone` has to normalise them.
+- **Link kinds:** one row per pair. `scanned_by` is trip → the employee of the **outbound** scan only (every scan would add
+  about 30 000 rows; the others are read into `arrived:`). `stopped_at` keeps stops of **20 minutes or more** only (shorter ones are
+  fuel and traffic), with the place's long stops, high-value long stops and lost trips in `via`. `lost` is trip → loss report
+  (`LR-`). `same_phone` is carrier → driver or driver → driver (a < b) after keeping digits and turning a leading 44 into 0;
+  background: 14 owner-operators share their driver's phone, and 3 pairs of drivers share one. High value is 100 000 or more.
+- **Views and the canvas cap:** one derived Job, `logistics_screen_links` (on `job.dataset.produced`, la-benefits style), writes
+  three screens: `inside_job` (drivers, co-drivers and outbound scanners on 2 or more lost trips), `stop_hotspot` (places where 3 or
+  more lost trips stood 20 minutes or more, with every long stop there) and `new_carrier` (high-value trips of carriers under 60
+  days old, with `same_phone` and the shared-phone driver's lost trips). `logistics_links` also runs on `cron: "*/5 * * * *"`
+  (`JOB-SIGNAL-OVERLAP-SKIP-1`). The golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes,
+  the story whole and connected, and the look-alike on the canvas but in another component: `driver_team_inside_job` 88 rows, 79
+  nodes; `theft_stop_hotspot` 333 rows, 335 nodes; `fictitious_carrier` 26 rows, 30 nodes.
+- **Stories as built:** inside job: the team `DRV-0892` / `DRV-0893` (`CAR-052`) drove 12 short-delivered loads in 107 landed trips
+  (2025-10-10..2026-08-20); `EMP-0123`, night shift at `WH-06` (Nottingham), scanned 10 of them out between 00:50 and 03:30 and no
+  other lost load. Look-alike `DRV-0894` (`CAR-103`): 318 landed trips, about 300 on Southampton-Birmingham, 2 thefts. The generator
+  keeps every other driver to at most one loss and the look-alike's scanners off the team's losses. Stop hotspot: `PL-118` Lay-by at
+  Rowley Gap (near Birmingham, beside 14 roads of 2.5 hours or more): 82 long stops, 9 of them high value, all 9 stolen there
+  (26-69 minutes, last GPS stop, 2025-10-24..2026-06-01, nine drivers); background high-value loads never take their break there.
+  Look-alike `PL-087` Whitecross Services (London-Birmingham road): 239 long stops, 26 high value, 3 stolen (forced, so the
+  services reach the screen). Fictitious carrier: `CAR-022` Larkmoor Freight Services Ltd, registered 2026-05-11, uninsured, 5
+  high-value loads 2026-06-05..06-11 (24-30 days old), no GPS, `non_delivery`; its phone `+44 7700 900374` is `DRV-0895`'s
+  `07700 900374` (`CAR-020`, left 2025-11-30 after the theft `LR-0006`). Look-alike `CAR-057`, an insured owner-operator
+  registered 2026-03-02 (phone = its driver `DRV-0001`'s), 9 high-value loads in its first 60 days and every one of its 58 delivered.
+- **Staged month:** October adds 1 128 trips with shipments, stops and scans and 3 background losses; no carrier or driver
+  re-extract; the stories stay as they are (the screens recomputed over landed plus staged with DuckDB: no story changes).
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (only recomputed outside the engine).
+- **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5, approved 2026-11-08): no
+  Space or industry prefix. The template id `la-logistics` is the one this spec gives; D2 of that plan gives the same id to the
+  *Logistics* industry Space, so the operator decides whether that Space is this template or takes another id.
 
 #### 12. `la-insider` — insider threat
 

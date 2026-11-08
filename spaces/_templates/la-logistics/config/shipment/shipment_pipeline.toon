@@ -1,0 +1,36 @@
+name: shipment
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per shipment (one load): shipper, consignee (blank for a few), goods, declared value and when it was booked. One file per month of departure (SHIPMENT_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/shipment
+  database:   data/shipment/database
+  backup:     data/shipment/backup
+  temp:       data/shipment/temp
+  errors:     data/shipment/errors
+  quarantine: data/shipment/quarantine
+  markers:    data/shipment/markers
+  status_dir: data/shipment/status
+  log_dir:    data/shipment/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: shipment_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

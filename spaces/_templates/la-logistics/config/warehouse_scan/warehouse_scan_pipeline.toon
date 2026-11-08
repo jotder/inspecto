@@ -1,0 +1,36 @@
+name: warehouse_scan
+active: true
+description: "Logistics cargo theft Link Analysis showcase - One row per barcode scan of a shipment at a warehouse: inbound (received at the origin), putaway, outbound (loaded onto the truck) and arrived (received at the destination), when, and the employee whose handheld scanned it (blank for a few). One file per month of departure (WAREHOUSE_SCAN_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/warehouse_scan
+  database:   data/warehouse_scan/database
+  backup:     data/warehouse_scan/backup
+  temp:       data/warehouse_scan/temp
+  errors:     data/warehouse_scan/errors
+  quarantine: data/warehouse_scan/quarantine
+  markers:    data/warehouse_scan/markers
+  status_dir: data/warehouse_scan/status
+  log_dir:    data/warehouse_scan/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: warehouse_scan_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

@@ -1,0 +1,340 @@
+{
+ "background": {
+  "households": [
+   [
+    "DRV-0093",
+    "DRV-0375"
+   ],
+   [
+    "DRV-0030",
+    "DRV-0312"
+   ],
+   [
+    "DRV-0047",
+    "DRV-0492"
+   ]
+  ],
+  "lost_trips": [
+   "TR-00969",
+   "TR-00988",
+   "TR-01415",
+   "TR-01492",
+   "TR-02638",
+   "TR-03930",
+   "TR-04582",
+   "TR-05097",
+   "TR-05258",
+   "TR-05283",
+   "TR-06322",
+   "TR-07740",
+   "TR-07895",
+   "TR-07980",
+   "TR-08161",
+   "TR-08839",
+   "TR-08842",
+   "TR-09230",
+   "TR-09599",
+   "TR-09600",
+   "TR-09622",
+   "TR-09991",
+   "TR-10019",
+   "TR-10413",
+   "TR-10609",
+   "TR-10641",
+   "TR-10864",
+   "TR-11604",
+   "TR-11771",
+   "TR-12198",
+   "TR-12262",
+   "TR-12573",
+   "TR-12873",
+   "TR-13989"
+  ],
+  "owner_operators": [
+   "CAR-004",
+   "CAR-007",
+   "CAR-012",
+   "CAR-015",
+   "CAR-017",
+   "CAR-038",
+   "CAR-040",
+   "CAR-051",
+   "CAR-057",
+   "CAR-066",
+   "CAR-071",
+   "CAR-094",
+   "CAR-111",
+   "CAR-117"
+  ],
+  "services_thefts": [
+   "TR-07513",
+   "TR-11221",
+   "TR-13856"
+  ]
+ },
+ "counts": {
+  "carrier": 120,
+  "co_driven_landed": 810,
+  "driver": 900,
+  "long_stop_pairs_landed": 5613,
+  "loss_report_landed": 63,
+  "place": 145,
+  "shipment_landed": 12872,
+  "stop_landed": 13387,
+  "trip_landed": 12872,
+  "warehouse": 12,
+  "warehouse_scan_landed": 46298
+ },
+ "fictitious_carrier": {
+  "carrier": "CAR-022",
+  "drivers": [
+   "DRV-0896",
+   "DRV-0897",
+   "DRV-0898",
+   "DRV-0899",
+   "DRV-0900"
+  ],
+  "lookalike_carrier": "CAR-057",
+  "lookalike_driver": "DRV-0001",
+  "lookalike_high_value_trips": [
+   "TR-03219",
+   "TR-03512",
+   "TR-03650",
+   "TR-04641",
+   "TR-05678",
+   "TR-10519",
+   "TR-11073",
+   "TR-11314",
+   "TR-13512"
+  ],
+  "lookalike_registered_at": "2026-03-02 11:40:00",
+  "losses": [
+   "LR-0049",
+   "LR-0050",
+   "LR-0051",
+   "LR-0052",
+   "LR-0053"
+  ],
+  "registered_at": "2026-05-11 10:14:00",
+  "thief": "DRV-0895",
+  "thief_carrier": "CAR-020",
+  "thief_loss": "LR-0006",
+  "thief_trip": "TR-09616",
+  "trips": [
+   "TR-01276",
+   "TR-02203",
+   "TR-02509",
+   "TR-04678",
+   "TR-10464"
+  ]
+ },
+ "high_value": 100000,
+ "inside_job": {
+  "busiest_route": [
+   "Southampton",
+   "Birmingham"
+  ],
+  "carrier": "CAR-052",
+  "co_driver": "DRV-0893",
+  "driver": "DRV-0892",
+  "lookalike_carrier": "CAR-103",
+  "lookalike_driver": "DRV-0894",
+  "lookalike_trips": [
+   "TR-02908",
+   "TR-06670"
+  ],
+  "lookalike_trips_landed": 318,
+  "losses": [
+   "LR-0001",
+   "LR-0003",
+   "LR-0013",
+   "LR-0014",
+   "LR-0018",
+   "LR-0024",
+   "LR-0029",
+   "LR-0033",
+   "LR-0043",
+   "LR-0046",
+   "LR-0060",
+   "LR-0061"
+  ],
+  "night_trips": [
+   "TR-02297",
+   "TR-03007",
+   "TR-03089",
+   "TR-03922",
+   "TR-05035",
+   "TR-09142",
+   "TR-09331",
+   "TR-10460",
+   "TR-11467",
+   "TR-11683"
+  ],
+  "scanner": "EMP-0123",
+  "scanner_warehouse": "WH-06",
+  "team_trips_landed": 107,
+  "trips": [
+   "TR-02297",
+   "TR-03007",
+   "TR-03015",
+   "TR-03089",
+   "TR-03922",
+   "TR-05035",
+   "TR-09142",
+   "TR-09331",
+   "TR-10460",
+   "TR-11467",
+   "TR-11683",
+   "TR-12405"
+  ]
+ },
+ "long_stop_minutes": 20,
+ "seed": 20261111,
+ "stop_hotspot": {
+  "layby": "PL-118",
+  "layby_name": "Lay-by at Rowley Gap",
+  "lookalike_high_value_long_stops": 26,
+  "lookalike_lost_trips": [
+   "TR-07513",
+   "TR-11221",
+   "TR-13856"
+  ],
+  "lookalike_name": "Whitecross Services",
+  "lookalike_services": "PL-087",
+  "losses": [
+   "LR-0004",
+   "LR-0016",
+   "LR-0019",
+   "LR-0020",
+   "LR-0021",
+   "LR-0023",
+   "LR-0041",
+   "LR-0042",
+   "LR-0047"
+  ],
+  "roads": [
+   "Birmingham-Doncaster",
+   "Birmingham-Leeds",
+   "Bristol-Doncaster",
+   "Cardiff-Doncaster",
+   "Doncaster-Birmingham",
+   "Doncaster-Bristol",
+   "Doncaster-Cardiff",
+   "Leeds-Birmingham",
+   "Leeds-Southampton",
+   "London-Manchester",
+   "Manchester-London",
+   "Newcastle-Southampton",
+   "Southampton-Leeds",
+   "Southampton-Newcastle"
+  ],
+  "trips": [
+   "TR-00398",
+   "TR-00438",
+   "TR-01572",
+   "TR-02863",
+   "TR-07844",
+   "TR-09856",
+   "TR-10442",
+   "TR-10469",
+   "TR-11525"
+  ]
+ },
+ "stories": {
+  "fictitious_carrier": {
+   "entities": [
+    "CAR-022",
+    "DRV-0895",
+    "LR-0049",
+    "LR-0050",
+    "LR-0051",
+    "LR-0052",
+    "LR-0053",
+    "TR-01276",
+    "TR-02203",
+    "TR-02509",
+    "TR-04678",
+    "TR-10464"
+   ],
+   "hub": "CAR-022",
+   "lookalikes": [
+    "CAR-057"
+   ],
+   "view": "fictitious_carrier"
+  },
+  "inside_job": {
+   "entities": [
+    "DRV-0892",
+    "DRV-0893",
+    "EMP-0123",
+    "LR-0001",
+    "LR-0003",
+    "LR-0013",
+    "LR-0014",
+    "LR-0018",
+    "LR-0024",
+    "LR-0029",
+    "LR-0033",
+    "LR-0043",
+    "LR-0046",
+    "LR-0060",
+    "LR-0061",
+    "TR-02297",
+    "TR-03007",
+    "TR-03015",
+    "TR-03089",
+    "TR-03922",
+    "TR-05035",
+    "TR-09142",
+    "TR-09331",
+    "TR-10460",
+    "TR-11467",
+    "TR-11683",
+    "TR-12405"
+   ],
+   "hub": "DRV-0892",
+   "lookalikes": [
+    "DRV-0894"
+   ],
+   "view": "driver_team_inside_job"
+  },
+  "stop_hotspot": {
+   "entities": [
+    "LR-0004",
+    "LR-0016",
+    "LR-0019",
+    "LR-0020",
+    "LR-0021",
+    "LR-0023",
+    "LR-0041",
+    "LR-0042",
+    "LR-0047",
+    "PL-118",
+    "TR-00398",
+    "TR-00438",
+    "TR-01572",
+    "TR-02863",
+    "TR-07844",
+    "TR-09856",
+    "TR-10442",
+    "TR-10469",
+    "TR-11525"
+   ],
+   "hub": "PL-118",
+   "lookalikes": [
+    "PL-087"
+   ],
+   "view": "theft_stop_hotspot"
+  }
+ },
+ "window": {
+  "landed": [
+   "2025-10-01",
+   "2026-09-30"
+  ],
+  "staged": [
+   "2026-10-01",
+   "2026-10-31"
+  ]
+ }
+}

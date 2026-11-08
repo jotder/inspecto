@@ -1,0 +1,24 @@
+raw:
+  name: LOSS_REPORT
+  format: CSV
+  fields[4]{name,selector,type}:
+    loss_id,"0",VARCHAR
+    shipment_id,"1",VARCHAR
+    reported_at,"2",TIMESTAMP
+    loss_type,"3",VARCHAR
+mapping:
+  canonicalName: loss_report
+  rawName: LOSS_REPORT
+  fields[4]:
+    - name: loss_id
+      from: loss_id
+      fn: keep
+    - name: shipment_id
+      from: shipment_id
+      fn: keep
+    - name: reported_at
+      from: reported_at
+      fn: keep
+    - name: loss_type
+      from: loss_type
+      fn: keep

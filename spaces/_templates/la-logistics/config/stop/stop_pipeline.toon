@@ -1,0 +1,36 @@
+name: stop
+active: true
+description: "Logistics cargo theft Link Analysis showcase - Stop-level GPS from the carriers' telematics: one row per time a truck stood still on the road - the place, when the stop started and how many minutes it lasted. Not every ping; a carrier that sends no telematics has no rows. One file per month of departure (STOP_YYYYMM.csv); the next month is in data/staged. Synthetic; regenerate with tools/gen-la-logistics-data.py."
+
+dirs:
+  poll:       data/inbox/stop
+  database:   data/stop/database
+  backup:     data/stop/backup
+  temp:       data/stop/temp
+  errors:     data/stop/errors
+  quarantine: data/stop/quarantine
+  markers:    data/stop/markers
+  status_dir: data/stop/status
+  log_dir:    data/stop/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: stop_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local
