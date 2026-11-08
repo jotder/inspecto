@@ -17,7 +17,7 @@ stays in the [demo runbook](../../module/la-core/admin-guide-demo.md).
 |---|---|---|---|
 | 1 | Build a Demo Auth bundle (Preview edition bundles everything) | `inspecto\package.ps1 -Edition Preview -DemoAuth -Ui la-app` | a bundle with `serve-demo.bat` |
 | 2 | Lay down the Space | `node tools/seed-la-claims.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-claims` (it also stamps the `la_index_build` owner; a plain file copy does not) |
-| 3 | Start with the embed flag | `set PORT=8096` then `set INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true` then `serve-demo.bat` | the Space ingests six extracts on boot |
+| 3 | Start with the embed flag | `set PORT=8096` then `set INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true` then `serve-demo.bat` | the Space ingests seven extracts on boot |
 | 4 | Seed the runtime state | `node tools/seed-la-claims.mjs --base http://127.0.0.1:8096 --apply` (without `--apply` it prints every call) | `created: ...`; it waits (up to 40 x 3 s) for the first `claims_links` build |
 | 5 | Smoke | `node tools/la-claims-smoke.mjs --base http://127.0.0.1:8096 --embed` | `PASS` lines and `n/n probes passed` |
 
@@ -45,12 +45,16 @@ The Space has **no landed link Dataset until the `claims_links` Job has run** (i
 | 5 | Early-claim policies | 7 policies claimed on within 20 days of inception, all through broker `BRK-05`; no other claim is inside 60 days | Dataset `claims_policy_timing_dataset` |
 | 6 | Identity resolution | `CL-0332` (ring) and `CL-0141` have names one letter apart, the same date of birth and the same phone, the latter written nationally (`07700...`) against E.164 (`+447700...`). The fold alone does **not** link them, so before resolving the duplicate is outside the ring; after it, the ring grows by one (`CL-0141`'s only co-party, `CL-0197`) | the seeded identity `party:CL-0332` = `party:CL-0141` |
 | 7 | Benign look-alikes | a family of four (`CL-0103 CL-0217 CL-0218 CL-0249`) shares one phone and address and files two claims in 18 months: it is a clique of five with its garage, in its own community. The busy GP clinic `CLI-01` tops **every** whole-graph centrality (degree, PageRank, eigenvector, Katz, closeness, HITS authority, triangles) and is not in the ring | `CLI-01` |
+| 8 | Parts-supplier ring (added 2026-11-07) | `SUP-07` invoiced 61 parts (£25 906) on 30 claims across all nine garages, and the garage fitted none of them (`repair_invoice.fitted = N`); none of the 30 is a staged-ring claim. Its `supplied_parts` link to each garage carries the unfitted value (£1 716 to £4 313). **Look-alike:** `SUP-01` also reaches all nine garages, on 218 claims, and every part it sold was fitted (amount 0). Only 3 other claims have an unfitted part (returns) | `SUP-07`, `SUP-01`; saved view `claims_parts_suppliers` |
+| 9 | Ghost broker (added 2026-11-07) | 25 policies `POL-0381`..`POL-0405` sold through broker `BRK-07` (January to July 2026, premiums £219 to £333; every genuine policy is £380 or more) to holders `CL-0381`..`CL-0405` who are on no claim, at addresses on Quarry, Saltmarsh, Tollgate and Wyvern Road, streets found on no other record; all premiums paid from `BA-93000017` (13) and `BA-93000029` (12). **Look-alike:** the family of story 7 pays its four policies from `BA-71000001` at `80 Kestrel Road, Leeds`, the address on its claims | `BRK-07`, the two accounts; saved view `claims_premium_payers` |
 
 Placeholders are data-quality noise the fold must ignore: 8 blank and 6 all-zero phones, 5 `UNKNOWN` and 3 blank addresses. They would
 make 15 false `shares_phone` pairs if they counted; the pinned count is 20 `shares_phone` rows in all.
 
-The link Dataset `claims_links_dataset` (`src`, `dst`, `kind`, `ts`, `amount`, `event_date`, `via`) has **2 574** rows of seven kinds:
-`claimed_with` 678, `same_accident` 291, `serviced_by` 1298, `represented_by` 241, `referred_to` 22, `shares_phone` 20, `shares_address` 24.
+The link Dataset `claims_links_dataset` (`src`, `dst`, `kind`, `ts`, `amount`, `event_date`, `via`) has **2 637** rows of nine kinds:
+`claimed_with` 678, `same_accident` 291, `serviced_by` 1298, `represented_by` 241, `referred_to` 22, `shares_phone` 20, `shares_address` 24,
+`supplied_parts` 34 (a parts supplier to a garage; `amount` = parts invoiced but not fitted), `paid_by` 29 (a policyholder to a bank account that
+pays two or more policies; `amount` = those premiums; an account that pays one policy makes no link).
 Symmetric kinds are stored once (`src` < `dst`); `via` names the claim, the accident or the shared value; `event_date` is the day of `ts`, so the data-trust strip reads.
 
 ## 2. The 12-minute version
@@ -59,7 +63,7 @@ Start as `siu.analyst`. Always **seed first**: an all-nodes canvas is a dust clo
 
 | Min | Scene | Click | Say | Expect |
 |---|---|---|---|---|
-| 0-2 | **Seed and the busy clinic** (UNVERIFIED on the canvas) | Open the saved view `claims_network` (an all-nodes canvas is a dust cloud: open `claims_shared_identity` for a small first picture); seed `CL-0134`, **Expand** twice. Then seed `CLI-01` | "One repeat passenger. Her neighbourhood is twelve strangers." The GP clinic arrives with a high-connectivity marker and **holds** | ~21 entities after two expands. `CLI-01` is held: high connectivity is not guilt |
+| 0-2 | **Seed and the busy clinic** (UNVERIFIED on the canvas) | Open the saved view `claims_network` (an all-nodes canvas is a dust cloud: open `claims_shared_identity` for a small first picture); seed `CL-0134`, **Expand** twice. Then seed `CLI-01` | "One repeat passenger. Her neighbourhood is twelve strangers." The GP clinic arrives with a high-connectivity marker and **holds** | ~23 entities after two expands (21 before stories 8 and 9 added `SUP-01` and `SUP-07` behind `GAR-03`). `CLI-01` is held: high connectivity is not guilt |
 | 2-4 | **Communities** | Toolbox > **Communities** > Louvain (client run), then **Run on server** | "The ring is one community, and it includes the garage, the clinic and the lawyer." | one community of the 12 claimants + `GAR-03`, `CLI-04`, `LAW-02` |
 | 4-5 | **Cliques and triangles** | **Cliques** (minimum 4), **Triangle count** | "Shared phones make cliques; the family is a clique too, so sharing is not guilt." | largest clique 7; `CL-0134` 67 triangles; the family clique of 5 is in a different community |
 | 5-6 | **Providers** | **HITS**, **PageRank** on the working set, then open `claims_provider_money` | "The lawyer is the hub, the clinic the authority; the clinic bills three times its peers." | authorities `GAR-03`, `LAW-02`, `CLI-04` on top |
@@ -88,7 +92,7 @@ masked and revocable. **Verified live**: the portal on `http://127.0.0.1:8099` f
 ## 3. Algorithm scenes (the nine assigned to this vertical)
 
 Run each **client first** (instant, small), then **Run on server** (a Job-class Algorithm; progress, cancel and result-parity beats). Scope: the Working Set after
-seeding `CL-0134` and expanding twice (about 21 entities) unless the row says otherwise. **The expected columns are the whole-graph golden-test values:** on the 21-entity Working Set the application returns Louvain 4 communities (8, 5, 5, 3), Label-propagation 1 community of 21, largest clique 7, `CL-0134` first on Triangle count, HITS hub, Eigenvector and Closeness (measured 2026-10-24, client and server equal). Server ids: `louvainCommunities`, `detectCommunities`,
+seeding `CL-0134` and expanding twice (about 23 entities since stories 8 and 9; the Working Set figures below were measured on 21 before them and are not re-measured) unless the row says otherwise. **The expected columns are the whole-graph golden-test values:** on the 21-entity Working Set the application returns Louvain 4 communities (8, 5, 5, 3), Label-propagation 1 community of 21, largest clique 7, `CL-0134` first on Triangle count, HITS hub, Eigenvector and Closeness (measured 2026-10-24, client and server equal). Server ids: `louvainCommunities`, `detectCommunities`,
 `cliques`, `triangleCount`, `pageRank`, `hits`, `eigenvectorCentrality`, `katzCentrality`, `closenessCentrality`. A server run of a masked Investigation returns masked ids.
 
 | Algorithm | Seed and scope | Expected top result (measured by the golden test over the shipped corpus) | Story |
@@ -117,14 +121,27 @@ presenter shows that **centrality alone is not guilt** and the ring is found by 
 7. **Police-report PDFs are not shipped.** The ring has none by design. The seed attaches three external references with invented URLs on the reserved `records.example` domain (never fetched).
 8. **Fixed 2026-10-17 (`f1b64ce03`):** `LaShowcaseTemplateTest` had failed since `91a03666c` gave the la-showcase analyst `canRevealLinkEntities`; the `la-showcase-off` roles and the test now carry the analyst Reveal.
 9. **Claims we do not make:** no precision or detection-rate claim from synthetic data; the plants are planted and labelled so. The ring is found because it is built to be found.
+10. **Stories 8 and 9 (2026-11-07, `LA-SHOWCASE-CLAIMS-ADDITIONS-1`).** The generator draws them from a second seeded Random after everything else, so
+    every row of stories 1 to 7 is byte-identical (`policy` gains two columns at the end; its first five are unchanged). Decided while building:
+    - `policy` gains `holder_address` as well as the planned `payer_account`: "an address that does not exist" needs an address on the policy.
+      "Does not exist" means a street found on no claim and no other policy (the corpus has no address register).
+    - `repair_invoice` carries an `amount` per part beyond the planned columns, so `supplied_parts` can carry the value never fitted.
+    - `paid_by` links only accounts that pay two or more policies (the shared-value rule of `shares_phone`). An account per policy would add
+      380 leaves that Louvain folds into the ring's community. There is no upper cap: an account paying 13 strangers is the evidence.
+    - The ring's garage `GAR-03` buys only from `SUP-01`. A small supplier shared by `GAR-03` and one other garage was drawn into the
+      ring's Louvain community (caught by `LaClaimsGoldenTest`); each small supplier now serves two of the eight ordinary garages.
+    - `claims_shared_identity` also excludes `supplied_parts` (a supplier whose parts were all fitted carries amount 0). Two saved views
+      added: `claims_parts_suppliers`, `claims_premium_payers`.
+    - Seeding `CL-0134` and expanding twice now also reaches `SUP-01` and `SUP-07` through `GAR-03` (about 23 entities, not 21). The
+      Working Set figures measured on 2026-10-24 in section 3 predate the additions; the whole-graph figures are re-pinned by the golden test.
 
 ## 5. Evidence
 
 | What | Test |
 |---|---|
-| Generator is byte-identical on regeneration, six feeds, under 1 MB | `node --test tools/gen-la-claims-data.test.mjs` |
-| Every plant, Louvain and Label-propagation, cliques, HITS, PageRank, eigenvector, Katz, closeness, triangles, identity resolution, benign look-alikes | `LaClaimsGoldenTest` (`-pl :inspecto-graph`) |
-| Real Pipelines and the `claims_links` SQL: contract columns, 7 kinds with their rows, de-duplication, placeholders, event day, early-claim policies | `LaClaimsLinksJobTest` (`-pl platform/inspecto-engine`) |
+| Generator is byte-identical on regeneration, seven feeds, under 1 MB; stories 8 and 9 on the files | `node --test tools/gen-la-claims-data.test.mjs` |
+| Every plant, Louvain and Label-propagation, cliques, HITS, PageRank, eigenvector, Katz, closeness, triangles, identity resolution, benign look-alikes, the parts-supplier ring and the ghost broker with their look-alikes | `LaClaimsGoldenTest` (`-pl :inspecto-graph`) |
+| Real Pipelines and the `claims_links` SQL: contract columns, 9 kinds with their rows, de-duplication, placeholders, event day, early-claim policies, unfitted value per supplier, `paid_by` accounts | `LaClaimsLinksJobTest` (`-pl platform/inspecto-engine`) |
 | Settings, Jobs, personas, Datasets, saved views | `LaClaimsTemplateTest` (`-pl inspecto`) |
 | Geo Views over the real `POST /geo/projection` (11 on the junction) | `ControlApiLaClaimsGeoSceneTest` (`-pl la/inspecto-geo-link -am`) |
 | Seed requests and scaffold | `node --test tools/seed-la-claims.test.mjs` |

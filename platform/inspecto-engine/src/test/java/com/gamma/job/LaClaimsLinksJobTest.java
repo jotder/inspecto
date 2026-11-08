@@ -29,9 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the six Pipelines
+ * The {@code la-claims} Space Template's insurance-claims corpus RUN end to end from a verbatim copy: the seven Pipelines
  * ingest the shipped extracts ({@code data/inbox/<feed>}, written by {@code tools/gen-la-claims-data.py}), then the two
- * {@code sql.template} Jobs build {@code claims_links} and {@code claims_policy_timing}. Pins the link contract (columns, the seven
+ * {@code sql.template} Jobs build {@code claims_links} and {@code claims_policy_timing}. Pins the link contract (columns, the nine
  * kinds and their row counts), the de-duplication and placeholder rules of docs/archived-documents/plans-archive/la-multi-vertical-showcase-plan.md
  * section 4, and the planted figures that live in tables rather than in the graph (early-claim policies, the near-duplicate
  * pair NOT linked by phone). The graph-side plants (Louvain, cliques, HITS ...) are pinned by {@code LaClaimsGoldenTest} in
@@ -41,12 +41,12 @@ class LaClaimsLinksJobTest {
 
     private static final Path TEMPLATE = Path.of("..", "..", "spaces", "_templates", "la-claims").toAbsolutePath().normalize();
     private static final List<String> FEEDS = List.of("claim", "claim_party", "policy", "provider_bill", "accident_location",
-            "provider_directory");
+            "provider_directory", "repair_invoice");
     private static final List<String> JOBS = List.of("claims_links", "claims_policy_timing");
 
     /** Per link kind, the rows the committed corpus folds to (the SAME numbers LaClaimsGoldenTest derives independently). */
     static final Map<String, Integer> KIND_ROWS = new TreeMap<>(Map.of("claimed_with", 678, "same_accident", 291,
-            "serviced_by", 1298, "represented_by", 241, "referred_to", 22, "shares_phone", 20, "shares_address", 24));
+            "serviced_by", 1298, "represented_by", 241, "referred_to", 22, "shares_phone", 20, "shares_address", 24, "supplied_parts", 34, "paid_by", 29));
 
     @TempDir static Path tmp;
     private static Path data;
@@ -96,7 +96,7 @@ class LaClaimsLinksJobTest {
         assertEquals(List.of("src", "dst", "kind", "ts", "amount", "event_date", "via"), new ArrayList<>(links.get(0).keySet()));
         Map<String, Integer> perKind = new TreeMap<>();
         for (Map<String, Object> l : links) perKind.merge((String) l.get("kind"), 1, Integer::sum);
-        assertEquals(KIND_ROWS, perKind, "exactly the seven link kinds, with their rows");
+        assertEquals(KIND_ROWS, perKind, "exactly the nine link kinds, with their rows");
     }
 
     @Test
@@ -150,6 +150,35 @@ class LaClaimsLinksJobTest {
         long soonest = ((Number) rows("SELECT min(days_to_claim) AS d FROM " + parquet("claims_policy_timing")
                 + " WHERE broker_id <> 'BRK-05'").get(0).get("d")).longValue();
         assertTrue(soonest > 60, "no other broker's policy is claimed on inside two months: " + soonest);
+    }
+
+    @Test
+    void theRingSupplierCarriesTheValueOfPartsNeverFittedOnAllNineGaragesAndTheLargeSupplierCarriesNone() {
+        Map<String, Integer> garages = new TreeMap<>();
+        Map<String, Double> unfitted = new TreeMap<>();
+        for (Map<String, Object> l : links)
+            if (l.get("kind").equals("supplied_parts")) {
+                garages.merge((String) l.get("src"), 1, Integer::sum);
+                unfitted.merge((String) l.get("src"), ((Number) l.get("amount")).doubleValue(), Double::sum);
+            }
+        assertEquals(9, garages.get("SUP-07"));
+        assertEquals(9, garages.get("SUP-01"), "the look-alike reaches every garage too");
+        assertEquals(0.0, unfitted.get("SUP-01"), "every part the large supplier sells is fitted");
+        assertTrue(links.stream().filter(l -> l.get("kind").equals("supplied_parts") && l.get("src").equals("SUP-07"))
+                .allMatch(l -> ((Number) l.get("amount")).doubleValue() > 0), "every ring-supplier link carries parts never fitted");
+        double others = unfitted.entrySet().stream().filter(e -> !e.getKey().equals("SUP-07")).mapToDouble(Map.Entry::getValue).sum();
+        assertTrue(unfitted.get("SUP-07") > 20 * others, "the ring's unfitted value " + unfitted.get("SUP-07") + " dwarfs ordinary returns " + others);
+    }
+
+    @Test
+    void onlyAccountsPayingTwoOrMorePoliciesMakePaidByLinksTwoForTheGhostBrokerAndOneForTheFamily() throws Exception {
+        Map<String, Integer> payers = new TreeMap<>();
+        for (Map<String, Object> l : links) if (l.get("kind").equals("paid_by")) payers.merge((String) l.get("dst"), 1, Integer::sum);
+        assertEquals(Map.of("BA-71000001", 4, "BA-93000017", 13, "BA-93000029", 12), payers);
+        List<Map<String, Object>> ghost = rows("SELECT count(*) AS n, count(DISTINCT payer_account) AS accounts FROM "
+                + parquet("policy/database") + " WHERE broker_id = 'BRK-07'");
+        assertEquals(25L, ((Number) ghost.get(0).get("n")).longValue(), "the ghost broker sold 25 policies");
+        assertEquals(2L, ((Number) ghost.get(0).get("accounts")).longValue(), "paid from two accounts");
     }
 
     // ---- helpers ----------------------------------------------------------------------------------------------------------

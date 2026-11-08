@@ -14,9 +14,9 @@ Insurance special-investigation units and presales teams evaluating Link Analysi
 
 ## What is included
 
-- Six feeds (claims, parties, policies, provider bills, accident locations, provider directory) landed by six Collectors and Pipelines.
-- One link Dataset of seven link kinds and a policy-timing Dataset.
-- Link Analysis settings, index-build and detection Jobs, three saved views and three saved Geo Views.
+- Seven feeds (claims, parties, policies, provider bills, accident locations, provider directory, repair invoices) landed by seven Collectors and Pipelines.
+- One link Dataset of nine link kinds and a policy-timing Dataset.
+- Link Analysis settings, index-build and detection Jobs, five saved views and three saved Geo Views.
 - Five demo users and a role table; a seeding script for Investigations, identity groups and a Case.
 
 ## How it fits with the Editions

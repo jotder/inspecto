@@ -1,0 +1,23 @@
+name: claims_premium_payers
+description: "Claims premium payers - only paid_by links: a policyholder to a bank account that pays the premiums of two or more policies; via names the policies. Two accounts each pay a dozen strangers' policies; one account pays a family's four. Read the policies' broker and holder address to tell them apart."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: claims_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[3]: ts,amount,via
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,kind,"=","paid_by"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

@@ -1,16 +1,18 @@
 raw:
   name: POLICY
   format: CSV
-  fields[5]{name,selector,type}:
+  fields[7]{name,selector,type}:
     policy_id,"0",VARCHAR
     holder_id,"1",VARCHAR
     broker_id,"2",VARCHAR
     inception_date,"3",DATE
     premium,"4",DOUBLE
+    payer_account,"5",VARCHAR
+    holder_address,"6",VARCHAR
 mapping:
   canonicalName: policy
   rawName: POLICY
-  fields[5]:
+  fields[7]:
     - name: policy_id
       from: policy_id
       fn: keep
@@ -25,4 +27,10 @@ mapping:
       fn: keep
     - name: premium
       from: premium
+      fn: keep
+    - name: payer_account
+      from: payer_account
+      fn: keep
+    - name: holder_address
+      from: holder_address
       fn: keep

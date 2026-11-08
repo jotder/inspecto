@@ -340,6 +340,36 @@ The existing template and `tools/gen-la-claims-data.py` stay. Changes:
   Look-alike: a family paying several policies from one account at a real address.
 - Extend `LaClaimsGoldenTest` and `gen-la-claims-data.test.mjs` with both stories.
 
+#### `la-claims` additions as built (step 4, 2026-11-07)
+
+- **Generator:** `tools/gen-la-claims-data.py` draws stories 8 and 9 from a second seeded Random (`20261107`) after
+  everything else, so every row of stories 1–7 is byte-identical; `policy` gains two columns at the end (its first five
+  are unchanged) and 25 rows. Seven feeds, about 300 kB.
+- **Parts-supplier ring:** `SUP-07` invoices 61 parts (£25 906) on 30 claims across all nine garages, and none is fitted;
+  none of the 30 is a staged-ring claim. Look-alike `SUP-01`: all nine garages, 218 claims, every part fitted. Only 3 other
+  claims carry an unfitted part (returns).
+- **Ghost broker:** 25 policies `POL-0381`..`POL-0405` through `BRK-07` (January–July 2026, premiums £219–£333 against £380 or
+  more for every genuine policy) to holders on no claim, on four streets found on no other record, paid from `BA-93000017`
+  (13) and `BA-93000029` (12). Look-alike: story 7's family pays its four policies from `BA-71000001` at the address on its claims.
+- **Job and views:** `claims_links` reads `repair_invoice` and `policy` too; nine kinds, 2 637 rows (`supplied_parts` 34,
+  `paid_by` 29). Saved views `claims_parts_suppliers` and `claims_premium_payers`; `claims_shared_identity` excludes
+  `supplied_parts`.
+- **Decided while building:**
+  - `policy` also gains `holder_address`: "an address that does not exist" needs an address on the policy. There is no
+    address register, so "does not exist" means a street found on no claim and no other policy.
+  - `repair_invoice` carries an `amount` per part, so a `supplied_parts` link carries the value never fitted (0 when all fitted).
+  - `paid_by` links only an account that pays two or more policies, with no upper cap. One account per policy would add 380
+    leaves to the graph.
+  - The ring's garage `GAR-03` buys only from `SUP-01`: a small supplier shared by `GAR-03` and one other garage joined the
+    ring's Louvain community (the golden test caught it). Each small supplier serves two of the eight ordinary garages.
+  - Seeding `CL-0134` and expanding twice now also reaches `SUP-01` and `SUP-07` through `GAR-03` (about 23 entities).
+    The runbook's Working Set figures from 2026-10-24 predate this.
+  - `minEdition` stays `advanced`; the Basic tier is wave B.
+- **Tests:** `LaClaimsGoldenTest` (12, with all whole-graph figures of stories 1–7 unchanged over the nine-kind graph),
+  `LaClaimsLinksJobTest` (real Pipelines and SQL, per-kind rows, unfitted value per supplier, `paid_by` accounts),
+  `LaClaimsTemplateTest` (seven feeds, five views), `tools/gen-la-claims-data.test.mjs` (determinism, both stories on the files).
+- **Hub:** the `la-claims` user guide has one exercise and answer per story; the runbook lists stories 8 and 9.
+
 ### 3. `la-utility` — electricity revenue protection (new)
 
 **Audience:** utility revenue-protection and loss-reduction teams. **Period:** 12 months of daily reads +
@@ -778,7 +808,13 @@ business and its customers. All data is invented. It shares no data, names or id
    transformers are not in that view) and 16 of 16 reconnection; churn view 25 of 25 churn and 13 of 13 commercial
    load; vendor view 41 of 41 prepaid. Not checked: the Link Analysis UI (no UI in the bundle; see the canvas-cap gap
    above), the staged month, the saved Geo View (Standard and above).
-4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check.
+4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check. **BUILT 2026-11-08** (as built under
+   `la-claims` above). `la-claims` is still Advanced-only, so the live proof was on a Preview Demo Auth build
+   (`package.ps1 -Edition Preview -DemoAuth -NoUi`), with the Space scaffolded and seeded (`seed-la-claims.mjs --apply`:
+   every step created, none failed). `la-claims-smoke.mjs --embed` passed 32 of 32, so the seven stories' scenes still hold
+   over the nine-kind link Dataset. The affected-module tests (`node tools/affected-modules.mjs`, 35 modules, Advanced
+   profile) passed. Not checked: the two new saved views drawn in the Link Analysis UI (no UI in the bundle), and the
+   runbook's Working Set figures, which predate the additions.
 
 **Wave B: the existing five ship in the new layout**
 

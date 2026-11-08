@@ -1,0 +1,36 @@
+raw:
+  name: REPAIR_INVOICE
+  format: CSV
+  fields[7]{name,selector,type}:
+    invoice_id,"0",VARCHAR
+    claim_id,"1",VARCHAR
+    garage_id,"2",VARCHAR
+    supplier_id,"3",VARCHAR
+    part_code,"4",VARCHAR
+    fitted,"5",VARCHAR
+    amount,"6",DOUBLE
+mapping:
+  canonicalName: repair_invoice
+  rawName: REPAIR_INVOICE
+  fields[7]:
+    - name: invoice_id
+      from: invoice_id
+      fn: keep
+    - name: claim_id
+      from: claim_id
+      fn: keep
+    - name: garage_id
+      from: garage_id
+      fn: keep
+    - name: supplier_id
+      from: supplier_id
+      fn: keep
+    - name: part_code
+      from: part_code
+      fn: keep
+    - name: fitted
+      from: fitted
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep

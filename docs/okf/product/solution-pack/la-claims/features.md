@@ -27,6 +27,8 @@ Insurance special-investigation units and presales teams.
 - Early-claim policies through one broker (`claims_policy_timing_dataset`).
 - Identity resolution of two records that are one person.
 - Benign look-alikes (a family sharing a home, a busy GP clinic) that do not join the ring.
+- Parts-supplier ring: one supplier invoices parts on 30 claims across all nine garages and none is fitted; a larger supplier whose parts are all fitted is the look-alike.
+- Ghost broker: 25 policies sold through one broker at addresses that do not exist, paid from two bank accounts; a family paying its four policies from one account is the look-alike.
 - Typed masking with a masked Party Entity Type, four-eyes, Drafts, a Dossier with untrusted external references, and a partner embed.
 
 Shared studio capabilities: [la-showcase features](../la-showcase/features.md) · [Link Analysis features](../../addon/linkAnalysis/features.md).
