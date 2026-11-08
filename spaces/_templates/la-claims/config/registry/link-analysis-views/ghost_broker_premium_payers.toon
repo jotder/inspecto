@@ -1,4 +1,4 @@
-name: claims_premium_payers
+name: ghost_broker_premium_payers
 description: "Claims premium payers - only paid_by links: a policyholder to a bank account that pays the premiums of two or more policies; via names the policies. Two accounts each pay a dozen strangers' policies; one account pays a family's four. Read the policies' broker and holder address to tell them apart."
 sourceId: entity-projection
 layout: force

@@ -1,0 +1,41 @@
+entity_types[8]:
+  - id: wallet
+    label: Wallet
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: WALLET_ID
+  - id: agent
+    label: Agent
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: AGENT_ID
+  - id: merchant
+    label: Merchant
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: MERCHANT
+  - id: staff_login
+    label: Staff login
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: STAFF_LOGIN
+  - id: settlement_account
+    label: Settlement account
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SETTLEMENT_ACCOUNT
+  - id: subscriber_number
+    label: Subscriber number
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: SUBSCRIBER_NUMBER
+  - id: device
+    label: Device
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: DEVICE
+  - id: telecom_entity
+    label: Telecom entity
+    normaliser: upper-trim
+    masked: false
+    classifications[1]: TELECOM_ENTITY

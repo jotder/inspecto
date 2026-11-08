@@ -58,8 +58,8 @@ Job runs. Within a minute or two:
   `<feed>/errors`.
 - `inspecto-la-data/la-telco-ra/data/telco_ra_links/` holds the link Dataset (about 21 000 rows, five kinds);
   `telco_ra_screen_links/` holds the three revenue-assurance screens the saved views read.
-- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `telco_ra_unbilled_usage`, `telco_ra_commission_spikes`
-  and `telco_ra_pbx_off_hours`. The [user guide](user-guide.md) has the tour
+- In Link Analysis, **File ▸ Open… ▸ Saved views** lists `unbilled_usage`, `dealer_commission_fraud`
+  and `pbx_hacking_off_hours`. The [user guide](user-guide.md) has the tour
   and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
@@ -89,3 +89,25 @@ node tools/package-la-showcase.mjs la-telco-ra
 The generator is deterministic (seed 20261110) and writes the ground truth to
 `tools/gen-la-telco-ra-data.ground-truth.json`, which is not part of any download. The packer reads committed
 content only, so commit first.
+
+## As the *Telecom* industry Space
+
+The same use case also ships as the industry Space *Telecom* (`la-telecom`). Its recipe is
+`spaces/_industries/la-telecom.toon`. Today its use cases are `la-telco-ra` and `la-mfs`; `la-mobile-money` and the telecom
+part of `la-showcase` join when the plan's wave B gives them a Basic tier. `node tools/package-la-showcase.mjs
+la-telecom` composes it into `inspecto-la-space-la-telecom-<version>.zip` and its data zip. Install them as above,
+with `la-telecom` in place of `la-telco-ra`.
+
+Every Dataset says what its id columns hold: *Subscriber number*, *Dealer*, *Device*, *Shop*, *Enterprise trunk*,
+*Enterprise customer* and *Destination country*. The two link Datasets mix kinds in one `src` and one `dst` column, so
+their ends hold the generic *Telecom entity*. Each Dataset of events has its own Mapping:
+
+| Dataset | Mapping |
+|---|---|
+| `subscriber_dataset` | Dealer → Subscriber number (kind `plan`, when `activated_at`) |
+| `topup_dataset` | Subscriber number → Shop (kind `channel`, when `topped_up_at`, measure `amount`) |
+| `trunk_call_dataset` | Enterprise trunk → Destination country (kind `number_type`, when `call_date`, measure `minutes`) |
+| `enterprise_trunk_dataset` | Enterprise customer → Enterprise trunk |
+| `telco_ra_links_dataset`, `telco_ra_screen_links_dataset` | Telecom entity → Telecom entity (kind `kind`, when `ts`, measure `amount`) |
+
+The views carry use-case names: `unbilled_usage`, `dealer_commission_fraud` and `pbx_hacking_off_hours`.

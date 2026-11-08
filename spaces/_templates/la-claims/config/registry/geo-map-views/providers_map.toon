@@ -1,4 +1,4 @@
-name: claims_providers_map
+name: providers_map
 description: "GEO scene 2 - the 25 providers (garages, clinics, lawyers) by type. The ring garage GAR-03, clinic CLI-04 and lawyer LAW-02 all sit in Derby. Synthetic placements."
 sourceId: dataset
 display: markers

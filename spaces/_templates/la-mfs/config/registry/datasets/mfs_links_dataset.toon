@@ -1,11 +1,18 @@
 physicalRef: mfs_links
 description: "Mobile financial services fraud Link Analysis showcase - ONE link Dataset built by the mfs_links Job from wallet, agent, merchant, wallet_txn, sim_event and device_login. kind is one of registered_by, paid, cashed_in_at, cashed_out_at, logged_in_on, swapped_by, settles_to; one row per pair; via names the evidence. Ids say what an endpoint is: WL- wallet, A- agent, MR- merchant, HS- handset, S- staff login, BA- bank account. Synthetic."
 eventDate: event_date
+primaryEntityType: telecom_entity
 columns[7]{name,type,classification}:
-  src,string,
-  dst,string,
+  src,string,TELECOM_ENTITY
+  dst,string,TELECOM_ENTITY
   kind,string,
   ts,timestamp,
   amount,number,
   event_date,date,
   via,string,
+defaultLinkMapping:
+  from: src
+  to: dst
+  kind: kind
+  primaryTime: ts
+  primaryMeasure: amount

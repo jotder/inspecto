@@ -1,4 +1,4 @@
-name: telco_ra_commission_spikes
+name: dealer_commission_fraud
 description: "Commission spikes - every SIM that earned its dealer an activation commission (activated and topped up) in a week when that dealer earned 50 or more, with the dealer, the activation device and the points of sale where the SIM was topped up (via on activated_by = plan, top-ups and days to the first, usage months, last usage). Two dealers spike: one near a university at the start of term, whose students keep topping up and using their SIMs, and one whose 400 SIMs were each topped up once at its own shop and never used again."
 sourceId: entity-projection
 layout: force

@@ -1,4 +1,4 @@
-name: police_handset_network
+name: drug_supply_handset_network
 description: "Handset network over time - the calls of every number with 6 or more call partners, the people those numbers are attributed to and where they live (police_call_links_dataset). Play the time range Mar-Jul 2026: five controller numbers take over from one another every 3-5 weeks, each called by about 35 customers, at least 70 percent carried over, all calling the same four runner numbers; the runners ring three lone, vulnerable residents (drug bases at vulnerable residents' addresses). Run Link prediction from a controller to find the next one. A delivery driver's number (208 contacts, each called once to three times) and a busy shared house never touch the network."
 sourceId: entity-projection
 layout: force
