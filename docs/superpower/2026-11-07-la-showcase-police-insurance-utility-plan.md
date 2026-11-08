@@ -892,6 +892,8 @@ Deliberate deviations:
 - **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
   Pipelines (the screens were recomputed over landed plus staged files outside the engine: no story changes).
 
+**Advanced tier BUILT 2026-11-09:** see step 8, "`la-telco-ra` BUILT 2026-11-09".
+
 #### 11. `la-logistics` — cargo theft
 
 **Audience:** logistics security teams and cargo insurers.
@@ -1578,6 +1580,72 @@ deviations:
      the expand's `linkKinds`, the window and the Draft annotation are as the API reads them, not observed. Also not
      checked: the Link Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build, and
      the packed downloads of a commit holding this tier (the packer reads HEAD).
+
+   **`la-telco-ra` BUILT 2026-11-09** (the `la-card` pattern; spec 10's "usage without billing over 1 day for a
+   subscriber"). As built:
+   - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`telcora.analyst` lead,
+     `telcora.manager` second approver, `telcora.reviewer` read-only, `telcora.outsider` not a member, and `admin`
+     byte-identical to `la-showcase`, `la-card` and `la-ownership`), `config/roles.toon` (`telcora-analyst`,
+     `fraud-analyst`, `telcora-manager`, `la-viewer`, `la-settings`; the three shared roles byte-identical to `la-card`'s,
+     since the packer merges roles by name and the *Telecom* industry Space composes this with `la-mfs`), and
+     `four_eyes_fan_out_above: 2000` plus `la-card`'s Drafts block in `link-analysis.toon` (no `masking_mode`; no Entity
+     Type masked).
+   - **Alert Rule as a registry rule over a counts Job:** `telco_ra_unbilled_counts` (`sql.template` on `telco_ra_links`'
+     `job.dataset.produced`; sources `subscriber`, `network_usage`, `billing_record`, not the link Dataset, so it does not
+     parse `via`; `min_unbilled_months: "2"`) writes one row: `unbilled_subscribers`, `known_list_subscribers`,
+     `other_unbilled_subscribers`; `telco_ra_unbilled_alerts` (`alert.evaluate`) runs after it;
+     `telco_ra_usage_without_billing` is `max(unbilled_subscribers) gte 1`, WARNING, not grouped (a Job output).
+   - **Real figures on the shipped data** (the Job run after `telco_ra_links` in `TelcoRaLinksJobGoldenTest`, and the same
+     SQL over the CSVs outside the engine): unbilled_subscribers **300** (exactly `DL-047`'s story SIMs), known_list_subscribers
+     **40** (`DL-000`'s test SIMs), other_unbilled_subscribers **62** (the 12 late-billed and the 50 single dropped months).
+     Landed plus staged: the same 300 / 40 / 62 (checked outside the engine, not pinned). With the story's SIMs taken out:
+     0 counted. Each guard measured by dropping it: no known-list exclusion 340, no "still unbilled" condition 312, no
+     billing-landed gate with September's billing file not yet landed 355 (with the gate: 300).
+   - **Decided while building:**
+     - **"Over 1 day" reads "over one period", and a period is a month.** The feeds were built monthly (Basic-tier
+       deviation), so a day cannot be seen. A subscriber counts when NOT on the known list (plan `Internal test`), with
+       usage and no billing record in 2 or more months (the `unbilled_usage` screen's own threshold), the latest of them
+       still unbilled. A literal "any unbilled month" would fire on the 50 single dropped months and the 12 late-billed
+       SIMs without the story (362 in all), so the rule would not tell the story from the reconciliation's ordinary noise.
+       The "still unbilled" condition is what keeps the 12 late-billed SIMs out (their first two months were never billed,
+       every later one was): leakage that stopped is not the alarm.
+     - **The known list is the plan `Internal test`**, as the generator and the Basic-tier view state it. It is a
+       literal in the SQL, not a parameter (one list, nothing asked to configure it).
+     - **A month is judged only once its billing file has landed** (`JOIN` on the billing periods present), the
+       `la-utility` lesson: on a first boot a month's usage file can land before its billing file, and every subscriber
+       used that month would read as unbilled (355 counted in the test). `telco_ra_links`' own `unbilled_months:` in `via`
+       has the same transient on a first boot; that is the Basic tier, not changed here.
+     - **A running total, not a "new" count** (as `la-police` and `la-ownership` decided): an unbilled SIM stays unbilled
+       until someone fixes billing, so the rule stays met after every build and the open Alert is not raised twice; the
+       staged month changes nothing. A per-build "new" count would need the previous build, which a `sql.template` Job
+       cannot see.
+     - The Draft annotates `DL-047` about `DEV-00086`: the bounded expand follows `activated_by` only, so the device is
+       two hops out (dealer, SIM, device) and annotating it would be refused.
+   - **Seed** `tools/seed-la-telco-ra.mjs` (`--scaffold`, dry run, `--apply`, idempotent; ids from the ground truth):
+     Investigation `unbilled-usage` (seed `DL-047`; a bounded expand over `activated_by`, `maxFanOut` 400, to the dealer's
+     336 subscribers, the 300 among them; annotate, threshold, window, resolve, snapshot), members (`telcora.reviewer` and
+     `telcora.manager` reviewers, `admin` lead; not `telcora.outsider`), Entity List `unbilled-sims` (the 300), a Case from
+     `DL-047` assigned to `telcora.manager` and linked, an Investigation template, one unbounded expand held for four-eyes,
+     one open Draft. The test dealer and its SIMs are in no step.
+   - **Tests:** `LaTelcoRaTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with
+     `auth.mode=demo`; four-eyes 2000, Drafts; no masked type; persona capabilities; every persona role defined;
+     `fraud-analyst`, `la-viewer`, `la-settings` as in `la-card`; the shared `admin`; the rule through
+     `AlertRoutes.parseContent`; the Jobs' signals); `TelcoRaLinksJobGoldenTest` (runs the counts Job after the link Jobs;
+     the figures above and the rule fires; without the story's SIMs it would not; the story's SIMs alone give 300; the
+     test SIMs alone are seen and never counted; the late-billed and dropped alone are never counted; with September's
+     billing not yet landed the count stays 300); the gallery test pins `la-telco-ra` creatable with no missing feature
+     and no Demo Auth; `tools/seed-la-telco-ra.test.mjs` (mocked fetch, 12 tests, including the shared roles byte for byte
+     as in `la-card`). Falsified, each then restored: the known list not excluded, the "still unbilled" condition dropped,
+     the billing-landed gate dropped, `masking_mode: typed`, `telcora-analyst` given the approve capability,
+     `fraud-analyst` removed, `la-settings` given a second capability, `admin` given `telcora-analyst`, `la-telco-ra` out
+     of the gallery's Basic-tier set; in the seed the outsider made a member, the Draft annotating `DEV-00086`, the test
+     dealer seeded, the expand narrowed below the dealer's 336, `la-viewer` given a capability.
+   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 300, the seed's
+     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `telco_ra_unbilled_alerts` reporting no breach, 0
+     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
+     checked: the Link Analysis UI, the composed *Telecom* Space with `la-mfs`'s roster (its Advanced tier is a parallel
+     lane; the merge was checked with `la-card`'s and `la-ownership`'s rosters through the packer's `mergeDemoUsers` /
+     `mergeRoles`), an OIDC build, and the packed downloads of a commit holding this tier (the packer reads HEAD).
 
 **Docs, with each Space**
 

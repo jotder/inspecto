@@ -78,6 +78,56 @@ billed, the commission SIMs stay dormant, and there is no new PBX attack. The pl
 Stop the product, delete `inspecto-la-data/la-telco-ra/`, and unzip the data download again. The Space
 configuration is untouched.
 
+## Advanced tier: personas, the usage-without-billing Alert Rule and the seed
+
+The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
+ignored (there is no sign-in), the Alert Rule `telco_ra_usage_without_billing` is loaded but not armed, and the
+`telco_ra_unbilled_counts` and `telco_ra_unbilled_alerts` Jobs run after each `telco_ra_links` build; the second finds
+no armed rule. On a build with sign-in it comes to life. To show it, use the demo build, which signs people in by name
+with no password (Preview, Demo Auth, loopback only), and the same Space and data downloads:
+
+```bat
+cd <parent>\inspecto-demo
+set SPACES_ROOT=..\inspecto-la-spaces
+set SPACES_DATA_ROOT=..\inspecto-la-data
+set PORT=8096
+bin\serve-demo.bat
+```
+
+Once the seven Pipelines have landed and `telco_ra_links` has run (a minute or two), create the runtime state from a
+checkout of the repository:
+
+```bash
+node tools/seed-la-telco-ra.mjs --base http://127.0.0.1:8096 --apply
+```
+
+It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `unbilled-usage`
+(seeded with `DL-047`, expanded once over `activated_by` to the dealer's 336 subscribers, the 300 unbilled SIMs among
+them, annotated, snapshotted), its members, the Entity List `unbilled-sims` (the 300), a Case assigned to
+`telcora.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
+person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
+`node tools/seed-la-telco-ra.mjs --scaffold <bundle>\spaces` does it before the first start.
+
+| Persona (sign in as) | Role | Sees |
+|---|---|---|
+| `telcora.analyst` | `telcora-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `telcora.manager` | `telcora-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `telcora.reviewer` | `la-viewer`, member as reviewer | reads `unbilled-usage`; any change is refused (403) |
+| `telcora.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
+
+**The Alert Rule.** `telco_ra_usage_without_billing` (WARNING) reads the one row of `telco_ra_unbilled_counts`. The
+feeds are monthly, so the spec's "usage without billing over 1 day" is counted a subscriber-month at a time: a month
+with network usage and no billing record, judged only once that month's billing file has landed (so a usage file that
+lands first is not read as unbilled). The rule fires when a subscriber not on the known list (plan `Internal test`) has
+2 or more such months and is still unbilled in the latest one. On the shipped data the Alert carries **300**: the SIMs
+of `DL-047`. The 40 test SIMs of `DL-000` are counted apart as `known_list_subscribers` and never raise it, and the 62
+ordinary subscribers with one dropped month or two late-billed months (`other_unbilled_subscribers`) do not either.
+October changes none of the three figures. The count is a running total, so the rule stays met after every build. It
+names no subscriber or dealer; the `unbilled_usage` view shows them. The rule is not grouped by subscriber, because
+`telco_ra_unbilled_counts` is a Job output: a `by` column cannot be checked against its Schema when the Space is
+created.
+
 ## Rebuild the downloads (maintainers)
 
 ```bash
