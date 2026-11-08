@@ -412,8 +412,11 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
   the other feeds as one extract) and `data/staged/<feed>` (October 2026 for the six event feeds). Two `sql.template`
   Jobs fire on `pipeline.commit`: `utility_links` folds the feeds into one link Dataset of the six specced kinds, one
   row per pair (4 301 rows), with an extra `kwh` column; `transformer_loss` balances each metered transformer against
-  its premises' meter reads per month (144 rows, `loss_band` over 15 % / over 9 % / normal). Three saved views
-  (`utility_contractor_network`, `utility_churn_by_bank`, `utility_vendor_network`) filter the link Dataset by kind; one
+  its premises' meter reads per month (144 rows, `loss_band` over 15 % / over 9 % / normal). A third Job,
+  `utility_bank_links` (on `utility_links`' `job.dataset.produced`), keeps the account links of bank accounts shared by
+  three or more accounts and of premises that changed holder (441 rows, 531 nodes) for the churn view. Three saved
+  views: `utility_contractor_network` and `utility_vendor_network` filter the link Dataset by kind,
+  `utility_churn_by_bank` reads `utility_bank_links`; one
   saved Geo View (`utility_transformer_loss_map`), inert on Basic. No `link-analysis.toon`. Ships
   `config/examples/sla-escalation-examples.md` like every template (`TemplateGovernanceExamplesTest`).
 - **Generator** `tools/gen-la-utility-data.py` (seed 20261107, standard library, byte-identical on a re-run) writes the
@@ -436,10 +439,17 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
     accounts), all 18 accounts on one bank account, so the story is one connected group, not 12 separate pairs.
   - C-22 is tied to C-14 by three joint visits at tampered premises ("C-14's colleague").
   - `tamper_flag` is VARCHAR (0, 1 or blank): a declared INTEGER lands as VARCHAR anyway.
+- **Canvas cap (fixed 2026-11-08):** `utility_churn_by_bank` first filtered the whole link Dataset to `account_at` and
+  `paid_from`: 1 954 rows but 2 932 nodes, over the 1 000-node canvas cap. It now reads the derived
+  `utility_bank_links` (441 rows, 531 nodes): the two hub bank accounts and every premise that changed holder, so the
+  genuine tenant changes still sit beside the churn as its look-alike. The heat-pump look-alike (one account, its own
+  bank account) is not in that view; it is in `meter_read`. `UtilityLinksJobGoldenTest` now checks every saved view
+  against both limits (under 4 000 rows and 1 000 nodes) and that each shows its stories' entities; the old view fails
+  it at 2 932 nodes. The other two views project 679 and 310 nodes.
+- **Missed last landing (worked around 2026-11-08):** `utility_links` and `transformer_loss` also run on
+  `cron: "*/5 * * * *"`, as `la-card` does, because a `pipeline.commit` that lands while a run is in flight is skipped,
+  not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`).
 - **Known gaps (open):**
-  - `utility_churn_by_bank` projects 1 954 rows but 2 932 nodes, over the 1 000-node canvas cap, so in the UI it
-    will likely say "Result cut short". The fix is a derived Dataset per view, as `la-police` does. The other two views
-    project 679 and 310 nodes.
   - The prepaid look-alike V-01 sells in another city, so its "no look-alike joins" check cannot fail.
   - Look-alikes are kept free of direct links only; some sit two hops from a story through a shared contractor.
 - **Live proof on Basic:** recorded at step 3 under Steps.
@@ -806,8 +816,9 @@ business and its customers. All data is invented. It shares no data, names or id
    folder held only `space.toon` and `config\`. Over each saved view's projection (`POST /inv/projection` with the
    view's filter, none truncated), every story's entities are present: contractor view 23 of 23 tampering (the
    transformers are not in that view) and 16 of 16 reconnection; churn view 25 of 25 churn and 13 of 13 commercial
-   load; vendor view 41 of 41 prepaid. Not checked: the Link Analysis UI (no UI in the bundle; see the canvas-cap gap
-   above), the staged month, the saved Geo View (Standard and above).
+   load; vendor view 41 of 41 prepaid. Not checked: the Link Analysis UI (no UI in the bundle), the staged month, the
+   saved Geo View (Standard and above). The churn view was over the canvas cap then (2 932 nodes); it was narrowed on
+   2026-11-08 (see "Canvas cap" above) and its product hub (brochure, user guide, install) landed the same day.
 4. **`la-claims` additions:** parts-supplier ring and ghost broker → same check. **BUILT 2026-11-08** (as built under
    `la-claims` above). `la-claims` is still Advanced-only, so the live proof was on a Preview Demo Auth build
    (`package.ps1 -Edition Preview -DemoAuth -NoUi`), with the Space scaffolded and seeded (`seed-la-claims.mjs --apply`:
