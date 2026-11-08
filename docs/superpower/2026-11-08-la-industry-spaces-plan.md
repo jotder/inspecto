@@ -113,6 +113,9 @@ Rules:
 | Trade finance | `trade_phantom_shipment` | `phantom_shipment` |
 | Trade finance | `trade_circular_trade` | `circular_trade` |
 | Trade finance | `trade_shell_importers` | `shell_importers` |
+| Crypto laundering (`la-crypto`, built 2026-11-08 with these names) | `hack_peel_chain` | `hack_peel_chain` |
+| Crypto laundering | `mixer_hop_timing_match` | `mixer_hop_timing_match` |
+| Crypto laundering | `converging_cash_out` | `converging_cash_out` |
 | Financial crime tour | `mule_layering_ring` (`la-showcase`) | `mule_layering_ring` |
 | Financial crime tour | `mule_large_transfers` | `mule_ring_large_transfers` |
 | Financial crime tour | `mule_structuring` | `structuring_smurfing` |

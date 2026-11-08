@@ -44,7 +44,7 @@ Telecom), with the same template id.
 | Beneficial ownership and sanctions | `la-ownership` | Hidden owner behind a five-layer chain of 24 % stakes; a sanctioned person two hops above a customer; one nominee director on 120 companies; circular ownership | exists |
 | Card and e-commerce fraud | `la-card` | Card testing from one device and IP range; account-takeover ring shipping to 5 drop addresses; colluding merchant refunding cards it never sold to; common point of purchase behind 60 compromised cards | exists |
 | Trade-based money laundering | `la-trade` | Over-invoicing between companies sharing a director; containers going round in a circle; a phantom shipment on a vessel that was elsewhere; shell importers at one formation agent | planned |
-| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | planned |
+| Crypto laundering | `la-crypto` | Peel chain from a hacked wallet; mixer hop matched by timing and amount; 40 accounts cashing out one cluster's funds | exists (Basic tier) |
 
 ### Insurance
 
@@ -996,6 +996,58 @@ later). Deliberate deviations:
   out to 3 bank accounts — an over-the-counter desk whose many customers deposit their own funds.
 
 **Alert Rule:** a deposit whose funds trace to a labelled hack within 5 hops.
+
+**Basic tier as built (2026-11-08, plan step 7).** `tools/gen-la-crypto-data.py` (seed 20261113; ground truth
+`tools/gen-la-crypto-data.ground-truth.json`), `tools/gen-la-crypto-data.test.mjs`, `CryptoLinksJobGoldenTest` (inspecto-engine),
+template `spaces/_templates/la-crypto/` (`minEdition: basic`; in `offerings/basic.toon` contentPacks), hub
+`docs/okf/product/solution-pack/la-crypto/`. Addresses are `syn1` + 26 characters of a bech32-like alphabet; the assets `SYC` and
+`SUSD`, the five exchanges (Larkmoor Digital, Fernhill Coin, Ashgrove, Pebblebrook, Wrenfield), the mixer, the company, the people
+and the bank accounts (`BK-` + 8 digits) are invented. Deliberate deviations:
+- **Scale:** 10 875 landed addresses (spec: 30 000), 44 559 landed transfers (spec: 150 000), 2 722 hinted addresses (spec:
+  30 000: only addresses spent with another get a hint), 3 154 exchange accounts and 3 021 KYC persons (spec: 5 000 each), 4 635
+  landed cash-outs (spec: 12 000). With every address pair a link row the spec's sizes would pass 100 000 links; these give about
+  39 500 link rows and 4.7 MB of data.
+- **Columns:** `from`, `to` and `at` are SQL keywords, so `transfer.from_address`, `to_address`, `tx_at`; `cashout` gains
+  `cashout_id` and its time is `cashout_at`; `exchange_account` gains `exchange` and `opened_at`. The `wallet.label` set gains
+  `hacked` (reported stolen from), which the hack story and the wave D Alert Rule need. Each address pair carries one asset: SUSD for
+  merchant payments and merchants' weekly sweeps, SYC for everything else. No balances are kept (exchange hot wallets and the mixer
+  pool pay out without a modelled inflow; deposit addresses are not swept).
+- **Link kinds:** the five specified (`sent_to` address → address, `same_cluster` address → `CL-`, `deposit_of` deposit address →
+  `XA-`, `kyc_of` `XA-` → `KP-`, `cashed_out_to` `XA-` → `BK-`) plus a sixth, **`mixer_exit`**: the timing-and-amount match is
+  worked out by the Job, not recorded, so it is its own link (input address → exit recipient, every exit within 6 hours and 90-100 %
+  of an input; `matched:yes` within 120 minutes and at least 98 %). Evidence in `via`: `sent_to` carries `src_hop` / `dst_hop` (the
+  peel shape: exactly one transfer in, two out to two addresses, both within 24 hours), `same_cluster` carries `cluster_exchange`,
+  `cashed_out_to` carries `accounts_to_this_bank`.
+- **Views and the canvas cap:** one derived Job, `crypto_screen_links` (on `job.dataset.produced`), writes three screens.
+  `peel_chain`: every `sent_to` link in or out of a peel-shaped address chained to another, plus the exchange accounts such a hop
+  paid and their KYC persons. `mixer_hop`: every `mixer_exit` link, and for matched exits the deposit, account and person.
+  `converging_cash_out`: clusters with no exchange-labelled address that paid 10 or more exchange accounts, with those payments,
+  accounts, persons and cash-out bank accounts. `crypto_links` also runs on `cron: "*/5 * * * *"` (`JOB-SIGNAL-OVERLAP-SKIP-1`). The
+  golden test reads each view with its own filter and pins under 4 000 rows and 1 000 nodes, the story whole and connected, and the
+  look-alike on the canvas but in another component: `hack_peel_chain` 785 rows, 426 nodes (the 80-hop chain is one thin component
+  of 100 nodes); `mixer_hop_timing_match` 12 rows, 15 nodes; `converging_cash_out` 670 rows, 397 nodes.
+- **Stories as built:** peel chain: the wallet labelled hacked `syn15z47fslrxrnhuwm4dppk77s0z7` sends all 412.5 SYC on 2026-03-14
+  02:17 to the first of 80 hops; each hop sends a peel of 1.6-4.9 SYC to one of six deposit addresses and the change on, 12-140
+  minutes apart, until 2026-03-18; the last change address keeps 170.6 SYC; the six accounts `XA-03111`..`XA-03116` (four exchanges,
+  opened February-March 2026, persons `KP-02973`..`KP-02978` with no shared surname) cash out to their own banks. Look-alike: the
+  company payroll wallet `syn1g6x78slgxx5zne6cwpmes8j554` (label `merchant`), whose month-end run of 25 hops pays the same 25 staff
+  wallets and returns the rest (300 landed hops). Mixer hop: the ransom address `syn1g2sua43rg5kfcjunpv6chu7rws` (seven payments,
+  about 36 SYC, April 2026) pays 11.8, 9.65 and 8.9 SYC into fresh mixer deposit addresses on 05-14, 05-21 and 06-02; each comes out
+  53-67 minutes later at 98.2-98.9 % to a fresh address that deposits it all at `XA-03118` (Ashgrove Exchange, `KP-02980`).
+  Look-alikes: `syn1zngjgrnpdxuwp8trqf4pddkppf` (another user's exit 75 minutes later at 92.5 %) and
+  `syn1sfr9e266n86z4c8zd7k00q4uph` (99.1 % but 281 minutes later), both `matched:no`; background exits never match by
+  construction (the generator moves a chance match 3 hours later). Converging cash-out: cluster `CL-01125` (30 addresses, fed by
+  about 200 payments from 150 people February-June) pays the 40 accounts `XA-03119`..`XA-03158` (22 Fernhill Coin, 18
+  Pebblebrook; 40 names, persons `KP-02981`..`KP-03020`), which cash out to `BK-49804167`, `BK-77665088` and `BK-95284540`.
+  Look-alike: the over-the-counter desk `CL-01126` (8 addresses) pays 60 customers' own accounts, which cash out to 54 banks of their
+  own. The generator also moves the last coins of any background address that would chain with another peel-shaped address, so the
+  peel screen holds exactly the story and the payroll.
+- **Staged month:** October adds 3 935 transfers, 275 addresses, a month of cash-outs and one more payroll run (the peel view grows
+  to about 451 nodes); no story activity.
+- **Not checked:** a live Basic run of the packed downloads and the Link Analysis UI; the staged month landing through the
+  Pipelines (checked outside the engine only).
+- **Names:** the saved views follow the use-case naming of `2026-11-08-la-industry-spaces-plan.md` (D5): `hack_peel_chain`,
+  `mixer_hop_timing_match`, `converging_cash_out`, added to its *Banking and finance* table.
 
 #### 14. `la-mfs` — mobile financial services fraud (added 2026-11-08)
 

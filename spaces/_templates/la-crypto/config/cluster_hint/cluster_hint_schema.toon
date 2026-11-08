@@ -1,0 +1,16 @@
+raw:
+  name: CLUSTER_HINT
+  format: CSV
+  fields[2]{name,selector,type}:
+    address,"0",VARCHAR
+    cluster_id,"1",VARCHAR
+mapping:
+  canonicalName: cluster_hint
+  rawName: CLUSTER_HINT
+  fields[2]:
+    - name: address
+      from: address
+      fn: keep
+    - name: cluster_id
+      from: cluster_id
+      fn: keep

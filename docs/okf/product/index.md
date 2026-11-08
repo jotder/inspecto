@@ -32,6 +32,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (74 open rows
 * [Link Analysis benefits and tax fraud showcase](solution-pack/la-benefits/index.md) - `solution-pack.la-benefits` · 3 doc(s) · 1 open row(s)
 * [Link Analysis card fraud showcase](solution-pack/la-card/index.md) - `solution-pack.la-card` · 3 doc(s) · 1 open row(s)
 * [Link Analysis claims showcase](solution-pack/la-claims/index.md) - `solution-pack.la-claims` · 5 doc(s) · 2 open row(s)
+* [Link Analysis crypto laundering showcase](solution-pack/la-crypto/index.md) - `solution-pack.la-crypto` · 3 doc(s) · 1 open row(s)
 * [Link Analysis daily feed](solution-pack/la-daily-feed/index.md) - `solution-pack.la-daily-feed` · 5 doc(s) · 1 open row(s)
 * [Link Analysis provider billing fraud showcase](solution-pack/la-health/index.md) - `solution-pack.la-health` · 3 doc(s) · 1 open row(s)
 * [Link Analysis logistics cargo theft showcase](solution-pack/la-logistics/index.md) - `solution-pack.la-logistics` · 3 doc(s) · 1 open row(s)
