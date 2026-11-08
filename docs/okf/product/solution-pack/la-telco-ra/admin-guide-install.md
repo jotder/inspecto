@@ -93,7 +93,7 @@ content only, so commit first.
 ## As the *Telecom* industry Space
 
 The same use case also ships as the industry Space *Telecom* (`la-telecom`). Its recipe is
-`spaces/_industries/la-telecom.toon`. Today its only use case is `la-telco-ra`; `la-mobile-money` and the telecom
+`spaces/_industries/la-telecom.toon`. Today its use cases are `la-telco-ra` and `la-mfs`; `la-mobile-money` and the telecom
 part of `la-showcase` join when the plan's wave B gives them a Basic tier. `node tools/package-la-showcase.mjs
 la-telecom` composes it into `inspecto-la-space-la-telecom-<version>.zip` and its data zip. Install them as above,
 with `la-telecom` in place of `la-telco-ra`.

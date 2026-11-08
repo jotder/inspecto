@@ -83,3 +83,24 @@ node tools/package-la-showcase.mjs la-mfs
 
 The generator is deterministic (seed 20261111) and writes the ground truth to `tools/gen-la-mfs-data.ground-truth.json`,
 which is not part of any download. The packer reads committed content only, so commit first.
+
+## As part of the *Telecom* industry Space
+
+This use case also ships inside the industry Space *Telecom* (`la-telecom`), beside `la-telco-ra`. The recipe is
+`spaces/_industries/la-telecom.toon`, composed by `node tools/package-la-showcase.mjs la-telecom`.
+
+Every Dataset says what its id columns hold: *Wallet*, *Agent*, *Merchant*, *Staff login* and *Settlement account*.
+*Subscriber number*, *Device* and *Telecom entity* are declared exactly as `la-telco-ra` declares them, so the two
+packs merge. `wallet_txn_dataset` and the link Datasets mix wallets, agents and merchants in one column, so their
+ends hold *Telecom entity*.
+
+Each Dataset of events has its own Mapping:
+
+| Dataset | Mapping |
+|---|---|
+| `wallet_txn_dataset` | Telecom entity → Telecom entity (kind `type`, when `txn_at`, measure `amount`) |
+| `sim_event_dataset` | Staff login → Subscriber number (kind `event`, when `event_at`) |
+| `wallet_dataset` | Agent → Wallet (when `opened_at`) |
+| `device_login_dataset` | Wallet → Device (when `login_at`) |
+| `agent_dataset` | Agent → Agent (its super-agent) |
+| `merchant_dataset` | Merchant → Settlement account |
