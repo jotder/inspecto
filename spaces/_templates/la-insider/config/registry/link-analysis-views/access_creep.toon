@@ -1,0 +1,23 @@
+name: access_creep
+description: "Access creep - every employee granted a finance system (AP, PAYROLL, TREASURY) more than 30 days after their hire date, linked to the person who approved it (via on granted_by = systems, grants without a ticket, finance grants, the last finance grant and its ticket, role and role_since), with the bank-detail vendor changes those employees made. A new payroll officer gets payroll access the day after the move, with a ticket; operations staff given payroll and treasury by their own manager with no ticket, one of whom then changes a vendor's bank account, is another thing."
+sourceId: entity-projection
+layout: force
+query:
+  projection:
+    datasetId: insider_screen_links_dataset
+    sourceCol: src
+    targetCol: dst
+    linkKindCol: kind
+    attrCols[4]: ts,amount,via,screen
+  filter:
+    kind: group
+    op: AND
+    items[1]{kind,field,operator,value}:
+      condition,screen,"=","access_creep"
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    hulls: true
+    behaviors[1]: hover-activate

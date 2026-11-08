@@ -1,0 +1,28 @@
+raw:
+  name: EXPENSE
+  format: CSV
+  fields[5]{name,selector,type}:
+    expense_id,"0",VARCHAR
+    requester_id,"1",VARCHAR
+    approver_id,"2",VARCHAR
+    amount,"3",DOUBLE
+    submitted_at,"4",TIMESTAMP
+mapping:
+  canonicalName: expense
+  rawName: EXPENSE
+  fields[5]:
+    - name: expense_id
+      from: expense_id
+      fn: keep
+    - name: requester_id
+      from: requester_id
+      fn: keep
+    - name: approver_id
+      from: approver_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep
+    - name: submitted_at
+      from: submitted_at
+      fn: keep

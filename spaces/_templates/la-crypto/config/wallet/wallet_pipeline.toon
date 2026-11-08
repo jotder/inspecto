@@ -1,0 +1,36 @@
+name: wallet
+active: true
+description: "Crypto laundering Link Analysis showcase - One row per address in the invented syn1 format (it cannot match a real chain): when it was first seen in a transfer, and the label the analytics provider gives it (exchange - an exchange's hot wallet or a customer deposit address; mixer; merchant - a business; hacked - reported stolen from; unknown). One extract of every address first seen by 2026-09-30 (WALLET_20260930.csv); the addresses first seen in October are in data/staged. Synthetic; regenerate with tools/gen-la-crypto-data.py."
+
+dirs:
+  poll:       data/inbox/wallet
+  database:   data/wallet/database
+  backup:     data/wallet/backup
+  temp:       data/wallet/temp
+  errors:     data/wallet/errors
+  quarantine: data/wallet/quarantine
+  markers:    data/wallet/markers
+  status_dir: data/wallet/status
+  log_dir:    data/wallet/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: wallet_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  discovery: poll
+  connector: local

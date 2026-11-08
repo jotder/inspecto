@@ -1,0 +1,40 @@
+raw:
+  name: EMPLOYEE
+  format: CSV
+  fields[8]{name,selector,type}:
+    employee_id,"0",VARCHAR
+    dept,"1",VARCHAR
+    role,"2",VARCHAR
+    manager_id,"3",VARCHAR
+    hired_at,"4",DATE
+    role_since,"5",DATE
+    notice_given_at,"6",DATE
+    left_at,"7",DATE
+mapping:
+  canonicalName: employee
+  rawName: EMPLOYEE
+  fields[8]:
+    - name: employee_id
+      from: employee_id
+      fn: keep
+    - name: dept
+      from: dept
+      fn: keep
+    - name: role
+      from: role
+      fn: keep
+    - name: manager_id
+      from: manager_id
+      fn: keep
+    - name: hired_at
+      from: hired_at
+      fn: keep
+    - name: role_since
+      from: role_since
+      fn: keep
+    - name: notice_given_at
+      from: notice_given_at
+      fn: keep
+    - name: left_at
+      from: left_at
+      fn: keep
