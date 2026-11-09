@@ -38,6 +38,8 @@ import random
 from datetime import date, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-health" / "data"
 TRUTH = TOOLS / "gen-la-health-data.ground-truth.json"
@@ -687,7 +689,7 @@ scripts.sort(key=lambda s: (s["d"], s["pr"]["id"], s["m"]["id"], s["cls"]))
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -697,8 +699,7 @@ def iso(d):
     return d.isoformat() if d else ""
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 write("inbox/address/ADDRESS_20260930.csv", ["address_id", "street", "city", "lat", "lon"],
       sorted([a["id"], a["street"], a["city"], a["lat"], a["lon"]] for a in addresses))
 write("inbox/owner/OWNER_20260930.csv", ["owner_id", "name", "owner_type", "address_id"],
@@ -759,7 +760,8 @@ truth = {
     "upcoding": {"owner": OWU["id"], "clinics": [U1["id"], U2["id"], U3["id"]], "lookalike": GERL["id"],
                  "lookalike_owner": OWL["id"], "top_level_share_all": round(overall, 4)},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(f"lines {len(landed)} landed of {len(lines)}, admissions {len(admissions)}, referrals {len(landed_ref)} landed of {len(referrals)}, "
       f"scripts {len(landed_rx)} landed of {len(scripts)}, owners {len(owners)}, addresses {len(addresses)}, overall top {overall:.3f}, "
       f"upcoding flags {len(flag_up)}, concentrated {len(concentrated)}")

@@ -34,6 +34,8 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-logistics" / "data"
 TRUTH = TOOLS / "gen-la-logistics-data.ground-truth.json"
@@ -632,7 +634,7 @@ assert not any(t["lost"] for t in d_trips if t not in d_loss) and not any(t["los
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -642,8 +644,7 @@ def ts(x):
     return x.strftime("%Y-%m-%d %H:%M:%S") if x else ""
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 
 write("inbox/carrier/CARRIER_20260930.csv", ["carrier_id", "name", "phone", "registered_at", "insured"],
       [[c, v["name"], v["phone"], ts(v["reg"]), v["insured"]] for c, v in sorted(carriers.items())])
@@ -707,7 +708,8 @@ truth = {
                            "lookalike_high_value_trips": ids(t for t in new_hv if t["carrier"] == CAR_N)},
     "background": {"lost_trips": ids(bg_loss), "services_thefts": ids(r_trips), "households": households, "owner_operators": sorted(owner_ops)},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 c = truth["counts"]
 print(f"trips {c['trip_landed']} landed of {len(trips)}, stops {c['stop_landed']}, scans {c['warehouse_scan_landed']}, losses {c['loss_report_landed']}, "
       f"co-driven {c['co_driven_landed']}, long-stop pairs {c['long_stop_pairs_landed']}, places {c['place']}, PL_L {PL_L}, PL_R {PL_R} ({len(rest_hv)} hv)")

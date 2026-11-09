@@ -36,6 +36,8 @@ from datetime import date, datetime, timedelta
 from itertools import accumulate
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-trade" / "data"
 TRUTH = TOOLS / "gen-la-trade-data.ground-truth.json"
@@ -670,7 +672,7 @@ stories = renumbered(stories)
 def write(rel: str, header: list[str], rows):
     p = DATA / rel
     p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(p) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -680,8 +682,7 @@ def ts(v: datetime) -> str:
     return v.strftime("%Y-%m-%d %H:%M:%S")
 
 
-for old in DATA.glob("*/*/*.csv"):
-    old.unlink()
+out = Outputs()
 write("inbox/trade_company/COMPANY_20260930.csv", ["company_id", "name", "country", "reg_address", "incorporated_at", "account_id"],
       [(c, v["name"], v["country"], v["reg_address"], v["incorporated_at"].isoformat(), v["account_id"]) for c, v in sorted(companies.items())])
 write("inbox/director/DIRECTOR_20260930.csv", ["company_id", "person_id", "person_name"],
@@ -726,12 +727,12 @@ for m0, m1 in months(START, STAGED_END):
 for s in stories.values():
     s["entities"] = sorted(set(s["entities"]))
     s["lookalikes"] = sorted(set(s["lookalikes"]))
-TRUTH.write_text(json.dumps({"note": "Story -> the entity ids that must form ONE connected group in the trade_links Dataset (and in "
-                                     "the story's saved-view Dataset), and look-alike ids that must have no link to any of them. Address "
-                                     "nodes are the upper-cased registered address. Written by tools/gen-la-trade-data.py; not part "
-                                     "of the data download.", "seed": SEED, "price_ratio_alert": PRICE_ALERT,
-                             "landed_rows": n_rows, "stories": stories}, indent=1, sort_keys=True, default=str) + "\n",
-                 encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps({"note": "Story -> the entity ids that must form ONE connected group in the trade_links Dataset (and in "
+                                          "the story's saved-view Dataset), and look-alike ids that must have no link to any of them. Address "
+                                          "nodes are the upper-cased registered address. Written by tools/gen-la-trade-data.py; not part "
+                                          "of the data download.", "seed": SEED, "price_ratio_alert": PRICE_ALERT,
+                                  "landed_rows": n_rows, "stories": stories}, indent=1, sort_keys=True, default=str) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(f"companies {len(companies)}, directors {len(set(directors))}, trades {len(trades)} ({n_rows['trade']} landed, "
       f"{transhipped} background transhipments), B/Ls {len(all_bls)}, payments {len(payments)}, boxes {len(used_boxes)}, "
       f"positions {n_rows['vessel_position']} landed")

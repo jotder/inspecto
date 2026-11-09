@@ -40,6 +40,8 @@ from bisect import bisect_left, bisect_right
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-mfs" / "data"
 TRUTH = TOOLS / "gen-la-mfs-data.ground-truth.json"
@@ -536,7 +538,7 @@ assert len(quick_payers[MR_COLLUDE]) == 60
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -546,8 +548,7 @@ def ts(t: datetime) -> str:
     return t.strftime("%Y-%m-%d %H:%M:%S")
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 
 write("inbox/agent/AGENT_20260930.csv", ["agent_id", "name", "area", "super_agent_id", "float_account"],
       [[a, v["name"], v["area"], v["super"], v["float"]] for a, v in sorted(agents.items())])
@@ -607,7 +608,8 @@ truth = {
                           "lookalike_account": merchants[MR_GROCERY]["account"], "lookalike_payers": ids(grocery_payers),
                           "lookalike_quick_payers": sorted(quick_payers[MR_GROCERY])},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 c = truth["counts"]
 print(f"wallets {c['wallet_landed']} landed of {len(wallets)}, txns {c['wallet_txn_landed']} landed of {len(txns)}, sim events "
       f"{c['sim_event_landed']}, logins {c['device_login_landed']}, handsets {n_dev}; bursts {burst[S_FRAUD]}/{burst[S_STORE]}; split "

@@ -39,6 +39,8 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-telco-ra" / "data"
 TRUTH = TOOLS / "gen-la-telco-ra-data.ground-truth.json"
@@ -360,7 +362,7 @@ assert all(s["dealer"] != DL_UNBILLED for s in late + dropped)
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -370,8 +372,7 @@ def ts(t: datetime) -> str:
     return t.strftime("%Y-%m-%d %H:%M:%S")
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 
 write("inbox/dealer/DEALER_20260930.csv", ["dealer_id", "name", "city"], [[d, v["name"], v["city"]] for d, v in sorted(dealers.items())])
 write("inbox/enterprise_trunk/ENTERPRISE_TRUNK_20260930.csv", ["trunk_id", "customer_id"], sorted(trunks.items()))
@@ -422,7 +423,8 @@ truth = {
                     "attack_fridays": [d.isoformat() for d in ATTACKS], "lookalike_trunk": TRK_LA, "lookalike_customer": trunks[TRK_LA],
                     "evening_trunks": sorted(US_EVENING)},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 c = truth["counts"]
 print(f"subscribers {c['subscriber_landed']} landed of {len(subs)}, usage {c['network_usage_landed']}, billing {c['billing_record_landed']}, "
       f"topups {c['topup_landed']}, trunk calls {c['trunk_call_landed']}, devices {n_dev}, pos {len(pos_city)}")
