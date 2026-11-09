@@ -1378,9 +1378,12 @@ deviations:
    **ALL 13 BUILT by 2026-11-09** (`la-police` 2026-11-08; `la-utility`, `la-card`, `la-ownership`, `la-trade`,
    `la-procurement`, `la-benefits`, `la-health`, `la-mfs`, `la-telco-ra`, `la-logistics`, `la-insider`, `la-crypto`
    2026-11-09; one section each below). Shared as built:
-   - Every Space's `admin` and its `fraud-analyst`, `la-viewer` and `la-settings` roles are byte-identical (a user id
-     defined differently in two Spaces is a 409 `ROSTER_CONFLICT`; `la-police` was brought in line on 2026-11-09), and
-     every `link-analysis.toon` states `four_eyes_fan_out_above: 2000` and the same Drafts limits.
+   - In these 13 Spaces, `admin` and the `fraud-analyst`, `la-viewer` and `la-settings` roles are byte-identical (a user
+     id defined differently in two Spaces is a 409 `ROSTER_CONFLICT`; `la-police` was brought in line on 2026-11-09), and
+     every `link-analysis.toon` states `four_eyes_fan_out_above: 2000` and the same Drafts limits. The `admin` row is the
+     same in every showcase with one (all but `la-audit`, whose roster uses `audit.admin`); the roles differ in the
+     older templates: `la-showcase`'s `fraud-analyst` adds `canShareInvestigation`, and `la-audit` and
+     `la-mobile-money` define no `la-viewer`.
    - The industry packer (`tools/package-la-showcase.mjs`) merges `link-analysis.toon` settings by key and
      `demo-users.toon` / `roles.toon` by id / name across the use cases of one industry Space, refusing a differing
      definition; a test composes every committed recipe from the real templates.
@@ -1396,7 +1399,8 @@ deviations:
    **`la-police` BUILT 2026-11-08.** As built:
    - **In the template, inert on Basic** (the Edition rule as settled 2026-11-08): `config/demo-users.toon` (`admin`,
      `police.analyst` lead, `police.sio` second approver, `police.reviewer` read-only, `police.outsider` not a member),
-     `config/roles.toon` (`police-analyst`, `police-sio`, `la-viewer`, `la-settings`), and `four_eyes_fan_out_above: 2000`
+     `config/roles.toon` (`police-analyst`, `police-sio`, `la-viewer`, `la-settings`; `fraud-analyst` for `admin` since
+     2026-11-09, when `admin` was brought in line with the other showcases), and `four_eyes_fan_out_above: 2000`
      plus Drafts added to the industry lane's `link-analysis.toon` (its Entity Types kept; none masked, no `masking_mode`).
    - **Alert Rule on new serial matches, as a registry rule** (the la-showcase telecom pattern, not an Investigation-bound
      one): the `police_serial_match_counts` Job (on `police_links` produced) writes one row, `repeat_seller_matches` (the
