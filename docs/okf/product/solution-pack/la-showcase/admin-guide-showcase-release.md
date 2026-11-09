@@ -24,7 +24,6 @@ git fetch
 git worktree add --detach C:\sandbox\la-release origin/master
 cd C:\sandbox\la-release
 $env:MAVEN_ARGS = '-o -Dmaven.repo.local=C:/sandbox/.m2-la-release -Dmaven.repo.local.tail=C:/.m2/repository'
-$env:MVN_OFFLINE = '1'
 pwsh -NoProfile -File inspecto\package.ps1 -Edition Basic -Ui la-app
 pwsh -NoProfile -File inspecto\package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo
 ```
@@ -33,7 +32,8 @@ pwsh -NoProfile -File inspecto\package.ps1 -Edition Preview -DemoAuth -Ui la-app
   empty and everything resolves read-only from the `.tail` repository. `package.ps1` runs `npm ci` for the UI itself.
 - `-NoBakeDemo` keeps the Preview product free of a pre-seeded `la-showcase`: a showcase release attaches every Space
   from its own downloads.
-- Without a Linux GraalVM jmods cache on the build box (`-GraalvmCache`, `GRAALVM_CACHE` or `<repo>/.graalvm-cache`),
+- Without a Linux GraalVM jmods cache on the build box (`-GraalvmCache`, `GRAALVM_CACHE`, `<repo>/.graalvm-cache` or the sibling
+  `<repo>/../.graalvm-cache`),
   `package.ps1` builds the `windows_amd64` products only.
 - The products unzip to `inspecto-deploy\` (Basic, start with `bin\serve.bat`) and `inspecto-demo\` (Preview, start with
   `bin\serve-demo.bat`; Demo User sign-in with no password, loopback only, internal evaluation only).

@@ -1,7 +1,7 @@
 # Link Analysis showcase catalogue — police, insurance, utility and fifteen more (plan)
 
 **Status: SHIPPED 2026-11-09, archived** (steps 1–10 built; the release built locally from `1963c661b` and its live
-proofs of the 13 Advanced tiers PASS, step 8). Durable facts: the `solution-pack/la-showcase` hub
+proofs of the 12 Advanced tiers built 2026-11-09 PASS, step 8; `la-police`'s was proved on 2026-11-08). Durable facts: the `solution-pack/la-showcase` hub
 (`architecture-showcase-catalogue.md`, `admin-guide-showcase-release.md`, `user-guide-showcase-catalogue.md`) and each
 Space's hub; open items: `docs/BACKLOG.md`. History of the status line: draft, 2026-11-07; scope widened the same day to the **full catalogue** (operator: "ship the full
 Showcase catalogue for users to play, learn and test"); 2026-11-08 the catalogue is grouped by industry and

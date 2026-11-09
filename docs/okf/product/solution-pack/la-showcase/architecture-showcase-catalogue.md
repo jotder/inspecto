@@ -115,7 +115,9 @@ What "inert" means, as seen live on Basic:
   `audit.admin`).
 - **Four-eyes and Drafts.** Every `link-analysis.toon` states `four_eyes_fan_out_above: 2000` and the same Drafts limits;
   no Entity Type is masked.
-- **The Alert Rule is a registry rule over a one-row counts Job.** A `sql.template` Job on the link Job's
+- **The Alert Rule is a registry rule over a one-row counts Job** (one exception: `la-utility`'s
+  `utility_transformer_loss` is `max(loss_pct) gte 15` over the multi-row monthly `transformer_loss` output, so its
+  Alert carries the highest monthly loss, not a count). A `sql.template` Job on the link Job's
   `job.dataset.produced` writes one row of counts; an `alert.evaluate` Job runs after it; the rule compares one count
   with a threshold. It is **not grouped** (`by:`): `POST /spaces` checks a `by` column against the Dataset's Schema, and
   a Job output has none when the Space is created, while the deferred `pending/alert-rules/` waits only for score-model
@@ -152,7 +154,8 @@ What "inert" means, as seen live on Basic:
   Several Spaces are smaller than first specified to keep the committed corpus small (for example `la-utility`: 1 000
   premises, not 8 000); each hub says so.
 - **Link Jobs also run on `cron: "*/5 * * * *"`**, because a `pipeline.commit` that lands while a run is in flight is
-  skipped, not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`). A counts or link Job that judges a month waits until that month's
+  skipped, not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`). Exception: `la-ownership`'s `ownership_links` has no cron yet
+  (BACKLOG `LA-OWNERSHIP-NO-CRON-FALLBACK-1`). A counts or link Job that judges a month waits until that month's
   every side has landed (`la-utility`'s `transformer_loss` joins both reads; `la-telco-ra` waits for the billing file).
 
 ## Deliberate decisions and gotchas
