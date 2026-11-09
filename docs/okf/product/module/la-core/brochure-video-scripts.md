@@ -230,9 +230,12 @@ the edition close. The asks use *Busiest nodes* only where it names the story fi
 | 3.1 D · Telecom revenue assurance | `la-telecom` · `dealer_commission_fraud` | `DL-112` 400, `POS-0008` 400, `DL-163` 350 | about 131 s |
 | 3.2 D · Banking card fraud | `la-banking` · `common_point_of_purchase` | `M-317` 60, then cards with 4 | about 120 s |
 | 3.9 B · Enterprise insider | `la-enterprise` · `access_creep` | `EMP-0007` 4, then `EMP-2057` 3 | about 127 s |
+| 3.6 · Public sector, paid after death (an alternative segment) | `la-public-sector` · `paid_after_death` | the three accounts `SYN-13618314`, `SYN-23138817`, `SYN-96993903` 4 each, then the living claimant `CIT-08276` 3 | about 134 s |
+| 3.3 · Insurance, parts never fitted | `la-insurance` · `parts_supplier_ring` | a tie: `SUP-01` and `SUP-07`, 9 links each. The voice says reach alone is not guilt, and the outcome shows `SUP-07` (its links carry the unfitted parts' value) | about 132 s |
 
 On `dealer_commission_fraud` the two dealers draw as two clusters far apart, so a push-in on the middle of the canvas
 lands on empty space: the 3.1 D draft holds the whole view instead. Film the master's push-in on `DL-112` itself.
+On a small graph (`parts_supplier_ring`, 19 nodes) the same push-in fills the frame with arrows: hold the view there too.
 
 **Drafted later.** Videos 1 and 4 and industry videos 3.1 and 3.9 use templates that need an Advanced install
 today (`la-mobile-money`, `la-showcase`, `la-audit`); segment D of 3.1 (`la-telco-ra`) is Basic and can be drafted in
