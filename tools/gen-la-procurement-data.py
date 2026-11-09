@@ -34,6 +34,8 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-procurement" / "data"
 TRUTH = TOOLS / "gen-la-procurement-data.ground-truth.json"
@@ -519,7 +521,7 @@ assert set(shared_authors) == {W_AUTHOR}, shared_authors
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -529,8 +531,7 @@ def iso(d):
     return d.isoformat() if d else ""
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 write("inbox/company/COMPANY_20260930.csv", ["company_id", "name", "reg_address", "phone", "bank_account", "incorporated_at", "debarred_at"],
       [[c["id"], c["name"], c["address"], c["phone"], c["bank"], iso(c["inc"]), iso(c["debarred"])] for c in companies.values()])
 write("inbox/director/DIRECTOR_20260930.csv", ["company_id", "person_id", "from_date", "to_date"],
@@ -583,7 +584,8 @@ truth = {
                      "lookalike_old": X_OLD, "lookalike_director": PX, "lookalike_new_home": U,
                      "background_debarred": sorted(background_debarred)},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(f"companies {len(companies)}, people {len(people)}, directors {len(directors)}, tenders {len(landed_t)} landed of {len(tenders)}, "
       f"bids {truth['counts']['bid_landed']} landed of {len(bids)}, changes {len(changes)}, big three win {south_wins:.0%} of Highways South, "
       f"covers {len(cover_rows)} ({len(ip_rows)} from W's IP, {len(au_rows)} W's author)")

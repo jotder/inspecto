@@ -35,6 +35,8 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-insider" / "data"
 TRUTH = TOOLS / "gen-la-insider-data.ground-truth.json"
@@ -498,7 +500,7 @@ def ym(day):
 def write(box, feed, name, header, rows):
     p = DATA / box / feed / name
     p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("w", newline="", encoding="utf-8") as f:
+    with out.open(p) as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -515,8 +517,7 @@ def ts(x):
 
 
 iso = lambda x: x.isoformat() if x else ""
-for old_file in DATA.glob("*/*/*.csv"):
-    old_file.unlink()
+out = Outputs()
 write("inbox", "employee", "EMPLOYEE_20260930.csv",
       ["employee_id", "dept", "role", "manager_id", "hired_at", "role_since", "notice_given_at", "left_at"],
       [[p["id"], p["dept"], p["role"], p["mgr"]["id"] if p["mgr"] else "", iso(p["hired"]), iso(p["role_since"]), iso(p["notice"]),
@@ -590,6 +591,7 @@ truth = {
         "lookalike_heavy_reports": sorted(k[1] for k in heavy if k[0] == tl["id"]),
     },
 }
-TRUTH.write_text(json.dumps(truth, indent=2) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=2) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(json.dumps(truth["counts"]), "grants", len(grants), "access", len(access), "mail", len(mail_rows), "expenses", len(expenses),
       "changes", len(changes))

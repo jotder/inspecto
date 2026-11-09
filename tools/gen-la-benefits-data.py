@@ -39,6 +39,8 @@ import random
 from datetime import date, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-benefits" / "data"
 TRUTH = TOOLS / "gen-la-benefits-data.ground-truth.json"
@@ -476,7 +478,7 @@ assert max(counts.values()) <= 55 and len({id(r[0]) for r in returns}) == N_RETU
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -486,8 +488,7 @@ def iso(d):
     return d.isoformat() if d else ""
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 write("inbox/address/ADDRESS_20260930.csv", ["address_id", "street", "city", "lat", "lon"],
       [[a, v["street"], v["city"], v["lat"], v["lon"]] for a, v in addresses.items()])
 write("inbox/person/PERSON_20260930.csv", ["person_id", "name", "birth_year", "address_id", "phone"],
@@ -551,7 +552,8 @@ truth = {
     "tax_preparer_ring": {"preparer": RING_PREP, "taxpayers": ids(ring), "accounts": ring_accounts,
                           "lookalike_preparer": BIG_PREP, "lookalike_clients": len(big_clients)},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(f"people {len(people)}, addresses {len(addresses)}, households {len(hh_rows)}, claims {truth['counts']['claim_landed']} landed of "
       f"{len(claims)}, deaths {len(deaths)}, payroll {landed_payroll} landed of {len(payroll)}, returns {len(returns)}, "
       f"permitted {len(permitted)}, starters {len(starters)}, preparers {sum(counts.values())} prepared by 97 + 330")

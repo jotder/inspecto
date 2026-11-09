@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **76<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 61<!--count:backlog-p3--> × P3** —
+> **75<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 60<!--count:backlog-p3--> × P3** —
+> ⬇ **76 → 75 (P3 61 → 60) on 2026-11-09**: closed P3 defect `LA-GENERATOR-DELETE-FIRST-1` [items: layer.platform · kind: defect] — the eleven `tools/gen-la-*-data.py` generators that deleted every committed CSV before rewriting (card, health, crypto, benefits, ownership, mfs, procurement, logistics, insider, telco-ra, trade) now write through `tools/la_gen_io.py`: a file whose bytes are unchanged is left alone, a changed one goes to a temp name beside it and is moved onto the final name in one step, and only the files a run no longer writes are removed, after every write; a `PermissionError` (WinError 5/32, a file briefly held by a watcher or scanner) on a move or removal is retried 10 × 0.2 s. Output byte-identical; `gen-la-card-data.test.mjs` passed five runs back to back; `tools/la_gen_io.test.mjs` (in CI) pins skip-unchanged, prune-last and the retry.
 > ↔ **76 (no count change) on 2026-11-09**: filed and closed P2 defect `ALERT-VALUE-REFRESH-1` [items: addon.incidents, module.engine · kind: defect] — found in the showcase release boot test (plan step 10): a scalar Measure rule fired on a partial count while data was still landing and its open Alert kept that value (la-crypto opened at 1, the full count is 2); the open Alert is now refreshed in place each sweep, nothing new emitted (`MeasureAlertTest.anOpenBreachCarriesTheCurrentValueWithoutRaisingAgain`).
 > ⬆ **74 → 76 (P3 59 → 61) on 2026-11-09**: filed P3 defects `LA-TELCO-RA-LANDING-ORDER-1` [items: solution-pack.la-telco-ra · kind: defect] and `LA-GENERATOR-DELETE-FIRST-1` [items: layer.platform · kind: defect] — found while building the step 8 Advanced tiers.
 > ⬆ **73 → 74 (P3 58 → 59) on 2026-11-08**: filed P3 defect `LA-INDEX-BUILD-REFUSED-NPE-1` [items: module.engine, module.la-core · kind: defect] — found in the `la-mobile-money` Basic live check (plan step 5).
@@ -472,10 +473,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 61<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 61<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 76<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 60<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 75<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -708,7 +709,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 - **P3** · `LA-INDEX-BUILD-REFUSED-NPE-1` — **a refused `la.index.build` run fails with a NullPointerException instead of recording the refusal.** Found in the `la-mobile-money` Basic live check (2026-11-08, plan step 5); not Basic-specific. On a first boot its `la_index_build` cron (:45) fired before the first `mm_links` run (:50), so the build was refused (no Dataset yet). `LaIndexBuildJob.run` then put `mode: null` into the `LA_INDEX_BUILD_COMPLETED` signal payload, and `Event`'s `Map.copyOf` threw, so the run was logged as an ERROR with message `null` instead of the refusal. Every later build succeeded. Fix: leave a null `mode` (and any other null outcome field) out of the payload, as `code` already is, and pin a refused build's signal in a test. [items: module.engine, module.la-core · kind: defect]
 - **P3** · `LA-TELCO-RA-LANDING-ORDER-1` — **on a first boot, the `telco_ra_links` Job's `unbilled_months:` in `via` can read a month as unbilled because its billing file has not landed yet.** Found building the `la-telco-ra` Advanced tier (2026-11-09). The Advanced tier's counts Job judges a month only once its `billing_record` file has landed (pinned: 355 without the gate, 300 with it), but the Basic-tier link Job still counts usage months with no billing record as they land, so the `unbilled_usage` view can briefly over-count until the next run. Fix: the same billing-landed gate in `telco_ra_links`, and pin it as `aMonthWhoseBillingFileHasNotLandedIsNotReadAsUnbilled` does. The same class of transient was fixed for `la-utility`'s `transformer_loss` on 2026-11-08. [items: solution-pack.la-telco-ra · kind: defect]
-- **P3** · `LA-GENERATOR-DELETE-FIRST-1` — **the showcase data generators delete every committed CSV before rewriting them, so a run that fails partway leaves committed data deleted.** Seen with `tools/gen-la-card-data.py` (2026-11-09): on this Windows box a second back-to-back run hits `WinError 32` (another process, likely a file watcher or antivirus, holds a just-written CSV) while unlinking, exits 1, and leaves files missing; `gen-la-card-data.test.mjs`, which runs the generator twice, then fails most runs. Other `gen-la-*-data.py` scripts follow the same delete-then-write pattern. Fix: write each file to a temp name and replace it atomically (or retry the unlink), and delete only files the run no longer writes. [items: layer.platform · kind: defect]
 
 #### API contract & vocabulary
 

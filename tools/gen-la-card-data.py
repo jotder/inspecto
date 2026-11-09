@@ -31,6 +31,8 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-card" / "data"
 TRUTH = TOOLS / "gen-la-card-data.ground-truth.json"
@@ -455,7 +457,7 @@ assert 7 <= m221_ratio <= 12, f"M-221 chargebacks are {m221_ratio:.1f}x its cate
 def write(rel, header, rows):
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -468,8 +470,7 @@ def split(feed, header, rows, when):
     write(f"staged/{feed}/{up}_20261031.csv", header, [r for r in rows if when(r) > LANDED_END])
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 write("inbox/cardholder/CARDHOLDER_20260930.csv", ["holder_id", "name", "email", "phone", "address"],
       [[h["id"], h["name"], h["email"], h["phone"], h["address"]] for h in holders])
 write("inbox/card/CARD_20260930.csv", ["card_id", "bin", "holder_id", "issued_at"],
@@ -511,6 +512,7 @@ truth = {
                                  "fraud_day": {c: d.isoformat() for c, d in sorted(cpp_fraud_day.items())},
                                  "in_window_not_defrauded": cpp_window[60:], "background_fraud_cards": bg_fraud},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(f"cards {len(cards)}, auths {len(auths)}, chargebacks {len(chargebacks)}, online rows {len(online)}, "
       f"M-221 {m221_ratio:.1f}x its category, M-140 {len(m140_cb)} chargebacks, M-052 used by {len(used_m052)} cards")

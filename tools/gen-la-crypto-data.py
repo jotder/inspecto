@@ -37,6 +37,8 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-crypto" / "data"
 TRUTH = TOOLS / "gen-la-crypto-data.ground-truth.json"
@@ -534,7 +536,7 @@ def write(rel, header, rows):
         return
     f = DATA / rel
     f.parent.mkdir(parents=True, exist_ok=True)
-    with f.open("w", newline="", encoding="utf-8") as fh:
+    with out.open(f) as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -544,8 +546,7 @@ def ts(t: datetime) -> str:
     return t.strftime("%Y-%m-%d %H:%M:%S")
 
 
-for old in sorted(DATA.glob("*/*/*.csv")):
-    old.unlink()
+out = Outputs()
 
 transfers = sorted((r for r in transfers if r[4] <= T_END), key=lambda r: (r[4], r[0], r[1]))
 first_seen = {}
@@ -621,7 +622,8 @@ truth = {
                             "lookalike_cluster": otc_cluster, "lookalike_addresses": sorted(otc_addrs),
                             "lookalike_accounts": sorted(u["acct"] for u in otc_customers), "lookalike_banks": len(otc_banks)},
 }
-TRUTH.write_text(json.dumps(truth, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps(truth, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 c = truth["counts"]
 print(f"addresses {c['wallet_landed']} landed of {len(seen)}, transfers {c['transfer_landed']} landed of {len(transfers)}, clusters "
       f"{c['cluster_hint_landed']}, accounts {c['exchange_account_landed']}, persons {c['kyc_person_landed']}, cashouts {c['cashout_landed']}; "

@@ -34,6 +34,8 @@ from itertools import accumulate
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import Outputs
+
 TOOLS = Path(__file__).resolve().parent
 DATA = TOOLS.parent / "spaces" / "_templates" / "la-ownership" / "data"
 TRUTH = TOOLS / "gen-la-ownership-data.ground-truth.json"
@@ -481,7 +483,7 @@ stories["sanctions_two_hops"]["facts"]["near_namesake_score"] = round(near_score
 def write(rel: str, header: list[str], rows):
     p = DATA / rel
     p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("w", newline="", encoding="utf-8") as f:
+    with out.open(p) as f:
         w = csv.writer(f, lineterminator="\n")
         w.writerow(header)
         w.writerows(rows)
@@ -491,8 +493,7 @@ def iso(v):
     return v.isoformat() if isinstance(v, date) and not isinstance(v, datetime) else v.strftime("%Y-%m-%d %H:%M:%S")
 
 
-for old in DATA.glob("*/*/*.csv"):
-    old.unlink()
+out = Outputs()
 write("inbox/company/COMPANY_20260930.csv", ["company_id", "name", "jurisdiction", "incorporated_at", "reg_address"],
       [(c, v["name"], v["jurisdiction"], iso(v["incorporated_at"]), v["reg_address"]) for c, v in sorted(companies.items())])
 write("inbox/person/PERSON_20260930.csv", ["person_id", "name", "birth_year", "nationality"],
@@ -519,9 +520,10 @@ for m0, m1 in month_starts(START, STAGED_END):
 for s in stories.values():
     s["entities"] = sorted(set(s["entities"]))
     s["lookalikes"] = sorted(set(s["lookalikes"]))
-TRUTH.write_text(json.dumps({"note": "Story -> the entity ids that must form ONE connected group in the ownership_links Dataset, and "
-                                     "look-alike ids that must have no link to any of them. Written by tools/gen-la-ownership-data.py; "
-                                     "not part of the data download.", "seed": SEED, "min_name_score": MIN_NAME_SCORE,
-                             "stories": stories}, indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+out.write_text(TRUTH, json.dumps({"note": "Story -> the entity ids that must form ONE connected group in the ownership_links Dataset, and "
+                                          "look-alike ids that must have no link to any of them. Written by tools/gen-la-ownership-data.py; "
+                                          "not part of the data download.", "seed": SEED, "min_name_score": MIN_NAME_SCORE,
+                                  "stories": stories}, indent=1, sort_keys=True) + "\n")
+out.prune(DATA, "*/*/*.csv")
 print(f"companies {len(companies)}, persons {len(persons)}, ownership {len(ownership)}, officers {len(officers)}, "
       f"customers {len(customers)}+{len(staged_customers)} staged, payments {seq}, list {len(sanctions)}, name_match {matches}")

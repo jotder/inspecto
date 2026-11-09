@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-GENERATOR-DELETE-FIRST-1` | P3 | defect | the showcase data generators delete every committed CSV before rewriting them, so a run that fails partway leaves committed data deleted. | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | two licence calls on the tokenizers natives wait on the operator ((a) accepted 2026-11-01). | operator |
 | `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4, item 4.5, of the archived plan; wave map in okf/product/layer/product/plan-assuranc… | operator |
