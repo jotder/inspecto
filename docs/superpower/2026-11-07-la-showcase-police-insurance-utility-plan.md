@@ -2167,6 +2167,18 @@ deviations:
    and install guide; plus install, where to start, and the industry Spaces in progress. Linked from the la-showcase user
    guide.
 10. **Release:** build all 18 Space and 18 data downloads from one commit and publish them with the product.
+   **BUILT locally 2026-11-09 from `127bd077e`** (operator: product version as is, built locally only, Basic and Preview
+   demo products), in `C:\sandbox\la-release-out\` (not in git): `product\` (Basic with the Link Analysis UI, 246 MB;
+   Preview with Demo Auth, `-NoBakeDemo`, 417 MB; no Linux zip, since no Linux GraalVM jmods cache was on the build
+   box), `spaces\` and `data\` (18 each, `4.0.0-SNAPSHOT`), `SHA256SUMS.txt`, `README.txt`. Boot tests: Basic with
+   `la-card`, `la-police` and `la-telco-ra` unzipped side by side landed every Pipeline with 0 rejected, every link Job
+   produced, every Alert Rule stayed unarmed (WARN) with its alerts Job reporting no breach; Preview with `la-crypto` armed
+   its rule, the counts read 1 / 2 / 3, and `seed-la-crypto.mjs --base … --space la-crypto --apply` created 19 steps,
+   none failed. **Found:** the crypto Alert opened at value 1, not 2 — its link Job runs on every Pipeline commit, so the
+   rule fired on a partial count and the open Alert kept it. Fixed in the engine (`ALERT-VALUE-REFRESH-1`: an open
+   scalar-Measure Alert is refreshed in place each sweep); the two product zips above predate the fix and must be
+   rebuilt from a commit that has it (the Space and data zips carry no engine code and are unaffected). Also noted: the product zips attach no Space, but their template gallery carries each template's
+   data (about 45 MB).
 
 ## Open questions
 

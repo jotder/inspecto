@@ -53,7 +53,11 @@ Rule shapes evaluated (`AlertRule.java`):
 
 Re-fire suppression: ledger rules use a per-rule+Pipeline cooldown equal to the window (10 minutes for
 batch-count windows, minimum 1 minute). Measure rules are edge-triggered and re-arm only after
-`healAfterSweeps` consecutive healthy sweeps (default 1, max 1000). A breach emits `ALERT_FIRED` and a heal
+`healAfterSweeps` consecutive healthy sweeps (default 1, max 1000). While a breach stays open, each sweep refreshes
+the open Alert's value, message and fired record in place when the value moved (`ALERT-VALUE-REFRESH-1`, 2026-11-09;
+a `by` rule's aggregate Alert does the same, `ALERT-PER-RULE-1`), so an Alert raised while data was still landing ends
+up carrying the full figure; nothing new is emitted, and when the breach began is kept. An Incident promoted from
+that Alert keeps the value it was opened with, and a resolved Alert is never rewritten. A breach emits `ALERT_FIRED` and a heal
 `ALERT_CLEARED` to the [event log](../../module/event/architecture-overview.md); a CRITICAL breach is promoted to an Incident.
 
 Separately, `EventAlertBridge` turns `SEQUENCE_GAP` and `PIPELINE_CONSERVATION_IMBALANCE` Events (and file-problem

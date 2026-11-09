@@ -652,7 +652,10 @@ public final class AlertService {
                 // Edge-triggered like a by-rule key (TELECOM-ALERT-REFIRE-1): an already-open breach raises nothing
                 // new, however many sweeps re-read it — only a heal re-arms it. It used to re-fire every cooldown.
                 // measureOpen seeds a restart from the still-active ALERT, so a restart does not re-fire either.
-                if (measureOpen(rule, measureKey)) continue;
+                if (measureOpen(rule, measureKey)) {
+                    refreshMeasureAlert(rule, value.getAsDouble());   // ALERT-VALUE-REFRESH-1: carry the current value
+                    continue;
+                }
                 // Open only once an Alert was actually raised — a heal must never clear an Alert that never fired.
                 if (fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out))
                     openMeasures.put(measureKey, Boolean.TRUE);
@@ -905,6 +908,35 @@ public final class AlertService {
                 return Boolean.FALSE;
             }
         });
+    }
+
+    /**
+     * ALERT-VALUE-REFRESH-1: a scalar Measure rule is still breached and its Alert is open, so nothing is raised - but
+     * the value may have moved (a count read while data was still landing, then the full count). Refresh the open
+     * Alert in place, as {@link #refreshRuleAlert} does for a {@code by} rule: its value, message and fired record, and
+     * the fired-history entry. When the breach began stays as it was; no Event, Signal, notification or Incident is
+     * emitted. An unchanged value leaves the Alert untouched.
+     */
+    private void refreshMeasureAlert(AlertRule rule, double value) {
+        try {
+            String scope = rule.dataset();
+            String alertId = records.activeAlertIndex(scope, "rule").get(rule.name());
+            if (alertId == null) return;
+            AlertStore.Row row = records.findAlert(alertId).orElse(null);
+            if (row == null || row.fired() == null || Double.compare(row.fired().value(), value) == 0) return;
+            Alert prev = row.fired();
+            Alert next = Alert.of(rule, scope, textScope(rule, scope), value, prev.epochMillis()).withEvidence(prev.evidence());
+            Map<String, String> attrs = new LinkedHashMap<>(row.attributes());
+            attrs.put("value", String.valueOf(value));
+            if (!records.updateAlert(alertId, next.message(), attrs, next)) return;   // resolved meanwhile: history stays as it was
+            List<Alert> ring = new ArrayList<>(fired);
+            for (int i = 0; i < ring.size(); i++)
+                if (ring.get(i).rule().equals(rule.name()) && ring.get(i).epochMillis() == prev.epochMillis()) ring.set(i, next);
+            fired.clear();
+            fired.addAll(ring);
+        } catch (RuntimeException e) {
+            log.warn("could not refresh the value of the Alert of rule {}: {}", rule.name(), e.getMessage());
+        }
     }
 
     /**

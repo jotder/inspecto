@@ -105,6 +105,47 @@ class MeasureAlertTest {
                 byRule.get("few-orders").get("message"), "no label → the id");
     }
 
+    @Test
+    void anOpenBreachCarriesTheCurrentValueWithoutRaisingAgain(@TempDir Path dir) throws Exception {
+        // ALERT-VALUE-REFRESH-1: a showcase download's data lands month by month, so its rule fires while the count is
+        // still partial (1) and the full count (2) arrives while that Alert is open. The open Alert must carry the
+        // current value - in place, with no second Alert, Event or Signal (the breach stays edge-triggered).
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        subscribe(seen::add);
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        InMemoryAlertStore store = new InMemoryAlertStore();
+        AlertRule rule = new AlertRule("traced", null, "gte", 1, null, "CRITICAL", null, "trace_ds", "max(n)");
+        AlertService svc = new AlertService(List.of(rule), configs(cfg), emptyStore(),
+                AlertRecords.of(store, java.util.Optional.empty()), AlertRecords.incidentsOf(java.util.Optional.empty()));
+        AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(1.0));
+        svc.measureProbe((d, m) -> value.get());
+
+        assertEquals(1, svc.evaluate(null, 0).size(), "fires on the partial count");
+        String id = store.allActive().get(0).id();
+        value.set(OptionalDouble.of(2.0));
+        assertTrue(svc.evaluate(null, 1000).isEmpty(), "still one breach: nothing new is raised");
+
+        List<AlertStore.Row> open = store.allActive();
+        assertEquals(1, open.size(), "one open Alert");
+        assertEquals(id, open.get(0).id(), "the same Alert, refreshed in place");
+        assertEquals("2.0", open.get(0).attributes().get("value"));
+        assertEquals(2.0, open.get(0).fired().value(), 1e-9);
+        assertTrue(open.get(0).message().contains(" 2,") || open.get(0).message().contains(" 2 "), open.get(0).message());
+        assertEquals(0L, open.get(0).fired().epochMillis(), "it still says when the breach began");
+        assertEquals(1, seen.stream().filter(e -> EventType.ALERT_FIRED.equals(e.type())).count(), "one fired Event");
+        assertEquals(2.0, ((Number) svc.recent(10).get(0).get("value")).doubleValue(), 1e-9,
+                "the fired-Alert history shows the current value too");
+
+        AlertStore.Row before = store.allActive().get(0);
+        svc.evaluate(null, 2000);   // still 2
+        assertEquals(before, store.allActive().get(0), "an unchanged value leaves the Alert exactly as it is");
+
+        value.set(OptionalDouble.of(3.0));
+        store.transition(id, "resolve", "operator");   // an operator closes it: a closed Alert is history, never rewritten
+        svc.evaluate(null, 3000);
+        assertEquals("2.0", store.get(id).orElseThrow().attributes().get("value"), "a resolved Alert keeps its last value");
+    }
+
     private static AlertRule measureRule2(String dataset) {
         return new AlertRule("few-orders", null, "lt", 1000, null, "WARNING", null, dataset, "count");
     }
