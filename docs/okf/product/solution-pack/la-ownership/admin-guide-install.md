@@ -121,6 +121,14 @@ carries no date a stake was registered, so a per-build "new path" count is not b
 `sanctioned_owner_path` shows the path. The rule is not grouped by customer, because `ownership_sanctions_counts` is a
 Job output: a `by` column cannot be checked against its Schema when the Space is created.
 
+**Checked live (2026-11-09 release).** On the Preview demo product, with all twelve showcases of that day in one server,
+the 18 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **1 (CRITICAL)**,
+`seed-la-ownership.mjs --apply` created 17 steps with none failed, and every persona got the answers in the table above
+(the held expand ran once the manager approved it). Unlike the other link Jobs, `ownership_links` has no `*/5` cron
+fallback: a file that lands while it runs is not caught up until the next landing (`LA-OWNERSHIP-NO-CRON-FALLBACK-1`).
+On Basic the rule stayed unarmed and the Space had no Alert. Method and record:
+[showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
+
 ## 6. Rebuild the downloads (maintainers)
 
 | Step | Command |

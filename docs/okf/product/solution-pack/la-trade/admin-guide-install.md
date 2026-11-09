@@ -125,6 +125,12 @@ met after every build (one open Alert, not one per build). It names no company; 
 rule is not grouped by pair, because `trade_over_reference_counts` is a Job output: a `by` column cannot be checked
 against its Schema when the Space is created.
 
+**Checked live (2026-11-09 release).** On the Preview demo product, with all twelve showcases of that day in one server,
+the 62 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **14 (WARNING)**,
+`seed-la-trade.mjs --apply` created 19 steps with none failed, and every persona got the answers in the table above (the
+held expand ran once the manager approved it). On Basic the rule stayed unarmed and the Space had no Alert. Method and
+record: [showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
+
 ## 7. Rebuild the downloads (maintainers)
 
 | Step | Command |

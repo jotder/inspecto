@@ -7,7 +7,7 @@ data/staged/<feed>/ (the next month, 2026-10, for the "new data arrives" step) f
   contract_change (one landed extract, one staged month)
 and tools/gen-la-procurement-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 7; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 7; pinned by
 tools/gen-la-procurement-data.test.mjs over the files and ProcurementLinksJobGoldenTest over the link Datasets):
   1 BID ROTATION        4 road firms win the 24 Highways North road-maintenance tenders in turn; only they bid; the losing bids are
                         5-12 % above the winner (never identical); 2 of the firms share a director

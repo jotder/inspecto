@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase plan, Distribution and install layout](../../../../superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-showcase-catalogue.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`SPACES_DATA_ROOT`).
 
 | Download | File | Unzip into |
@@ -121,6 +121,12 @@ reads money out, not how many swaps a login made. No balance is computed (the da
 no takeover and leaves it at 30. It names no wallet or login; `mfs_sim_swap_bursts` shows them. The rule is not grouped
 by login, because `mfs_swap_drain_counts` is a Job output: a `by` column cannot be checked against its Schema when the
 Space is created.
+
+**Checked live (2026-11-09 release).** On the Preview demo product, with all twelve showcases of that day in one server,
+the 51 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **30 (WARNING)**, `seed-la-mfs.mjs --apply`
+created 19 steps with none failed, and every persona got the answers in the table above (the held expand ran once the
+manager approved it). On Basic the rule stayed unarmed and the Space had no Alert. Method and record:
+[showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
 
 ## Rebuild the downloads (maintainers)
 

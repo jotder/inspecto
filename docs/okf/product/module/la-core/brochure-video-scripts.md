@@ -5,7 +5,7 @@
 *Audience: marketing, presales and the video agency. Product Map Item `module.la-core`. Draft of 2026-11-08, not
 yet reviewed by product or legal. Every product claim below is taken from the
 [Link Analysis user guide](user-guide-link-analysis.md); every story, id and figure in the industry videos is
-taken from the showcase plan (`docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md`) and,
+taken from the showcase plan (`docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md`) and,
 for a built Space, its generator's ground truth file. The [whitepaper](brochure-inspecto-la-whitepaper.md) is the
 reference for anything wider.*
 

@@ -15,8 +15,9 @@ truth. Every story has a benign look-alike that must not join it; the user guide
 real people, businesses or plates.
 
 This page helps you pick one. The screens are the shared studio ones, described in the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Design and plan:
-[showcase plan](../../../../superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md).
+[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). How the catalogue is built and shipped:
+[catalogue architecture](architecture-showcase-catalogue.md); building and boot-testing a release:
+[release guide](admin-guide-showcase-release.md).
 
 ## Where to start
 
@@ -163,5 +164,5 @@ the industry Spaces land.
 
 ## References
 
-[la-showcase hub](index.md) · [showcase plan, Distribution and install layout](../../../../superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md#distribution-and-install-layout) ·
+[la-showcase hub](index.md) · [Distribution and install layout](architecture-showcase-catalogue.md#distribution-and-install-layout) ·
 [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md)

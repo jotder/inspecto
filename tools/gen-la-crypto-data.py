@@ -8,7 +8,7 @@ month, 2026-10, for the "new data arrives" step) for six feeds:
   address), kyc_person (name, birth year, country), cashout (an exchange account paying out to a bank account, by month)
 and tools/gen-la-crypto-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 13; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 13; pinned by
 tools/gen-la-crypto-data.test.mjs over the files and CryptoLinksJobGoldenTest over the link Datasets):
   1 PEEL CHAIN          412.5 SYC is stolen from a wallet labelled hacked in one transfer on 2026-03-14 (about three quarters of what it was sent); the thief's address then peels small amounts
                         over 80 hops (one transfer in, two out: a small peel and the change to a fresh address) into 6 exchange

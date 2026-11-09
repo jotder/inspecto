@@ -6,7 +6,7 @@ event feeds, data/staged/<feed>/<FEED>_20261130.csv (the next month, for the "ne
   incident_report, person, incident_person, vehicle, plate_read, call_record, handset, custody, dealer_sale, property_stolen, address
 plus tools/la-police-ground-truth.json (story -> entity ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, la-police; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, la-police; pinned by
 tools/gen-la-police-data.test.mjs on the files and LaPoliceLinksJobTest on the link Job's output):
   1 BURGLARY SERIES   18 burglaries in Feb-Apr 2026 across Leeds North and Leeds East; 40 % of the stolen items resurface at
                       DLR-04 and DLR-09 through 3 sellers, the serial matches on 60 % of those; a vehicle kept by one seller's

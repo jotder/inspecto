@@ -95,8 +95,9 @@ home; `tools/seed-la-showcase.mjs` and `tools/seed-la-mm.mjs` create them agains
 - Both templates are demos on synthetic data and need the Demo Auth build (`serve-demo`) for the Demo
   Users.
 - Investigations and Entity Lists are not part of the template; the seed scripts must be run.
-- `la-showcase` and `la-mobile-money` are not in any offering's `contentPacks` list; only
-  `la-daily-feed` is (`offerings/basic.toon`).
+- Since 2026-11-08 both have a Basic tier (`minEdition: basic`) and are in `offerings/basic.toon` `contentPacks` with
+  every other showcase; their Demo Users, Alert Rules and Investigations are the inert Advanced tier there
+  ([catalogue architecture](architecture-showcase-catalogue.md#edition-rule-a-basic-tier-and-an-inert-advanced-tier)).
 - The AML pack ships its own Link Analysis starter view (see [AML](../aml/architecture.md)).
 
 ## Showcase design rules (decided 2026-10-16 for the three vertical showcases)

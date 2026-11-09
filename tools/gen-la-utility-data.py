@@ -7,7 +7,7 @@ month, 2026-10, for the "new data arrives" step) for eight feeds:
   field_visit, service_order, prepaid_vend, payment (one landed extract, one staged month)
 and tools/gen-la-utility-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, section 3; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, section 3; pinned by
 tools/gen-la-utility-data.test.mjs over the files and UtilityLinksJobGoldenTest over the link Dataset):
   1 METER TAMPERING        22 premises under the metered transformers TX-007 and TX-019 drop 40-70 % within 2 weeks of a visit by
                            contractor C-14 (3 of the visits are joint with C-22); transformer supply stays flat, so loss rises

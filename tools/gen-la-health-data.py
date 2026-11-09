@@ -7,7 +7,7 @@ next month, 2026-10, for the "new data arrives" step) for nine feeds:
   month), admission (by admission month), referral (by referral month), prescription (by fill month)
 and tools/gen-la-health-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 9; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 9; pinned by
 tools/gen-la-health-data.test.mjs over the files and HealthLinksJobGoldenTest over the link Datasets):
   1 REFERRAL KICKBACKS  2 York general practices send 85 % of their referrals to one imaging centre; the centre's owner lives
                         at the same home as the owner of one of the practices (spouses)

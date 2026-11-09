@@ -297,7 +297,7 @@ for i, prov in enumerate(GARAGES + CLINICS + LAWYERS):
     kind = {"GAR": "garage", "CLI": "clinic", "LAW": "lawyer"}[prov[:3]]
     directory.append([prov, f"{pick(LAST)} {NAMES[prov[:3]]}", kind, city, f"{lat:.5f}", f"{lon:.5f}"])
 
-# ---- additions (plan docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 2) -------------------------
+# ---- additions (plan docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 2) -------------------------
 # A SECOND seeded Random, drawn only after everything above, so every row of stories 1-7 is unchanged.
 rng2 = random.Random(20261107)
 SUPPLIERS = [f"SUP-{i:02d}" for i in range(1, 11)]

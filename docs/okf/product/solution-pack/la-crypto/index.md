@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-crypto` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `LA-SHOWCASE-CATALOGUE-1` | P2 | feature | ten more showcase Spaces, one lane each: la-card, la-ownership, la-trade, la-procurement, la-benefits, la-health, la-telco-ra, la-logisti… | — |
+_No open rows._

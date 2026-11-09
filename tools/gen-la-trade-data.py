@@ -10,7 +10,7 @@ The world: 300 vessels on 30 liner services that call 25 invented ports in 24 re
 loop day by day, so vessel_position holds one row per vessel per day (a port, or "At sea - <area>"), and every genuine bill of
 lading is dated on a day its vessel really was in its port of loading.
 
-Planted stories (plan docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 6):
+Planted stories (plan docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 6):
   1 OVER-INVOICING     14 shipments of integrated circuits (HS 854231) at 3-8x the reference price, from a Hong Kong exporter to
                        a UK importer that share a director.  Look-alike: a German specialty supplier of medical instruments
                        (HS 901890) whose prices sit at 3.3-3.9x the reference all year, to 8 unrelated buyers, no shared director.

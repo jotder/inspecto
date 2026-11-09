@@ -2,7 +2,7 @@
 // package-la-showcase.mjs — turn a Link Analysis showcase template into its two downloads (LA-SHOWCASE-DIST-1, 2026-11-07).
 //
 // The product bundle ships no Spaces; a showcase is attached beside it from two more downloads, so each can be updated
-// on its own (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, "Distribution and install
+// on its own (docs/okf/product/solution-pack/la-showcase/architecture-showcase-catalogue.md, "Distribution and install
 // layout"):
 //
 //   inspecto-la-space-<id>-<version>.zip   <id>/space.toon + <id>/config/**      -> unzip into <parent>/inspecto-la-spaces/

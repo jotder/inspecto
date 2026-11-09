@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase plan, Distribution and install layout](../../../../superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-showcase-catalogue.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`SPACES_DATA_ROOT`).
 
 | Download | File | Unzip into |
@@ -123,6 +123,14 @@ TX-019 reaches 15 % from March 2026 (TX-007 from July); with all twelve months i
 other metered transformer, the holiday home's included, stays under 7 %. Open `transformer_loss` (`loss_band = loss over
 threshold`) to see which transformer. The rule is not grouped by transformer, because `transformer_loss` is a Job
 output: a `by` column cannot be checked against its Schema when the Space is created.
+
+**Checked live (2026-11-09 release).** On the Preview demo product, with all twelve showcases of that day in one server,
+the 30 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **24.7 (CRITICAL)**,
+`seed-la-utility.mjs --apply` created 21 steps with none failed, and every persona got the answers in the table above
+(the held expand ran once the manager approved it). The Alert opens at the first crossing of 15 % while the months land
+and is refreshed in place to the current highest loss, 24.7 % on TX-019, keeping its first-fire time. On Basic the rule
+stayed unarmed and the Space had no Alert. Method and record:
+[showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
 
 ## Rebuild the downloads (maintainers)
 

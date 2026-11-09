@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SHOWCASE-POLICE-UTILITY-1` | P2 | feature | two new Link Analysis showcase Spaces, la-police (criminal investigation) and la-utility (electricity revenue protection), each a templat… | — |
+| `LA-SHOWCASE-VARIANTS-ON-DEMAND-1` | P3 | feature | two showcase variants that wait for a market: police wording per target market (UK, US, India), and a water variant of la-utility. | demand |

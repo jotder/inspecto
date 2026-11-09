@@ -8,7 +8,7 @@ next month, 2026-10, for the "new data arrives" step) for eight feeds:
   (one landed file, one staged)
 and tools/gen-la-logistics-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 11; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 11; pinned by
 tools/gen-la-logistics-data.test.mjs over the files and LogisticsLinksJobGoldenTest over the link Datasets).
   1 INSIDE JOB          12 short-delivered loads share one driver pair (a two-driver team); one night-shift scanner at the
                         Nottingham warehouse scanned 10 of them out

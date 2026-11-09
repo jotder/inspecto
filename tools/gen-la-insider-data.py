@@ -8,7 +8,7 @@ next month, 2026-10, for the "new data arrives" step) for six feeds:
   external domain and day), expense (one file per month), vendor_change (one landed file, one staged)
 and tools/gen-la-insider-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 12; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 12; pinned by
 tools/gen-la-insider-data.test.mjs over the files and InsiderLinksJobGoldenTest over the link Datasets).
   1 LEAVER EXFILTRATION  a customer account specialist gives notice, then reads about 20x their normal customer records
                          in the customer system for three weeks and mails 1.2 GB of attachments to a personal mail domain

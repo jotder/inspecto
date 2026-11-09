@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SHOWCASE-CATALOGUE-1` | P2 | feature | ten more showcase Spaces, one lane each: la-card, la-ownership, la-trade, la-procurement, la-benefits, la-health, la-telco-ra, la-logisti… | — |
+| `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` | P3 | defect | on a first boot la-telco-ra's Alert Rule fires, clears and fires again, leaving a stray RESOLVED Alert beside the OPEN one. | — |

@@ -9,7 +9,7 @@ next month, 2026-10, for the "new data arrives" step) for seven feeds:
   trunk, destination and day, by month)
 and tools/gen-la-telco-ra-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 10; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 10; pinned by
 tools/gen-la-telco-ra-data.test.mjs over the files and TelcoRaLinksJobGoldenTest over the link Datasets). SIM box, Wangiri and
 IRSF are la-showcase's; this Space does not repeat them.
   1 UNBILLED USAGE      300 SIMs activated by one dealer on one device on one day (2026-03-17) use the network heavily every

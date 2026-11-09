@@ -32,4 +32,7 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-utility` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-UTILITY-LOOKALIKE-CHECKS-1` | P3 | defect | two la-utility look-alike checks are weaker than they read. | — |
+| `LA-SHOWCASE-VARIANTS-ON-DEMAND-1` | P3 | feature | two showcase variants that wait for a market: police wording per target market (UK, US, India), and a water variant of la-utility. | demand |

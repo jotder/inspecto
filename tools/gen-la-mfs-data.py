@@ -9,7 +9,7 @@ month, 2026-10, for the "new data arrives" step) for seven feeds:
   agent_commission (one row per agent and month)
 and tools/gen-la-mfs-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 14; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 14; pinned by
 tools/gen-la-mfs-data.test.mjs over the files and MfsLinksJobGoldenTest over the link Datasets). la-mobile-money covers wallet
 anti-money-laundering (structuring, mule chains, a device farm); this Space covers fraud AGAINST the MFS business and its customers
 and shares no data, names or ids with it.

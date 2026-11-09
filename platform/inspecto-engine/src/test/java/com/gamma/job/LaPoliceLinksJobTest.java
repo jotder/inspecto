@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the link Dataset, and the three derived Jobs build the Datasets the saved views read. Pins the link contract and, against
  * the generator's ground truth ({@code tools/la-police-ground-truth.json}), that every story's entities link up inside the
  * Dataset of its saved view and that no benign look-alike is linked to any story entity
- * (plan docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, la-police).
+ * (plan docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, la-police).
  */
 class LaPoliceLinksJobTest {
 

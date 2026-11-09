@@ -6,7 +6,7 @@ spaces/_templates/la-ownership/data/staged/<feed>/ (October 2026, copied in duri
   company, person, ownership, officer, customer, payment (one file per month), sanctions_list
 and tools/gen-la-ownership-data.ground-truth.json (story -> entity ids and look-alike ids; NOT part of the data download).
 
-Planted stories (plan docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 5):
+Planted stories (plan docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 5):
   1 HIDDEN OWNER       one person reaches 4 customers through a 5-layer chain across 3 jurisdictions (CY, VG, AE); every stake on
                        the chain is 24 %, under a 25 % disclosure threshold; at the bottom three of the chain's vehicles hold
                        24 + 24 + 13 = 61 % of each customer.  Look-alike: a listed company holding 61 % of 4 customer

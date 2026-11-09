@@ -8,7 +8,7 @@ next month, 2026-10, for the "new data arrives" step) for seven feeds:
   month filed)
 and tools/gen-la-benefits-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 8; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 8; pinned by
 tools/gen-la-benefits-data.test.mjs over the files and BenefitsLinksJobGoldenTest over the link Datasets):
   1 ADDRESS FARM        14 claimants under 5 surnames at one address, each declaring a single-person household, paid into 3
                         accounts that nobody else uses

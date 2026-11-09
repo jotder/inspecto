@@ -65,4 +65,4 @@ not part of the data download.
 
 ## References
 
-[User guide](user-guide.md) · [Install](admin-guide-install.md) · plan: `docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md` spec 5
+[User guide](user-guide.md) · [Install](admin-guide-install.md) · plan: `docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md` spec 5

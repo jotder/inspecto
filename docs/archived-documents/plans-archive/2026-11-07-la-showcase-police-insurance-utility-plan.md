@@ -1,6 +1,9 @@
 # Link Analysis showcase catalogue — police, insurance, utility and fifteen more (plan)
 
-Status: draft, 2026-11-07; scope widened the same day to the **full catalogue** (operator: "ship the full
+**Status: SHIPPED 2026-11-09, archived** (steps 1–10 built; the release built locally from `1963c661b` and its live
+proofs of the 13 Advanced tiers PASS, step 8). Durable facts: the `solution-pack/la-showcase` hub
+(`architecture-showcase-catalogue.md`, `admin-guide-showcase-release.md`, `user-guide-showcase-catalogue.md`) and each
+Space's hub; open items: `docs/BACKLOG.md`. History of the status line: draft, 2026-11-07; scope widened the same day to the **full catalogue** (operator: "ship the full
 Showcase catalogue for users to play, learn and test"); 2026-11-08 the catalogue is grouped by industry and
 `la-mfs` added. Product Map Items: existing `solution-pack.la-claims`,
 `solution-pack.la-showcase`, `solution-pack.la-mobile-money`, `solution-pack.la-audit`; one new
@@ -200,8 +203,9 @@ by replacing `inspecto-la/` without touching any Space or data.
 
 ### Still open for distribution
 
-- **Install guide:** a short admin-guide page per showcase with the three unzip steps and the start command
-  (lands with each showcase's hub, plan step 6).
+- ~~**Install guide:** a short admin-guide page per showcase with the three unzip steps and the start command
+  (lands with each showcase's hub, plan step 6).~~ — done: every new Space's hub has `admin-guide-install.md`; the
+  four older showcases have their runbooks.
 
 ### Edition rule
 
@@ -464,7 +468,7 @@ Rule on a transformer's loss going over 15 %; seed script `tools/seed-la-utility
 - **Missed last landing (worked around 2026-11-08):** `utility_links` and `transformer_loss` also run on
   `cron: "*/5 * * * *"`, as `la-card` does, because a `pipeline.commit` that lands while a run is in flight is skipped,
   not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`).
-- **Known gaps (open):**
+- **Known gaps (open, filed as `LA-UTILITY-LOOKALIKE-CHECKS-1`):**
   - The prepaid look-alike V-01 sells in another city, so its "no look-alike joins" check cannot fail.
   - Look-alikes are kept free of direct links only; some sit two hops from a story through a shared contractor.
 - **Live proof on Basic:** recorded at step 3 under Steps.
@@ -1394,8 +1398,45 @@ deviations:
      more unbilled months, the latest still unbilled).
    - Each lane was verified independently on its integration commit (targeted tests, one falsification by the
      verifier); the full reactor gate was not run per lane.
-   - **Not checked for any of the twelve 2026-11-09 Spaces:** a live Preview build with Demo Auth (rule armed and firing,
-     the seed's `--apply`, persona probes), a Basic bundle boot of the Advanced tier, the Link Analysis UI, an OIDC build.
+   - **Live proofs of the twelve 2026-11-09 Advanced tiers, PASS (2026-11-09, the release rebuilt from `1963c661b`).**
+     Method: the product zips plus the 12 Space and 12 data zips from `C:\sandbox\la-release-out`, laid out as the
+     README's three sibling folders, ALL 12 Spaces in ONE server per product (so the Demo User rosters coexist: no
+     `ROSTER_CONFLICT`, every persona signed in). Preview demo (`serve-demo`, port 8180) and Basic (`serve.bat`, port
+     8190), launched from a `.cmd` file (Git Bash mangles `..\` in `SPACES_ROOT`). Waited for every inbox file to land
+     and at least one `*/5` cron after the last landing; no Job triggered by hand. Alerts read through
+     `GET /api/v1/spaces/<id>/alerts`; seeds `node tools/seed-la-<id>.mjs --base … --space <id> --apply` (a second run
+     idempotent); persona probes with Demo Auth tokens (`POST /api/v1/auth/exchange`): Working Set read, add a step,
+     approval inbox, approve the held expand. Preview: 0 ERROR lines and 0 rejected / error rows / quarantined in every
+     Space:
+
+     | Space | files landed | OPEN Alert value | seed created / failed | persona checks |
+     |---|---|---|---|---|
+     | la-utility | 30 | 24.7 CRITICAL (fired at the first crossing, refreshed in place to max(loss_pct) = TX-019 2026-09) | 21 / 0 | 18/18 |
+     | la-card | 17 | 60 WARNING | 19 / 0 | 18/18 |
+     | la-ownership | 18 | 1 CRITICAL | 17 / 0 | 18/18 |
+     | la-trade | 62 | 14 WARNING | 19 / 0 | 18/18 |
+     | la-procurement | 29 | 16 WARNING | 19 / 0 | 18/18 after one retry (a manager approve answered 422 during a cron rebuild of the link Dataset; 200 30 s later) |
+     | la-benefits | 40 | 9 WARNING | 20 / 0 | all gates held (the second approved expand admitted 0 new entities: an earlier threshold step) |
+     | la-health | 53 | 159 WARNING | 19 / 0 | 18/18 |
+     | la-mfs | 51 | 30 WARNING | 19 / 0 | 18/18 |
+     | la-telco-ra | 51 | 300 WARNING (+ 1 RESOLVED Alert at 4 from the first boot) | 19 / 0 | 18/18 |
+     | la-logistics | 52 | 5 WARNING | 19 / 0 | 18/18 |
+     | la-insider | 39 | 8 WARNING | 19 / 0 | 18/18 |
+     | la-crypto | 28 | 2 CRITICAL | 19 / 0 | 18/18 |
+
+     Persona checks: analyst, reviewer and manager read the Working Set (200), the outsider 404; reviewer add-step 403,
+     outsider 403/404; analyst inbox 403; analyst and reviewer approve 403; the manager's inbox holds the expand, approve
+     200, the expand runs with `decidedBy` = manager. Basic: every Space landed with 0 rejected, "Not arming alert rule
+     '<rule>'" WARN, its alerts Job always "no rule breached", 0 Alerts, `maskingModeInForce: none`, 0 ERROR lines.
+     Findings (none a failure of a tier; filed in `docs/BACKLOG.md`): the la-telco-ra stray RESOLVED Alert
+     (`LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1`); la-logistics' saved view `driver_team_inside_job.toon` read by the Job
+     loader (`JOB-LOADER-SAVED-VIEW-SUFFIX-1`); la-ownership's `ownership_links` with no cron fallback
+     (`LA-OWNERSHIP-NO-CRON-FALLBACK-1`); `alert.evaluate` logging "no rule breached" while an Alert stays OPEN
+     (`ALERT-EVALUATE-NO-BREACH-WORDING-1`). Noise, not filed: each link Job's one transient `__no_readable_files__`
+     retry at first boot; Preview's DatasetMeasureProbe "No files found" WARNs before the counts Datasets exist.
+   - **Still not checked for the twelve:** the Link Analysis UI (the personas were checked through the API), an OIDC
+     sign-in build, the composed industry Spaces booted with these tiers (the industry Spaces plan), the Geo Views on
+     Standard (`LA-SHOWCASE-RELEASE-RESIDUALS-1`).
    **`la-police` BUILT 2026-11-08.** As built:
    - **In the template, inert on Basic** (the Edition rule as settled 2026-11-08): `config/demo-users.toon` (`admin`,
      `police.analyst` lead, `police.sio` second approver, `police.reviewer` read-only, `police.outsider` not a member),
@@ -1469,7 +1510,9 @@ deviations:
        allow one Alert per transformer; not built.
      - **`transformer_loss` balances a month only once both sides have landed** (`JOIN`, was `LEFT JOIN`). On the first
        Preview boot a month's `transformer_read` file landed before its `meter_read` file, the month read as 100 % loss, and
-       the Alert fired at 100. Now it fires at the first real crossing (15.2 % on TX-019).
+       the Alert fired at 100. Now it fires at the first real crossing of 15 % (TX-019, while the months land),
+       and since `ALERT-VALUE-REFRESH-1` (2026-11-09) the open Alert is refreshed in place to the current
+       max(loss_pct): 24.7 % (TX-019, 2026-09) once every month is in.
      - The Draft step annotates `C-14` (in the Working Set) about `C-22`: `C-22` is two hops out, and annotating it was
        refused ("not in the Working Set").
    - **Tests:** `LaUtilityTemplateTest` (inspecto: masking unset, `none` without sign-in and `typed` with `auth.mode=demo`;
@@ -1480,7 +1523,8 @@ deviations:
      Demo Auth installed.
    - **Live proof on Preview** (`package.ps1 -Edition Preview -DemoAuth -NoUi -NoBakeDemo`, the Space laid out with
      `seed-la-utility.mjs --scaffold`, `serve-demo`): 30 files landed, 0 rejected; the rule was armed at boot and fired
-     once (CRITICAL, 15.2 %, state OPEN). `seed-la-utility.mjs --apply` created every step (the Draft on the second run,
+     once (CRITICAL, state OPEN; it opened at 15.2 % then, before `ALERT-VALUE-REFRESH-1`; the 2026-11-09 release proof
+     below shows it refreshed to 24.7 %). `seed-la-utility.mjs --apply` created every step (the Draft on the second run,
      after the fix above), none failed. Probes, 11 of 11: the five personas sign in; `rp.analyst` reads `tampering-case`;
      `rp.outsider` gets 404 on it; `rp.reviewer` reads it (200) and a write is refused (403); `rp.manager`'s approval
      inbox holds the expand (`rp.analyst`'s inbox is 403); the Alert is listed. Every persona, `rp.outsider` included, reads
@@ -1489,9 +1533,13 @@ deviations:
      rejected; "Not arming alert rule 'utility_transformer_loss'" (WARN); `utility_loss_alerts` ran and reported no rule
      breached; the three data Jobs produced 4 301, 144 and 441 rows; the gallery lists `la-utility` creatable with no
      missing feature; masking in force `none`. 0 ERROR lines.
-   - **Not checked:** the Link Analysis UI (no UI in either bundle; the personas were checked through the API), the
-     packed downloads on Preview (the Space was scaffolded; the downloads carry the same `config/`), the Investigation's
-     embed link, and an OIDC sign-in build.
+   - **Live proof of the release, 2026-11-09** (packed downloads from `1963c661b`, all twelve Spaces in one server per
+     product; method in step 8): Preview demo: 30 files landed, 0 rejected, one OPEN Alert at 24.7 CRITICAL (fired at
+     the first crossing, refreshed in place to max(loss_pct) = TX-019 2026-09), `seed-la-utility.mjs --apply` 21 created
+     / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN), `utility_loss_alerts` no rule
+     breached, masking `none`. So the packed downloads on Preview are now checked too.
+   - **Not checked:** the Link Analysis UI (the personas were checked through the API), the Investigation's embed link,
+     and an OIDC sign-in build.
 
    **`la-card` BUILT 2026-11-09** (finishing a half-done lane; the `la-utility` pattern, the `la-police` counts-Job rule). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`card.analyst` lead, `card.manager`
@@ -1533,10 +1581,11 @@ deviations:
      383 terminals in all), `masking_mode: typed`, `fraud-analyst` removed, `card-analyst` given the approve capability,
      `admin` back to `card-analyst`, `la-card` out of the gallery's Basic-tier set, and in the seed: the outsider made a
      member, the Draft annotating a card to reissue, `M-052` added to the seed.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 60, the seed's
-     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `card_compromise_alerts` reporting no breach, 0
-     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 17 files landed, 0 rejected, one OPEN Alert at 60 WARNING, `seed-la-card.mjs --apply` 19
+     created / 0 failed, persona checks 18/18 (the held expand approved by `card.manager` ran); Basic: 0 rejected, the
+     rule unarmed (WARN), `card_compromise_alerts` no rule breached, masking `none`. **Not checked:** the Link Analysis
+     UI, the composed *Banking and finance* industry Space with this tier, an OIDC build.
 
    **`la-mfs` BUILT 2026-11-09** (the `la-card` pattern: personas, four-eyes, a registry rule over a counts Job). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`mfs.analyst` lead, `mfs.manager`
@@ -1590,10 +1639,11 @@ deviations:
    - ***Telecom* composition:** the packer joins `config/demo-users.toon` (users by id) and `config/roles.toon` (roles
      by name) since the `la-ownership` lane, so `la-telco-ra`'s roster composes with this one; `admin`, `fraud-analyst`,
      `la-viewer` and `la-settings` are byte-identical to la-card's.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 30, the seed's
-     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `mfs_swap_drain_alerts` reporting no breach, 0
-     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the Link Analysis UI, the composed *Telecom* industry Space with this tier, an OIDC build.
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 51 files landed, 0 rejected, one OPEN Alert at 30 WARNING, `seed-la-mfs.mjs --apply` 19
+     created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN), `mfs_swap_drain_alerts` no
+     rule breached, masking `none`. **Not checked:** the Link Analysis UI, the composed *Telecom* industry Space with
+     this tier, an OIDC build.
 
    **`la-health` BUILT 2026-11-09** (the `la-card` pattern). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`health.analyst` lead, `health.manager`
@@ -1652,11 +1702,11 @@ deviations:
      the approve capability; `admin`'s title changed; `la-health` out of the gallery's Basic-tier set; and in the seed:
      the outsider made a member, the Draft annotating an admitting hospital (`PR-0199`), the look-alike `PR-0632` added
      to the seed.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 159, the seed's
-     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `health_phantom_alerts` reporting no breach, 0
-     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the Link Analysis UI, the composed *Healthcare* industry Space (`la-healthcare`) with this tier, an OIDC
-     build, the full reactor gate.
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 53 files landed, 0 rejected, one OPEN Alert at 159 WARNING, `seed-la-health.mjs --apply` 19
+     created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN), `health_phantom_alerts` no
+     rule breached, masking `none`. **Not checked:** the Link Analysis UI, the composed *Healthcare* industry Space
+     (`la-healthcare`) with this tier, an OIDC build, the full reactor gate.
 
    **`la-benefits` BUILT 2026-11-09** (the `la-card` pattern). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`benefits.analyst` lead,
@@ -1710,11 +1760,12 @@ deviations:
      `benefits.outsider` given `benefits-manager`, `admin` given `benefits-analyst` instead of `fraud-analyst`,
      `fraud-analyst` without `canRevealLinkEntities`, `la-benefits` out of the gallery's Basic-tier set, and in the seed:
      the outsider made a member, the Draft annotating an address, the look-alike added to the Entity List.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 9, the seed's `--apply`,
-     the persona probes) and no Basic bundle (rule unarmed, `benefits_deceased_alerts` reporting no breach, 0 rejected);
-     the expands' `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
-     Link Analysis UI, the composed *Public sector* industry Space booted (it packs: the packer merges both rosters), the
-     staged month landing (it adds new claims only, starting 2026-10-01 to 2026-10-31, which moves the running-claim
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 40 files landed, 0 rejected, one OPEN Alert at 9 WARNING, `seed-la-benefits.mjs --apply` 20
+     created / 0 failed; every persona gate held (the second approved expand admitted 0 new entities, because of an
+     earlier threshold step); Basic: 0 rejected, the rule unarmed (WARN), `benefits_deceased_alerts` no rule breached,
+     masking `none`. **Not checked:** the Link Analysis UI, the composed *Public sector* industry Space booted (it packs:
+     the packer merges both rosters), the staged month landing (it adds new claims only, starting 2026-10-01 to 2026-10-31, which moves the running-claim
      cut-off to 2026-10-31 and changes no figure: re-run in DuckDB at integration, 9 / 314 / 5), an OIDC build.
 
    **`la-procurement` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
@@ -1764,10 +1815,12 @@ deviations:
    - ***Public sector* industry Space:** the roster files compose with `la-benefits`' once it has its own, because the
      packer joins `config/demo-users.toon` (users by id) and `config/roles.toon` (roles by name) since the
      `la-ownership` lane; `admin`, `fraud-analyst`, `la-viewer` and `la-settings` are byte-identical to la-card's.
-   - **Not checked:** any live run (no Preview build with Demo Auth: the rule armed and firing at 16, the seed's
-     `--apply`, the persona probes; no Basic bundle: rule unarmed, `procurement_shared_ip_alerts` reporting no breach);
-     the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not checked: the
-     Link Analysis UI, the composed *Public sector* industry Space with this tier, an OIDC build.
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 29 files landed, 0 rejected, one OPEN Alert at 16 WARNING, `seed-la-procurement.mjs --apply`
+     19 created / 0 failed, persona checks 18/18 after one retry (a manager approve answered 422 while a cron run was
+     rebuilding the link Dataset, and 200 30 s later); Basic: 0 rejected, the rule unarmed (WARN),
+     `procurement_shared_ip_alerts` no rule breached, masking `none`. **Not checked:** the Link Analysis UI, the composed
+     *Public sector* industry Space with this tier, an OIDC build.
 
    **`la-trade` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`trade.analyst` lead, `trade.manager`
@@ -1816,10 +1869,10 @@ deviations:
      `masking_mode: typed`, `trade-analyst` given the approve capability, `la-trade` out of the gallery's Basic-tier set,
      `fraud-analyst` removed, `admin` given `trade-analyst`, and in the seed: the outsider made a member, the Draft
      annotating a company two hops out, the specialty supplier added to the seed, the first expand unbounded.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 14, the seed's
-     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `trade_over_reference_alerts` reporting no breach, 0
-     rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
-     Also not checked: the Link Analysis UI, the composed *Banking and finance* industry Space with this tier (its other
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 62 files landed, 0 rejected, one OPEN Alert at 14 WARNING, `seed-la-trade.mjs --apply` 19
+     created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN), `trade_over_reference_alerts`
+     no rule breached, masking `none`. **Not checked:** the Link Analysis UI, the composed *Banking and finance* industry Space with this tier (its other
      packs' Advanced tiers are other lanes), the staged month, an OIDC build.
 
    **`la-ownership` BUILT 2026-11-09** (the `la-card` pattern; spec 5's "a new ownership path that reaches a listed person
@@ -1883,11 +1936,12 @@ deviations:
      removed, `la-ownership` out of the gallery's Basic-tier set; in the seed the outsider made a member, the Draft
      annotating `CO-04431`, the near-namesake's customer seeded; in the packer the roster not joined (*Banking and
      finance* refused) and a differing definition not refused.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 1, the seed's `--apply`,
-     the persona probes) and no Basic bundle (rule unarmed, `ownership_sanctions_alerts` reporting no breach, 0 rejected);
-     the expand's `linkKinds`, the window and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the Link Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build, and
-     the packed downloads of a commit holding this tier (the packer reads HEAD).
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 18 files landed, 0 rejected, one OPEN Alert at 1 CRITICAL, `seed-la-ownership.mjs --apply`
+     17 created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN),
+     `ownership_sanctions_alerts` no rule breached, masking `none`. Found: `ownership_links` is the only link Job of the
+     twelve with no `cron: "*/5 * * * *"` fallback (`LA-OWNERSHIP-NO-CRON-FALLBACK-1`). **Not checked:** the Link
+     Analysis UI, the composed *Banking and finance* Space booted with both rosters, an OIDC build.
 
    **`la-crypto` BUILT 2026-11-09** (the `la-card` pattern; spec 13's "a deposit whose funds trace to a labelled hack within
    5 hops"). As built:
@@ -1961,12 +2015,12 @@ deviations:
      packer a differing `la-viewer`, `max_open: 11` and a differing `admin` (each refuses *Banking and finance*); in the seed
      the outsider made a member, the Draft annotating `XA-03111`, the payroll wallet added to the seeds, the first expand
      unbounded.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 2, the seed's `--apply`,
-     the persona probes) and no Basic bundle (rule unarmed, `crypto_hack_trace_alerts` reporting no breach, 0 rejected);
-     the expand's `linkKinds`, the window and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the recursive trace's cost on data much larger than the shipped 44 559 transfers, the Link Analysis UI, the
-     composed *Banking and finance* Space booted with this roster, an OIDC build, and the packed downloads of a commit
-     holding this tier (the packer reads HEAD).
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 28 files landed, 0 rejected, one OPEN Alert at 2 CRITICAL (refreshed in place from a partial
+     1, `ALERT-VALUE-REFRESH-1`), `seed-la-crypto.mjs --apply` 19 created / 0 failed, persona checks 18/18; Basic: 0
+     rejected, the rule unarmed (WARN), `crypto_hack_trace_alerts` no rule breached, masking `none`. **Not checked:** the
+     recursive trace's cost on data much larger than the shipped 44 559 transfers, the Link Analysis UI, the composed
+     *Banking and finance* Space booted with this roster, an OIDC build.
 
    **`la-insider` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job; spec 12's rule as written). As built:
    - **In the template** (`minEdition` stays `basic`): `config/demo-users.toon` (`insider.analyst` lead, `insider.manager`
@@ -2021,12 +2075,12 @@ deviations:
      `masking_mode: typed`, `insider-analyst` given the approve capability, `admin` given `insider-analyst`, `la-insider`
      out of the gallery's Basic-tier set, `fraud-analyst` removed, and in the seed: the outsider made a member, the Draft
      annotating `VEN-0264`, the mover added to the Entity List, the first expand unbounded.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 8, the seed's `--apply`,
-     the persona probes) and no Basic bundle (rule unarmed, `insider_ticketless_grant_alerts` reporting no breach, 0
-     rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not observed.
-     Also not checked: the Link Analysis UI, the composed *Enterprise* industry Space booted with this tier, the staged
-     month landing through the Pipelines, an OIDC build, and the packed downloads of a commit holding this tier (the packer
-     reads HEAD).
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 39 files landed, 0 rejected, one OPEN Alert at 8 WARNING, `seed-la-insider.mjs --apply` 19
+     created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN),
+     `insider_ticketless_grant_alerts` no rule breached, masking `none`. **Not checked:** the Link Analysis UI, the
+     composed *Enterprise* industry Space booted with this tier, the staged month landing through the Pipelines, an OIDC
+     build.
 
    **`la-logistics` BUILT 2026-11-09** (the `la-card` pattern: a registry rule over a counts Job; spec 11's "a high-value
    trip assigned to a carrier under 60 days old"). As built:
@@ -2084,11 +2138,12 @@ deviations:
      `logistics-analyst`, `la-logistics` out of the gallery's Basic-tier set, `fraud-analyst` removed, `la-viewer` given a
      capability; in the seed the outsider made a member, the Draft annotating `TR-09616` (two hops out), `CAR-057` added
      to the Entity List, the first expand unbounded.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 5, the seed's
-     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `logistics_new_carrier_alerts` reporting no breach,
-     0 rejected); the expand's `linkKinds`, its `maxFanOut` and the Draft annotation are as the API reads them, not
-     observed. Also not checked: the Link Analysis UI, the composed *Logistics* industry Space with this tier, the staged
-     month, an OIDC build, and the packed downloads of a commit holding this tier (the packer reads HEAD).
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 52 files landed, 0 rejected, one OPEN Alert at 5 WARNING, `seed-la-logistics.mjs --apply` 19
+     created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN), `logistics_new_carrier_alerts`
+     no rule breached, masking `none`. Found: the saved view `driver_team_inside_job.toon` is read by the Job loader for
+     its `_job.toon` suffix (a WARN at every boot on both products; `JOB-LOADER-SAVED-VIEW-SUFFIX-1`). **Not checked:**
+     the Link Analysis UI, the composed *Logistics* industry Space with this tier, the staged month, an OIDC build.
 
    **`la-telco-ra` BUILT 2026-11-09** (the `la-card` pattern; spec 10's "usage without billing over 1 day for a
    subscriber"). As built:
@@ -2151,10 +2206,13 @@ deviations:
      `fraud-analyst` removed, `la-settings` given a second capability, `admin` given `telcora-analyst`, `la-telco-ra` out
      of the gallery's Basic-tier set; in the seed the outsider made a member, the Draft annotating `DEV-00086`, the test
      dealer seeded, the expand narrowed below the dealer's 336, `la-viewer` given a capability.
-   - **Not checked:** any live run. No Preview build with Demo Auth (the rule armed and firing at 300, the seed's
-     `--apply`, the persona probes) and no Basic bundle (rule unarmed, `telco_ra_unbilled_alerts` reporting no breach, 0
-     rejected); the expand's `linkKinds` and the Draft annotation are as the API reads them, not observed. Also not
-     checked: the Link Analysis UI, the composed *Telecom* Space booted (it packs from the integration commit with
+   - **Live proof 2026-11-09** (the release from `1963c661b`, all twelve Spaces in one server per product; method in
+     step 8): Preview demo: 51 files landed, 0 rejected, one OPEN Alert at 300 WARNING, `seed-la-telco-ra.mjs --apply` 19
+     created / 0 failed, persona checks 18/18; Basic: 0 rejected, the rule unarmed (WARN), `telco_ra_unbilled_alerts` no
+     rule breached, masking `none`. Found: on the first boot the rule fired at 4 (13:40:27), cleared at 0 (13:40:32),
+     refired at 1 and was refreshed to 300, leaving a stray RESOLVED Alert beside the OPEN one; the release predates the
+     link-Job landing fix (`f842417fb`) but the counts Job already had the billing-landed gate, so the cause is not known
+     (`LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1`). **Not checked:** the Link Analysis UI, the composed *Telecom* Space booted (it packs from the integration commit with
      both rosters merged: 9 users, 7 roles, both Alert Rules), and an OIDC build.
 
 **Docs, with each Space**
@@ -2183,7 +2241,9 @@ deviations:
    `la-crypto` the one OPEN Alert now ends at value 2, refreshed in place from 1 with its first-fire time kept, no
    RESOLVED Alert; the seed created 19 steps, none failed; Basic with `la-card` landed 17 batches with 0 rejected, the
    rule unarmed; 0 ERROR lines on either. Also noted: the product zips attach no Space, but their template gallery carries each template's
-   data (about 45 MB).
+   data (about 45 MB). **Live proofs of all twelve 2026-11-09 Advanced tiers on this release: PASS** (step 8). Recipe,
+   method and record: `solution-pack/la-showcase/admin-guide-showcase-release.md`. Not built: the Linux product zip
+   (`LA-SHOWCASE-RELEASE-RESIDUALS-1`).
 
 ## Open questions
 
@@ -2191,8 +2251,9 @@ deviations:
   built from the same commit as the product.
 - ~~Where downloads are published~~ — **decided (operator 2026-11-09): built locally only**; the operator publishes them.
 - Police wording for the target market (UK, US, India)? Default is neutral wording with local terms only in the
-  user guide.
-- Water-utility variant later?
+  user guide. → BACKLOG `LA-SHOWCASE-VARIANTS-ON-DEMAND-1` (hold: demand).
+- Water-utility variant later? → BACKLOG `LA-SHOWCASE-VARIANTS-ON-DEMAND-1` (hold: demand).
 - One combined "all showcases" download (up to about 900 MB of data at the 50 MB cap per Space) as well as
-  per-Space downloads?
-- Wave C order follows likely customer demand (cards and KYC first); change it if a deal needs a vertical sooner.
+  per-Space downloads? → BACKLOG `LA-SHOWCASE-COMBINED-DOWNLOAD-1` (hold: operator).
+- ~~Wave C order follows likely customer demand (cards and KYC first); change it if a deal needs a vertical sooner.~~ —
+  moot: all eleven wave C Spaces were built by 2026-11-08.

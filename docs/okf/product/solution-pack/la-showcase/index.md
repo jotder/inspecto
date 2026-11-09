@@ -17,11 +17,11 @@ tags: [product-item, solution-pack]
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Link Analysis](architecture.md) |
+| architecture | current | [Link Analysis showcase catalogue — architecture](architecture-showcase-catalogue.md) · [Link Analysis](architecture.md) |
 | features | current | [Link Analysis showcase — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Link Analysis showcase catalogue — user guide](user-guide-showcase-catalogue.md) · [Link Analysis showcase — user guide](user-guide.md) |
-| admin-guide | current | [Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)](admin-guide-cross-vertical-tour.md) · [Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants](admin-guide-variants-runbook.md) |
+| admin-guide | current | [Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)](admin-guide-cross-vertical-tour.md) · [Link Analysis showcase release — build and boot-test](admin-guide-showcase-release.md) · [Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants](admin-guide-variants-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | brochure | current | [Link Analysis showcase — brochure](brochure.md) |
@@ -32,4 +32,7 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-showcase` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-SHOWCASE-RELEASE-RESIDUALS-1` | P3 | chore | what the 2026-11-09 showcase release and its live proofs did not cover. | — |
+| `LA-SHOWCASE-COMBINED-DOWNLOAD-1` | P3 | feature | one combined "all showcases" download beside the per-Space downloads? | operator |

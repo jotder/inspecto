@@ -7,7 +7,7 @@ month, 2026-10, for the "new data arrives" step) for six feeds:
   chargeback, online_account (one landed extract, one staged month)
 and tools/gen-la-card-data.ground-truth.json (story -> entity ids and look-alike ids; NOT shipped in the data download).
 
-Planted stories (plan: docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 4; pinned by
+Planted stories (plan: docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 4; pinned by
 tools/gen-la-card-data.test.mjs over the files and CardLinksJobGoldenTest over the link Dataset):
   1 CARD TESTING           one device and one /24 (203.0.113.0/24) try 300 cards with 1.00 authorisations at 3 small online shops
                            in one night, 85 % declined

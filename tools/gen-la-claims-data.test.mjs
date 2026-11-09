@@ -33,7 +33,7 @@ test('generator twice = the committed bytes; seven feeds; under 1 MB', { skip: !
   assert.deepEqual(snapshot(), before, 'second run changed bytes');
 });
 
-// ---- the stories added by docs/superpower/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 2 (on the committed files) ----
+// ---- the stories added by docs/archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md, spec 2 (on the committed files) ----
 function rows(feed) {
   const dir = join(DATA, 'inbox', feed);
   const text = readFileSync(join(dir, readdirSync(dir).find((f) => f.endsWith('.csv'))), 'utf8').replace(/\r\n/g, '\n').trimEnd();

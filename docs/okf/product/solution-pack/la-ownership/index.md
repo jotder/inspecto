@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SHOWCASE-CATALOGUE-1` | P2 | feature | ten more showcase Spaces, one lane each: la-card, la-ownership, la-trade, la-procurement, la-benefits, la-health, la-telco-ra, la-logisti… | — |
+| `LA-OWNERSHIP-NO-CRON-FALLBACK-1` | P3 | defect | la-ownership's ownership_links is the only link Job of the twelve 2026-11-09 showcases with no cron: "*/5 * * * *" fallback. | — |
