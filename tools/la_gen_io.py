@@ -49,8 +49,8 @@ class Outputs:
         except FileNotFoundError:
             pass
         tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-        tmp.write_bytes(data)
         try:
+            tmp.write_bytes(data)
             retry(lambda: os.replace(tmp, path))
         except BaseException:
             tmp.unlink(missing_ok=True)

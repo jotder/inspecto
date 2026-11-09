@@ -196,3 +196,6 @@ product-map/private/
 
 # Real-data working notes (operator 2026-10-16): never committed; local copy lives as a *.local.md
 docs/superpower/la-ims-production-day-measurements.md
+
+# Python bytecode (tools/la_gen_io.py is imported by the showcase data generators)
+__pycache__/
