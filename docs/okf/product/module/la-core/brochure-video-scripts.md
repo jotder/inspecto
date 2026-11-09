@@ -35,9 +35,9 @@ with my own records*. Every story follows the same beats, and every script below
 
 | # | Title | Length (about) | Features shown | Film on | Data | Ready to film |
 |---|---|---|---|---|---|---|
-| 1 | The ring nobody saw | 1 min 45 s | Basic | Advanced install | `la-mobile-money` | Yes |
+| 1 | The ring nobody saw | 1 min 45 s | Basic | Basic install (its Basic tier) | `la-mobile-money` | Yes |
 | 2 | Zero to graph | 1 min 45 s | Basic | Basic install | *Try the sample* | After the timing check |
-| 4 | Retire the red string | 40 s | Basic | Advanced install | `la-mobile-money` | Yes |
+| 4 | Retire the red string | 40 s | Basic | Basic install (its Basic tier) | `la-mobile-money` | Yes |
 | 5 | It stays current | 1 min 30 s | Basic, plus one Advanced shot | Basic install | `la-police` + its staged month | Yes (shot 7 later) |
 | 6 | The analyst (dramatization) | 65 s | Standard | Standard or Advanced install | `la-mobile-money` | After casting |
 | 7 | One graph for any data (introduces the industry videos) | 100 s | Basic | Basic install | Two prepared synthetic files, telecom and mobile money | After data preparation |
@@ -233,14 +233,27 @@ the edition close. The asks use *Busiest nodes* only where it names the story fi
 | 3.6 · Public sector, paid after death (an alternative segment) | `la-public-sector` · `paid_after_death` | the three accounts `SYN-13618314`, `SYN-23138817`, `SYN-96993903` 4 each, then the living claimant `CIT-08276` 3 | about 134 s |
 | 3.3 · Insurance, parts never fitted | `la-insurance` · `parts_supplier_ring` | a tie: `SUP-01` and `SUP-07`, 9 links each. The voice says reach alone is not guilt, and the outcome shows `SUP-07` (its links carry the unfitted parts' value) | about 132 s |
 
+**Concept drafts (2026-11-09).**
+
+| Draft | Install · Space | What the draft found | Length |
+|---|---|---|---|
+| 2 · Zero to graph | A fresh unzip of the Basic bundle (`79cadff9c`), port 8096 | Measured: unzip 2.1 s, start 2.0 s, *Try the sample* to the drawn graph (112 nodes, 224 links), **11.5 s** in all, on a warm disk; the first, cold start took 7.0 s. *Route from A to B* names `SMURF-01 → MULE-HUB-01 → RELAY-01 → OFFSHORE-77`. The unzip and console shots are cards replaying the measured times; the master films the desktop. Time it three times on the filming laptop, as the brief says | about 102 s |
+| 5 · It stays current | `la-law-enforcement` and its staged November | Copying `data/staged` into `data/inbox` takes `burglary_series` from 66 to 67 links; `P-04874` goes from 6 to 7 (a television, `SNMYAA9S4A`, sold at `DLR-09` on 2026-11-06). Shot 3 cannot be filmed as written: *What changed in your data* lists *Add data* imports only and says so, and this Space's data comes through Pipelines, so the draft shows the Dataset kept by its Pipeline instead. *Search nodes* did not find the item by its serial; the draft shows the seller's count in *Busiest nodes*. Shot 8 needs the video 7 Space and is left out, as is shot 7 | about 110 s |
+| 1 · The ring nobody saw | `la-mobile-money` (Basic tier, staged on its own) | *Start a graph ▸ Whole Dataset* draws 465 nodes and 4,000 links (cut short, and the screen says so). *Busiest nodes*: `MER-ELECTRIC` first. Hidden with *Hide the selected nodes* (the *Exclude…* of the script was not reached headless). *Tight groups* on the whole graph then finds the agents' neighbourhoods (33 and 32 wallets), as the brief's "Before filming" foresaw, so the draft opens `mm_device_farm` and says why: there *Tight groups* puts the nine `FARM` wallets first (one handset, nine national ids) | about 153 s |
+| 7 · One graph for any data | A fresh unzip of the Basic bundle, a new Space *Calls and transfers* (Generic), the two files from `tools/gen-la-video7-data.mjs` | What the product reported differs from the script in three places, and the draft says what it saw. **`calls.csv` has no guess**: its names are plain, so `caller` and `callee` are *Phone number* outright; its two time formats make `start_time` text, and the analyst sets it to *Date and time*. **`transfers.csv` carries the guesses** (*A guess* · *Confirm*, 16 of them, the spaced number flagged), so shot 4's guess is filmed on the second file. **Nothing is set aside**: all 286 rows are added, the blank callee, the repeated row and the odd times included. *Settings ▸ Entity Types* lists the types but not the Datasets that hold them, so the "Entities page" of shot 7 is not shown. *Graph model ▸ Entity/Link (several Datasets)* with both Datasets draws **62 nodes, 419 links**: the 60 ordinary numbers, the suspect and the lead, so `999 7910 0042` and `+9997…` merged with their plain spellings; *Route from A to B* puts the lead one link from the suspect | about 146 s |
+| 4 · Retire the red string | `la-mobile-money`, view `mm_structuring_band` | 16:9 draft of a 9:16 master. *Route from A to B*: `HUB-01 → RELAY-1 → RELAY-3 → AG-39`, 3 transfers. The corkboard is a placeholder built from the real rows; the master shoots a physical board | about 41 s |
+
+Video 6 is not drafted: it needs a Standard or Advanced install and an actor. Video 5's shot 8 (*Watch this folder*)
+can now be filmed on the video 7 Space: each Dataset added with *Add data* shows its Inbox folder and the switch.
+
 On `dealer_commission_fraud` the two dealers draw as two clusters far apart, so a push-in on the middle of the canvas
 lands on empty space: the 3.1 D draft holds the whole view instead. Film the master's push-in on `DL-112` itself.
 On a small graph (`parts_supplier_ring`, 19 nodes) the same push-in fills the frame with arrows: hold the view there too.
 
-**Drafted later.** Videos 1 and 4 and industry videos 3.1 and 3.9 use templates that need an Advanced install
-today (`la-mobile-money`, `la-showcase`, `la-audit`); segment D of 3.1 (`la-telco-ra`) is Basic and can be drafted in
-the Basic round on its own. They join the Basic round when the plan's wave B gives those templates a Basic tier, or
-are drafted on an Advanced install, signed in as a user who can reveal identifiers. Video 6 shows Standard features
+**Drafted later.** Wave B has given `la-mobile-money`, `la-showcase` and `la-audit` a Basic tier (`minEdition: basic`
+in each `template.toon`); videos 1 and 4 were drafted on it on 2026-11-09. Segments of 3.1, 3.2 and 3.9 that use
+`la-showcase` or `la-audit` join the Basic round once their Basic tier is checked on a Basic install; until then they are
+drafted on an Advanced install, signed in as a user who can reveal identifiers. Video 6 shows Standard features
 and is drafted after casting, on a Standard or Advanced install. A planned Space's segment is drafted when its Space
 is built.
 
@@ -259,7 +272,7 @@ is built.
 | Must show | The problem; the raw transfer file; the link Dataset the `mm_links` Job builds; the graph explained; *Busiest nodes* and excluding the busy biller; *Tight groups* finding the device farm; the outcome; why it took a graph; the Space's home page; the own-data line. |
 | Outcome | Nine wallets on shared devices: one group to review, every link behind it on screen. |
 | Must not | Claim the product "detects fraud on its own". The analyst finds it, and the product points at it. |
-| Data | *Link Analysis mobile money* (`la-mobile-money`, 14 days of synthetic wallet transactions) on an Advanced install, as a user who can reveal identifiers (ids are masked by default there). Its links come from the `mm_links` Job (`mm_links_dataset`: `p2p`, `cash_in`, `cash_out`, `merchant_pay`, `shared_device`, `shared_id`). The busy biller is `MER-ELECTRIC` (300 payers, one way: the look-alike, and the busiest node by degree), and the planted ring is the nine-wallet device farm. Every feature shown is in Basic. |
+| Data | *Link Analysis mobile money* (`la-mobile-money`, 14 days of synthetic wallet transactions) on a Basic install, through the template's Basic tier, where ids show unmasked (drafted so on 2026-11-09). Its links come from the `mm_links` Job (`mm_links_dataset`: `p2p`, `cash_in`, `cash_out`, `merchant_pay`, `shared_device`, `shared_id`). The busy biller is `MER-ELECTRIC` (300 payers, one way: the look-alike, and the busiest node by degree), and the planted ring is the nine-wallet device farm. Every feature shown is in Basic. |
 | Before filming | Try the ask live: if *Tight groups* after the exclusion does not put the nine wallets first, open the shipped saved view `mm_device_farm` instead and say so. |
 
 **Script**
@@ -707,7 +720,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | Message | The corkboard is how investigators used to think. Inspecto LA is how they think now, on their own records. |
 | Must show | Split screen. Left: a real, physical corkboard with printouts, sticky notes and red string, shot practically (not CGI); the printouts are real rows of the Space's raw transfer file. Right: the same wallets as a graph. |
 | Outcome | The cash-out agent at the end of the chain. |
-| Data | `la-mobile-money` on an Advanced install. The route is the planted 98 % pass-through mule chain that ends at agent `AG-39`; take its first wallet from the Space's ground truth. Every feature shown is in Basic. |
+| Data | `la-mobile-money` on a Basic install (its Basic tier). The route is the planted 98 % pass-through mule chain that ends at agent `AG-39`; take its first wallet from the Space's ground truth. Every feature shown is in Basic. |
 | Casting | Hands only, no faces. |
 
 **Script**
@@ -810,7 +823,7 @@ of the nine industries, each leading to its video.
 | Outcome | The number that calls the suspect is the one that receives the money: one lead, across two systems. |
 | Must not | Say the product maps data "automatically" or "with AI". It detects and proposes, marks its guesses, and the analyst confirms. Do not show *Derive mapping* (it needs configuration-authoring rights and is not the point). |
 | Data | A fresh Basic install, a new Space, and two **prepared synthetic files**: `calls.csv` (telecom call records: caller, callee, start time, duration) and `transfers.csv` (mobile-money transfers: sender number, receiver number, time, amount). The numbers are invented, from a range no real subscriber can have (the showcase uses `999…`); a planted handful appear in both files, so that a number that calls the suspect also receives the money. |
-| Data preparation | Generate both files with a script kept beside the showcase generators. Plant real-world mess in them: the same number written with and without its country code or with spaces, a few rows with a blank callee or receiver, one repeated row, a time in a second format. Product confirms which of these the shared Entity Type's *Compare values as: Phone number* treats as equal and which rows *Create and run* sets aside, before the files are made; film what the product reports. Film a dry run first. |
+| Data preparation | Generate both files with `node tools/gen-la-video7-data.mjs <folder>` (seeded: the same bytes every run; its test pins the planted facts). Plant real-world mess in them: the same number written with and without its country code or with spaces, a few rows with a blank callee or receiver, one repeated row, a time in a second format. Product confirms which of these the shared Entity Type's *Compare values as: Phone number* treats as equal and which rows *Create and run* sets aside, before the files are made; film what the product reports. Film a dry run first. |
 | Edition | Basic. Product confirms that *Entity/Link (several Datasets)* in Graph model is on Basic before filming. |
 
 **Script**

@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-85 test file(s). Run one, or all:
+86 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -63,6 +63,7 @@ node --test tools/
 | `tools/gen-la-telco-ra-data.test.mjs` | Determinism and planted facts of tools/gen-la-telco-ra-data.py. Run: node --test tools/gen-la-telco-ra-data.test.mjs |
 | `tools/gen-la-trade-data.test.mjs` | Golden test of tools/gen-la-trade-data.py. Run: node --test tools/gen-la-trade-data.test.mjs |
 | `tools/gen-la-utility-data.test.mjs` | Determinism and planted facts of tools/gen-la-utility-data.py. Run: node --test tools/gen-la-utility-data.test.mjs |
+| `tools/gen-la-video7-data.test.mjs` | Determinism and planted facts of tools/gen-la-video7-data.mjs. Run: node --test tools/gen-la-video7-data.test.mjs |
 | `tools/java-closure.test.mjs` | Fixture test for tools/java-closure.mjs — each blind spot that bit the D-1 closure script must now be SEEN. |
 | `tools/jlink-modules.test.mjs` | ── PACKAGE-DEMOAUTH-ADVANCED-1: the demo bundle's module set follows the bundle it really stages ───────────────────────────── |
 | `tools/la-audit-smoke.test.mjs` | node --test tools/la-audit-smoke.test.mjs  -  the pure helpers of the la-audit smoke runner (no server). |
