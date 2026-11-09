@@ -193,7 +193,7 @@ export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'space
     for (const sub of ['config', 'data', 'audit', 'duckdb']) fs.mkdirSync(path.join(base, sub), { recursive: true });
     copy(path.join(templatesDir, id, 'config'), path.join(base, 'config'), id);
     copy(path.join(templatesDir, id, 'data'), path.join(base, 'data'), null);
-    fs.writeFileSync(path.join(base, 'space.toon'), `display_name: Link Analysis audit showcase\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\n`);
+    fs.writeFileSync(path.join(base, 'space.toon'), `display_name: Audit\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\n`);
     made.push(id);
   }
   return made;
