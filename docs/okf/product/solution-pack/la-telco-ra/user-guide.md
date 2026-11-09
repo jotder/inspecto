@@ -39,7 +39,7 @@ in that country).
 
 | Link kind | From → to | `via` says |
 |---|---|---|
-| `activated_by` | subscriber → dealer | `plan:`, `device:`, `topups:`, `first_topup_days:`, `usage_months:`, `unbilled_months:` (months of usage with no billing record), `usage_minutes:`, `billed_minutes:`, `usage_mb:`, `last_usage:` (`amount` = total topped up) |
+| `activated_by` | subscriber → dealer | `plan:`, `device:`, `topups:`, `first_topup_days:`, `usage_months:`, `unbilled_months:` (months of usage with no billing record, a month counted only once its billing file has landed), `usage_minutes:`, `billed_minutes:`, `usage_mb:`, `last_usage:` (`amount` = total topped up) |
 | `activated_on` | subscriber → dealer device | the dealer and plan |
 | `topped_up` | subscriber → point of sale | top-ups there, first and last (`amount` = their total). App and card top-ups have no point of sale |
 | `trunk_of` | trunk → customer | `international_minutes:` |

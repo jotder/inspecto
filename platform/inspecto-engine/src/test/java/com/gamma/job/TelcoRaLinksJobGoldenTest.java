@@ -189,6 +189,53 @@ class TelcoRaLinksJobGoldenTest {
         assertEquals(300L, ((Number) early.get("unbilled_subscribers")).longValue(), early.toString());
     }
 
+    @Test
+    void theLinkJobReadsNoMonthAsUnbilledBeforeItsBillingFileHasLanded() throws Exception {
+        // the Basic tier's own view of the same first boot (LA-TELCO-RA-LANDING-ORDER-1): September's usage has landed, its billing
+        // file has not. Read as unbilled, every subscriber used in September gains an unbilled month and the unbilled_usage screen
+        // over-counts (395 subscribers, not 352); judged only once that month's billing lands, no count includes it
+        String unbilled = "TRY_CAST(regexp_extract(via, 'unbilled_months:([0-9]+)', 1) AS INTEGER)";
+        Map<String, Long> full = new HashMap<>();
+        for (Map<String, Object> r : rows("SELECT src, " + unbilled + " AS n FROM " + bl + " WHERE kind = 'activated_by'"))
+            full.put((String) r.get("src"), ((Number) r.get("n")).longValue());
+        String withheld = "CAST(period AS DATE) < DATE '2026-09-01'";
+        List<String> over = new ArrayList<>();
+        for (Map<String, Object> r : linksOver(withheld, "SELECT src, " + unbilled + " AS n FROM telco_ra_links WHERE kind = 'activated_by'"))
+            if (((Number) r.get("n")).longValue() > full.get((String) r.get("src"))) over.add((String) r.get("src"));
+        assertTrue(over.isEmpty(), over.size() + " subscribers read September as unbilled, e.g. " + over.subList(0, Math.min(5, over.size())));
+        // and the unbilled_usage screen the saved view draws holds the same subscribers as once September's billing has landed
+        JsonNode u = truth.get("unbilled_usage");
+        Set<String> expected = ids(u.get("subscribers"));
+        expected.addAll(ids(u.get("test_sims")));
+        expected.addAll(ids(u.get("late_billing")));
+        String screen = JobConfig.load(TEMPLATE.resolve("config/jobs/telco_ra_screen_links_job.toon").toString()).require("sql");
+        assertEquals(expected, new TreeSet<>(linksOver(withheld, "SELECT src FROM (" + screen + ") WHERE screen = 'unbilled_usage' AND kind = 'activated_by'")
+                .stream().map(r -> (String) r.get("src")).toList()), "the unbilled_usage screen does not over-count");
+    }
+
+    /** The links Job's own SQL over the real landed feeds, billing_record narrowed by a predicate, materialised as telco_ra_links; then {@code select} over it. */
+    private static List<Map<String, Object>> linksOver(String billingFilter, String select) throws Exception {
+        String sql = JobConfig.load(TEMPLATE.resolve("config/jobs/telco_ra_links_job.toon").toString()).require("sql");
+        DuckDbUtil.loadDriver();
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            for (String feed : FEEDS)
+                st.execute("CREATE VIEW " + feed + " AS SELECT * FROM " + parquet(feed + "/database", "/**/*.parquet")
+                        + (feed.equals("billing_record") ? " WHERE " + billingFilter : ""));
+            st.execute("CREATE TABLE telco_ra_links AS " + sql);
+            try (ResultSet rs = st.executeQuery(select)) {
+                int n = rs.getMetaData().getColumnCount();
+                while (rs.next()) {
+                    Map<String, Object> r = new LinkedHashMap<>();
+                    for (int i = 1; i <= n; i++) r.put(rs.getMetaData().getColumnLabel(i), rs.getObject(i));
+                    out.add(r);
+                }
+            }
+        }
+        assertFalse(out.isEmpty(), "no rows: " + select);
+        return out;
+    }
+
     private static com.gamma.alert.AlertRule rule() throws Exception {
         return com.gamma.alert.AlertRule.fromMap(ToonHelper.load(
                 TEMPLATE.resolve("config/registry/alert-rules/telco_ra_usage_without_billing.toon").toString()));

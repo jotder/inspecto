@@ -2123,7 +2123,9 @@ deviations:
      - **A month is judged only once its billing file has landed** (`JOIN` on the billing periods present), the
        `la-utility` lesson: on a first boot a month's usage file can land before its billing file, and every subscriber
        used that month would read as unbilled (355 counted in the test). `telco_ra_links`' own `unbilled_months:` in `via`
-       has the same transient on a first boot; that is the Basic tier, not changed here.
+       had the same transient on a first boot (Basic tier); fixed 2026-11-09 (`LA-TELCO-RA-LANDING-ORDER-1`) with the
+       same gate, pinned by `TelcoRaLinksJobGoldenTest.theLinkJobReadsNoMonthAsUnbilledBeforeItsBillingFileHasLanded`
+       (395 screen subscribers with September's billing withheld, 352 with the gate; full-data figures unchanged).
      - **A running total, not a "new" count** (as `la-police` and `la-ownership` decided): an unbilled SIM stays unbilled
        until someone fixes billing, so the rule stays met after every build and the open Alert is not raised twice; the
        staged month changes nothing. A per-build "new" count would need the previous build, which a `sql.template` Job
