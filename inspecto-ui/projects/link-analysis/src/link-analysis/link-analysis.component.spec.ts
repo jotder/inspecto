@@ -2875,15 +2875,18 @@ describe('LinkAnalysisComponent', () => {
             }
         });
 
-        it('ends the header with Full screen · About · Settings and drops the toolbox shortcuts (operator 2026-10-29)', async () => {
+        it('ends the header with Full screen · About · Settings · the toolbox toggle (operator 2026-11-09)', async () => {
             const { el } = await ready();
             const header = el.querySelector('[data-testid="la-header"]') as HTMLElement;
             const end = header.querySelector('[data-testid="la-fullscreen"]')!.parentElement!;
+            const toolbox = (header.querySelector('[data-testid="la-toolbox-toggle"]') as HTMLElement).getAttribute('aria-label');
             expect(Array.from(end.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
                 'Full screen',
                 'About Link Analysis',
                 'Settings',
+                toolbox,
             ]);
+            expect(['Hide the toolbox', 'Show the toolbox']).toContain(toolbox);
             expect(header.querySelectorAll('inspecto-la-host-slot').length).toBe(1); // one About only
             for (const gone of ['Open the graph-algorithms toolbox', 'Open the Investigation', 'Hide the side panels']) {
                 expect(header.querySelector(`button[aria-label="${gone}"]`), gone).toBeNull();
@@ -3023,7 +3026,9 @@ describe('LinkAnalysisComponent - the Explorer level: only the On screen tab (op
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
-        const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tab"]')).map((t) => t.textContent?.trim());
+        const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tablist"][aria-label="Toolbox tab"] [role="tab"]')).map((t) =>
+            t.textContent?.trim(),
+        );
         expect(tabs).toEqual(['On screen']);
         c.openInvestigation();
         fixture.detectChanges();

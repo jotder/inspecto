@@ -17,6 +17,7 @@ import { LensService } from 'app/inspecto/api';
 import { of } from 'rxjs';
 import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
+import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
 import { LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
 import { LandingComponent } from './landing.component';
 
@@ -150,23 +151,25 @@ describe('la-app shell and landing page', () => {
         expect(links.map((a) => a.textContent?.trim())).toEqual([...LA_APP_NAV.map((n) => n.label), LA_APP_SETTINGS_NAV.label]);
     });
 
-    it('is slim by default, expands on the toggle, and remembers the choice', async () => {
+    it('is slim by default, expands when the page header toggles it, and remembers the choice', async () => {
         const el = await render();
-        const toggle = () => el.querySelector<HTMLButtonElement>('button[aria-expanded]') as HTMLButtonElement;
-        expect(toggle().getAttribute('aria-expanded')).toBe('false');
-        expect(toggle().getAttribute('aria-label')).toBe('Expand navigation');
-        toggle().click();
+        const rail = TestBed.inject(LaRailService);
+        // the toggle lives in the Link Analysis header now; the rail itself carries no Collapse button
+        expect(rail.available()).toBe(true);
+        expect(el.querySelector('button[aria-label$="navigation"]')).toBeNull();
+        expect(el.querySelector('aside')?.className).toContain('sm:w-16');
+        rail.toggle();
         harness.detectChanges();
-        expect(toggle().getAttribute('aria-expanded')).toBe('true');
         expect(localStorage.getItem(LA_RAIL_EXPANDED_KEY)).toBe('1');
-        expect(el.querySelector('aside')?.className).toContain('sm:w-56');
+        expect(el.querySelector('aside')?.className).not.toContain('sm:w-16');
+        expect(el.querySelector('[role="separator"]')?.classList.contains('hidden')).toBe(false);
         expect(el.textContent).toContain(TestBed.inject(APP_ENVIRONMENT).footerText);
     });
 
     it('starts expanded when the remembered choice says so', async () => {
         localStorage.setItem(LA_RAIL_EXPANDED_KEY, '1');
         const el = await render();
-        expect(el.querySelector('button[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true');
+        expect(el.querySelector('aside')?.className).not.toContain('sm:w-16');
     });
 
     it('has no axe violations', async () => {

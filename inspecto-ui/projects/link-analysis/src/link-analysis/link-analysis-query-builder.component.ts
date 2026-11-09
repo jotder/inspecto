@@ -172,6 +172,12 @@ const DAY_OR_INSTANT = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?Z)?$/;
                 <inspecto-alert variant="success">{{ note() }}</inspecto-alert>
             }
             @if (result(); as r) {
+                <div class="flex items-center gap-2">
+                    <h4 class="m-0 flex-auto text-sm font-semibold">Answer</h4>
+                    <button mat-stroked-button type="button" (click)="result.set(null)" data-testid="la-builder-answer-close">
+                        Close the answer
+                    </button>
+                </div>
                 @if (r.truncated) {
                     <inspecto-alert variant="warning" title="Answer cut short">
                         Only the first {{ r.count }} rows are shown. Narrow the question or ask for fewer rows.

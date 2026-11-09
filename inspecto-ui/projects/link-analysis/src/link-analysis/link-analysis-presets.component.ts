@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormRecord, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -37,6 +38,7 @@ export interface PresetDraw {
     imports: [
         ReactiveFormsModule,
         MatButtonModule,
+        MatIconModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         PenFieldComponent,
@@ -46,8 +48,10 @@ export interface PresetDraw {
     host: { class: 'block' },
     template: `
         <section class="flex flex-col gap-2 text-sm" aria-labelledby="la-presets-title" data-testid="la-presets">
-            <h2 id="la-presets-title" class="m-0 text-base font-semibold">Preset queries</h2>
-            <p class="text-secondary m-0 text-xs">Questions your industry already asks of a Dataset. Draw the answer as a graph.</p>
+            <h2 id="la-presets-title" class="m-0 text-base font-semibold">{{ part() === 'builder' ? 'Build a question' : 'Preset queries' }}</h2>
+            <p class="text-secondary m-0 text-xs">
+                {{ part() === 'builder' ? 'Ask a question of your own over a Dataset; save it as a preset to ask again.' : 'Questions your industry already asks of a Dataset. Draw the answer as a graph.' }}
+            </p>
             <div class="flex flex-wrap items-end gap-3">
                 <inspecto-option-picker
                     label="Dataset"
@@ -57,6 +61,7 @@ export interface PresetDraw {
                     data-testid="la-presets-dataset"
                 />
                 @if (list(); as l) {
+                  @if (part() === 'presets') {
                     <inspecto-option-picker
                         label="Question"
                         [outlined]="true"
@@ -64,6 +69,7 @@ export interface PresetDraw {
                         [formControl]="preset"
                         data-testid="la-presets-preset"
                     />
+                  }
                 }
             </div>
             @if (loadError()) {
@@ -76,6 +82,7 @@ export interface PresetDraw {
                     </p>
                 }
             }
+          @if (part() === 'presets') {
             @if (chosenSaved(); as s) {
                 <p class="text-secondary m-0 text-xs" data-testid="la-presets-saved-description">{{ s.description }}</p>
                 <button mat-flat-button color="primary" type="button" class="self-start" [disabled]="busy()" (click)="run()" data-testid="la-presets-run-saved">
@@ -104,6 +111,14 @@ export interface PresetDraw {
                 <inspecto-alert variant="error">{{ runError() }}</inspecto-alert>
             }
             @if (result(); as r) {
+              <!-- the answer is a closable card: Close clears it (operator 2026-11-09) -->
+              <div class="flex flex-col gap-2 rounded-lg border p-3" style="border-color: var(--gamma-border)" data-testid="la-presets-answer">
+                <div class="flex items-center gap-2">
+                    <h3 class="m-0 flex-auto text-sm font-semibold">Answer</h3>
+                    <button mat-icon-button type="button" aria-label="Close the answer" (click)="result.set(null)" data-testid="la-presets-answer-close">
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
                 @if (r.truncated) {
                     <inspecto-alert variant="warning" title="Answer cut short">
                         Only the first {{ r.count }} rows are shown. Raise a minimum or ask for fewer rows.
@@ -133,8 +148,11 @@ export interface PresetDraw {
                 @if (drawWhyNot()) {
                     <p id="la-presets-draw-why" class="text-secondary m-0 text-xs">{{ drawWhyNot() }}</p>
                 }
+              </div>
             }
+          }
             @if (list(); as l) {
+              @if (part() === 'builder') {
               @if (l.roles.from && l.roles.to) {
                 <!-- LA-QUERY-BUILDER-1: a question of one's own over the same Dataset; Save as preset adds it to the list above -->
                 <inspecto-link-analysis-query-builder
@@ -146,6 +164,12 @@ export interface PresetDraw {
                     (draw)="draw.emit($event)"
                     (saved)="load(dataset.value)"
                 ></inspecto-link-analysis-query-builder>
+              } @else {
+                <p class="text-secondary m-0 text-xs" data-testid="la-builder-none">
+                    This Dataset does not say which columns link one entity to another, so there is nothing to build a
+                    question over. Name them on the Data page (a Mapping), then come back.
+                </p>
+              }
               }
             }
         </section>
@@ -161,6 +185,8 @@ export class LinkAnalysisPresetsComponent {
     readonly initialDataset = input<string | null>(null);
     /** Why *Draw these* cannot run here; '' = it can. */
     readonly drawWhyNot = input('');
+    /** Which half to show: the preset questions, or Build a question (the start area shows them as two tabs). */
+    readonly part = input<'presets' | 'builder'>('presets');
 
     readonly draw = output<PresetDraw>();
 

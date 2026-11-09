@@ -218,6 +218,7 @@ import { GeoLinkBrushService, nodeIdsForKeys } from '@inspecto/link-analysis/gra
 import { GraphSnapshot } from '@inspecto/link-analysis/graph/graph-snapshot';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { InspectoSplitDirective } from '@inspecto/core/components/split.directive';
+import { LaRailService } from '../la-rail.service';
 import {
     LegendItem,
     hideLinkKinds,
@@ -750,6 +751,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly settingsDirty = (): boolean => !!this.queryPanel?.isDirty();
     /** The right dock (Analysis | Investigation toolbox); collapses to an icon rail. */
     readonly toolboxDockOpen = signal(initialToolboxOpen());
+    /** The host's navigation rail; its collapse toggle sits before the title when the host has one. */
+    readonly rail = inject(LaRailService);
+    /** The start area's tab (Start a graph | Preset queries | Explore the Dataset): one panel at a time, so the page never grows. */
+    readonly startTab = signal<'start' | 'presets' | 'builder' | 'discover'>('start');
+    readonly startTabs = [
+        { id: 'start', label: 'Start a graph', icon: 'heroicons_outline:play' },
+        { id: 'presets', label: 'Preset queries', icon: 'heroicons_outline:queue-list' },
+        { id: 'builder', label: 'Build a question', icon: 'heroicons_outline:adjustments-horizontal' },
+        { id: 'discover', label: 'Explore the Dataset', icon: 'heroicons_outline:magnifying-glass-circle' },
+    ] as const;
     private toolboxSeen = false;
     /** Remember an explicit open/close for the session (the initial value is not an explicit choice). */
     private readonly rememberToolbox = effect(() => {

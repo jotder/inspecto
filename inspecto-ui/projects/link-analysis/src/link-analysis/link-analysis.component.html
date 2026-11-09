@@ -121,6 +121,21 @@
             </button>
         </mat-menu>
         <!-- the page title and its info (back up from the footer, operator 2026-10-28): the page's one h1 -->
+        @if (rail.available()) {
+            <button
+                mat-icon-button
+                class="shrink-0 max-sm:!hidden"
+                (click)="rail.toggle()"
+                [attr.aria-expanded]="rail.expanded()"
+                [attr.aria-label]="rail.expanded() ? 'Collapse navigation' : 'Expand navigation'"
+                [matTooltip]="rail.expanded() ? 'Collapse navigation' : 'Expand navigation'"
+                data-testid="la-rail-toggle"
+            >
+                <mat-icon
+                    [svgIcon]="rail.expanded() ? 'heroicons_outline:chevron-double-left' : 'heroicons_outline:chevron-double-right'"
+                ></mat-icon>
+            </button>
+        }
         <h1 class="m-0 shrink-0 whitespace-nowrap px-1 text-lg font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
         <!-- the two toolbars sit side by side; only when a long selection row cannot fit does the canvas toolbar drop
              under the rail, so nothing is clipped (the canvas toolbar must never be overflow-hidden) -->
@@ -1168,6 +1183,20 @@
             >
                 <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
             </button>
+            <!-- the toolbox show/hide toggle sits right after Settings (operator 2026-11-09) -->
+            <button
+                mat-icon-button
+                class="max-sm:!hidden"
+                (click)="toolboxDockOpen.set(!toolboxDockOpen())"
+                [attr.aria-expanded]="toolboxDockOpen()"
+                [matTooltip]="toolboxDockOpen() ? 'Hide the toolbox' : 'Show the toolbox'"
+                [attr.aria-label]="toolboxDockOpen() ? 'Hide the toolbox' : 'Show the toolbox'"
+                data-testid="la-toolbox-toggle"
+            >
+                <mat-icon
+                    [svgIcon]="toolboxDockOpen() ? 'heroicons_outline:chevron-double-right' : 'heroicons_outline:chevron-double-left'"
+                ></mat-icon>
+            </button>
         </div>
     </header>
 
@@ -1518,7 +1547,7 @@
                 } @else if (loading()) {
                     <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>
                 } @else {
-                    <div class="flex flex-auto flex-col items-center justify-center overflow-auto">
+                    <div class="flex min-h-0 flex-auto flex-col items-center overflow-hidden">
                         @if (investigateIssue(); as issue) {
                             <inspecto-empty-state
                                 class="block w-full max-w-3xl p-4"
@@ -1542,7 +1571,40 @@
                                 Start from the Investigation tab →
                             </button>
                         } @else {
+                          <!-- operator 2026-11-09: one bounded launchpad - a tab strip over ONE panel that scrolls inside
+                               itself, so the start area never grows the page and its top is always reachable -->
+                          <div class="flex min-h-0 w-full max-w-4xl flex-auto flex-col self-stretch" data-testid="la-launchpad">
+                            <div class="flex shrink-0 flex-wrap gap-1 border-b px-2 pt-2" role="tablist" aria-label="Start area" style="border-color: var(--gamma-border)">
+                                @for (t of startTabs; track t.id) {
+                                    @if (t.id !== 'discover' || aboutDataset()) {
+                                        <button
+                                            type="button"
+                                            role="tab"
+                                            class="flex items-center gap-1.5 rounded-t-md px-3 py-1.5 text-sm"
+                                            [id]="'la-start-tab-' + t.id"
+                                            [class.font-semibold]="startTab() === t.id"
+                                            [class.text-secondary]="startTab() !== t.id"
+                                            [style.boxShadow]="startTab() === t.id ? 'inset 0 -2px 0 var(--gamma-primary)' : null"
+                                            [attr.aria-selected]="startTab() === t.id"
+                                            [attr.aria-controls]="'la-start-panel'"
+                                            [attr.data-testid]="'la-start-tab-' + t.id"
+                                            (click)="startTab.set(t.id)"
+                                        >
+                                            <mat-icon class="icon-size-4" [svgIcon]="t.icon"></mat-icon>
+                                            {{ t.label }}
+                                        </button>
+                                    }
+                                }
+                            </div>
+                            <div
+                                id="la-start-panel"
+                                role="tabpanel"
+                                [attr.aria-labelledby]="'la-start-tab-' + startTab()"
+                                class="min-h-0 flex-auto overflow-y-auto"
+                                data-testid="la-start-panel"
+                            >
                             <inspecto-link-analysis-start-box
+                                [class.hidden]="startTab() !== 'start'"
                                 [catalogue]="startCatalogue()"
                                 [lists]="entityLists()"
                                 [dataset]="startDataset()"
@@ -1557,7 +1619,9 @@
                             ></inspecto-link-analysis-start-box>
                             <!-- LA-PRESET-QUERIES-1: the questions the Space's pack asks of a Dataset; Draw these starts from the answer -->
                             <inspecto-link-analysis-presets
-                                class="block w-full max-w-3xl p-4"
+                                class="block w-full p-4"
+                                [class.hidden]="startTab() !== 'presets' && startTab() !== 'builder'"
+                                [part]="startTab() === 'builder' ? 'builder' : 'presets'"
                                 [datasets]="startCatalogue().datasets"
                                 [initialDataset]="startDataset()"
                                 (draw)="drawPreset($event)"
@@ -1565,13 +1629,16 @@
                             <!-- LA-BASIC-DISCOVER-1: what is in the Dataset before drawing; Draw these starts from the busiest -->
                             @if (aboutDataset(); as about) {
                                 <inspecto-link-analysis-dataset-discover
-                                    class="block w-full max-w-3xl p-4"
+                                    class="block w-full p-4"
+                                    [class.hidden]="startTab() !== 'discover'"
                                     [dataset]="about"
                                     [title]="aboutTitle()"
                                     [level]="2"
                                     (draw)="drawPreset($event)"
                                 ></inspecto-link-analysis-dataset-discover>
                             }
+                            </div>
+                          </div>
                         }
                     </div>
                 }
@@ -1624,15 +1691,6 @@
                                 </button>
                             }
                         </div>
-                        <button
-                            class="ml-auto"
-                            mat-icon-button
-                            (click)="toolboxDockOpen.set(false)"
-                            matTooltip="Hide the toolbox"
-                            aria-label="Hide the toolbox"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
-                        </button>
                     </div>
                     <div #toolboxScroll data-testid="toolbox-scroll" class="min-h-0 min-w-0 flex-auto overflow-y-auto overflow-x-hidden p-3">
                         <!-- LA-ONBOARD-1 phase 7 (UC-12): three plain questions first; the full toolbox below. -->

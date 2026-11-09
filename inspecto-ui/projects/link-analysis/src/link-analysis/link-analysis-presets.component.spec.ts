@@ -62,6 +62,7 @@ const ANSWER: PresetRunResult = {
         <inspecto-link-analysis-presets
             [datasets]="datasets()"
             [initialDataset]="initial()"
+            [part]="part()"
             (draw)="drawn.push($event)"
         ></inspecto-link-analysis-presets>
     </main>`,
@@ -69,6 +70,7 @@ const ANSWER: PresetRunResult = {
 class HostComponent {
     readonly datasets = signal([{ id: 'pays', name: 'Payments' }]);
     readonly initial = signal<string | null>('pays');
+    readonly part = signal<'presets' | 'builder'>('presets');
     readonly drawn: PresetDraw[] = [];
 }
 
@@ -188,7 +190,7 @@ describe('LinkAnalysisPresetsComponent', () => {
             ...LIST,
             saved: [{ id: 'busiest', label: 'Busiest', description: 'The senders with the most links.', query: { by: 'from' as const } }],
         };
-        const { fixture, el, c, inv } = setup({ list: () => of(saved) });
+        const { fixture, el, c, inv, host } = setup({ list: () => of(saved) });
         expect(c.presetOptions().map((o) => o.value)).toContain('saved:busiest');
         const runQuery = vi.fn(() => of({ ...ANSWER, query: { by: 'from' } }));
         (inv as unknown as { runQuery: typeof runQuery }).runQuery = runQuery;
@@ -199,10 +201,17 @@ describe('LinkAnalysisPresetsComponent', () => {
         fixture.detectChanges();
         expect(runQuery).toHaveBeenCalledWith('pays', { by: 'from' });
         expect(inv.runPreset).not.toHaveBeenCalled();
+        // the builder is its own tab (operator 2026-11-09): absent under Preset queries, present under Build a question
+        expect(el.querySelector('[data-testid="la-builder"]')).toBeNull();
+        host.part.set('builder');
+        fixture.detectChanges();
         expect(el.querySelector('[data-testid="la-builder"]')).not.toBeNull();
     });
     it('offers no builder over a Dataset that does not say which columns link one entity to another', () => {
-        const { el } = setup({ list: () => of({ ...LIST, presets: [], roles: { ...LIST.roles, from: null, to: null } }) });
+        const { el, fixture, host } = setup({ list: () => of({ ...LIST, presets: [], roles: { ...LIST.roles, from: null, to: null } }) });
+        host.part.set('builder');
+        fixture.detectChanges();
         expect(el.querySelector('[data-testid="la-builder"]')).toBeNull();
+        expect(el.querySelector('[data-testid="la-builder-none"]')).not.toBeNull();
     });
 });

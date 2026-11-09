@@ -129,6 +129,16 @@
       ],
       "autoPort": true,
       "port": 4210
+    },
+    {
+      "name": "la-app-dev",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd inspecto-ui && npx ng serve la-app --port %PORT%"
+      ],
+      "autoPort": true,
+      "port": 4304
     }
   ]
 }

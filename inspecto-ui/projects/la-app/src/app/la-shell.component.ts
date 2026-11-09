@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { InspectoSplitDirective } from '@inspecto/core/components/split.directive';
+import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -13,16 +15,7 @@ import { LA_PRODUCT_NAME } from './la-brand';
 import { LA_APP_SETTINGS_NAV, visibleLaNav } from './la-nav';
 import { NextStepsDialog } from './next-steps.dialog';
 
-/** localStorage key remembering whether the navigation rail is expanded ('1') or slim (anything else). */
-export const LA_RAIL_EXPANDED_KEY = 'la-app.rail-expanded';
-
-function readExpanded(): boolean {
-    try {
-        return localStorage.getItem(LA_RAIL_EXPANDED_KEY) === '1';
-    } catch {
-        return false;
-    }
-}
+export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-rail.service';
 
 /**
  * The signed-in frame: a LEFT navigation rail (product mark, the three areas, Space switcher, user menu) beside the
@@ -41,6 +34,7 @@ function readExpanded(): boolean {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ConnectivityBannerComponent,
+        InspectoSplitDirective,
         MatIconModule,
         MatTooltipModule,
         RouterLink,
@@ -57,7 +51,7 @@ function readExpanded(): boolean {
         <aside
             class="bg-card flex min-h-12 flex-0 flex-row items-center gap-1 border-b px-2 max-sm:flex-wrap sticky top-0 z-40 sm:h-screen sm:flex-col sm:items-stretch sm:gap-2 sm:border-r sm:border-b-0 sm:py-3"
             [class.sm:w-16]="!expanded()"
-            [class.sm:w-56]="expanded()"
+            [style.width.px]="expanded() && wide() ? railSplit.width() : null"
         >
             <a
                 routerLink="/"
@@ -106,30 +100,22 @@ function readExpanded(): boolean {
                     <inspecto-space-switcher [dataKind]="true" preferredSample="la-sample"></inspecto-space-switcher>
                 </div>
                 <user [showAvatar]="false"></user>
-                <button
-                    type="button"
-                    class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm max-sm:hidden focus-visible:outline-2"
-                    [attr.aria-expanded]="expanded()"
-                    [attr.aria-label]="expanded() ? 'Collapse navigation' : 'Expand navigation'"
-                    [matTooltip]="expanded() ? '' : 'Expand navigation'"
-                    matTooltipPosition="right"
-                    (click)="toggle()"
-                >
-                    <mat-icon
-                        class="icon-size-5 flex-0"
-                        [svgIcon]="
-                            expanded() ? 'heroicons_outline:chevron-double-left' : 'heroicons_outline:chevron-double-right'
-                        "
-                    ></mat-icon>
-                    @if (expanded()) {
-                        <span>Collapse</span>
-                    }
-                </button>
                 @if (expanded()) {
                     <p class="text-secondary m-0 px-2 text-xs max-sm:hidden">{{ footer }}</p>
                 }
             </div>
         </aside>
+        <!-- the expanded rail is drag-resizable like the Link Analysis toolbox; the collapse toggle is in the page header -->
+        <div
+            inspectoSplit="la-app.rail"
+            #railSplit="inspectoSplit"
+            [min]="160"
+            [max]="400"
+            [defaultWidth]="224"
+            class="max-sm:hidden"
+            [class.hidden]="!expanded()"
+            aria-label="Resize the navigation (arrow keys or drag)"
+        ></div>
         <div class="flex min-h-0 min-w-0 flex-1 flex-col">
             <inspecto-connectivity-banner></inspecto-connectivity-banner>
             <main class="flex min-h-0 flex-1 flex-col">
@@ -157,8 +143,22 @@ export class LaShellComponent {
     protected readonly product = LA_PRODUCT_NAME;
     protected readonly logo = this.env.appLogo;
     protected readonly footer = this.env.footerText;
-    protected readonly expanded = signal(readExpanded());
+    private readonly rail = inject(LaRailService);
+    protected readonly expanded = this.rail.expanded;
+    /** At sm and up the rail is a side column (an inline width applies); below it, a top bar. */
+    private readonly smQuery = typeof matchMedia === 'function' ? matchMedia('(min-width: 600px)') : null;
+    protected readonly wide = signal(this.smQuery?.matches ?? true);
     private readonly dialog = inject(MatDialog);
+
+    constructor() {
+        this.rail.available.set(true);
+        const onChange = (e: MediaQueryListEvent) => this.wide.set(e.matches);
+        this.smQuery?.addEventListener?.('change', onChange);
+        inject(DestroyRef).onDestroy(() => {
+            this.rail.available.set(false);
+            this.smQuery?.removeEventListener?.('change', onChange);
+        });
+    }
 
     /** *What can I do next?* (UC-15 rule 4). */
     protected openNextSteps(): void {
@@ -170,15 +170,5 @@ export class LaShellComponent {
         if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey || isEditingTarget(event.target)) return;
         event.preventDefault();
         this.dialog.open(ShortcutsHelpDialog, { width: '460px', autoFocus: false, data: { shortcuts: LA_APP_SHORTCUTS } });
-    }
-
-    protected toggle(): void {
-        const next = !this.expanded();
-        this.expanded.set(next);
-        try {
-            localStorage.setItem(LA_RAIL_EXPANDED_KEY, next ? '1' : '0');
-        } catch {
-            /* storage blocked: the choice just does not persist */
-        }
     }
 }
