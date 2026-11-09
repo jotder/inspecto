@@ -2176,8 +2176,11 @@ deviations:
    its rule, the counts read 1 / 2 / 3, and `seed-la-crypto.mjs --base … --space la-crypto --apply` created 19 steps,
    none failed. **Found:** the crypto Alert opened at value 1, not 2 — its link Job runs on every Pipeline commit, so the
    rule fired on a partial count and the open Alert kept it. Fixed in the engine (`ALERT-VALUE-REFRESH-1`: an open
-   scalar-Measure Alert is refreshed in place each sweep); the two product zips above predate the fix and must be
-   rebuilt from a commit that has it (the Space and data zips carry no engine code and are unaffected). Also noted: the product zips attach no Space, but their template gallery carries each template's
+   scalar-Measure Alert is refreshed in place each sweep, `1963c661b`). **The whole release was rebuilt from
+   `1963c661b` the same day** (the 127bd077e build is kept beside it as `la-release-out-127bd077e`): on Preview with
+   `la-crypto` the one OPEN Alert now ends at value 2, refreshed in place from 1 with its first-fire time kept, no
+   RESOLVED Alert; the seed created 19 steps, none failed; Basic with `la-card` landed 17 batches with 0 rejected, the
+   rule unarmed; 0 ERROR lines on either. Also noted: the product zips attach no Space, but their template gallery carries each template's
    data (about 45 MB).
 
 ## Open questions
