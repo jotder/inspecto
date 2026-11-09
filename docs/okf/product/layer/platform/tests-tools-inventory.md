@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-87 test file(s). Run one, or all:
+88 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -40,6 +40,7 @@ node --test tools/
 | `tools/check-package-strict.test.mjs` | Run: node --test tools/check-package-strict.test.mjs |
 | `tools/check-product-docs.test.mjs` | Fixture test for tools/check-product-docs.mjs. Run: node --test tools/check-product-docs.test.mjs |
 | `tools/check-product-map.test.mjs` | Fixture test for tools/check-product-map.mjs. Run: node --test tools/check-product-map.test.mjs |
+| `tools/check-reactor-verdict.test.mjs` | tools/check-reactor-verdict.mjs, driven end to end over a synthetic log and surefire reports. |
 | `tools/check-release-signing.test.mjs` |  |
 | `tools/check-sbom-modules.test.mjs` | Negative fixtures for tools/check-sbom-modules.mjs. Run: node --test tools/check-sbom-modules.test.mjs |
 | `tools/compile-clean.test.mjs` | Fixture test for tools/compile-clean.mjs — the verdict must come from the LOG, never from an exit code, and each way |

@@ -187,8 +187,11 @@ if (!finishedAt || secs === undefined) {
       ' — so STALE surefire reports could not be ruled out. Re-run with `-B`.',
   );
 } else {
-  // 2s slack: Maven's footer is whole-second precision and the clock may round against us.
-  const startMs = Date.parse(finishedAt) - secs * 1000 - 2000;
+  // 2s slack: Maven's footer is whole-second precision and the clock may round against us. A run of an
+  // hour or more prints `hh:mm h` - its seconds are DROPPED, so the true duration is up to 59 s longer
+  // (REACTOR-VERDICT-HOUR-PRECISION-1, 2026-11-09: a 1:13 h gate called its first modules' reports stale).
+  const precisionMs = /h$/.test(totalTime.trim()) ? 59_000 : 0;
+  const startMs = Date.parse(finishedAt) - secs * 1000 - precisionMs - 2000;
   // `inspecto-deploy` is a staged BUNDLE, not a reactor module — its copies would double-count.
   // `node_modules` / `.git` are excluded for walk cost; neither holds a Maven module.
   const SKIP_DIR = new Set(['inspecto-deploy', 'node_modules', '.git']);
