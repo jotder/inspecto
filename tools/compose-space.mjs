@@ -7,6 +7,8 @@
 // two files written here (COMPOSER_OWNED in tools/products.mjs):
 //   template.toon                              the gallery entry, named for the Product, listing each part's contents
 //   config/examples/sla-escalation-examples.md each part's examples under its App's heading
+// A telecom Space whose parts each ingest the network usage record gets ONE usage feed instead (PA-5c, D-PA17:
+// tools/telecom-usage.mjs swaps the parts' usage Pipelines for the Industry's canonical one, which fans out to their stores).
 // Any other file two parts both ship is refused. tools/check-products.mjs refuses the same collision statically, so a
 // refusal here means the staged copies differ from the committed definitions.
 //
@@ -18,6 +20,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFi
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPOSER_OWNED } from './products.mjs';
+import { applyUsageFeed } from './telecom-usage.mjs';
 
 const EDITION_ORDER = ['basic', 'standard', 'advanced', 'preview'];
 const SLA_DOC = 'config/examples/sla-escalation-examples.md';
@@ -84,7 +87,8 @@ function walk(dir, rel = '') {
 
 /**
  * Compose `<templatesDir>/<space.id>` from `<templatesDir>/<part.template>` for each part. Refuses an existing target, a
- * missing part and a file two parts both ship (other than COMPOSER_OWNED). Returns { id, files, parts }.
+ * missing part and a file two parts both ship (other than COMPOSER_OWNED). A `telecom` Space (`space.industry`) gets the
+ * Industry's one usage feed (applyUsageFeed). Returns { id, files, parts, usageFeed }.
  */
 export function composeSpace(space, templatesDir) {
     const out = join(templatesDir, space.id);
@@ -117,7 +121,8 @@ export function composeSpace(space, templatesDir) {
         mkdirSync(dirname(join(out, SLA_DOC)), { recursive: true });
         writeFileSync(join(out, ...SLA_DOC.split('/')), slaDoc({ title: space.title, parts }));
     }
-    return { id: space.id, files: owner.size + 1 + (parts.some((p) => p.sla !== null) ? 1 : 0), parts: parts.map((p) => p.template) };
+    const usageFeed = space.industry === 'telecom' ? applyUsageFeed(out, Object.fromEntries(parts.map((p) => [p.template, p.dir]))) : null;
+    return { id: space.id, files: walk(out).length, parts: parts.map((p) => p.template), usageFeed };
 }
 
 function main() {
@@ -130,6 +135,7 @@ function main() {
         if (!plan.space) { console.log(`compose-space: Product '${plan.product?.id}' composes no Space - nothing to do`); return; }
         const r = composeSpace(plan.space, templates);
         console.log(`compose-space: composed '${r.id}' from ${r.parts.join(', ')} (${r.files} files)`);
+        if (r.usageFeed) console.log(`compose-space: one usage feed, telecom_usage -> ${r.usageFeed.readers.join(', ')} (${r.usageFeed.counts.records} records, ${r.usageFeed.counts.bridged} bridged into RA's chain)`);
     } catch (e) {
         console.error(`compose-space: ${e.message}`);
         process.exit(1);

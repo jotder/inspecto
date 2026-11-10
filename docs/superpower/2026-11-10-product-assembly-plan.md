@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b done 2026-11-10; PA-5c is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); PA-5d is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -551,6 +551,70 @@ The slices, each its own lane (D-PA16):
     `+1-555-01xx` numbers, no IRSF prefixes).
   - Proof: one new golden test of the composed Space (each App's planted findings, nothing new), the four existing
     golden tests untouched, and the Telco bundle seeded from the composed corpus.
+
+  **As built (PA-5c done 2026-11-10).**
+  - **Mechanism: one canonical Pipeline that fans out, not views.** A `sql.template` Job registers its `sources` as
+    views over the store folder (`<dataDir>/<store>/**/*.parquet`, `SqlTemplateJob`), never over a Dataset or a
+    `config/views` view, so FM's 14 detection Jobs and bypass's Jobs can read only a real store. A Reconciliation side
+    would resolve a `view:` Dataset (`DatasetRelation`), but one feed has to serve all three readers. So the
+    `telecom_usage` Pipeline uses `route: mode: clone` (armed since CLONE-ARM-1) with one sink per App store
+    (`data/switch_xdr/database`, `data/cdr/database`, `data/voice_cdr/database`), and each branch's `sql` step
+    (SQL-BRANCH-1) projects the canonical columns onto that App's names. Every Job, Reconciliation, Expectation,
+    Dataset and Alert Rule keeps reading the store it read before.
+  - **Where it lives.** `tools/telecom-usage.mjs`, beside the composer: the canonical columns (FM's and bypass's names,
+    plus RA's `usage_units` and `partner`), the three readers, the converter (`convert`), the generated Pipeline and
+    schema, and `applyUsageFeed`. `tools/compose-space.mjs` calls it when the Assembly Plan's `space.industry` is
+    `telecom` (`tools/assemble.mjs` now carries it) and two or more parts read usage. It removes each part's usage
+    Pipeline (`config/<feed>/`) and sample (`data/samples/<feed>/`), writes `config/telecom_usage/` and the converted
+    samples, and retargets what named a removed Pipeline: FM's Decision Rule `tf_long_roaming_call_escalate`
+    (`target: cdr`) and RA's `ra_switch_kpi_completeness` Job (`pipeline: switch_xdr`). The stores' zero-row seeds stay.
+    Each App template, its own feeds and its golden tests are unchanged: the swap happens only in the composed copy.
+  - **The composed corpus.** 3,959 records: RA's 600 switch records (direction `MO`, the subscriber as `a_number`, the
+    charge RA's rating gave them) and FM's 3,359 call records as they are, sorted by time. RA reads only originated
+    records (`where: direction = 'MO'`), so FM's 2,672 MO records are bridged into RA's chain: a mediated row (same
+    units), a rated row on `PLAN_B` at the one tariff row in force (VOICE seconds, SMS one event, DATA one MB per
+    session minute, rounded up; cents rounded half away from zero, as DuckDB rounds the DECIMAL product) and one invoice
+    line per subscriber and month equal to the rated sum (332 lines, `INVTU00001`…). The bridge refuses an ambiguous
+    tariff, a record id two parts share, and a subscriber RA already bills. Bypass ships no usage sample (its corpus is
+    generated in-test by `BypassCorpus`), so it adds no records.
+  - ⚠ **One cross-App finding no template plants alone (decision owed, recorded; the test pins it).** FM's five planted
+    premium-rate callers (`999700012xx`) all originate on one cell (`C500`), each dialling a new number almost every
+    call, briefly, receiving nothing. In the composed Space bypass sees that traffic, and its cluster rule
+    `tb_box_suspected` opens one Incident for `cell:C500` on the first night. No SIM-level bypass rule fires (one day of
+    traffic never meets the persistence gate). The SIM-day signal `box_like` marks those five lines and one more of
+    FM's, `99970001211` (a sequential dialler on cell `C501`), which reaches no Alert; the test pins all six. Recommended: keep it. It is a plausible true positive (artificial
+    premium-rate traffic from a SIM farm), and hiding it would need FM's corpus or the converter to move those calls to
+    other cells, which would change what FM's golden test pins. If the operator prefers no cross-App findings, the
+    converter can spread those five lines over five cells in the composed copy only (FM's typologies do not read
+    `cell_id` for premium rate).
+  - **Deliberately not done.** FM's `tf_anomaly_score` (the `anomaly.score` Job) is not run by either composed test: RA's
+    40 subscribers join the population that the per-subscriber usage model scores, so scores move. That is expected for a
+    population model and is not a planted finding. The four Expectations whose `target` names a usage Pipeline
+    (`tf_cdr_*`, `ra_switch_xdr_id_non_null`) still evaluate their store (`ExpectationEvaluator` reads
+    `data/<target>`), but `MetadataValidateTask` would list them as broken Pipeline references, because `target` serves
+    as both the store and the Pipeline id. Gap detection on FM's and bypass's feed file names is dropped with their
+    Pipelines.
+  - **Gotcha.** A clone branch must keep the ingest lane's lineage column `__src_id`. A branch that projects only its
+    own columns fails the Consignment with "Referenced column `__src_id` not found". So each branch is generated as
+    `SELECT * EXCLUDE (<every canonical column>), <the App's columns> FROM input`. Two files in one inbox are one
+    Consignment, so `runPipeline` reports `RunResult(1, 0)` for RA's feeds that gain a bridging file.
+  **Proof (as built).** Node: `tools/telecom-usage.test.mjs` 6/6 (union and order, the bridge agreeing with RA's
+  re-rating, rounding and units, the generated Pipeline, the swap and its refusals), with `compose-space.test.mjs` and
+  `assemble.test.mjs` 23/23 in all. Java: `TelcoComposedSpaceGoldenTest` (inspecto-reconciliation) runs
+  `tools/assemble.mjs` and `tools/compose-space.mjs` exactly as the bundle does (`node` on the PATH), creates the
+  composed Space and a `telco-fraud` Space beside it, and ingests every composed sample through the Space's own
+  Pipelines. It checks that `switch_xdr` holds every MO record and `cdr` and `voice_cdr` every record. RA: every
+  control's planted set equals `TelcoRaCorpus.planted` (xDR lost, re-rating, roll-forward, settlement, both
+  Reconciliations), with 17 leakage and 17 data-quality rows. FM: the 14 typologies' breached keys and every detection
+  sink's rows are identical to the `telco-fraud` Space's, for each of 07-01, 07-02 and 07-03. `TelcoComposedBypassTest` (inspecto-scoring) runs bypass's
+  whole nightly chain for 07-01…07-03 and pins the one cross-App Incident above, with no SIM finding at `alert`. The
+  four existing golden tests (`TelcoRaGoldenTest`, `TelcoFraudTemplateGoldenTest`, `BypassFeatureGoldenTest`,
+  `TelcoRerateGoldenTest`) are unchanged and green (8 + 12 + 26 + 6 tests); `spaces/_templates/` has no diff. Bundle:
+  `package.ps1 -Product telco -Edition Standard -NoRuntime` composes `telco` (245 files; "one usage feed,
+  telecom_usage -> switch_xdr, cdr, voice_cdr (3959 records, 2672 bridged into RA's chain)"), and the bundle's
+  `spaces/_templates/telco` ships `config/telecom_usage/` and the converted samples, with no `config/switch_xdr`,
+  `config/cdr` or `config/voice_cdr`. The bundle was not booted: a Space created from it is what the two Java tests
+  build. Seeding a demo Space from it is PA-5d.
 - **PA-5d — the demo Distribution.** `tools/seed-telco.mjs`, `products/telco.demo-build.txt`, `demoSpace: telco`, and
   the Telco Product matrix (Standard, Advanced) in CI.
 

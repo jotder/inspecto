@@ -90,7 +90,7 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         templates,
         // PA-5 (D-PA14): the Space Template composed from the selected Apps' templates (tools/compose-space.mjs), or null.
         space: p.space
-            ? { id: p.space, title: p.brand?.name ?? p.title, parts: spaceParts(selected, model.apps).map(({ app, template }) => ({ app, appTitle: model.apps[app].title, template })) }
+            ? { id: p.space, title: p.brand?.name ?? p.title, industry: p.industry ?? null, parts: spaceParts(selected, model.apps).map(({ app, template }) => ({ app, appTitle: model.apps[app].title, template })) }
             : null,
         seedSpace,
         seedTool: seedSpace ? seedToolOf(seedSpace) : null,

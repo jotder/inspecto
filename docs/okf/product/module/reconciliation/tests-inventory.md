@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-29 test class(es): 23 unit, 6 real-HTTP control-plane, 0 IT.
+30 test class(es): 24 unit, 6 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -38,6 +38,7 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `PartnerSettlementPositionGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementPositionGoldenTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S4 golden test: netting, positions and the roll-forward. The shipped template is created |
 | `PartnerSettlementReferenceTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementReferenceTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S1: the four References and the settlement-cycle calendar. The shipped |
 | `PartnerSettlementSeedTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/PartnerSettlementSeedTest.java` | The zero-row schema seeds of the {@code partner-settlement} Space Template. Every Dataset a Job reads or writes ships a seed |
+| `TelcoComposedSpaceGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoComposedSpaceGoldenTest.java` | Golden test of the Inspecto Telco Composed Space Template with ONE usage feed ({@code PRODUCT-ASSEMBLY-1} PA-5c, |
 | `TelcoRaGoldenTest` | `com.gamma.job` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` | Golden test of the {@code telco-ra} Space Template ({@code ASSURE-PACK-TELCO-RA-1}): the template's OWN |
 | `ReconBreaksParityTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconBreaksParityTest.java` | RECON-UPLIFT-1 B1 parity: {@link ReconBreaks#compute} now reads every Break set off ONE shared {@code __grain}; it |
 | `ReconBreaksTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconBreaksTest.java` | {@link ReconBreaks} — the server-side port of the SPA's Break lifecycle (R2-03): the {@code mergeBreaks} |

@@ -47,9 +47,15 @@ test('Inspecto Telco x Standard: the plan composes RA and FM into one Space, eve
         const r = composeSpace(plan.space, dir);
         const out = join(dir, 'telco');
         const files = new Set(walk(out));
+        // PA-5c: the parts' usage feeds are swapped for the telecom Industry's one (tools/telecom-usage.test.mjs pins it).
+        assert.deepEqual(r.usageFeed.readers, ['switch_xdr', 'cdr', 'voice_cdr']);
+        const swapped = (f) => r.usageFeed.readers.some((p) => f.startsWith(`config/${p}/`) || f.startsWith(`data/samples/${p}/`));
+        assert.deepEqual(r.usageFeed.retargeted, ['config/jobs/ra_switch_kpi_completeness_job.toon', 'config/registry/decision-rules/tf_long_roaming_call_escalate.toon']);
         for (const t of plan.space.parts.map((p) => p.template)) {
             for (const f of walk(join(dir, t))) {
                 if (f === 'template.toon' || f === 'config/examples/sla-escalation-examples.md') continue;
+                if (swapped(f)) { assert.ok(!files.has(f), `${t}/${f} is swapped out`); continue; }
+                if (r.usageFeed.retargeted.includes(f)) continue;
                 assert.ok(files.has(f), `${t}/${f} is in the composed Space`);
                 assert.deepEqual(readFileSync(join(out, f)), readFileSync(join(dir, t, f)), `${t}/${f} is copied byte for byte`);
             }

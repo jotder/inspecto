@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-92 test file(s). Run one, or all:
+93 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -109,6 +109,7 @@ node --test tools/
 | `tools/seed-la-trade.test.mjs` | node --test tools/seed-la-trade.test.mjs  -  request building of the trade-based money-laundering seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-utility.test.mjs` | node --test tools/seed-la-utility.test.mjs  -  request building of the utility seed script against a MOCKED fetch (no server). |
 | `tools/seed-telco-fraud-demo.test.mjs` | node --test tools/seed-telco-fraud-demo.test.mjs |
+| `tools/telecom-usage.test.mjs` | Tests for tools/telecom-usage.mjs - PRODUCT-ASSEMBLY-1 PA-5c (D-PA17). Run: node --test tools/telecom-usage.test.mjs |
 | `tools/unreadable-dirs.test.mjs` | Fixture test: the two whole-tree walkers that a local, permission-locked folder used to crash |
 | `tools/vuln-db-refresh.test.mjs` | Offline tests for tools/vuln-db-refresh.mjs. Run: node --test tools/vuln-db-refresh.test.mjs |
 | `tools/vuln-scan.test.mjs` | Offline tests for tools/vuln-scan.mjs (ASSURE-OPERABILITY-1). Run: node --test tools/vuln-scan.test.mjs |

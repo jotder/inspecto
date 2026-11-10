@@ -75,6 +75,7 @@ test('PA-5: Inspecto Telco is la-app built with -c telco, four Apps, and one Spa
         assert.deepEqual(p.space, {
             id: 'telco',
             title: 'Inspecto Telco',
+            industry: 'telecom',
             parts: [
                 { app: 'telco-ra', appTitle: 'Revenue Assurance', template: 'telco-ra' },
                 { app: 'telco-fraud', appTitle: 'Fraud Management', template: 'telco-fraud' },

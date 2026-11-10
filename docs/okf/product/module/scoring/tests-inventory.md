@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.scoring`](../../../../../product-map/module/scoring.toon).
 
-32 test class(es): 28 unit, 4 real-HTTP control-plane, 0 IT.
+33 test class(es): 29 unit, 4 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -38,6 +38,7 @@ mvn -o test -pl features/inspecto-scoring -Dtest=RiskScoreAlertTest,BypassAllowL
 | `ScoringAbsentSurfaceParityTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/ScoringAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule}s |
 | `TelcoBypassClusterGoldenTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoBypassClusterGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B3 golden test. The shipped {@code telco-bypass} Space Template, copied verbatim, |
 | `TelcoBypassGoldenTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoBypassGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B2 golden test. The shipped {@code telco-bypass} Space Template, copied verbatim, |
+| `TelcoComposedBypassTest` | `com.gamma.control` | unit | `features/inspecto-scoring/src/test/java/com/gamma/control/TelcoComposedBypassTest.java` | The bypass App in the Inspecto Telco Composed Space with ONE usage feed ({@code PRODUCT-ASSEMBLY-1} PA-5c, D-PA17). The |
 | `AmlPackGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/AmlPackGoldenTest.java` | {@code PACK-AML-1}: the {@code aml} Space Template RUN end to end from a verbatim copy. The two Pipelines ingest the |
 | `LaShowcaseRiskScoreGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/LaShowcaseRiskScoreGoldenTest.java` | {@code LA-SUSPICION-FACTORS-DEMO-1}: the {@code la-showcase} template ships the {@code mule_account} Risk Score so |
 | `MobileMoneyRiskScoreGoldenTest` | `com.gamma.pack` | unit | `features/inspecto-scoring/src/test/java/com/gamma/pack/MobileMoneyRiskScoreGoldenTest.java` | {@code PACK-MOBILE-MONEY-1}: the {@code mobile-money} template's per-agent Risk Score ({@code mm_agent}), run over |
