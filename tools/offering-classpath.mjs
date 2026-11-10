@@ -101,7 +101,7 @@ export function classpath(edition, { demo = false, g = gather(join(dirname(fileU
     const shipped = new Map([...bundleModules(ed), ...coreModules()].map((m) => [m.artifactId, m.bundleFile]));
     const known = [...bundleModules('Preview'), ...coreModules()];
     for (const a of CLASSPATH_ORDER) if (!known.some((m) => m.artifactId === a)) throw new Error(`CLASSPATH_ORDER names '${a}', which bundle-modules.mjs does not know`);
-    for (const a of shipped.keys()) if (!CLASSPATH_ORDER.includes(a)) throw new Error(`module '${a}' ships in ${ed} but has no place in CLASSPATH_ORDER (tools/offering-classpath.mjs) - add it, deliberately`);
+    for (const a of shipped.keys()) if (!CLASSPATH_ORDER.includes(a)) throw new Error(`module '${a}' ships in ${ed} but has no place in CLASSPATH_ORDER (tools/bundle-modules.mjs) - add it, deliberately`);
     const jars = [];
     for (const a of CLASSPATH_ORDER) {
         if (!shipped.has(a)) continue;

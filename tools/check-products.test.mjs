@@ -65,7 +65,7 @@ const RED = {
     'an App id that differs from its folder': [(m) => { m.apps['link-analysis'].id = 'la'; }, /apps\/link-analysis\/app\.toon: id 'la' does not equal its folder name/],
     'an App with no version': [(m) => { delete m.apps['link-analysis'].version; }, /apps\/link-analysis\/app\.toon: no version/],
     'an unreadable App version range': [(m) => { m.apps['link-analysis'].platform = '~4'; }, /unreadable version range token '~4'/],
-    'an App naming an Industry with no definition': [(m) => { m.apps['link-analysis'].industries.push('retail'); m.products.la.industry = 'retail'; }, /Industry 'retail' has no industries\/retail\/industry\.toon/],
+    'an App naming an Industry with no definition': [(m) => { m.apps['link-analysis'].industries.push('retail'); m.products.la.industry = 'retail'; }, /apps\/link-analysis\/app\.toon: Industry 'retail' has no industries\/retail\/industry\.toon/],
     'an App template that does not exist': [(m) => m.apps['link-analysis'].templates.push('la-ghost'), /apps\/link-analysis\/app\.toon: template 'la-ghost' is not under spaces\/_templates/],
     'an App whose docs do not exist': [(m) => { m.apps['link-analysis'].docs = 'docs/nowhere.md'; }, /apps\/link-analysis\/app\.toon: docs 'docs\/nowhere\.md' does not exist/],
     'a Product with no host': [(m) => { delete m.products.la.host; }, /products\/la\.toon: no host/],
