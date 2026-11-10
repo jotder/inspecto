@@ -577,7 +577,7 @@ The slices, each its own lane (D-PA16):
     line per subscriber and month equal to the rated sum (332 lines, `INVTU00001`…). The bridge refuses an ambiguous
     tariff, a record id two parts share, and a subscriber RA already bills. Bypass ships no usage sample (its corpus is
     generated in-test by `BypassCorpus`), so it adds no records.
-  - ⚠ **One cross-App finding no template plants alone (decision owed, recorded; the test pins it).** FM's five planted
+  - **One cross-App finding no template plants alone (operator 2026-11-10: KEEP it; the test pins it).** FM's five planted
     premium-rate callers (`999700012xx`) all originate on one cell (`C500`), each dialling a new number almost every
     call, briefly, receiving nothing. In the composed Space bypass sees that traffic, and its cluster rule
     `tb_box_suspected` opens one Incident for `cell:C500` on the first night. No SIM-level bypass rule fires (one day of
