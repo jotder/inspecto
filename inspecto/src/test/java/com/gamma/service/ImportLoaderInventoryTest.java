@@ -114,6 +114,9 @@ class ImportLoaderInventoryTest {
                 + "vNNNNNN/ — a derived artefact written by the index builder, outside the config tree, under a path built "
                 + "from a validated dataset id and mapping hash; a planted file there is refused by the manifest's own "
                 + "format and mapping-hash checks, and no import lands outside <config>");
+        ALLOWED.put("product.json", "the Product descriptor (ProductDescriptor, PRODUCT-ASSEMBLY-1 PA-3) in the bundle's lib/, "
+                + "beside the processor jar, or wherever -Dproduct.descriptor points - an install file written by package.ps1, "
+                + "never under a Space or config root, so no import lands there; the server reads it once at boot");
         ALLOWED.put("pins.json", "the LA index's version pins (IndexPins, D7-2) in <write root>/la-index/<dataset>/<mappingHash>/ - "
                 + "a derived registry outside the config tree; a planted or truncated file makes gc delete nothing (fail closed), "
                 + "and no import lands outside <config>");
