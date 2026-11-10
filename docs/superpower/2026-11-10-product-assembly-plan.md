@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed), PA-6a is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -673,7 +673,35 @@ The slices, each its own lane (D-PA16):
   (gap detection removed) boots with exactly those 17 Alerts and 36 Incidents (the first bake also had 262 `sequence_gap`
   Alerts and their Incidents).
 
-## 12. Decisions (operator, all signed 2026-11-10 as recommended)
+**PA-6 designed and sliced (2026-11-11; D-PA18…D-PA20 signed).** The Platform product's proof is a sample partner App
+built only with the kit that passes conformance (§8). Four lanes, in this order (D-PA20):
+- **PA-6a — the App authoring kit, `tools/inspecto-app.mjs`.**
+  - **An App lives in any folder** (D-PA18): `<app-root>/app.toon`, its Space Templates under `<app-root>/templates/<id>/`,
+    its golden data and expectations in `<app-root>/conformance.toon`, and its docs under `<app-root>/docs/`.
+    `tools/products.mjs` `gatherModel(root, { appRoots })` reads such folders beside `apps/` (`apps/` stays
+    first-party). The assembler takes `--app-root`, and the bundle stages a partner template from its App's folder. An id,
+    or a template name, that a first-party App already uses is refused.
+  - `inspecto app new <id> --dir <folder> [--industry] [--addons]` scaffolds an App that passes `validate` and `test` as
+    created: one Space Template with a sample feed, a Pipeline, a Dataset, a `sql.template` detection Job, an Alert Rule
+    and the expected findings.
+  - `validate` applies the guard's App rules (`checkModel`) plus the layout and the conformance file.
+  - `test` is the conformance kit. Statically: validate, then for each Edition where the App's Add-ons are built,
+    assemble a Platform product carrying it and check the plan and descriptor (`check-product-build`). With
+    `--bundle <built bundle>` (D-PA19), it also boots that bundle on loopback with a Space from each of the App's
+    templates, triggers its Pipelines and the Jobs `conformance.toon` lists, and checks each expectation's keys exactly,
+    as `seed-telco.mjs` checks the Telco demo.
+  - `package` writes `<id>-<version>.zip` with a SHA-256 manifest. Signing and installing are PA-7.
+- **PA-6b — the sample partner App.** `examples/partner-app/`, made only with `inspecto app new` and edited through
+  the kit, outside `apps/`. CI runs its static conformance, and a local run proves `test --bundle` against a Standard
+  bundle.
+- **PA-6c — the Add-on picker.** A CLI first, `tools/pick-addons.mjs`: the Add-ons with their closure and Edition
+  floor, and the price when `product-map/private/` is present. It writes a Platform product definition and runs the
+  assembler. The page comes next.
+- **PA-6d — the builder-kit docs**, in the `layer/platform` hub: Studio, the Pipeline editor, the Step and Collector SPIs,
+  the Consequence registry, Job types, the Control API and its OpenAPI document, the Java embedding API (`@PublicApi`),
+  and the App kit.
+
+## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
 | Id | Call | Signed |
 |---|---|---|
@@ -694,6 +722,9 @@ The slices, each its own lane (D-PA16):
 | D-PA15 | How Telco reaches one ingest | the `telecom` Industry owns canonical feeds and one generated golden corpus; Apps map them through views |
 | D-PA16 | The order of the PA-5 lanes | compose (5a), suite shell (5b), one ingest (5c), demo (5d) |
 | D-PA17 | How PA-5c reaches one ingest, given ~650 golden assertions over hand-made corpora | in the Composed Space Template only: the composer swaps the parts' usage feeds for the Industry's one; templates and their golden tests stay (signed 2026-11-10, refines D-PA15) |
+| D-PA18 | Where a partner's App lives when built with the kit | any folder (`--app-root`); `apps/` stays first-party (signed 2026-11-11) |
+| D-PA19 | How deep the App conformance kit goes in PA-6 | boot a built bundle per listed Edition, seed the App's template, run its Jobs, check its declared golden findings (signed 2026-11-11) |
+| D-PA20 | The order of the PA-6 lanes | the App kit (6a), the sample partner App with its conformance in CI (6b), the Add-on picker (6c), the builder-kit docs (6d) (signed 2026-11-11) |
 
 ## 13. The open board, re-checked 2026-11-10
 
