@@ -109,8 +109,11 @@ registry). Those stubs were replaced by manifest synthesis in P3b.
 
 ## Offerings (`offerings/<id>.toon`)
 An Offering composes modules and content; an edition is an Offering that `includes` another. Built in P6a as a
-**checked** artifact — the bundle and pom still derive from `tools/bundle-modules.mjs`, and
-`tools/check-offerings.mjs` fails when an Offering disagrees with it, with the pom profile, or with the manifests.
+**checked** artifact; since `PRODUCT-ASSEMBLY-1` PA-1 (2026-11-10) the Offerings are **the one module table**:
+`tools/bundle-modules.mjs` derives its rows from them and the manifests (the processor plus every optional / provider
+module an Offering resolves to, its floor the lowest tier that resolves it, ordered by `CLASSPATH_ORDER`), so adding a
+module means its manifest, its Offering line and a `CLASSPATH_ORDER` position. `tools/check-offerings.mjs` still fails
+when an Offering disagrees with the pom profile or the manifests.
 ```
 id: professional
 title: Professional
@@ -138,7 +141,7 @@ into the marked block of `docs/EDITIONS.md` (`--check` in CI); transport, secret
 hand-authored there.
 
 ## Packaging (thin jars, P3d-P3f)
-- `tools/offering-classpath.mjs` resolves the Offering (includes + the `requires.modules` closure) and asserts it equals what `tools/bundle-modules.mjs` ships; it writes the bundle's `modules.list` (one jar per line, classpath order, processor first) and `edition.properties` (`edition=Professional`; `variant=demo` for a demo build). Every launcher reads `modules.list`; none hand-keeps a jar list.
+- `tools/offering-classpath.mjs` resolves the Offering (includes + the `requires.modules` closure) and asserts it equals what `tools/bundle-modules.mjs` ships (which, since `PRODUCT-ASSEMBLY-1` PA-1, is derived from the same Offerings); it writes the bundle's `modules.list` (one jar per line, classpath order, processor first) and `edition.properties` (`edition=Professional`; `variant=demo` for a demo build). Every launcher reads `modules.list`; none hand-keeps a jar list.
 - The first-party core ships as 15 thin jars (the Analytics Kernel joined 2026-10-17) plus `inspecto.jar` (the processor and third-party code), first in `modules.list`; optional modules ship one jar each, in `modules.list` order after the core.
 - One CycloneDX SBOM per shipped jar under `sbom/`, beside the combined edition SBOM (`tools/sbom-modules.mjs --verify`).
 

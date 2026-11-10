@@ -1,7 +1,8 @@
 # Product assembly — one Inspecto Platform, Industry Apps, finished Products (plan)
 
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
-as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); PA-1 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
+as-built note); PA-2 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -301,7 +302,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | Phase | Builds | Proof |
 |---|---|---|
 | **PA-0** Words and decisions ✅ 2026-11-10 | `GLOSSARY.md` §15 *Product assembly*: Product (Domain / Platform), App, Industry, Suite, Distribution, Entitlement, Assembly Plan, Product lock, Base; §13 rename-map row; §12 signed | vocabulary guard green |
-| **PA-1** Definitions describe today | `products/{platform,la}.toon`, `apps/link-analysis/app.toon`, `industries/{telecom,mobile-money}/`; the three guards; the Offering as the only module table | guards green; both existing bundles unchanged except `edition.properties` |
+| **PA-1** Definitions describe today ✅ 2026-11-10 | `products/{inspecto,la}.toon`, `apps/link-analysis/app.toon`, `industries/{telecom,mobile-money}/`; one guard, `tools/check-products.mjs` (rules in `tools/products.mjs`, shared with the assembler); the Offering as the only module table | ✅ guard + 21 tests green; the derived module table equals the hand-kept one row for row in every Edition and the core set (only the row order of Standard and up changed, to `CLASSPATH_ORDER`); all 735 tool tests green |
 | **PA-2** Assembler | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised |
 | **PA-3** Server | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination |
 | **PA-4** Suite shell | shared shell library; generated hosts; Apps as lazy libraries; App switcher; My work across Apps | both shells' specs and axe green; bundle sizes within 5 % |
@@ -311,6 +312,19 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-8** Container and air-gap | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
 | **PA-9** CEP App | the **Streaming** Add-on (Kafka in, windowed conditions on the Decision Kernel, Alerts out); the CEP App | a pattern on a live stream raises an Alert within a stated latency |
 | **PA-10** Go-to-market | Product Map kinds; generated Product documents; `customer-build` through the assembler | a customer build of the pilot customer matches today's, plus an entitlement |
+
+**PA-1 as built (2026-11-10).**
+- **The two Products partition the 31 templates.** The LA App owns the 20 `la-*` templates, including
+  `la-showcase-off`, the demo's companion Space, which no Offering listed. The console (`inspecto`, Platform product)
+  owns the other 10 and takes the LA App as optional. The guard refuses a template that no Product ships.
+- **Industry-neutral Apps.** Link Analysis serves any Industry (`industries[0]`), so Inspecto LA names no Industry
+  (the glossary follow-up of 2026-11-10).
+- **`tools/bundle-modules.mjs` keeps its API but derives its table** from the Offerings and the manifests
+  (`readModuleSources`, `deriveTables`). `CLASSPATH_ORDER` moved there; `offering-classpath.mjs` re-exports it.
+  `parseToon` moved to `tools/toon-subset.mjs`; `check-offerings.mjs` re-exports it for its dozen importers.
+- **Deliberately not done in PA-1:** `nav` and `brand` beyond the name (the TOON subset has no tabular arrays; they
+  arrive with `/bootstrap` in PA-3). `products.mjs` resolves Add-ons, but the module set is still the whole Edition's;
+  trimming per Product is customer-build's job until PA-10.
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 

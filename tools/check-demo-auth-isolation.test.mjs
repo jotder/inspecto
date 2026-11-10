@@ -15,13 +15,16 @@ import { execFileSync, spawnSync } from 'node:child_process';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GUARD = join(repo, 'tools/check-demo-auth-isolation.mjs');
+// bundle-modules.mjs derives its table from the Offerings and the module manifests (PRODUCT-ASSEMBLY-1 PA-1), so they ride along.
 const FILES = [
     'tools/bundle-modules.mjs',
+    'tools/toon-subset.mjs',
     'inspecto/package.ps1',
     'pom.xml',
     'providers/inspecto-connectors/pom.xml',
     'providers/inspecto-demo-auth/pom.xml',
     '.github/workflows/ci.yml',
+    ...execFileSync('git', ['ls-files', 'offerings/*.toon', '*META-INF/inspecto/module.toon'], { cwd: repo, encoding: 'utf8' }).split('\n').filter(Boolean),
 ];
 
 /** A fixture repo, optionally mutated by `plant(root)`; returns the guard's { status, output }. */
@@ -56,12 +59,8 @@ test('the unmodified inputs are GREEN', () => {
 });
 
 const RED = {
-    'an edition module table entry (Preview takes every module)': [
-        edit(
-            'tools/bundle-modules.mjs',
-            "    // Advanced only.",
-            "    { artifactId: 'inspecto-demo-auth', dir: 'providers/inspecto-demo-auth', bundleFile: 'inspecto-demo-auth.jar', from: 'advanced' },\n    // Advanced only.",
-        ),
+    'an Offering that lists demo-auth (the module table is derived from the Offerings)': [
+        edit('offerings/advanced.toon', 'modules[3]: policy,la-store-pg,intelligence', 'modules[4]: policy,la-store-pg,intelligence,demo-auth'),
         /bundle-modules\.mjs ships inspecto-demo-auth\.jar/,
     ],
     'the boot-smoke classpath literal': [

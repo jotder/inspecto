@@ -1,0 +1,14 @@
+id: la
+title: Inspecto LA
+shape: domain
+host: la-app
+editions[4]: basic,standard,advanced,preview
+apps:
+  required[1]: link-analysis
+  optional[0]:
+templates[0]:
+distributions[2]: production,demo
+demoSpace: la-showcase
+brand:
+  name: Inspecto LA
+docs: docs/okf/product/layer/la/index.md

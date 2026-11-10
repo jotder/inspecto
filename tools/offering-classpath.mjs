@@ -32,7 +32,7 @@
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EDITIONS, LIB_DIR, PG_SIDECAR, DEMO_JAR, DEMO_REPLACES, bundleModules, editionOnlyModules, coreModules, needsPostgresDriver } from './bundle-modules.mjs';
+import { EDITIONS, LIB_DIR, PG_SIDECAR, DEMO_JAR, DEMO_REPLACES, CLASSPATH_ORDER, bundleModules, editionOnlyModules, coreModules, needsPostgresDriver } from './bundle-modules.mjs';
 import { gather, idOf } from './check-offerings.mjs';
 
 /**
@@ -47,20 +47,8 @@ export const EDITION_FILE = 'edition.properties';
 /** The demo build's replacement jar (the build-time check lives in package.ps1's `if ($DemoAuth)` block); defined in bundle-modules.mjs. */
 export { DEMO_JAR };
 
-/** artifactId -> classpath position. Every shipped module must appear exactly once; the third-party driver follows. */
-export const CLASSPATH_ORDER = [
-    'inspecto-processor',
-    // P3d stage 2: the first-party core libraries (bundle-modules.mjs CORE_MODULES), thin jars, directly behind the product jar -
-    // exactly where the shade used to put them (the processor's own classes first, then its first-party dependencies).
-    'inspecto-api', 'inspecto-graph', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-audit-spi', 'inspecto-auth-spi',
-    'inspecto-access', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-event', 'inspecto-workflow', 'inspecto-analytics', 'inspecto-acquire', 'inspecto-engine',
-    'inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-country', 'inspecto-connectors-kafka', 'inspecto-telecom-asn1',
-    'inspecto-policy',
-    'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',
-    'inspecto-entity-list', 'inspecto-la-storage', 'inspecto-la-core', 'inspecto-la-api', 'inspecto-la-store-pg', 'inspecto-geo-link',
-    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive',
-    'inspecto-agent', 'inspecto-intelligence',
-];
+/** artifactId -> classpath position; its home is tools/bundle-modules.mjs since PRODUCT-ASSEMBLY-1 PA-1 (the derived table is ordered by it). */
+export { CLASSPATH_ORDER };
 
 /** 'standard' | 'Standard' | 'STANDARD' -> the EDITIONS spelling (case-insensitive). */
 export function normalizeEdition(e) {

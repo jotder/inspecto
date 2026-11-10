@@ -1,26 +1,29 @@
 /**
- * The first-party module set a PACKAGED BUNDLE ships, per edition — one enumeration, read by both
- * `tools/sbom.mjs` (which renders it into the shipped CycloneDX + SPDX documents) and
- * `tools/check-sbom-modules.mjs` (which holds it against `inspecto/package.ps1`).
+ * The first-party module set a PACKAGED BUNDLE ships, per edition — read by `tools/sbom.mjs`, `tools/check-sbom-modules.mjs`
+ * (which holds it against `inspecto/package.ps1`), `tools/offering-classpath.mjs`, `tools/jlink-modules.mjs` and the guards.
  *
- * WHY IT IS ITS OWN FILE. It used to be a literal inside sbom.mjs, under a comment claiming it was
- * "the SAME table package.ps1 stages from". It was not, and had not been since EDG-01: the generator
- * knew four modules while package.ps1 staged eleven jars for Standard and twelve for Advanced. Every
- * Standard and Advanced bill of materials since then under-declared its own bundle, and javax.mail —
- * which moved to inspecto-notify-channels in EDG-01 cell 1 — appeared in no shipped SBOM at all. The
- * documents are covered by the release checksum and GPG signature, so the gap shipped signed.
+ * DERIVED, NOT HAND-KEPT (PRODUCT-ASSEMBLY-1 PA-1, 2026-11-10). Until then this file held a literal MODULES table that had to
+ * equal what `offerings/*.toon` resolved to, and `offering-classpath.mjs` threw when the two disagreed: two module tables
+ * edited in lockstep for every new module. Now the Offerings are the ONE table, and this file computes the rows from them and
+ * the module manifests (`<dir>/src/main/resources/META-INF/inspecto/module.toon`):
+ *   - a row per optional / provider module that some Offering resolves to (its `includes` chain plus the manifests'
+ *     `requires.modules` closure), plus `inspecto-processor`, the product jar (offeringRole base, always staged);
+ *   - `from` is the lowest tier whose Offering resolves the module ('all' = Basic and up, 'standard', 'advanced');
+ *   - `dir` is where the module's manifest lives; `bundleFile` is `<artifactId>.jar` (the processor ships as `inspecto.jar`);
+ *   - CORE_MODULES (the always-present thin jars) are the manifests whose offeringRole is base, minus the processor.
+ * Rows are ordered by CLASSPATH_ORDER (below), so the staging loop, the SBOM and the classpath agree on one order.
+ * Adding a module now means: its manifest, its Offering line, and a CLASSPATH_ORDER position — nothing here.
  *
- * A prose claim that two lists agree is not a mechanism. This file is the mechanism: one list, two
- * readers, and a guard that fails when it drifts from the script that does the staging.
- *
- * ⛔ NOT the whole bundle. `postgresql.jar` (PG-1) rides Standard/Advanced too, but it is third-party
- * and test-scoped in the reactor, so sbom.mjs adds it from the parent pom's `postgresql.version`. It is
- * named here as PG_SIDECAR only so the guard can account for every staged jar.
- *
- * AUTHORITY. `inspecto/package.ps1` — the `$modules` assignment, the `Copy-Item … "$bundleDir\*.jar"`
- * staging steps, and the boot-smoke classpath. Its own header comment is stale and names three jars;
- * do not use it. Adding a module means editing this file AND package.ps1; the guard refuses either alone.
+ * ⛔ NOT the whole bundle. `postgresql.jar` (PG-1) rides Standard/Advanced too, but it is third-party and test-scoped in the
+ * reactor, so sbom.mjs adds it from the parent pom's `postgresql.version`. It is named here as PG_SIDECAR only so the guard
+ * can account for every staged jar.
  */
+
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseToon } from './toon-subset.mjs';
 
 /** The third-party JDBC sidecar package.ps1 stages for Standard and Advanced (PG-1). */
 export const PG_SIDECAR = 'postgresql.jar';
@@ -34,98 +37,98 @@ export const LIB_DIR = 'lib';
 // Preview is not a customer-facing tier (operator decision 2026-09-21): it exists for testing/
 // incubation and bundles EVERY optional module unconditionally — see bundleModules() below, which
 // gives it a dedicated branch instead of a 'from' floor so a brand-new module needs no edit here to
-// be included in Preview the day it's added to MODULES.
+// be included in Preview the day it's added to an Offering.
 export const EDITIONS = ['Basic', 'Standard', 'Advanced', 'Preview'];
 
 /**
- * artifactId → { dir, bundleFile, from }.
- *
- * `dir` is the reactor directory, which is what Maven's `-pl` takes; `inspecto-processor` is the one
- * module whose directory (`inspecto/`) differs from its artifactId. `bundleFile` is the canonical name
- * the jar is staged under, which is what the bundle carries and what gets hashed.
- *
- * `from` is the edition floor: 'all' ships everywhere (Basic and up), 'standard' means Standard and above (Advanced
- * is a superset of Standard, never a replacement for it), 'advanced' means Advanced only. Edition names follow
- * LA-EDITIONS-1 ED-2 (2026-10-17): Basic / Standard / Advanced replaced the three older edition names.
+ * artifactId -> classpath position (ORDER only; which modules ship is the Offerings' call). Load-bearing for ServiceLoader
+ * first-match: serve.sh/serve.bat's historic order, byte for byte: processor, the core thin jars, the auth/secrets/geo/premium
+ * provider group, policy, connectors, then the feature modules, the agents. The third-party JDBC driver follows the list.
+ * Every shipped module must appear exactly once (tools/offering-classpath.mjs refuses a module with no place here).
+ * Moved here from tools/offering-classpath.mjs (which re-exports it) so the derived table can be ordered by it.
  */
-const MODULES = [
-    // Every edition. The shaded fat jar is the product; the connector sidecar is NOT edition-gated
-    // (EDITIONS SP-ACQ-02 marks SFTP shipped in all three) and brings sshj/BouncyCastle, commons-net
-    // into a deployment — all deliberately absent from the lean core.
-    { artifactId: 'inspecto-processor', dir: 'inspecto', bundleFile: 'inspecto.jar', from: 'all' },
-    { artifactId: 'inspecto-connectors', dir: 'providers/inspecto-connectors', bundleFile: 'inspecto-connectors.jar', from: 'all' },
-
-    // Standard and above. inspecto-oidc (ex inspecto-security) is the original non-Basic sidecar; the seven below are
-    // EDG-01 cells 1–7, added 2026-09-07 and absent from the generator until this file existed.
-    { artifactId: 'inspecto-oidc', dir: 'providers/inspecto-oidc', bundleFile: 'inspecto-oidc.jar', from: 'standard' },                      // D-MR6: was inspecto-security (OIDC Authenticator + TokenRelay)
-    { artifactId: 'inspecto-secrets', dir: 'providers/inspecto-secrets', bundleFile: 'inspecto-secrets.jar', from: 'standard' },            // D-MR6: the file-keystore SecretsProvider
-    { artifactId: 'inspecto-geo-country', dir: 'providers/inspecto-geo-country', bundleFile: 'inspecto-geo-country.jar', from: 'standard' },  // D-MR6: the MaxMind GeoCountryResolver
-    { artifactId: 'inspecto-connectors-kafka', dir: 'providers/inspecto-connectors-kafka', bundleFile: 'inspecto-connectors-kafka.jar', from: 'standard' },  // MODULE-REORG-1 P7: the Kafka stream connector (premium, NOT Basic)
-    { artifactId: 'inspecto-telecom-asn1', dir: 'providers/inspecto-telecom-asn1', bundleFile: 'inspecto-telecom-asn1.jar', from: 'standard' },  // MODULE-REORG-1 P7: the Telecom industry-pack ASN.1 decoder (NOT Basic)
-    // EDG-01 cell 1 (CP-15). Brings javax.mail — SmtpEmailChannel needs it, and it came here FROM
-    // inspecto-connectors, whose pom no longer declares it.
-    { artifactId: 'inspecto-notify-channels', dir: 'providers/inspecto-notify-channels', bundleFile: 'inspecto-notify-channels.jar', from: 'standard' },
-    { artifactId: 'inspecto-backup', dir: 'features/inspecto-backup', bundleFile: 'inspecto-backup.jar', from: 'standard' },        // cell 2 (OPS-06)
-    { artifactId: 'inspecto-entity-list', dir: 'features/inspecto-entity-list', bundleFile: 'inspecto-entity-list.jar', from: 'all' },  // SEP-08 (Entity Lists + the shared fact log; geo-link depends on it)
-    { artifactId: 'inspecto-la-storage', dir: 'la/inspecto-la-storage', bundleFile: 'inspecto-la-storage.jar', from: 'all' },  // LA separation D-3 step 2 (the index store skeleton; la-api depends on it from a later step, staged now so the jar and the classpaths are consistent)
-    { artifactId: 'inspecto-la-core', dir: 'la/inspecto-la-core', bundleFile: 'inspecto-la-core.jar', from: 'all' },    // LA separation D-1 step 5b (host-free Link Analysis model + the Dataset/Case ports)
-    { artifactId: 'inspecto-la-api', dir: 'la/inspecto-la-api', bundleFile: 'inspecto-la-api.jar', from: 'all' },       // LA separation D-1 step 5b (the Link Analysis routes, written against the ports)
-    { artifactId: 'inspecto-geo-link', dir: 'la/inspecto-geo-link', bundleFile: 'inspecto-geo-link.jar', from: 'all' },  // cell 3b (CP-09) - since D-1 step 5b the BRIDGE: implements the ports, holds the Alert Rule routes
-    { artifactId: 'inspecto-exchange', dir: 'features/inspecto-exchange', bundleFile: 'inspecto-exchange.jar', from: 'standard' },  // cell 4 (SEC-10)
-    { artifactId: 'inspecto-observability', dir: 'features/inspecto-observability', bundleFile: 'inspecto-observability.jar', from: 'standard' },  // cells 5+6 (CP-13: /metrics + /events*), merged MODULE-REORG-1 P7
-    { artifactId: 'inspecto-ops', dir: 'features/inspecto-ops', bundleFile: 'inspecto-ops.jar', from: 'standard' },                 // cell 7 (CP-11)
-    { artifactId: 'inspecto-reconciliation', dir: 'features/inspecto-reconciliation', bundleFile: 'inspecto-reconciliation.jar', from: 'standard' },  // MODULE-REORG-1 P7: the Reconciliation add-on (recon routes + recon.run; NOT Basic)
-    { artifactId: 'inspecto-scoring', dir: 'features/inspecto-scoring', bundleFile: 'inspecto-scoring.jar', from: 'standard' },  // MODULE-REORG-1 P7: the Scoring add-on (risk-score routes + risk.score + save checks; NOT Basic)
-    { artifactId: 'inspecto-case-management', dir: 'features/inspecto-case-management', bundleFile: 'inspecto-case-management.jar', from: 'standard' },  // MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, from-entities, caserule.evaluate; requires ops; NOT Basic)
-    { artifactId: 'inspecto-action-requests', dir: 'features/inspecto-action-requests', bundleFile: 'inspecto-action-requests.jar', from: 'standard' },  // MODULE-REORG-P7: the Action Requests add-on (/action-requests* + invoke-api; reaches subjects through LinkedSubjectProvider; NOT Basic)
-    { artifactId: 'inspecto-regulatory-reporting', dir: 'features/inspecto-regulatory-reporting', bundleFile: 'inspecto-regulatory-reporting.jar', from: 'standard' },  // REGULATORY-REPORTING-1: the Regulatory Reporting add-on (/regulatory-reports*; requires ops; NOT Basic)
-    { artifactId: 'inspecto-screening', dir: 'features/inspecto-screening', bundleFile: 'inspecto-screening.jar', from: 'standard' },  // SCREENING-1: the Screening add-on (/screening* + screening.run; requires entity-list; NOT Basic)
-    { artifactId: 'inspecto-anomaly', dir: 'features/inspecto-anomaly', bundleFile: 'inspecto-anomaly.jar', from: 'standard' },  // ANOMALY-DETECTION-1: the Anomaly Detection add-on (anomaly-model kind + anomaly.score; NOT Basic)
-    { artifactId: 'inspecto-predictive', dir: 'features/inspecto-predictive', bundleFile: 'inspecto-predictive.jar', from: 'standard' },  // PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model + churn-model + forecast-model kinds, predict.segment + predict.churn + predict.forecast; NOT Basic)
-    // PKG-5 (2026-09-12): the assist agent ships Standard and above, as an OPTIONAL component. NB it is
-    // a DEFAULT-reactor module, unlike the gated ones around it — package.ps1 lists it in $modules only so
-    // that pass builds its shaded `sidecar` artifact. The staged file is the sidecar, never the thin jar.
-    { artifactId: 'inspecto-agent', dir: 'features/inspecto-agent', bundleFile: 'inspecto-agent.jar', from: 'standard' },             // CP-14
-
-    // Advanced only.
-    { artifactId: 'inspecto-policy', dir: 'providers/inspecto-policy', bundleFile: 'inspecto-policy.jar', from: 'advanced' },
-    // LA-INVESTIGATION-STORE-DESIGN-1 S6 (D-IS7): the optional PostgreSQL Investigation store, so two pods can serve one Space.
-    // A THIN jar over plain JDBC (the driver is postgresql.jar); `investigations.backend=db` selects it, the default stays the filesystem.
-    { artifactId: 'inspecto-la-store-pg', dir: 'la/inspecto-la-store-pg', bundleFile: 'inspecto-la-store-pg.jar', from: 'advanced' },
-    // ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2, 2026-09-29): the /agent/* intelligence agent, Advanced first. Like
-    // inspecto-agent a DEFAULT-reactor module staged as its shaded `sidecar`; it carries onnxruntime natives.
-    { artifactId: 'inspecto-intelligence', dir: 'features/inspecto-intelligence', bundleFile: 'inspecto-intelligence.jar', from: 'advanced' }, // CP-14, SP-ENR-08
+export const CLASSPATH_ORDER = [
+    'inspecto-processor',
+    // P3d stage 2: the first-party core libraries, thin jars, directly behind the product jar - exactly where the shade used to
+    // put them (the processor's own classes first, then its first-party dependencies).
+    'inspecto-api', 'inspecto-graph', 'inspecto-util', 'inspecto-config', 'inspecto-sql', 'inspecto-etl', 'inspecto-audit-spi', 'inspecto-auth-spi',
+    'inspecto-access', 'inspecto-http-spi', 'inspecto-entity-store', 'inspecto-event', 'inspecto-workflow', 'inspecto-analytics', 'inspecto-acquire', 'inspecto-engine',
+    'inspecto-oidc', 'inspecto-secrets', 'inspecto-geo-country', 'inspecto-connectors-kafka', 'inspecto-telecom-asn1',
+    'inspecto-policy',
+    'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',
+    'inspecto-entity-list', 'inspecto-la-storage', 'inspecto-la-core', 'inspecto-la-api', 'inspecto-la-store-pg', 'inspecto-geo-link',
+    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive',
+    'inspecto-agent', 'inspecto-intelligence',
 ];
 
-/**
- * The CORE first-party libraries the processor used to shade into inspecto.jar (MODULE-REORG-P3d stage 2, 2026-10-08): now their own
- * THIN jars, staged in EVERY edition next to inspecto.jar and named on modules.list in front of the optional modules. They are the
- * manifests' `base`/`internal` modules (never listed in an Offering - always present), so they are NOT rows of MODULES: adding them
- * there would change the edition counts and every guard that reads "the modules an edition adds". `inspecto/pom.xml`'s shade
- * `artifactSet` excludes exactly these artifactIds (tools/check-sbom-modules.mjs holds the two equal).
- * Listed in dependency order (a library before what imports it); the jars have disjoint packages, so order is cosmetic.
- */
-export const CORE_MODULES = [
-    { artifactId: 'inspecto-api', dir: 'platform/inspecto-api' },
-    { artifactId: 'inspecto-graph', dir: 'platform/inspecto-graph' },   // D-AN2 (analytics core plan, M8): the graph library, JDK only; was the optional la-graph
-    { artifactId: 'inspecto-util', dir: 'platform/inspecto-util' },
-    { artifactId: 'inspecto-config', dir: 'platform/inspecto-config' },
-    { artifactId: 'inspecto-sql', dir: 'platform/inspecto-sql' },
-    { artifactId: 'inspecto-etl', dir: 'platform/inspecto-etl' },
-    { artifactId: 'inspecto-audit-spi', dir: 'spi/inspecto-audit-spi' },
-    { artifactId: 'inspecto-auth-spi', dir: 'spi/inspecto-auth-spi' },
-    { artifactId: 'inspecto-access', dir: 'platform/inspecto-access' },
-    { artifactId: 'inspecto-http-spi', dir: 'spi/inspecto-http-spi' },
-    { artifactId: 'inspecto-entity-store', dir: 'platform/inspecto-entity-store' },
-    { artifactId: 'inspecto-event', dir: 'platform/inspecto-event' },
-    { artifactId: 'inspecto-workflow', dir: 'platform/inspecto-workflow' },
-    { artifactId: 'inspecto-analytics', dir: 'platform/inspecto-analytics' },   // ANALYTICS-CORE-1: the Analytics Kernel (Base, D-AN1)
-    { artifactId: 'inspecto-acquire', dir: 'platform/inspecto-acquire' },
-    { artifactId: 'inspecto-engine', dir: 'platform/inspecto-engine' },
-].map((m) => ({ ...m, bundleFile: `${m.artifactId}.jar`, from: 'all', kind: 'base' }));
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const MANIFEST_SUFFIX = '/src/main/resources/META-INF/inspecto/module.toon';
+const TIERS = ['basic', 'standard', 'advanced'];
+const FLOOR_OF = { basic: 'all', standard: 'standard', advanced: 'advanced' };
+const PROCESSOR = 'inspecto-processor';
 
-/** The core thin jars every edition stages (see CORE_MODULES). */
-export const coreModules = () => CORE_MODULES.slice();
+/** Module id -> artifactId (`processor` -> `inspecto-processor`, `ops` -> `inspecto-ops`). */
+const artifactOf = (id) => `inspecto-${id}`;
+
+/** Read the inputs the table is derived from: { manifests: {id: {..., dir}}, offerings: {id: {...}} }. */
+export function readModuleSources(root = REPO_ROOT) {
+    let files;
+    try {
+        files = execFileSync('git', ['ls-files', `*${MANIFEST_SUFFIX.slice(1)}`], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean);
+    } catch (e) {
+        throw new Error(`tools/bundle-modules.mjs derives the module table from the git-tracked module manifests, and git could not list them in ${root}: ${e.message}`);
+    }
+    const manifests = {};
+    for (const f of files) {
+        const m = parseToon(readFileSync(join(root, f), 'utf8'));
+        manifests[m.id] = { ...m, dir: f.slice(0, -MANIFEST_SUFFIX.length) };
+    }
+    const odir = join(root, 'offerings');
+    const offerings = {};
+    for (const f of existsSync(odir) ? readdirSync(odir).filter((n) => n.endsWith('.toon')) : []) offerings[f.slice(0, -5)] = parseToon(readFileSync(join(odir, f), 'utf8'));
+    return { manifests, offerings };
+}
+
+/** An Offering's module ids: its `includes` (transitive) + `modules`, then the manifests' `requires.modules` closure. */
+export function resolveOfferingModules(id, { manifests, offerings }, seen = []) {
+    const o = offerings[id];
+    if (!o) throw new Error(`offering '${id}' not found under offerings/`);
+    if (seen.includes(id)) throw new Error(`offering includes cycle ${[...seen, id].join(' -> ')}`);
+    const set = new Set(o.modules ?? []);
+    for (const inc of o.includes ?? []) resolveOfferingModules(inc, { manifests, offerings }, [...seen, id]).forEach((m) => set.add(m));
+    const queue = [...set];
+    while (queue.length) for (const req of manifests[queue.pop()]?.requires?.modules ?? []) if (!set.has(req)) { set.add(req); queue.push(req); }
+    for (const m of set) if (!manifests[m]) throw new Error(`offering '${id}': module '${m}' has no manifest`);
+    return set;
+}
+
+const position = (artifactId) => { const i = CLASSPATH_ORDER.indexOf(artifactId); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
+const byClasspath = (a, b) => position(a.artifactId) - position(b.artifactId) || a.artifactId.localeCompare(b.artifactId);
+
+/** The derived tables: { modules: [{artifactId, dir, bundleFile, from}], core: [{artifactId, dir, bundleFile, from, kind}] }. */
+export function deriveTables(sources) {
+    const { manifests } = sources;
+    const processor = manifests.processor;
+    if (!processor) throw new Error('no manifest with id `processor` - the product jar has to be a module like every other');
+    const resolved = Object.fromEntries(TIERS.map((t) => [t, resolveOfferingModules(t, sources)]));
+    const optional = new Set([...resolved.advanced].filter((id) => !['base', 'internal'].includes(manifests[id].offeringRole)));
+    const modules = [{ artifactId: PROCESSOR, dir: processor.dir, bundleFile: 'inspecto.jar', from: 'all' }];
+    for (const id of optional) {
+        const tier = TIERS.find((t) => resolved[t].has(id));
+        modules.push({ artifactId: artifactOf(id), dir: manifests[id].dir, bundleFile: `${artifactOf(id)}.jar`, from: FLOOR_OF[tier] });
+    }
+    const core = Object.values(manifests)
+        .filter((m) => m.offeringRole === 'base' && m.id !== 'processor')
+        .map((m) => ({ artifactId: artifactOf(m.id), dir: m.dir, bundleFile: `${artifactOf(m.id)}.jar`, from: 'all', kind: 'base' }));
+    return { modules: modules.sort(byClasspath), core: core.sort(byClasspath) };
+}
+
+let tables = null;
+/** The repo's tables, derived once per process. */
+const repoTables = () => (tables ??= deriveTables(readModuleSources()));
+
+/** The core thin jars every edition stages (the manifests' offeringRole `base`, minus the processor), in classpath order. */
+export const coreModules = () => repoTables().core.slice();
 
 /** The Maven profile that activates an edition's extra modules, or null for Basic (the default build). */
 export function editionProfile(edition) {
@@ -136,23 +139,21 @@ export function editionProfile(edition) {
 }
 
 /**
- * The first-party modules staged for `edition`, in package.ps1's staging order.
+ * The first-party modules staged for `edition`, in classpath order.
  * Basic 7, Standard 26, Advanced 29, Preview 29 — first-party only; add PG_SIDECAR for the jar count.
- * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
- * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
- * the assertion exists so the next module to arrive cannot leave them wrong again.
+ * ⚠ Those numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this very line.
  */
 export function bundleModules(edition) {
-    const normalized = edition;
-    if (!EDITIONS.includes(normalized)) throw new Error(`unknown edition '${edition}'`);
+    if (!EDITIONS.includes(edition)) throw new Error(`unknown edition '${edition}'`);
+    const all = repoTables().modules;
     // Preview: every module, unconditionally — deliberately not floor-based, so a module added at any
     // 'from' tier (including a future one) needs no edit here to reach Preview.
-    if (normalized === 'Preview') return MODULES.slice();
-    return MODULES.filter(
+    if (edition === 'Preview') return all.slice();
+    return all.filter(
         (m) =>
             m.from === 'all' ||
-            (m.from === 'standard' && normalized !== 'Basic') ||
-            (m.from === 'advanced' && normalized === 'Advanced'),
+            (m.from === 'standard' && edition !== 'Basic') ||
+            (m.from === 'advanced' && edition === 'Advanced'),
     );
 }
 
@@ -162,7 +163,7 @@ export function editionOnlyModules(edition) {
 }
 
 /**
- * The demo build (`package.ps1 -DemoAuth`, DEMO-AUTH-1) swaps the sign-in trio for ONE jar: inspecto-oidc, inspecto-secrets and
+ * The demo build (DEMO-AUTH-1) swaps the sign-in trio for ONE jar: inspecto-oidc, inspecto-secrets and
  * inspecto-geo-country leave the bundle and DEMO_JAR takes the OIDC jar's place. Read by tools/offering-classpath.mjs (the demo
  * modules.list) and tools/jlink-modules.mjs (the staged jars the demo runtime must be derived from).
  */

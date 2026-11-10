@@ -1,0 +1,14 @@
+id: inspecto
+title: Inspecto
+shape: platform
+host: gamma
+editions[4]: basic,standard,advanced,preview
+addons[17]: actionRequests,aiAssist,anomalyDetection,caseManagement,incidents,integrationDelivery,laInvestigations,linkAnalysis,multiEntity,predictiveAnalytics,premiumConnectors,reconciliation,regulatoryReporting,scoringLists,screening,telecomIndustryPack,workflowSla
+apps:
+  required[0]:
+  optional[1]: link-analysis
+templates[10]: aml,business-assurance,mobile-money,orders-starter,partner-settlement,payment-fraud,telco-bypass,telco-fraud,telco-ra,telco-rerating
+distributions[2]: production,demo
+brand:
+  name: Inspecto
+docs: docs/okf/product/layer/product/index.md

@@ -31,28 +31,10 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundleModules } from './bundle-modules.mjs';
+import { parseToon } from './toon-subset.mjs';
 
-/** Parse the TOON subset used by manifests and offerings: `k: v`, `k[N]: a,b`, `k:` + indented children. */
-export function parseToon(text) {
-    const lines = text.split(/\r?\n/).filter((l) => l.trim() && l.trim() !== '---');
-    const root = {};
-    const stack = [{ indent: -1, obj: root }];
-    for (const raw of lines) {
-        const indent = raw.length - raw.trimStart().length;
-        const m = /^([A-Za-z_][\w.]*)(?:\[(\d+)\])?:\s*(.*)$/.exec(raw.trim());
-        if (!m) throw new Error(`unparseable line: ${raw}`);
-        while (stack.length > 1 && indent <= stack.at(-1).indent) stack.pop();
-        const parent = stack.at(-1).obj;
-        const [, key, n, val] = m;
-        if (n !== undefined) {
-            const items = val === '' ? [] : val.split(',').map((s) => s.trim());
-            if (items.length !== Number(n)) throw new Error(`${key}[${n}] has ${items.length} items`);
-            parent[key] = items;
-        } else if (val === '') { const o = {}; parent[key] = o; stack.push({ indent, obj: o }); }
-        else parent[key] = val;
-    }
-    return root;
-}
+/** Re-exported: a dozen tools import the parser from here (its home is tools/toon-subset.mjs since PRODUCT-ASSEMBLY-1 PA-1). */
+export { parseToon };
 
 /**
  * The closed POSTURE vocabulary (P6b): the non-module deployment facts that are stable data AND that a guard can verify.
