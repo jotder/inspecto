@@ -7157,7 +7157,14 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         await runQuery(fixture);
         fixture.detectChanges();
         expect(c.dockShown()).toBe(true);
-        expect(row().className).toContain('h-[28rem]');
+        // LA-NO-LONG-PAGES-1: only a phone holds the row at the dock height; from sm up the row takes what the open dock
+        // leaves and the canvas floor drops to 12rem, so canvas + dock never make the page taller than the window
+        expect(row().className).toContain('max-sm:h-[28rem]');
+        expect(row().classList).not.toContain('h-[28rem]');
+        const workspace = fixture.nativeElement.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
+        expect(workspace.classList).toContain('min-h-[12rem]');
+        expect(workspace.classList).not.toContain('min-h-[26.25rem]');
+        expect(fixture.nativeElement.querySelector('#bottom-panel-body')?.classList).toContain('max-h-[45dvh]');
         fixture.destroy();
     });
 

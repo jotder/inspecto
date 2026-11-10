@@ -35,30 +35,39 @@ import { visibleLaNav } from './la-nav';
             @if (firstRunPage()) {
                 <la-app-getting-started [state]="s"></la-app-getting-started>
             } @else {
-                <section class="mx-auto flex max-w-4xl flex-col gap-6 p-6" aria-labelledby="la-landing-title">
-                    <header class="flex flex-col gap-1">
+                <!-- LA-NO-LONG-PAGES-1: from md up the page is the window; the title stays, the rest scrolls under it -->
+                <section
+                    class="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 md:h-[calc(100dvh-var(--shell-chrome-height,0rem))] md:overflow-hidden"
+                    aria-labelledby="la-landing-title"
+                >
+                    <header class="flex shrink-0 flex-col gap-1">
                         <h1 id="la-landing-title" class="text-title m-0 font-semibold">{{ product }}</h1>
                         <p class="text-secondary m-0">
                             Find the links between entities in your data: explore them as a graph, place them on a map,
                             and keep lists of the ones that matter.
                         </p>
                     </header>
-                    <inspecto-space-guide [state]="s" (stepOpen)="firstRun.openStep($event)"></inspecto-space-guide>
-                    <la-app-my-work></la-app-my-work>
-                    <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
-                        @for (item of nav(); track item.path) {
-                            <li>
-                                <a
-                                    [routerLink]="'/' + item.path"
-                                    class="bg-card flex h-full flex-col gap-2 rounded-lg border p-4 no-underline"
-                                >
-                                    <mat-icon class="icon-size-6" [svgIcon]="item.icon"></mat-icon>
-                                    <span class="text-lg font-semibold">{{ item.label }}</span>
-                                    <span class="text-secondary text-sm">{{ item.blurb }}</span>
-                                </a>
-                            </li>
-                        }
-                    </ul>
+                    <div
+                        class="flex min-h-0 flex-auto flex-col gap-6 md:overflow-y-auto md:pr-1"
+                        data-testid="la-landing-body"
+                    >
+                        <inspecto-space-guide [state]="s" (stepOpen)="firstRun.openStep($event)"></inspecto-space-guide>
+                        <la-app-my-work></la-app-my-work>
+                        <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
+                            @for (item of nav(); track item.path) {
+                                <li>
+                                    <a
+                                        [routerLink]="'/' + item.path"
+                                        class="bg-card flex h-full flex-col gap-2 rounded-lg border p-4 no-underline"
+                                    >
+                                        <mat-icon class="icon-size-6" [svgIcon]="item.icon"></mat-icon>
+                                        <span class="text-lg font-semibold">{{ item.label }}</span>
+                                        <span class="text-secondary text-sm">{{ item.blurb }}</span>
+                                    </a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
                 </section>
             }
         } @else {

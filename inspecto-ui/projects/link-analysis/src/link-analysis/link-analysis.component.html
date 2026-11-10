@@ -1275,11 +1275,12 @@
 
         <!-- ══ row: [tool rail] │ workspace — the rail is a labelled nav docked on the LEFT edge (canvas height);
              under the sm breakpoint it wraps back into a row above the stacked workspace ══ -->
-        <div class="flex min-h-0 flex-auto gap-2 max-sm:flex-col" [class]="dockShown() && bottomOpen() ? 'h-[28rem] flex-none' : ''" data-testid="la-workspace-row">
+        <div class="flex min-h-0 flex-auto gap-2 max-sm:flex-col" [class]="dockShown() && bottomOpen() ? 'max-sm:h-[28rem] max-sm:flex-none' : ''" data-testid="la-workspace-row">
 
         <!-- ══ workspace: [query dock] │ canvas zone │ [toolbox dock] — the pipelines-editor dock idiom ══ -->
         <div
-            class="relative flex min-h-[26.25rem] min-w-0 flex-auto overflow-hidden max-sm:min-h-[28rem] rounded-lg border max-sm:!h-auto max-sm:flex-col"
+            [class]="dockShown() && bottomOpen() ? 'min-h-[12rem]' : 'min-h-[26.25rem]'"
+            class="relative flex min-w-0 flex-auto overflow-hidden max-sm:min-h-[28rem] rounded-lg border max-sm:!h-auto max-sm:flex-col"
         >
             <!-- ══ canvas zone (graph + states + overlays) — the graph-fullscreen target ══ -->
             <div
@@ -1966,7 +1967,7 @@
                 <div
                     id="bottom-panel-body"
                     role="tabpanel"
-                    class="overflow-auto border-t px-3 py-3"
+                    class="relative max-h-[45dvh] overflow-auto border-t px-3 py-3"
                     style="border-color: var(--gamma-border)"
                     [attr.aria-labelledby]="'la-dock-tab-' + dockTabShown()"
                     [style.height.px]="dockSplit.width()"

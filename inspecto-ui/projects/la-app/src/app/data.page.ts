@@ -89,7 +89,10 @@ import {
         LinkAnalysisDatasetDiscoverComponent,
     ],
     template: `
-        <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 p-6">
+        <!-- LA-NO-LONG-PAGES-1: from md up the page is the window: the menu and the Dataset scroll on their own -->
+        <div
+            class="mx-auto flex w-full max-w-7xl flex-col gap-4 p-6 md:h-[calc(100dvh-var(--shell-chrome-height,0rem))] md:overflow-hidden"
+        >
             <div class="flex flex-wrap items-center gap-3">
                 <h1 class="text-title m-0 font-semibold">Data</h1>
                 <a mat-flat-button color="primary" class="ml-auto" [routerLink]="addData" data-testid="data-add">
@@ -117,9 +120,9 @@ import {
             } @else {
                 <!-- LA-DATA-MENU-1 (operator 2026-11-10): the Settings layout - a menu of Datasets grouped by kind on the
                      left, the chosen one on the right; nothing folds -->
-                <div class="flex min-w-0 flex-col gap-4 md:flex-row md:items-start" data-testid="data-layout">
+                <div class="flex min-w-0 flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row" data-testid="data-layout">
                     <nav
-                        class="flex shrink-0 flex-col gap-3 md:sticky md:top-4 md:max-h-[calc(100dvh-2rem)] md:w-72 md:overflow-y-auto"
+                        class="flex shrink-0 flex-col gap-3 md:min-h-0 md:w-72 md:overflow-y-auto"
                         aria-label="Datasets"
                     >
                         @if (bases().length > 6) {
@@ -189,7 +192,7 @@ import {
                     </nav>
                     @if (selected(); as d) {
                         <section
-                            class="flex min-w-0 flex-auto flex-col gap-3"
+                            class="flex min-w-0 flex-auto flex-col gap-3 md:min-h-0 md:overflow-y-auto md:pr-1"
                             [attr.aria-labelledby]="'data-title-' + d.id"
                             [attr.data-testid]="'data-' + d.id"
                         >

@@ -57,6 +57,16 @@ const TABS = ['types', 'columns'] as const;
         NewEntityTypeComponent,
         TermHelpComponent,
     ],
+    // LA-NO-LONG-PAGES-1: from md up the page is the window; the header and tabs stay, the tab body scrolls
+    host: {
+        class: 'flex min-w-0 flex-col md:h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),30rem)] md:overflow-hidden',
+    },
+    styles: `
+        :host ::ng-deep .la-fill-tabs .mat-mdc-tab-body-wrapper {
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+    `,
     template: `
         <inspecto-page-header
             title="Entities"
@@ -83,7 +93,7 @@ const TABS = ['types', 'columns'] as const;
                 }
             </ng-container>
         </inspecto-page-header>
-        <div class="flex flex-col gap-4 p-6">
+        <div class="flex flex-col gap-4 p-6 md:min-h-0 md:flex-1">
             @if (adding()) {
                 <inspecto-la-new-entity-type
                     (added)="typeAdded($event)"
@@ -91,6 +101,7 @@ const TABS = ['types', 'columns'] as const;
                 ></inspecto-la-new-entity-type>
             }
             <mat-tab-group
+                class="la-fill-tabs md:min-h-0 md:flex-1"
                 [selectedIndex]="tabIndex()"
                 (selectedIndexChange)="selectTab($event)"
                 mat-stretch-tabs="false"

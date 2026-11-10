@@ -52,10 +52,16 @@ const AUDIENCES: readonly { id: Audience; label: string }[] = [
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [NgComponentOutlet, MatIconModule, ChipComponent],
     template: `
-        <div class="flex min-w-0 flex-auto flex-col gap-4 p-4 md:p-6">
+        <!-- LA-NO-LONG-PAGES-1: from md up the page is the window: the menu and the section scroll on their own -->
+        <div
+            class="flex min-w-0 flex-auto flex-col gap-4 p-4 md:h-[calc(100dvh-var(--shell-chrome-height,0rem))] md:overflow-hidden md:p-6"
+        >
             <div class="text-secondary text-xs font-semibold uppercase tracking-wider">Settings</div>
-            <div class="flex max-w-320 flex-col gap-4 md:flex-row md:items-start">
-                <nav class="flex shrink-0 flex-col gap-3 md:w-60" aria-label="Settings sections">
+            <div class="flex max-w-320 flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row md:items-start">
+                <nav
+                    class="flex shrink-0 flex-col gap-3 md:max-h-full md:w-60 md:overflow-y-auto"
+                    aria-label="Settings sections"
+                >
                     @for (group of groups(); track group.id) {
                         <div
                             class="flex flex-col gap-0.5"
@@ -91,7 +97,7 @@ const AUDIENCES: readonly { id: Audience; label: string }[] = [
                     }
                 </nav>
                 <section
-                    class="min-w-0 flex-auto rounded-lg border border-gray-200 dark:border-gray-700"
+                    class="min-w-0 flex-auto rounded-lg border border-gray-200 md:max-h-full md:overflow-y-auto dark:border-gray-700"
                     aria-live="polite"
                 >
                     <ng-container [ngComponentOutlet]="selected().component"></ng-container>
