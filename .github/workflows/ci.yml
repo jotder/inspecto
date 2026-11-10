@@ -295,7 +295,7 @@ jobs:
       # package.ps1 executes; its tests prove each refusal and the plan both existing Products produce.
       # PA-4 (2026-11-10): each host's product.generated.ts (brand + App nav) must be what the definitions generate.
       - name: Guard — Product, App and Industry definitions resolve
-        run: node tools/check-products.mjs && node tools/render-product-hosts.mjs --check && node --test tools/check-products.test.mjs tools/assemble.test.mjs tools/render-product-hosts.test.mjs tools/compose-space.test.mjs tools/telecom-usage.test.mjs
+        run: node tools/check-products.mjs && node tools/render-product-hosts.mjs --check && node --test tools/check-products.test.mjs tools/assemble.test.mjs tools/render-product-hosts.test.mjs tools/compose-space.test.mjs tools/telecom-usage.test.mjs tools/check-product-build.test.mjs tools/seed-telco.test.mjs
 
       # DuckDB extension guard (AIRGAP-EXTENSIONS-CI-1, 2026-09-14). Sibling of the guard above, and filed
       # for the same reason one layer down: package.ps1 stages extensions best-effort from a local cache and
@@ -725,3 +725,21 @@ jobs:
 # storage on every tag for no benefit — the downloadable release JAR is built
 # locally and attached to the GitHub release at cut time (see the release flow),
 # not produced here.
+
+  # The Product matrix (PRODUCT-ASSEMBLY-1 PA-5d, 2026-11-10): each Inspecto Telco build assembled WITHOUT building anything
+  # (no Maven, no UI) and its Assembly Plan + descriptor checked (Apps, their modules on the classpath, nav, the composed Space
+  # with its one usage feed, the demo's seed tool and presenter text). tools/check-product-build.mjs; pure Node, a few seconds.
+  # A boot step is left out: booting needs the reactor build the `test` job makes, and the demo bake (package.ps1) is Windows-only.
+  product-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { product: telco, edition: standard, distribution: production }
+          - { product: telco, edition: advanced, distribution: production }
+          - { product: telco, edition: advanced, distribution: demo }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Product build check — ${{ matrix.product }} x ${{ matrix.edition }} x ${{ matrix.distribution }}
+        run: node tools/check-product-build.mjs --product ${{ matrix.product }} --edition ${{ matrix.edition }} --distribution ${{ matrix.distribution }}

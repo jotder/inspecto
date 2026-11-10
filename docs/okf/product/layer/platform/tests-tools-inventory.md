@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-93 test file(s). Run one, or all:
+95 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -39,6 +39,7 @@ node --test tools/
 | `tools/check-offerings.test.mjs` | Fixture test for tools/check-offerings.mjs. Run: node --test tools/check-offerings.test.mjs |
 | `tools/check-openapi-fragments.test.mjs` | Negative fixtures for tools/check-openapi-fragments.mjs (+ the split/merge round trip on the REAL document). |
 | `tools/check-package-strict.test.mjs` | Run: node --test tools/check-package-strict.test.mjs |
+| `tools/check-product-build.test.mjs` | node --test tools/check-product-build.test.mjs - the Product matrix check (PRODUCT-ASSEMBLY-1 PA-5d). |
 | `tools/check-product-docs.test.mjs` | Fixture test for tools/check-product-docs.mjs. Run: node --test tools/check-product-docs.test.mjs |
 | `tools/check-product-map.test.mjs` | Fixture test for tools/check-product-map.mjs. Run: node --test tools/check-product-map.test.mjs |
 | `tools/check-products.test.mjs` | Tests for tools/products.mjs checkModel (the rules of tools/check-products.mjs) — PRODUCT-ASSEMBLY-1 PA-1. |
@@ -109,6 +110,7 @@ node --test tools/
 | `tools/seed-la-trade.test.mjs` | node --test tools/seed-la-trade.test.mjs  -  request building of the trade-based money-laundering seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-utility.test.mjs` | node --test tools/seed-la-utility.test.mjs  -  request building of the utility seed script against a MOCKED fetch (no server). |
 | `tools/seed-telco-fraud-demo.test.mjs` | node --test tools/seed-telco-fraud-demo.test.mjs |
+| `tools/seed-telco.test.mjs` | node --test tools/seed-telco.test.mjs - the Inspecto Telco demo seed (PRODUCT-ASSEMBLY-1 PA-5d): the scaffold against the |
 | `tools/telecom-usage.test.mjs` | Tests for tools/telecom-usage.mjs - PRODUCT-ASSEMBLY-1 PA-5c (D-PA17). Run: node --test tools/telecom-usage.test.mjs |
 | `tools/unreadable-dirs.test.mjs` | Fixture test: the two whole-tree walkers that a local, permission-locked folder used to crash |
 | `tools/vuln-db-refresh.test.mjs` | Offline tests for tools/vuln-db-refresh.mjs. Run: node --test tools/vuln-db-refresh.test.mjs |

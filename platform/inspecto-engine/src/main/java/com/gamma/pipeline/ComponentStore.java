@@ -184,10 +184,10 @@ public final class ComponentStore {
         return registryRoot;
     }
 
-    /** Components of {@code type} currently on disk (re-scans), in scan order. */
+    /** Components of {@code type} currently on disk (re-scans; a {@link #snapshot} answers from its one scan), in scan order. */
     public List<ComponentRegistry.Component> list(String type) {
         validateType(type);
-        return ComponentRegistry.scan(registryRoot).ofType(type);
+        return (frozen != null ? frozen : ComponentRegistry.scan(registryRoot)).ofType(type);
     }
 
     /** One component by {@code type}/{@code id} (its in-file identity), if present. */

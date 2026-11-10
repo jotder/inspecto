@@ -1,0 +1,34 @@
+INSPECTO DEMO BUILD (INSPECTO TELCO) - INTERNAL EVALUATION ONLY
+===============================================================
+This build signs people in as Demo Users with NO password and NO identity provider (DEMO-AUTH-1).
+It is not secure and must never be given to a customer, exposed on a network, or used with real data.
+
+UNZIP, RUN, SIGN IN. The Space telco is PRE-INSTALLED under .\spaces\telco: Revenue Assurance, Fraud Management and SIM-box
+bypass over ONE usage feed (telecom_usage), with their synthetic July 2026 samples ingested and every App's Jobs run for each
+day. Nothing needs a seed step; no node is required. What you will find:
+  Revenue Assurance   the two Reconciliations (switch vs mediation vs rating; rated vs billed) and their breaks, the leakage and
+                      data-quality findings (17 each) and their Alerts, the KPIs
+  Fraud Management    the fourteen typologies (IRSF, Wangiri, SIM box, premium rate, roaming, SIM swap, ...), each with its
+                      planted offenders and one Alert per typology; Incidents and Cases in Case Management
+  SIM-box bypass      Risk Scores per SIM, and one suspected box: the cell C500, where FM's five premium-rate callers share a
+                      cell (a finding no single App's data plants; kept on purpose)
+  Link Analysis       explore any of those numbers as a graph
+
+1. Run bin\serve-demo.bat (Windows) or bin/serve-demo.sh (Linux). Set PORT to change the port (default 8080).
+2. Open http://127.0.0.1:8080 and pick a Demo User:
+     admin        Demo Admin        Platform administrator: every area and setting
+     ra.analyst   Demo RA Analyst   Revenue Assurance analyst: runs Jobs, works Incidents and Cases
+     fm.analyst   Demo FM Analyst   Fraud analyst: runs Jobs, works Incidents and Cases
+     fm.manager   Demo FM Manager   Fraud manager: also authors Alert Rules and Pipelines
+     viewer       Demo Viewer       Non-privileged viewer: reads, changes nothing
+3. Use the App switcher at the top of the rail to move between Revenue Assurance, Fraud Management, Case Management and
+   Link Analysis. My work on the landing page lists the open Incidents and Cases.
+
+The findings are dated July 2026, the corpus's month: filter by that period, not by "today".
+
+RESET THE DEMO: stop the server, delete .\spaces\telco, and restore that folder from the zip (re-extract spaces\telco).
+Anything done during a session (assignments, dispositions, new Rules) lives in that folder, so a reset discards it.
+
+The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
+The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
+omits inspecto-demo-auth (shipped here).

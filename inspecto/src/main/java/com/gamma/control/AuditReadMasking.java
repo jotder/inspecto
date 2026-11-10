@@ -111,6 +111,10 @@ public final class AuditReadMasking {
 
     /** Every Dataset's sensitive columns, lower-cased; {@link EvidenceMasker#UNKNOWN_LINEAGE} when any is untraceable. */
     static Set<String> classifiedColumns(ComponentStore registry, ViewStore views) {
+        // ONE registry scan for the whole walk: each Dataset's read (its get and its lineage list) re-scanned the whole
+        // registry, about 2 x Datasets full parses for every masked notification and audit page (PA-5d, 2026-11-10: ~60
+        // Datasets in the composed Telco Space kept its notification queue busy for over 15 minutes after a demo seed).
+        registry = registry.snapshot();
         Set<String> out = new TreeSet<>();
         for (ComponentRegistry.Component c : registry.list("dataset"))
             out.addAll(EvidenceMasker.sensitiveColumns(registry, views, c.name()));

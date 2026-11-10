@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); PA-5d is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -617,6 +617,61 @@ The slices, each its own lane (D-PA16):
   build. Seeding a demo Space from it is PA-5d.
 - **PA-5d — the demo Distribution.** `tools/seed-telco.mjs`, `products/telco.demo-build.txt`, `demoSpace: telco`, and
   the Telco Product matrix (Standard, Advanced) in CI.
+
+  **As built (PA-5d done 2026-11-11).**
+  - **The Product.** `products/telco.toon` offers `distributions[2]: production,demo` with `demoSpace: telco`. A demo
+    build is Advanced or Preview (`DEMO_EDITIONS`); Telco lists Standard and Advanced, so its demo is Telco × Advanced.
+  - **The seed, `tools/seed-telco.mjs`** (the bake's contract). `--scaffold <spacesRoot>` composes the template exactly
+    as the bundle does (`assemble` + `composeSpace` over copies of the committed parts). It then lays down
+    `spaces/telco` with each sample feed also in `data/inbox/<feed>/`, the Demo Users (`admin`, `ra.analyst`,
+    `fm.analyst`, `fm.manager`, `viewer`; built-in roles only) and a `space.toon`. `--apply` signs in as Demo Users and
+    over HTTP triggers every Pipeline, then RA's Jobs, then FM's 14 detection Jobs and `tf_anomaly_score`, then bypass's
+    six nightly Jobs, each for 2026-07-01…03. It waits on each run and ends with the Alert sweep. It fails unless one
+    Alert each of `ra_leakage_found`, `fraud_irsf` and `tb_box_suspected` exists. A Job its own `on_signal` chain is
+    already running (a 409, or a run recorded SKIPPED "previous run still in flight") is fired again. In the demo Space
+    only, the gap-detection block is removed: the corpus is fixed to July 2026, so FM's `payments` and
+    `subscriber_events` raised 262 `sequence_gap` Alerts (one per missing day), and one more each day the bundle aged.
+    Removed, not `enabled: false`, because the file-template check ignores that switch (`GAP-DETECTION-ENABLED-IGNORED-1`).
+    The templates keep it.
+  - **The presenter text**, `products/telco.demo-build.txt` (the bundle's `DEMO-BUILD.txt`): what each App shows, the
+    Demo Users, the App switcher, the July 2026 dating, and the reset.
+  - **The Product matrix.** `tools/check-product-build.mjs` assembles a Product × Edition × Distribution without
+    building anything and checks the plan and descriptor: the Apps (required plus optional), each App's Add-on modules
+    on the classpath, nav present and no path drawn twice, the composed Space with its one usage feed, and the demo's
+    seed tool and presenter text. CI's `product-matrix` job runs Telco × Standard, × Advanced and × Advanced demo. A
+    boot step is left out: it needs the reactor build of the `test` job, and the bake uses Windows console calls.
+  - ⚠ **Three defects the bake found, fixed here.**
+    (1) A packaging pwsh started by a process that ignores Ctrl+C (an IDE's or agent's shell) handed that to the bake
+    server, whose JVM then never ran its shutdown hook. It failed the same way with `la-showcase`. `Start-BakeServer`
+    now clears the inherited flag before `CreateProcess`.
+    (2) Every masked notification re-parsed the whole registry about twice per Dataset:
+    `AuditReadMasking.classifiedColumns` read each Dataset and its lineage, and each read re-scanned the registry. With the
+    composed Space's ~60 Datasets the notification queue stayed busy for over 15 minutes after the seed. Now one
+    registry snapshot serves the walk (`ComponentStore.list` reads a snapshot's one scan, as `get` already did). After
+    the seed the server is quiet in about 215 s, and in 15 s once the 262 gap Alerts below are gone.
+    (3) DEMO-BAKE-WAL-RACE-1's mechanism: the bake stopped the server while it still worked through what the seed set
+    off, so the Space close abandoned that work after its 10 s budget and left 8 `.wal` files. The bake now waits until
+    the server is quiet (under 0.5 s of CPU in a 5 s window, at most 10 minutes) before the Ctrl+C.
+  - **Found, not fixed (a board row each):** a Collector's file-template gap check ignores `gap_detection.enabled: false`
+    (`GAP-DETECTION-ENABLED-IGNORED-1`). The demo sign-in headline is hard-coded `{{ product }} MFS`
+    (`sign-in.component.ts`, from `52aa6e7a7`), so the Telco demo reads "Inspecto Telco MFS". The engine's Space close
+    still abandons a busy Space after 10 s without a checkpoint; the bake now avoids it, but a production stop does not.
+  **Proof (as built).** Node: `seed-telco.test.mjs` 6/6 (plan order and windows, dry run, Demo User sign-in, the
+  SKIPPED and 409 re-fire, a failed run and a missing App Alert fail the seed, the real scaffold), and
+  `check-product-build.test.mjs` 3/3 (the seed test also fails a crashed Pipeline run: FAILED with no failed file). With the Product tools, 99/99 across `check-products`, `assemble`,
+  `render-product-hosts`, `compose-space`, `telecom-usage`, `check-bundle-spaces` and `check-seed-paths`. Java:
+  `ComponentStoreTest` (a snapshot's `list` and `get` re-scan nothing) and `NotificationContentMaskingTest` (the
+  classified-column walk is one scan over 20 Datasets). The full reactor gate `mvn -o install -Pedition-advanced` is
+  green: 12,059 tests, 0 failures, 148 skipped, 1 h 10 min. `package.ps1 -Product telco -Edition Advanced -Distribution
+  demo` bakes `spaces\telco` (seed: 85 calls, none failed; one Alert each of RA, FM and bypass; quiet after 215 s; no
+  `.wal`; no build-time path embedded). The unzipped demo bundle boots with `serve-demo.bat`, and `/bootstrap` reports
+  `authMode: demo` with the five Demo Users. Signed in as Demo Admin, the landing page carries the Telco tagline, and
+  *My work* lists FM's data-charging bypass Incidents. The rail's App switcher lists Revenue Assurance, Case
+  Management, Fraud Management and Link Analysis and follows the URL. Reconciliation lists both of RA's
+  Reconciliations with their seeded runs, Risk Scores lists `tb_sim`, and Alerts lists the seeded Alerts: the 14 FM
+  typologies, `ra_leakage_found`, `ra_data_quality` and `tb_box_suspected`. There is no console error. The final bake
+  (gap detection removed) boots with exactly those 17 Alerts and 36 Incidents (the first bake also had 262 `sequence_gap`
+  Alerts and their Incidents).
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 

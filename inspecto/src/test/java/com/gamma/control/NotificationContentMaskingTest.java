@@ -33,6 +33,20 @@ class NotificationContentMaskingTest {
         return b.build();
     }
 
+    /** PA-5d: the classified-column walk is ONE registry scan, however many Datasets name each other's stores. */
+    @Test
+    void theClassifiedColumnsAreReadFromOneRegistryScan(@TempDir Path root) throws Exception {
+        ComponentStore store = new ComponentStore(root.resolve("registry"));
+        for (int i = 0; i < 20; i++)
+            store.write("dataset", "d" + i, Map.of("physicalRef", "shared/database", "columns", List.of(
+                    Map.of("name", "msisdn" + i, "classification", "MSISDN"))));
+        long before = com.gamma.pipeline.ComponentRegistry.scanCount();
+        java.util.Set<String> classified = AuditReadMasking.classifiedColumns(store, new com.gamma.pipeline.ViewStore(root.resolve("views")));
+        long scans = com.gamma.pipeline.ComponentRegistry.scanCount() - before;   // the counter is JVM-wide: allow a stray scan
+        assertTrue(scans >= 1 && scans < 5, "one scan, not two per Dataset (was " + scans + "; 41 before the fix)");
+        for (int i = 0; i < 20; i++) assertTrue(classified.contains("msisdn" + i), "msisdn" + i);
+    }
+
     /** Returns {feed notification, channel notification}. */
     private static Notification[] run(Path root, Event e) throws Exception {
         new ComponentStore(root.resolve("registry")).write("dataset", "calls", Map.of("columns", List.of(

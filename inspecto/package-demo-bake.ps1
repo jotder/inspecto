@@ -39,6 +39,12 @@ function Start-BakeServer {
         $si.so = $so.SafeFileHandle.DangerousGetHandle(); $si.se = $se.SafeFileHandle.DangerousGetHandle(); $si.si = [IntPtr]::Zero
         $pi = New-Object Inspecto.NC+PI
         $cmd = [System.Text.StringBuilder]::new((@($Java) + $JvmArgs | ForEach-Object { & $q $_ }) -join ' ')
+        # "Ignore Ctrl+C" is a process attribute a child INHERITS, even with a console of its own. A packaging pwsh started by a
+        # process that ignores Ctrl+C (an IDE's or an agent's shell, a service) would otherwise hand that to the server, whose JVM
+        # then never sees the stop helper's Ctrl+C: no shutdown hook, no checkpoint, and the bake refuses after 45 s (PA-5d,
+        # 2026-11-10: reproduced with la-showcase as well as telco). Clearing it here makes the server's Ctrl+C handling its own.
+        if (-not ('Inspecto.NCI' -as [type])) { Add-Type -Namespace Inspecto -Name NCI -MemberDefinition '[DllImport("kernel32.dll")] public static extern bool SetConsoleCtrlHandler(IntPtr h, bool add);' }
+        [void][Inspecto.NCI]::SetConsoleCtrlHandler([IntPtr]::Zero, $false)
         $ok = [Inspecto.NC]::CreateProcessW($Java, $cmd, [IntPtr]::Zero, [IntPtr]::Zero, $true, 0x10, [IntPtr]::Zero, $WorkDir, [ref]$si, [ref]$pi)   # 0x10 = CREATE_NEW_CONSOLE
         $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
     } finally { $so.Dispose(); $se.Dispose() }
@@ -129,6 +135,16 @@ function Invoke-DemoSpaceBake {
         & node $seed --base "http://127.0.0.1:$Port" --space $Space --apply @extra | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "demo bake: the seed script failed (exit $LASTEXITCODE) - refusing to ship a half-seeded demo. Server log: $log" }
 
+        # Wait for the server to go QUIET before the stop (DEMO-BAKE-WAL-RACE-1): a seed's last call returns while the server
+        # still works through what it set off (on_signal Jobs, the Alert sweep's notifications). A stop then makes the Space
+        # close wait on that work past its 10 s budget, abandon it, and leave .wal files (seen with telco, 2026-11-10: 8 .wal
+        # files; after waiting until idle, none). Quiet = under 0.5 s of CPU in a 5 s window; at most 10 minutes.
+        $quiet = [Diagnostics.Stopwatch]::StartNew(); $cpu = $proc.TotalProcessorTime.TotalSeconds
+        while ($quiet.Elapsed.TotalSeconds -lt 600 -and -not $proc.HasExited) {
+            Start-Sleep -Seconds 5; $proc.Refresh(); $now = $proc.TotalProcessorTime.TotalSeconds
+            if (($now - $cpu) -lt 0.5) { break }; $cpu = $now
+        }
+        Write-Host "Demo bake: server quiet after $([int]$quiet.Elapsed.TotalSeconds) s; stopping it" -ForegroundColor Cyan
         if (-not (Stop-BakeServer -Proc $proc)) {
             & taskkill /F /T /PID $proc.Id 2>&1 | Out-Null; $proc.WaitForExit(5000)
             throw "demo bake: the server did not stop gracefully (Ctrl+C) within 45 s - refusing to copy a Space whose DuckDB files may not be checkpointed."

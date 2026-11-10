@@ -32,6 +32,23 @@ class ComponentStoreTest {
     }
 
     @Test
+    void aSnapshotAnswersListAndGetFromItsOneScan(@TempDir Path root) throws Exception {
+        ComponentStore store = new ComponentStore(root);
+        store.write("grammar", "pipe", Map.of("delimiter", "|"));
+        ComponentStore snap = store.snapshot();
+        long before = ComponentRegistry.scanCount();
+        for (int i = 0; i < 5; i++) {
+            assertEquals(1, snap.list("grammar").size());
+            assertTrue(snap.get("grammar", "pipe").isPresent());
+        }
+        long scans = ComponentRegistry.scanCount() - before;   // the counter is JVM-wide: allow a stray scan from another thread
+        assertTrue(scans < 3, "ten reads of a snapshot re-scan nothing (was " + scans + ")");
+        store.write("grammar", "comma", Map.of("delimiter", ","));
+        assertEquals(1, snap.list("grammar").size(), "a snapshot does not see a later write");
+        assertEquals(2, store.list("grammar").size(), "the live store does");
+    }
+
+    @Test
     void listAndDeleteAcrossTypes(@TempDir Path root) throws Exception {
         ComponentStore store = new ComponentStore(root);
         store.write("grammar", "pipe", Map.of("delimiter", "|"));
