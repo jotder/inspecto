@@ -110,7 +110,7 @@ Also useful here, from the plan's coverage matrix: **Recursive paths** (approval
 * API (as `audit.lead`): `GET .../inv/investigations/vendor-v117-workpaper/dossier`, then `POST .../dossier/verify` with `{manifest}`.
 
 ### F. Members, roles, Settings (1 min) [audit.admin]
-Members: `audit.lead` lead, `audit.admin` lead, `audit.manager` and `audit.committee` reviewers, `audit.outsider` absent. Settings > Link Analysis: masking `typed`, four-eyes above 30, index ON, Draft limits, the embed allow-list, Max fan-out. Entity types: `party` (masked) and `legal_entity` (not masked).
+Members: `audit.lead` lead, `audit.admin` lead, `audit.manager` and `audit.committee` reviewers, `audit.outsider` absent. Settings > Link Analysis: masking `typed`, four-eyes above 2000, index ON, Draft limits, the embed allow-list, Max fan-out. Entity types: `party` (masked) and `legal_entity` (not masked).
 
 ### G. Embed, optional (1 min) [audit.admin]
 Mint an embed link on the Investigation (`POST .../embeds` or the Share panel; needs `-Dla.embed.enabled=true` and a lead member, hence `audit.admin`). Serve the portal from the allowed origin and open it:
