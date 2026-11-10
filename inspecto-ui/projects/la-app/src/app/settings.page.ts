@@ -136,7 +136,7 @@ export class SettingsPageComponent {
             component: InvestigationAccessPageComponent,
             // the server decides each revoke (lead + capability); the page shows Revoke only where it would succeed
             canChange: () => true,
-            // Investigations are Standard and up: on Basic every read here 503s, so the section is not offered (as la-nav.ts)
+            // Investigations are Standard and up: on Basic every read here 503s, so the section is not offered (as the Alerts area)
             visible: () => this.session.features()['investigations'] === true,
         },
         {

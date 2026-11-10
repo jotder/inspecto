@@ -11,11 +11,32 @@ import { ConnectivityBannerComponent } from '@inspecto/core/components/connectiv
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
-import { LA_PRODUCT_NAME } from './la-brand';
-import { LA_APP_SETTINGS_NAV, visibleLaNav } from './la-nav';
+import { areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
 import { NextStepsDialog } from './next-steps.dialog';
+import { PRODUCT } from './product.generated';
 
 export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-rail.service';
+
+/** One rail link: an App area (PRODUCT-ASSEMBLY-1 PA-4: from the Product's nav) or the shell's own Settings. */
+export interface RailLink {
+    readonly path: string;
+    readonly label: string;
+    readonly icon: string;
+}
+
+/**
+ * The rail link to Settings: the SHELL's, not an App area, so it is not in any app.toon. Shown to every signed-in user,
+ * because the page always has a section for them (their own limits) and shows the others read-only unless they may
+ * change them. Not on the landing page, which offers the areas.
+ */
+export const LA_APP_SETTINGS_NAV: RailLink = {
+    path: 'settings',
+    label: 'Settings',
+    icon: 'heroicons_outline:cog-6-tooth',
+};
+
+/** An App area as a rail link. */
+export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label: n.label, icon: areaIcon(n) });
 
 /**
  * The signed-in frame: a LEFT navigation rail (product mark, the three areas, Space switcher, user menu) beside the
@@ -65,7 +86,10 @@ export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-rail.service';
                     <span class="truncate font-semibold max-sm:hidden">{{ product }}</span>
                 }
             </a>
-            <nav class="flex flex-1 flex-row items-center gap-1 sm:mt-2 sm:flex-col sm:items-stretch" aria-label="Areas">
+            <nav
+                class="flex flex-1 flex-row items-center gap-1 sm:mt-2 sm:flex-col sm:items-stretch"
+                aria-label="Areas"
+            >
                 @for (item of nav(); track item.path) {
                     <a
                         [routerLink]="'/' + item.path"
@@ -137,10 +161,16 @@ export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-rail.service';
 })
 export class LaShellComponent {
     private readonly env = inject(APP_ENVIRONMENT);
-    /** The areas, plus Settings: it always has a section for the signed-in user. */
+    /**
+     * The Product's areas, plus Settings: it always has a section for the signed-in user. PA-4: the server's nav when it
+     * resolved one for this Product (`/bootstrap.product.nav`), else the generated nav under the feature rule.
+     */
     private readonly session = inject(SessionService);
-    protected readonly nav = computed(() => [...visibleLaNav(this.session.features()), LA_APP_SETTINGS_NAV]);
-    protected readonly product = LA_PRODUCT_NAME;
+    protected readonly nav = computed<RailLink[]>(() => [
+        ...productNav(this.session.product(), PRODUCT, this.session.features()).map(railLink),
+        LA_APP_SETTINGS_NAV,
+    ]);
+    protected readonly product = PRODUCT.brand.name;
     protected readonly logo = this.env.appLogo;
     protected readonly footer = this.env.footerText;
     private readonly rail = inject(LaRailService);
@@ -167,8 +197,13 @@ export class LaShellComponent {
 
     /** `?` (a bare press, never while editing text) opens the keyboard-shortcuts help, as in the main app. */
     protected onKeydown(event: KeyboardEvent): void {
-        if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey || isEditingTarget(event.target)) return;
+        if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey || isEditingTarget(event.target))
+            return;
         event.preventDefault();
-        this.dialog.open(ShortcutsHelpDialog, { width: '460px', autoFocus: false, data: { shortcuts: LA_APP_SHORTCUTS } });
+        this.dialog.open(ShortcutsHelpDialog, {
+            width: '460px',
+            autoFocus: false,
+            data: { shortcuts: LA_APP_SHORTCUTS },
+        });
     }
 }

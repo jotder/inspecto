@@ -151,6 +151,10 @@ export function checkModel(model) {
         if (p.id !== file) out.push(`${at}: id '${p.id}' does not equal its file name '${file}'`);
         for (const k of ['title', 'shape', 'host', 'docs']) if (!p[k]) out.push(`${at}: no ${k}`);
         if (!p.brand?.name) out.push(`${at}: no brand.name`);
+        // PA-4: the sign-in pitch is two lines that only make sense together.
+        if (!!p.brand?.signInTitle !== !!p.brand?.signInBody) out.push(`${at}: brand.signInTitle and brand.signInBody go together - set both or neither`);
+        const sameHost = Object.entries(products).find(([other, q]) => other < file && q.host && q.host === p.host);
+        if (sameHost) out.push(`${at}: shares the host '${p.host}' with Product '${sameHost[0]}' - each host is built as exactly one Product`);
         if (p.shape && !SHAPES.includes(p.shape)) out.push(`${at}: shape '${p.shape}' is not one of ${SHAPES.join(', ')}`);
         if (p.host && !hosts.includes(p.host)) out.push(`${at}: host '${p.host}' is not an Angular project in inspecto-ui/angular.json (${hosts.join(', ')})`);
         if (p.docs && !exists(p.docs)) out.push(`${at}: docs '${p.docs}' does not exist`);

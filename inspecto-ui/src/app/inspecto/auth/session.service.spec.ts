@@ -146,7 +146,10 @@ describe('SessionService (W6d edition switch)', () => {
         httpMock.expectOne(`${base}/bootstrap`).flush({
             edition: 'standard',
             laLevel: 'explorer',
-            featureReasons: { investigations: 'Needs the Investigations add-on, which this installation does not hold.', blank: ' ' },
+            featureReasons: {
+                investigations: 'Needs the Investigations add-on, which this installation does not hold.',
+                blank: ' ',
+            },
             features: { authMode: 'none', geoLink: true, investigations: false },
         });
         await init;
@@ -164,11 +167,48 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.featureReasons()).toEqual({});
 
         const reload = svc.reloadFeatures();
-        httpMock
-            .expectOne(`${base}/bootstrap`)
-            .flush({ edition: 'standard', laLevel: 'investigations', featureReasons: {}, features: { investigations: true } });
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            edition: 'standard',
+            laLevel: 'investigations',
+            featureReasons: {},
+            features: { investigations: true },
+        });
         await reload;
         expect(svc.laLevel()).toBe('investigations');
+    });
+
+    // PRODUCT-ASSEMBLY-1 PA-4: the Product and its nav come with every bootstrap; a Space's Module settings change re-resolve
+    // the nav, and a server built without a descriptor reads as no Product.
+    it('reads the Product from bootstrap and refreshes it when the features are re-read', async () => {
+        const init = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            edition: 'basic',
+            features: { authMode: 'none' },
+            product: {
+                id: 'la',
+                title: 'Inspecto LA',
+                nav: [{ app: 'link-analysis', id: 'data', path: 'data', label: 'Data' }],
+            },
+        });
+        await init;
+        expect(svc.product()?.id).toBe('la');
+        expect(svc.product()?.nav?.map((n) => n.id)).toEqual(['data']);
+
+        const reload = svc.reloadFeatures();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ features: { authMode: 'none' }, product: { id: 'la', title: 'Inspecto LA', nav: [] } });
+        await reload;
+        expect(svc.product()?.nav, 'a Space that switched Link Analysis off: the server sent an empty nav').toEqual([]);
+    });
+
+    it('a server built without a Product descriptor reads as no Product', async () => {
+        const init = svc.init();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ edition: 'basic', features: { authMode: 'none' }, product: null });
+        await init;
+        expect(svc.product()).toBeNull();
     });
 
     it('reads features.events (EDG-01 cell 6 — the optional events feed module)', async () => {

@@ -11,4 +11,6 @@ distributions[2]: production,demo
 demoSpace: la-showcase
 brand:
   name: Inspecto LA
+  signInTitle: Follow every link, one case at a time.
+  signInBody: Explore who is connected to whom, investigate a number, and build a Dossier you can stand behind.
 docs: docs/okf/product/layer/la/index.md

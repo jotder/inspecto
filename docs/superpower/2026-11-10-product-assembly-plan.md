@@ -3,7 +3,7 @@
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
-design and proof); PA-4 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -306,8 +306,8 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-1** Definitions describe today ✅ 2026-11-10 | `products/{inspecto,la}.toon`, `apps/link-analysis/app.toon`, `industries/{telecom,mobile-money}/`; one guard, `tools/check-products.mjs` (rules in `tools/products.mjs`, shared with the assembler); the Offering as the only module table | ✅ guard + 21 tests green; the derived module table equals the hand-kept one row for row in every Edition and the core set (only the row order of Standard and up changed, to `CLASSPATH_ORDER`); all 735 tool tests green |
 | **PA-2** Assembler ✅ 2026-11-10 | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised (✅; package runs in the as-built note) |
 | **PA-3** Server ✅ 2026-11-10 | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination (✅; proof in the PA-3 note) |
-| **PA-4** Suite shell | shared shell library; generated hosts; Apps as lazy libraries; App switcher; My work across Apps | both shells' specs and axe green; bundle sizes within 5 % |
-| **PA-5** **Inspecto Telco** as proof | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
+| **PA-4** Suite shell ✅ 2026-11-10 | one shell provider set (`provideInspectoShell`); generated host data (`product.generated.ts`); the LA shell draws the Product's nav (the App switcher and *My work* across Apps moved to PA-5) | both shells' specs and axe green; bundle sizes within 5 % (✅; proof in the PA-4 note) |
+| **PA-5** **Inspecto Telco** as proof | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; the App switcher and *My work* across Apps; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
 | **PA-6** Platform product | the Add-on picker; builder-kit docs; `inspecto app new/validate/test/package`; the conformance kit | a sample partner App built only with the kit passes conformance |
 | **PA-7** Entitlements and live App install | signed entitlements; `POST /apps` install / upgrade / remove; the trial Distribution | install, upgrade and remove an App on a running server with no lost config |
 | **PA-8** Container and air-gap | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
@@ -395,6 +395,43 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   Inspecto LA × Basic answers `product.id` `la`, `apps[0]` installed, nav `linkAnalysis, data, entityLists` (geoMap,
   entities and alerts hidden because Basic reports those features false - exactly what `la-nav.ts` draws on Basic);
   the console × Basic answers `product.id` `inspecto`, shape `platform`, host `gamma`, the same three entries.
+
+**PA-4 design (2026-11-10).** The shells stop holding the Product in code. Scope of this phase, and what moves:
+- **Generated host data.** `tools/render-product-hosts.mjs` writes one `product.generated.ts` per Product into its
+  Angular host (`inspecto-ui/projects/<host>/src/app/` for `la-app`, `inspecto-ui/src/app/` for the console): the
+  brand (`name`, and the sign-in pitch when the Product declares one) and each App's nav, from `products/` and
+  `apps/`. `--check` fails when a file is stale; it runs in the Product guard's CI step, so an edited `app.toon`
+  cannot ship without its host data. The PA-3 parity test against `la-nav.ts` retires with that file.
+- **The session knows the Product.** `SessionService.product` holds `/bootstrap.product`, refreshed on every
+  re-read (`init`, after sign-in, and after a Space's Module settings change), because its nav depends on the caller
+  and the Space.
+- **The LA shell draws the Product's nav.** When the server resolved one (`/bootstrap.product.nav`), the rail and the
+  landing page draw it as is - the server already applied the four gates. When it did not (a backend built before
+  PA-3, `ng serve` against a dev server with no descriptor), they draw the generated nav under the same feature rule
+  `la-nav.ts` applied. Settings stays a shell link, not an App area. `la-nav.ts` and `la-brand.ts` are deleted.
+- **One shell provider set.** `provideInspectoShell()` (`@inspecto/core`) holds what both hosts configure alike
+  (HTTP and its four interceptors in order, animations, toasts, the router with its scrolling and input binding, the
+  keep-alive reuse strategy, the date adapter and formats, modal dialogs); each host adds only its own routes,
+  initialisers, host services and theme.
+- **Moved to later phases, deliberately.** The App switcher and *My work* across Apps need a Product with more than
+  one App, so they land with Inspecto Telco (PA-5). The console's nav as data is the Platform product's work (PA-6):
+  its 4-group, Lens-gated nav is a different shape from an App's areas.
+- **Proof:** the specs of both hosts and of `SessionService`, axe on the shell, `lint`, `lint:tokens`, `lint:forms`,
+  the three typechecks, both production builds within 5 % of today's bundle sizes, and the LA shell in the preview
+  drawing a server-resolved nav and the fallback.
+- **Proof (as built, 2026-11-10).** `product-host.spec.ts` (5: the server's nav as is, an empty server nav, the feature
+  rule with no Product, identity only, another Product's nav ignored), two `SessionService` cases (the Product read and
+  re-read; a server with no descriptor reads as none), two la-shell cases (server nav with axe; another Product's nav
+  falls back); every la-app spec plus those: 24 files, 218 tests. `render-product-hosts.test.mjs` (4) and two new guard
+  cases: 66 tool tests. `typecheck` (all three configs), `lint:tokens` and `lint:forms` green. Production builds against
+  `c08499967`: the console 32,552,672 → 32,554,223 bytes, la-app 29,716,271 → 29,717,139 (both +0.005 %). Preview,
+  `ng serve la-app` from the lane: (a) a target/classes server with the Inspecto LA descriptor answers `product.id` `la`
+  with the App not installed (its modules are not on that classpath) and nav `[]`, and the rail draws Settings only;
+  (b) the same server with no descriptor answers `product: null` and the rail draws the generated nav under the
+  feature rule (Link Analysis, Data, Entity Lists, Settings); (c) a real Inspecto LA × Basic bundle packaged from the
+  lane answers nav `linkAnalysis, data, entityLists`, the session holds it and the rail draws it; no console errors.
+  ⚠ Not PA-4, already on master and left alone: `npm run lint` fails on `link-analysis.component.ts` (a restricted
+  `../la-rail.service` import from `d634b6a7d`) and `format:check` reports 251 drifted files.
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 

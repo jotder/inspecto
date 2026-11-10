@@ -7,6 +7,7 @@ import { SpacesService } from '../api/spaces.service';
 import { catchError, firstValueFrom, map, Observable, of, tap } from 'rxjs';
 import { APP_ENVIRONMENT } from '../api/app-environment';
 import { apiErrorMessage, apiUrl } from '../api/api-base';
+import type { BootstrapProduct } from '../product/product-host';
 
 /**
  * OIDC endpoint configuration for the Standard-edition login redirect. Comes from `bootstrap.auth`
@@ -73,6 +74,8 @@ interface Bootstrap {
     featureReasons?: Record<string, string>;
     session?: { authenticated?: boolean; actor?: string; displayName?: string | null; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
+    /** PRODUCT-ASSEMBLY-1 PA-3: the Product this server was built as; null from a server without a descriptor. */
+    product?: BootstrapProduct | null;
     auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[]; spacesAttached?: number };
 }
 
@@ -162,6 +165,12 @@ export class SessionService {
      */
     /** Every boolean `/bootstrap` feature, by id — what `navFeature` on a nav entry is checked against. */
     readonly features = signal<Record<string, boolean>>({});
+    /**
+     * `bootstrap.product` (PRODUCT-ASSEMBLY-1 PA-3/PA-4): the Product this server was built as - identity always, its Apps
+     * and the nav this caller sees once the Space roster is shown. Re-read with every bootstrap (sign-in and a Space's
+     * Module settings change the nav). null from a server built without a Product descriptor.
+     */
+    readonly product = signal<BootstrapProduct | null>(null);
     readonly geoLinkEnabled = signal(false);
     /**
      * `bootstrap.features.investigations` — the Link Analysis Investigation surface is installed AND included in this
@@ -301,6 +310,7 @@ export class SessionService {
         this.eventsEnabled.set(boot.features?.events === true);
         this.opsEnabled.set(boot.features?.ops === true);
         this.loopbackOnly.set(boot.features?.loopbackOnly === true);
+        this.product.set(boot.product ?? null);
 
         if (mode !== 'oidc') return; // Basic / offline — done, no login path.
 
@@ -345,6 +355,8 @@ export class SessionService {
         this.applyLevel(boot);
         this.eventsEnabled.set(boot.features.events === true);
         this.opsEnabled.set(boot.features.ops === true);
+        // PA-4: a Space that switched a module off hides that App's nav - the server re-resolved it.
+        if (boot.product !== undefined) this.product.set(boot.product);
     }
 
     /** `laLevel` and `featureReasons` from a bootstrap (a server without them reads as the Explorer, no reasons). */
@@ -560,6 +572,8 @@ export class SessionService {
         this.actor.set(authenticated ? (boot.session?.actor ?? null) : null);
         this.subjectDisplayName.set(authenticated ? (boot.session?.displayName ?? null) : null);
         this.capabilities.set(boot.session?.capabilities ?? []);
+        // PA-4: signed in, the server now sends the Product's Apps and the nav THIS caller sees (a failed read keeps the last).
+        if (boot.product !== undefined) this.product.set(boot.product);
     }
 }
 

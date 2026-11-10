@@ -1220,7 +1220,8 @@ evidence and the design records, each dated where it was built. Where it and Par
 > (browser tab, rail brand, landing heading, sign-in screen) says *Inspecto LA*. The capability on this page keeps the
 > name **Link Analysis** everywhere else: the console nav, the app's own *Link Analysis* area, routes, keys and modules
 > (GLOSSARY §11 *Inspecto LA*). The sign-in screen is the core's, shared with the console; it reads the product name from
-> `AppEnvironment.productName`, which `la-app` sets to `LA_PRODUCT_NAME` (`la-brand.ts`) and the console leaves unset (*Inspecto*).
+> `AppEnvironment.productName`, which each host sets from its Product's `brand` (`products/<id>.toon`, generated into the
+> host's `product.generated.ts`): *Inspecto LA* for `la-app`, *Inspecto* for the console.
 
 > **Backend structure** (modules, store backends, index layout, gate order, host wiring): [`okf/product/module/la-core/architecture.md`](architecture.md).
 

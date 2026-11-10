@@ -2361,7 +2361,7 @@ data origin decides the entry points (phase 2).
   Investigation toolbox tab (kept in the tablist; its panel is the locked *Start an Investigation*; the rail's *Open the
   Investigation* opens it), *Run on server* / *Run on index* (`LinkAnalysisServerRunComponent`, the over-cap note kept), and
   the *All algorithms (server)* and *Edge index* tool groups (listed, their action locked). Whole Standard+ pages stay out of
-  the navigation (`la-nav.ts` Alerts, `investigationsGuard`). Deep links (`?investigation=`, `?seed=`) still do not open one.
+  the navigation (the Alerts entry's `feature: investigations` in `apps/link-analysis/app.toon`, `investigationsGuard`). Deep links (`?investigation=`, `?seed=`) still do not open one.
   ⚠ *Find paths (server)* is NOT locked: `POST /inv/traversal/recursive-paths` is an explorer route (`InvRoutes`, every
   edition; EDITIONS "Find paths … ✅ Basic").
 - **The masking default keys on sign-in** (OB-6, A-16). `EditionMaskingDefault` answers `none` when nobody signs in

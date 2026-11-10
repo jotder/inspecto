@@ -6,8 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
-import { appNav, checkModel, gatherModel, productTemplates, satisfies, builtAddons } from './products.mjs';
+import { checkModel, gatherModel, productTemplates, satisfies, builtAddons } from './products.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fresh = () => structuredClone({ ...gatherModel(repo), exists: undefined });
@@ -26,19 +25,6 @@ test('today: the two Products partition the templates as the bundles ship them',
     const console_ = productTemplates(m.products.inspecto, ['link-analysis'], m.apps);
     assert.ok(la.every((t) => t.startsWith('la-')), 'Inspecto LA stages only la-* templates');
     assert.deepEqual([...console_].sort(), [...m.templates].sort(), 'the console stages every template, as before');
-});
-
-// PA-3 -> PA-4 bridge: the LA shell still draws inspecto-ui/projects/la-app/src/app/la-nav.ts; until PA-4 replaces that constant with
-// /bootstrap.product.nav, the App's declared nav must equal it field for field, in order - or the two silently drift apart.
-test('the Link Analysis App nav equals la-app\'s LA_APP_NAV (until PA-4 deletes la-nav.ts)', () => {
-    const ts = readFileSync(join(repo, 'inspecto-ui/projects/la-app/src/app/la-nav.ts'), 'utf8');
-    const body = /export const LA_APP_NAV = \[([\s\S]*?)\] as const;/.exec(ts);
-    assert.ok(body, 'la-nav.ts no longer declares LA_APP_NAV as expected - update this parity test (or retire it in PA-4)');
-    const field = (block, k) => (new RegExp(`\\b${k}: '([^']*)'`).exec(block) ?? [])[1];
-    const fromTs = body[1].split(/\n    \},?/).filter((b) => /path:/.test(b))
-        .map((b) => ['path', 'label', 'icon', 'blurb', 'feature'].map((k) => field(b, k) ?? null));
-    const fromApp = appNav(model().apps['link-analysis']).map((n) => ['path', 'label', 'icon', 'blurb', 'feature'].map((k) => n[k] ?? null));
-    assert.deepEqual(fromApp, fromTs);
 });
 
 test('satisfies() reads version ranges', () => {
@@ -100,6 +86,9 @@ const RED = {
     'a nav entry with no label': [(m) => { delete m.apps['link-analysis'].nav.data.label; }, /nav entry 'data' has no label/],
     'two nav entries sharing a path': [(m) => { m.apps['link-analysis'].nav.alerts.path = 'data'; }, /nav entries 'data' and 'alerts' share the path 'data'/],
     'a nav entry keyed on a feature its Add-ons do not provide': [(m) => { m.apps['link-analysis'].nav.data.feature = 'reconciliation'; }, /nav entry 'data' keys on feature 'reconciliation', which no module of its Add-ons \(linkAnalysis\) provides/],
+    // PA-4: the generated host data.
+    'a sign-in title without its body': [(m) => { delete m.products.la.brand.signInBody; }, /brand\.signInTitle and brand\.signInBody go together/],
+    'two Products on one host': [(m) => { m.products.la.host = 'gamma'; }, /shares the host 'gamma' with Product 'inspecto'/],
     'a demoSpace on a Product with no demo distribution': [(m) => { m.products.la.distributions = ['production']; }, /demoSpace is set but the Product offers no demo distribution/],
 };
 for (const [name, [plant, re]] of Object.entries(RED)) test(`RED: ${name}`, () => red(plant, re));

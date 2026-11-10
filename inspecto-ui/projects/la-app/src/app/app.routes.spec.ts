@@ -1,10 +1,18 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, Route, Router, RouterStateSnapshot, UrlSegment, UrlTree, provideRouter } from '@angular/router';
+import {
+    ActivatedRouteSnapshot,
+    Route,
+    Router,
+    RouterStateSnapshot,
+    UrlSegment,
+    UrlTree,
+    provideRouter,
+} from '@angular/router';
 import { describe, expect, it } from 'vitest';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { investigationsGuard, laAppRoutes } from './app.routes';
-import { LA_APP_NAV } from './la-nav';
+import { PRODUCT } from './product.generated';
 
 const shell = laAppRoutes.find((r) => r.path === '' && r.children) as Route;
 const child = (path: string): Route => shell.children!.find((r) => r.path === path) as Route;
@@ -17,8 +25,9 @@ describe('la-app routes', () => {
         expect(shell.canActivate?.length).toBe(1);
     });
 
+    // PRODUCT-ASSEMBLY-1 PA-4: every area the Product's Apps declare (app.toon -> product.generated.ts) must have a route here.
     it('routes every nav entry, and lands on the landing page at the root', () => {
-        for (const item of LA_APP_NAV) {
+        for (const item of PRODUCT.nav) {
             const r = child(item.path);
             expect(r, item.path).toBeTruthy();
             expect(r.loadChildren || r.loadComponent, item.path).toBeTruthy();
@@ -90,7 +99,9 @@ describe('la-app routes', () => {
     it('matches /settings and /settings/<section> with one route, and nothing deeper', () => {
         const seg = (...p: string[]) => p.map((x) => new UrlSegment(x, {}));
         expect(settings.matcher!(seg('settings'), {} as never, settings)?.consumed.length).toBe(1);
-        expect(settings.matcher!(seg('settings', 'access'), {} as never, settings)?.posParams?.['section'].path).toBe('access');
+        expect(settings.matcher!(seg('settings', 'access'), {} as never, settings)?.posParams?.['section'].path).toBe(
+            'access',
+        );
         expect(settings.matcher!(seg('settings', 'a', 'b'), {} as never, settings)).toBeNull();
         expect(settings.matcher!(seg('alerts'), {} as never, settings)).toBeNull();
     });

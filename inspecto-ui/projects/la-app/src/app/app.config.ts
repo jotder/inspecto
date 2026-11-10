@@ -1,70 +1,29 @@
-import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
-import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
-import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
-import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialogConfig } from '@angular/material/dialog';
-import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { RouteReuseStrategy, provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
+import { ApplicationConfig, inject, provideAppInitializer } from '@angular/core';
 import { provideGamma } from '@gamma';
 import { provideIcons } from 'app/core/icons/icons.provider';
-import { provideAppEnvironment } from '@inspecto/core/api/app-environment';
-import { authInterceptor } from '@inspecto/core/auth/auth.interceptor';
 import { SessionService } from '@inspecto/core/auth/session.service';
-import { KeepAliveRouteReuseStrategy } from '@inspecto/core/keep-alive.strategy';
-import { errorInterceptor } from '@inspecto/core/api/error.interceptor';
-import { spaceInterceptor } from '@inspecto/core/api/space.interceptor';
-import { v1Interceptor } from '@inspecto/core/api/v1.interceptor';
+import { provideInspectoShell } from '@inspecto/core/shell/provide-inspecto-shell';
 import { environment } from 'environments/environment';
-import { provideToastr } from 'ngx-toastr';
 import { laAppRoutes } from './app.routes';
-import { LA_PRODUCT_NAME, LA_SIGN_IN_PITCH } from './la-brand';
 import { provideLaAppHostServices } from './la-host.providers';
+import { PRODUCT } from './product.generated';
 
 /**
- * The Link Analysis application's provider set (D-5 step 6). It mirrors the gamma host's `app.config` for everything
- * the shared core needs (environment, the four interceptors in the same order, Material, Toastr, icons, the Gamma theme
- * config) and differs in three places: the routes, no `registerLinkAnalysisViz` / `registerGeoMapViz` (la-app has no
- * dashboards to embed a widget in), and the ten Link Analysis host tokens come from `provideLaAppHostServices`.
+ * Inspecto LA's provider set (D-5 step 6; PRODUCT-ASSEMBLY-1 PA-4). The shell everything shares comes from
+ * `provideInspectoShell` - with the Product's brand from `product.generated.ts` - so this host adds only what is its own:
+ * the routes, the bootstrap initialiser (skipped by the anonymous embed viewer), the ten Link Analysis host tokens, icons
+ * and the theme. No `registerLinkAnalysisViz` / `registerGeoMapViz`: la-app has no dashboards to embed a widget in.
  */
 export const appConfig: ApplicationConfig = {
     providers: [
-        provideAppEnvironment({ ...environment, productName: LA_PRODUCT_NAME, signInPitch: LA_SIGN_IN_PITCH }),
-        provideZoneChangeDetection({ eventCoalescing: true }),
-        // Same order as the host: v1 envelope unwrap, Space scope rewrite, auth bearer / refresh, error tracker.
-        provideHttpClient(
-            withXhr(),
-            withInterceptors([v1Interceptor, spaceInterceptor, authInterceptor, errorInterceptor]),
-        ),
-        provideAnimationsAsync(),
-        provideToastr({ positionClass: 'toast-bottom-right' }),
-        provideRouter(
-            laAppRoutes,
-            withInMemoryScrolling({ scrollPositionRestoration: 'enabled' }),
-            withComponentInputBinding(),
-        ),
-        // The Link Analysis page stays alive while the analyst visits another page (KEEP_ALIVE routes only).
-        { provide: RouteReuseStrategy, useClass: KeepAliveRouteReuseStrategy },
-        { provide: DateAdapter, useClass: LuxonDateAdapter },
-        {
-            provide: MAT_DATE_FORMATS,
-            useValue: {
-                parse: { dateInput: 'D' },
-                display: {
-                    dateInput: 'DDD',
-                    monthYearLabel: 'LLL yyyy',
-                    dateA11yLabel: 'DD',
-                    monthYearA11yLabel: 'LLLL yyyy',
-                },
-            },
-        },
-        // Every dialog is modal to assistive technology (axe aria-modal; the gamma host does the same). It REPLACES
-        // `new MatDialogConfig()` rather than merging, so the defaults are spread in: `{ ariaModal: true }` alone drops `role`.
-        { provide: MAT_DIALOG_DEFAULT_OPTIONS, useFactory: () => ({ ...new MatDialogConfig(), ariaModal: true }) },
-        // `GET /bootstrap` once, before routing: the auth mode, the module flags (`LA_FEATURES` reads them) and, under
-        // OIDC, a session resumed from the refresh cookie. Never rejects.
+        ...provideInspectoShell({ environment, product: PRODUCT, routes: laAppRoutes }),
+        // `GET /bootstrap` once, before routing: the auth mode, the module flags (`LA_FEATURES` reads them), the Product and its
+        // nav and, under OIDC, a session resumed from the refresh cookie. Never rejects.
         // The shared-Investigation viewer (`/embed/...`) is anonymous and talks to nothing but its one public read, so it skips the
         // bootstrap, the session refresh and the Space bootstrap: a stranger's browser makes no session call at all (LA-EMBED-SPA-1).
-        provideAppInitializer(() => (location.pathname.startsWith('/embed/') ? undefined : inject(SessionService).init())),
+        provideAppInitializer(() =>
+            location.pathname.startsWith('/embed/') ? undefined : inject(SessionService).init(),
+        ),
         ...provideLaAppHostServices(),
         provideIcons(),
         provideGamma({

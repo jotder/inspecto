@@ -23,7 +23,7 @@ function create(load: Observable<SpaceGuideState>) {
         providers: [
             provideRouter([]),
             { provide: SpaceGuideService, useValue: { load: () => load } },
-            { provide: SessionService, useValue: { features: signal({}) } },
+            { provide: SessionService, useValue: { features: signal({}), product: signal(null) } },
             { provide: FirstRun, useValue: { openStep: vi.fn() } },
             { provide: OnboardingEventsService, useValue: { guideCompleted } },
         ],

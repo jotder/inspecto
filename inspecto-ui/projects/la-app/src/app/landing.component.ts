@@ -6,12 +6,12 @@ import { SpaceGuideComponent } from '@inspecto/core/onboarding/space-guide.compo
 import { guideDone, setupIncomplete, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
-import { LA_PRODUCT_NAME } from './la-brand';
 import { SessionService } from '@inspecto/core/auth/session.service';
+import { areaIcon, productNav } from '@inspecto/core/product/product-host';
 import { FirstRun } from './first-run';
 import { GettingStartedComponent } from './getting-started.component';
 import { MyWorkComponent } from './my-work.component';
-import { visibleLaNav } from './la-nav';
+import { PRODUCT } from './product.generated';
 
 /**
  * The front door: **Getting started** while setup is incomplete (no Space, or no Dataset yet; LA-ONBOARD-1 UC-01),
@@ -79,12 +79,20 @@ import { visibleLaNav } from './la-nav';
     `,
 })
 export class LandingComponent implements OnInit {
-    protected readonly product = LA_PRODUCT_NAME;
+    protected readonly product = PRODUCT.brand.name;
     private readonly session = inject(SessionService);
     private readonly guide = inject(SpaceGuideService);
     private readonly events = inject(OnboardingEventsService);
     protected readonly firstRun = inject(FirstRun);
-    protected readonly nav = computed(() => visibleLaNav(this.session.features()));
+    /** One card per area the rail offers (PA-4: the Product's nav - the server's, else the generated one under the feature rule). */
+    protected readonly nav = computed(() =>
+        productNav(this.session.product(), PRODUCT, this.session.features()).map((n) => ({
+            path: n.path,
+            label: n.label,
+            icon: areaIcon(n),
+            blurb: n.blurb ?? '',
+        })),
+    );
     /** The current Space's setup, from the server; null while it loads. */
     protected readonly state = signal<SpaceGuideState | null>(null);
     protected readonly firstRunPage = computed(() => {

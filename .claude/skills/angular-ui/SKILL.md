@@ -933,6 +933,18 @@ in use. Look there before picking a class — do not invent a token.
   `access-catalog.spec.ts`'s "the default catalog covers every declared action node" — a real failure that
   reads as unrelated to a nav edit (2026-07-28, Connections → a Settings section). The **grant id stays the
   same**, so `LensService.identityCapability(...)` needs no change.
+- **An App's areas are data, not code** (PRODUCT-ASSEMBLY-1 PA-4, 2026-11-10). The Inspecto LA rail and landing page
+  draw `productNav(session.product(), PRODUCT, session.features())` (`inspecto/product/product-host.ts`): the
+  server's resolved nav (`/bootstrap.product.nav`, every gate already applied) when it names this host's Product,
+  else the generated nav under the feature rule. **Adding an LA area = three edits:** a `nav:` entry in
+  `apps/<app>/app.toon`, `node tools/render-product-hosts.mjs` (rewrites the host's `product.generated.ts`; its
+  `--check` in CI fails a stale file), and the route in `projects/la-app/src/app/app.routes.ts`
+  (`app.routes.spec.ts` fails a nav entry with no route). ⛔ Never hand-edit `product.generated.ts`; the product
+  name is `PRODUCT.brand.name`. A spec rendering the LA shell or landing page mocks `SessionService` with
+  `product: signal(null)` beside `features`, or it fails with `this.session.product is not a function`. Both hosts
+  take what they configure alike from `provideInspectoShell({ environment, product, routes })`
+  (`inspecto/shell/provide-inspecto-shell.ts`): a provider both hosts need goes THERE, a host-only one in that
+  host's `app.config.ts`. The console's 4-group nav stays in `navigation-data.ts` until PA-6.
 - **A Settings *section* is not a nav item.** `SettingsComponent.drawers` is the list; a section is a
   `{id,title,icon,description,component}` row rendering an existing standalone component through
   `NgComponentOutlet`, and its own route stays. Adding one = the drawer row + its import.

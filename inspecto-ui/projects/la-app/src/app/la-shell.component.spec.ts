@@ -15,24 +15,33 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
 import { LensService } from 'app/inspecto/api';
 import { of } from 'rxjs';
-import { LA_PRODUCT_NAME } from './la-brand';
-import { LA_APP_NAV, LA_APP_SETTINGS_NAV } from './la-nav';
+import { BootstrapProduct } from '@inspecto/core/product/product-host';
 import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
-import { LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
+import { LA_APP_SETTINGS_NAV, LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
 import { LandingComponent } from './landing.component';
+import { PRODUCT } from './product.generated';
+
+/** The Product's areas as the generated host data declares them (PRODUCT-ASSEMBLY-1 PA-4: apps/link-analysis/app.toon). */
+const LA_NAV = PRODUCT.nav;
 
 describe('la-app shell and landing page', () => {
     beforeEach(() => localStorage.removeItem(LA_RAIL_EXPANDED_KEY));
 
     let harness: RouterTestingHarness;
 
-    async function render(features: Record<string, boolean> = { geoMap: true, investigations: true, entityPages: true }) {
+    async function render(
+        features: Record<string, boolean> = { geoMap: true, investigations: true, entityPages: true },
+        product: BootstrapProduct | null = null,
+    ) {
         TestBed.configureTestingModule({
             providers: [
                 provideHttpClient(),
                 provideHttpClientTesting(),
                 provideNoopAnimations(),
-                { provide: LensService, useValue: { canAuthorWorkbench: signal(false), canManageIncidents: signal(false) } },
+                {
+                    provide: LensService,
+                    useValue: { canAuthorWorkbench: signal(false), canManageIncidents: signal(false) },
+                },
                 {
                     provide: SessionService,
                     useValue: {
@@ -40,6 +49,7 @@ describe('la-app shell and landing page', () => {
                         actorName: signal(''),
                         loginRequired: signal(false),
                         features: signal(features),
+                        product: signal(product),
                     },
                 },
                 // A set-up install (Space, data, columns, a graph): the landing page shows its area cards, no guide.
@@ -63,18 +73,51 @@ describe('la-app shell and landing page', () => {
         const el = await render();
         const hrefs = (sel: string) =>
             [...el.querySelectorAll<HTMLAnchorElement>(sel)].map((a) => a.getAttribute('href'));
-        const expected = LA_APP_NAV.map((n) => '/' + n.path);
+        const expected = LA_NAV.map((n) => '/' + n.path);
         expect(hrefs('nav[aria-label="Areas"] a')).toEqual([...expected, '/settings']);
         expect(hrefs('ul a')).toEqual(expected);
         expect(el.querySelector('h1')?.textContent?.trim()).toBe('Inspecto LA');
         expect(el.querySelector('main')).toBeTruthy();
     });
 
+    // PRODUCT-ASSEMBLY-1 PA-4: a server that resolved the nav for this caller and Space (PA-3) is drawn as is - it already
+    // applied Installed, Enabled, the feature and the capability, so the shell does not re-filter it.
+    it("draws the server's resolved nav as is, in the rail and on the landing page", async () => {
+        const server: BootstrapProduct = {
+            id: 'la',
+            title: 'Inspecto LA',
+            nav: [
+                {
+                    app: 'link-analysis',
+                    id: 'data',
+                    path: 'data',
+                    label: 'Data',
+                    icon: 'heroicons_outline:circle-stack',
+                },
+                { app: 'link-analysis', id: 'alerts', path: 'alerts', label: 'Alerts' },
+            ],
+        };
+        const el = await render({ geoMap: true, investigations: false, entityPages: true }, server);
+        const hrefs = (sel: string) =>
+            [...el.querySelectorAll<HTMLAnchorElement>(sel)].map((a) => a.getAttribute('href'));
+        expect(hrefs('nav[aria-label="Areas"] a')).toEqual(['/data', '/alerts', '/settings']);
+        expect(hrefs('ul a')).toEqual(['/data', '/alerts']);
+        await expectNoA11yViolations(el);
+    }, 30_000);
+
+    it("never draws another Product's nav: it falls back to its own under the feature rule", async () => {
+        const console_: BootstrapProduct = { id: 'inspecto', title: 'Inspecto', nav: [] };
+        const el = await render({ geoMap: false, investigations: false, entityPages: false }, console_);
+        expect(
+            [...el.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')].map((a) => a.getAttribute('href')),
+        ).toEqual(['/link-analysis', '/data', '/entity-lists', '/settings']);
+    });
+
     // ED-1 (LA-EDITIONS-1): the product is "Inspecto LA"; the capability area inside it keeps "Link Analysis".
     it('brands the app Inspecto LA and keeps Link Analysis as the name of its area', async () => {
         localStorage.setItem(LA_RAIL_EXPANDED_KEY, '1');
         const el = await render();
-        expect(LA_PRODUCT_NAME).toBe('Inspecto LA');
+        expect(PRODUCT.brand.name).toBe('Inspecto LA');
         const home = el.querySelector('aside a[href="/"]') as HTMLElement;
         expect(home.getAttribute('aria-label')).toBe('Inspecto LA home');
         expect(home.textContent?.trim()).toBe('Inspecto LA');
@@ -120,7 +163,7 @@ describe('la-app shell and landing page', () => {
         const el = await render();
         const rail = el.querySelector('aside') as HTMLElement;
         expect(rail.querySelector('nav[aria-label="Areas"]')).toBeTruthy();
-        expect(rail.querySelectorAll('nav[aria-label="Areas"] a').length).toBe(LA_APP_NAV.length + 1);
+        expect(rail.querySelectorAll('nav[aria-label="Areas"] a').length).toBe(LA_NAV.length + 1);
         expect(rail.querySelector('inspecto-space-switcher')).toBeTruthy();
         expect(rail.querySelector('user')).toBeTruthy();
         expect([...el.querySelectorAll('header')].filter((h) => !h.closest('main'))).toEqual([]);
@@ -148,7 +191,10 @@ describe('la-app shell and landing page', () => {
         const links = [...el.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')];
         // Landing is "/", so no area is current yet; every link still has a text name (visually hidden when slim).
         expect(links.every((a) => a.getAttribute('aria-current') === null)).toBe(true);
-        expect(links.map((a) => a.textContent?.trim())).toEqual([...LA_APP_NAV.map((n) => n.label), LA_APP_SETTINGS_NAV.label]);
+        expect(links.map((a) => a.textContent?.trim())).toEqual([
+            ...LA_NAV.map((n) => n.label),
+            LA_APP_SETTINGS_NAV.label,
+        ]);
     });
 
     it('is slim by default, expands when the page header toggles it, and remembers the choice', async () => {
@@ -193,6 +239,9 @@ describe('la-app shell and landing page', () => {
         input.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
         expect(open).not.toHaveBeenCalled();
         document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }));
-        expect(open).toHaveBeenCalledWith(ShortcutsHelpDialog, expect.objectContaining({ data: { shortcuts: LA_APP_SHORTCUTS } }));
+        expect(open).toHaveBeenCalledWith(
+            ShortcutsHelpDialog,
+            expect.objectContaining({ data: { shortcuts: LA_APP_SHORTCUTS } }),
+        );
     });
 });

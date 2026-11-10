@@ -316,7 +316,7 @@ operator answer A-11 "locked with a reason inside screens"): the Investigation t
 Investigation from the top results", every Run-on-server / Run-on-index control and the edge-index and server-algorithm
 tools. The `?investigation=` and `?seed=` openers still open nothing, so nothing offered can 503. The standalone Inspecto LA app also hides its **Alerts** area on
 Basic (operator 2026-10-21): those are the standing-detection Alerts behind Investigations, so the rail and landing page
-omit it (`la-nav.ts` `feature: 'investigations'`) and a typed `/alerts` lands on the landing page (`investigationsGuard`). Pinned by `ControlApiBasicEditionLinkAnalysisTest`
+omit it (its nav entry in `apps/link-analysis/app.toon` carries `feature: investigations`) and a typed `/alerts` lands on the landing page (`investigationsGuard`). Pinned by `ControlApiBasicEditionLinkAnalysisTest`
 (`la/inspecto-geo-link`: Basic answers an explorer route 200 with no sign-in and refuses one route per Investigation
 module; Standard answers both) and the Explorer-level specs in `link-analysis.component.spec.ts` /
 `link-analysis-toolbox.server-run.spec.ts`.

@@ -1,74 +1,22 @@
-import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
-import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
-import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
-import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialogConfig } from '@angular/material/dialog';
-import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { RouteReuseStrategy, provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
+import { ApplicationConfig, inject, provideAppInitializer } from '@angular/core';
 import { provideGamma } from '@gamma';
 import { appRoutes } from 'app/app.routes';
 import { provideIcons } from 'app/core/icons/icons.provider';
-import { provideToastr } from 'ngx-toastr';
-import { errorInterceptor as inspectoErrorInterceptor } from './inspecto/api/error.interceptor';
-import { spaceInterceptor } from './inspecto/api/space.interceptor';
-import { authInterceptor } from './inspecto/auth/auth.interceptor';
-import { v1Interceptor } from './inspecto/api/v1.interceptor';
 import { registerGeoMapViz, registerLinkAnalysisViz } from '@inspecto/link-analysis';
 import { provideLaHostServices } from './modules/admin/studio/la-host.providers';
 import { SessionService } from './inspecto/auth/session.service';
-import { KeepAliveRouteReuseStrategy } from './inspecto/keep-alive.strategy';
-import { provideAppEnvironment } from './inspecto/api/app-environment';
+import { provideInspectoShell } from './inspecto/shell/provide-inspecto-shell';
 import { environment } from 'environments/environment';
+import { PRODUCT } from './product.generated';
 
+/**
+ * The console's provider set (the Platform product `inspecto`; PRODUCT-ASSEMBLY-1 PA-4). The shell every Inspecto host
+ * shares comes from `provideInspectoShell` - environment and brand, change detection, HTTP and its four interceptors, the
+ * router, dates, modal dialogs; this host adds only what is its own.
+ */
 export const appConfig: ApplicationConfig = {
     providers: [
-        // D-5 step 2: `api/` reads the build-time environment only through this injected config, never by import.
-        provideAppEnvironment(environment),
-
-        // Zone.js change detection (explicit opt-in for Angular 21). The zoneless flip was reverted:
-        // it shipped without a component-by-component audit and froze eight surfaces whose state is a
-        // plain field written from an async callback (sidebar, Connections Test, Spaces expand, …).
-        // Re-attempt it only alongside that audit — see docs/BACKLOG.md.
-        provideZoneChangeDetection({ eventCoalescing: true }),
-
-        // Main HttpClient. The Basic/core edition is auth-free; the Standard edition adds OIDC via
-        // the authInterceptor (W6d), which is a no-op unless SessionService.authMode === 'oidc'. Order:
-        // v1 envelope unwrap (W7 — first) → space scope rewrite → auth bearer/refresh → error tracker.
-        provideHttpClient(
-            withXhr(),
-            withInterceptors([v1Interceptor, spaceInterceptor, authInterceptor, inspectoErrorInterceptor]),
-        ),
-
-        // Angular 21: use async animations provider for better performance
-        provideAnimationsAsync(),
-        provideToastr({ positionClass: 'toast-bottom-right' }),
-        provideRouter(
-            appRoutes,
-            withInMemoryScrolling({ scrollPositionRestoration: 'enabled' }),
-            withComponentInputBinding(),
-        ),
-        // The Link Analysis page stays alive while the analyst visits another page (KEEP_ALIVE routes only).
-        { provide: RouteReuseStrategy, useClass: KeepAliveRouteReuseStrategy },
-
-        // Material Date Adapter
-        {
-            provide: DateAdapter,
-            useClass: LuxonDateAdapter,
-        },
-        {
-            provide: MAT_DATE_FORMATS,
-            useValue: {
-                parse: {
-                    dateInput: 'D',
-                },
-                display: {
-                    dateInput: 'DDD',
-                    monthYearLabel: 'LLL yyyy',
-                    dateA11yLabel: 'DD',
-                    monthYearA11yLabel: 'LLLL yyyy',
-                },
-            },
-        },
+        ...provideInspectoShell({ environment, product: PRODUCT, routes: appRoutes }),
 
         // Read GET /bootstrap once to learn the edition's authMode and (under OIDC) resume a session
         // from the refresh cookie, before routing runs. Never rejects — a Basic/offline backend just
@@ -82,14 +30,7 @@ export const appConfig: ApplicationConfig = {
         // D-5 prep: the host services the Link Analysis / Geo features reach only through tokens (inspecto/la-host).
         ...provideLaHostServices(),
 
-        // Every Material dialog is modal behind a backdrop: say so to assistive tech (Material's own default is
-        // aria-modal="false", which leaves the page behind a dialog readable) — LA-A11Y-AUDIT-1.
-        // ⚠ The provided options REPLACE `new MatDialogConfig()` rather than merge with it, so the defaults
-        // (role, hasBackdrop, …) must be spread in.
-        { provide: MAT_DIALOG_DEFAULT_OPTIONS, useFactory: () => ({ ...new MatDialogConfig(), ariaModal: true }) },
-
         // Gamma
-        // provideAuth(),
         provideIcons(),
         provideGamma({
             gamma: {

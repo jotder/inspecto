@@ -9,7 +9,7 @@ import { SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
 import { failedSampleRuns } from '@inspecto/core/spaces/sample-space.dialog';
 import { SpaceSwitcherComponent } from 'app/layout/common/space-switcher/space-switcher.component';
 import { ADD_DATA_ROUTE, FirstRun, LA_SAMPLE_TEMPLATE } from './first-run';
-import { LA_PRODUCT_NAME } from './la-brand';
+import { PRODUCT } from './product.generated';
 
 /**
  * **Getting started** (LA-ONBOARD-1 phase 3, UC-01): replaces the home cards while setup is incomplete (no Space, or a
@@ -117,7 +117,7 @@ export class GettingStartedComponent implements OnInit {
     /** The guide state the landing page loaded. */
     readonly state = input.required<SpaceGuideState>();
 
-    protected readonly product = LA_PRODUCT_NAME;
+    protected readonly product = PRODUCT.brand.name;
     protected readonly firstRun = inject(FirstRun);
     protected readonly spaces = inject(SpacesService);
     private readonly router = inject(Router);
