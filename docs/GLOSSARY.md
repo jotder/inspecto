@@ -1466,9 +1466,10 @@ formats, parsers, the **canonical Datasets** every App of the Industry reads, En
 and terms. Apps of one Industry share one ingest. ⛔ Not a **Domain Profile** (§11, a Space's choice of Industry pack for
 Link Analysis vocabulary); ⛔ never *vertical* or *domain* as the name of this layer.
 
-**App** — A finished job for one **Industry**: Revenue Assurance, Fraud Management, Link Analysis, Case Management,
-Complex event processing. It is made of its content (one or more Space Templates: its **Function pack** mapped onto the
-Industry's canonical Datasets), its own landing, nav and personas mapped to **Roles**, golden data with ground truth,
+**App** — A finished job, either for one **Industry** (Revenue Assurance, Fraud Management and Complex event
+processing for *Telecom*) or **Industry-neutral** (Link Analysis, Case Management: any Industry, with the Space's
+Domain Profile giving the words). It is made of its content (one or more Space Templates: its **Function pack** mapped
+onto the Industry's canonical Datasets), its own landing, nav and personas mapped to **Roles**, golden data with ground truth,
 the **Add-ons** it requires, and a version with a Platform compatibility range. Declared in `apps/<id>/app.toon`; it
 installs at build time or into a running install. ⛔ Not a **Space Template** (an App installs one or more), not an
 **Add-on** (horizontal, no Industry), not a **Function pack** (content only, no landing or nav), and not the Angular
@@ -1476,8 +1477,9 @@ host projects `la-app` / gamma (code names, §13).
 
 **Product** — What a customer receives, declared in `products/<id>.toon` with its brand, its shell and the Editions it
 comes in. Two shapes:
-- **Domain product** — one Industry plus chosen Apps, for end customers (*Inspecto Telco*: Revenue Assurance, Fraud
-  Management, Link Analysis, Case Management; *Inspecto LA* (§13) is a one-App Domain product).
+- **Domain product** — chosen Apps for end customers, of one Industry plus Industry-neutral ones (*Inspecto Telco*:
+  Revenue Assurance, Fraud Management, Link Analysis, Case Management). A Domain product whose Apps are all
+  Industry-neutral names no Industry: *Inspecto LA* (§13) is a one-App Domain product, and each Space picks its own.
 - **Platform product** — the Base modules plus chosen Add-ons plus the builder kit (Studio, the SPIs, the Control API,
   an App authoring kit), for builders, integrators and OEMs (*Inspecto Platform*).
 
