@@ -1,7 +1,7 @@
 # Product assembly — one Inspecto Platform, Industry Apps, finished Products (plan)
 
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
-as recommended. Nothing built; PA-0 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); PA-1 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -75,23 +75,23 @@ product, *Link Analysis* the capability) is assembled out of pieces that each en
 ```
                        ┌───────────────────────── Product ─────────────────────────┐
   Domain product:      │ Inspecto Telco = Industry telecom + Apps {RA, FM, LA, CM}  │  × Edition × Distribution
-  Platform product:    │ Inspecto Platform = kernel + chosen Add-ons + builder kit  │    × Entitlement
+  Platform product:    │ Inspecto Platform = Base + chosen Add-ons + builder kit    │    × Entitlement
                        └────────────────────────────────────────────────────────────┘
   App          RA · FM · LA · CM · CEP · Partner settlement · Re-rating · Bypass …   (finished job, one Industry)
   Industry     telecom: collectors, ASN.1 parsers, canonical Datasets, Entity Types, link kinds, terms
   Add-ons      Incidents · Case Management · Link Analysis & Investigations · Reconciliation · Scoring & Lists ·
                Screening · Anomaly · Predictive · AI Assist · Regulatory Reporting · Multi-entity · Workflow & SLA ·
                Premium Connectors · (new) Streaming
-  Kernel       acquisition · ingestion · Pipelines · data plane · Studio/BI · observability · Jobs · Control API · security
+  Base         acquisition · ingestion · Pipelines · data plane · Studio/BI · observability · Jobs · Control API · security
 ```
 
 | Layer | What it is | Today | New |
 |---|---|---|---|
-| **Kernel** | the base modules every build has | the `base` / `internal` modules | nothing |
+| **Base** | the modules every build has (Offering role *Base*) | the `base` / `internal` modules | nothing |
 | **Add-on** | a horizontal, domain-neutral Optional module set | `addons:` in `offerings/*.toon`, Product Map `addon/` | `Streaming` (for CEP) |
 | **Industry** | a vertical's shared spine: Collectors and record formats, parsers, **canonical Datasets**, Entity Types, link kinds, reference data, terms | Industry packs `telecom`, `mobile-money` (LA-only; no Datasets) | widened to own the canonical Datasets every App of that Industry reads |
 | **App** *(new)* | a finished job for one Industry: content mapped onto the Industry's Datasets, its own landing and nav, personas mapped to Roles, golden data, and the Add-ons it needs | scattered: Space Templates (`telco-ra`, `telco-fraud`, …) plus, for LA only, a hand-built shell | `apps/<id>/app.toon` |
-| **Product** *(new)* | what a customer receives. **Domain product**: one Industry plus chosen Apps. **Platform product**: the kernel plus chosen Add-ons plus the builder kit | implicit (`-Ui`, Basic = LA) | `products/<id>.toon` |
+| **Product** *(new)* | what a customer receives. **Domain product**: one Industry plus chosen Apps. **Platform product**: the Base modules plus chosen Add-ons plus the builder kit | implicit (`-Ui`, Basic = LA) | `products/<id>.toon` |
 
 Three axes run across every Product:
 - **Edition**: the posture tier (Basic · Standard · Advanced). It no longer carries content.
@@ -100,13 +100,15 @@ Three axes run across every Product:
   (OCI image + Helm chart) · `airgap`, and later a SaaS tenant template.
 - **Entitlement**: what one customer's build may switch on, signed, checked at run time.
 
-**Vocabulary (binding once PA-0 lands).** *Capability* is already taken twice: an RBAC permission (§1-A) and the
-fifteen capability areas (§14). So **the horizontal sellable unit stays *Add-on***, and the always-present part is the
-**kernel**. Sales copy may say "capabilities" only as plain English, never as a name. The vertical is **Industry**,
-matching the existing *Industry pack*. The new terms are **App**, **Product** (with its two shapes **Domain product**
-and **Platform product**), **Distribution**, **Entitlement** and **Product lock**. ⛔ An App is not a Space Template
-(an App installs one or more), not an Add-on (horizontal, no domain) and not a Function pack (content only, no
-experience).
+**Vocabulary (binding; ✅ in `GLOSSARY.md` §15 *Product assembly* since 2026-11-10).** *Capability* is already taken
+twice: an RBAC permission (§1-A) and the fifteen capability areas (§14). So **the horizontal sellable unit stays
+*Add-on***, and the always-present layer is the **Base** modules (the existing Offering role). The first draft of this
+plan said *kernel*; PA-0 replaced it, because *kernel* belongs to the **Decision Kernel**. Sales copy may say
+"capabilities" only as plain English, never as a name. The vertical is **Industry**, matching the existing *Industry
+pack*. The new terms are **App**, **Product** (with its two shapes **Domain product** and **Platform product**),
+**Suite**, **Distribution**, **Entitlement**, **Assembly Plan** and **Product lock**. ⛔ An App is not a Space Template
+(an App installs one or more), not an Add-on (horizontal, no Industry) and not a Function pack (content only, no
+landing or nav). An item outside a customer's Entitlement fails the **Installed** gate, so the gates stay three.
 
 ### 3.1 The first Domain product: Inspecto Telco
 
@@ -298,7 +300,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 
 | Phase | Builds | Proof |
 |---|---|---|
-| **PA-0** Words and decisions | `GLOSSARY.md` §15: App, Product (Domain / Platform), Industry, Distribution, Entitlement, Product lock (§12 ✅ signed 2026-11-10) | vocabulary guard green |
+| **PA-0** Words and decisions ✅ 2026-11-10 | `GLOSSARY.md` §15 *Product assembly*: Product (Domain / Platform), App, Industry, Suite, Distribution, Entitlement, Assembly Plan, Product lock, Base; §13 rename-map row; §12 signed | vocabulary guard green |
 | **PA-1** Definitions describe today | `products/{platform,la}.toon`, `apps/link-analysis/app.toon`, `industries/{telecom,mobile-money}/`; the three guards; the Offering as the only module table | guards green; both existing bundles unchanged except `edition.properties` |
 | **PA-2** Assembler | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised |
 | **PA-3** Server | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination |
@@ -380,10 +382,10 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
 
 | Lane | Rows | Serves |
 |---|---|---|
-| Jobs runtime | `JOB-SIGNAL-OVERLAP-SKIP-1` (P2), `LA-INDEX-BUILD-REFUSED-NPE-1`, `JOB-LOADER-SAVED-VIEW-SUFFIX-1` | Kernel |
-| Alerting | `ALERT-EVALUATE-NO-BREACH-WORDING-1`, `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` | Kernel |
-| Mapping | `MAPPING-EPOCH-TIMESTAMP-1` | Kernel |
-| Egress security | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (e): an all-digits host such as `2130706433` passes `BARE_HOST` (`ObjectStoreDatabase.java:39`) | Kernel |
+| Jobs runtime | `JOB-SIGNAL-OVERLAP-SKIP-1` (P2), `LA-INDEX-BUILD-REFUSED-NPE-1`, `JOB-LOADER-SAVED-VIEW-SUFFIX-1` | Base |
+| Alerting | `ALERT-EVALUATE-NO-BREACH-WORDING-1`, `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` | Base |
+| Mapping | `MAPPING-EPOCH-TIMESTAMP-1` | Base |
+| Egress security | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (e): an all-digits host such as `2130706433` passes `BARE_HOST` (`ObjectStoreDatabase.java:39`) | Base |
 | Inspecto LA UI | the 14 defects from the 2026-11-10 UI test (`LA-BASIC-PLACEHOLDER-CASE-1` … `LA-UI-TEXT-PASS-2`); `LA-SAMPLE-EMPTY-DATASET-1`'s likely cause is a Space created without `loadSamples` | LA App |
 | Showcases | `LA-OWNERSHIP-NO-CRON-FALLBACK-1`, `LA-UTILITY-LOOKALIKE-CHECKS-1` | LA App |
 
@@ -391,7 +393,7 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
 
 | Product / layer | Rows that stand between it and "sellable" |
 |---|---|
-| Kernel (every Product) | §13.3 Jobs, Alerting, Mapping and Egress lanes; `ANALYTICS-CORE-1` (the SqlIdent sweep has not started; all 15 named classes still hand-quote identifiers); `DATA-TIERS-1` P2/P4–P7 |
+| Base (every Product) | §13.3 Jobs, Alerting, Mapping and Egress lanes; `ANALYTICS-CORE-1` (the SqlIdent sweep has not started; all 15 named classes still hand-quote identifiers); `DATA-TIERS-1` P2/P4–P7 |
 | **Assembly** (this plan) | `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` (absorbed by §9), `MODULE-REORG-P3-THIN-JARS` defect (2) (`package.ps1` runs `npm ci` in the shared `inspecto-ui`), `PRODUCT-MAP-S6-1`, `DOCS-FUNCTIONALITY-HUBS-1`, and `DATA-TIERS-1` DT-18, which is really D-PA2 |
 | **Inspecto Telco** | RA: `PACK-RERATING-1` R4–R7, `PACK-PARTNER-SETTLEMENT-1` W1–W3. FM: `TELCO-BYPASS-SIMBOX-1` B4–B7, `PACK-IRSF-WANGIRI-1`, `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1`. CEP: `REALTIME-DECISIONING-1`. 5G/IoT: `PACK-5G-IOT-ASSURANCE-1` U0 |
 | Inspecto LA | the 14 UI defects; showcase residuals; `LA-A11Y-AUDIT-1` (person-only); `LA-SHOWCASE-RELEASE-RESIDUALS-1` (Linux zip) |

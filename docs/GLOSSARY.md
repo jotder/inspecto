@@ -1303,6 +1303,7 @@ routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** —
 | ~~Batch~~ *(the unit-of-work entity)* | **Consignment** | ✅ **ROLLED OUT 2026-08-31 (Phase 7 / D-12).** The Java types are renamed: `Consignment`, `ConsignmentEvent`/`ConsignmentEventBus`, `ConsignmentManifest`, `ConsignmentAuditWriter`/`ConsignmentAuditReport`, `ConsignmentRow`, `ConsignmentGraphRunner`, `ConsignmentIngestStrategy`, `ConsignmentProcessingException`, plus `CsvIngestStrategy`, `StreamingPluginIngestStrategy`, `PipelineConsignmentSignal` and the UI's `ConsignmentAuditReport` mirror. 🔴 **`BatchProcessor` became `ConsignmentIngestor`, NOT `ConsignmentProcessor`** — that name is taken by the third-party post-sync SPI, and reusing it would break plugin authors and this table's own one-word-one-concept rule. Executed as ONE commit by `tools/rename-batch-to-consignment.mjs`: 24 files renamed, 1092 occurrences across 155 files, full reactor **3841/0/0/5** (baseline, unmoved). 🔴 **The stale scope figures are settled**: not 517 files/39 `@PublicApi`, and not the 81/29/8 re-measure either — the concept-scoped sweep was **155 files**. Over half the apparent blast radius was `PipelineConfigBatchTest`, a shared TEST FIXTURE imported by 165 tests that is **not** the entity and was deliberately left alone. ⚠ **Wire + persisted spellings intentionally unchanged**: `batch_id` keeps its `Csv.LEGACY_HEADERS` read-alias, `GET /runs/{n}/batches` and `/provenance/batches` still answer, and the `batch_max_*` config keys / `BatchedOperations` telemetry / JDBC `addBatch()` are the GROUPING sense and stay. ⚠ Residual: method-local identifiers (`batches`, `batch`) still read the old way in places — no published surface, and the vocabulary guard passes on them. |
 | *(no old term)* | **Core** (`@inspecto/core`) · **Link Analysis library** (`@inspecto/link-analysis`) · **gamma** · **la-app** | ✅ **Named 2026-10-02 (D-5 step 6, signed Decision 4)**, in-workspace code only (no npm package, no ng-packagr). **Core** = `inspecto-ui/src/app/inspecto/*`, imported as `@inspecto/core/*` (design system, API clients, OIDC client code, the host-service contracts' dependencies). **Link Analysis library** = `inspecto-ui/projects/link-analysis`, whose only eager surface is `@inspecto/link-analysis` (`public-api.ts`). **gamma** = the Inspecto console, the Angular application at the repository root (name kept; renaming it is not a D-5 job). **la-app** = the Link Analysis application, `inspecto-ui/projects/la-app`: its own shell and routes over the same Core and library. These are code and build names, not product concepts for a user to learn: the UI says *Link Analysis*, never *la-app*. ⛔ A **UI flavor** (`package.ps1 -Ui gamma|la-app`) is not an **edition** (EDITIONS.md): every edition can ship either application. |
 | *(no old term)* | **Inspecto LA** *(product)* vs **Link Analysis** *(capability)* | ✅ **Named 2026-10-17 (`ED-1`, `LA-EDITIONS-1`)**. Product name only: `la-app` index title, shell brand, landing heading and the shared sign-in screen (through `AppEnvironment.productName`, which the console leaves unset and so still reads "Inspecto"); user docs `docs/ui/link-analysis-*.md`, `docs/ops/la-*-runbook.md`, the two Link Analysis OKF concepts. Routes, keys, modules, packages and nav labels keep **Link Analysis** — no code rename. Whitepaper done 2026-10-18 (version 1.1); `TECHNICAL_ARCHITECTURE.md` carries no old naming. |
+| *(no old term)* · ~~kernel~~ *(the always-present layer, in the first plan draft)* | **Product** (**Domain product** · **Platform product**) · **App** · **Industry** · **Suite** · **Distribution** · **Entitlement** · **Assembly Plan** · **Product lock** · **Base** modules | ⏳ **Named 2026-11-10 (`PRODUCT-ASSEMBLY-1` PA-0; §15 *Product assembly*)**. Docs only so far. Touchpoints arrive with the phases: model and guards in PA-1 (`products/`, `apps/`, `industries/`), the assembler in PA-2, `/bootstrap` in PA-3, the shell in PA-4, the Product Map kinds `industry` · `app` · `product` in PA-10. Existing code names stay: `la-app`, gamma, `industry-packs/`. |
 | ~~Lenses & selection~~ *(LA Studio toolbar group)* · ~~Save as a case~~ *(LA saved view)* | **Canvas mode** · **Save view** / **Save view as…** | ✅ **UI DONE 2026-10-27 (`LA-STUDIO-UI-REORG-1` P1a, P3a)**: second toolbar "Canvas mode" group; File ▸ Save view / Save view as… / Open…. The model keeps `link-analysis-view` and the `?view=` param (no rename needed). Docs: `okf/product/module/la-core/user-guide-link-analysis.md` §4–§6. |
 | ~~Sandbox~~ *(per-analyst working copy; the option-D placeholder)* | **Draft** | Vocabulary only (2026-10-03, `D16`); no code yet. Touchpoints for `D-7`: SPA labels/routes, `Draft*` model types, `/inv/investigations/{id}/drafts*` routes, per-Draft DuckDB file naming, audit action `draft.*`. Never touch `SqlSandboxPolicy` (the SQL sandbox keeps its word); never confuse with Pipeline draft / *Import as draft* (§11 *Draft*). |
 
@@ -1364,6 +1365,9 @@ the Java embedding API's stability policy (`@PublicApi`). *Control* distinguishe
 sign-in, never sold) — assembled by `package.ps1` from Maven profiles and `ServiceLoader` modules. ⛔ Never a branch (versions are
 branches; see `BRANCHING.md`) and never a runtime flag: a feature an edition lacks is a module that edition
 does not bundle. The per-feature table is `okf/product/layer/platform/spec-editions.md` (the customer summary is `EDITIONS.md`).
+⏳ Under `PRODUCT-ASSEMBLY-1` (signed 2026-11-10, D-PA2) an Edition becomes a posture tier that every **Product** (§15)
+comes in, and stops carrying content: Basic no longer means *Inspecto LA*, whose packs move into the Link Analysis
+**App**. ⛔ Not a **Distribution** (§15, how a build ships).
 
 **Compliance** — The controls, evidence and packaging obligations that let a deployment pass an external
 audit (SOC 2 / ISO 27001 / HIPAA / PCI scope): SBOM per bundle, signed releases, the dependency-review
@@ -1413,7 +1417,10 @@ Three words, three concepts: *module* is code, *Platform Service* is a runtime g
 **Offering** — A sellable composition of modules and content, declared in `offerings/<id>.toon`: modules, UI
 features, packs (Space Templates, Pipelines, Dashboards, Alert / Decision Rule sets) and default Space
 settings. An **Edition** (§14 `PKG`) is an Offering that lists other Offerings; the bundle, the EDITIONS matrix
-and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *product tier*.
+and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *product tier*. ⏳ Under
+`PRODUCT-ASSEMBLY-1` (signed 2026-11-10) content moves into **Apps** and an Offering keeps an Edition's modules,
+Add-ons and posture only; it becomes the one module table (`bundle-modules.mjs` stops being hand-kept). ⛔ Not a
+**Product** (below).
 
 **Product Map** *(added 2026-10-18, `PRODUCT-MAP-1`, plan [`archived-documents/plans-archive/product-map-plan.md`](archived-documents/plans-archive/product-map-plan.md); built, slices S0–S5; as-built in `okf/product/layer/platform/spec-product-map.md`)* — The commercial tree of everything Inspecto offers, laid out like a mind map (Layer → Module → **Functionality**, plus Add-ons, Solution packs and Editions), used for pricing, support and customer-specific builds. It refers to module manifests and Offerings by id and never restates their technical facts. ⛔ Not the **Catalog** (§3, the library of Schemas and Datasets) and not an **Offering** (what one bundle contains).
 
@@ -1426,7 +1433,8 @@ and the SBOM are generated from Offerings. ⛔ Not *plan*, *SKU*, *package* or *
 **Add-on** — A horizontal, domain-neutral Optional module set sold to any customer (Incidents, Case Management,
 Reconciliation, Scoring & Lists, Action Requests, Regulatory Reporting, Workflow & SLA, Link Analysis & Investigations, AI Assist &
 Intelligence, Integration & Delivery, Premium Connectors, Multi-entity / Group). **Tiers** (Basic ·
-Standard · Advanced) are deployment and compliance posture, not Add-ons.
+Standard · Advanced) are deployment and compliance posture, not Add-ons. A **Platform product** sells Add-ons
+directly; in a **Domain product** its **Apps** require them (below).
 
 **Solution pack** — Mostly-content bundle of Space Templates that **requires** Add-ons. Two kinds, composed:
 - **Function pack** — domain-neutral, written against neutral entity and measure names (Revenue Assurance,
@@ -1439,15 +1447,73 @@ Standard · Advanced) are deployment and compliance posture, not Add-ons.
   Templates). A Space selects one as its **Domain Profile** (§11). Shipped: `telecom`, `mobile-money`. A pack that
   breaks any rule is refused whole at load.
 
-⛔ Not *vertical pack × function pack* as one artifact — a sold solution is an **Offering** that composes them.
+⛔ Not *vertical pack × function pack* as one artifact — a sold solution is a **Product** whose **Apps** compose
+them (below; an **Offering** until 2026-11-10).
 ⚠ A **Job Pack** (§6-A) is an unrelated, Implementation-level unit of executable Jobs.
+
+**Product assembly** *(added 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-0; plan
+[`superpower/2026-11-10-product-assembly-plan.md`](superpower/2026-11-10-product-assembly-plan.md), decisions
+D-PA1…D-PA12 signed 2026-11-10; ⏳ the words are decided, the definitions and the assembler are not built yet)* — five
+layers, **Base** modules → **Add-ons** → **Industry** → **App** → **Product**, across three axes: **Edition**,
+**Distribution** and **Entitlement**. The always-present layer is the **Base** modules (Offering role *Base*, above).
+⛔ Not *kernel* (that word belongs to the **Decision Kernel**, below) and not *core* (the `@inspecto/core` UI
+library, §13). ⛔ *Capability* is not a name for any layer: it is an RBAC permission (§1-A), and §14 uses it for the
+capability areas; sales copy may say "capabilities" only as plain English.
+
+**Industry** — A vertical that Apps are built for (*Telecom*, *Mobile money*), declared by its **Industry pack** and
+named by that pack's id (`telecom`). The pack is widened to own the vertical's shared spine: Collectors and record
+formats, parsers, the **canonical Datasets** every App of the Industry reads, Entity Types, link kinds, reference data
+and terms. Apps of one Industry share one ingest. ⛔ Not a **Domain Profile** (§11, a Space's choice of Industry pack for
+Link Analysis vocabulary); ⛔ never *vertical* or *domain* as the name of this layer.
+
+**App** — A finished job for one **Industry**: Revenue Assurance, Fraud Management, Link Analysis, Case Management,
+Complex event processing. It is made of its content (one or more Space Templates: its **Function pack** mapped onto the
+Industry's canonical Datasets), its own landing, nav and personas mapped to **Roles**, golden data with ground truth,
+the **Add-ons** it requires, and a version with a Platform compatibility range. Declared in `apps/<id>/app.toon`; it
+installs at build time or into a running install. ⛔ Not a **Space Template** (an App installs one or more), not an
+**Add-on** (horizontal, no Industry), not a **Function pack** (content only, no landing or nav), and not the Angular
+host projects `la-app` / gamma (code names, §13).
+
+**Product** — What a customer receives, declared in `products/<id>.toon` with its brand, its shell and the Editions it
+comes in. Two shapes:
+- **Domain product** — one Industry plus chosen Apps, for end customers (*Inspecto Telco*: Revenue Assurance, Fraud
+  Management, Link Analysis, Case Management; *Inspecto LA* (§13) is a one-App Domain product).
+- **Platform product** — the Base modules plus chosen Add-ons plus the builder kit (Studio, the SPIs, the Control API,
+  an App authoring kit), for builders, integrators and OEMs (*Inspecto Platform*).
+
+⛔ Not an **Offering** (an Edition's declaration), not an **Edition** (a posture tier every Product comes in), not a
+**Product Map Item** (a commercial node; each Product will be one, kind `product`) and not *SKU*. ⚠ Always say
+*Platform product* in full: a **Platform module** (Build role, above) and a **Platform Service** (§6-A) are
+unrelated.
+
+**Suite** — One install running several Products over the same Spaces, with an App switcher across them. Today's
+Standard install, the console plus Link Analysis, is the precursor. ⛔ Not a Product.
+
+**Distribution** — How one Product build ships: a kind (`demo`: golden data, Demo Users, a guided tour · `trial`:
+time-boxed by its Entitlement · `pilot`: the customer's Collectors pre-wired, no data · `production`) and a target
+(`windows` · `linux` · `container`, an OCI image plus a Helm chart · `airgap`). ⛔ Not an **Edition** (posture) and not
+*flavour* (the word for an Edition's build).
+
+**Entitlement** — The signed file listing what one customer's build may switch on: Apps, Add-ons, Edition, node count
+and expiry. It is checked offline at boot and on each gated route; there is no call-home. An item outside the
+Entitlement fails **Installed** (reported as *not entitled*), so the gates stay three. It realises the reserved
+`entitlementKey` and generalises the Product Map's `enforcement: runtime`. ⛔ Never *licensed* or *activated* for what
+it covers (the gates' rule, below).
+
+**Assembly Plan** — The JSON the assembler writes for one Product × Edition × Distribution × target: the module
+closure, the classpath order, the UI host and App libraries to build, the content to stage, the Spaces to seed, the
+docs and the SBOM scope. `package.ps1` executes it. ⛔ Not a plan in `docs/superpower/`.
+
+**Product lock** — `products/<id>.lock`, committed for every released Product: the exact versions and content hashes
+of every module, App, Industry and Space Template in it. It makes a build reproducible and gives the exact per-Product
+SBOM and a per-customer upgrade diff. ⛔ Not the dependency lock (`locked-dependencies`) and not `package-lock.json`.
 
 **Module manifest** — A module's declaration of what it **provides** (contracts, capabilities, routes, config
 kinds, store families) and **requires** (contracts, other modules). At boot the activator resolves the graph; an
 unsatisfied module stays inert and is reported by name with the missing requirement.
 
 **Installed · Enabled · Permitted** — The three gates, in order. **Installed**: jar present, requirements
-resolved, build id matches. **Enabled**: switched on per Space (default from the Offering). **Permitted**: the
+resolved, build id matches (⏳ and, once `PRODUCT-ASSEMBLY-1` PA-7 lands, inside the **Entitlement**). **Enabled**: switched on per Space (default from the Offering). **Permitted**: the
 caller's RBAC allows it. `/bootstrap` reports all three. ⛔ Never *licensed*, *activated* or *available* for
 any one of them.
 
