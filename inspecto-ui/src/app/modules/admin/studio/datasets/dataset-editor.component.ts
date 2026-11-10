@@ -329,7 +329,7 @@ export class DatasetEditorComponent implements OnInit {
         // Patch WITHOUT firing the pick handler: it would blank the saved model and re-infer the roles
         // this seed is about to restore. The page is loaded explicitly instead.
         this.form.patchValue(
-            { name: d.name, kind: d.kind, sourceName: d.sourceName, physicalRef: d.physicalRef ?? '' },
+            { name: d.id, kind: d.kind, sourceName: d.sourceName, physicalRef: d.physicalRef ?? '' },
             { emitEvent: false },
         );
         this.form.controls.name.disable(); // id is immutable on edit

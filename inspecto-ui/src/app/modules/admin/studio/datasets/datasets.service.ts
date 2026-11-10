@@ -162,7 +162,9 @@ function isLinkMapping(v: unknown): boolean {
 function fromContent(name: string, content: Record<string, unknown>): Dataset {
     return {
         id: name,
-        name: (content['name'] as string) ?? name,
+        // LA-DATA-DETAILS-1: a stated `title` is the name shown (the server stamps `name` with the id on every write)
+        name:
+            (typeof content['title'] === 'string' && content['title'].trim()) || ((content['name'] as string) ?? name),
         ...(typeof content['description'] === 'string' ? { description: content['description'] } : {}),
         ...(typeof content['primaryEntityType'] === 'string'
             ? { primaryEntityType: content['primaryEntityType'] }

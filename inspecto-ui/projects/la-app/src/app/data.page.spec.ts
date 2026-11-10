@@ -2,11 +2,14 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
-import { afterEach, describe, expect, it } from 'vitest';
+import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { of } from 'rxjs';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiUrl } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { DataPageComponent } from './data.page';
+import { DatasetDetailsDialog } from './dataset-details.dialog';
 
 let http: HttpTestingController;
 
@@ -72,7 +75,7 @@ const DATASETS = [
 ];
 
 /** Builds the page; `open` (the default) unfolds every Dataset, as the reader would before editing one. */
-function create(datasets: unknown[] = DATASETS, { open = true } = {}) {
+function create(datasets: unknown[] = DATASETS) {
     TestBed.configureTestingModule({
         imports: [DataPageComponent],
         providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), provideNoopAnimations()],
@@ -98,15 +101,12 @@ function create(datasets: unknown[] = DATASETS, { open = true } = {}) {
     );
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    if (open) openAll(fixture);
     return { fixture, el, c: fixture.componentInstance };
 }
 
-/** LA-DATA-GROUPS-1: unfolds every folded Dataset, from its header. */
-function openAll(fixture: { nativeElement: HTMLElement; detectChanges(): void }): void {
-    fixture.nativeElement
-        .querySelectorAll<HTMLElement>('mat-expansion-panel-header[aria-expanded="false"]')
-        .forEach((h) => h.click());
+/** LA-DATA-MENU-1: shows a Dataset by picking it in the menu (the first listed is shown until another is picked). */
+function show(fixture: { nativeElement: HTMLElement; detectChanges(): void }, id: string): void {
+    (fixture.nativeElement.querySelector(`[data-testid="data-toggle-${id}"]`) as HTMLElement).click();
     fixture.detectChanges();
 }
 
@@ -128,6 +128,9 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         http
             ?.match((r) => r.url.endsWith('/storage'))
             .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        http
+            ?.match((r) => r.url.endsWith('/coverage'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
         http?.verify();
     });
 
@@ -147,7 +150,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         await expectNoA11yViolations(el);
     });
 
-    it('LA-DATA-GROUPS-1: groups the Datasets by kind, each folded to one line until opened, each group foldable (no violations)', async () => {
+    it('LA-DATA-MENU-1: a menu of Datasets grouped by kind, the picked one shown on the right, nothing folds (no violations)', async () => {
         const reference = {
             type: 'dataset',
             name: 'agents',
@@ -163,55 +166,34 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
                 ],
             },
         };
-        const { fixture, el } = create([...DATASETS, reference], { open: false });
+        const { fixture, el } = create([...DATASETS, reference]);
         const streams = q(el, 'data-group-stream')!;
         const refs = q(el, 'data-group-reference')!;
-        expect(streams.querySelector('h2')!.textContent).toContain('Streams');
-        expect(streams.querySelector('h2')!.textContent).toContain('2 Datasets');
-        expect(q(streams, 'data-transfers')).not.toBeNull();
-        expect(q(streams, 'data-wallet_txn')).not.toBeNull();
-        expect(q(refs, 'data-agents')).not.toBeNull();
-        expect(refs.querySelector('h2')!.textContent).toContain('1 Dataset');
+        expect(streams.textContent).toContain('Streams · 2');
+        expect(refs.textContent).toContain('References · 1');
+        expect(q(streams, 'data-toggle-transfers')).not.toBeNull();
+        expect(q(streams, 'data-toggle-wallet_txn')).not.toBeNull();
+        expect(q(refs, 'data-toggle-agents')).not.toBeNull();
+        expect(el.querySelector('mat-expansion-panel, [aria-expanded]')).toBeNull();
 
-        // folded: one line saying where its data comes from and what is set, nothing of its body rendered
-        const header = q(el, 'data-toggle-transfers')!;
-        expect(header.getAttribute('aria-expanded')).toBe('false');
-        expect(header.textContent).toContain('Added here · 3 columns · 1 Mapping');
+        // each menu entry is one line: where its data comes from and what is set
+        const first = q(el, 'data-toggle-transfers')!;
+        expect(first.tagName).toBe('BUTTON');
+        expect(first.textContent).toContain('Added here · 3 columns · 1 Mapping');
         expect(q(el, 'data-toggle-wallet_txn')!.textContent).toContain('Kept up to date by a Pipeline');
-        expect(el.querySelector('[data-testid="columns"]')).toBeNull();
-        expect(http.match((r) => r.url.endsWith('/arrivals'))).toHaveLength(0);
-        await expectNoA11yViolations(el);
 
-        // a Dataset opens from its header (a button, so Enter and Space work), its body only then
-        header.click();
-        fixture.detectChanges();
-        expect(header.getAttribute('aria-expanded')).toBe('true');
+        // the first listed is shown until another is picked; exactly one Dataset's body at a time
+        expect(first.getAttribute('aria-current')).toBe('true');
         expect(q(q(el, 'data-transfers')!, 'columns')!.textContent).toContain('from_account');
-        expect(q(q(el, 'data-wallet_txn')!, 'columns')).toBeNull();
-
-        // a group folds from its heading's button, which names what it controls
-        const toggle = q(el, 'data-group-toggle-stream')!;
-        expect(toggle.tagName).toBe('BUTTON');
-        expect(toggle.getAttribute('aria-expanded')).toBe('true');
-        const body = el.querySelector('#' + toggle.getAttribute('aria-controls'))!;
-        expect(body.classList).not.toContain('hidden');
-        toggle.click();
-        fixture.detectChanges();
-        expect(toggle.getAttribute('aria-expanded')).toBe('false');
-        expect(body.classList).toContain('hidden');
-        expect(q(el, 'data-group-toggle-reference')!.getAttribute('aria-expanded')).toBe('true');
-        toggle.click();
-        fixture.detectChanges();
-        expect(body.classList).not.toContain('hidden');
-        // the Dataset opened before the fold is still open
-        expect(header.getAttribute('aria-expanded')).toBe('true');
+        expect(q(el, 'data-wallet_txn')).toBeNull();
         await expectNoA11yViolations(el);
-    });
 
-    it('LA-DATA-GROUPS-1: a Space with one Dataset shows it open', () => {
-        const { el } = create([DATASETS[0]], { open: false });
-        expect(q(el, 'data-toggle-transfers')!.getAttribute('aria-expanded')).toBe('true');
-        expect(q(el, 'columns')).not.toBeNull();
+        show(fixture, 'agents');
+        expect(q(el, 'data-transfers')).toBeNull();
+        expect(q(q(el, 'data-agents')!, 'columns')!.textContent).toContain('agent_id');
+        expect(q(el, 'data-toggle-agents')!.getAttribute('aria-current')).toBe('true');
+        expect(first.getAttribute('aria-current')).toBeNull();
+        await expectNoA11yViolations(el);
     });
 
     it('New mapping refuses an empty name and the same From and To, then saves a Mapping of the base', () => {
@@ -301,6 +283,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
 
     it('a Pipeline-fed Dataset gets its own Entities and Mappings, and a Mapping of it saves with it as the base', () => {
         const { fixture, el, c } = create();
+        show(fixture, 'wallet_txn');
         const pipe = q(el, 'data-wallet_txn')!;
         expect(pipe.querySelector('[data-testid="pipeline-card"]')!.textContent).toContain(
             'Kept up to date by a Pipeline or a Job',
@@ -344,10 +327,12 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
     });
 
     it('a Mapping that reads a column its base no longer lists is marked, naming the column', async () => {
-        const { el } = create();
+        const { fixture, el } = create();
+        show(fixture, 'wallet_txn');
         const drift = q(el, 'data-wallet_txn')!.querySelector('[data-testid="mapping-drift"]');
         expect(drift?.textContent).toContain('agent_id');
         expect(drift?.textContent).not.toContain('src_id');
+        show(fixture, 'transfers');
         expect(q(el, 'data-transfers')!.querySelector('[data-testid="mapping-drift"]')).toBeNull();
         await expectNoA11yViolations(el);
     });
@@ -398,11 +383,12 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
                 defaultLinkMapping: m,
             },
         });
-        const { el, c } = create([
+        const { fixture, el, c } = create([
             ...datasets,
             mapping('wallet_links', { from: 'src_id', to: 'dst_id', amount: 'amt', kind: 'kind' }),
             mapping('kind_sums', { from: 'src_id', to: 'dst_id', amount: 'kind' }),
         ]);
+        show(fixture, 'wallet_txn');
         const card = q(el, 'data-wallet_txn')!.querySelector('[data-testid="columns"]')!;
         // one Mapping: Measure, and says where it came from
         expect(card.querySelector('[data-testid="role-amt"]')!.textContent).toContain('Measure');
@@ -543,7 +529,6 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             }),
         );
         fixture.detectChanges();
-        openAll(fixture);
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance as unknown as {
             holdsOptions: () => ReadonlyMap<string, { value: string; group?: string }[]>;
@@ -626,7 +611,6 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             columns: { from_account: [{ type: 'phone', strong: true }] },
         });
         fixture.detectChanges();
-        openAll(fixture);
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance as unknown as {
             holdsOptions: () => ReadonlyMap<string, { value: string; hint?: string }[]>;
@@ -684,5 +668,108 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(written).toMatch(/"name":"txn_date"[^}]*"carried":false/);
         req.flush({});
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
+    });
+
+    it('LA-DATA-DETAILS-1: the open Dataset shows its name, id, description and facts (no violations)', async () => {
+        const titled = DATASETS.map((d) =>
+            d.name === 'transfers'
+                ? { ...d, content: { ...d.content, title: 'Card transfers', description: 'One row per transfer.' } }
+                : d,
+        );
+        const { el } = create(titled);
+        expect(q(el, 'data-name')!.textContent!.trim()).toBe('Card transfers');
+        expect(q(el, 'data-id')!.textContent!.trim()).toBe('transfers');
+        expect(q(el, 'data-description')!.textContent).toContain('One row per transfer.');
+        const facts = q(el, 'data-facts')!.textContent ?? '';
+        expect(facts).toContain('Stream');
+        expect(facts).toContain('Added here');
+        expect(facts).toContain('3 columns');
+        expect(facts).toContain('1 Mapping'); // the same count as its menu line
+        // the menu names it too, with the id beside its summary
+        const entry = q(el, 'data-toggle-transfers')!.textContent ?? '';
+        expect(entry).toContain('Card transfers');
+        expect(entry).toContain('transfers · Added here');
+        await expectNoA11yViolations(el);
+    });
+
+    it('LA-DATA-DETAILS-1: with no description it invites one; with no title the id is the name', () => {
+        const { el } = create();
+        expect(q(el, 'data-name')!.textContent!.trim()).toBe('transfers');
+        expect(q(el, 'data-description')).toBeNull();
+        expect(q(el, 'data-description-empty')!.textContent).toContain('No description yet');
+    });
+
+    it('LA-DATA-DETAILS-1: Rename or describe opens the details dialog and shows what it saved', () => {
+        const { fixture, el } = create();
+        const open = vi
+            .spyOn((fixture.componentInstance as unknown as { dialog: MatDialog }).dialog, 'open')
+            .mockReturnValue({
+                afterClosed: () => of({ name: 'Card transfers', description: 'One row per transfer.' }),
+            } as never);
+        (q(el, 'data-edit-details') as HTMLButtonElement).click();
+        expect(open).toHaveBeenCalledWith(
+            DatasetDetailsDialog,
+            expect.objectContaining({ data: { id: 'transfers', name: '', description: '' } }),
+        );
+        fixture.detectChanges();
+        expect(q(el, 'data-name')!.textContent!.trim()).toBe('Card transfers');
+        expect(q(el, 'data-description')!.textContent).toContain('One row per transfer.');
+    });
+
+    it('LA-DATA-DETAILS-1: the menu filter keeps the Datasets whose name, id or description hold every word', () => {
+        const many = Array.from({ length: 8 }, (_, i) => ({
+            type: 'dataset',
+            name: `store_${i}`,
+            ref: `dataset/store_${i}`,
+            content: {
+                origin: 'import',
+                kind: i % 2 ? 'reference' : 'stream',
+                physicalRef: `store_${i}/database`,
+                importPipeline: `store_${i}`,
+                ...(i === 3 ? { title: 'Port calls', description: 'Vessels in harbour' } : {}),
+                columns: [
+                    { name: 'a', type: 'string' },
+                    { name: 'b', type: 'string' },
+                ],
+            },
+        }));
+        const { fixture, el } = create(many);
+        const box = q(el, 'data-filter') as HTMLInputElement;
+        const type = (v: string) => {
+            box.value = v;
+            box.dispatchEvent(new Event('input'));
+            fixture.detectChanges();
+        };
+        const listed = () =>
+            Array.from(el.querySelectorAll('[data-testid^="data-toggle-"]')).map((b) =>
+                b.getAttribute('data-testid')!.replace('data-toggle-', ''),
+            );
+        expect(listed()).toHaveLength(8);
+        type('vessels HARBOUR');
+        expect(listed()).toEqual(['store_3']);
+        type('port store_3');
+        expect(listed()).toEqual(['store_3']);
+        type('nothing like it');
+        expect(listed()).toEqual([]);
+        expect(q(el, 'data-filter-none')!.textContent).toContain('No Dataset matches');
+    });
+
+    it('LA-DATA-MENU-1: ?dataset= opens that Dataset', () => {
+        TestBed.overrideProvider(ActivatedRoute, {
+            useValue: { snapshot: { queryParamMap: convertToParamMap({ dataset: 'wallet_txn' }) } },
+        });
+        const { el } = create();
+        expect(q(el, 'data-wallet_txn')).not.toBeNull();
+        expect(q(el, 'data-transfers')).toBeNull();
+        expect(q(el, 'data-toggle-wallet_txn')!.getAttribute('aria-current')).toBe('true');
+    });
+
+    it('LA-DATA-MENU-1: opening a Mapping form brings its base into view, where the form renders', () => {
+        const { fixture, el, c } = create();
+        expect(q(el, 'data-transfers')).not.toBeNull();
+        c.newMapping(c.bases().find((d) => d.id === 'wallet_txn')!);
+        fixture.detectChanges();
+        expect(q(el, 'data-transfers')).toBeNull();
+        expect(q(q(el, 'data-wallet_txn')!, 'mapping-form')).not.toBeNull();
     });
 });

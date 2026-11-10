@@ -36,6 +36,8 @@ export interface LinkMapping {
 
 export interface DataEntry {
     id: string;
+    /** LA-DATA-DETAILS-1: the name shown for it (its stored `title`); the id when none is stated. */
+    name: string;
     description: string;
     /** `import` (Add data), `mapping` (a Mapping of another Dataset), or `other` (kept up to date by a Pipeline). */
     origin: 'import' | 'mapping' | 'other';
@@ -124,6 +126,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
             columns.length >= 2);
     return {
         id: def.name,
+        name: str(c['title'])?.trim() || def.name,
         description: str(c['description']) ?? '',
         origin,
         mappable,

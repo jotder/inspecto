@@ -54,6 +54,18 @@ const IMPORTED = {
 };
 
 describe('DatasetsService', () => {
+    it('LA-DATA-DETAILS-1: a stated title is the name shown, and a Studio save keeps it', () => {
+        const { svc, update } = setup({ ...IMPORTED, title: 'Card transfers' });
+        let read: ReturnType<typeof svc.fromContent>[] = [];
+        svc.list().subscribe((d) => (read = d));
+        expect(read[0].id).toBe('d1');
+        expect(read[0].name).toBe('Card transfers');
+        expect(svc.fromContent('x', { name: 'x' }).name).toBe('x');
+        expect(svc.fromContent('x', { name: 'x', title: '  ' }).name).toBe('x');
+        svc.save(read[0], { update: true }).subscribe();
+        expect(((update.mock.calls[0] as unknown[])[2] as Record<string, unknown>)['title']).toBe('Card transfers');
+    });
+
     it('a Studio save writes back every stored key it does not edit (LA-ONBOARD-1 phase 5)', () => {
         const { svc, update } = setup(IMPORTED);
         let read: ReturnType<typeof svc.fromContent>[] = [];

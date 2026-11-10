@@ -9,9 +9,12 @@ import {
 } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { Router, RouterLink } from '@angular/router';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { ChipComponent } from '@inspecto/core/components/chip.component';
+import { DatasetDetailsData, DatasetDetailsDialog, DatasetDetailsResult } from './dataset-details.dialog';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, of } from 'rxjs';
 import { ComponentsService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -60,8 +63,10 @@ import {
  * import's Data status, Arrivals, Add a file, Run now; a short one otherwise), its **Columns** (each column's role - Entity,
  * Time, Measure, Category, Detail - with what an Entity column holds and a Measure's unit, editable; LA-COLUMN-ROLES-1) and its **Mappings** - each a Dataset of its own that reads the same data its own way (From, To, Kind of
  * link, When, Amount), created, edited and deleted here. Every other Dataset is listed by name, with why.
- * LA-DATA-GROUPS-1: the bases are grouped by kind (Streams, References), each group foldable from its heading, and each
- * Dataset is a panel folded to one line until opened - its body (and the reads its card and Discover make) only then.
+ * LA-DATA-MENU-1: laid out like Settings - a menu of the bases grouped by kind (Streams, References) on the left, the
+ * picked one on the right (its body, and the reads its card and Discover make, only then); nothing folds.
+ * LA-DATA-DETAILS-1: the open Dataset's header shows its name (stored as `title`), id, description and facts, with
+ * *Rename or describe* (`DatasetDetailsDialog`); a filter over the menu finds a Dataset by name, id or description.
  */
 @Component({
     selector: 'la-app-data-page',
@@ -72,8 +77,9 @@ import {
         ReactiveFormsModule,
         RouterLink,
         MatButtonModule,
-        MatExpansionModule,
         MatIconModule,
+        MatTooltipModule,
+        ChipComponent,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         PenFieldComponent,
@@ -83,7 +89,7 @@ import {
         LinkAnalysisDatasetDiscoverComponent,
     ],
     template: `
-        <div class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-6">
+        <div class="mx-auto flex w-full max-w-7xl flex-col gap-4 p-6">
             <div class="flex flex-wrap items-center gap-3">
                 <h1 class="text-title m-0 font-semibold">Data</h1>
                 <a mat-flat-button color="primary" class="ml-auto" [routerLink]="addData" data-testid="data-add">
@@ -109,415 +115,492 @@ import {
                     (action)="goAddData()"
                 ></inspecto-empty-state>
             } @else {
-                <!-- LA-DATA-GROUPS-1: grouped by kind (Stream / Reference), each group and each Dataset collapsible -->
-                @for (g of groups(); track g.kind) {
-                    @let shut = closedGroups().has(g.kind);
-                    <section
-                        class="flex flex-col gap-2"
-                        [attr.aria-labelledby]="'data-group-' + g.kind"
-                        [attr.data-testid]="'data-group-' + g.kind"
+                <!-- LA-DATA-MENU-1 (operator 2026-11-10): the Settings layout - a menu of Datasets grouped by kind on the
+                     left, the chosen one on the right; nothing folds -->
+                <div class="flex min-w-0 flex-col gap-4 md:flex-row md:items-start" data-testid="data-layout">
+                    <nav
+                        class="flex shrink-0 flex-col gap-3 md:sticky md:top-4 md:max-h-[calc(100dvh-2rem)] md:w-72 md:overflow-y-auto"
+                        aria-label="Datasets"
                     >
-                        <h2 class="m-0 text-lg font-semibold" [id]="'data-group-' + g.kind">
-                            <button
-                                type="button"
-                                class="flex w-full items-center gap-2 rounded text-left"
-                                [attr.aria-expanded]="!shut"
-                                [attr.aria-controls]="'data-group-body-' + g.kind"
-                                (click)="toggleGroup(g.kind)"
-                                [attr.data-testid]="'data-group-toggle-' + g.kind"
-                            >
+                        @if (bases().length > 6) {
+                            <div class="relative px-1">
                                 <mat-icon
-                                    aria-hidden="true"
-                                    [svgIcon]="
-                                        shut ? 'heroicons_outline:chevron-right' : 'heroicons_outline:chevron-down'
-                                    "
+                                    class="icon-size-4 text-hint pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                                    svgIcon="heroicons_outline:magnifying-glass"
                                 ></mat-icon>
-                                {{ g.label }}
-                                <span class="text-secondary text-sm font-normal">
-                                    {{ g.items.length }} {{ g.items.length === 1 ? 'Dataset' : 'Datasets' }}
-                                </span>
-                            </button>
-                        </h2>
-                        <mat-accordion
-                            multi
-                            class="inspecto-flat-accordion flex flex-col gap-2"
-                            [class.hidden]="shut"
-                            [id]="'data-group-body-' + g.kind"
-                        >
-                            @for (d of g.items; track d.id) {
-                                <mat-expansion-panel
-                                    [expanded]="bases().length === 1"
-                                    [attr.data-testid]="'data-' + d.id"
+                                <input
+                                    type="search"
+                                    class="bg-card focus-visible:outline-primary w-full rounded-lg border py-1.5 pl-8 pr-2 text-sm focus-visible:outline-2"
+                                    placeholder="Find a Dataset"
+                                    aria-label="Find a Dataset by name, id or description"
+                                    [value]="filter()"
+                                    (input)="filter.set($any($event.target).value)"
+                                    data-testid="data-filter"
+                                />
+                            </div>
+                        }
+                        @if (filter() && !shownGroups().length) {
+                            <p class="text-secondary m-0 px-3 text-sm" data-testid="data-filter-none">
+                                No Dataset matches “{{ filter() }}”.
+                            </p>
+                        }
+                        @for (g of shownGroups(); track g.kind) {
+                            <div
+                                class="flex flex-col gap-0.5"
+                                role="group"
+                                [attr.aria-labelledby]="'data-group-' + g.kind"
+                                [attr.data-testid]="'data-group-' + g.kind"
+                            >
+                                <div
+                                    [id]="'data-group-' + g.kind"
+                                    class="text-secondary px-3 pb-1 text-xs font-semibold uppercase tracking-wider"
                                 >
-                                    <mat-expansion-panel-header [attr.data-testid]="'data-toggle-' + d.id">
-                                        <mat-panel-title class="font-semibold">{{ d.id }}</mat-panel-title>
-                                        <mat-panel-description>{{ summary(d) }}</mat-panel-description>
-                                    </mat-expansion-panel-header>
-                                    <ng-template matExpansionPanelContent>
-                                        <div class="flex flex-col gap-3">
-                                            @if (d.origin === 'import') {
-                                                <inspecto-import-dataset-card
-                                                    [dataset]="{
-                                                        id: d.id,
-                                                        kind: d.kind,
-                                                        description: d.description,
-                                                        importPipeline: d.importPipeline ?? d.id,
-                                                        importSource: d.importSource ?? undefined,
-                                                        importFilter: d.importFilter,
-                                                    }"
-                                                ></inspecto-import-dataset-card>
-                                            } @else {
-                                                <div
-                                                    class="bg-card flex flex-col gap-1 rounded-2xl border p-4"
-                                                    data-testid="pipeline-card"
-                                                >
-                                                    <p class="m-0 text-sm font-semibold">
-                                                        Kept up to date by a Pipeline or a Job
-                                                    </p>
-                                                    @if (d.description) {
-                                                        <p class="text-secondary m-0 text-sm">{{ d.description }}</p>
-                                                    }
-                                                    <p class="text-secondary m-0 text-sm">
-                                                        Its data is written there, not added here. What its columns hold
-                                                        and its Mappings are set here.
-                                                    </p>
-                                                </div>
-                                            }
-
-                                            <div
-                                                class="bg-card flex flex-col gap-2 rounded-2xl border p-4"
-                                                data-testid="columns"
+                                    {{ g.label }} · {{ g.items.length }}
+                                </div>
+                                @for (d of g.items; track d.id) {
+                                    <button
+                                        type="button"
+                                        class="hover:bg-hover flex items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-colors"
+                                        [class.bg-hover]="selected()?.id === d.id"
+                                        [attr.aria-current]="selected()?.id === d.id ? 'true' : null"
+                                        [attr.data-testid]="'data-toggle-' + d.id"
+                                        (click)="select(d.id)"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-4 text-hint"
+                                            [svgIcon]="
+                                                d.origin === 'import'
+                                                    ? 'heroicons_outline:arrow-up-tray'
+                                                    : 'heroicons_outline:circle-stack'
+                                            "
+                                        ></mat-icon>
+                                        <span class="flex min-w-0 flex-auto flex-col">
+                                            <span class="truncate text-sm font-medium" [title]="d.name">{{
+                                                d.name
+                                            }}</span>
+                                            <span class="text-secondary truncate text-xs">{{
+                                                d.name !== d.id ? d.id + ' · ' + summary(d) : summary(d)
+                                            }}</span>
+                                        </span>
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </nav>
+                    @if (selected(); as d) {
+                        <section
+                            class="flex min-w-0 flex-auto flex-col gap-3"
+                            [attr.aria-labelledby]="'data-title-' + d.id"
+                            [attr.data-testid]="'data-' + d.id"
+                        >
+                            <!-- LA-DATA-DETAILS-1 (operator 2026-11-10): what the open Dataset is called and is for, and where to change it -->
+                            <header
+                                class="bg-card flex flex-col gap-2 rounded-2xl border p-4"
+                                data-testid="data-header"
+                            >
+                                <div class="flex flex-wrap items-start gap-2">
+                                    <div class="flex min-w-0 flex-auto flex-col gap-0.5">
+                                        <h2
+                                            class="m-0 break-words text-lg font-semibold"
+                                            [id]="'data-title-' + d.id"
+                                            data-testid="data-name"
+                                        >
+                                            {{ d.name }}
+                                        </h2>
+                                        <div class="text-secondary flex flex-wrap items-center gap-1 text-xs">
+                                            <span>Id</span>
+                                            <span class="font-mono" data-testid="data-id">{{ d.id }}</span>
+                                            <button
+                                                mat-icon-button
+                                                type="button"
+                                                class="icon-size-4 !h-6 !w-6 !p-0"
+                                                [matTooltip]="copied() === d.id ? 'Copied' : 'Copy the id'"
+                                                [attr.aria-label]="'Copy the id ' + d.id"
+                                                (click)="copyId(d.id)"
+                                                data-testid="data-copy-id"
                                             >
-                                                <h3 class="m-0 text-base font-semibold">Columns</h3>
-                                                <p class="text-secondary m-0 text-sm">
-                                                    What each column is: an Entity it holds, a Time, a Measure, a
-                                                    Category or a Detail. A Dataset may have several of each.
-                                                </p>
-                                                @if (recordTypes().length && recordTypeControls().get(d.id); as rt) {
+                                                <mat-icon
+                                                    class="icon-size-4"
+                                                    [svgIcon]="
+                                                        copied() === d.id
+                                                            ? 'heroicons_outline:check'
+                                                            : 'heroicons_outline:clipboard-document'
+                                                    "
+                                                ></mat-icon>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        (click)="editDetails(d)"
+                                        data-testid="data-edit-details"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                                        Rename or describe
+                                    </button>
+                                </div>
+                                @if (d.description) {
+                                    <p class="m-0 whitespace-pre-line text-sm" data-testid="data-description">
+                                        {{ d.description }}
+                                    </p>
+                                } @else {
+                                    <button
+                                        type="button"
+                                        class="text-secondary self-start text-left text-sm italic underline-offset-2 hover:underline"
+                                        (click)="editDetails(d)"
+                                        data-testid="data-description-empty"
+                                    >
+                                        No description yet: add one so others know what its rows are.
+                                    </button>
+                                }
+                                <div class="flex flex-wrap gap-1" data-testid="data-facts">
+                                    <inspecto-chip variant="soft" tone="primary">{{
+                                        d.kind === 'reference' ? 'Reference' : 'Stream'
+                                    }}</inspecto-chip>
+                                    <inspecto-chip variant="outline">{{
+                                        d.origin === 'import' ? 'Added here' : 'Kept up to date by a Pipeline'
+                                    }}</inspecto-chip>
+                                    <inspecto-chip variant="outline"
+                                        >{{ d.columns.length }}
+                                        {{ d.columns.length === 1 ? 'column' : 'columns' }}</inspecto-chip
+                                    >
+                                    <inspecto-chip variant="outline"
+                                        >{{ mappingsOf(d.id).length }}
+                                        {{ mappingsOf(d.id).length === 1 ? 'Mapping' : 'Mappings' }}</inspecto-chip
+                                    >
+                                    @if (d.eventDate) {
+                                        <inspecto-chip variant="outline">Time: {{ d.eventDate }}</inspecto-chip>
+                                    }
+                                </div>
+                            </header>
+                            <div class="flex flex-col gap-3">
+                                @if (d.origin === 'import') {
+                                    <inspecto-import-dataset-card
+                                        [dataset]="{
+                                            id: d.id,
+                                            kind: d.kind,
+                                            description: d.description,
+                                            importPipeline: d.importPipeline ?? d.id,
+                                            importSource: d.importSource ?? undefined,
+                                            importFilter: d.importFilter,
+                                        }"
+                                    ></inspecto-import-dataset-card>
+                                } @else {
+                                    <div
+                                        class="bg-card flex flex-col gap-1 rounded-2xl border p-4"
+                                        data-testid="pipeline-card"
+                                    >
+                                        <p class="m-0 text-sm font-semibold">Kept up to date by a Pipeline or a Job</p>
+                                        <p class="text-secondary m-0 text-sm">
+                                            Its data is written there, not added here. What its columns hold and its
+                                            Mappings are set here.
+                                        </p>
+                                    </div>
+                                }
+
+                                <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="columns">
+                                    <h3 class="m-0 text-base font-semibold">Columns</h3>
+                                    <p class="text-secondary m-0 text-sm">
+                                        What each column is: an Entity it holds, a Time, a Measure, a Category or a
+                                        Detail. A Dataset may have several of each.
+                                    </p>
+                                    @if (recordTypes().length && recordTypeControls().get(d.id); as rt) {
+                                        <inspecto-option-picker
+                                            label="Each row is"
+                                            [options]="recordTypeOptions()"
+                                            [formControl]="rt"
+                                            help="Puts the Entity Types such a record usually holds first"
+                                            data-testid="record-type"
+                                        ></inspecto-option-picker>
+                                    }
+                                    <!-- ENTITY-TYPE-RECORD-ROLES-1: the roles such a record usually gives its columns, not said yet -->
+                                    @if (proposals().get(d.id); as p) {
+                                        <div
+                                            class="flex flex-wrap items-center gap-2 text-sm"
+                                            data-testid="record-roles"
+                                        >
+                                            <span class="text-secondary">
+                                                {{ p.phrase }} usually has
+                                                @for (r of p.roles; track r.column; let last = $last) {
+                                                    <span class="font-medium">{{ r.column }}</span> as a
+                                                    {{ roleLabel(r.role) }}{{ last ? '.' : ',' }}
+                                                }
+                                            </span>
+                                            <button
+                                                mat-stroked-button
+                                                type="button"
+                                                [disabled]="applying()"
+                                                (click)="applyProposals(d, p.roles)"
+                                                data-testid="record-roles-apply"
+                                            >
+                                                Use these roles
+                                            </button>
+                                        </div>
+                                    }
+                                    <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                                        @for (col of d.columns; track col.name) {
+                                            @let r = roleShown(d, col);
+                                            <div class="flex flex-col" [attr.data-testid]="'column-' + col.name">
+                                                <inspecto-option-picker
+                                                    [label]="col.name"
+                                                    [options]="roleOptions"
+                                                    [formControl]="roles().get(d.id)!.get(col.name)!"
+                                                    [attr.data-testid]="'role-' + col.name"
+                                                ></inspecto-option-picker>
+                                                @if (derivedRoles().get(d.id)?.get(col.name); as dr) {
+                                                    @if (dr.role === r) {
+                                                        <p
+                                                            class="text-secondary m-0 text-xs"
+                                                            [attr.data-testid]="'derived-' + col.name"
+                                                        >
+                                                            From
+                                                            {{ dr.mappings.length === 1 ? 'Mapping' : 'Mappings' }}
+                                                            {{ dr.mappings.join(', ') }} - not set on this Dataset.
+                                                        </p>
+                                                    }
+                                                }
+                                                @if (r === 'entity') {
                                                     <inspecto-option-picker
-                                                        label="Each row is"
-                                                        [options]="recordTypeOptions()"
-                                                        [formControl]="rt"
-                                                        help="Puts the Entity Types such a record usually holds first"
-                                                        data-testid="record-type"
+                                                        [label]="col.name + ' holds'"
+                                                        [options]="
+                                                            holdsOptions().get(d.id + '/' + col.name) ?? typeOptions()
+                                                        "
+                                                        [formControl]="holds().get(d.id)!.get(col.name)!"
+                                                        [attr.data-testid]="'entity-' + col.name"
+                                                    ></inspecto-option-picker>
+                                                    @if (!holds().get(d.id)!.get(col.name)!.value) {
+                                                        <p class="text-warn m-0 text-xs" role="alert">
+                                                            Pick the Entity Type it holds to save it as an Entity.
+                                                        </p>
+                                                    }
+                                                } @else if (r === 'measure') {
+                                                    <inspecto-pen-field
+                                                        label="Unit"
+                                                        [ariaLabel]="col.name + ' unit'"
+                                                        placeholder="USD, s, bytes"
+                                                        [maxlength]="32"
+                                                        help="What it counts in"
+                                                        [formControl]="units().get(d.id)!.get(col.name)!"
+                                                        [attr.data-testid]="'unit-' + col.name"
+                                                    ></inspecto-pen-field>
+                                                }
+                                                <!-- LA-COLUMN-ROLES-1 P2: a Time, Measure or Category rides on every link unless kept off -->
+                                                @if (r === 'temporal' || r === 'measure' || r === 'dimension') {
+                                                    <inspecto-option-picker
+                                                        label="On each link"
+                                                        [options]="carriedOptions"
+                                                        [formControl]="carried().get(d.id)!.get(col.name)!"
+                                                        [attr.data-testid]="'carried-' + col.name"
                                                     ></inspecto-option-picker>
                                                 }
-                                                <!-- ENTITY-TYPE-RECORD-ROLES-1: the roles such a record usually gives its columns, not said yet -->
-                                                @if (proposals().get(d.id); as p) {
-                                                    <div
-                                                        class="flex flex-wrap items-center gap-2 text-sm"
-                                                        data-testid="record-roles"
-                                                    >
-                                                        <span class="text-secondary">
-                                                            {{ p.phrase }} usually has
-                                                            @for (r of p.roles; track r.column; let last = $last) {
-                                                                <span class="font-medium">{{ r.column }}</span> as a
-                                                                {{ roleLabel(r.role) }}{{ last ? '.' : ',' }}
-                                                            }
-                                                        </span>
-                                                        <button
-                                                            mat-stroked-button
-                                                            type="button"
-                                                            [disabled]="applying()"
-                                                            (click)="applyProposals(d, p.roles)"
-                                                            data-testid="record-roles-apply"
-                                                        >
-                                                            Use these roles
-                                                        </button>
-                                                    </div>
-                                                }
-                                                <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-                                                    @for (col of d.columns; track col.name) {
-                                                        @let r = roleShown(d, col);
-                                                        <div
-                                                            class="flex flex-col"
-                                                            [attr.data-testid]="'column-' + col.name"
-                                                        >
-                                                            <inspecto-option-picker
-                                                                [label]="col.name"
-                                                                [options]="roleOptions"
-                                                                [formControl]="roles().get(d.id)!.get(col.name)!"
-                                                                [attr.data-testid]="'role-' + col.name"
-                                                            ></inspecto-option-picker>
-                                                            @if (derivedRoles().get(d.id)?.get(col.name); as dr) {
-                                                                @if (dr.role === r) {
-                                                                    <p
-                                                                        class="text-secondary m-0 text-xs"
-                                                                        [attr.data-testid]="'derived-' + col.name"
-                                                                    >
-                                                                        From
-                                                                        {{
-                                                                            dr.mappings.length === 1
-                                                                                ? 'Mapping'
-                                                                                : 'Mappings'
-                                                                        }}
-                                                                        {{ dr.mappings.join(', ') }} - not set on this
-                                                                        Dataset.
-                                                                    </p>
-                                                                }
-                                                            }
-                                                            @if (r === 'entity') {
-                                                                <inspecto-option-picker
-                                                                    [label]="col.name + ' holds'"
-                                                                    [options]="
-                                                                        holdsOptions().get(d.id + '/' + col.name) ??
-                                                                        typeOptions()
-                                                                    "
-                                                                    [formControl]="holds().get(d.id)!.get(col.name)!"
-                                                                    [attr.data-testid]="'entity-' + col.name"
-                                                                ></inspecto-option-picker>
-                                                                @if (!holds().get(d.id)!.get(col.name)!.value) {
-                                                                    <p class="text-warn m-0 text-xs" role="alert">
-                                                                        Pick the Entity Type it holds to save it as an
-                                                                        Entity.
-                                                                    </p>
-                                                                }
-                                                            } @else if (r === 'measure') {
-                                                                <inspecto-pen-field
-                                                                    label="Unit"
-                                                                    [ariaLabel]="col.name + ' unit'"
-                                                                    placeholder="USD, s, bytes"
-                                                                    [maxlength]="32"
-                                                                    help="What it counts in"
-                                                                    [formControl]="units().get(d.id)!.get(col.name)!"
-                                                                    [attr.data-testid]="'unit-' + col.name"
-                                                                ></inspecto-pen-field>
-                                                            }
-                                                            <!-- LA-COLUMN-ROLES-1 P2: a Time, Measure or Category rides on every link unless kept off -->
-                                                            @if (
-                                                                r === 'temporal' || r === 'measure' || r === 'dimension'
-                                                            ) {
-                                                                <inspecto-option-picker
-                                                                    label="On each link"
-                                                                    [options]="carriedOptions"
-                                                                    [formControl]="carried().get(d.id)!.get(col.name)!"
-                                                                    [attr.data-testid]="'carried-' + col.name"
-                                                                ></inspecto-option-picker>
-                                                            }
-                                                        </div>
-                                                    }
-                                                </div>
                                             </div>
+                                        }
+                                    </div>
+                                </div>
 
-                                            <!-- LA-BASIC-DISCOVER-1: what is in it - entities, busiest, kinds, period, Measure totals -->
-                                            <inspecto-link-analysis-dataset-discover
-                                                class="bg-card rounded-2xl border p-4"
-                                                [dataset]="d.id"
-                                                title="Discover"
-                                                [level]="3"
-                                                drawWhyNot="Draw from Explore: its Start box has the same Discover."
-                                                [attr.data-testid]="'discover-' + d.id"
-                                            ></inspecto-link-analysis-dataset-discover>
+                                <!-- LA-BASIC-DISCOVER-1: what is in it - entities, busiest, kinds, period, Measure totals -->
+                                <inspecto-link-analysis-dataset-discover
+                                    class="bg-card rounded-2xl border p-4"
+                                    [dataset]="d.id"
+                                    title="Discover"
+                                    [level]="3"
+                                    drawWhyNot="Draw from Explore: its Start box has the same Discover."
+                                    [attr.data-testid]="'discover-' + d.id"
+                                ></inspecto-link-analysis-dataset-discover>
 
-                                            <div
-                                                class="bg-card flex flex-col gap-2 rounded-2xl border p-4"
-                                                data-testid="mappings"
+                                <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="mappings">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="m-0 text-base font-semibold">Mappings</h3>
+                                        <button
+                                            mat-stroked-button
+                                            type="button"
+                                            class="ml-auto"
+                                            data-testid="mapping-new"
+                                            (click)="newMapping(d)"
+                                        >
+                                            <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                                            New mapping
+                                        </button>
+                                    </div>
+                                    <ul class="m-0 flex list-none flex-col gap-2 p-0 text-sm">
+                                        <li class="flex flex-wrap items-center gap-2">
+                                            <span class="font-medium">{{ d.id }}</span>
+                                            <span class="text-secondary">(its own) · {{ line(d.mapping) }}</span>
+                                        </li>
+                                        @for (m of mappingsOf(d.id); track m.id) {
+                                            <li
+                                                class="flex flex-wrap items-center gap-2"
+                                                [attr.data-testid]="'mapping-' + m.id"
                                             >
-                                                <div class="flex flex-wrap items-center gap-2">
-                                                    <h3 class="m-0 text-base font-semibold">Mappings</h3>
-                                                    <button
-                                                        mat-stroked-button
-                                                        type="button"
-                                                        class="ml-auto"
-                                                        data-testid="mapping-new"
-                                                        (click)="newMapping(d)"
-                                                    >
-                                                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                                                        New mapping
-                                                    </button>
-                                                </div>
-                                                <ul class="m-0 flex list-none flex-col gap-2 p-0 text-sm">
-                                                    <li class="flex flex-wrap items-center gap-2">
-                                                        <span class="font-medium">{{ d.id }}</span>
-                                                        <span class="text-secondary"
-                                                            >(its own) · {{ line(d.mapping) }}</span
+                                                <span class="font-medium">{{ m.id }}</span>
+                                                <span class="text-secondary">· {{ line(m.mapping) }}</span>
+                                                @if (drifted(m, d); as gone) {
+                                                    @if (gone.length) {
+                                                        <span
+                                                            class="text-warn w-full text-sm"
+                                                            data-testid="mapping-drift"
                                                         >
-                                                    </li>
-                                                    @for (m of mappingsOf(d.id); track m.id) {
-                                                        <li
-                                                            class="flex flex-wrap items-center gap-2"
-                                                            [attr.data-testid]="'mapping-' + m.id"
-                                                        >
-                                                            <span class="font-medium">{{ m.id }}</span>
-                                                            <span class="text-secondary">· {{ line(m.mapping) }}</span>
-                                                            @if (drifted(m, d); as gone) {
-                                                                @if (gone.length) {
-                                                                    <span
-                                                                        class="text-warn w-full text-sm"
-                                                                        data-testid="mapping-drift"
-                                                                    >
-                                                                        Reads
-                                                                        {{
-                                                                            gone.length === 1 ? 'a column' : 'columns'
-                                                                        }}
-                                                                        {{ d.id }} no longer has: {{ gone.join(', ') }}.
-                                                                        Edit the Mapping, or it cannot be read.
-                                                                    </span>
-                                                                }
-                                                            }
-                                                            <span class="ml-auto flex gap-1">
-                                                                <a
-                                                                    mat-button
-                                                                    [routerLink]="'/link-analysis'"
-                                                                    [queryParams]="{ dataset: m.id }"
-                                                                    [attr.aria-label]="'Explore the Mapping ' + m.id"
-                                                                    >Explore</a
-                                                                >
-                                                                <button
-                                                                    mat-button
-                                                                    type="button"
-                                                                    (click)="editMapping(d, m)"
-                                                                    [attr.aria-label]="'Edit the Mapping ' + m.id"
-                                                                >
-                                                                    Edit
-                                                                </button>
-                                                                <button
-                                                                    mat-button
-                                                                    type="button"
-                                                                    (click)="deleteMapping(m)"
-                                                                    [attr.aria-label]="'Delete the Mapping ' + m.id"
-                                                                >
-                                                                    Delete
-                                                                </button>
-                                                            </span>
-                                                        </li>
+                                                            Reads
+                                                            {{ gone.length === 1 ? 'a column' : 'columns' }}
+                                                            {{ d.id }} no longer has: {{ gone.join(', ') }}. Edit the
+                                                            Mapping, or it cannot be read.
+                                                        </span>
                                                     }
-                                                </ul>
-                                                @if (editing()?.base?.id === d.id) {
-                                                    <form
-                                                        class="flex flex-col gap-2 border-t pt-3"
-                                                        [formGroup]="form"
-                                                        (ngSubmit)="saveMapping()"
-                                                        [attr.aria-label]="
-                                                            editing()?.id
-                                                                ? 'Edit the Mapping ' + editing()?.id
-                                                                : 'New mapping of ' + d.id
-                                                        "
-                                                        data-testid="mapping-form"
+                                                }
+                                                <span class="ml-auto flex gap-1">
+                                                    <a
+                                                        mat-button
+                                                        [routerLink]="'/link-analysis'"
+                                                        [queryParams]="{ dataset: m.id }"
+                                                        [attr.aria-label]="'Explore the Mapping ' + m.id"
+                                                        >Explore</a
                                                     >
-                                                        <!-- property rows (label · value · ✎ / ▾), two per line: the whole form at a glance -->
-                                                        <div class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
-                                                            <inspecto-pen-field
-                                                                label="Mapping name"
-                                                                formControlName="name"
-                                                                data-testid="mapping-name"
-                                                                [required]="true"
-                                                                [error]="nameError()"
-                                                                help="Lower-case letters, digits and _"
-                                                            ></inspecto-pen-field>
-                                                            <inspecto-pen-field
-                                                                label="Description"
-                                                                formControlName="description"
-                                                            ></inspecto-pen-field>
-                                                            <!-- validated on save: the page draws the required line itself (the picker
-                                             shows its own only once its dialog was opened), so no [required] here -->
-                                                            <div>
-                                                                <inspecto-option-picker
-                                                                    label="From"
-                                                                    formControlName="from"
-                                                                    data-testid="mapping-from"
-                                                                    [options]="columnOptions(d)"
-                                                                    help="The column each link starts from"
-                                                                ></inspecto-option-picker>
-                                                                @if (
-                                                                    form.controls.from.touched &&
-                                                                    form.controls.from.hasError('required')
-                                                                ) {
-                                                                    <p class="text-warn m-0 text-xs" role="alert">
-                                                                        Choose the column each link starts from.
-                                                                    </p>
-                                                                }
-                                                            </div>
-                                                            <inspecto-option-picker
-                                                                label="From holds"
-                                                                formControlName="fromType"
-                                                                [options]="typeOptions()"
-                                                                help="Links join where columns hold the same Entity Type"
-                                                            ></inspecto-option-picker>
-                                                            <div>
-                                                                <inspecto-option-picker
-                                                                    label="To"
-                                                                    formControlName="to"
-                                                                    data-testid="mapping-to"
-                                                                    [options]="columnOptions(d)"
-                                                                    help="The column each link goes to"
-                                                                ></inspecto-option-picker>
-                                                                @if (
-                                                                    form.controls.to.touched &&
-                                                                    form.controls.to.hasError('required')
-                                                                ) {
-                                                                    <p class="text-warn m-0 text-xs" role="alert">
-                                                                        Choose the column each link goes to.
-                                                                    </p>
-                                                                } @else if (
-                                                                    form.controls.to.touched &&
-                                                                    form.controls.to.hasError('same')
-                                                                ) {
-                                                                    <p class="text-warn m-0 text-xs" role="alert">
-                                                                        From and To must be two different columns.
-                                                                    </p>
-                                                                }
-                                                            </div>
-                                                            <inspecto-option-picker
-                                                                label="To holds"
-                                                                formControlName="toType"
-                                                                [options]="typeOptions()"
-                                                            ></inspecto-option-picker>
-                                                            <!-- LA-COLUMN-ROLES-2: this Mapping's own "On each link" marks -->
-                                                            @for (col of mappingCarried(); track col) {
-                                                                <inspecto-option-picker
-                                                                    [label]="col + ' on each link'"
-                                                                    [options]="carriedOptions"
-                                                                    [ngModel]="isCarried(col) ? 'yes' : 'no'"
-                                                                    [ngModelOptions]="{ standalone: true }"
-                                                                    (ngModelChange)="setCarried(col, $event)"
-                                                                    [attr.data-testid]="'mapping-carried-' + col"
-                                                                ></inspecto-option-picker>
-                                                            }
-                                                            @for (opt of optional; track opt.key) {
-                                                                <inspecto-option-picker
-                                                                    [label]="opt.label"
-                                                                    [formControlName]="opt.key"
-                                                                    [attr.data-testid]="'mapping-' + opt.key"
-                                                                    [options]="noneOr(d, opt.role)"
-                                                                    [help]="opt.help"
-                                                                    placeholder="None"
-                                                                ></inspecto-option-picker>
-                                                            }
-                                                        </div>
-                                                        @if (saveError()) {
-                                                            <inspecto-alert variant="error">{{
-                                                                saveError()
-                                                            }}</inspecto-alert>
-                                                        }
-                                                        <div class="flex gap-2">
-                                                            <button
-                                                                mat-flat-button
-                                                                color="primary"
-                                                                type="submit"
-                                                                [disabled]="saving()"
-                                                                data-testid="mapping-save"
-                                                            >
-                                                                Save Mapping
-                                                            </button>
-                                                            <button
-                                                                mat-button
-                                                                type="button"
-                                                                (click)="editing.set(null)"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    </form>
+                                                    <button
+                                                        mat-button
+                                                        type="button"
+                                                        (click)="editMapping(d, m)"
+                                                        [attr.aria-label]="'Edit the Mapping ' + m.id"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        mat-button
+                                                        type="button"
+                                                        (click)="deleteMapping(m)"
+                                                        [attr.aria-label]="'Delete the Mapping ' + m.id"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </span>
+                                            </li>
+                                        }
+                                    </ul>
+                                    @if (editing()?.base?.id === d.id) {
+                                        <form
+                                            class="flex flex-col gap-2 border-t pt-3"
+                                            [formGroup]="form"
+                                            (ngSubmit)="saveMapping()"
+                                            [attr.aria-label]="
+                                                editing()?.id
+                                                    ? 'Edit the Mapping ' + editing()?.id
+                                                    : 'New mapping of ' + d.id
+                                            "
+                                            data-testid="mapping-form"
+                                        >
+                                            <!-- property rows (label · value · ✎ / ▾), two per line: the whole form at a glance -->
+                                            <div class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
+                                                <inspecto-pen-field
+                                                    label="Mapping name"
+                                                    formControlName="name"
+                                                    data-testid="mapping-name"
+                                                    [required]="true"
+                                                    [error]="nameError()"
+                                                    help="Lower-case letters, digits and _"
+                                                ></inspecto-pen-field>
+                                                <inspecto-pen-field
+                                                    label="Description"
+                                                    formControlName="description"
+                                                ></inspecto-pen-field>
+                                                <!-- validated on save: the page draws the required line itself (the picker
+             shows its own only once its dialog was opened), so no [required] here -->
+                                                <div>
+                                                    <inspecto-option-picker
+                                                        label="From"
+                                                        formControlName="from"
+                                                        data-testid="mapping-from"
+                                                        [options]="columnOptions(d)"
+                                                        help="The column each link starts from"
+                                                    ></inspecto-option-picker>
+                                                    @if (
+                                                        form.controls.from.touched &&
+                                                        form.controls.from.hasError('required')
+                                                    ) {
+                                                        <p class="text-warn m-0 text-xs" role="alert">
+                                                            Choose the column each link starts from.
+                                                        </p>
+                                                    }
+                                                </div>
+                                                <inspecto-option-picker
+                                                    label="From holds"
+                                                    formControlName="fromType"
+                                                    [options]="typeOptions()"
+                                                    help="Links join where columns hold the same Entity Type"
+                                                ></inspecto-option-picker>
+                                                <div>
+                                                    <inspecto-option-picker
+                                                        label="To"
+                                                        formControlName="to"
+                                                        data-testid="mapping-to"
+                                                        [options]="columnOptions(d)"
+                                                        help="The column each link goes to"
+                                                    ></inspecto-option-picker>
+                                                    @if (
+                                                        form.controls.to.touched &&
+                                                        form.controls.to.hasError('required')
+                                                    ) {
+                                                        <p class="text-warn m-0 text-xs" role="alert">
+                                                            Choose the column each link goes to.
+                                                        </p>
+                                                    } @else if (
+                                                        form.controls.to.touched && form.controls.to.hasError('same')
+                                                    ) {
+                                                        <p class="text-warn m-0 text-xs" role="alert">
+                                                            From and To must be two different columns.
+                                                        </p>
+                                                    }
+                                                </div>
+                                                <inspecto-option-picker
+                                                    label="To holds"
+                                                    formControlName="toType"
+                                                    [options]="typeOptions()"
+                                                ></inspecto-option-picker>
+                                                <!-- LA-COLUMN-ROLES-2: this Mapping's own "On each link" marks -->
+                                                @for (col of mappingCarried(); track col) {
+                                                    <inspecto-option-picker
+                                                        [label]="col + ' on each link'"
+                                                        [options]="carriedOptions"
+                                                        [ngModel]="isCarried(col) ? 'yes' : 'no'"
+                                                        [ngModelOptions]="{ standalone: true }"
+                                                        (ngModelChange)="setCarried(col, $event)"
+                                                        [attr.data-testid]="'mapping-carried-' + col"
+                                                    ></inspecto-option-picker>
+                                                }
+                                                @for (opt of optional; track opt.key) {
+                                                    <inspecto-option-picker
+                                                        [label]="opt.label"
+                                                        [formControlName]="opt.key"
+                                                        [attr.data-testid]="'mapping-' + opt.key"
+                                                        [options]="noneOr(d, opt.role)"
+                                                        [help]="opt.help"
+                                                        placeholder="None"
+                                                    ></inspecto-option-picker>
                                                 }
                                             </div>
-                                        </div>
-                                    </ng-template>
-                                </mat-expansion-panel>
-                            }
-                        </mat-accordion>
-                    </section>
-                }
+                                            @if (saveError()) {
+                                                <inspecto-alert variant="error">{{ saveError() }}</inspecto-alert>
+                                            }
+                                            <div class="flex gap-2">
+                                                <button
+                                                    mat-flat-button
+                                                    color="primary"
+                                                    type="submit"
+                                                    [disabled]="saving()"
+                                                    data-testid="mapping-save"
+                                                >
+                                                    Save Mapping
+                                                </button>
+                                                <button mat-button type="button" (click)="editing.set(null)">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        </section>
+                    }
+                </div>
             }
             @if (others().length) {
                 <section class="flex flex-col gap-1" aria-labelledby="data-others">
@@ -539,6 +622,8 @@ export class DataPageComponent implements OnInit {
     private readonly confirm = inject(InspectoConfirmService);
     private readonly fb = inject(FormBuilder);
     private readonly router = inject(Router);
+    private readonly route = inject(ActivatedRoute);
+    private readonly dialog = inject(MatDialog);
 
     protected readonly addData = ADD_DATA_ROUTE;
     protected readonly line = mappingLine;
@@ -792,18 +877,66 @@ export class DataPageComponent implements OnInit {
             .map((g) => ({ ...g, items: this.bases().filter((d) => d.kind === g.kind) }))
             .filter((g) => g.items.length),
     );
-    /** The groups the reader folded (all open at first). */
-    readonly closedGroups = signal<ReadonlySet<string>>(new Set());
+    /** LA-DATA-MENU-1: the Dataset picked in the menu (`?dataset=` keeps it across a reload). */
+    private readonly pickedDataset = signal<string | null>(null);
+    /** LA-DATA-DETAILS-1: the menu's filter - a Dataset whose name, id or description holds every word typed. */
+    readonly filter = signal('');
+    readonly shownGroups = computed(() => {
+        const words = this.filter().toLowerCase().split(/\s+/).filter(Boolean);
+        if (!words.length) return this.groups();
+        const hit = (d: DataEntry) => {
+            const text = `${d.name} ${d.id} ${d.description}`.toLowerCase();
+            return words.every((w) => text.includes(w));
+        };
+        return this.groups()
+            .map((g) => ({ ...g, items: g.items.filter(hit) }))
+            .filter((g) => g.items.length);
+    });
+    /** The Dataset shown on the right: the one picked, else the first listed (menu order), so the pane is never empty. */
+    readonly selected = computed(() => {
+        const list = this.groups().flatMap((g) => g.items);
+        return list.find((d) => d.id === this.pickedDataset()) ?? list[0] ?? null;
+    });
 
-    toggleGroup(kind: string): void {
-        this.closedGroups.update((s) => {
-            const next = new Set(s);
-            if (!next.delete(kind)) next.add(kind);
-            return next;
-        });
+    /** The id just copied (its button shows a tick for a moment). */
+    readonly copied = signal<string | null>(null);
+
+    copyId(id: string): void {
+        navigator.clipboard?.writeText(id).then(
+            () => {
+                this.copied.set(id);
+                setTimeout(() => this.copied.set(null), 1500);
+            },
+            () => this.copied.set(null),
+        );
     }
 
-    /** A folded Dataset's one line: where its data comes from, and how much is set on it. */
+    /** Rename or describe the Dataset; the dialog saves, and closes with the values it saved, shown here at once. */
+    editDetails(d: DataEntry): void {
+        this.dialog
+            .open<DatasetDetailsDialog, DatasetDetailsData, DatasetDetailsResult>(DatasetDetailsDialog, {
+                data: { id: d.id, name: d.name === d.id ? '' : d.name, description: d.description },
+                width: '36rem',
+                maxWidth: '95vw',
+                autoFocus: 'first-tabbable',
+            })
+            .afterClosed()
+            .subscribe((r) => {
+                if (!r) return;
+                this.entries.update((list) =>
+                    (list ?? []).map((e) =>
+                        e.id === d.id ? { ...e, name: r.name || e.id, description: r.description } : e,
+                    ),
+                );
+            });
+    }
+
+    select(id: string): void {
+        this.pickedDataset.set(id);
+        this.router.navigate([], { queryParams: { dataset: id }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
+
+    /** A Dataset's one line in the menu: where its data comes from, and how much is set on it. */
     summary(d: DataEntry): string {
         const maps = this.mappingsOf(d.id).length;
         return [
@@ -875,6 +1008,7 @@ export class DataPageComponent implements OnInit {
     }
 
     ngOnInit(): void {
+        this.pickedDataset.set(this.route.snapshot.queryParamMap.get('dataset'));
         this.load();
         this.profiles
             .entityTypes()
@@ -985,6 +1119,7 @@ export class DataPageComponent implements OnInit {
 
     private open(base: DataEntry, id: string | null, f: MappingForm): void {
         this.saveError.set('');
+        this.pickedDataset.set(base.id); // the form renders under its Dataset, so show that one
         this.editing.set({ base, id });
         // fromType / toType are reset after from / to (declaration order), so Edit keeps the Mapping's own "holds"
         this.form.reset(f);

@@ -315,6 +315,32 @@ describe('DatasetEditorComponent', () => {
         expect(ds.viz).toEqual({ type: 'table' });
     });
 
+    it('LA-DATA-DETAILS-1: a renamed Dataset is edited and saved under its id, its title kept', async () => {
+        const stored = {
+            id: 'transfers',
+            name: 'Card transfers', // the shown name: fromContent reads the stored title first
+            kind: 'physical',
+            sourceName: 'cdr',
+            physicalRef: 'cdr',
+            columns: [],
+            measures: [],
+            calculated: [],
+            extra: { title: 'Card transfers' },
+        } as unknown as Dataset;
+        const save = vi.fn((d: Dataset) => of(d));
+        const fixture = create(save, [], stored);
+        fixture.componentInstance.id = 'transfers';
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        await vi.waitFor(() => expect(c.form.controls.name.disabled).toBe(true));
+        expect(c.form.controls.name.value).toBe('transfers');
+        c.save();
+        await vi.waitFor(() => expect(save).toHaveBeenCalled());
+        const ds = save.mock.calls[0][0] as Dataset;
+        expect(ds.id).toBe('transfers');
+        expect(ds.extra).toEqual({ title: 'Card transfers' });
+    });
+
     it('a readable store is not flagged as unpreviewable', async () => {
         const fixture = create();
         fixture.detectChanges();

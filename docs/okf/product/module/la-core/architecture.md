@@ -1933,6 +1933,19 @@ component that imports `DataTableComponent` brings `MatDialogModule` into its in
 beyond the kind of link (`LA-COLUMN-ROLES-2`); drawing from the Data page (it points to Explore); a live drive on the
 Basic install (the plan's §5 check over IMS and Mobile money) waits for a redeploy.
 
+**The Data page's layout and a Dataset's name (`LA-DATA-MENU-1`, `LA-DATA-DETAILS-1`, operator 2026-11-10).** The la-app
+Data page is laid out like Settings: a menu of Datasets grouped by kind (Streams, References) on the left, the picked one
+on the right (`?dataset=<id>` keeps it across a reload; the first listed shows when none is picked); nothing folds. A
+filter box over the menu (shown past six Datasets) keeps those whose name, id or description hold every word typed.
+The open Dataset's header shows its name, its id (copyable), its description and facts (kind, origin, columns,
+Mappings, Time column); *Rename or describe* opens `DatasetDetailsDialog`, which re-reads the component and writes it
+back with only `title` and `description` changed, against its `contentHash` (a concurrent change is refused with the
+stale-write message, never overwritten). Opening a Mapping form also brings its base into view.
+**Gotcha:** the shown name is stored as **`title`**, never `name` - `ComponentRoutes` stamps `name` with the id on every
+write, so a renamed `name` is silently put back. The id never changes (Mappings, saved views and Pipelines refer to it).
+The shared `DatasetsService.fromContent` reads `title` first, so every Dataset picker in the app shows the new name, and
+a Studio save carries `title` through untouched.
+
 ### 6.17 Arrivals: the ledger, Data status and what a later file does (LA-ARRIVAL-LEDGER-1 + LA-ARRIVAL-MODES-1, as built 2026-11-03/05)
 
 Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrivals).
