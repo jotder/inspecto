@@ -35,6 +35,18 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-INDEX-BUILD-REFUSED-NPE-1` | P3 | defect | a refused la.index.build run fails with a NullPointerException instead of recording the refusal. | — |
+| `LA-BASIC-PLACEHOLDER-CASE-1` | P2 | defect | in Basic, Attach to Case lists invented placeholder Cases, seals the Snapshot and reports it attached. | — |
+| `LA-SAMPLE-EMPTY-DATASET-1` | P2 | defect | the la-sample Space's only Dataset is empty on the Basic install, so its example and its only saved view fail. | — |
+| `LA-DOCK-PAGE-GROWS-1` | P2 | defect | opening the Link Analysis bottom Data dock makes the page taller than the window. | — |
+| `LA-BASIC-503-EXPLAINED-1` | P2 | defect | Basic-edition 503s show as red errors or with a wrong reason. | — |
+| `LA-RADIAL-LAYOUT-SQUASH-1` | P3 | defect | the Radial layout draws a two-component graph as a narrow, overlapping wedge. | — |
+| `LA-PHONE-OVERFLOW-1` | P3 | defect | at phone width the Link Analysis tool bar and the Add data page scroll sideways. | — |
+| `LA-CLIPPED-CONTROLS-1` | P3 | defect | Link Analysis controls clipped by their panels. | — |
+| `LA-TOOLBAR-SHIFT-1` | P3 | defect | the canvas tool bar shifts under the pointer when a node search adds or removes its clear button. | — |
+| `LA-OVERLAYS-HIDE-GRAPH-1` | P3 | defect | the expanded Legend and Graph counts cover the drawn graph, fit puts nodes under overlays or on the edge, and node labels start off. | — |
+| `LA-OPEN-DIALOG-ACTIONS-1` | P3 | defect | File ▸ Open puts Open / Rename / Delete below the fold of its scroll area and shows Last changed in UTC. | — |
+| `LA-SETTINGS-PROFILE-FLASH-1` | P3 | defect | Settings ▸ Link Analysis flashes a red "Domain Profile unavailable" error while it loads. | — |
+| `LA-UI-TEXT-PASS-2` | P3 | defect | wording and vocabulary breaks left on the la-app screens. | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

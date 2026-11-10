@@ -32,4 +32,9 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `layer.la` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-PHONE-OVERFLOW-1` | P3 | defect | at phone width the Link Analysis tool bar and the Add data page scroll sideways. | — |
+| `LA-SPACE-SWITCHER-1` | P3 | defect | the Space switcher button overflows the rail, and its list mixes old names, near-twins and no order. | — |
+| `LA-DARK-RADIO-CONTRAST-1` | P3 | defect | a selected radio button is nearly invisible in the dark scheme. | — |
+| `LA-UI-TEXT-PASS-2` | P3 | defect | wording and vocabulary breaks left on the la-app screens. | — |

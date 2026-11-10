@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-sample` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-SAMPLE-EMPTY-DATASET-1` | P2 | defect | the la-sample Space's only Dataset is empty on the Basic install, so its example and its only saved view fail. | — |

@@ -35,3 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `e
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
+| `LA-BASIC-PLACEHOLDER-CASE-1` | P2 | defect | in Basic, Attach to Case lists invented placeholder Cases, seals the Snapshot and reports it attached. | — |
+| `LA-BASIC-503-EXPLAINED-1` | P2 | defect | Basic-edition 503s show as red errors or with a wrong reason. | — |
+| `LA-DARK-RADIO-CONTRAST-1` | P3 | defect | a selected radio button is nearly invisible in the dark scheme. | — |
