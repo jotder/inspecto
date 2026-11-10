@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-crypto` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `JOB-SNAPSHOT-SWAP-READER-RACE-1` | P3 | defect | a Job reading a snapshot Dataset fails when the Job that writes that Dataset publishes a new snapshot during the read. | — |
