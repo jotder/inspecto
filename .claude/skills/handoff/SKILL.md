@@ -30,6 +30,11 @@ zero questions.
    durable as-built facts into the matching `docs/okf/` concept, move still-open items to
    `docs/BACKLOG.md`, `git mv` the plan to `docs/archived-documents/plans-archive/`, and update
    `docs/INDEX.md`. `docs/superpower/` holds in-flight plans only.
+   **Shift audit (root `CLAUDE.md`, "origin/master is the only line"):** `git worktree list` must show the
+   shared checkout plus lanes listed in `SESSION_STATUS.local.md` only, and `git branch` must show `master` only.
+   Anything else pushed → remove it (`git cherry origin/master <branch>` first, bundle what differs into
+   `C:\sandbox\archive\`); anything unpushed → list it in the status file with owner and date (one shift max).
+   When clean, fast-forward the shared checkout: `git merge --ff-only origin/master`.
 3. **Update the memory index breadcrumb** only if a milestone shipped (repo stays the source of
    truth; memory is a thin pointer).
 4. **Report to the operator**: one paragraph of what was handed off, then recommend ending this

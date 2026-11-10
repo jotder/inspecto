@@ -131,5 +131,18 @@ run **offline (`-o`)**. **Every JVM launch needs `--enable-native-access=ALL-UNN
 including test invocations. Tests spin up real `SourceService`/`ControlApi` on an ephemeral port and
 drive the HTTP surface — extend that pattern (see `inspecto/src/test/java/com/gamma/control/`).
 
+## DuckDB 2.0.0.0 (pinned 2026-10-23)
+
+Facts: `docs/okf/product/module/engine/spec-duckdb.md` § *DuckDB 2.0.0.0*; lesson: `.claude/memory/duckdb-and-sql-rules.md`.
+
+- **Lambdas are `lambda x: …`** — the `x -> …` arrow is a Binder error in 2.0.
+- **Open every analytics connection through `DuckDbUtil`** (`openConnection` / `openInMemory` /
+  `applyGlobalDuckDbSettings`) or call `DuckDbUtil.applyCorrectnessSettings`: 2.0's `window_self_join` makes a
+  `PARTITION BY` aggregate over hive-pruned parquet count the pruned days (wrong results, no error).
+- **`json_serialize_sql` readers** use 2.0's shape (`arguments[].expression`, `literal {kind, text}`) and **fail closed**
+  on an unknown shape — the masking check once failed open on exactly this.
+- **Session TimeZone = host default**, not UTC and not `-Dops.timezone`; set `TimeZone` explicitly if a Java half moves zones.
+- **Persisted SQL stores ingredients, renders at read** (`{{reader}}` / `ViewReaderSql.READER_TOKEN`); never bake a glob or file list.
+
 For the build/package/edition recipe see the **build-verify** skill; for committing/branching see the
 **release-workflow** skill and [docs/BRANCHING.md](../../../docs/BRANCHING.md).

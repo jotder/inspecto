@@ -91,14 +91,25 @@ A `fix:` lands on the **oldest still-supported branch it affects**, then merges 
 6. **Editions** are build flavors — never create/push `basic`/`standard` branches.
 7. **Tag** releases `vX.Y.Z` on the branch they ship from.
 
-## Common commands
+## Lane workflow — how work reaches `origin/master` TODAY (operator 2026-10-20 / 2026-10-26, binding)
+
+Full rule: root `CLAUDE.md` ("Shared team sandbox") and `.claude/memory/lane-integration-workflow.md`.
 
 ```bash
-# Bug fix present in the shipped major:
-git checkout 4.x && git checkout -b fix/<name>      # commit as fix(scope): …
-git checkout master && git merge --no-ff 4.x && git push origin master   # merge-forward
-
-# Feature (next release): branch from master, commit feat(scope): …, PR into master only.
+git fetch origin
+git worktree add --detach C:\sandbox\<lane> origin/master      # never start from the shared checkout's local master
+# …build the lane; commit feat(<item>): … ; pre-commit runs every guard — never --no-verify…
+git fetch origin && git merge origin/master                    # merge, never rebase; re-run cheap guards if it moved
+node tools/affected-modules.mjs                                # targeted tests + the lane's named classes
+git push origin HEAD:master                                    # ONE lane (or one small related group) per push
+git worktree remove C:\sandbox\<lane>                          # lane dies when pushed; also delete C:\sandbox\.m2-<lane>
 ```
+
+- Integrate in a **clean sibling worktree**, never by merging in the shared checkout (peers' dirty files block the
+  fast-forward and the pre-push guards read the tree they run from). The shared checkout later runs `git merge --ff-only origin/master`.
+- No per-person/topic branches, no parked worktrees. Before deleting any branch: `git cherry origin/master <branch>`;
+  bundle what differs into `C:\sandbox\archive\`. `git branch --merged` lies after cherry-pick/squash.
+- Unpushed work may stay for ONE shift, listed in `SESSION_STATUS.local.md` with owner and date.
+- A `fix:` for a retired line does not apply (see CURRENT STATE); the old `git checkout 4.x` recipe is gone with the branch.
 
 End commit messages with the required co-author trailer when committing on the user's behalf.

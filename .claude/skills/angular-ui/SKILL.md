@@ -762,6 +762,32 @@ in use. Look there before picking a class — do not invent a token.
   11.25 px, body 15.75 px, `text-title` 24.75 px; rem spacing too) and the full console stays at 16 px. A pixel size
   (`text-[11px]`) does NOT scale: in the Link Analysis library write rem (`text-[0.6875rem]`) or a scale class.
 - **Cards** `bg-card rounded-2xl p-6 shadow`; popovers `shadow-lg`; chips/dots `rounded-full`.
+- **Settings pages are flat, never grey cards** (2026-11-06): a collapsing group on a settings page is a
+  `<mat-accordion class="inspecto-flat-accordion">` (`src/styles/styles.scss`: outlined rows on the page background,
+  `--gamma-border`), not a raised Material panel. A section shown on its own page does not repeat the page header's
+  title and intro (keep an sr-only heading).
+
+### 5.2 Layout and wording decisions (operator, 2026-10-29 … 2026-11-09)
+
+- **Bounded panels, never a growing page.** A start area, empty state or tool panel that can hold more than a
+  screen is ONE bounded panel that scrolls inside itself (tabs if it has several modes); the page never grows and
+  its top is always reachable. ⛔ `justify-center` + `overflow-auto` on the same box clips the top (the old LA start
+  box). Answers (preset, query builder) sit in a closable card.
+- **Resizable rails and splits use `[inspectoSplit]`** (`inspecto/components/split.directive.ts`) with a persisted
+  key and min/max px (the la-app rail: `"la-app.rail"`, 160–400). Shared shell state (rail collapsed) lives in a
+  service (`LaRailService`), not in two components.
+- **Panel show/hide toggles live in the page header**, after Settings, as one Show/Hide toggle — not inside the
+  panel they hide (a hidden panel cannot hold its own Show button). The rail's Collapse sits in the header before the title.
+- **Disabled controls say why** (tooltip): "Draw a graph first.", "Needs Incident management." — the permission name,
+  no "capability", no raw server text, no ticket ids. A 403 maps to a plain reason (`refusal403` in
+  `link-analysis/investigation-state.ts`).
+- **Counts describe what is drawn** ("N nodes · M links on screen"), and a capped result is "Result cut short".
+- **Wording (LA-UI-TEXT-PASS-1 G15, everywhere):** British spelling (neighbour, colour, analyse); Sentence case;
+  capitalised Dataset, Space, Collector, Pipeline; "…" only where a dialog opens; no " - " as a dash; curly quotes;
+  `▸` in menu paths; real plurals, never "(s)"; thousands comma "3,254". Glossary words always (root `CLAUDE.md`);
+  LA words: Expand (not Grow), Link (not edge), Start entity (not seed), Busy/Held, Step log, Snapshot, Annotation,
+  From/To for path and column pickers, Both ways/Outgoing/Incoming. (Provenance only: the archived `la-ui-text-pass.md` §2.)
+- **Every icon means one thing** — a new action gets its own icon, not a reused one.
 - **`text-primary` is scheme-aware TEXT** (2026-09-25): it reads `--gamma-text-primary` (`src/styles/styles.scss`,
   wired as `textColor.primary.DEFAULT` in `tailwind.config.js`) — primary-600 in light, **primary-400 in dark**
   (4.90:1 on the dark card; the raw 600 is 2.33:1). Just write `text-primary`; no `dark:text-primary-400` needed.
