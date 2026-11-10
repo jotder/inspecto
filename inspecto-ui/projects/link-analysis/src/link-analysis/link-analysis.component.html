@@ -137,6 +137,22 @@
             </button>
         }
         <h1 class="m-0 shrink-0 whitespace-nowrap px-1 text-lg font-semibold leading-6" data-testid="la-title">Link Analysis</h1>
+        <!-- LA-VIEW-DETAILS-1 (operator 2026-11-10): the open saved view by name; its details, Rename and Description are one click away -->
+        @if (openView(); as v) {
+            <button
+                type="button"
+                class="hover:bg-hover focus-visible:outline-primary flex min-w-0 max-w-[16rem] shrink items-center gap-1 rounded-md border px-2 py-0.5 text-sm focus-visible:outline-2"
+                style="border-color: var(--gamma-border)"
+                [matTooltip]="v.description || 'No description yet: click to add one'"
+                [attr.aria-label]="'Saved view ' + v.name + ': details, rename and description'"
+                (click)="openViewDetails()"
+                data-testid="la-open-view"
+            >
+                <mat-icon class="icon-size-4 shrink-0" svgIcon="heroicons_outline:bookmark"></mat-icon>
+                <span class="truncate font-medium">{{ v.name }}</span>
+                <mat-icon class="icon-size-4 text-hint shrink-0" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+            </button>
+        }
         <!-- the two toolbars sit side by side; only when a long selection row cannot fit does the canvas toolbar drop
              under the rail, so nothing is clipped (the canvas toolbar must never be overflow-hidden) -->
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1" data-testid="la-toolbars">

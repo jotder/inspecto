@@ -39,6 +39,7 @@ import { LensService, SpacesService } from '@inspecto/core/api';
 import { DeepLinkService } from '@inspecto/link-analysis/open/open-link';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
+import { ViewDetailsDialogData } from './link-analysis-view-details.dialog';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { configureLaLimits, laLimit, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
 import { LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
@@ -7093,6 +7094,54 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         expect(fileItem('la-save-view')!.disabled).toBe(true);
         expect(fileItem('la-save-view-as')!.disabled).toBe(false);
         await c.saveOpenView();
+        expect(save).not.toHaveBeenCalled();
+        fixture.destroy();
+    });
+
+    it('LA-VIEW-DETAILS-1: the open saved view is named in the header; its details rename and re-describe the same id, never the graph', async () => {
+        const view: LinkAnalysisView = {
+            id: 'ring',
+            name: 'ring',
+            description: 'The old words',
+            sourceId: 'entity-projection',
+            query: {},
+            layout: 'force',
+        };
+        const { fixture, save } = create({ views: [view] });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const header = () => fixture.nativeElement.querySelector('[data-testid="la-open-view"]') as HTMLButtonElement | null;
+        c.views.set([view]);
+        fixture.detectChanges();
+        expect(header()).toBeNull(); // a drawn graph that is no saved view names nothing
+
+        c.openViewId.set(view.id);
+        fixture.detectChanges();
+        expect(header()!.textContent).toContain('ring');
+        expect(header()!.getAttribute('aria-label')).toBe('Saved view ring: details, rename and description');
+
+        const dialog = fixture.debugElement.injector.get(MatDialog);
+        const openSpy = vi
+            .spyOn(dialog, 'open')
+            .mockReturnValue({ afterClosed: () => of({ name: 'Mule ring', description: '' }) } as never);
+        save.mockClear();
+        header()!.click();
+        fixture.detectChanges();
+        const data = (openSpy.mock.calls[0][1] as { data: ViewDetailsDialogData }).data;
+        expect(data.view).toEqual(view);
+        expect(data.editBlock).toBe(c.viewOverwriteBlocked());
+        // one write: the stored view under the same id with only the name and description changed (an empty one dropped)
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(save.mock.calls[0][0]).toEqual({ ...view, name: 'Mule ring', description: undefined });
+        expect((save.mock.calls[0] as unknown[])[1]).toEqual({ update: true });
+        expect(c.openView()?.name).toBe('Mule ring');
+        expect(header()!.textContent).toContain('Mule ring');
+
+        // Cancel (no result) writes nothing
+        openSpy.mockReturnValue({ afterClosed: () => of(undefined) } as never);
+        save.mockClear();
+        header()!.click();
         expect(save).not.toHaveBeenCalled();
         fixture.destroy();
     });

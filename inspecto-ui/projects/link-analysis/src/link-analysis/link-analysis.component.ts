@@ -327,6 +327,11 @@ import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import { LaOpenDialogData, LaOpenResult, LinkAnalysisOpenDialog } from './link-analysis-open.dialog';
 import {
+    LinkAnalysisViewDetailsDialog,
+    ViewDetailsDialogData,
+    ViewDetailsDialogResult,
+} from './link-analysis-view-details.dialog';
+import {
     CaseStart,
     LinkAnalysisService,
     LinkAnalysisView,
@@ -3297,6 +3302,38 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                     this.investigation.adopt(r.id, r.title, this.investigation.activeRef() ?? undefined);
                     this.openInvestigation();
                 }
+            });
+    }
+
+    /** LA-VIEW-DETAILS-1: the saved view this page has open, or null. */
+    readonly openView = computed(() => this.views().find((v) => v.id === this.openViewId()) ?? null);
+
+    /**
+     * LA-VIEW-DETAILS-1: the open view's details from its name in the header - Rename and a new Description in one Save,
+     * written as an update of the same id (the Open dialog's Rename); the graph on screen and the rest of the view are
+     * kept as stored, so this never saves the canvas.
+     */
+    openViewDetails(): void {
+        const view = this.openView();
+        if (!view) return;
+        this.dialog
+            .open<LinkAnalysisViewDetailsDialog, ViewDetailsDialogData, ViewDetailsDialogResult>(LinkAnalysisViewDetailsDialog, {
+                data: { view, editBlock: this.viewOverwriteBlocked(), history: (v) => this.openHistory(v) },
+                width: '34rem',
+                maxWidth: '95vw',
+                autoFocus: false,
+            })
+            .afterClosed()
+            .subscribe((r) => {
+                if (!r) return;
+                const updated: LinkAnalysisView = { ...view, name: r.name, description: r.description || undefined };
+                this.viewsService.save(updated, { update: true }).subscribe({
+                    next: () => {
+                        this.views.update((all) => all.map((v) => (v.id === updated.id ? updated : v)));
+                        this.toastr.success(`Saved the details of “${updated.name}”.`);
+                    },
+                    error: (err) => this.toastr.error(apiErrorMessage(err, 'Saving the view details failed.')),
+                });
             });
     }
 
