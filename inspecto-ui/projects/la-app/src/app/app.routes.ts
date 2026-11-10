@@ -66,7 +66,10 @@ export const laAppRoutes: Route[] = [
             area('link-analysis', () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes')),
             area('geo-map', () => import('@inspecto/link-analysis/geo-map/geo-map.routes')),
             // The Entities pages (Entity Type Profile, Entity Profile), the library's own lazy boundary.
-            area('entities', () => import('@inspecto/link-analysis/entities/entities.routes')),
+            // NOT behind the area guard: the Space guide's "What the columns hold" (/entities?tab=columns) is a step of every
+            // edition, Basic included, where the Entities area itself is not offered (entityPages false; D-LAE4 gates only
+            // the profile reads on the server).
+            { path: 'entities', loadChildren: () => import('@inspecto/link-analysis/entities/entities.routes') },
             // LA-EDITIONS-1 section 4: the "Open in Inspecto LA" deep link another tool builds (/open?entity=&investigation=).
             { path: 'open', loadChildren: () => import('@inspecto/link-analysis/open/open.routes') },
             {

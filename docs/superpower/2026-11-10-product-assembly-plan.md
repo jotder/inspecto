@@ -498,7 +498,10 @@ The slices, each its own lane (D-PA16):
   `products/<id>.toon`). In la-app each console page is mounted whole (`area(path, loadChildren)`), and **one
   `areaGuard`** replaces `investigationsGuard`: an App-area route opens only when `productNav(...)` offers its path, else
   the landing page. That covers the edition (Basic: no Alerts), the build (Inspecto LA: no Reconciliations) and a
-  switched-off module. **The App switcher** shows when `appAreas(...)` returns more than one App; the rail then shows
+  switched-off module. ⚠ `/entities` stays unguarded (found in review): the Space guide's mandatory "What the columns
+  hold" step links `/entities?tab=columns` on every edition, Basic included, where the Entities area is not offered.
+  ⚠ *My work* reads the 50 newest Incidents and Cases of each type (the server has no open-only filter over HTTP), so an
+  older open one behind 50 newer closed ones is not listed. **The App switcher** shows when `appAreas(...)` returns more than one App; the rail then shows
   the current App's areas plus Settings. The current App is the one whose area the URL opens (`appOfUrl`), else the
   last one chosen (kept in `localStorage`, `la-app.app.<product>`), else the first. The landing page groups the cards
   under each App's name. *My work* gains **Incidents and Cases** where the nav offers those areas: assigned to the
