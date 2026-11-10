@@ -2,7 +2,7 @@
 
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
-as-built note); ✅ PA-2 built 2026-11-10 (§11 as-built note; pushed once its package runs pass); PA-3 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); PA-3 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -350,6 +350,15 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
   rehearsal) keep their wording with a removal note, which the doc-flag guard accepts.
 - **Left as is:** Java and pom comments that say "the `-DemoAuth` build" (changing them would rebuild modules for a
   comment; `OperationalDb.java`, `ObjectsBackendEditionBootTest.java`, two poms, `.gitignore`).
+- **Proven by real package runs (2026-11-10, JDK 27, offline Maven, `-NoUi`; the Angular build is unchanged and was
+  not exercised).** Inspecto LA × Advanced × demo: `edition=Advanced`, `variant=demo`, `product=la`,
+  `apps=link-analysis`; exactly the 20 `la-*` templates; `la-showcase` baked (268 files); `DEMO-BUILD.txt` is
+  `products/la.demo-build.txt`; the Space guard passes with `--seed-space`. Console × Standard: 30 templates,
+  `product=inspecto`, boots. Inspecto LA × Basic: 20 templates, boots. Inspecto LA × Basic × demo: refused before any
+  staging, with the assembler's reason. The five Java tests that read `package.ps1` pass (30 tests).
+- **The bake only works from a real console.** An agent session has none, so the graceful Ctrl+C stop times out
+  there. In a console one bake in three (same jars, flags and seed) left `.wal` files and was refused; a rerun and the
+  pre-PA-2 code baked cleanly. That is the shutdown race `DEMO-BAKE-WAL-RACE-1`, not PA-2.
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 

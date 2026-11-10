@@ -43,6 +43,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-INDEX-BUILD-REFUSED-NPE-1` | P3 | defect | a refused la.index.build run fails with a NullPointerException instead of recording the refusal. | — |
 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` | P3 | defect | the Job loader reads a saved view whose file name ends in _job.toon. | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
+| `DEMO-BAKE-WAL-RACE-1` | P3 | defect | the demo bake sometimes refuses a good build: after its graceful Ctrl+C stop, DuckDB has left .wal files, so package.ps1 -Product la -Dis… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | external |
