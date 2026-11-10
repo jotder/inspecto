@@ -430,8 +430,9 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   (b) the same server with no descriptor answers `product: null` and the rail draws the generated nav under the
   feature rule (Link Analysis, Data, Entity Lists, Settings); (c) a real Inspecto LA × Basic bundle packaged from the
   lane answers nav `linkAnalysis, data, entityLists`, the session holds it and the rail draws it; no console errors.
-  ⚠ Not PA-4, already on master and left alone: `npm run lint` fails on `link-analysis.component.ts` (a restricted
-  `../la-rail.service` import from `d634b6a7d`) and `format:check` reports 251 drifted files.
+  ⚠ Not PA-4, already on master: `npm run lint` failed on `link-analysis.component.ts` (a restricted
+  `../la-rail.service` import from `d634b6a7d`; fixed right after PA-4 by importing it through the library alias)
+  and `format:check` reports 251 drifted files (left alone).
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 

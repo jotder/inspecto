@@ -218,7 +218,7 @@ import { GeoLinkBrushService, nodeIdsForKeys } from '@inspecto/link-analysis/gra
 import { GraphSnapshot } from '@inspecto/link-analysis/graph/graph-snapshot';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { InspectoSplitDirective } from '@inspecto/core/components/split.directive';
-import { LaRailService } from '../la-rail.service';
+import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
 import {
     LegendItem,
     hideLinkKinds,
