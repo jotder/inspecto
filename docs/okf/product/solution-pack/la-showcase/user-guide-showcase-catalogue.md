@@ -159,7 +159,9 @@ Dataset mapped and saved views named after their use case. It is in progress: a 
 `spaces/_industries/<id>.toon`, and `node tools/package-la-showcase.mjs <industry id>` composes it into a Space
 download and a data download (for example `la-utilities`, `la-law-enforcement`, `la-telecom`). Every *install* guide
 linked above, and the `la-claims` runbook, has a section on installing that use case's industry Space. The industry Spaces are not in the
-in-app template gallery yet. The use-case templates on this page stay as they are, so everything here still holds as
+in-app template gallery yet. Since 2026-11-10 *Enterprise* holds `la-audit` with `la-insider`, and *Banking and finance*
+no longer holds `la-sample` (an example only, opened with *Try the sample*). `la-showcase` and `la-mobile-money` ship as
+Spaces of their own until they fold into *Banking and finance* and *Telecom* (`LA-INDUSTRY-FOLD-1` in `docs/BACKLOG.md`). The use-case templates on this page stay as they are, so everything here still holds as
 the industry Spaces land.
 
 ## References

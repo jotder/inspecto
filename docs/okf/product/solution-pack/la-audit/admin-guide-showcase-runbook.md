@@ -163,3 +163,12 @@ Rehearsal 2026-10-16 on an Advanced Demo Auth bundle built from this branch (por
 * Recorded precision claims: none. The plants are planted, the counts are the corpus, and no detection rate is implied.
 
 **Browser rehearsal, 2026-10-24.** Driven as `audit.lead`, `audit.manager`-side API and `audit.admin`: k-core, Cut points, Bridges, Betweenness, Strongest backbone, Link prediction, Find cycles and Maximum flow on `gl_intercompany` (3, not 7 200 000), the Draft cycle, Members grant and revoke, Settings, the Entity profile page, and the Dossier tamper through the file upload (one flipped digit names `log.jsonl#2`). Still not driven: Jaccard and Find similar (need a node pick). Is forest has no client button. Detail: [the cross-vertical tour](../la-showcase/admin-guide-cross-vertical-tour.md).
+
+## 7. As part of the *Enterprise* industry Space
+
+Since 2026-11-10 this use case also ships inside the industry Space *Enterprise* (`la-enterprise`), with `la-insider`.
+The recipe is `spaces/_industries/la-enterprise.toon`; `node tools/package-la-showcase.mjs la-enterprise` composes one
+Space download and one data download. Its saved views keep their ids (`ap_vendor_identity`, `ap_approval_graph`,
+`gl_intercompany`). The two use cases share one four-eyes fan-out threshold, this template's 30, so the seed's bounded
+expands run and its unbounded expand is held in either Space. Installing the industry Space: the
+[la-insider install guide](../la-insider/admin-guide-install.md).

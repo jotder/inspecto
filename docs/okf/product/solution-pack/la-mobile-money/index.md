@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-INDUSTRY-FOLD-1` | P3 | chore | fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |
 | `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | all three showcases are driven in the browser (2026-10-24, and the items left then on 2026-10-28 on the reorganized Studio); what is left… | — |

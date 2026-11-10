@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-mfs` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-INDUSTRY-FOLD-1` | P3 | chore | fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |

@@ -1,5 +1,5 @@
 name: Enterprise
-tagline: "Insider threat on synthetic data - a leaver's bulk reads and mail to a personal domain, access creep granted by one manager, and two employees approving each other's expenses, every Dataset mapped. Internal audit joins when its pack gets a Basic tier."
+tagline: "Internal audit and insider threat on synthetic data - a fictitious vendor, a shell cluster, split invoices, a single point of control and an intercompany round trip; a leaver's bulk reads and mail to a personal domain, access creep granted by one manager, and two employees approving each other's expenses, every Dataset mapped."
 minEdition: basic
 icon: heroicons_outline:identification
-useCases[1]: la-insider
+useCases[2]: la-audit,la-insider

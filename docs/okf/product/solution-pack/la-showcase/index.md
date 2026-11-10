@@ -38,3 +38,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 | `LA-UI-TEXT-PASS-2` | P3 | defect | wording and vocabulary breaks left on the la-app screens. | — |
 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` | P3 | chore | what the 2026-11-09 showcase release and its live proofs did not cover. | — |
 | `LA-SHOWCASE-COMBINED-DOWNLOAD-1` | P3 | feature | one combined "all showcases" download beside the per-Space downloads? | operator |
+| `LA-INDUSTRY-FOLD-1` | P3 | chore | fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |

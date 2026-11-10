@@ -50,7 +50,7 @@ test('apply signs in once per persona and acts as the right persona', async () =
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'annotate', 'threshold', 'window', 'resolve', 'snapshot']);
   assert.deepEqual(ops[0].body.ids, ['EMP-0007']);
-  assert.ok(ops[1].body.maxFanOut <= 2000, 'the first expand is bounded under four_eyes_fan_out_above, so it runs');
+  assert.ok(ops[1].body.maxFanOut <= 30, 'the first expand is bounded under four_eyes_fan_out_above, so it runs');
   assert.deepEqual(ops[1].body.linkKinds, ['granted_by'], 'one hop reaches everyone whose grants the manager approved');
   assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:insider.analyst'));
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));

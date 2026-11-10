@@ -148,8 +148,9 @@ content only, so commit first.
 ## As the *Enterprise* industry Space
 
 This use case also ships as the industry Space *Enterprise* (`la-enterprise`). The recipe is
-`spaces/_industries/la-enterprise.toon`, and `node tools/package-la-showcase.mjs la-enterprise` composes it. `la-audit`
-joins when the plan's wave B gives it a Basic tier.
+`spaces/_industries/la-enterprise.toon`, and `node tools/package-la-showcase.mjs la-enterprise` composes it with
+`la-audit` (internal audit, since 2026-11-10). The two share one four-eyes fan-out threshold, 30: an industry Space
+states each setting once, so `la-insider` moved from 2000 to `la-audit`'s 30 (its seed's bounded expand asks for 20).
 
 Every Dataset says what its id columns hold: *Employee*, *System*, *Email domain*, *Vendor* and *Ticket*. The link
 Datasets' mixed ends hold *Insider entity*. Each Dataset of events has its own Mapping: a granting manager to the

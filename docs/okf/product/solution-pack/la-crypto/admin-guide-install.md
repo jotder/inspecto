@@ -146,8 +146,8 @@ which is not part of any download. The packer reads committed content only, so c
 
 ## As part of the *Banking and finance* industry Space
 
-This use case also ships inside the industry Space *Banking and finance* (`la-banking`), with the sample, ownership,
-card, trade and crypto showcases. The recipe is `spaces/_industries/la-banking.toon`; `node tools/package-la-showcase.mjs
+This use case also ships inside the industry Space *Banking and finance* (`la-banking`), with the ownership, card,
+trade and crypto showcases. The recipe is `spaces/_industries/la-banking.toon`; `node tools/package-la-showcase.mjs
 la-banking` composes one Space download and one data download.
 
 To share one Space, trade's `company` and `payment` feeds are called `trade_company` and `trade_payment` (Pipelines,
