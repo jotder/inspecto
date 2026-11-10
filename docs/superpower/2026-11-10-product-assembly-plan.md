@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed), PA-6a is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); PA-6b is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -700,6 +700,42 @@ built only with the kit that passes conformance (§8). Four lanes, in this order
 - **PA-6d — the builder-kit docs**, in the `layer/platform` hub: Studio, the Pipeline editor, the Step and Collector SPIs,
   the Consequence registry, Job types, the Control API and its OpenAPI document, the Java embedding API (`@PublicApi`),
   and the App kit.
+
+**PA-6a as built (2026-11-11).**
+- **The model takes App roots.** `gatherModel(root, { appRoots })` reads each `<app-root>/app.toon` and its
+  `templates/<id>/` beside `apps/`, and keeps them apart: `partnerApps` (id → folder), `templateDirs` (template →
+  folder). An App id that a first-party App uses, or a template name that a first-party template uses, is a finding. A
+  partner App is not held to "id equals folder name", and its `docs` resolve inside its own folder. `carryPartnerApps`
+  adds them to a Platform product's optional Apps and their Add-ons to its own. A Domain product is refused, because
+  its Apps are its definition.
+- **The assembler and the bundle.** `assemble.mjs --app-root <folder>` (repeatable) carries the App. The plan gains
+  `partnerTemplates` (`{id, dir}`). `package.ps1 -AppRoot <folder>` passes it on, stages first-party templates from git as
+  before, and copies a partner template from its folder (a name collision throws).
+- **The kit, `tools/inspecto-app.mjs`.** `new` writes ten files: `app.toon` (one nav entry onto `data-browser`), a
+  template with a feed (Pipeline, schema, Dataset), the `<id>_detect` `sql.template` Job and its findings Dataset, a
+  sample with three accounts over the threshold and five look-alikes at or under it (two exactly at it), `conformance.toon` and
+  `docs/index.md`. `validate` runs `checkModel` with the App on the Platform product, then the layout and
+  `conformance.toon` (template, day, Jobs, each expectation's Dataset, key and `expected[N]` list, and the golden data
+  present). `test` holds the static conformance on every Edition that builds the App's Add-ons
+  (`check-product-build`'s `checkPlan`, plus the template staged from the App's folder). With `--bundle` it boots the
+  bundle on loopback, with no sign-in, over a scaffolded Space (`kit-<template>`). It triggers every Pipeline, then the
+  listed Jobs for the corpus day, then reads each Dataset's `rows` and compares the key set exactly. A bundle that
+  answers 401 or 403 is named as one that needs sign-in. `package` writes a deterministic
+  `<id>-<version>.zip` (Node's own deflate and CRC-32, a fixed entry time) with `MANIFEST.sha256`, and refuses an App
+  that does not validate.
+- **Deliberately not done.** The starter ships no Alert Rule. A rule over a `sql.template` sink needs the sink's
+  zero-row seed parquet at template create (the Telco templates ship one), and the kit, being Node, does not write
+  parquet. `config/pending/alert-rules/` defers only rules over score outputs. Boot conformance needs a bundle without
+  sign-in: it does not sign in to an OIDC bundle. Both go to PA-6b, with the sample App.
+**Proof (as built).** `tools/inspecto-app.test.mjs` 7/7 covers: the scaffold passes validate and static conformance on
+all four Editions; the starter's planted set; the assembler stages the partner template from its folder; validate's
+refusals (a reused App id, a reused template, a broken conformance file, missing golden data); golden conformance on a
+mock (Job windows, every Pipeline triggered, an extra key, a failed Job, a 401); the scaffolded Space; and the
+deterministic zip with its manifest. With the Product tools it is 90/90. `assemble.mjs --app-root` refuses the Telco
+Domain product. `package.ps1 -Product inspecto -Edition Basic -NoRuntime -AppRoot <app>` stages the partner template
+from its folder beside the 30 first-party ones. On that bundle, `inspecto-app.mjs test --bundle inspecto-deploy` boots
+it, ingests the golden data, runs the Job and holds `acme_limits_findings` to exactly A-001, A-002, A-003. With the
+expectation changed to A-001, A-104 the same run fails, naming the keys it found.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 

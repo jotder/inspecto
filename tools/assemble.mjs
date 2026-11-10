@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addonModules, builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
+import { addonModules, builtAddons, carryPartnerApps, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -88,6 +88,8 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         modules: classpath(Edition, { demo, g }),
         mvnModules: mvnModules(Edition, g),
         templates,
+        // PA-6a (D-PA18): the templates a partner App ships from its own folder, staged from there rather than from git.
+        partnerTemplates: templates.filter((t) => model.templateDirs?.[t]).map((t) => ({ id: t, dir: model.templateDirs[t] })),
         // PA-5 (D-PA14): the Space Template composed from the selected Apps' templates (tools/compose-space.mjs), or null.
         space: p.space
             ? { id: p.space, title: p.brand?.name ?? p.title, industry: p.industry ?? null, parts: spaceParts(selected, model.apps).map(({ app, template }) => ({ app, appTitle: model.apps[app].title, template })) }
@@ -191,9 +193,12 @@ function main() {
             write(d.length ? d.join('\n') + '\n' : 'no change\n');
             return;
         }
-        const model = gatherModel(REPO);
+        // PA-6a (D-PA18): `--app-root <folder>`, repeatable, adds an App that lives outside apps/.
+        const appRoots = a.flatMap((x, i) => (x === '--app-root' && a[i + 1] ? [a[i + 1]] : []));
+        const model = gatherModel(REPO, { appRoots });
         const g = gather(REPO);
         const product = val('--product') ?? fail('--product <id> is required');
+        carryPartnerApps(model, product);
         if (a.includes('--lock')) { write(productLock(model, g, product)); return; }
         const plan = assemble(model, g, {
             product,

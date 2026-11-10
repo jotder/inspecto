@@ -14,7 +14,7 @@
 // what those own (the Product Map rule D-PM1).
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { parseToon } from './toon-subset.mjs';
 import { readModuleSources } from './bundle-modules.mjs';
 
@@ -31,13 +31,38 @@ const subdirsWith = (dir, file) => (existsSync(dir) ? readdirSync(dir, { withFil
 const read = (f) => parseToon(readFileSync(f, 'utf8'));
 
 /** Everything a check or an assembly needs, read from `root`. */
-export function gatherModel(root) {
+export function gatherModel(root, { appRoots = [] } = {}) {
     const products = Object.fromEntries(toonFiles(join(root, 'products')).map((f) => [f.slice(0, -5), read(join(root, 'products', f))]));
     const apps = Object.fromEntries(subdirsWith(join(root, 'apps'), 'app.toon').map((d) => [d, read(join(root, 'apps', d, 'app.toon'))]));
+    // PA-6a (D-PA18): an App may live in any folder - <app-root>/app.toon, its Space Templates under <app-root>/templates/.
+    // Kept apart (partnerApps: id -> folder, templateDirs: template -> folder) so a first-party name it reuses is refused.
+    const partnerApps = {};
+    const partnerTemplates = {};
+    const collisions = [];
+    for (const r of appRoots) {
+        const dir = resolve(r);
+        if (!existsSync(join(dir, 'app.toon'))) { collisions.push(`${dir}: no app.toon - an App root holds app.toon (and templates/<id>/)`); continue; }
+        const app = read(join(dir, 'app.toon'));
+        const id = app.id ?? '';
+        if (!id) { collisions.push(`${dir}/app.toon: no id`); continue; }
+        if (apps[id]) { collisions.push(`${dir}/app.toon: App id '${id}' is already ${partnerApps[id] ? `the App at ${partnerApps[id]}` : `a first-party App (apps/${id})`}`); continue; }
+        apps[id] = app;
+        partnerApps[id] = dir;
+        for (const t of existsSync(join(dir, 'templates')) ? readdirSync(join(dir, 'templates'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) : [])
+            if (partnerTemplates[t]) collisions.push(`${join(dir, 'templates', t)}: template '${t}' is already shipped by the partner App '${partnerTemplates[t].app}'`);
+            else partnerTemplates[t] = { app: id, dir: join(dir, 'templates', t) };
+    }
     const industries = Object.fromEntries(subdirsWith(join(root, 'industries'), 'industry.toon').map((d) => [d, read(join(root, 'industries', d, 'industry.toon'))]));
     const offerings = Object.fromEntries(toonFiles(join(root, 'offerings')).map((f) => [f.slice(0, -5), read(join(root, 'offerings', f))]));
     const tdir = join(root, 'spaces', '_templates');
     const templates = existsSync(tdir) ? readdirSync(tdir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) : [];
+    const templateDirs = {};
+    for (const [t, { app, dir }] of Object.entries(partnerTemplates)) {
+        if (templates.includes(t)) { collisions.push(`${dir}: template '${t}' of App '${app}' is already a first-party template (spaces/_templates)`); continue; }
+        templates.push(t);
+        templateDirs[t] = dir;
+    }
+    const templateDir = (t) => templateDirs[t] ?? join(tdir, t);
     const ng = join(root, 'inspecto-ui', 'angular.json');
     const ngProjects = existsSync(ng) ? JSON.parse(readFileSync(ng, 'utf8')).projects ?? {} : {};
     const hosts = Object.keys(ngProjects);
@@ -49,8 +74,23 @@ export function gatherModel(root) {
     // only for those, and kept as data so a test can clone and plant the model.
     const parts = Object.values(products).filter((p) => p.space)
         .flatMap((p) => [...list(p.apps?.required), ...list(p.apps?.optional)]).flatMap((a) => list(apps[a]?.templates));
-    const templateFiles = Object.fromEntries([...new Set(parts)].filter((t) => templates.includes(t)).map((t) => [t, walk(join(tdir, t))]));
-    return { root, products, apps, industries, offerings, templates, hosts, ngProjects, industryPacks, pomVersion, moduleFeatures, templateFiles, exists: (p) => existsSync(join(root, p)) };
+    const templateFiles = Object.fromEntries([...new Set(parts)].filter((t) => templates.includes(t)).map((t) => [t, walk(templateDir(t))]));
+    return { root, products, apps, industries, offerings, templates, hosts, ngProjects, industryPacks, pomVersion, moduleFeatures, templateFiles,
+        partnerApps, templateDirs, collisions, exists: (p) => existsSync(join(root, p)) };
+}
+
+/**
+ * PA-6a (D-PA18): the partner Apps loaded from `appRoots` ride on the Platform product `productId` as optional Apps, their
+ * Add-ons added to its own. A Domain product's Apps are its definition, so it takes none (refused).
+ */
+export function carryPartnerApps(model, productId) {
+    const ids = Object.keys(model.partnerApps ?? {});
+    const p = model.products[productId];
+    if (!ids.length || !p) return model;
+    if (p.shape !== 'platform') throw new Error(`Product '${productId}' is a Domain product: its Apps are its definition, so a partner App (--app-root) rides on a Platform product`);
+    p.apps = { required: list(p.apps?.required), optional: [...new Set([...list(p.apps?.optional), ...ids])] };
+    p.addons = [...new Set([...list(p.addons), ...ids.flatMap((a) => list(model.apps[a]?.requires?.addons))])];
+    return model;
 }
 
 /** Every file under `dir`, as `/`-separated paths relative to it. */
@@ -152,7 +192,7 @@ export function productTemplates(p, appIds, apps) {
 /** Every finding about the definitions in `model` (an empty list = green). */
 export function checkModel(model) {
     const { products, apps, industries, offerings, templates, hosts, industryPacks, pomVersion, exists } = model;
-    const out = [];
+    const out = [...(model.collisions ?? [])];
     const editionIds = Object.keys(offerings);
 
     for (const [file, ind] of Object.entries(industries)) {
@@ -163,8 +203,10 @@ export function checkModel(model) {
     }
 
     for (const [file, app] of Object.entries(apps)) {
-        const at = `apps/${file}/app.toon`;
-        if (app.id !== file) out.push(`${at}: id '${app.id}' does not equal its folder name '${file}'`);
+        // PA-6a: a partner App (any folder, D-PA18) is named by its id, and its docs path is relative to its own folder.
+        const home = model.partnerApps?.[file];
+        const at = home ? `${home}/app.toon` : `apps/${file}/app.toon`;
+        if (!home && app.id !== file) out.push(`${at}: id '${app.id}' does not equal its folder name '${file}'`);
         for (const k of ['title', 'version', 'platform', 'docs']) if (!app[k]) out.push(`${at}: no ${k}`);
         if (app.platform && pomVersion) {
             try { if (!satisfies(pomVersion, app.platform)) out.push(`${at}: platform '${app.platform}' does not admit this Platform version ${pomVersion}`); }
@@ -173,8 +215,11 @@ export function checkModel(model) {
         for (const i of list(app.industries)) if (!industries[i]) out.push(`${at}: Industry '${i}' has no industries/${i}/industry.toon`);
         const known = new Set(editionIds.flatMap((e) => Object.keys(offeringAddons(e, offerings))));
         for (const a of list(app.requires?.addons)) if (!known.has(a)) out.push(`${at}: requires Add-on '${a}', which no Offering names`);
-        for (const t of list(app.templates)) if (!templates.includes(t)) out.push(`${at}: template '${t}' is not under spaces/_templates`);
-        if (app.docs && !exists(app.docs)) out.push(`${at}: docs '${app.docs}' does not exist`);
+        for (const t of list(app.templates)) {
+            if (!templates.includes(t)) out.push(`${at}: template '${t}' is not under ${home ? `${home}/templates` : 'spaces/_templates'}`);
+            else if (home && !model.templateDirs?.[t]) out.push(`${at}: template '${t}' is a first-party template; a partner App ships its own under ${home}/templates`);
+        }
+        if (app.docs && !(home ? existsSync(join(home, app.docs)) : exists(app.docs))) out.push(`${at}: docs '${app.docs}' does not exist`);
         // PA-3: the nav the shells draw. A `feature` must be one the App's own Add-on modules provide (in any edition), or
         // the server could never report it true and the entry would never show.
         const provided = new Set(editionIds.flatMap((e) => list(app.requires?.addons).flatMap((a) => [...addonModules(e, a, offerings)]))

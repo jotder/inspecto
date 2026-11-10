@@ -103,6 +103,9 @@ param(
     # ($DemoAuth is set from the plan below), or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list
     # comes from tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
     [string]$Distribution = 'production',
+    # PRODUCT-ASSEMBLY-1 PA-6a (D-PA18): folders holding a partner App (app.toon + templates/<id>/) built with tools/inspecto-app.mjs,
+    # outside apps/. Passed to the assembler as --app-root; the App's templates are staged from those folders, not from git.
+    [string[]]$AppRoot = @(),
     # A demo build of a Product with a `demoSpace` ships that Space PRE-SEEDED (operator 2026-10-12; step 6f, package-demo-bake.ps1):
     # the staged bundle is booted against a scaffolded Space and seeded over HTTP before the zip. -NoBakeDemo skips that for a fast
     # local package (the bundle then ships no Space, as every other bundle does). Ignored when the plan names no seedSpace.
@@ -236,7 +239,8 @@ if ($duckdbExtCacheDir) {
 $planFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-assembly-$Product-$Edition-$Distribution.json"
 # PA-3: the Product build's descriptor too (written into lib/product.json beside edition.properties at step 3a-ter).
 $descriptorFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-product-$Product-$Edition-$Distribution.json"
-& node (Join-Path $sandboxRoot 'tools\assemble.mjs') --product $Product --edition $Edition --distribution $Distribution --out $planFile --descriptor $descriptorFile
+$appRootArgs = @($AppRoot | Where-Object { $_ } | ForEach-Object { '--app-root'; (Resolve-Path $_).Path })
+& node (Join-Path $sandboxRoot 'tools\assemble.mjs') --product $Product --edition $Edition --distribution $Distribution --out $planFile --descriptor $descriptorFile @appRootArgs
 if ($LASTEXITCODE -ne 0) { throw "tools/assemble.mjs refused Product '$Product' x $Edition x $Distribution (the reason is above)" }
 $plan = Get-Content -Raw $planFile | ConvertFrom-Json
 $Ui = [string]$plan.host
@@ -1387,7 +1391,16 @@ if (Test-Path $uiDist) {
 # from the working tree, so a running ControlApi's lock on spaces/<id>/duckdb/*.db cannot fail the copy.
 . (Join-Path $adjParserDir 'package-spaces.ps1')
 # PRODUCT-ASSEMBLY-1 PA-2: only the Product build's templates (the Assembly Plan's `templates`: the Product's own plus its Apps').
-$staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir -Only @($plan.templates)
+$partnerIds = @($plan.partnerTemplates | ForEach-Object { $_.id })
+$staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir -Only @($plan.templates | Where-Object { $partnerIds -notcontains $_ })
+# PA-6a (D-PA18): a partner App's templates come from its own folder (it is not in this repo's git), copied as they are.
+foreach ($pt in @($plan.partnerTemplates)) {
+    if (-not $pt) { continue }
+    $to = Join-Path $bundleDir "spaces\_templates\$($pt.id)"
+    if (Test-Path $to) { throw "partner template '$($pt.id)' collides with a staged template" }
+    Copy-Item -LiteralPath $pt.dir -Destination $to -Recurse
+    Write-Host "Staged partner template $($pt.id) from $($pt.dir)" -ForegroundColor Green
+}
 # PA-5 (D-PA14): a Product whose Apps share one Space gets that Space's template composed from theirs, out of the copies
 # staged just above (so only committed content is composed). tools/compose-space.mjs refuses a file two parts both ship.
 if ($plan.space) {
