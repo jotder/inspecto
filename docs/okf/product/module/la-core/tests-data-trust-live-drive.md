@@ -1,6 +1,6 @@
 # Link Analysis data trust: live drive (S10 of `LA-DATA-TRUST-1`)
 
-Driven 2026-10-14 on a fresh Enterprise `la-app` demo bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`, built from master `388651a19`), served on port 8147, with a Space `la-feed` created from the `la-daily-feed` template through `POST /spaces`. Personas copied from the `la-showcase` template (`roles.toon`, `demo-users.toon`, `link-analysis.toon`) because `la-daily-feed` ships none. Synthetic days came from a scratchpad script (nothing committed). The built-in browser drove the SPA for steps 3 and 4; the rest was driven over the control API as the Demo Users. *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+Driven 2026-10-14 on a fresh Enterprise `la-app` demo bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo`)*, built from master `388651a19`), served on port 8147, with a Space `la-feed` created from the `la-daily-feed` template through `POST /spaces`. Personas copied from the `la-showcase` template (`roles.toon`, `demo-users.toon`, `link-analysis.toon`) because `la-daily-feed` ships none. Synthetic days came from a scratchpad script (nothing committed). The built-in browser drove the SPA for steps 3 and 4; the rest was driven over the control API as the Demo Users.
 
 Plan: [la-data-trust-plan.md](../../../../archived-documents/plans-archive/la-data-trust-plan.md). As-built: [link-analysis.md](user-guide-link-analysis.md), section *Data trust*.
 
@@ -54,4 +54,4 @@ T1 (trap): an incremental Maven package left `CollectorService` calling the old 
 
 ## Not driven
 
-The corrected-day banner and its Refresh in a live Space (no signal of a kind it shows could be produced, see D5); the fixed strip re-checked in the browser (pane hidden, timers throttled; covered by specs and the API); a live axe pass; a masked persona; the `-DemoAuth` bundle bake (used `-NoBakeDemo`). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+The corrected-day banner and its Refresh in a live Space (no signal of a kind it shows could be produced, see D5); the fixed strip re-checked in the browser (pane hidden, timers throttled; covered by specs and the API); a live axe pass; a masked persona; the `-DemoAuth` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Distribution demo`)* bundle bake (used `-NoBakeDemo`).

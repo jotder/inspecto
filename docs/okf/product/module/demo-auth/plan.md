@@ -32,6 +32,6 @@ give the same roles. It must never be able to reach a customer bundle.
 
 ## Left
 
-* `MODULE-REORG-P3-THIN-JARS` packaging defect (1): `package.ps1 -Edition Advanced -Product la -Distribution demo`
+* `MODULE-REORG-P3-THIN-JARS` packaging defect (1): `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Advanced -Product la -Distribution demo`)*
   fails at the jlink step because the derived module set expects `inspecto-oidc.jar`; `-NoRuntime` works around
   it ([BACKLOG](../../../../BACKLOG.md)).

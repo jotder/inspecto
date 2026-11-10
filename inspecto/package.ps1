@@ -23,7 +23,7 @@
 # turn on -Dauth.mode=oidc. Standard/Advanced also bundle the PostgreSQL JDBC driver as
 # postgresql.jar (PG-1) — listed in modules.list, inert until -Dinspecto.db=postgres; the fat
 # JAR stays driver-free. The driver is read from Maven's real local repository (tools/maven-repo.mjs) and is REQUIRED only by a
-# bundle that carries inspecto-la-store-pg (Advanced, Preview - not -DemoAuth); Standard and the demo build skip it when absent. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
+# bundle that carries inspecto-la-store-pg (Advanced, Preview - not -Distribution demo); Standard and the demo build skip it when absent. (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle).
 # The embedded jlink runtime's module set (below) is VERIFIED sufficient for inspecto-oidc too
 # (PKG-4, 2026-07-07): jdeps on inspecto-oidc.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
 # java.base/java.sql/java.net.http/jdk.httpserver, and RS256/ES256 resolve via SunRsaSign/SunEC
@@ -1241,7 +1241,7 @@ if ($SignJars) {
 # PACKAGE-DEMOAUTH-ADVANCED-1 (operator 2026-10-23: the next release ships WITHOUT Postgres): the driver is looked up in Maven's REAL local
 # repository (tools/maven-repo.mjs: $env:M2_REPO, else <localRepository> in ~/.m2/settings.xml, else ~/.m2/repository - never assumed
 # to be %USERPROFILE%\.m2) and is REQUIRED only by a bundle that carries a Postgres module (tools/bundle-modules.mjs
-# needsPostgresDriver: inspecto-la-store-pg, i.e. Advanced and Preview, not the -DemoAuth build). Everywhere else it rides along when
+# needsPostgresDriver: inspecto-la-store-pg, i.e. Advanced and Preview, not the -Distribution demo build). Everywhere else it rides along when
 # the repository holds it and is skipped with a note when not - Basic, Standard and the demo bundle package without it.
 if ($Edition -ne 'Basic') {
     $pgVersion = ([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.properties.'postgresql.version'
@@ -2126,7 +2126,7 @@ if (-not $NoRuntime) {
     # for Basic the hand list was the incomplete one (it lacked java.security.jgss and jdk.jfr). FAIL CLOSED: a
     # lock mismatch, a missing lock section or no set at all stops the package instead of linking a guessed runtime.
     # An intended change: re-run with --write-lock (see the tool's header) and commit the lock.
-    # PACKAGE-DEMOAUTH-ADVANCED-1: a -DemoAuth bundle stages inspecto-demo-auth.jar where the OIDC trio was; --demo makes the tool expect
+    # PACKAGE-DEMOAUTH-ADVANCED-1: a -Distribution demo bundle stages inspecto-demo-auth.jar where the OIDC trio was; --demo makes the tool expect
     # (and derive from) exactly that, instead of demanding jars the demo step removed.
     $jlinkArgs = @('--edition', $Edition, '--staged-dir', $libDir, '--emit'); if ($DemoAuth) { $jlinkArgs += '--demo' }
     $derivedOut = & node (Join-Path $sandboxRoot 'tools\jlink-modules.mjs') @jlinkArgs 2>&1
@@ -2205,7 +2205,7 @@ if (-not $NoRuntime) {
     $hostPlatform = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'windows_amd64' } else { 'linux_amd64' }
 }
 
-# ── step 6c-demo: DEMO-AUTH-1 launchers (only with -DemoAuth) ─────────────────────────────────────
+# ── step 6c-demo: DEMO-AUTH-1 launchers (only with -Distribution demo) ─────────────────────────────────────
 # The regular launchers and installers go: with no inspecto-oidc.jar, serve.* would boot an auth-free
 # control plane on every interface. serve-demo.* adds the demo module and pins the flags the demo needs:
 #   -Dcontrol.bind=127.0.0.1  demo sign-in is unauthenticated; the module refuses to load otherwise

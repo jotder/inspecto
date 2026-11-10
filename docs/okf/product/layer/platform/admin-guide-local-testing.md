@@ -143,7 +143,7 @@ Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo
 inbox if needed (below), run `bin\serve-demo.bat` (or `./bin/serve-demo.sh`), open `http://127.0.0.1:8080`
 and pick a Demo User.
 
-> ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Advanced -DemoAuth` *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+> ✅ **The `-DemoAuth` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Distribution demo` / `package.ps1 -Edition Advanced -Distribution demo`)* package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Advanced -DemoAuth`
 > built and the bundle booted (`authentication enforced via …DemoAuthenticator`); `/bootstrap` reported
 > `authMode: demo` with the Space's Demo Users; the SPA picker signed three users in with their real roles, and a
 > Link Analysis live check (identity resolution, value Measures, Case-team sharing, settings) ran 33/33 over it.

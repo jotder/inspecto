@@ -1,6 +1,6 @@
 # Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)
 
-*Status: run end to end 2026-10-13 against WSO2 IS 7.3.0 in Docker and a Professional `-Ui la-app` bundle (`LA-APP-REAL-SIGNIN-1`). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+*Status: run end to end 2026-10-13 against WSO2 IS 7.3.0 in Docker and a Professional `-Ui la-app` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Product la`)* bundle (`LA-APP-REAL-SIGNIN-1`).
 Rerun this after any change to `SessionService`, `CallbackComponent`, `OidcTokenRelay` or `OidcAuthenticator`.*
 
 Purpose: prove the whole sign-in against a real IAM - guard redirect, IdP login, callback, `/auth/exchange`, `groups` to

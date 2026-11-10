@@ -9,7 +9,7 @@ metadata:
 `C:\sandbox\spaces\<id>`: `inspecto-mfs` (MFS; `space.toon data_root: "C:/data/inspecto-mfs"` - the 28.9 GB state; the
 repo junction `spaces\inspecto-mfs` -> `C:\sandbox\inspecto-mfs-root\inspecto-mfs` is a stale 1 MB refill, not used),
 `mfs-demo` (IMS, 16 GB) and `la-mobile-money`. Each install boots them through `spaces\<id>.ref` files (one absolute path):
-- **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -Product la -Distribution demo -NoBakeDemo`
+- **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Edition Preview -Product la -Distribution demo -NoBakeDemo`)*
   (demo sign-in); also holds the synthetic LA showcases (la-showcase, la-claims, la-audit, la-daily-feed, ...).
   Start `& C:\sandbox\inspecto-preview\inspecto-la\start-la-preview.ps1`.
 - **Basic** `C:\sandbox\ims-mfs-demo` on :8098, built `-Edition Basic -Product la` (no sign-in, loopback), only the

@@ -137,11 +137,16 @@ for (const pom of poms) {
 }
 
 // ── 4. every other launcher / script / workflow ─────────────────────────────────────────────────
+/**
+ * `-Distribution demo` in every spelling PowerShell accepts: any unambiguous prefix from `-Di` (no other package.ps1
+ * parameter starts with `Di`), any case, a space or a colon before the value, the value bare or quoted.
+ */
+const DEMO_DISTRIBUTION =/(?<![\w$])-Di(?:s(?:t(?:r(?:i(?:b(?:u(?:t(?:i(?:o(?:n)?)?)?)?)?)?)?)?)?)?(?:\s*:\s*|\s+)['"]?demo\b/i;
 for (const file of lsFiles('*.sh', '*.bat', '*.cmd', '*.ps1', '*Dockerfile*', '*.yml', '*.yaml')) {
     if (file === SCRIPT) continue;
     for (const [n, line] of readFileSync(join(root, file), 'utf8').split('\n').entries()) {
         // PRODUCT-ASSEMBLY-1 PA-2: the demo build is `-Distribution demo` now; -DemoAuth stays matched so an old script is caught too.
-        if (!isComment(line) && (line.includes(DEMO) || /-DemoAuth\b/.test(line) || /-Distribution\s+['"]?demo\b/.test(line))) {
+        if (!isComment(line) && (line.includes(DEMO) || /-DemoAuth\b/i.test(line) || DEMO_DISTRIBUTION.test(line))) {
             problems.push(`${file}:${n + 1} stages or builds the demo sign-in outside package.ps1's demo build: ${line.trim()}`);
         }
     }
@@ -150,11 +155,11 @@ for (const file of lsFiles('*.sh', '*.bat', '*.cmd', '*.ps1', '*Dockerfile*', '*
 if (problems.length) {
     fail(
         `${DEMO} can reach a non-demo bundle:\n  - ${problems.join('\n  - ')}\n` +
-            `  The Demo User sign-in has NO real authentication. Only \`package.ps1 -DemoAuth\` may stage it,\n` +
+            `  The Demo User sign-in has NO real authentication. Only \`package.ps1 -Distribution demo\` may stage it,\n` +
             `  and only in place of inspecto-oidc.jar (docs/okf/product/layer/platform/admin-guide-local-testing.md).`,
     );
 }
 console.log(
     `✓ demo-auth isolation guard: ${DEMO} is in no edition's module set, ${gatedRefs} package.ps1 reference(s) all ` +
-        `gated by -DemoAuth across ${blocks.length} block(s), ${poms.length} pom(s) and every other launcher clean.`,
+        `gated by the demo build (if ($DemoAuth), set from -Distribution demo) across ${blocks.length} block(s), ${poms.length} pom(s) and every other launcher clean.`,
 );

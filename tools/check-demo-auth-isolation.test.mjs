@@ -103,7 +103,25 @@ const RED = {
             'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Edition Advanced -Product la -Distribution demo\n'),
         /release\.yml:4 stages or builds the demo sign-in/,
     ],
+    // Every spelling PowerShell accepts for the same switch (PA-2 review): colon form, abbreviation, case, quotes.
+    'a workflow packaging with -Distribution:demo': [
+        (root) => writeFileSync(join(root, '.github/workflows/release.yml'), 'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Distribution:demo\n'),
+        /release\.yml:4 stages or builds the demo sign-in/,
+    ],
+    'a workflow packaging with an abbreviated -Distr demo': [
+        (root) => writeFileSync(join(root, '.github/workflows/release.yml'), 'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Distr demo\n'),
+        /release\.yml:4 stages or builds the demo sign-in/,
+    ],
+    'a workflow packaging with -di \'Demo\' (case, quotes, shortest prefix)': [
+        (root) => writeFileSync(join(root, '.github/workflows/release.yml'), "jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -di 'Demo'\n"),
+        /release\.yml:4 stages or builds the demo sign-in/,
+    ],
 };
+
+test('GREEN: a workflow packaging the production distribution is not refused', () => {
+    const r = runGuard((root) => writeFileSync(join(root, '.github/workflows/release.yml'), 'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Product la -Distribution production\n'));
+    assert.equal(r.status, 0, r.output);
+});
 
 for (const [name, [plant, expected]] of Object.entries(RED)) {
     test(`RED: ${name}`, () => {

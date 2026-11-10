@@ -365,7 +365,7 @@ Home makes ONE call, `type=dataset.write,job.dataset.produced`, and shows the se
 `capped` now tests the RAW page size (the window held `EventQuery.MAX_LIMIT` Signals of any type), not the filtered
 count: the old test almost never fired, so a window flooded with other Signals reported an exact-looking floor.
 Pinned by `ControlApiSignalsTest` (`countsSeveralTypesInOneCall…`, `capsWhenTheWindowIsFull…`) and
-`home.component.spec.ts`. **Live 2026-10-23** (Advanced `-DemoAuth` bundle, a fresh `telco-fraud` Space, the three *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+`home.component.spec.ts`. **Live 2026-10-23** (Advanced `-DemoAuth` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Distribution demo`)* bundle, a fresh `telco-fraud` Space, the three
 sample feeds, 14 detection Jobs): the tile read *14 / 14 writes*; two Jobs re-run with Home open moved it to
 *14 / 16 writes* on the next tick with no reload (distinct Datasets held). The same drive found a fresh Space's Home
 stuck on the first-run panel (*Nothing has been onboarded yet*) beside 14 finished Jobs until a reload, because the

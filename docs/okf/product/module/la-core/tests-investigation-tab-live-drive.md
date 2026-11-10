@@ -10,7 +10,7 @@ the Investigation tab's start form, Expand filter, Clean up or canvas toolbar.*
 
 | Item | Value |
 |---|---|
-| Bundle | `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo`, built from `origin/master` `dc1300f1b` in a sibling worktree  *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)* |
+| Bundle | `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Preview -Product la -Distribution demo -NoBakeDemo`)*, built from `origin/master` `dc1300f1b` in a sibling worktree |
 | Server | the staged `inspecto-demo\bin\serve-demo.bat` (root `serve-demo.bat` before BUNDLE-LAYOUT-1) on `127.0.0.1:8092`, started in a terminal and stopped with Ctrl+C (graceful) |
 | Space | a COPY of the demo's `la-showcase`; the shared demo at `inspecto-preview\inspecto-la` was not touched |
 | User | Demo User `admin`, built-in browser pane (800 × 600 shown, 1024 px CSS width) |
@@ -42,7 +42,7 @@ Investigation whose time column is `last_seen`.
 ## 3. Re-drive after the fixes (2026-11-02)
 
 `LA-INVESTIGATE-TIMECOL-DATE-1`, `-THIS-MASKED-1` and `-CLICKS-2` fixed (as built in
-[`architecture.md`](architecture.md) §6.9). Same set-up as §1: `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+[`architecture.md`](architecture.md) §6.9). Same set-up as §1: `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Preview -Product la -Distribution demo -NoBakeDemo`)*
 built from the fix worktree, `serve-demo.bat` on `127.0.0.1:8092`, a COPY of `la-showcase`, Demo User `admin`, 1024 px.
 
 | Defect | Workflow | Result | Evidence |

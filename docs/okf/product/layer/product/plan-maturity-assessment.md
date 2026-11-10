@@ -1502,7 +1502,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **To reach the next level:** settle D1: set `minEdition: standard` or move the Alert Rules out of the Basic variant. Ship at least 4 sample days so the band demo works. Verify `owner: admin` behaviour on a Basic bundle and file a row for the result.
 
 #### Inspecto LA (`la-app`) — the standalone Link Analysis product (module.la-core and its la/ modules)
-- **What it is (customer view):** a graph investigation product over existing Datasets. Analysts explore who is connected to whom, run 29 graph algorithms, record the work as a sealed Investigation and hand it on as a verifiable Dossier, a Case link or a standing detection. It ships as a standalone app (`package.ps1 -Ui la-app`) or inside the console (`docs/GLOSSARY.md` "Inspecto LA", `docs/EDITIONS.md` "UI flavor"). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
+- **What it is (customer view):** a graph investigation product over existing Datasets. Analysts explore who is connected to whom, run 29 graph algorithms, record the work as a sealed Investigation and hand it on as a verifiable Dossier, a Case link or a standing detection. It ships as a standalone app (`package.ps1 -Product la`) or inside the console (`docs/GLOSSARY.md` "Inspecto LA", `docs/EDITIONS.md` "UI flavor").
 - **Scores:** F 3 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**.
 - **Evidence:**
   - Modules: `la-core`, `la-storage`, `la-api`, `geo-link`, `la-store-pg` (`la/`). Routes: `la-api` 90 (90 in OpenAPI), `geo-link` 7 (`module/la-api/api-routes.md`, `module/geo-link/api-routes.md`).

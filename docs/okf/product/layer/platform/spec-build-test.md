@@ -272,11 +272,13 @@ Every other top-level entry (the committed `default`/`demo`/`ucc`, untracked or 
   with the `serve-demo` flags, runs the seed script `--apply`, stops the server gracefully (Ctrl+C, so DuckDB checkpoints; a leftover
   `.wal` fails the build), scans the baked folder for the build-time path (any hit fails the build), and copies it to
   `spaces\la-showcase`, so a presenter unzips, runs `serve-demo` and signs in with no node and no seed step. Any failure throws; `-NoBakeDemo`
-  skips it for a fast local package. `tools/check-bundle-spaces.mjs` allows exactly that one Space, only for demo-auth + la-app
-  (`tools/bundle-spaces-rule.mjs`, `--bundle <dir>`), and still fails every other bundle shape. Every other bundle still ships none.
+  skips it for a fast local package. `tools/check-bundle-spaces.mjs` allows exactly that one Space, only for a demo build whose
+  Assembly Plan names it as `seedSpace` (`tools/bundle-spaces-rule.mjs`, `--bundle <dir> --seed-space <id>`; `PRODUCT-ASSEMBLY-1`
+  PA-2 made the Space the Product's `demoSpace` and the seed script `tools/seed-<space>.mjs`), and still fails every other bundle
+  shape. Every other bundle still ships none.
 - 🔴 **Why no Spaces.** A hand-over built as "the bundle plus ONE Space folder" opened the sample `default`
   Space instead of the one dropped in beside it (2026-09-25 rehearsal); `0228534d0` pruned the samples for
-  `-Distribution demo` only, and this decision made it the rule for every edition.
+  `-DemoAuth` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Distribution demo`)* only, and this decision made it the rule for every edition.
 - 🔴 **Why committed content** (`BUNDLE-UNTRACKED-SPACES-1`). Step 4 used to copy the working-tree
   `Get-ChildItem spaces/` listing, and a demo bundle built in the shared sandbox checkout shipped a
   git-excluded client working set and a peer's untracked pilot Space.
