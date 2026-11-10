@@ -528,6 +528,29 @@ The slices, each its own lane (D-PA16):
   tariff, …) with ONE generated golden corpus that plants RA's leakages and FM's typologies, with ground truth; each App
   maps them onto its own names through views, so its Jobs and Alert Rules stay; the golden tests are re-pointed; LA's
   telecom link Job reads the same feeds.
+  **Re-scoped 2026-11-10 (D-PA17, operator).** The survey found the telco corpora hand-made (no generator for
+  `telco-ra`, `telco-fraud`, `telco-bypass`, `telco-rerating`) and pinned by about 650 assertions in four Java golden
+  tests (`TelcoRaGoldenTest` 67, `TelcoFraudTemplateGoldenTest` 105, `BypassFeatureGoldenTest` 132,
+  `TelcoRerateGoldenTest` 353; 4,100 lines). Re-deriving them all was judged the wrong risk, so **one ingest happens in
+  the Composed Space Template only**: each App template keeps its own feeds and golden tests (it still installs alone),
+  and `tools/compose-space.mjs` swaps the parts' usage-feed Pipelines for the `telecom` Industry's one canonical
+  feed when it composes a Product's Space. Facts and open questions for the build lane:
+  - The overlap is the network usage record: RA's `switch_xdr` (`XDR_ID`, `SUBSCRIBER_ID`, `B_NUMBER`, `SERVICE`,
+    `PARTNER`, `USAGE_UNITS`), FM's `cdr` (`record_id`, `a_number`, `b_number`, `direction`, `duration_s`, `charge`,
+    `roaming`, `cell_id`) and bypass's `voice_cdr` (the same plus `answered`, `release_cause`, `imei`, `imsi`). RA's
+    mediated, rated, billed, tariff and interconnect feeds and FM's subscriber and payment feeds have no second
+    reader in Telco, so they stay the parts' own.
+  - Mechanism, to decide first: a `config/views/*.toon` view is a Pipeline `sink.view` read through `ViewQuery`; it is
+    not yet shown that a Reconciliation side, a `sql.template` Job's `FROM cdr` and an Alert Rule resolve a view as
+    they resolve a store. The alternative is ONE canonical Pipeline that fans out (one sink per App store:
+    `switch_xdr`, `cdr`, `voice_cdr`), so every consumer keeps reading a real store.
+  - The composed corpus: the union of the parts' usage samples converted to the canonical shape. RA's three-way
+    completeness and rated-vs-billed controls would then flag FM's and bypass's traffic as lost or unbilled, so the
+    converter must also emit their mediated, rated and billed rows (rated at the tariff; billed per subscriber and
+    month), or the composed Space plants false leakage. FM's typologies must stay quiet on RA's rows (fictional
+    `+1-555-01xx` numbers, no IRSF prefixes).
+  - Proof: one new golden test of the composed Space (each App's planted findings, nothing new), the four existing
+    golden tests untouched, and the Telco bundle seeded from the composed corpus.
 - **PA-5d — the demo Distribution.** `tools/seed-telco.mjs`, `products/telco.demo-build.txt`, `demoSpace: telco`, and
   the Telco Product matrix (Standard, Advanced) in CI.
 
@@ -551,6 +574,7 @@ The slices, each its own lane (D-PA16):
 | D-PA14 | How several Apps land in one Space with no new Java | the assembler composes one Space Template from the Apps' templates at build time; a file two parts ship is refused |
 | D-PA15 | How Telco reaches one ingest | the `telecom` Industry owns canonical feeds and one generated golden corpus; Apps map them through views |
 | D-PA16 | The order of the PA-5 lanes | compose (5a), suite shell (5b), one ingest (5c), demo (5d) |
+| D-PA17 | How PA-5c reaches one ingest, given ~650 golden assertions over hand-made corpora | in the Composed Space Template only: the composer swaps the parts' usage feeds for the Industry's one; templates and their golden tests stay (signed 2026-11-10, refines D-PA15) |
 
 ## 13. The open board, re-checked 2026-11-10
 
