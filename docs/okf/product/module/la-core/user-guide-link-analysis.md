@@ -3023,7 +3023,9 @@ have `forTestAbsent`. Routes, URLs and `openapi-v1.json` did not change. `Pendin
 
 **Gotchas.**
 * A new module is one more place the hand-kept mirrors (`the la-api and geo-link manifests' `provides.routes``, `CapabilityManifest`, the bundle
-  module lists) must agree: add it to `tools/bundle-modules.mjs` and the static profile list in `pom.xml` in the SAME commit.
+  module lists) must agree: list it in its Offering (`offerings/<edition>.toon`, from which `tools/bundle-modules.mjs` derives the
+  bundle since `PRODUCT-ASSEMBLY-1` PA-1), give it a `CLASSPATH_ORDER` position, and add it to the static profile list in `pom.xml`
+  in the SAME commit.
 * An import closure is a prediction, not proof. The first closure script treated a `/*` inside a string literal as a
   comment and undercounted 46 → 20 classes; it also could not see fully-qualified inline references, which the compiler
   found. Re-ground with a string-aware tokenizer and prove with `mvn clean test-compile` of a clean checkout.

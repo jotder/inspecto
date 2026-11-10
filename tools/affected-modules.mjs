@@ -23,7 +23,7 @@ const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 1 <<
 export const FULL_THRESHOLD = 0.7;
 
 /** Paths that no Java build or test reads unless a test literally names them (then the consumer scan wins). */
-const NO_BUILD = [/^docs\//, /^\.claude\//, /^product-map\//, /^offerings\//, /^compliance\//, /^tools\/(?!templates\/)/,
+const NO_BUILD = [/^docs\//, /^\.claude\//, /^product-map\//, /^offerings\//, /^products\//, /^apps\//, /^industries\//, /^compliance\//, /^tools\/(?!templates\/)/,
     /^\.github\//, /^\.githooks\//, /\.md$/i, /^\.gitignore$/, /^\.gitattributes$/, /^\.claudeignore$/, /^\.mcp\.json$/,
     /^CLAUDE\.md$/, /^dev-infra\//, /^spaces\//, /^tools\/templates\//, /\.xlsx$/i, /^warehouse_[\w]+\.sql$/, /^test-run\.ps1$/];
 /** Paths that matter for PACKAGING (bundle smoke), not for unit tests. */

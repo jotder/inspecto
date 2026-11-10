@@ -96,7 +96,7 @@ resolves after a root `mvn install`**. Every entry point builds via the root rea
 - `inspecto/package.ps1` step 1: `mvn clean package -pl inspecto -am` **from the repo root**
   (`-am` builds fp-api/fp-config in-pass; the shaded JAR still lands in `inspecto/target/`).
   Same idiom as its Standard-edition step 1c.
-- ⚠ **Superseded 2026-10-08 (P3d stage 2):** the shade now has an `artifactSet` EXCLUDE list — the 14 first-party core libraries are thin jars, not shaded. A new first-party library the processor depends on must be added to `CORE_MODULES` (`tools/bundle-modules.mjs`) AND that exclude list or `tools/check-sbom-modules.mjs` goes red.
+- ⚠ **Superseded 2026-10-08 (P3d stage 2):** the shade now has an `artifactSet` EXCLUDE list — the 14 first-party core libraries are thin jars, not shaded. A new first-party library the processor depends on must be a module whose manifest says `offeringRole: base` (since `PRODUCT-ASSEMBLY-1` PA-1 `tools/bundle-modules.mjs` derives the core set from the manifests), with a `CLASSPATH_ORDER` position, AND be on that exclude list or `tools/check-sbom-modules.mjs` goes red.
 
 ## Module-extraction playbook (what S5 proved)
 

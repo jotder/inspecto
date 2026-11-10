@@ -32,7 +32,7 @@ The platform already composes builds from parts. Each layer works; what is missi
 | Module manifest | `META-INF/inspecto/module.toon` per module (48) | what a module provides and requires; boot resolves the graph, an unmet module stays inert |
 | Offering | `offerings/{basic,standard,advanced,preview}.toon` | modules, Add-ons, content packs and posture (auth mode, stores, Postgres sidecar) per Edition; `includes` chains Basic → Standard → Advanced → Preview |
 | Industry pack | `platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/{telecom,mobile-money}/` | terms, Entity Types, link kinds and record types of a vertical; today used by Link Analysis only (a Space's **Domain Profile**) |
-| Space Templates | `spaces/_templates/*` (31) | the content: `telco-ra`, `telco-fraud`, `telco-bypass`, `partner-settlement`, `telco-rerating`, `business-assurance`, `aml`, `payment-fraud`, `mobile-money`, 20 `la-*` showcases, … |
+| Space Templates | `spaces/_templates/*` (30) | the content: `telco-ra`, `telco-fraud`, `telco-bypass`, `partner-settlement`, `telco-rerating`, `business-assurance`, `aml`, `payment-fraud`, `mobile-money`, 20 `la-*` showcases, … |
 | Product Map | `product-map/<kind>/<name>.toon` | the commercial tree: billable items, Order Codes, billing model, support tier |
 | Packaging | `inspecto/package.ps1` (2,850 lines), `tools/offering-classpath.mjs`, `tools/bundle-modules.mjs` | one bundle per `-Edition`, plus `-Ui gamma\|la-app` and `-DemoAuth` |
 | Customer build | `tools/customer-build.mjs` | trims an Edition bundle to what one customer bought |
@@ -314,7 +314,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-10** Go-to-market | Product Map kinds; generated Product documents; `customer-build` through the assembler | a customer build of the pilot customer matches today's, plus an entitlement |
 
 **PA-1 as built (2026-11-10).**
-- **The two Products partition the 31 templates.** The LA App owns the 20 `la-*` templates, including
+- **The two Products partition the 30 templates** (the first draft said 31; corrected after review). The LA App owns the 20 `la-*` templates, including
   `la-showcase-off`, the demo's companion Space, which no Offering listed. The console (`inspecto`, Platform product)
   owns the other 10 and takes the LA App as optional. The guard refuses a template that no Product ships.
 - **Industry-neutral Apps.** Link Analysis serves any Industry (`industries[0]`), so Inspecto LA names no Industry

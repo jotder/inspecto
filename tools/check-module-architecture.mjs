@@ -95,8 +95,9 @@ export function registries(read, files) {
     add('Governable config kinds', ap, sizeOf(ap, (t) => { const m = /private static Set<String> governable\(\)\s*\{([\s\S]*?)\n    \}/.exec(t); return m ? count(m[1], /\bs\.(add|addAll|remove)\s*\(/g) : 0; }), 'hand-edit sites in the computed set');
     const oa = 'docs/api/openapi-v1.json';
     add('API contract', oa, sizeOf(oa, (t) => { try { return Object.keys(JSON.parse(t).paths ?? {}).length; } catch { return 0; } }), 'paths in one file');
-    const bm = 'tools/bundle-modules.mjs', pk = 'inspecto/package.ps1';
-    add('Edition / bundle lists', `${bm}, ${pk}`, (sizeOf(pk, (t) => count(t, /\$modules\s*=/g)) ?? 0) + (read(bm) == null ? 0 : 1), 'hand-kept list sites');
+    // tools/bundle-modules.mjs no longer counts: since PRODUCT-ASSEMBLY-1 PA-1 it derives its table from offerings/*.toon.
+    const pk = 'inspecto/package.ps1';
+    add('Edition / bundle lists', pk, sizeOf(pk, (t) => count(t, /\$modules\s*=/g)) ?? 0, 'hand-kept list sites');
     add('jlink module set', pk, sizeOf(pk, (t) => { const m = /\$runtimeModules\s*=\s*'([^']*)'/.exec(t); return m ? m[1].split(',').length : 0; }), 'java modules');
     const of = 'inspecto/src/main/java/com/gamma/service/OperationalDb.java';
     add('Operational store families', of, sizeOf(of, (t) => { const m = /enum Family\s*\{([\s\S]*?);\s*\n/.exec(t); return m ? count(m[1].replace(/\/\/.*$/gm, ''), /^\s*[A-Z][A-Z_]+\(/gm) : 0; }), 'Family constants');

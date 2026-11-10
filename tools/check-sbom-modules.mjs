@@ -176,14 +176,14 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
     // ship twice (inside inspecto.jar AND as its thin jar, which modules.list also names) - classes duplicated, signing impossible.
     // If it excludes one the generator does not stage, the library would ship NOWHERE and the bundle would die at boot.
     if (!/offering-classpath\.mjs'\)\s+--list-core/.test(text)) {
-        problems.push(`${SCRIPT} does not stage the core thin jars from \`tools/offering-classpath.mjs --list-core\` - a hand-kept list of them would drift from tools/bundle-modules.mjs CORE_MODULES and from the shade excludes.`);
+        problems.push(`${SCRIPT} does not stage the core thin jars from \`tools/offering-classpath.mjs --list-core\` - a hand-kept list of them would drift from tools/bundle-modules.mjs coreModules() (the manifests' offeringRole base) and from the shade excludes.`);
     }
     let procPom = processorPomText;
     if (procPom === undefined) {
         try { procPom = readFileSync(join(root, 'inspecto/pom.xml'), 'utf8'); } catch { procPom = null; }
     }
     if (procPom === null) {
-        problems.push('inspecto/pom.xml is unreadable - cannot hold its shade artifactSet against CORE_MODULES.');
+        problems.push('inspecto/pom.xml is unreadable - cannot hold its shade artifactSet against the core modules (bundle-modules.mjs coreModules()).');
     } else {
         const noComments = procPom.replace(/<!--[\s\S]*?-->/g, '');
         const excl = /<artifactSet>\s*<excludes>([\s\S]*?)<\/excludes>\s*<\/artifactSet>/.exec(noComments);
@@ -195,7 +195,7 @@ export function analyze(text, { root = repoRoot, bundleModulesText, generated, p
             const d = diff(excluded, core);
             if (!d.same) {
                 problems.push(
-                    `inspecto/pom.xml's shade artifactSet excludes do not equal tools/bundle-modules.mjs CORE_MODULES` +
+                    `inspecto/pom.xml's shade artifactSet excludes do not equal tools/bundle-modules.mjs coreModules() (the manifests' offeringRole base)` +
                         (d.missing.length ? `
       core thin jar shipped but ALSO shaded into inspecto.jar (not excluded): ${d.missing.join(', ')}` : '') +
                         (d.extra.length ? `

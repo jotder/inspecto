@@ -8,7 +8,8 @@
  * the module manifests (`<dir>/src/main/resources/META-INF/inspecto/module.toon`):
  *   - a row per optional / provider module that some Offering resolves to (its `includes` chain plus the manifests'
  *     `requires.modules` closure), plus `inspecto-processor`, the product jar (offeringRole base, always staged);
- *   - `from` is the lowest tier whose Offering resolves the module ('all' = Basic and up, 'standard', 'advanced');
+ *   - `from` is the lowest tier whose Offering resolves the module ('all' = Basic and up, 'standard', 'advanced', or
+ *     'preview' for a module only preview.toon lists - it then ships in Preview alone);
  *   - `dir` is where the module's manifest lives; `bundleFile` is `<artifactId>.jar` (the processor ships as `inspecto.jar`);
  *   - CORE_MODULES (the always-present thin jars) are the manifests whose offeringRole is base, minus the processor.
  * Rows are ordered by CLASSPATH_ORDER (below), so the staging loop, the SBOM and the classpath agree on one order.
@@ -63,8 +64,9 @@ export const CLASSPATH_ORDER = [
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST_SUFFIX = '/src/main/resources/META-INF/inspecto/module.toon';
-const TIERS = ['basic', 'standard', 'advanced'];
-const FLOOR_OF = { basic: 'all', standard: 'standard', advanced: 'advanced' };
+// Preview is a tier too: a module only preview.toon lists ships in Preview alone (bundleModules('Preview') takes every row).
+const TIERS = ['basic', 'standard', 'advanced', 'preview'];
+const FLOOR_OF = { basic: 'all', standard: 'standard', advanced: 'advanced', preview: 'preview' };
 const PROCESSOR = 'inspecto-processor';
 
 /** Module id -> artifactId (`processor` -> `inspecto-processor`, `ops` -> `inspecto-ops`). */
@@ -111,7 +113,7 @@ export function deriveTables(sources) {
     const processor = manifests.processor;
     if (!processor) throw new Error('no manifest with id `processor` - the product jar has to be a module like every other');
     const resolved = Object.fromEntries(TIERS.map((t) => [t, resolveOfferingModules(t, sources)]));
-    const optional = new Set([...resolved.advanced].filter((id) => !['base', 'internal'].includes(manifests[id].offeringRole)));
+    const optional = new Set([...resolved.preview].filter((id) => !['base', 'internal'].includes(manifests[id].offeringRole)));
     const modules = [{ artifactId: PROCESSOR, dir: processor.dir, bundleFile: 'inspecto.jar', from: 'all' }];
     for (const id of optional) {
         const tier = TIERS.find((t) => resolved[t].has(id));
