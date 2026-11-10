@@ -139,6 +139,28 @@ class LaIndexBuildJobTest {
         }
     }
 
+    /**
+     * LA-INDEX-BUILD-NULL-MODE-1: an early refusal names no {@code mode} (ScheduledIndexBuild's {@code refused(null, …)}:
+     * NO_INDEX_SERVICE while the control API does not serve the index yet on a first boot, UNDECIDABLE, MAPPING_INVALID).
+     * The real emitter copies the payload into an audit Event (Map.copyOf), which refuses a null value, so the Run used to
+     * fail with a NullPointerException instead of reporting the refusal.
+     */
+    @Test
+    void aBuildWithNoModeEmitsAPayloadWithoutNullValues() throws Exception {
+        Ctx ctx = new Ctx(false, grantOf(r -> new Outcome("REFUSED", null, "NO_INDEX_SERVICE",
+                "the control API is not serving the index in this process", 0, 0, 0)), PARAMS);
+
+        JobResult r = job().run(ctx);
+
+        assertFalse(r.success(), "a refused build does not report a current index");
+        assertTrue(r.message().contains("not serving the index"), r.message());
+        Map<String, Object> payload = ctx.payloads.get(0);
+        assertFalse(payload.containsValue(null), "every payload value is set: " + payload);
+        assertFalse(payload.containsKey("mode"), "no mode is reported when the build named none");
+        assertEquals("NO_INDEX_SERVICE", payload.get("code"));
+        assertDoesNotThrow(() -> Map.copyOf(payload), "the audit Event's copy of the payload");
+    }
+
     @Test
     void aMissingRequiredParameterIsRejectedBeforeAnythingRuns() {
         Map<String, String> p = new HashMap<>(PARAMS);

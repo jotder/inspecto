@@ -76,7 +76,9 @@ final class LaIndexBuildJob implements Job {
         payload.put("job", cfg.name());
         payload.put("dataset", req.dataset());   // an id, never a value: the index-lag clock pairs this with dataset.write
         payload.put("result", o.result());
-        payload.put("mode", o.mode());
+        // An early refusal (no index service yet on a first boot, an undecidable or invalid mapping) names no mode;
+        // the audit Event refuses a null value.
+        if (o.mode() != null) payload.put("mode", o.mode());
         if (o.code() != null) payload.put("code", o.code());
         payload.put("edges", o.edges());
         payload.put("nodes", o.nodes());
