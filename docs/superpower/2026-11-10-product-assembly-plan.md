@@ -2,7 +2,8 @@
 
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
-as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); PA-3 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
+design and proof); PA-4 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -304,7 +305,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-0** Words and decisions ✅ 2026-11-10 | `GLOSSARY.md` §15 *Product assembly*: Product (Domain / Platform), App, Industry, Suite, Distribution, Entitlement, Assembly Plan, Product lock, Base; §13 rename-map row; §12 signed | vocabulary guard green |
 | **PA-1** Definitions describe today ✅ 2026-11-10 | `products/{inspecto,la}.toon`, `apps/link-analysis/app.toon`, `industries/{telecom,mobile-money}/`; one guard, `tools/check-products.mjs` (rules in `tools/products.mjs`, shared with the assembler); the Offering as the only module table | ✅ guard + 21 tests green; the derived module table equals the hand-kept one row for row in every Edition and the core set (only the row order of Standard and up changed, to `CLASSPATH_ORDER`); all 735 tool tests green |
 | **PA-2** Assembler ✅ 2026-11-10 | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised (✅; package runs in the as-built note) |
-| **PA-3** Server | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination |
+| **PA-3** Server ✅ 2026-11-10 | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination (✅; proof in the PA-3 note) |
 | **PA-4** Suite shell | shared shell library; generated hosts; Apps as lazy libraries; App switcher; My work across Apps | both shells' specs and axe green; bundle sizes within 5 % |
 | **PA-5** **Inspecto Telco** as proof | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
 | **PA-6** Platform product | the Add-on picker; builder-kit docs; `inspecto app new/validate/test/package`; the conformance kit | a sample partner App built only with the kit passes conformance |
@@ -385,9 +386,15 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   `feature` is true in this response's `features` (installed, enabled in this Space, in this Edition), and, where an
   Authenticator is active, the caller holds its `capability`. These are the three gates of `GLOSSARY.md` §15
   (Installed · Enabled · Permitted), plus the Product; Entitlement joins Installed in PA-7.
-- **Proof:** unit tests over the resolution matrix (each gate on its own), real-HTTP tests over the wiring (no
-  descriptor, pre-sign-in identity only, a signed-in caller with and without the capability, a missing module), the
-  OpenAPI `Bootstrap` schema regenerated, and a bundle whose `/bootstrap` names its Product.
+- **Proof (as built, 2026-11-10).** `ProductDescriptorTest` (9: each gate alone, the reader's refusals) and
+  `ControlApiBootstrapProductTest` (5, real HTTP: no descriptor, Basic, pre-sign-in identity only, a caller with and
+  without the capability, a malformed descriptor failing the boot before a port is bound); the nav parity test against
+  `la-nav.ts`; the OpenAPI `Bootstrap` schema regenerated. The affected-module run (`-Pedition-advanced`): the processor
+  2,669 tests and 21 downstream modules 3,033 tests, no failure; it caught `ImportLoaderInventoryTest`, which
+  requires `product.json` (a fixed name a loader reads) to be allow-listed with its reason. Real bundles, booted:
+  Inspecto LA × Basic answers `product.id` `la`, `apps[0]` installed, nav `linkAnalysis, data, entityLists` (geoMap,
+  entities and alerts hidden because Basic reports those features false - exactly what `la-nav.ts` draws on Basic);
+  the console × Basic answers `product.id` `inspecto`, shape `platform`, host `gamma`, the same three entries.
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 
