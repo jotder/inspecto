@@ -1,0 +1,15 @@
+id: acme-spend
+title: Acme Spend Watch
+version: 0.1.0
+platform: >=4.0 <5
+industries[0]:
+requires:
+  addons[0]:
+templates[1]: acme-spend
+nav:
+  findings:
+    path: data-browser
+    label: Acme Spend Watch findings
+    icon: heroicons_outline:magnifying-glass
+    blurb: Browse what Acme Spend Watch found.
+docs: docs/index.md

@@ -83,7 +83,7 @@ export function starterFiles(id, { title = null, industry = null, addons = [] } 
         'app.toon': [
             `id: ${id}`, `title: ${t}`, 'version: 0.1.0', 'platform: >=4.0 <5',
             industry ? `industries[1]: ${industry}` : 'industries[0]:',
-            'requires:', `  addons[${addons.length}]: ${addons.join(',')}`,
+            'requires:', `  addons[${addons.length}]:${addons.length ? ` ${addons.join(',')}` : ''}`,
             `templates[1]: ${tpl}`,
             'nav:', '  findings:', '    path: data-browser', `    label: ${t} findings`, '    icon: heroicons_outline:magnifying-glass',
             `    blurb: Browse what ${t} found.`,
@@ -287,6 +287,9 @@ export async function goldenConformance({ fetchFn = fetch, base, space, conforma
     return findings;
 }
 
+/** The bundle's OIDC Authenticator jar (`lib/inspecto-oidc.jar`), as a modules.list entry names it. */
+export const isOidcJar = (entry) => /(^|[\\/])inspecto-oidc(-[^\\/]*)?\.jar$/.test(entry);
+
 /** Boot `bundle` on loopback with a Space from the App's conformance template and hold it to its golden data. */
 export async function bootConformance(appRoot, bundle, { log = () => {}, readyTries = 240 } = {}) {
     const root = resolve(appRoot);
@@ -302,7 +305,11 @@ export async function bootConformance(appRoot, bundle, { log = () => {}, readyTr
     try {
         scaffoldSpace(join(work, 'spaces'), space, join(root, 'templates', c.template));
         const port = await freePort();
-        const cp = readFileSync(modules, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean).map((j) => join(bundleDir, j)).join(sep);
+        // A Standard or Advanced bundle carries inspecto-oidc.jar, whose Authenticator needs an identity provider; conformance
+        // tests the App, not sign-in, so this loopback boot over a scratch Space leaves it off and runs without sign-in.
+        const jars = readFileSync(modules, 'utf8').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        const cp = jars.filter((j) => !isOidcJar(j)).map((j) => join(bundleDir, j)).join(sep);
+        if (jars.some(isOidcJar)) log('left inspecto-oidc.jar off the classpath: the conformance boot runs without sign-in');
         const javaExe = join(bundleDir, 'runtime', 'bin', process.platform === 'win32' ? 'java.exe' : 'java');
         const ext = join(bundleDir, 'lib', 'duckdb', plat);
         const args = ['--enable-native-access=ALL-UNNAMED', '-Dcontrol.bind=127.0.0.1', `-Dcontrol.port=${port}`, '-Dspaces.root=spaces',

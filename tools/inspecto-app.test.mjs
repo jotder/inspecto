@@ -5,8 +5,9 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
-import { STARTER, goldenConformance, packageApp, scaffold, scaffoldSpace, staticConformance, validate, zip } from './inspecto-app.mjs';
+import { STARTER, goldenConformance, isOidcJar, packageApp, scaffold, scaffoldSpace, staticConformance, validate, zip } from './inspecto-app.mjs';
 import { assemble } from './assemble.mjs';
 import { gather } from './check-offerings.mjs';
 import { gatherModel } from './products.mjs';
@@ -149,3 +150,16 @@ test('package writes a deterministic zip with a SHA-256 manifest, and refuses an
     assert.throws(() => packageApp(root, join(dir, 'c')), /does not validate/);
     assert.equal(zip([]).readUInt32LE(0), 0x06054b50, 'an empty archive is just the end record');
 }));
+
+test('the conformance boot leaves only the OIDC Authenticator jar off a bundle classpath', () => {
+    for (const j of ['lib/inspecto-oidc.jar', 'lib\\inspecto-oidc.jar','lib/inspecto-oidc-4.2.0.jar']) assert.ok(isOidcJar(j), j);
+    for (const j of ['lib/inspecto.jar', 'lib/nimbus-jose-jwt.jar', 'lib/inspecto-oidc.jar.sha256', 'lib/inspecto-oidcx.jar']) assert.ok(!isOidcJar(j), j);
+});
+
+test('the sample partner App (examples/partner-app) validates and holds static conformance on every Edition', () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'examples', 'partner-app');
+    assert.deepEqual(validate(root), []);
+    const { findings, editions } = staticConformance(root);
+    assert.deepEqual(findings, []);
+    assert.deepEqual(editions, ['basic', 'standard', 'advanced', 'preview']);
+});

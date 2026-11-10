@@ -1,0 +1,29 @@
+name: acme_spend_events
+active: true
+
+dirs:
+  poll:       data/inbox/acme_spend_events
+  database:   data/acme_spend_events/database
+  backup:     data/acme_spend_events/backup
+  temp:       data/acme_spend_events/temp
+  errors:     data/acme_spend_events/errors
+  quarantine: data/acme_spend_events/quarantine
+  markers:    data/acme_spend_events/markers
+  status_dir: data/acme_spend_events/status
+  log_dir:    data/acme_spend_events/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: acme_spend_events_schema.toon
+  csv_settings:
+    delimiter: ","
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

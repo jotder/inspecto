@@ -1,0 +1,6 @@
+name: "Acme Spend Watch"
+tagline: "Acme Spend Watch: one feed, one detection Job and its findings"
+description: "Made with the Inspecto App kit (tools/inspecto-app.mjs new). One daily acme_spend_events feed lands through its Pipeline into a Dataset; the acme_spend_detect Job flags each account whose amounts in a day exceed a threshold (1000) into acme_spend_findings. Synthetic data only: the samples in data/samples/acme_spend_events plant three accounts over it and five look-alikes at or under it."
+minEdition: basic
+icon: heroicons_outline:puzzle-piece
+contents[3]: "Pipeline + schema", "Dataset", "Detection Job + findings Dataset"

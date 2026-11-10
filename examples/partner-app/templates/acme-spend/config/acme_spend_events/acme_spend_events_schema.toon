@@ -1,0 +1,24 @@
+raw:
+  name: ACME_SPEND_EVENTS
+  format: CSV
+  fields[4]{name,selector,type,description,unit,classification}:
+    event_id,"0",VARCHAR,"Event identifier","","INTERNAL"
+    event_ts,"1",TIMESTAMP,"Event time","","INTERNAL"
+    account_id,"2",VARCHAR,"Account (synthetic)","","INTERNAL"
+    amount,"3",DOUBLE,"Amount","","INTERNAL"
+mapping:
+  canonicalName: acme_spend_events
+  rawName: ACME_SPEND_EVENTS
+  fields[4]:
+    - name: event_id
+      from: event_id
+      fn: keep
+    - name: event_ts
+      from: event_ts
+      fn: keep
+    - name: account_id
+      from: account_id
+      fn: keep
+    - name: amount
+      from: amount
+      fn: keep

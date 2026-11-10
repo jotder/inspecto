@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); PA-6b is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); PA-6c is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -736,6 +736,28 @@ Domain product. `package.ps1 -Product inspecto -Edition Basic -NoRuntime -AppRoo
 from its folder beside the 30 first-party ones. On that bundle, `inspecto-app.mjs test --bundle inspecto-deploy` boots
 it, ingests the golden data, runs the Job and holds `acme_limits_findings` to exactly A-001, A-002, A-003. With the
 expectation changed to A-001, A-104 the same run fails, naming the keys it found.
+
+**PA-6b as built (2026-11-11).**
+- **The sample partner App, `examples/partner-app/`** (App `acme-spend`, "Acme Spend Watch"), is the unedited output
+  of `node tools/inspecto-app.mjs new acme-spend --dir examples/partner-app --title "Acme Spend Watch"`, outside
+  `apps/`. The kit's own `new` was fixed to write an empty Add-on list as `addons[0]:`, with no trailing space.
+- **CI holds it.** A guards step, "the sample partner App holds its conformance", runs `validate` and `test` on it.
+  `tools/inspecto-app.test.mjs` also checks it validates and assembles on all four Editions.
+- **Boot conformance on a bundle with sign-in (decided).** A Standard or Advanced bundle carries `inspecto-oidc.jar`.
+  Without an identity provider configured, its Authenticator does not construct and the server exits 1, and Demo Auth
+  ships only in demo builds. So `test --bundle` leaves `inspecto-oidc.jar` off the classpath of its loopback boot over
+  the scratch Space and runs without sign-in (`isOidcJar`). Conformance tests the App, not sign-in. The bundle itself
+  is not changed.
+- **The starter's Alert Rule stays out (decided):** `APP-KIT-ALERT-RULE-1` on the board, held for demand. A rule over
+  a `sql.template` sink needs its zero-row seed parquet, which the Node kit does not write.
+
+**Proof (as built).**
+- `tools/inspecto-app.test.mjs`: 9/9.
+- `package.ps1 -Product inspecto -Edition Standard -NoRuntime -NoUi -AppRoot examples/partner-app` built and passed its
+  boot smoke, staging `acme-spend` beside the first-party templates.
+- On that bundle, the PA-6a kit's `test --bundle inspecto-deploy` fails: the server exits 1.
+- PA-6b's kit boots it without the OIDC jar and holds `acme_spend_findings` to exactly A-001, A-002, A-003. With the
+  expectation changed to A-001, A-104, the same run fails, naming the keys it found.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 

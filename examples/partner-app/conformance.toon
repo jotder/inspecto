@@ -1,0 +1,7 @@
+template: acme-spend
+day: 2026-07-01
+jobs[1]: acme_spend_detect
+expectations:
+  acme_spend_findings:
+    key: account_id
+    expected[3]: A-001,A-002,A-003

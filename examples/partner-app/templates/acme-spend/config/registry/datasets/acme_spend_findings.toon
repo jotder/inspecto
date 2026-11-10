@@ -1,0 +1,7 @@
+name: acme_spend_findings
+physicalRef: acme_spend_findings
+columns[4]{name,type,classification}:
+  account_id,string,
+  events,number,
+  total,number,
+  window_date,date,
