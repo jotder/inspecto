@@ -28,7 +28,8 @@ import java.util.Set;
  * from a broken build, and serving half a Product - a nav with an App missing - is worse than serving none.
  *
  * <p><b>What it decides.</b> {@link #resolve} turns the declared Apps and nav into what this caller, in this Space, sees: an
- * App is installed when every module it needs is ACTIVE; a nav entry is drawn when its App is installed, its {@code feature}
+ * App is installed when every module it needs is ACTIVE, and enabled when this Space has switched none of them off; a nav
+ * entry is drawn when its App is installed and enabled, its {@code feature}
  * is true in the response's feature map (installed, enabled in this Space, in this Edition) and - only where an
  * Authenticator is active - the caller holds its {@code capability}. Pure: the caller supplies all four signals.
  */
@@ -146,28 +147,37 @@ public record ProductDescriptor(String id, String title, String shape, String ho
     }
 
     /**
-     * The Apps and the nav this caller sees: {@code {apps: [{id, title, version, installed, missing}], nav: [{app, id, path,
-     * label, icon?, blurb?}]}}.
+     * The Apps and the nav this caller sees: {@code {apps: [{id, title, version, installed, enabled, missing, switchedOff}],
+     * nav: [{app, id, path, label, icon?, blurb?}]}}. An App draws nav only when it is installed AND enabled - an entry with no
+     * {@code feature} of its own still disappears when this Space switches the App's modules off.
      *
      * @param activeModules     ids of the modules this server runs ACTIVE (the set {@code GET /modules} reports)
+     * @param enabledModules    ids of the ACTIVE modules this Space has not switched off (none of their features is disabled in
+     *                          {@code modules.toon} - {@code GET /modules}' {@code enabledInSpace})
      * @param features          the response's feature map: a {@code feature} is on when its value is {@code Boolean.TRUE}
      * @param capabilities      the caller's capabilities
      * @param capabilitiesApply whether an Authenticator is active - without one there is no caller to check, as everywhere
      */
-    public Map<String, Object> resolve(Set<String> activeModules, Map<String, Object> features, Collection<String> capabilities,
-                                       boolean capabilitiesApply) {
+    public Map<String, Object> resolve(Set<String> activeModules, Set<String> enabledModules, Map<String, Object> features,
+                                       Collection<String> capabilities, boolean capabilitiesApply) {
         List<Object> appsOut = new ArrayList<>();
         List<Object> navOut = new ArrayList<>();
         for (App a : apps) {
             List<String> missing = a.modules().stream().filter(mod -> !activeModules.contains(mod)).toList();
+            List<String> switchedOff = a.modules().stream()
+                    .filter(mod -> activeModules.contains(mod) && !enabledModules.contains(mod)).toList();
+            boolean installed = missing.isEmpty();
+            boolean enabled = installed && switchedOff.isEmpty();
             Map<String, Object> ao = new LinkedHashMap<>();
             ao.put("id", a.id());
             ao.put("title", a.title());
             ao.put("version", a.version());
-            ao.put("installed", missing.isEmpty());
+            ao.put("installed", installed);
+            ao.put("enabled", enabled);
             ao.put("missing", missing);
+            ao.put("switchedOff", switchedOff);
             appsOut.add(ao);
-            if (!missing.isEmpty()) continue;
+            if (!enabled) continue;
             for (NavEntry n : a.nav()) {
                 if (n.feature() != null && !Boolean.TRUE.equals(features.get(n.feature()))) continue;
                 if (n.capability() != null && capabilitiesApply && !capabilities.contains(n.capability())) continue;

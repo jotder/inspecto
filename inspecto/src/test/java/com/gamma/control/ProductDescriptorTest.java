@@ -33,6 +33,8 @@ class ProductDescriptorTest {
                 {"id":"hidden","path":"hidden","label":"Hidden"}]}]}""";
 
     private static final Map<String, Object> FEATURES = Map.of("featOn", true, "featOff", false);
+    /** The one module the `core` App needs, ACTIVE and (where passed as the second set) enabled in the Space. */
+    private static final Set<String> ENGINE = Set.of("engine");
 
     @AfterEach
     void clear() {
@@ -57,22 +59,35 @@ class ProductDescriptorTest {
     @Test
     void anAppIsInstalledOnlyWhenEveryModuleItNeedsIsActive() {
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> apps = (List<Map<String, Object>>) parse().resolve(Set.of("engine"), FEATURES, Set.of(), false).get("apps");
+        List<Map<String, Object>> apps = (List<Map<String, Object>>) parse().resolve(ENGINE, ENGINE, FEATURES, Set.of(), false).get("apps");
         assertEquals(true, apps.get(0).get("installed"));
+        assertEquals(true, apps.get(0).get("enabled"));
         assertEquals(List.of(), apps.get(0).get("missing"));
         assertEquals(false, apps.get(1).get("installed"));
+        assertEquals(false, apps.get(1).get("enabled"), "an App that is not installed is not enabled either");
         assertEquals(List.of("no-such-module"), apps.get(1).get("missing"), "the missing module is named");
     }
 
     @Test
     void anAppThatIsNotInstalledDrawsNoNav() {
-        assertFalse(navIds(parse().resolve(Set.of("engine"), FEATURES, Set.of(), false)).contains("hidden"));
-        assertEquals(List.of(), navIds(parse().resolve(Set.of(), FEATURES, Set.of(), false)), "no active module, no nav at all");
+        assertFalse(navIds(parse().resolve(ENGINE, ENGINE, FEATURES, Set.of(), false)).contains("hidden"));
+        assertEquals(List.of(), navIds(parse().resolve(Set.of(), Set.of(), FEATURES, Set.of(), false)), "no active module, no nav at all");
+    }
+
+    @Test
+    void anAppWhoseModulesThisSpaceSwitchedOffDrawsNoNavEvenWithoutAFeature() {
+        Map<String, Object> r = parse().resolve(ENGINE, Set.of(), FEATURES, Set.of(), false);
+        assertEquals(List.of(), navIds(r), "the 'open' entry has no feature of its own and still disappears: the App is not Enabled");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> core = ((List<Map<String, Object>>) r.get("apps")).get(0);
+        assertEquals(true, core.get("installed"));
+        assertEquals(false, core.get("enabled"));
+        assertEquals(List.of("engine"), core.get("switchedOff"), "the switched-off module is named");
     }
 
     @Test
     void anEntryWithAFeatureIsDrawnOnlyWhenTheFeatureIsTrue() {
-        List<String> ids = navIds(parse().resolve(Set.of("engine"), FEATURES, Set.of(), false));
+        List<String> ids = navIds(parse().resolve(ENGINE, ENGINE, FEATURES, Set.of(), false));
         assertTrue(ids.contains("featureOn"));
         assertFalse(ids.contains("featureOff"), "a feature reported false hides the entry");
         assertFalse(ids.contains("featureUnknown"), "a feature the response does not report at all hides the entry");
@@ -80,15 +95,15 @@ class ProductDescriptorTest {
 
     @Test
     void aCapabilityGatesOnlyWhereAnAuthenticatorIsActive() {
-        assertTrue(navIds(parse().resolve(Set.of("engine"), FEATURES, Set.of(), false)).contains("needsCap"),
+        assertTrue(navIds(parse().resolve(ENGINE, ENGINE, FEATURES, Set.of(), false)).contains("needsCap"),
                 "no Authenticator: there is no caller to check, as on Basic everywhere");
-        assertFalse(navIds(parse().resolve(Set.of("engine"), FEATURES, Set.of("canAuthorWorkbench"), true)).contains("needsCap"));
-        assertTrue(navIds(parse().resolve(Set.of("engine"), FEATURES, Set.of("canOperateRuns"), true)).contains("needsCap"));
+        assertFalse(navIds(parse().resolve(ENGINE, ENGINE, FEATURES, Set.of("canAuthorWorkbench"), true)).contains("needsCap"));
+        assertTrue(navIds(parse().resolve(ENGINE, ENGINE, FEATURES, Set.of("canOperateRuns"), true)).contains("needsCap"));
     }
 
     @Test
     void theNavKeepsItsDrawingOrderAndOmitsAbsentFields() {
-        Map<String, Object> r = parse().resolve(Set.of("engine"), FEATURES, Set.of("canOperateRuns"), true);
+        Map<String, Object> r = parse().resolve(ENGINE, ENGINE, FEATURES, Set.of("canOperateRuns"), true);
         assertEquals(List.of("open", "featureOn", "needsCap"), navIds(r));
         @SuppressWarnings("unchecked")
         Map<String, Object> first = ((List<Map<String, Object>>) r.get("nav")).get(0);

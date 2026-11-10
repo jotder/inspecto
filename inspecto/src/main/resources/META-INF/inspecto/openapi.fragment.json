@@ -9819,7 +9819,7 @@
               },
               "apps" : {
                 "type" : "array",
-                "description" : "The Product build's Apps. installed: every module the App needs is ACTIVE (the set GET /modules reports); otherwise missing names them and the App draws no nav.",
+                "description" : "The Product build's Apps. installed: every module the App needs is ACTIVE (the set GET /modules reports), else missing names them. enabled: installed and none of those modules is switched off in this Space (modules.toon), else switchedOff names them. Only an enabled App draws nav.",
                 "items" : {
                   "type" : "object",
                   "properties" : {
@@ -9835,7 +9835,16 @@
                     "installed" : {
                       "type" : "boolean"
                     },
+                    "enabled" : {
+                      "type" : "boolean"
+                    },
                     "missing" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      }
+                    },
+                    "switchedOff" : {
                       "type" : "array",
                       "items" : {
                         "type" : "string"

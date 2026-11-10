@@ -47,20 +47,32 @@ import java.util.stream.Collectors;
  */
 final class BootstrapRoutes implements RouteModule {
 
-    /** The ids of the modules this server runs ACTIVE - the same resolution as {@code GET /modules} (ModulesRoutes); read once. */
-    private volatile Set<String> active;
+    /**
+     * The modules this server runs ACTIVE, each with the feature ids it declares - the same resolution as {@code GET /modules}
+     * (ModulesRoutes); read once. The features decide whether a Space has switched the module off.
+     */
+    private volatile Map<String, List<String>> active;
 
-    private Set<String> activeModules() {
-        Set<String> a = active;
+    private Map<String, List<String>> activeModules() {
+        Map<String, List<String>> a = active;
         if (a == null) {
             ClassLoader cl = BootstrapRoutes.class.getClassLoader();
             ModuleManifests.Loaded loaded = ModuleManifests.load(cl, BootstrapRoutes.class);
             Set<String> absent = KnownModules.absent(KnownModules.load(cl).manifests(), loaded.manifests()).stream()
                     .map(ModuleManifest::id).collect(Collectors.toSet());
-            active = a = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(), absent).stream()
-                    .filter(s -> s.state() == ModuleStatus.State.ACTIVE).map(ModuleStatus::id).collect(Collectors.toUnmodifiableSet());
+            Set<String> on = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(), absent).stream()
+                    .filter(s -> s.state() == ModuleStatus.State.ACTIVE).map(ModuleStatus::id).collect(Collectors.toSet());
+            Map<String, List<String>> m = new LinkedHashMap<>();
+            for (ModuleManifest mm : loaded.manifests()) if (on.contains(mm.id())) m.put(mm.id(), List.copyOf(mm.provides().features()));
+            active = a = java.util.Collections.unmodifiableMap(m);
         }
         return a;
+    }
+
+    /** The ACTIVE modules the current Space has not switched off: none of their features is disabled ({@code enabledInSpace}). */
+    private Set<String> enabledModules(Set<String> disabledFeatures) {
+        return activeModules().entrySet().stream().filter(e -> e.getValue().stream().noneMatch(disabledFeatures::contains))
+                .map(Map.Entry::getKey).collect(Collectors.toUnmodifiableSet());
     }
 
     @Override
@@ -122,11 +134,11 @@ final class BootstrapRoutes implements RouteModule {
             data.put("spaces", spaces(api));
             // LA-ONBOARD-1 OB-7: whether this Space lets people Add data (`data.self_import` in force); both apps lock on it.
             data.put("selfImport", DataSettings.forRoot(writeRootOrNull(api)).selfImportInForce());
-            // PA-3: the Product's Apps and the nav this caller sees, inventory like the Space roster. Gates: the App's modules ACTIVE,
-            // the entry's feature true in THIS response's features (installed, enabled in this Space, in this Edition), and the
-            // caller's capability where an Authenticator is active (GLOSSARY.md §15 Installed · Enabled · Permitted, plus the Product).
+            // PA-3: the Product's Apps and the nav this caller sees, inventory like the Space roster. Gates: the App's modules ACTIVE
+            // (Installed) and not switched off in this Space (Enabled), the entry's feature true in THIS response's features, and the
+            // caller's capability where an Authenticator is active (Permitted) - GLOSSARY.md §15's three gates, plus the Product.
             if (productOut != null)
-                productOut.putAll(product.get().resolve(activeModules(), features,
+                productOut.putAll(product.get().resolve(activeModules().keySet(), enabledModules(api.disabledFeatures()), features,
                         ApiContext.subject(ex).map(Subject::capabilities).orElse(Set.of()), Authenticators.active().isPresent()));
         }
         data.put("session", session(ex));

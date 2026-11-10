@@ -364,8 +364,11 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 and the nav the shells will draw in PA-4. Nothing changes for a user yet: no shell reads the new block until PA-4.
 - **Nav is App data.** An App declares `nav:` in `app.toon`: one entry per area (`path`, `label`, `icon`, optional
   `feature`, optional `capability`), in drawing order. The LA App's six entries are `la-nav.ts`'s, unchanged, so PA-4
-  is a swap. `path` is relative to where the host mounts the App (PA-4 decides mounts). The guard refuses a `feature`
-  that none of the App's Add-on modules provides, a duplicate id or path, and an entry with no path or label.
+  is a swap; until then a parity test holds the two equal field for field. `path` is relative to where the host mounts
+  the App (PA-4 decides mounts). The guard refuses a `feature` that none of the App's Add-on modules provides, two
+  entries sharing a path, and an entry with no path or label. ⚠ It cannot see a repeated entry id: ids are TOON map keys
+  and the parser keeps the last of two. A `capability` is not checked against the capability catalogue (no entry uses
+  one yet); a misspelt one would hide the entry from every signed-in caller.
 - **The bundle carries a resolved descriptor.** `tools/assemble.mjs --descriptor <file>` writes the Product build's
   `product.json` (`inspecto.product/1`): id, title, shape, host, brand, Edition, Distribution, and per App its version,
   the modules its Add-ons need in this Edition, and its nav. `package.ps1` places it at `lib/product.json`.
@@ -375,11 +378,13 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   file: it can only come from a broken build, and a half-read Product is worse than none.
 - **`/bootstrap.product`.** Identity (`id`, `title`, `shape`, `host`, `brand`) always, like `branding`: the sign-in
   page shows the Product's name. `apps` and `nav` only where the Space roster is shown (signed in, or no
-  Authenticator). An App is `installed` when every module it needs is ACTIVE (the set `GET /modules` reports);
-  otherwise it lists what is `missing` and contributes no nav. A nav entry is drawn when its App is installed, its
+  Authenticator). An App is `installed` when every module it needs is ACTIVE (the set `GET /modules` reports), else it
+  lists what is `missing`; and `enabled` when, in addition, this Space has switched none of those modules off, else it
+  lists them as `switchedOff`. Only an enabled App draws nav, so an entry with no `feature` of its own still disappears
+  when the Space switches Link Analysis off (added after review). A nav entry is drawn when its App is enabled, its
   `feature` is true in this response's `features` (installed, enabled in this Space, in this Edition), and, where an
-  Authenticator is active, the caller holds its `capability`. These are the four gates of `GLOSSARY.md` §15, plus the
-  Product; Entitlement joins Installed in PA-7.
+  Authenticator is active, the caller holds its `capability`. These are the three gates of `GLOSSARY.md` §15
+  (Installed · Enabled · Permitted), plus the Product; Entitlement joins Installed in PA-7.
 - **Proof:** unit tests over the resolution matrix (each gate on its own), real-HTTP tests over the wiring (no
   descriptor, pre-sign-in identity only, a signed-in caller with and without the capability, a missing module), the
   OpenAPI `Bootstrap` schema regenerated, and a bundle whose `/bootstrap` names its Product.
