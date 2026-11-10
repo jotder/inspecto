@@ -252,12 +252,14 @@ export function checkModel(model) {
             if (templates.includes(p.space)) out.push(`${at}: space '${p.space}' is the id of a committed template under spaces/_templates - a composed Space needs its own id`);
             const parts = spaceParts(all.filter((a) => apps[a]), apps).filter((x) => templates.includes(x.template));
             if (!parts.length) out.push(`${at}: space '${p.space}' has nothing to compose - none of its Apps ships a template`);
+            // Keyed on the lower-cased path: on a case-insensitive file system (Windows) `X.toon` and `x.toon` are one file.
             const owner = new Map();
             for (const { template } of parts) {
                 for (const f of model.templateFiles?.[template] ?? []) {
                     if (COMPOSER_OWNED.includes(f)) continue;
-                    if (owner.has(f)) out.push(`${at}: space '${p.space}': templates '${owner.get(f)}' and '${template}' both ship ${f}`);
-                    else owner.set(f, template);
+                    const key = f.toLowerCase();
+                    if (owner.has(key)) out.push(`${at}: space '${p.space}': templates '${owner.get(key)}' and '${template}' both ship ${f}`);
+                    else owner.set(key, template);
                 }
             }
         }

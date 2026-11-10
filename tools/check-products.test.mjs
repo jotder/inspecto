@@ -99,6 +99,8 @@ const RED = {
     'a space with nothing to compose': [(m) => { m.apps['telco-ra'].templates = []; m.apps['telco-fraud'].templates = []; }, /space 'telco' has nothing to compose/],
     'two parts shipping one file': [(m) => { m.templateFiles['telco-bypass'].push(m.templateFiles['telco-ra'].find((f) => f.startsWith('config/registry/'))); },
         /space 'telco': templates 'telco-ra' and 'telco-bypass' both ship config\/registry\//],
+    'two parts shipping one file that differs only in case': [(m) => { m.templateFiles['telco-bypass'].push(m.templateFiles['telco-ra'].find((f) => f.startsWith('config/registry/')).toUpperCase()); },
+        /space 'telco': templates 'telco-ra' and 'telco-bypass' both ship CONFIG\/REGISTRY\//],
     'a demoSpace on a Product with no demo distribution': [(m) => { m.products.la.distributions = ['production']; }, /demoSpace is set but the Product offers no demo distribution/],
 };
 for (const [name, [plant, re]] of Object.entries(RED)) test(`RED: ${name}`, () => red(plant, re));

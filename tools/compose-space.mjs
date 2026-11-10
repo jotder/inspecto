@@ -34,6 +34,8 @@ const quote = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"
 export function readTemplateMeta(text) {
     const out = {};
     for (const line of text.split(/\r?\n/)) {
+        // Top-level keys only: an indented line belongs to a nested block, which a gallery entry does not read.
+        if (/^\s/.test(line)) continue;
         const m = /^([A-Za-z_]\w*)(?:\[(\d+)\])?:\s*(.*)$/.exec(line.trim());
         if (!m) continue;
         const [, key, n, val] = m;
@@ -94,15 +96,18 @@ export function composeSpace(space, templatesDir) {
         const sla = join(dir, SLA_DOC);
         return { ...p, dir, meta: readTemplateMeta(readFileSync(join(dir, 'template.toon'), 'utf8')), sla: existsSync(sla) ? readFileSync(sla, 'utf8') : null };
     });
+    // Keyed on the lower-cased path: on a case-insensitive file system (Windows) `X.toon` and `x.toon` are one file, and the
+    // second copy would silently overwrite the first.
     const owner = new Map();
     for (const p of parts) {
         for (const f of walk(p.dir)) {
             if (COMPOSER_OWNED.includes(f)) continue;
-            if (owner.has(f)) fail(`templates '${owner.get(f)}' and '${p.template}' both ship ${f} - the composed Space '${space.id}' cannot hold both`);
-            owner.set(f, p.template);
+            const key = f.toLowerCase();
+            if (owner.has(key)) fail(`templates '${owner.get(key).template}' and '${p.template}' both ship ${f} - the composed Space '${space.id}' cannot hold both`);
+            owner.set(key, { file: f, template: p.template });
         }
     }
-    for (const [f, t] of owner) {
+    for (const { file: f, template: t } of owner.values()) {
         const to = join(out, ...f.split('/'));
         mkdirSync(dirname(to), { recursive: true });
         copyFileSync(join(templatesDir, t, ...f.split('/')), to);

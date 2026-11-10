@@ -464,10 +464,16 @@ The slices, each its own lane (D-PA16):
   ship is refused, statically by the guard and again by the composer. RA, FM and CM declare no nav yet: their areas come
   with their pages in PA-5b, so the Telco shell draws LA's areas only until then. la-app's `index.html` names no Product
   any more (`<title>Inspecto</title>`); `provideInspectoShell()` sets the tab title from the Product's brand.
-  **Proof (as built, 2026-11-10).** Tool tests 78/78 (`compose-space.test.mjs` 4: every committed `template.toon` reads
-  with its declared counts, the Telco Space composed byte for byte from the three parts, the refusals; 8 new guard cases;
-  the Telco plan on Standard and Advanced); `render-product-hosts --check`; `typecheck` and `lint` green; the shell spec
-  plus every la-app spec, 24 files / 176 tests. `package.ps1 -Product telco -Edition Standard` built la-app with
+  **Proof (as built, 2026-11-10).** Tool tests 79/79 (`compose-space.test.mjs` 4: every committed `template.toon` reads
+  with its declared counts, the Telco Space composed byte for byte from the three parts, the refusals; 9 new guard cases;
+  the Telco plan on Standard and Advanced); `render-product-hosts --check`; `typecheck` and `lint` green; the shell and
+  product-host specs plus every la-app spec, 24 files / 176 tests; the five Java classes that read a changed file
+  (`ImportLoaderInventoryTest`, `EventStoreDurabilityTest`, `EnrichmentEngineTest`, `ConsignmentOutputRegistrationTest`,
+  `TriggerVocabularyContractTest`) 47 tests green. After review: a collision is keyed on the lower-cased path (on
+  Windows `X.toon` and `x.toon` are one file and the second silently overwrote the first), and the `template.toon`
+  reader takes top-level keys only. ⚠ `inspecto` now stages the 20 `la-*` templates as its own, so a programmatic
+  `assemble({apps: []})` stages them although no App asks; `package.ps1` and the CLI never narrow its one optional App,
+  so no build changes. `package.ps1 -Product telco -Edition Standard` built la-app with
   `-c production,telco`, composed `telco` from `telco-ra`, `telco-fraud`, `telco-bypass` (247 files) and passed its boot
   check. Booted as shipped (OIDC, placeholder issuer): the sign-in page shows Inspecto Telco's pitch, `/bootstrap.product`
   names `telco`. Booted auth-free (a scratch copy with `inspecto-oidc.jar` off `modules.list`): all four Apps installed

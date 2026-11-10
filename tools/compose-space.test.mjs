@@ -36,6 +36,7 @@ test('every committed template.toon reads with the item counts it declares (quot
         assert.ok(m.name, `${t}: name`);
         assert.ok(Array.isArray(m.contents), `${t}: contents is a list`);
     }
+    assert.equal(readTemplateMeta('name: Outer\nextra:\n  name: Inner\n').name, 'Outer', 'a nested key never overwrites a top-level one');
 });
 
 test('Inspecto Telco x Standard: the plan composes RA and FM into one Space, every part file side by side', () => {
@@ -84,6 +85,11 @@ test('refuses a file two parts both ship, a missing part and an existing target'
         mkdirSync(join(dir, 'ab'));
         assert.throws(() => composeSpace(space(['a']), dir), /already exists/);
         assert.throws(() => composeSpace({ id: 'none', title: 'N', parts: [] }, dir), /has no parts/);
+        // Two paths that differ only in case are one file on Windows: refused, never silently overwritten.
+        rmSync(join(dir, 'ab'), { recursive: true, force: true });
+        rmSync(join(dir, 'b', 'config', 'shared.toon'));
+        writeFileSync(join(dir, 'b', 'config', 'Shared.toon'), 'k: b\n');
+        assert.throws(() => composeSpace(space(['a', 'b']), dir), /templates 'a' and 'b' both ship config\/Shared\.toon/);
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
