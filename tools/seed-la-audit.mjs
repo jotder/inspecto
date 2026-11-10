@@ -32,7 +32,7 @@ export function buildPlan() {
   const base = `/inv/investigations/${INV}`;
   const ops = [
     { op: 'seed', ids: ['V-117', 'E-31'], entityType: 'party' },
-    { op: 'expand', direction: 'either', maxFanOut: 20 },   // bounded, under four_eyes_fan_out_above (30): runs now
+    { op: 'expand', direction: 'either', maxFanOut: 20 },   // bounded, under four_eyes_fan_out_above (2000): runs now
     { op: 'annotate', ids: ['E-31'], note: 'shares bank account BA-9031 and address AD-9031 with V-117; manager E-15 approved all 14 invoices' },
     { op: 'window', window: { from: '2025-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' } },
     { op: 'resolve' },

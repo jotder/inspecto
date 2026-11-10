@@ -96,7 +96,7 @@ Rules:
 | Mobile money | `mm_device_farm` | `wallet_device_farm` |
 | Telco fraud | `telecom_fraud_network` | `suspect_number_to_sim_box` |
 
-**Banking and finance** (`la-sample`, `la-ownership`, `la-card`, `la-trade` now; the mule part of `la-showcase` after wave B)
+**Banking and finance** (`la-sample`, `la-ownership`, `la-card`, `la-trade` now; the mule part of `la-showcase` after wave B). *As built 2026-11-10: `la-ownership`, `la-card`, `la-trade`, `la-crypto`; `la-sample` left (example only); `la-showcase` waits for `LA-INDUSTRY-FOLD-1`.*
 
 | Use case | Today | Proposed |
 |---|---|---|
@@ -178,7 +178,7 @@ Rules:
 The use-case template already has the id `la-logistics` (plan spec 11), which D2 gives the *Logistics* industry Space.
 With one use case the industry Space could be that template itself, or take another id: the operator decides.
 
-**Enterprise** (`la-audit`, after wave B)
+**Enterprise** (`la-audit`, after wave B). *As built 2026-11-10: `la-audit` + `la-insider`, one four-eyes threshold of 2000.*
 
 | Today | Proposed |
 |---|---|

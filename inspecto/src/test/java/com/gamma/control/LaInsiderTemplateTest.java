@@ -46,7 +46,7 @@ class LaInsiderTemplateTest {
         } finally {
             if (before == null) System.clearProperty("auth.mode"); else System.setProperty("auth.mode", before);
         }
-        assertEquals(30, s.fourEyesFanOutAbove(), "matches la-audit's, so both fold into the Enterprise industry Space");
+        assertEquals(2000, s.fourEyesFanOutAbove());
         assertEquals(10, s.drafts().maxOpen());
         List<EntityTypes.EntityType> types = s.effectiveEntityTypes();
         assertTrue(types.stream().anyMatch(t -> t.id().equals("insider_entity")), "the link Dataset's Entity Type");

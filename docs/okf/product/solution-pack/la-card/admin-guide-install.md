@@ -150,5 +150,5 @@ Dataset, the ends mixing kinds keep the pack's own generic type: *Party* (owners
 *Crypto entity*.
 
 Views carry use-case names, for example `hidden_beneficial_owner`, `sanctioned_owner_path`, `common_point_of_purchase`,
-`circular_trade` and `hack_peel_chain`. The sample's `mule_layering_ring` keeps its name, because the first-run page
-and *Follow the money* open it by that id.
+`circular_trade` and `hack_peel_chain`. Since 2026-11-10 the example-only sample (`la-sample`, its view `mule_layering_ring`)
+is no longer part of this Space: *Try the sample* creates it on its own.

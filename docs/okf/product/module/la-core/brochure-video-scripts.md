@@ -433,7 +433,7 @@ The opening, map, *Explore it* and close are the same in every multi-segment vid
 | Audience | Fraud, AML, KYC, sanctions and trade-finance compliance teams at banks, payment providers and virtual-asset service providers. |
 | Film on | Advanced install (`la-showcase`); film as a user who can reveal identifiers. Without segment B, a Basic install. |
 | Ships as | *Banking and finance* (`la-banking`, the industry Space composed from `la-ownership`, `la-card`, `la-trade` and `la-crypto`, every Dataset mapped; Basic; since 2026-11-10 without `la-sample`, which is an example only). Segment A films the sample on its own (*Try the sample*). The money-mule tour (`la-showcase`) ships as its own Space until it folds into *Banking and finance* (`LA-INDUSTRY-FOLD-1` on the board). |
-| Ready | All six segments now: B on an Advanced install, the rest in the *Banking and finance* Space on Basic. |
+| Ready | All six segments now: A on its own (*Try the sample*), B in `la-showcase` (its own Space for now), the rest in the *Banking and finance* Space on Basic. |
 | As built | `TILL-06` takes **97 %** of the cash-out from 8 payers (the shipped data and `ControlApiLaShowcaseFiguresTest`; the old plan said 80 %). `la-sample` and the mule part of `la-showcase` mark their account columns as accounts; `la-ownership` and `la-trade` also set one Entity Type over a Job-built link Dataset; `la-card` builds its links with a Job only. The circular trade runs twice round between 18 March and 27 June 2026. |
 
 | Seg | Use case | Space | Raw records | Story | Ask and reveal | Outcome | Look-alike |
@@ -675,7 +675,7 @@ passes over it; product decides whether that hint should stay on a node the anal
 | | |
 |---|---|
 | Audience | Internal audit, accounts-payable control, security, HR and internal investigations. All people and systems are invented. |
-| Film on | Advanced install (`la-audit`); identifiers are masked there, so film as a user who can reveal them. |
+| Film on | A Basic install with the *Enterprise* Space (both segments, ids unmasked). |
 | Ships as | *Enterprise* (`la-enterprise`, the industry Space composed from `la-audit` and `la-insider` since 2026-11-10, every Dataset mapped; Basic; saved views `leaver_exfiltration`, `access_creep`, `mutual_approvals`, and internal audit's `ap_vendor_identity`, `ap_approval_graph`, `gl_intercompany`). |
 | Ready | Both segments now, in the *Enterprise* Space on Basic. |
 | As built | The busy vendor `V-001` and the CFO `E-01` lead betweenness and are not findings: seed first, never start from a whole-graph ranking. |

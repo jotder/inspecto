@@ -38,7 +38,7 @@ export function buildPlan() {
   const base = `/inv/investigations/${INV}`;
   const ops = [
     { op: 'seed', ids: [MANAGER], entityType: ENTITY_TYPE },
-    // bounded, under four_eyes_fan_out_above (30): runs now and brings in everyone whose grants the manager approved (its 11
+    // bounded, under four_eyes_fan_out_above (2000): runs now and brings in everyone whose grants the manager approved (its 11
     // reports, the 4 among them) and the manager's own approver; an UNBOUNDED expand always goes pending
     { op: 'expand', direction: 'either', linkKinds: ['granted_by'], maxFanOut: 20 },
     { op: 'annotate', ids: [MANAGER], note: `granted ${ac.systems.join(' and ')} to ${REPORTS.length} reports in operations roles with no ticket: the only ${GRANTS.length} finance grants without one` },

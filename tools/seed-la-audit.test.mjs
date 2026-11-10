@@ -38,7 +38,7 @@ test('apply acts as the audit personas, in order, and never as a reviewer', asyn
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'annotate', 'window', 'resolve', 'snapshot']);
   assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:audit.lead'));
   assert.equal(ops[0].body.entityType, 'party');
-  assert.ok(ops[1].body.maxFanOut < 30, 'the seeded expand stays under four_eyes_fan_out_above');
+  assert.ok(ops[1].body.maxFanOut < 2000, 'the seeded expand stays under four_eyes_fan_out_above');
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
   assert.deepEqual(members.map((c) => c.body), [{ subject: 'audit.committee', role: 'reviewer' }, { subject: 'audit.manager', role: 'reviewer' }, { subject: 'audit.admin', role: 'lead' }]);
   assert.ok(!members.some((c) => c.body.subject === 'audit.outsider'), 'the outsider is not a member');

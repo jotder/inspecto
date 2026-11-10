@@ -169,6 +169,8 @@ Rehearsal 2026-10-16 on an Advanced Demo Auth bundle built from this branch (por
 Since 2026-11-10 this use case also ships inside the industry Space *Enterprise* (`la-enterprise`), with `la-insider`.
 The recipe is `spaces/_industries/la-enterprise.toon`; `node tools/package-la-showcase.mjs la-enterprise` composes one
 Space download and one data download. Its saved views keep their ids (`ap_vendor_identity`, `ap_approval_graph`,
-`gl_intercompany`). The two use cases share one four-eyes fan-out threshold, this template's 30, so the seed's bounded
-expands run and its unbounded expand is held in either Space. Installing the industry Space: the
+`gl_intercompany`). The two use cases share one four-eyes fan-out threshold, 2000: an industry Space states each setting once, and
+this template's former 30 also refused, on every edition, an Explore neighbours read of any party with more than 30 links
+(the CFO's 40 vendors), which Basic cannot approve. The seed's bounded expands still run and its unbounded expand is
+still held. Installing the industry Space: the
 [la-insider install guide](../la-insider/admin-guide-install.md).

@@ -27,7 +27,7 @@ Internal audit, finance controls and presales teams.
 - Intercompany round trip: the only cycle in the journal graph, with maximum flow.
 - Duplicate payments (13 pairs) as their own Dataset.
 - Benign look-alikes (a busy utilities vendor, the CFO) that lead centrality and are not findings.
-- Typed masking, four-eyes expand above 30, Drafts, and a Dossier that fails Verify if one byte changes.
+- Typed masking, four-eyes expand above 2000, Drafts, and a Dossier that fails Verify if one byte changes.
 - Read-only embed into a committee portal page.
 
 Shared studio capabilities: [la-showcase features](../la-showcase/features.md) · [Link Analysis features](../../addon/linkAnalysis/features.md).

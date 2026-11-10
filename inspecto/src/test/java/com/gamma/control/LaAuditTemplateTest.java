@@ -44,7 +44,7 @@ class LaAuditTemplateTest {
         } finally {
             if (before == null) System.clearProperty("auth.mode"); else System.setProperty("auth.mode", before);
         }
-        assertEquals(30, s.fourEyesFanOutAbove());
+        assertEquals(2000, s.fourEyesFanOutAbove(), "la-insider's value, so both fold into the Enterprise industry Space; a neighbours read of a busier entity is refused on every edition");
         assertEquals(Boolean.TRUE, s.index().enabled());
         assertEquals(10, s.drafts().maxOpen());
         Map<String, EntityTypes.EntityType> types = new HashMap<>();
