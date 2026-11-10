@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addonModules, appNav, builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productTemplates, seedToolOf } from './products.mjs';
+import { addonModules, appNav, builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productTemplates, seedToolOf, spaceParts } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -79,6 +79,8 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         target,
         platformVersion: model.pomVersion,
         host: p.host,
+        // PA-5: the host's build configuration when the host builds several Products (null = its default build).
+        hostConfiguration: p.hostConfiguration ?? null,
         demo,
         industry: p.industry ?? null,
         apps: selected.map((a) => ({ id: a, version: model.apps[a].version })),
@@ -86,6 +88,10 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         modules: classpath(Edition, { demo, g }),
         mvnModules: mvnModules(Edition, g),
         templates,
+        // PA-5 (D-PA14): the Space Template composed from the selected Apps' templates (tools/compose-space.mjs), or null.
+        space: p.space
+            ? { id: p.space, title: p.brand?.name ?? p.title, parts: spaceParts(selected, model.apps).map(({ app, template }) => ({ app, appTitle: model.apps[app].title, template })) }
+            : null,
         seedSpace,
         seedTool: seedSpace ? seedToolOf(seedSpace) : null,
         demoText: seedSpace ? demoTextOf(p.id) : null,

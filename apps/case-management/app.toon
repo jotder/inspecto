@@ -1,0 +1,9 @@
+id: case-management
+title: Case Management
+version: 1.0.0
+platform: >=4.0 <5
+industries[0]:
+requires:
+  addons[3]: caseManagement,incidents,workflowSla
+templates[0]:
+docs: docs/okf/product/module/case-management/index.md

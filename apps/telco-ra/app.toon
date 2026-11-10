@@ -1,0 +1,9 @@
+id: telco-ra
+title: Revenue Assurance
+version: 1.0.0
+platform: >=4.0 <5
+industries[1]: telecom
+requires:
+  addons[2]: reconciliation,incidents
+templates[1]: telco-ra
+docs: docs/okf/product/solution-pack/telco-ra/index.md

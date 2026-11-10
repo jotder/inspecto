@@ -2,8 +2,10 @@
 // words in docs/GLOSSARY.md §15 "Product assembly"). One loader and one checker, shared by tools/check-products.mjs (the guard)
 // and tools/assemble.mjs (the assembler), so the two can never disagree about what a definition means.
 //
-//   products/<id>.toon          a Product: shape domain|platform, host (the Angular project), editions, apps{required,optional},
-//                               addons (platform shape), templates, distributions, demoSpace, brand{name}, docs
+//   products/<id>.toon          a Product: shape domain|platform, host (the Angular project), hostConfiguration (PA-5: the
+//                               host's build configuration when the host is shared), editions, apps{required,optional},
+//                               addons (platform shape), templates, space (PA-5: the id of the Space Template composed from
+//                               its Apps' templates), distributions, demoSpace, brand{name}, docs
 //   apps/<id>/app.toon          an App: version, platform (a version range), industries (empty = Industry-neutral),
 //                               requires{addons}, templates, docs
 //   industries/<id>/industry.toon  an Industry: title, pack (the Industry pack id under platform/inspecto-entity-store)
@@ -37,13 +39,41 @@ export function gatherModel(root) {
     const tdir = join(root, 'spaces', '_templates');
     const templates = existsSync(tdir) ? readdirSync(tdir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name) : [];
     const ng = join(root, 'inspecto-ui', 'angular.json');
-    const hosts = existsSync(ng) ? Object.keys(JSON.parse(readFileSync(ng, 'utf8')).projects ?? {}) : [];
+    const ngProjects = existsSync(ng) ? JSON.parse(readFileSync(ng, 'utf8')).projects ?? {} : {};
+    const hosts = Object.keys(ngProjects);
     const industryPacks = subdirsWith(join(root, INDUSTRY_PACK_DIR), 'industry-pack.toon');
     const pomVersion = (/<version>([^<]+)<\/version>/.exec(existsSync(join(root, 'pom.xml')) ? readFileSync(join(root, 'pom.xml'), 'utf8') : '') ?? [])[1] ?? null;
     // PA-3: the feature ids each module declares (`provides.features`), so a nav entry's `feature` can be checked.
     const moduleFeatures = Object.fromEntries(Object.values(readModuleSources(root).manifests).map((m) => [m.id, list(m.provides?.features)]));
-    return { root, products, apps, industries, offerings, templates, hosts, industryPacks, pomVersion, moduleFeatures, exists: (p) => existsSync(join(root, p)) };
+    // PA-5: the files (`/`-separated, relative to the template) of every template a composed Space takes as a part - read
+    // only for those, and kept as data so a test can clone and plant the model.
+    const parts = Object.values(products).filter((p) => p.space)
+        .flatMap((p) => [...list(p.apps?.required), ...list(p.apps?.optional)]).flatMap((a) => list(apps[a]?.templates));
+    const templateFiles = Object.fromEntries([...new Set(parts)].filter((t) => templates.includes(t)).map((t) => [t, walk(join(tdir, t))]));
+    return { root, products, apps, industries, offerings, templates, hosts, ngProjects, industryPacks, pomVersion, moduleFeatures, templateFiles, exists: (p) => existsSync(join(root, p)) };
 }
+
+/** Every file under `dir`, as `/`-separated paths relative to it. */
+function walk(dir, rel = '') {
+    if (!existsSync(join(dir, rel))) return [];
+    return readdirSync(join(dir, rel), { withFileTypes: true }).flatMap((d) => {
+        const r = rel ? `${rel}/${d.name}` : d.name;
+        return d.isDirectory() ? walk(dir, r) : [r];
+    });
+}
+
+/**
+ * PA-5: a host's generated data file for a Product, relative to the host's `sourceRoot`. The host's default build reads
+ * `app/product.generated.ts`; a Product built with a `hostConfiguration` gets its own file, which that configuration's
+ * `fileReplacements` puts in the default's place.
+ */
+export const hostDataFile = (p) => (p.hostConfiguration ? `app/product.${p.id}.generated.ts` : 'app/product.generated.ts');
+
+/** PA-5: the files a composed Space writes itself, so two parts may each ship one (tools/compose-space.mjs). */
+export const COMPOSER_OWNED = ['template.toon', 'config/examples/sla-escalation-examples.md'];
+
+/** PA-5: the parts of a Product's composed Space: each selected App's templates, in App order: [{ app, template }]. */
+export const spaceParts = (appIds, apps) => appIds.flatMap((a) => list(apps[a]?.templates).map((t) => ({ app: a, template: t })));
 
 /** The modules an Add-on brings in an edition: the union of its `modules` along the Offering's `includes` chain. */
 export function addonModules(edition, addon, offerings, seen = []) {
@@ -153,10 +183,20 @@ export function checkModel(model) {
         if (!p.brand?.name) out.push(`${at}: no brand.name`);
         // PA-4: the sign-in pitch is two lines that only make sense together.
         if (!!p.brand?.signInTitle !== !!p.brand?.signInBody) out.push(`${at}: brand.signInTitle and brand.signInBody go together - set both or neither`);
-        const sameHost = Object.entries(products).find(([other, q]) => other < file && q.host && q.host === p.host);
-        if (sameHost) out.push(`${at}: shares the host '${p.host}' with Product '${sameHost[0]}' - each host is built as exactly one Product`);
+        // PA-5: a host may build several Products (la-app is the suite shell, D-PA13), but only one is its default build;
+        // every other one names a build configuration that puts its own generated data in the default's place.
+        const sameHost = Object.entries(products).find(([other, q]) => other < file && q.host && q.host === p.host && !q.hostConfiguration && !p.hostConfiguration);
+        if (sameHost) out.push(`${at}: shares the default build of host '${p.host}' with Product '${sameHost[0]}' - give one of them a hostConfiguration`);
         if (p.shape && !SHAPES.includes(p.shape)) out.push(`${at}: shape '${p.shape}' is not one of ${SHAPES.join(', ')}`);
         if (p.host && !hosts.includes(p.host)) out.push(`${at}: host '${p.host}' is not an Angular project in inspecto-ui/angular.json (${hosts.join(', ')})`);
+        if (p.hostConfiguration && hosts.includes(p.host)) {
+            const proj = model.ngProjects?.[p.host] ?? {};
+            const cfg = (proj.architect ?? proj.targets)?.build?.configurations?.[p.hostConfiguration];
+            const base = `${proj.sourceRoot}/app/product.generated.ts`;
+            const mine = `${proj.sourceRoot}/${hostDataFile(p)}`;
+            if (!cfg) out.push(`${at}: hostConfiguration '${p.hostConfiguration}' is not a build configuration of host '${p.host}' in inspecto-ui/angular.json`);
+            else if (!list(cfg.fileReplacements).some((r) => r.replace === base && r.with === mine)) out.push(`${at}: build configuration '${p.hostConfiguration}' of host '${p.host}' must replace ${base} with ${mine}`);
+        }
         if (p.docs && !exists(p.docs)) out.push(`${at}: docs '${p.docs}' does not exist`);
         const eds = list(p.editions);
         if (!eds.length) out.push(`${at}: lists no editions`);
@@ -204,7 +244,24 @@ export function checkModel(model) {
                 shipped.add(t);
             }
         }
-        if (p.demoSpace && !seen.has(p.demoSpace)) out.push(`${at}: demoSpace '${p.demoSpace}' is not one of the Product's templates`);
+        // PA-5: the composed Space (D-PA14). Its parts are the Apps' templates; two parts may not ship the same file, except
+        // the ones tools/compose-space.mjs writes itself. Checked over every App the Product can ship, so no Edition's
+        // selection can collide.
+        if (p.space) {
+            if (p.shape !== 'domain') out.push(`${at}: space '${p.space}' is composed from Apps, so only a Domain product has one`);
+            if (templates.includes(p.space)) out.push(`${at}: space '${p.space}' is the id of a committed template under spaces/_templates - a composed Space needs its own id`);
+            const parts = spaceParts(all.filter((a) => apps[a]), apps).filter((x) => templates.includes(x.template));
+            if (!parts.length) out.push(`${at}: space '${p.space}' has nothing to compose - none of its Apps ships a template`);
+            const owner = new Map();
+            for (const { template } of parts) {
+                for (const f of model.templateFiles?.[template] ?? []) {
+                    if (COMPOSER_OWNED.includes(f)) continue;
+                    if (owner.has(f)) out.push(`${at}: space '${p.space}': templates '${owner.get(f)}' and '${template}' both ship ${f}`);
+                    else owner.set(f, template);
+                }
+            }
+        }
+        if (p.demoSpace && !seen.has(p.demoSpace) && p.demoSpace !== p.space) out.push(`${at}: demoSpace '${p.demoSpace}' is not one of the Product's templates`);
         if (p.demoSpace && !exists(seedToolOf(p.demoSpace))) out.push(`${at}: demoSpace '${p.demoSpace}' has no seed tool ${seedToolOf(p.demoSpace)} (--scaffold / --apply, as tools/seed-la-showcase.mjs)`);
         if (p.demoSpace && !exists(demoTextOf(file))) out.push(`${at}: demoSpace '${p.demoSpace}' has no presenter text ${demoTextOf(file)} (the bundle's DEMO-BUILD.txt)`);
         if (p.demoSpace && !list(p.distributions).includes('demo')) out.push(`${at}: demoSpace is set but the Product offers no demo distribution`);

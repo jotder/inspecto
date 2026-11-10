@@ -16,11 +16,20 @@ test('every committed host file is what the definitions generate (the CI --check
     }
 });
 
-test("each Product lands in its host project's sourceRoot", () => {
+test("each Product lands in its host project's sourceRoot; a configured build gets its own file (PA-5)", () => {
     const files = Object.fromEntries(renderAll(repo).map((r) => [r.product, r.file.replace(/\\/g, '/')]));
-    assert.equal(files.la, 'inspecto-ui/projects/la-app/src/app/product.generated.ts');
+    assert.equal(files.la, 'inspecto-ui/projects/la-app/src/app/product.generated.ts', 'Inspecto LA is the default build of la-app');
+    assert.equal(files.telco, 'inspecto-ui/projects/la-app/src/app/product.telco.generated.ts', 'Inspecto Telco is la-app built with -c telco');
     assert.equal(files.inspecto, 'inspecto-ui/src/app/product.generated.ts');
-    assert.throws(() => hostFile({}, 'nope'), /host 'nope' is not an Angular project/);
+    assert.throws(() => hostFile({}, { id: 'x', host: 'nope' }), /host 'nope' is not an Angular project/);
+});
+
+test('PA-5: the Telco host data names its brand and pitch, and draws no area yet for an App with no nav', () => {
+    const m = gatherModel(repo);
+    const g = generatedProduct(m, m.products.telco);
+    assert.equal(g.brand.name, 'Inspecto Telco');
+    assert.ok(g.brand.signInPitch.title && g.brand.signInPitch.body);
+    assert.deepEqual([...new Set(g.nav.map((n) => n.app))], ['link-analysis'], 'RA, FM and CM declare their areas with their pages (PA-5b)');
 });
 
 test('the LA host data carries the brand, the pitch and the App nav in drawing order', () => {

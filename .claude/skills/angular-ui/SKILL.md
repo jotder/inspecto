@@ -944,7 +944,11 @@ in use. Look there before picking a class — do not invent a token.
   `product: signal(null)` beside `features`, or it fails with `this.session.product is not a function`. Both hosts
   take what they configure alike from `provideInspectoShell({ environment, product, routes })`
   (`inspecto/shell/provide-inspecto-shell.ts`): a provider both hosts need goes THERE, a host-only one in that
-  host's `app.config.ts`. The console's 4-group nav stays in `navigation-data.ts` until PA-6.
+  host's `app.config.ts`. The console's 4-group nav stays in `navigation-data.ts` until PA-6. **One host, several
+  Products (PA-5):** la-app builds Inspecto LA by default and Inspecto Telco with `ng build la-app -c production,telco`
+  (`products/telco.toon` `hostConfiguration`; the configuration's `fileReplacements` swaps in
+  `product.telco.generated.ts`). Code always imports `./product.generated`; never name a Product in la-app's code,
+  templates or `index.html` (the tab title comes from `provideInspectoShell`). Preview Telco with `ng serve la-app -c telco`.
 - **A Settings *section* is not a nav item.** `SettingsComponent.drawers` is the list; a section is a
   `{id,title,icon,description,component}` row rendering an existing standalone component through
   `NgComponentOutlet`, and its own route stays. Adding one = the drawer row + its import.

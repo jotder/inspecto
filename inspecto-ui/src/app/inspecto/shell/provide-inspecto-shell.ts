@@ -1,5 +1,6 @@
 import { provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, inject, provideAppInitializer, provideZoneChangeDetection } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { LuxonDateAdapter } from '@angular/material-luxon-adapter';
 import { DateAdapter, MAT_DATE_FORMATS, MatDateFormats } from '@angular/material/core';
 import { MAT_DIALOG_DEFAULT_OPTIONS, MatDialogConfig } from '@angular/material/dialog';
@@ -47,6 +48,8 @@ export const SHELL_DATE_FORMATS: MatDateFormats = {
  *   stays alive while the analyst visits another page; KEEP_ALIVE routes only).
  * - Every Material dialog modal to assistive technology (LA-A11Y-AUDIT-1). ⚠ The options REPLACE `new MatDialogConfig()`
  *   rather than merge with it, so the defaults (role, hasBackdrop, ...) are spread in.
+ * - The browser tab's title, the Product's brand (PA-5: la-app builds Inspecto LA and Inspecto Telco, so its index.html
+ *   names neither).
  */
 export function provideInspectoShell(opts: {
     environment: AppEnvironment;
@@ -75,5 +78,6 @@ export function provideInspectoShell(opts: {
         { provide: DateAdapter, useClass: LuxonDateAdapter },
         { provide: MAT_DATE_FORMATS, useValue: SHELL_DATE_FORMATS },
         { provide: MAT_DIALOG_DEFAULT_OPTIONS, useFactory: () => ({ ...new MatDialogConfig(), ariaModal: true }) },
+        provideAppInitializer(() => inject(Title).setTitle(opts.product.brand.name)),
     ];
 }

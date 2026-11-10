@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appNav, checkModel, gatherModel, productApps } from './products.mjs';
+import { appNav, checkModel, gatherModel, hostDataFile, productApps } from './products.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NAV_FIELDS = ['app', 'id', 'path', 'label', 'icon', 'blurb', 'feature', 'capability'];
@@ -26,11 +26,15 @@ function str(s) {
     return `'${v.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
 
-/** Where a host's file goes: `<sourceRoot>/app/product.generated.ts` of its Angular project. */
-export function hostFile(projects, host) {
-    const root = projects[host]?.sourceRoot;
-    if (!root) throw new Error(`host '${host}' is not an Angular project with a sourceRoot in inspecto-ui/angular.json`);
-    return join('inspecto-ui', root, 'app', 'product.generated.ts');
+/**
+ * Where a Product's file goes: `<sourceRoot>/app/product.generated.ts` of its host when it is the host's default build,
+ * `product.<id>.generated.ts` when it is built with a `hostConfiguration` (PA-5: la-app builds Inspecto LA and Inspecto
+ * Telco; the configuration's fileReplacements swaps the file in).
+ */
+export function hostFile(projects, p) {
+    const root = projects[p.host]?.sourceRoot;
+    if (!root) throw new Error(`host '${p.host}' is not an Angular project with a sourceRoot in inspecto-ui/angular.json`);
+    return join('inspecto-ui', root, ...hostDataFile(p).split('/'));
 }
 
 /** The generated data of one Product: brand and the nav of every App it can ship, required first. */
@@ -74,21 +78,16 @@ export function render(productFile, g) {
     return lines.join('\n');
 }
 
-/** Every host file this repo's Products produce: [{ product, file, text }]. Throws on broken definitions or a shared host. */
+/** Every host file this repo's Products produce: [{ product, file, text }]. Throws on broken definitions (two default builds of one host among them). */
 export function renderAll(root = REPO) {
     const model = gatherModel(root);
     const findings = checkModel(model);
     if (findings.length) throw new Error(`the definitions do not pass tools/check-products.mjs:\n  ${findings.join('\n  ')}`);
-    const projects = JSON.parse(readFileSync(join(root, 'inspecto-ui', 'angular.json'), 'utf8')).projects;
-    const byHost = new Map();
-    const out = [];
-    for (const [id, p] of Object.entries(model.products)) {
-        if (byHost.has(p.host)) throw new Error(`Products '${byHost.get(p.host)}' and '${id}' share the host '${p.host}' - one generated file per host`);
-        byHost.set(p.host, id);
-        const file = hostFile(projects, p.host);
-        out.push({ product: id, file, text: render(`products/${id}.toon`, generatedProduct(model, p)) });
-    }
-    return out;
+    return Object.entries(model.products).map(([id, p]) => ({
+        product: id,
+        file: hostFile(model.ngProjects, p),
+        text: render(`products/${id}.toon`, generatedProduct(model, p)),
+    }));
 }
 
 function main() {

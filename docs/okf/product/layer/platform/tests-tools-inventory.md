@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-91 test file(s). Run one, or all:
+92 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -46,6 +46,7 @@ node --test tools/
 | `tools/check-release-signing.test.mjs` |  |
 | `tools/check-sbom-modules.test.mjs` | Negative fixtures for tools/check-sbom-modules.mjs. Run: node --test tools/check-sbom-modules.test.mjs |
 | `tools/compile-clean.test.mjs` | Fixture test for tools/compile-clean.mjs — the verdict must come from the LOG, never from an exit code, and each way |
+| `tools/compose-space.test.mjs` | Tests for tools/compose-space.mjs - PRODUCT-ASSEMBLY-1 PA-5 (D-PA14). Run: node --test tools/compose-space.test.mjs |
 | `tools/customer-build.test.mjs` | Fixture test for tools/customer-build.mjs. Run: node --test tools/customer-build.test.mjs |
 | `tools/dev-doctor.test.mjs` | Fixture test for tools/dev-doctor.mjs. Run: node --test tools/dev-doctor.test.mjs |
 | `tools/fetch-duckdb-extensions.test.mjs` | Offline tests for tools/fetch-duckdb-extensions.mjs's --only / --platform selection (D-8, 2026-09-26). |

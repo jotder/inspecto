@@ -3,7 +3,8 @@
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
-design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a done
+2026-11-10; PA-5b is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -307,7 +308,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-2** Assembler ✅ 2026-11-10 | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised (✅; package runs in the as-built note) |
 | **PA-3** Server ✅ 2026-11-10 | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination (✅; proof in the PA-3 note) |
 | **PA-4** Suite shell ✅ 2026-11-10 | one shell provider set (`provideInspectoShell`); generated host data (`product.generated.ts`); the LA shell draws the Product's nav (the App switcher and *My work* across Apps moved to PA-5) | both shells' specs and axe green; bundle sizes within 5 % (✅; proof in the PA-4 note) |
-| **PA-5** **Inspecto Telco** as proof | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; the App switcher and *My work* across Apps; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
+| **PA-5** **Inspecto Telco** as proof (lanes 5a ✅ … 5d, §11) | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; the App switcher and *My work* across Apps; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
 | **PA-6** Platform product | the Add-on picker; builder-kit docs; `inspecto app new/validate/test/package`; the conformance kit | a sample partner App built only with the kit passes conformance |
 | **PA-7** Entitlements and live App install | signed entitlements; `POST /apps` install / upgrade / remove; the trial Distribution | install, upgrade and remove an App on a running server with no lost config |
 | **PA-8** Container and air-gap | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
@@ -434,6 +435,59 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   `../la-rail.service` import from `d634b6a7d`; fixed right after PA-4 by importing it through the library alias)
   and `format:check` reports 251 drifted files (left alone).
 
+**PA-5 design (2026-11-10; D-PA13…D-PA16 signed).** Inspecto Telco: RA, FM, LA and CM over one ingest, with no new Java.
+What the survey found decides the shape:
+- **A Space is created from exactly one Space Template** (`POST /spaces {template}` copies one folder;
+  `SpaceManager.createFromTemplate`). With no new Java, Apps that share a Space can only do so through a template made
+  of theirs at build time (D-PA14).
+- **The telco templates share no ingest.** RA (`telco-ra`) reads switch, mediated and rated xDRs (`XDR_ID`,
+  `SUBSCRIBER_ID`, `B_NUMBER`, `SERVICE`, `PARTNER`, `USAGE_UNITS`); FM's `telco-fraud` reads `cdr` (`a_number`,
+  `b_number`, `direction`, `duration_s`, `charge`, `roaming`, `cell_id`); `telco-bypass` reads `voice_cdr` (the same plus
+  `answered`, `release_cause`, `imei`, `imsi`); the LA showcase `la-telco-ra` reads `network_usage`. Re-rating shares
+  RA's `rated_usage` schema field for field. Java golden tests pin each corpus (`TelcoRaGoldenTest`,
+  `TelcoFraudTemplateGoldenTest`, `BypassFeatureGoldenTest`, `TelcoRerateGoldenTest`, `BypassBoxCaseRuleTest`, …).
+- **RA, FM and CM pages exist only in the console**; la-app holds Link Analysis and *My work* (LA cases, data changes).
+
+The slices, each its own lane (D-PA16):
+- **PA-5a — definitions and the composed Space.** `apps/telco-ra` (Revenue Assurance: Reconciliation, Incidents),
+  `apps/telco-fraud` (Fraud Management: `telco-fraud` + `telco-bypass`; Incidents, Case Management, Scoring & Lists,
+  Anomaly), `apps/case-management` (Case Management, Industry-neutral, no content of its own yet) and
+  `products/telco.toon` (Standard, Advanced; RA and CM required, FM and LA optional; `space: telco`). The 20 LA showcase
+  templates move from the LA App to the Products that ship them (`la`, `inspecto`: both stage exactly what they did):
+  they are Inspecto LA's gallery, and a Telco build must not carry them (§5). LA's telecom content returns in PA-5c, over
+  the Industry's feeds. **A shared host (D-PA13):** a host builds several Products; one is its default build, every other
+  names a `hostConfiguration` whose `fileReplacements` swap in `product.<id>.generated.ts` (la-app `-c telco`);
+  `package.ps1` builds the UI with it. **The composed Space (D-PA14):** `tools/compose-space.mjs` writes
+  `spaces/_templates/<space>` in the bundle from the staged parts (each selected App's templates): their files side by
+  side, plus the two it owns, `template.toon` (named for the Product, each part's contents under its App's name) and
+  `config/examples/sla-escalation-examples.md` (each part's examples under its App's heading). Any other file two parts
+  ship is refused, statically by the guard and again by the composer. RA, FM and CM declare no nav yet: their areas come
+  with their pages in PA-5b, so the Telco shell draws LA's areas only until then. la-app's `index.html` names no Product
+  any more (`<title>Inspecto</title>`); `provideInspectoShell()` sets the tab title from the Product's brand.
+  **Proof (as built, 2026-11-10).** Tool tests 78/78 (`compose-space.test.mjs` 4: every committed `template.toon` reads
+  with its declared counts, the Telco Space composed byte for byte from the three parts, the refusals; 8 new guard cases;
+  the Telco plan on Standard and Advanced); `render-product-hosts --check`; `typecheck` and `lint` green; the shell spec
+  plus every la-app spec, 24 files / 176 tests. `package.ps1 -Product telco -Edition Standard` built la-app with
+  `-c production,telco`, composed `telco` from `telco-ra`, `telco-fraud`, `telco-bypass` (247 files) and passed its boot
+  check. Booted as shipped (OIDC, placeholder issuer): the sign-in page shows Inspecto Telco's pitch, `/bootstrap.product`
+  names `telco`. Booted auth-free (a scratch copy with `inspecto-oidc.jar` off `modules.list`): all four Apps installed
+  and enabled, nav = LA's six areas; the gallery offers `telco`, creatable, with samples and 29 contents (9 + 10 + 10);
+  `POST /spaces {template: telco, loadSamples: true}` loaded all 11 feeds (RA's 8, FM's 3), none quarantined; the Space
+  holds 35 Jobs (11 + 18 + 6), 19 Alert Rules (2 + 14 + 3), 2 Reconciliations, 44 Datasets (17 + 18 + 9), as the parts
+  ship them; `ra_xdr_completeness`, `ra_rated_vs_billed`, `fraud_irsf`, `fraud_simbox` and `tb_features` ran to SUCCESS
+  side by side; the la-app Telco build titles the tab and the rail *Inspecto Telco* and draws the server's nav. Not run:
+  the Advanced package (the assembler test covers its plan; the Product matrix is PA-5d) and the parts' golden values in
+  the composed Space (the Java golden tests pin each part; the composer copies bytes, proven by the test above).
+- **PA-5b — the suite shell (D-PA13).** la-app becomes the suite host: an App switcher, each App's areas lazy-loading the
+  console's existing pages (Reconciliation, Incidents, Cases, Alerts, Dashboards), and *My work* across Apps (Alerts,
+  Incidents and Cases assigned to me, plus LA's cases), composed client-side from existing routes.
+- **PA-5c — one ingest (D-PA15).** `telecom` owns canonical feeds (switch, mediated and rated xDR, subscriber, invoice,
+  tariff, …) with ONE generated golden corpus that plants RA's leakages and FM's typologies, with ground truth; each App
+  maps them onto its own names through views, so its Jobs and Alert Rules stay; the golden tests are re-pointed; LA's
+  telecom link Job reads the same feeds.
+- **PA-5d — the demo Distribution.** `tools/seed-telco.mjs`, `products/telco.demo-build.txt`, `demoSpace: telco`, and
+  the Telco Product matrix (Standard, Advanced) in CI.
+
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 
 | Id | Call | Signed |
@@ -450,6 +504,10 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
 | D-PA10 | Apps install into a running Platform (PA-7) as well as at build time | yes, admin-only and signed |
 | D-PA11 | Entitlements: a signed file checked offline at boot and on gated routes | yes; no call-home |
 | D-PA12 | Apps version on their own within a Platform range | yes |
+| D-PA13 | Where the Telco suite shell (App switcher, *My work*) lives | la-app becomes the suite host, built once per Product; RA/FM/CM areas lazy-load the console's pages |
+| D-PA14 | How several Apps land in one Space with no new Java | the assembler composes one Space Template from the Apps' templates at build time; a file two parts ship is refused |
+| D-PA15 | How Telco reaches one ingest | the `telecom` Industry owns canonical feeds and one generated golden corpus; Apps map them through views |
+| D-PA16 | The order of the PA-5 lanes | compose (5a), suite shell (5b), one ingest (5c), demo (5d) |
 
 ## 13. The open board, re-checked 2026-11-10
 

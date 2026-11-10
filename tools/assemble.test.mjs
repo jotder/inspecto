@@ -66,6 +66,29 @@ test('PA-3: the descriptor carries each App\'s modules for THIS edition and its 
     assert.deepEqual([console_.shape, console_.host, console_.apps.map((a) => a.id)], ['platform', 'gamma', ['link-analysis']]);
 });
 
+test('PA-5: Inspecto Telco is la-app built with -c telco, four Apps, and one Space composed from RA and FM', () => {
+    for (const edition of ['standard', 'advanced']) {
+        const p = plan({ product: 'telco', edition });
+        assert.deepEqual([p.host, p.hostConfiguration, p.industry], ['la-app', 'telco', 'telecom']);
+        assert.deepEqual(p.apps.map((a) => a.id), ['telco-ra', 'case-management', 'telco-fraud', 'link-analysis']);
+        assert.deepEqual(p.templates, ['telco-ra', 'telco-fraud', 'telco-bypass'], 'the parts ship as templates of their own too');
+        assert.deepEqual(p.space, {
+            id: 'telco',
+            title: 'Inspecto Telco',
+            parts: [
+                { app: 'telco-ra', appTitle: 'Revenue Assurance', template: 'telco-ra' },
+                { app: 'telco-fraud', appTitle: 'Fraud Management', template: 'telco-fraud' },
+                { app: 'telco-fraud', appTitle: 'Fraud Management', template: 'telco-bypass' },
+            ],
+        });
+        assert.equal(p.editionProperties.product, 'telco');
+        assert.deepEqual(p.descriptor.apps.map((a) => a.id), p.apps.map((a) => a.id));
+    }
+    assert.equal(plan({ product: 'la', edition: 'basic' }).hostConfiguration, null, 'Inspecto LA stays the default build of la-app');
+    assert.equal(plan({ product: 'la', edition: 'basic' }).space, null);
+    assert.throws(() => plan({ product: 'telco', edition: 'basic' }), /Product 'telco' does not come in edition 'basic'/);
+});
+
 const REFUSED = {
     'an unknown Product': [{ product: 'nope', edition: 'basic' }, /unknown Product 'nope'/],
     'an edition the Product does not list': [{ product: 'la', edition: 'enterprise' }, /does not come in edition 'enterprise'/],

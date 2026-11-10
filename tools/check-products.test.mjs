@@ -88,7 +88,17 @@ const RED = {
     'a nav entry keyed on a feature its Add-ons do not provide': [(m) => { m.apps['link-analysis'].nav.data.feature = 'reconciliation'; }, /nav entry 'data' keys on feature 'reconciliation', which no module of its Add-ons \(linkAnalysis\) provides/],
     // PA-4: the generated host data.
     'a sign-in title without its body': [(m) => { delete m.products.la.brand.signInBody; }, /brand\.signInTitle and brand\.signInBody go together/],
-    'two Products on one host': [(m) => { m.products.la.host = 'gamma'; }, /shares the host 'gamma' with Product 'inspecto'/],
+    'two Products on one host': [(m) => { m.products.la.host = 'gamma'; }, /products\/la\.toon: shares the default build of host 'gamma' with Product 'inspecto'/],
+    // PA-5: a shared host (D-PA13) and the composed Space (D-PA14).
+    'two default builds of one host': [(m) => { delete m.products.telco.hostConfiguration; }, /products\/telco\.toon: shares the default build of host 'la-app' with Product 'la'/],
+    'a hostConfiguration the host does not have': [(m) => { m.products.telco.hostConfiguration = 'nope'; }, /hostConfiguration 'nope' is not a build configuration of host 'la-app'/],
+    'a host configuration that does not swap the host data in': [(m) => { m.ngProjects['la-app'].architect.build.configurations.telco.fileReplacements = []; },
+        /build configuration 'telco' of host 'la-app' must replace projects\/la-app\/src\/app\/product\.generated\.ts with projects\/la-app\/src\/app\/product\.telco\.generated\.ts/],
+    'a space on a Platform product': [(m) => { m.products.inspecto.space = 'x'; }, /products\/inspecto\.toon: space 'x' is composed from Apps, so only a Domain product has one/],
+    'a space named like a committed template': [(m) => { m.products.telco.space = 'telco-ra'; }, /space 'telco-ra' is the id of a committed template/],
+    'a space with nothing to compose': [(m) => { m.apps['telco-ra'].templates = []; m.apps['telco-fraud'].templates = []; }, /space 'telco' has nothing to compose/],
+    'two parts shipping one file': [(m) => { m.templateFiles['telco-bypass'].push(m.templateFiles['telco-ra'].find((f) => f.startsWith('config/registry/'))); },
+        /space 'telco': templates 'telco-ra' and 'telco-bypass' both ship config\/registry\//],
     'a demoSpace on a Product with no demo distribution': [(m) => { m.products.la.distributions = ['production']; }, /demoSpace is set but the Product offers no demo distribution/],
 };
 for (const [name, [plant, re]] of Object.entries(RED)) test(`RED: ${name}`, () => red(plant, re));

@@ -315,7 +315,13 @@ if (-not $NoUi -and (Test-Path (Join-Path $uiDir 'package.json'))) {
     try {
         & npm ci
         if ($LASTEXITCODE -ne 0) { throw "npm ci failed in inspecto-ui/" }
-        & npm run build -- $Ui
+        # PA-5: a host that builds several Products (la-app: Inspecto LA and Inspecto Telco) builds a non-default one with its
+        # hostConfiguration, which swaps that Product's generated host data in (inspecto-ui/angular.json fileReplacements).
+        if ($plan.hostConfiguration) {
+            & npm run build -- $Ui --configuration "production,$($plan.hostConfiguration)"
+        } else {
+            & npm run build -- $Ui
+        }
         if ($LASTEXITCODE -ne 0) { throw "ng build $Ui failed in inspecto-ui/" }
         $uiBuilt = $true
         Write-Host "UI build complete." -ForegroundColor Green
@@ -1382,6 +1388,12 @@ if (Test-Path $uiDist) {
 . (Join-Path $adjParserDir 'package-spaces.ps1')
 # PRODUCT-ASSEMBLY-1 PA-2: only the Product build's templates (the Assembly Plan's `templates`: the Product's own plus its Apps').
 $staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir -Only @($plan.templates)
+# PA-5 (D-PA14): a Product whose Apps share one Space gets that Space's template composed from theirs, out of the copies
+# staged just above (so only committed content is composed). tools/compose-space.mjs refuses a file two parts both ship.
+if ($plan.space) {
+    & node (Join-Path $sandboxRoot 'tools\compose-space.mjs') --plan $planFile --templates (Join-Path $bundleDir 'spaces\_templates')
+    if ($LASTEXITCODE -ne 0) { throw "tools/compose-space.mjs could not compose the Space '$($plan.space.id)' (the reason is above)" }
+}
 if ($staged.Templates.Count -gt 0) {
     Write-Host "Bundled Space templates → $($staged.Out)\_templates ($($staged.Files) committed files; templates: $($staged.Templates -join ', '))" -ForegroundColor Green
 } else {

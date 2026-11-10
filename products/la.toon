@@ -6,7 +6,7 @@ editions[4]: basic,standard,advanced,preview
 apps:
   required[1]: link-analysis
   optional[0]:
-templates[0]:
+templates[20]: la-audit,la-benefits,la-card,la-claims,la-crypto,la-daily-feed,la-health,la-insider,la-logistics,la-mfs,la-mobile-money,la-ownership,la-police,la-procurement,la-sample,la-showcase,la-showcase-off,la-telco-ra,la-trade,la-utility
 distributions[2]: production,demo
 demoSpace: la-showcase
 brand:

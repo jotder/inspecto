@@ -5,7 +5,7 @@ platform: >=4.0 <5
 industries[0]:
 requires:
   addons[1]: linkAnalysis
-templates[20]: la-audit,la-benefits,la-card,la-claims,la-crypto,la-daily-feed,la-health,la-insider,la-logistics,la-mfs,la-mobile-money,la-ownership,la-police,la-procurement,la-sample,la-showcase,la-showcase-off,la-telco-ra,la-trade,la-utility
+templates[0]:
 nav:
   linkAnalysis:
     path: link-analysis

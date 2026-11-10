@@ -1,0 +1,18 @@
+id: telco
+title: Inspecto Telco
+shape: domain
+industry: telecom
+host: la-app
+hostConfiguration: telco
+editions[2]: standard,advanced
+apps:
+  required[2]: telco-ra,case-management
+  optional[2]: telco-fraud,link-analysis
+templates[0]:
+space: telco
+distributions[1]: production
+brand:
+  name: Inspecto Telco
+  signInTitle: Find the leakage, catch the fraud, close the case.
+  signInBody: Revenue Assurance, Fraud Management, Link Analysis and Case Management in one product for your network's records.
+docs: docs/okf/product/solution-pack/industry-telecom/index.md

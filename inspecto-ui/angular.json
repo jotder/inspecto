@@ -224,6 +224,14 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "telco": {
+              "fileReplacements": [
+                {
+                  "replace": "projects/la-app/src/app/product.generated.ts",
+                  "with": "projects/la-app/src/app/product.telco.generated.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -240,6 +248,9 @@
             },
             "development": {
               "buildTarget": "la-app:build:development"
+            },
+            "telco": {
+              "buildTarget": "la-app:build:development,telco"
             }
           },
           "defaultConfiguration": "development"

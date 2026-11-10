@@ -1,0 +1,9 @@
+id: telco-fraud
+title: Fraud Management
+version: 1.0.0
+platform: >=4.0 <5
+industries[1]: telecom
+requires:
+  addons[4]: incidents,caseManagement,scoringLists,anomalyDetection
+templates[2]: telco-fraud,telco-bypass
+docs: docs/okf/product/solution-pack/telco-fraud/index.md
