@@ -290,6 +290,13 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * @param port   TCP port (0 = ephemeral; read back via {@link #port()})
      */
     public ControlApi(SpaceManager spaces, int port) throws IOException {
+        // PRODUCT-ASSEMBLY-1 PA-3: a Product descriptor (lib/product.json) that does not parse fails the boot, naming the file -
+        // checked FIRST, before a port is bound, so a refused boot leaves nothing open. Absent is fine (target/classes, pre-PA-3).
+        try {
+            ProductDescriptor.current();
+        } catch (IllegalStateException bad) {
+            throw new IOException(bad.getMessage(), bad);
+        }
         this.spaces = spaces;
         String cors  = System.getProperty("control.cors");
         this.corsOrigin = blank(cors) ? null : cors.trim();

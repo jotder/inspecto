@@ -9789,6 +9789,91 @@
               }
             }
           },
+          "product" : {
+            "type" : "object",
+            "nullable" : true,
+            "description" : "The Product this server was built as (PRODUCT-ASSEMBLY-1 PA-3), read from the bundle's lib/product.json; null when the build carries none (a target/classes run, a bundle built before PA-3). id, title, shape, host and brand are pre-sign-in context like branding; apps and nav appear only where the Space roster does (signed in, or no Authenticator).",
+            "required" : [ "id", "title", "brand" ],
+            "properties" : {
+              "id" : {
+                "type" : "string"
+              },
+              "title" : {
+                "type" : "string"
+              },
+              "shape" : {
+                "type" : "string",
+                "enum" : [ "domain", "platform" ]
+              },
+              "host" : {
+                "type" : "string",
+                "description" : "The single-page application the bundle ships (inspecto-ui/projects/<host>)."
+              },
+              "brand" : {
+                "type" : "object",
+                "properties" : {
+                  "name" : {
+                    "type" : "string"
+                  }
+                }
+              },
+              "apps" : {
+                "type" : "array",
+                "description" : "The Product build's Apps. installed: every module the App needs is ACTIVE (the set GET /modules reports); otherwise missing names them and the App draws no nav.",
+                "items" : {
+                  "type" : "object",
+                  "properties" : {
+                    "id" : {
+                      "type" : "string"
+                    },
+                    "title" : {
+                      "type" : "string"
+                    },
+                    "version" : {
+                      "type" : "string"
+                    },
+                    "installed" : {
+                      "type" : "boolean"
+                    },
+                    "missing" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "nav" : {
+                "type" : "array",
+                "description" : "The areas this caller sees, in drawing order: an entry of an installed App whose feature (if any) is true in this response's features and, where an Authenticator is active, whose capability (if any) the caller holds. path is relative to where the host mounts the App.",
+                "items" : {
+                  "type" : "object",
+                  "required" : [ "app", "id", "path", "label" ],
+                  "properties" : {
+                    "app" : {
+                      "type" : "string"
+                    },
+                    "id" : {
+                      "type" : "string"
+                    },
+                    "path" : {
+                      "type" : "string"
+                    },
+                    "label" : {
+                      "type" : "string"
+                    },
+                    "icon" : {
+                      "type" : "string"
+                    },
+                    "blurb" : {
+                      "type" : "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "session" : {
             "type" : "object",
             "required" : [ "authenticated" ],

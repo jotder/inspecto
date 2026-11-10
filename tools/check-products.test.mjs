@@ -81,6 +81,11 @@ const RED = {
     'a Domain product that names Add-ons': [(m) => { m.products.la.addons = ['linkAnalysis']; }, /a Domain product names no addons/],
     'a Domain product naming an Industry with no definition': [(m) => { m.products.la.industry = 'retail'; }, /products\/la\.toon: Industry 'retail' has no industries\/retail\/industry\.toon/],
     'a Platform product naming an unknown Add-on': [(m) => m.products.inspecto.addons.push('ghostAddon'), /Add-on 'ghostAddon' is named by no Offering/],
+    // PA-3: the nav an App declares.
+    'a nav entry with no path': [(m) => { delete m.apps['link-analysis'].nav.data.path; }, /nav entry 'data' has no path/],
+    'a nav entry with no label': [(m) => { delete m.apps['link-analysis'].nav.data.label; }, /nav entry 'data' has no label/],
+    'two nav entries sharing a path': [(m) => { m.apps['link-analysis'].nav.alerts.path = 'data'; }, /nav entries 'data' and 'alerts' share the path 'data'/],
+    'a nav entry keyed on a feature its Add-ons do not provide': [(m) => { m.apps['link-analysis'].nav.data.feature = 'reconciliation'; }, /nav entry 'data' keys on feature 'reconciliation', which no module of its Add-ons \(linkAnalysis\) provides/],
     'a demoSpace on a Product with no demo distribution': [(m) => { m.products.la.distributions = ['production']; }, /demoSpace is set but the Product offers no demo distribution/],
 };
 for (const [name, [plant, re]] of Object.entries(RED)) test(`RED: ${name}`, () => red(plant, re));

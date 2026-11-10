@@ -234,7 +234,9 @@ if ($duckdbExtCacheDir) {
 # naming the reason, anything the Product does not offer: an edition it does not come in, a distribution not built yet, a demo on
 # an edition without the demo sign-in swap. Everything Product-specific below reads $plan; nothing here names a Product.
 $planFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-assembly-$Product-$Edition-$Distribution.json"
-& node (Join-Path $sandboxRoot 'tools\assemble.mjs') --product $Product --edition $Edition --distribution $Distribution --out $planFile
+# PA-3: the Product build's descriptor too (written into lib/product.json beside edition.properties at step 3a-ter).
+$descriptorFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-product-$Product-$Edition-$Distribution.json"
+& node (Join-Path $sandboxRoot 'tools\assemble.mjs') --product $Product --edition $Edition --distribution $Distribution --out $planFile --descriptor $descriptorFile
 if ($LASTEXITCODE -ne 0) { throw "tools/assemble.mjs refused Product '$Product' x $Edition x $Distribution (the reason is above)" }
 $plan = Get-Content -Raw $planFile | ConvertFrom-Json
 $Ui = [string]$plan.host
@@ -1323,6 +1325,9 @@ $classpathArgs += @('--product', [string]$plan.editionProperties.product)
 if ($plan.editionProperties.apps) { $classpathArgs += @('--apps', [string]$plan.editionProperties.apps) }
 & node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') @classpathArgs
 if ($LASTEXITCODE -ne 0) { throw "tools/offering-classpath.mjs failed - the staged jars and the Offering's classpath disagree (see above)" }
+# PRODUCT-ASSEMBLY-1 PA-3: the server reads lib/product.json (beside the jar that holds it) to answer GET /bootstrap with its Product,
+# Apps and nav. Byte-for-byte the assembler's file: one writer, so the bundle cannot carry a hand-edited variant.
+Copy-Item -LiteralPath $descriptorFile -Destination (Join-Path $libDir 'product.json') -Force
 
 # P3f: every jar on modules.list has its own per-module SBOM (written by tools/sbom.mjs above); hashes match the staged jars and every
 # third-party component is also in the combined SBOM. Not a warning: a bundle whose per-jar bill of materials disagrees with the jars does not ship.

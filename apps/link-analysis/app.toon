@@ -6,4 +6,38 @@ industries[0]:
 requires:
   addons[1]: linkAnalysis
 templates[20]: la-audit,la-benefits,la-card,la-claims,la-crypto,la-daily-feed,la-health,la-insider,la-logistics,la-mfs,la-mobile-money,la-ownership,la-police,la-procurement,la-sample,la-showcase,la-showcase-off,la-telco-ra,la-trade,la-utility
+nav:
+  linkAnalysis:
+    path: link-analysis
+    label: Link Analysis
+    icon: heroicons_outline:share
+    blurb: Investigate how entities link, one expand step at a time.
+  data:
+    path: data
+    label: Data
+    icon: heroicons_outline:circle-stack
+    blurb: Your Datasets: add files, see what arrived, and choose how each is read as a graph.
+  geoMap:
+    path: geo-map
+    label: Geo
+    icon: heroicons_outline:map
+    feature: geoMap
+    blurb: Place entities and routes on a map, over any Dataset with coordinates.
+  entities:
+    path: entities
+    label: Entities
+    icon: heroicons_outline:identification
+    feature: entityPages
+    blurb: See what the data says about each Entity Type and each Entity: how many, where, how fresh.
+  entityLists:
+    path: entity-lists
+    label: Entity Lists
+    icon: heroicons_outline:queue-list
+    blurb: Keep watch lists of entities, with every change on the record.
+  alerts:
+    path: alerts
+    label: Alerts
+    icon: heroicons_outline:bell-alert
+    feature: investigations
+    blurb: See fired Alerts, and open the Investigation behind a standing detection.
 docs: docs/okf/product/layer/la/index.md

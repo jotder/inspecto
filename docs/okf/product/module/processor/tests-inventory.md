@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-395 test class(es): 154 unit, 241 real-HTTP control-plane, 0 IT.
+397 test class(es): 155 unit, 242 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -82,6 +82,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiBiQueryMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryMaskingTest.java` | BI-QUERY-MASKING-1: classified entity keys in BI result rows are masked unless the caller holds |
 | `ControlApiBiQueryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryTest.java` | Real-HTTP + real-DuckDB tests for the headless BI API (BI-7): {@code POST /bi/query} aggregates a |
 | `ControlApiBiTemplatesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiTemplatesTest.java` | BI-8 template gallery: listing, parameterized apply, all-or-nothing conflict handling. |
+| `ControlApiBootstrapProductTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBootstrapProductTest.java` | PRODUCT-ASSEMBLY-1 PA-3 over real HTTP: {@code GET /bootstrap} names the Product this server was built as and, where the |
 | `ControlApiBundleImportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleImportTest.java` | Round-trips a data-source bundle over real HTTP: export from one space, import into another, and prove <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiBundleNewKindsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleNewKindsTest.java` | Metadata Bundle v2 (2026-07-18 follow-up): the three own-store kinds {@code authored-pipeline}/ |
 | `ControlApiBundleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleTest.java` | Metadata Bundle v2 backend (SPC-4) over real HTTP: export (real content + contentHash), the |
@@ -322,6 +323,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `PersonalAlertHistoryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/PersonalAlertHistoryTest.java` | MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): <b>Basic keeps Alert history and |
 | `PipelineSinksFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PipelineSinksFileRoundTripTest.java` | The plural {@code sinks:} block through the <b>real file</b>: graph → {@code lower} → |
 | `PipelineStepsFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PipelineStepsFileRoundTripTest.java` | The multiplicity chain through the <b>real file</b>: graph → {@code lower} → {@code ConfigCodec.toToon} |
+| `ProductDescriptorTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ProductDescriptorTest.java` | PRODUCT-ASSEMBLY-1 PA-3: the descriptor reader and the resolution of Apps and nav, one gate at a time. The wiring into |
 | `PublishAuthorityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PublishAuthorityTest.java` | ASSURE-BI-PUBLICATION-1: the author a {@code publish.postgres} run acts as — its last editor, with the capabilities |
 | `RateLimiterBudgetTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/RateLimiterBudgetTest.java` | The Link Analysis budget is operator-tunable, and a bad value never disables the limiter. |
 | `RateLimiterEvictionTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/RateLimiterEvictionTest.java` | Deterministic refill and idle-bucket eviction: memory stays bounded, and eviction never resets a budget early. |

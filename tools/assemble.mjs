@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productTemplates, seedToolOf } from './products.mjs';
+import { addonModules, appNav, builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productTemplates, seedToolOf } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -91,7 +91,35 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         demoText: seedSpace ? demoTextOf(p.id) : null,
         posture: model.offerings[ed].posture ?? null,
         editionProperties: { edition: Edition, ...(demo ? { variant: 'demo' } : {}), product: p.id, apps: selected.join(',') },
+        descriptor: productDescriptor(model, p, ed, distribution, selected),
         notes,
+    };
+}
+
+export const DESCRIPTOR_SCHEMA = 'inspecto.product/1';
+
+/**
+ * The Product build's descriptor (PA-3): what the running server reads from `lib/product.json` to answer `/bootstrap.product`.
+ * Resolved here, never by the server: each App carries the modules its Add-ons bring in THIS edition (the server checks
+ * they are ACTIVE) and its nav in drawing order. Fields absent from a nav entry are left out, not written as null.
+ */
+export function productDescriptor(model, p, ed, distribution, selected) {
+    const entry = (n) => Object.fromEntries(['id', 'path', 'label', 'icon', 'blurb', 'feature', 'capability']
+        .filter((k) => n[k] !== undefined && n[k] !== '').map((k) => [k, n[k]]));
+    return {
+        schema: DESCRIPTOR_SCHEMA,
+        id: p.id,
+        title: p.title,
+        shape: p.shape,
+        host: p.host,
+        brand: { name: p.brand?.name ?? p.title },
+        edition: normalizeEdition(ed),
+        distribution,
+        apps: selected.map((a) => {
+            const app = model.apps[a];
+            const modules = [...new Set((app.requires?.addons ?? []).flatMap((x) => [...addonModules(ed, x, model.offerings)]))];
+            return { id: a, title: app.title, version: app.version, modules, nav: appNav(app).map(entry) };
+        }),
     };
 }
 
@@ -168,6 +196,13 @@ function main() {
             target: val('--target') ?? 'windows',
         });
         for (const n of plan.notes) console.error(`assemble: note: ${n}`);
+        // PA-3: `--descriptor <file>` also writes the Product build's descriptor (package.ps1 places it at lib/product.json).
+        const descriptor = val('--descriptor');
+        if (descriptor) {
+            mkdirSync(dirname(resolve(descriptor)), { recursive: true });
+            writeFileSync(descriptor, JSON.stringify(plan.descriptor, null, 2) + '\n');
+            console.error(`assemble: wrote ${descriptor}`);
+        }
         write(plan);
     } catch (e) {
         console.error(`assemble: ${e.message}`);

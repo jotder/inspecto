@@ -48,6 +48,24 @@ test('an optional App whose Add-ons the edition lacks is left out with a note, a
     assert.throws(() => plan({ product: 'la', edition: 'basic', apps: ['link-analysis'] }, both), /App 'link-analysis' needs Add-on\(s\) reconciliation/);
 });
 
+test('PA-3: the descriptor carries each App\'s modules for THIS edition and its nav in drawing order', () => {
+    const adv = plan({ product: 'la', edition: 'advanced', distribution: 'demo' }).descriptor;
+    assert.equal(adv.schema, 'inspecto.product/1');
+    assert.deepEqual([adv.id, adv.title, adv.shape, adv.host, adv.brand.name, adv.edition, adv.distribution],
+        ['la', 'Inspecto LA', 'domain', 'la-app', 'Inspecto LA', 'Advanced', 'demo']);
+    const [la] = adv.apps;
+    assert.deepEqual(la.modules, ['la-storage', 'la-core', 'la-api', 'geo-link', 'la-store-pg'], 'Advanced adds the Postgres Investigation store');
+    assert.deepEqual(la.nav.map((n) => [n.id, n.path, n.feature ?? null]), [
+        ['linkAnalysis', 'link-analysis', null], ['data', 'data', null], ['geoMap', 'geo-map', 'geoMap'],
+        ['entities', 'entities', 'entityPages'], ['entityLists', 'entity-lists', null], ['alerts', 'alerts', 'investigations'],
+    ]);
+    assert.ok(la.nav.every((n) => !('capability' in n)), 'an absent field is left out, not written as null');
+    const basic = plan({ product: 'la', edition: 'basic' }).descriptor.apps[0];
+    assert.deepEqual(basic.modules, ['la-storage', 'la-core', 'la-api', 'geo-link'], 'Basic has no Postgres store');
+    const console_ = plan({ product: 'inspecto', edition: 'standard' }).descriptor;
+    assert.deepEqual([console_.shape, console_.host, console_.apps.map((a) => a.id)], ['platform', 'gamma', ['link-analysis']]);
+});
+
 const REFUSED = {
     'an unknown Product': [{ product: 'nope', edition: 'basic' }, /unknown Product 'nope'/],
     'an edition the Product does not list': [{ product: 'la', edition: 'enterprise' }, /does not come in edition 'enterprise'/],

@@ -14,6 +14,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseToon } from './toon-subset.mjs';
+import { readModuleSources } from './bundle-modules.mjs';
 
 export const SHAPES = ['domain', 'platform'];
 /** Distributions the assembler builds today, and the ones the plan names for later phases. */
@@ -39,8 +40,24 @@ export function gatherModel(root) {
     const hosts = existsSync(ng) ? Object.keys(JSON.parse(readFileSync(ng, 'utf8')).projects ?? {}) : [];
     const industryPacks = subdirsWith(join(root, INDUSTRY_PACK_DIR), 'industry-pack.toon');
     const pomVersion = (/<version>([^<]+)<\/version>/.exec(existsSync(join(root, 'pom.xml')) ? readFileSync(join(root, 'pom.xml'), 'utf8') : '') ?? [])[1] ?? null;
-    return { root, products, apps, industries, offerings, templates, hosts, industryPacks, pomVersion, exists: (p) => existsSync(join(root, p)) };
+    // PA-3: the feature ids each module declares (`provides.features`), so a nav entry's `feature` can be checked.
+    const moduleFeatures = Object.fromEntries(Object.values(readModuleSources(root).manifests).map((m) => [m.id, list(m.provides?.features)]));
+    return { root, products, apps, industries, offerings, templates, hosts, industryPacks, pomVersion, moduleFeatures, exists: (p) => existsSync(join(root, p)) };
 }
+
+/** The modules an Add-on brings in an edition: the union of its `modules` along the Offering's `includes` chain. */
+export function addonModules(edition, addon, offerings, seen = []) {
+    const o = offerings[edition];
+    if (!o) throw new Error(`offering '${edition}' not found under offerings/`);
+    if (seen.includes(edition)) throw new Error(`offering includes cycle ${[...seen, edition].join(' -> ')}`);
+    const out = new Set();
+    for (const inc of o.includes ?? []) addonModules(inc, addon, offerings, [...seen, edition]).forEach((m) => out.add(m));
+    for (const m of list(o.addons?.[addon]?.modules)) out.add(m);
+    return out;
+}
+
+/** An App's nav entries in drawing order (PA-3): [{id, path, label, icon, blurb?, feature?, capability?}]. */
+export const appNav = (app) => Object.entries(app?.nav && typeof app.nav === 'object' ? app.nav : {}).map(([id, e]) => ({ id, ...e }));
 
 /** An Offering's Add-ons with `includes` resolved (an including Offering's entry wins): { name: {status, modules} }. */
 export function offeringAddons(id, offerings, seen = []) {
@@ -114,6 +131,18 @@ export function checkModel(model) {
         for (const a of list(app.requires?.addons)) if (!known.has(a)) out.push(`${at}: requires Add-on '${a}', which no Offering names`);
         for (const t of list(app.templates)) if (!templates.includes(t)) out.push(`${at}: template '${t}' is not under spaces/_templates`);
         if (app.docs && !exists(app.docs)) out.push(`${at}: docs '${app.docs}' does not exist`);
+        // PA-3: the nav the shells draw. A `feature` must be one the App's own Add-on modules provide (in any edition), or
+        // the server could never report it true and the entry would never show.
+        const provided = new Set(editionIds.flatMap((e) => list(app.requires?.addons).flatMap((a) => [...addonModules(e, a, offerings)]))
+            .flatMap((m) => model.moduleFeatures?.[m] ?? []));
+        const paths = new Map();
+        for (const n of appNav(app)) {
+            if (typeof n.path !== 'string' || !n.path) out.push(`${at}: nav entry '${n.id}' has no path`);
+            else if (paths.has(n.path)) out.push(`${at}: nav entries '${paths.get(n.path)}' and '${n.id}' share the path '${n.path}'`);
+            else paths.set(n.path, n.id);
+            if (typeof n.label !== 'string' || !n.label) out.push(`${at}: nav entry '${n.id}' has no label`);
+            if (n.feature !== undefined && !provided.has(n.feature)) out.push(`${at}: nav entry '${n.id}' keys on feature '${n.feature}', which no module of its Add-ons (${list(app.requires?.addons).join(', ') || 'none'}) provides`);
+        }
     }
 
     const shipped = new Set();

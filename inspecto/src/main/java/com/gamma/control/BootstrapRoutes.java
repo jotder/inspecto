@@ -9,6 +9,11 @@ import com.gamma.spi.auth.TokenRelay;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.config.spec.ConfigSpecs;
+import com.gamma.module.KnownModules;
+import com.gamma.module.ModuleActivator;
+import com.gamma.module.ModuleManifest;
+import com.gamma.module.ModuleManifests;
+import com.gamma.module.ModuleStatus;
 import com.gamma.service.SpaceContext;
 import com.gamma.service.SpaceManager;
 import com.sun.net.httpserver.HttpExchange;
@@ -18,6 +23,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Platform bootstrap ({@code GET /bootstrap}; W3, design §6.1): the one cached, ETag'd call that
@@ -38,6 +46,22 @@ import java.util.Map;
  * descriptors, lookup values, per-Lens navigation) is a follow-on once those become backend-owned.
  */
 final class BootstrapRoutes implements RouteModule {
+
+    /** The ids of the modules this server runs ACTIVE - the same resolution as {@code GET /modules} (ModulesRoutes); read once. */
+    private volatile Set<String> active;
+
+    private Set<String> activeModules() {
+        Set<String> a = active;
+        if (a == null) {
+            ClassLoader cl = BootstrapRoutes.class.getClassLoader();
+            ModuleManifests.Loaded loaded = ModuleManifests.load(cl, BootstrapRoutes.class);
+            Set<String> absent = KnownModules.absent(KnownModules.load(cl).manifests(), loaded.manifests()).stream()
+                    .map(ModuleManifest::id).collect(Collectors.toSet());
+            active = a = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(), absent).stream()
+                    .filter(s -> s.state() == ModuleStatus.State.ACTIVE).map(ModuleStatus::id).collect(Collectors.toUnmodifiableSet());
+        }
+        return a;
+    }
 
     @Override
     public void register(ApiContext api) {
@@ -82,6 +106,11 @@ final class BootstrapRoutes implements RouteModule {
         // it the usual way there: `GET /settings/branding` sits behind the auth gate, so a sign-in page
         // calling `BrandingService` would 401 on exactly the screen that needs it.
         data.put("branding", branding(api));
+        // PRODUCT-ASSEMBLY-1 PA-3: the Product this server was built as (lib/product.json). Its identity is pre-sign-in context like
+        // branding - the sign-in page names the Product. null when the build carries no descriptor (target/classes, tests, pre-PA-3).
+        Optional<ProductDescriptor> product = ProductDescriptor.current();
+        Map<String, Object> productOut = product.map(p -> (Map<String, Object>) new LinkedHashMap<>(p.identity())).orElse(null);
+        data.put("product", productOut);
         // Landing-page plan D2 (2026-09-15): before sign-in a Standard/Advanced deployment tells an
         // unauthenticated caller only what the SPA needs to START the OIDC redirect — edition, topology,
         // feature flags and the anonymous session. The Space roster and the spec catalogue are
@@ -93,6 +122,12 @@ final class BootstrapRoutes implements RouteModule {
             data.put("spaces", spaces(api));
             // LA-ONBOARD-1 OB-7: whether this Space lets people Add data (`data.self_import` in force); both apps lock on it.
             data.put("selfImport", DataSettings.forRoot(writeRootOrNull(api)).selfImportInForce());
+            // PA-3: the Product's Apps and the nav this caller sees, inventory like the Space roster. Gates: the App's modules ACTIVE,
+            // the entry's feature true in THIS response's features (installed, enabled in this Space, in this Edition), and the
+            // caller's capability where an Authenticator is active (GLOSSARY.md §15 Installed · Enabled · Permitted, plus the Product).
+            if (productOut != null)
+                productOut.putAll(product.get().resolve(activeModules(), features,
+                        ApiContext.subject(ex).map(Subject::capabilities).orElse(Set.of()), Authenticators.active().isPresent()));
         }
         data.put("session", session(ex));
 
