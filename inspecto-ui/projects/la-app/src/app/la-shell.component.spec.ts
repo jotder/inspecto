@@ -6,7 +6,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
@@ -17,7 +17,12 @@ import { LensService } from 'app/inspecto/api';
 import { of } from 'rxjs';
 import { BootstrapProduct } from '@inspecto/core/product/product-host';
 import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
-import { LA_APP_SETTINGS_NAV, LA_RAIL_EXPANDED_KEY, LaShellComponent } from './la-shell.component';
+import {
+    LA_APP_CURRENT_APP_KEY,
+    LA_APP_SETTINGS_NAV,
+    LA_RAIL_EXPANDED_KEY,
+    LaShellComponent,
+} from './la-shell.component';
 import { LandingComponent } from './landing.component';
 import { PRODUCT } from './product.generated';
 
@@ -25,7 +30,10 @@ import { PRODUCT } from './product.generated';
 const LA_NAV = PRODUCT.nav;
 
 describe('la-app shell and landing page', () => {
-    beforeEach(() => localStorage.removeItem(LA_RAIL_EXPANDED_KEY));
+    beforeEach(() => {
+        localStorage.removeItem(LA_RAIL_EXPANDED_KEY);
+        localStorage.removeItem(LA_APP_CURRENT_APP_KEY);
+    });
 
     let harness: RouterTestingHarness;
 
@@ -48,6 +56,7 @@ describe('la-app shell and landing page', () => {
                         authMode: signal('none'),
                         actorName: signal(''),
                         loginRequired: signal(false),
+                        actor: signal(null),
                         features: signal(features),
                         product: signal(product),
                     },
@@ -60,7 +69,15 @@ describe('la-app shell and landing page', () => {
                     },
                 },
                 provideRouter([
-                    { path: '', component: LaShellComponent, children: [{ path: '', component: LandingComponent }] },
+                    {
+                        path: '',
+                        component: LaShellComponent,
+                        // any area path opens in the shell (the App switcher navigates to an App's first area)
+                        children: [
+                            { path: '', component: LandingComponent },
+                            { path: '**', component: LandingComponent },
+                        ],
+                    },
                 ]),
             ],
         });
@@ -78,7 +95,47 @@ describe('la-app shell and landing page', () => {
         expect(hrefs('ul a')).toEqual(expected);
         expect(el.querySelector('h1')?.textContent?.trim()).toBe('Inspecto LA');
         expect(el.querySelector('main')).toBeTruthy();
+        expect(el.querySelector('[data-testid="la-app-switcher"]'), 'one App: no App switcher').toBeNull();
     });
+
+    // PRODUCT-ASSEMBLY-1 PA-5b: a Product with several Apps (Inspecto Telco) gets the App switcher; the rail shows the
+    // current App's areas, the landing page groups every App's.
+    it('offers an App switcher when the Product has several Apps, and the rail shows the current App only', async () => {
+        const suite: BootstrapProduct = {
+            id: 'la',
+            title: 'Inspecto LA',
+            apps: [
+                { id: 'telco-ra', title: 'Revenue Assurance' },
+                { id: 'case-management', title: 'Case Management' },
+            ],
+            nav: [
+                { app: 'telco-ra', id: 'reconciliation', path: 'reconciliation', label: 'Reconciliations' },
+                { app: 'case-management', id: 'incidents', path: 'incidents', label: 'Incidents' },
+                { app: 'case-management', id: 'cases', path: 'cases', label: 'Cases' },
+            ],
+        };
+        const el = await render(undefined, suite);
+        const rail = () =>
+            [...el.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Areas"] a')].map((a) => a.getAttribute('href'));
+        const switcher = el.querySelector<HTMLButtonElement>('[data-testid="la-app-switcher"]')!;
+        expect(switcher.getAttribute('aria-label')).toBe('App: Revenue Assurance. Switch App');
+        expect(rail(), 'the first App, until one is chosen').toEqual(['/reconciliation', '/settings']);
+        expect(
+            [...el.querySelectorAll('[data-testid="la-landing-app"] h2')].map((h) => h.textContent?.trim()),
+            'the landing page groups the areas under each App',
+        ).toEqual(['Revenue Assurance', 'Case Management']);
+        await expectNoA11yViolations(el);
+
+        switcher.click();
+        harness.detectChanges();
+        document.querySelector<HTMLButtonElement>('[data-testid="la-app-switch-case-management"]')!.click();
+        await harness.fixture.whenStable();
+        harness.detectChanges();
+        expect(TestBed.inject(Router).url, 'choosing an App opens its first area').toBe('/incidents');
+        expect(rail()).toEqual(['/incidents', '/cases', '/settings']);
+        expect(switcher.getAttribute('aria-label')).toBe('App: Case Management. Switch App');
+        expect(localStorage.getItem(LA_APP_CURRENT_APP_KEY)).toBe('case-management');
+    }, 30_000);
 
     // PRODUCT-ASSEMBLY-1 PA-4: a server that resolved the nav for this caller and Space (PA-3) is drawn as is - it already
     // applied Installed, Enabled, the feature and the capability, so the shell does not re-filter it.

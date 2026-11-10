@@ -6,4 +6,16 @@ industries[1]: telecom
 requires:
   addons[2]: reconciliation,incidents
 templates[1]: telco-ra
+nav:
+  reconciliation:
+    path: reconciliation
+    label: Reconciliations
+    icon: heroicons_outline:arrows-right-left
+    feature: reconciliation
+    blurb: Compare switch, mediation, rating and billing, and see every break they leave.
+  kpis:
+    path: kpi-reports
+    label: KPIs
+    icon: heroicons_outline:chart-bar
+    blurb: Follow completeness, leakage found and leakage recovered over time.
 docs: docs/okf/product/solution-pack/telco-ra/index.md

@@ -1,19 +1,43 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentsService, RunsService } from '@inspecto/core/api';
+import { ObjectFilter, ObjectsService } from '@inspecto/core/api/objects.service';
+import { SessionService } from '@inspecto/core/auth/session.service';
+import { BootstrapProduct } from '@inspecto/core/product/product-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisService } from '@inspecto/link-analysis/link-analysis/link-analysis.service';
 import { MyWorkComponent } from './my-work.component';
 
-function create(opts: { views?: unknown; datasets?: unknown; lists?: unknown; batches?: (p: string) => unknown } = {}) {
+function create(
+    opts: {
+        views?: unknown;
+        datasets?: unknown;
+        lists?: unknown;
+        batches?: (p: string) => unknown;
+        product?: BootstrapProduct | null;
+        actor?: string | null;
+        objects?: (f: ObjectFilter) => unknown;
+    } = {},
+) {
     const batches = vi.fn((p: string) => (opts.batches ? opts.batches(p) : of([])));
+    const objects = vi.fn((f: ObjectFilter) => (opts.objects ? opts.objects(f) : of([])));
     TestBed.configureTestingModule({
         imports: [MyWorkComponent],
         providers: [
             provideRouter([]),
+            {
+                provide: SessionService,
+                useValue: {
+                    product: signal(opts.product ?? null),
+                    features: signal({}),
+                    actor: signal(opts.actor ?? null),
+                },
+            },
+            { provide: ObjectsService, useValue: { list: objects } },
             {
                 provide: ComponentsService,
                 useValue: {
@@ -37,10 +61,77 @@ function create(opts: { views?: unknown; datasets?: unknown; lists?: unknown; ba
     });
     const f = TestBed.createComponent(MyWorkComponent);
     f.detectChanges();
-    return { f, el: f.nativeElement as HTMLElement, batches };
+    return { f, el: f.nativeElement as HTMLElement, batches, objects };
 }
 
 describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () => {
+    // PRODUCT-ASSEMBLY-1 PA-5b: Case Management's work joins My work where the Product's nav offers it.
+    it('lists the Incidents and Cases assigned to the caller where the nav offers them, each opening its page (no violations)', async () => {
+        const product: BootstrapProduct = {
+            id: 'la',
+            title: 'Inspecto LA',
+            nav: [
+                { app: 'case-management', id: 'incidents', path: 'incidents', label: 'Incidents' },
+                { app: 'case-management', id: 'cases', path: 'cases', label: 'Cases' },
+            ],
+        };
+        const at = Date.parse('2026-11-10T09:00:00Z');
+        const { el, objects } = create({
+            product,
+            actor: 'ana',
+            objects: (f) =>
+                of(
+                    f.type === 'INCIDENT'
+                        ? [
+                              {
+                                  id: 'i-1',
+                                  objectType: 'INCIDENT',
+                                  title: 'Lost xDRs',
+                                  status: 'OPEN',
+                                  description: '',
+                                  createdAt: at,
+                                  updatedAt: at,
+                                  closedAt: 0,
+                              },
+                          ]
+                        : [
+                              {
+                                  id: 'c-1',
+                                  objectType: 'CASE',
+                                  title: 'SIM-box ring',
+                                  status: 'OPEN',
+                                  description: '',
+                                  createdAt: at,
+                                  updatedAt: at + 1,
+                                  closedAt: 0,
+                              },
+                          ],
+                ),
+        });
+        expect(objects.mock.calls.map(([f]) => [f.type, f.assignee])).toEqual([
+            ['INCIDENT', 'ana'],
+            ['CASE', 'ana'],
+        ]);
+        const work = el.querySelector('[data-testid="la-work"]')!;
+        expect(work.querySelector('h3')?.textContent?.trim()).toBe('Assigned to you');
+        expect(
+            [...work.querySelectorAll('[data-testid="la-work-rows"] a')].map((a) => [
+                a.textContent?.trim(),
+                a.getAttribute('href'),
+            ]),
+        ).toEqual([
+            ['SIM-box ring', '/cases/c-1'],
+            ['Lost xDRs', '/incidents/i-1'],
+        ]);
+        await expectNoA11yViolations(el);
+    }, 30_000);
+
+    it('shows no Incidents or Cases, and reads none, where the nav does not offer them (Inspecto LA)', () => {
+        const { el, objects } = create();
+        expect(el.querySelector('[data-testid="la-work"]')).toBeNull();
+        expect(objects).not.toHaveBeenCalled();
+    });
+
     it('lists the cases with their lists, each opening its graph, and what changed in imported data (no violations)', async () => {
         const { el, batches } = create({
             views: of([

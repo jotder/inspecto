@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addonModules, appNav, builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productTemplates, seedToolOf, spaceParts } from './products.mjs';
+import { addonModules, builtAddons, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -121,10 +121,11 @@ export function productDescriptor(model, p, ed, distribution, selected) {
         brand: { name: p.brand?.name ?? p.title },
         edition: normalizeEdition(ed),
         distribution,
-        apps: selected.map((a) => {
+        // PA-5b: a page two Apps both declare is drawn once, under the first of them (productNavByApp).
+        apps: productNavByApp(selected, model.apps).map(({ app: a, entries }) => {
             const app = model.apps[a];
             const modules = [...new Set((app.requires?.addons ?? []).flatMap((x) => [...addonModules(ed, x, model.offerings)]))];
-            return { id: a, title: app.title, version: app.version, modules, nav: appNav(app).map(entry) };
+            return { id: a, title: app.title, version: app.version, modules, nav: entries.map(entry) };
         }),
     };
 }

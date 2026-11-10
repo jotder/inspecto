@@ -10,6 +10,7 @@ const TELCO: GeneratedProduct = {
     id: 'telco',
     title: 'Inspecto Telco',
     brand: { name: 'Inspecto Telco', signInPitch: { title: 'Find the leakage.', body: 'Four Apps in one product.' } },
+    apps: [],
     nav: [],
 };
 

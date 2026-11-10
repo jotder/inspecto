@@ -949,6 +949,15 @@ in use. Look there before picking a class — do not invent a token.
   (`products/telco.toon` `hostConfiguration`; the configuration's `fileReplacements` swaps in
   `product.telco.generated.ts`). Code always imports `./product.generated`; never name a Product in la-app's code,
   templates or `index.html` (the tab title comes from `provideInspectoShell`). Preview Telco with `ng serve la-app -c telco`.
+  **The suite shell (PA-5b):** every App-area route in la-app carries `canActivate: [areaGuard]` (`app.routes.ts`): a
+  page opens only when `productNav(...)` offers its path, so one guard covers the edition (Basic: no Alerts), the build
+  (Inspecto LA: no Reconciliations) and a Space's switched-off module. A Telco App's area is a console page mounted
+  whole (`area('reconciliation', () => import('app/modules/admin/reconciliation/reconciliation.routes'))`); it may
+  only inject root services. A page two Apps declare is drawn once, under the first App in Product order
+  (`productNavByApp` in `tools/products.mjs`, used by the assembler and the generator alike). The rail shows an App
+  switcher when `appAreas(...)` returns more than one App, and then only the current App's areas; the current App
+  follows the URL (`appOfUrl`), else the last one chosen. A spec rendering *My work* with Case Management's areas mocks
+  `SessionService.actor` and `ObjectsService.list`.
 - **A Settings *section* is not a nav item.** `SettingsComponent.drawers` is the list; a section is a
   `{id,title,icon,description,component}` row rendering an existing standalone component through
   `NgComponentOutlet`, and its own route stays. Adding one = the drawer row + its import.

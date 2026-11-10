@@ -2,27 +2,33 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } 
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { ComponentDef, ComponentsService, RunsService } from '@inspecto/core/api';
+import { ObjectsService, OperationalObject } from '@inspecto/core/api/objects.service';
+import { SessionService } from '@inspecto/core/auth/session.service';
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
+import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { TermHelpComponent } from '@inspecto/core/onboarding/term-help.component';
+import { productNav } from '@inspecto/core/product/product-host';
 import { EntityListSummary, InvService } from '@inspecto/link-analysis/api/inv.service';
 import {
     LinkAnalysisService,
     SAVED_VIEW_NOT_EVIDENCE,
 } from '@inspecto/link-analysis/link-analysis/link-analysis.service';
 import { ADD_DATA_ROUTE } from './first-run';
-import { CaseRow, caseRows, filterCases, importedDatasets, lastImportLine } from './my-work';
+import { CaseRow, caseRows, filterCases, importedDatasets, lastImportLine, WorkRow, workRows } from './my-work';
+import { PRODUCT } from './product.generated';
 
 /**
  * **My work** on the Inspecto LA home page (LA-ONBOARD-1 phase 7; UC-13, UC-14, A-1b): the cases - saved views with the
  * Entity Lists they use - most recent first, each opening its graph; and **What changed in your data**, each imported
- * Dataset's last import read from its Pipeline's run ledger. Every read degrades on its own: a failed one shows as
- * nothing, never as an error page.
+ * Dataset's last import read from its Pipeline's run ledger. PRODUCT-ASSEMBLY-1 PA-5b: where the Product's nav offers
+ * Incidents or Cases (Inspecto Telco's Case Management), the ones assigned to the caller, or the open ones where nobody
+ * is signed in. Every read degrades on its own: a failed one shows as nothing, never as an error page.
  */
 @Component({
     selector: 'la-app-my-work',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [RouterLink, InspectoSkeletonComponent, TermHelpComponent],
+    imports: [RouterLink, InspectoSkeletonComponent, StatusBadgeComponent, TermHelpComponent],
     host: { class: 'block' },
     template: `
         <section class="flex flex-col gap-4" aria-labelledby="la-my-work-title" data-testid="la-my-work">
@@ -164,6 +170,49 @@ import { CaseRow, caseRows, filterCases, importedDatasets, lastImportLine } from
                         <inspecto-skeleton [lines]="2"></inspecto-skeleton>
                     }
                 </section>
+                @if (workAreas().incidents || workAreas().cases) {
+                    <section
+                        class="bg-card flex flex-col gap-2 rounded-2xl border p-4 md:col-span-2"
+                        aria-labelledby="la-work-title"
+                        data-testid="la-work"
+                    >
+                        <h3 id="la-work-title" class="m-0 text-sm font-semibold">
+                            {{ mine() ? 'Assigned to you' : 'Open Incidents and Cases' }}
+                        </h3>
+                        @if (work(); as rows) {
+                            @if (rows.length) {
+                                <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm" data-testid="la-work-rows">
+                                    @for (r of rows; track r.link) {
+                                        <li class="flex min-w-0 items-center gap-2">
+                                            <inspecto-status-badge
+                                                [value]="r.status"
+                                                variant="dot"
+                                            ></inspecto-status-badge>
+                                            <span class="text-secondary text-xs">{{ r.kind }}</span>
+                                            <a class="truncate" [routerLink]="r.link" [title]="r.title">{{
+                                                r.title
+                                            }}</a>
+                                        </li>
+                                    }
+                                </ul>
+                            } @else {
+                                <p class="m-0 text-sm" data-testid="la-work-empty">
+                                    {{ mine() ? 'Nothing is assigned to you.' : 'No Incident or Case is open.' }}
+                                </p>
+                            }
+                            <p class="m-0 flex gap-3 text-xs">
+                                @if (workAreas().incidents) {
+                                    <a routerLink="/incidents">All Incidents</a>
+                                }
+                                @if (workAreas().cases) {
+                                    <a routerLink="/cases">All Cases</a>
+                                }
+                            </p>
+                        } @else {
+                            <inspecto-skeleton [lines]="2"></inspecto-skeleton>
+                        }
+                    </section>
+                }
             </div>
         </section>
     `,
@@ -173,6 +222,18 @@ export class MyWorkComponent implements OnInit {
     private readonly views = inject(LinkAnalysisService);
     private readonly inv = inject(InvService);
     private readonly runs = inject(RunsService);
+    private readonly session = inject(SessionService);
+    private readonly objects = inject(ObjectsService);
+
+    /** PA-5b: which of Case Management's areas the Product's nav offers (none in Inspecto LA). */
+    protected readonly workAreas = computed(() => {
+        const paths = new Set(productNav(this.session.product(), PRODUCT, this.session.features()).map((n) => n.path));
+        return { incidents: paths.has('incidents'), cases: paths.has('cases') };
+    });
+    /** Someone is signed in: the list is what is assigned to them, not everything open. */
+    protected readonly mine = computed(() => !!this.session.actor());
+    /** The open Incidents and Cases (assigned to the caller when signed in), most recently changed first; null while they load. */
+    readonly work = signal<WorkRow[] | null>(null);
 
     protected readonly notEvidence = SAVED_VIEW_NOT_EVIDENCE;
     protected readonly addData = ADD_DATA_ROUTE;
@@ -229,6 +290,20 @@ export class MyWorkComponent implements OnInit {
             this.cases.set(caseRows(Array.isArray(defs) ? defs : [], (id, c) => this.views.fromContent(id, c), lists)),
         );
         this.whatChanged().subscribe((lines) => this.changes.set(lines));
+        this.loadWork();
+    }
+
+    /** PA-5b: the Incidents and Cases, each type read on its own so one failing leaves the other. */
+    private loadWork(): void {
+        const { incidents, cases } = this.workAreas();
+        if (!incidents && !cases) return;
+        this.work.set(null);
+        const assignee = this.session.actor() ?? undefined;
+        const read = (type: string) =>
+            this.objects.list({ type, assignee, limit: 50 }).pipe(catchError(() => of([] as OperationalObject[])));
+        forkJoin([incidents ? read('INCIDENT') : of([]), cases ? read('CASE') : of([])]).subscribe(([i, c]) =>
+            this.work.set(workRows([...(Array.isArray(i) ? i : []), ...(Array.isArray(c) ? c : [])])),
+        );
     }
 
     private whatChanged(): Observable<string[]> {

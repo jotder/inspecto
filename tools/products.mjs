@@ -89,6 +89,20 @@ export function addonModules(edition, addon, offerings, seen = []) {
 /** An App's nav entries in drawing order (PA-3): [{id, path, label, icon, blurb?, feature?, capability?}]. */
 export const appNav = (app) => Object.entries(app?.nav && typeof app.nav === 'object' ? app.nav : {}).map(([id, e]) => ({ id, ...e }));
 
+/**
+ * PA-5b: the nav of a Product's Apps, in Product order (required, then optional): [{ app, entries }]. A page is drawn
+ * once: an entry whose path an earlier App already declared is left out, so in Inspecto Telco Case Management's Alerts
+ * wins over Link Analysis' (both open the one Alerts page). The assembler (the descriptor the server resolves) and the
+ * host data generator use this same rule, so the server's nav and the fallback agree.
+ */
+export function productNavByApp(appIds, apps) {
+    const seen = new Set();
+    return appIds.map((app) => ({
+        app,
+        entries: appNav(apps[app]).filter((n) => (seen.has(n.path) ? false : (seen.add(n.path), true))),
+    }));
+}
+
 /** An Offering's Add-ons with `includes` resolved (an including Offering's entry wins): { name: {status, modules} }. */
 export function offeringAddons(id, offerings, seen = []) {
     const o = offerings[id];

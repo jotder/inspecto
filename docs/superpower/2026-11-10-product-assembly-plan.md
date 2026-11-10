@@ -3,8 +3,8 @@
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
-design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a done
-2026-11-10; PA-5b is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
+PA-5b done 2026-11-10; PA-5c is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -487,6 +487,40 @@ The slices, each its own lane (D-PA16):
 - **PA-5b — the suite shell (D-PA13).** la-app becomes the suite host: an App switcher, each App's areas lazy-loading the
   console's existing pages (Reconciliation, Incidents, Cases, Alerts, Dashboards), and *My work* across Apps (Alerts,
   Incidents and Cases assigned to me, plus LA's cases), composed client-side from existing routes.
+  **As built (2026-11-10).** The Apps' areas are `nav:` in `app.toon`: Revenue Assurance `reconciliation`, `kpi-reports`;
+  Case Management `alerts`, `incidents`, `cases`; Fraud Management `risk-scores`, `anomaly-models`; each keyed on its
+  module's feature (`reconciliation`, `ops`, `cases`, `scoring`, `anomaly`), so a Space that switches the module off
+  loses the area. **A page is drawn once** (`productNavByApp`, `tools/products.mjs`): an entry whose path an earlier App
+  in Product order already declared is left out, in the assembler's descriptor and in the generated host data alike, so
+  in Inspecto Telco Case Management's Alerts wins over Link Analysis' (one page); Inspecto LA keeps its own. Dashboards
+  were left out: the Studio dashboard viewer is not a mountable page yet, and RA's KPIs page shows its KPIs. The
+  generated data gains `apps` (id, title: the switcher's fallback) and `brand.tagline` (the landing line, now from
+  `products/<id>.toon`). In la-app each console page is mounted whole (`area(path, loadChildren)`), and **one
+  `areaGuard`** replaces `investigationsGuard`: an App-area route opens only when `productNav(...)` offers its path, else
+  the landing page. That covers the edition (Basic: no Alerts), the build (Inspecto LA: no Reconciliations) and a
+  switched-off module. **The App switcher** shows when `appAreas(...)` returns more than one App; the rail then shows
+  the current App's areas plus Settings. The current App is the one whose area the URL opens (`appOfUrl`), else the
+  last one chosen (kept in `localStorage`, `la-app.app.<product>`), else the first. The landing page groups the cards
+  under each App's name. *My work* gains **Incidents and Cases** where the nav offers those areas: assigned to the
+  caller when someone is signed in (`ObjectsService.list({type, assignee})`), else the open ones, five at most, each
+  opening its page. Alerts are assigned to nobody, so they stay in the Alerts area, not in *My work*. Inspecto LA (one
+  App) has no switcher, no groups and no Incidents section.
+  **Proof (as built).** Tool tests 80/80 (the descriptor and generated nav drop the duplicate Alerts; the generator
+  follows Prettier's short-key rule for long strings). UI: `lint`, `lint:tokens`, `lint:forms`, `typecheck` green; the
+  product-host, shell and every la-app spec, 24 files / 184 tests, among them the switcher with axe, the area guard,
+  every nav entry of both la-app Products routed, the six console route files resolving, and *My work*'s Incidents and
+  Cases with axe. Builds against `df2a7cc33`: console 32,554,268 → 32,554,318 bytes; la-app 29,717,435 → 30,437,778 and
+  la-app `-c telco` 29,717,398 → 30,436,409 (+2.4 %: the console pages' lazy chunks now compile into both la-app
+  builds; trimming routes per Product is later); initial transfer 142.88 → 143.53 kB (LA), 142.94 → 143.86 kB (Telco).
+  Preview: Inspecto Telco × Standard packaged from the lane, booted auth-free (a scratch copy with `inspecto-oidc.jar`
+  off `modules.list`); `/bootstrap.product.nav` has all twelve areas; a Space from the composed template with its
+  samples, RA's two Reconciliations, `fraud_irsf` and `fraud_alert_evaluate` run. The rail shows the switcher
+  (Revenue Assurance) and RA's areas; the landing page groups four Apps under the tagline; *My work* lists the open
+  Incidents the Reconciliation breaches opened. Choosing Case Management opens Alerts (100 fired); Incidents shows
+  395, Cases the Case Manager, Risk Scores, Anomaly Models, Reconciliation (both Reconciliations) and KPI & Reports
+  all render, the switcher following the URL each time; no console error from the shell. The same bundle with the
+  Inspecto LA build: no switcher, LA's flat rail, no groups, no Incidents section, and `/reconciliation` lands on the
+  home page.
 - **PA-5c — one ingest (D-PA15).** `telecom` owns canonical feeds (switch, mediated and rated xDR, subscriber, invoice,
   tariff, …) with ONE generated golden corpus that plants RA's leakages and FM's typologies, with ground truth; each App
   maps them onto its own names through views, so its Jobs and Alert Rules stay; the golden tests are re-pointed; LA's

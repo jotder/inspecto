@@ -8,6 +8,7 @@ export const PRODUCT: GeneratedProduct = {
     brand: {
         name: 'Inspecto',
     },
+    apps: [{ id: 'link-analysis', title: 'Link Analysis' }],
     nav: [
         {
             app: 'link-analysis',

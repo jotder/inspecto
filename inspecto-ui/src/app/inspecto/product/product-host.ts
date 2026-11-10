@@ -23,11 +23,24 @@ export interface ProductNavEntry {
     readonly capability?: string;
 }
 
+/** One App a Product can ship: its id and the title the App switcher shows. */
+export interface ProductApp {
+    readonly id: string;
+    readonly title: string;
+}
+
 /** A host's `product.generated.ts` - written by `tools/render-product-hosts.mjs`, never by hand. */
 export interface GeneratedProduct {
     readonly id: string;
     readonly title: string;
-    readonly brand: { readonly name: string; readonly signInPitch?: { readonly title: string; readonly body: string } };
+    readonly brand: {
+        readonly name: string;
+        /** The landing page's line under the Product's name (PA-5b). */
+        readonly tagline?: string;
+        readonly signInPitch?: { readonly title: string; readonly body: string };
+    };
+    /** Every App the Product can ship, in Product order (required first): the App switcher's fallback (PA-5b). */
+    readonly apps: readonly ProductApp[];
     readonly nav: readonly ProductNavEntry[];
 }
 
@@ -74,4 +87,36 @@ export function productNav(
 ): readonly ProductNavEntry[] {
     if (server && server.id === generated.id && Array.isArray(server.nav)) return server.nav;
     return generated.nav.filter((n) => !n.feature || features[n.feature] === true);
+}
+
+/** One App of the Product with the areas it draws (PA-5b: the App switcher, and the landing page's groups). */
+export interface AppAreas {
+    readonly id: string;
+    readonly title: string;
+    readonly areas: readonly ProductNavEntry[];
+}
+
+/**
+ * The Apps that draw at least one area of `nav`, in Product order (the generated `apps`, required first), each with its
+ * areas in drawing order. An App's title is the server's when it resolved this Product, else the generated one.
+ */
+export function appAreas(
+    server: BootstrapProduct | null,
+    generated: GeneratedProduct,
+    nav: readonly ProductNavEntry[],
+): AppAreas[] {
+    const served = server && server.id === generated.id ? server.apps : undefined;
+    const title = (id: string) =>
+        served?.find((a) => a.id === id)?.title ?? generated.apps.find((a) => a.id === id)?.title ?? id;
+    const order = [...generated.apps.map((a) => a.id), ...nav.map((n) => n.app)];
+    return order
+        .filter((id, i) => order.indexOf(id) === i)
+        .map((id) => ({ id, title: title(id), areas: nav.filter((n) => n.app === id) }))
+        .filter((a) => a.areas.length > 0);
+}
+
+/** The App whose area a URL opens (its first path segment is that area's path), or null (the landing page, Settings). */
+export function appOfUrl(nav: readonly ProductNavEntry[], url: string): string | null {
+    const first = url.replace(/^\/+/, '').split(/[/?#;(]/)[0];
+    return nav.find((n) => n.path === first)?.app ?? null;
 }

@@ -6,4 +6,17 @@ industries[1]: telecom
 requires:
   addons[4]: incidents,caseManagement,scoringLists,anomalyDetection
 templates[2]: telco-fraud,telco-bypass
+nav:
+  riskScores:
+    path: risk-scores
+    label: Risk scores
+    icon: heroicons_outline:scale
+    feature: scoring
+    blurb: See which lines score highest for SIM-box and bypass, and which factors raised them.
+  anomalyModels:
+    path: anomaly-models
+    label: Anomaly models
+    icon: heroicons_outline:sparkles
+    feature: anomaly
+    blurb: Find lines whose usage moves away from their own history.
 docs: docs/okf/product/solution-pack/telco-fraud/index.md

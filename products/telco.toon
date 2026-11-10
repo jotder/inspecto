@@ -13,6 +13,7 @@ space: telco
 distributions[1]: production
 brand:
   name: Inspecto Telco
+  tagline: Find revenue leakage and fraud in your network's records, see who is linked to whom, and work every case to a decision.
   signInTitle: Find the leakage, catch the fraud, close the case.
   signInBody: Revenue Assurance, Fraud Management, Link Analysis and Case Management in one product for your network's records.
 docs: docs/okf/product/solution-pack/industry-telecom/index.md

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ComponentDef } from '@inspecto/core/api';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisView } from '@inspecto/link-analysis/link-analysis/link-analysis.service';
-import { caseRows, importedDatasets, lastImportLine } from './my-work';
+import type { OperationalObject } from '@inspecto/core/api/objects.service';
+import { caseRows, importedDatasets, lastImportLine, workRows } from './my-work';
 
 const def = (name: string, content: Record<string, unknown>, modified?: string | null): ComponentDef => ({
     type: 'link-analysis-view',
@@ -29,7 +30,11 @@ describe('My work - cases (LA-ONBOARD-1 phase 7, A-1b, UC-14)', () => {
         const rows = caseRows(
             [
                 def('older', { name: 'Older' }, '2026-10-01T09:00:00Z'),
-                def('ring', { name: 'Ring', description: 'The mules', lists: { start: 'suspects', exclusions: ['noisy'] } }, '2026-10-21T09:00:00Z'),
+                def(
+                    'ring',
+                    { name: 'Ring', description: 'The mules', lists: { start: 'suspects', exclusions: ['noisy'] } },
+                    '2026-10-21T09:00:00Z',
+                ),
                 def('undated', { name: 'A undated' }, null),
             ],
             decode,
@@ -54,7 +59,12 @@ describe('My work - cases (LA-ONBOARD-1 phase 7, A-1b, UC-14)', () => {
 
 describe('My work - what changed in your data (UC-14)', () => {
     it('only the Datasets Add data made count, by their import Pipeline', () => {
-        const ds = (name: string, content: Record<string, unknown>): ComponentDef => ({ type: 'dataset', name, ref: '', content });
+        const ds = (name: string, content: Record<string, unknown>): ComponentDef => ({
+            type: 'dataset',
+            name,
+            ref: '',
+            content,
+        });
         expect(
             importedDatasets([
                 ds('transfers', { origin: 'import', importPipeline: 'transfers' }),
@@ -121,7 +131,12 @@ describe('My work - what changed in your data (UC-14)', () => {
     });
 
     it('importedDatasets reads a well-formed lastImport and ignores a malformed one', () => {
-        const ds = (name: string, content: Record<string, unknown>): ComponentDef => ({ type: 'dataset', name, ref: '', content });
+        const ds = (name: string, content: Record<string, unknown>): ComponentDef => ({
+            type: 'dataset',
+            name,
+            ref: '',
+            content,
+        });
         const [good, bad] = importedDatasets([
             ds('a', {
                 origin: 'import',
@@ -138,5 +153,39 @@ describe('My work - what changed in your data (UC-14)', () => {
             batch: 'c1',
         });
         expect(bad.last).toBeUndefined();
+    });
+});
+
+// PRODUCT-ASSEMBLY-1 PA-5b: Case Management's Incidents and Cases on the home page.
+describe('workRows', () => {
+    const obj = (id: string, objectType: string, status: string, at: number, closedAt = 0): OperationalObject => ({
+        id,
+        objectType,
+        title: `T ${id}`,
+        description: '',
+        status,
+        createdAt: at,
+        updatedAt: at,
+        closedAt,
+    });
+
+    it('keeps the open ones, most recently changed first, at most five, each linking its own page', () => {
+        const rows = workRows([
+            obj('i1', 'INCIDENT', 'OPEN', 1),
+            obj('c1', 'CASE', 'OPEN', 7),
+            obj('i2', 'INCIDENT', 'RESOLVED', 9),
+            obj('i3', 'INCIDENT', 'CLOSED', 8),
+            obj('c2', 'CASE', 'IN_REVIEW', 6, 5),
+            obj('i4', 'incident', 'DIAGNOSING', 5),
+            obj('i5', 'INCIDENT', 'IDENTIFIED', 4),
+            obj('i6', 'INCIDENT', 'IDENTIFIED', 3),
+            obj('i7', 'INCIDENT', 'IDENTIFIED', 2),
+        ]);
+        expect(rows.map((r) => r.id)).toEqual(['c1', 'i4', 'i5', 'i6', 'i7']);
+        expect(rows[0]).toMatchObject({ kind: 'Case', link: '/cases/c1', status: 'OPEN' });
+        expect(rows[1]).toMatchObject({ kind: 'Incident', link: '/incidents/i4' });
+        expect(workRows([obj('i1', 'INCIDENT', 'OPEN', 1)])[0].status, 'Incidents on the mail lifecycle').toBe(
+            'IDENTIFIED',
+        );
     });
 });

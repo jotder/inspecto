@@ -83,7 +83,14 @@ test('PA-5: Inspecto Telco is la-app built with -c telco, four Apps, and one Spa
         });
         assert.equal(p.editionProperties.product, 'telco');
         assert.deepEqual(p.descriptor.apps.map((a) => a.id), p.apps.map((a) => a.id));
+        // PA-5b: a page two Apps declare is drawn once, under the first App in Product order.
+        const navOf = (id) => p.descriptor.apps.find((a) => a.id === id).nav.map((n) => n.path);
+        assert.deepEqual(navOf('case-management'), ['alerts', 'incidents', 'cases']);
+        assert.ok(!navOf('link-analysis').includes('alerts'), "Link Analysis' Alerts gives way to Case Management's");
+        assert.deepEqual(navOf('telco-ra'), ['reconciliation', 'kpi-reports']);
+        assert.deepEqual(navOf('telco-fraud'), ['risk-scores', 'anomaly-models']);
     }
+    assert.ok(plan({ product: 'la', edition: 'standard' }).descriptor.apps[0].nav.some((n) => n.path === 'alerts'), 'Inspecto LA keeps its Alerts');
     assert.equal(plan({ product: 'la', edition: 'basic' }).hostConfiguration, null, 'Inspecto LA stays the default build of la-app');
     assert.equal(plan({ product: 'la', edition: 'basic' }).space, null);
     assert.throws(() => plan({ product: 'telco', edition: 'basic' }), /Product 'telco' does not come in edition 'basic'/);

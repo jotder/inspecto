@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appNav, checkModel, gatherModel, hostDataFile, productApps } from './products.mjs';
+import { checkModel, gatherModel, hostDataFile, productApps, productNavByApp } from './products.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NAV_FIELDS = ['app', 'id', 'path', 'label', 'icon', 'blurb', 'feature', 'capability'];
@@ -37,14 +37,29 @@ export function hostFile(projects, p) {
     return join('inspecto-ui', root, ...hostDataFile(p).split('/'));
 }
 
-/** The generated data of one Product: brand and the nav of every App it can ship, required first. */
+/**
+ * The generated data of one Product: brand (name, the landing page's tagline and the sign-in pitch where it declares them),
+ * its Apps in Product order (required first; the App switcher's fallback, PA-5b) and their nav, a page two Apps declare
+ * drawn once under the first (productNavByApp, the rule the assembler's descriptor follows too).
+ */
 export function generatedProduct(model, p) {
     const { required, optional } = productApps(p);
+    const ids = [...required, ...optional];
     const pitch = p.brand?.signInTitle && p.brand?.signInBody ? { title: p.brand.signInTitle, body: p.brand.signInBody } : null;
-    const nav = [...required, ...optional].flatMap((a) =>
-        appNav(model.apps[a]).map((n) => Object.fromEntries(NAV_FIELDS.map((k) => [k, k === 'app' ? a : n[k]]).filter(([, v]) => v !== undefined && v !== ''))),
+    const nav = productNavByApp(ids, model.apps).flatMap(({ app, entries }) =>
+        entries.map((n) => Object.fromEntries(NAV_FIELDS.map((k) => [k, k === 'app' ? app : n[k]]).filter(([, v]) => v !== undefined && v !== ''))),
     );
-    return { id: p.id, title: p.title, brand: { name: p.brand?.name ?? p.title, ...(pitch ? { signInPitch: pitch } : {}) }, nav };
+    const brand = { name: p.brand?.name ?? p.title, ...(p.brand?.tagline ? { tagline: p.brand.tagline } : {}), ...(pitch ? { signInPitch: pitch } : {}) };
+    return { id: p.id, title: p.title, brand, apps: ids.map((id) => ({ id, title: model.apps[id]?.title ?? id })), nav };
+}
+
+/**
+ * One `key: 'value',` line at `pad`, as Prettier prints it at 120 columns: a line too long breaks after the colon, but only
+ * for a key at least 7 wide (Prettier's short-key rule: `tabWidth` 4 + 3 of overlap), so `tagline:` breaks and `body:` never.
+ */
+function prop(pad, key, value) {
+    const one = `${pad}${key}: ${str(value)},`;
+    return one.length > 120 && key.length >= 7 ? [`${pad}${key}:`, `${pad}    ${str(value)},`] : [one];
 }
 
 /** The file text, in Prettier's output style for this shape (objects expanded one key per line). */
@@ -55,21 +70,27 @@ export function render(productFile, g) {
         "import type { GeneratedProduct } from '@inspecto/core/product/product-host';",
         '',
         'export const PRODUCT: GeneratedProduct = {',
-        `    id: ${str(g.id)},`,
-        `    title: ${str(g.title)},`,
+        ...prop('    ', 'id', g.id),
+        ...prop('    ', 'title', g.title),
         '    brand: {',
-        `        name: ${str(g.brand.name)},`,
+        ...prop('        ', 'name', g.brand.name),
     ];
+    if (g.brand.tagline) lines.push(...prop('        ', 'tagline', g.brand.tagline));
     if (g.brand.signInPitch) {
-        lines.push('        signInPitch: {', `            title: ${str(g.brand.signInPitch.title)},`, `            body: ${str(g.brand.signInPitch.body)},`, '        },');
+        lines.push('        signInPitch: {', ...prop('            ', 'title', g.brand.signInPitch.title), ...prop('            ', 'body', g.brand.signInPitch.body), '        },');
     }
     lines.push('    },');
+    // One App per line, objects kept inline (Prettier breaks an array of several objects, and keeps a lone one inline).
+    const app = (a) => `{ id: ${str(a.id)}, title: ${str(a.title)} }`;
+    if (!g.apps.length) lines.push('    apps: [],');
+    else if (g.apps.length === 1) lines.push(`    apps: [${app(g.apps[0])}],`);
+    else lines.push('    apps: [', ...g.apps.map((a) => `        ${app(a)},`), '    ],');
     if (!g.nav.length) lines.push('    nav: [],');
     else {
         lines.push('    nav: [');
         for (const n of g.nav) {
             lines.push('        {');
-            for (const [k, v] of Object.entries(n)) lines.push(`            ${k}: ${str(v)},`);
+            for (const [k, v] of Object.entries(n)) lines.push(...prop('            ', k, v));
             lines.push('        },');
         }
         lines.push('    ],');

@@ -7,11 +7,14 @@ export const PRODUCT: GeneratedProduct = {
     title: 'Inspecto LA',
     brand: {
         name: 'Inspecto LA',
+        tagline:
+            'Find the links between entities in your data: explore them as a graph, place them on a map, and keep lists of the ones that matter.',
         signInPitch: {
             title: 'Follow every link, one case at a time.',
             body: 'Explore who is connected to whom, investigate a number, and build a Dossier you can stand behind.',
         },
     },
+    apps: [{ id: 'link-analysis', title: 'Link Analysis' }],
     nav: [
         {
             app: 'link-analysis',

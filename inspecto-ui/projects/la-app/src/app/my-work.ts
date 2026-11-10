@@ -1,4 +1,5 @@
 import type { AuditRow, ComponentDef } from '@inspecto/core/api';
+import { normalizeIncidentStatus, type OperationalObject } from '@inspecto/core/api/objects.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
 import { dayLabel } from '@inspecto/link-analysis/link-analysis/investigate-number';
 import { LinkAnalysisView, caseListIds } from '@inspecto/link-analysis/link-analysis/link-analysis.service';
@@ -143,4 +144,39 @@ export function lastImportLine(
             ? `${datasetId}: imported${day}, +${rows(loaded)}${aside}`
             : `${datasetId}: re-imported${day}, ${rows(loaded)} loaded${aside}`;
     return { text, at: Number.isFinite(when) ? when : 0 };
+}
+
+/** One Incident or Case on the home page (PRODUCT-ASSEMBLY-1 PA-5b: Case Management's work joins My work). */
+export interface WorkRow {
+    id: string;
+    kind: 'Incident' | 'Case';
+    title: string;
+    /** The status, Incidents on the mail lifecycle (normalizeIncidentStatus). */
+    status: string;
+    /** Where it opens: its page in the Incidents or Cases area. */
+    link: string;
+    /** Sort key: its last change. */
+    at: number;
+}
+
+/** The states an Incident or a Case is done in. */
+const DONE = new Set(['RESOLVED', 'ARCHIVED', 'CLOSED']);
+
+/** The open Incidents and Cases, the most recently changed first, at most `limit` of them. */
+export function workRows(objects: readonly OperationalObject[], limit = 5): WorkRow[] {
+    return objects
+        .map((o): WorkRow => {
+            const incident = o.objectType?.toUpperCase() === 'INCIDENT';
+            return {
+                id: o.id,
+                kind: incident ? 'Incident' : 'Case',
+                title: o.title || o.id,
+                status: incident ? normalizeIncidentStatus(o.status) : (o.status ?? '').toUpperCase(),
+                link: `/${incident ? 'incidents' : 'cases'}/${encodeURIComponent(o.id)}`,
+                at: o.updatedAt || o.createdAt || 0,
+            };
+        })
+        .filter((r, i) => !(objects[i].closedAt > 0) && !DONE.has(r.status))
+        .sort((a, b) => b.at - a.at)
+        .slice(0, limit);
 }
