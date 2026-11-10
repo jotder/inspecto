@@ -9,7 +9,7 @@ timestamp: 2026-11-01T00:00:00Z
 
 # OIDC authenticator and token relay — admin guide
 
-`inspecto-oidc.jar` ships in Standard, Advanced and Preview bundles (not Basic, not a `-DemoAuth` demo bundle).
+`inspecto-oidc.jar` ships in Standard, Advanced and Preview bundles (not Basic, not a `-Distribution demo` demo bundle).
 Being on the classpath is what turns sign-in on: the control plane resolves the `Authenticator` at boot and
 refuses to start rather than serve unauthenticated. Wider security posture: [admin-guide-auth-security](../access/admin-guide-auth-security.md).
 

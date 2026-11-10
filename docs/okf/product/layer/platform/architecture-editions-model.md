@@ -84,7 +84,7 @@ Seven cells were gated out of Basic this way (`9fdb99f8` · `c323f35c` · `91b6c
 8. ⚠ **Five sites make a capability-gated route work**, `CapabilityManifest` being the one most easily
    missed; route matching is FIRST-MATCH across modules, so a duplicate silently never runs (hence the
    duplicate-registration guard added in `91b6c9de`).
-9. ⚠ **`package.ps1` emits four launchers** (`run.sh`/`run.bat`/`serve.sh`/`serve.bat`, plus `serve-demo.*` for `-DemoAuth`)
+9. ⚠ **`package.ps1` emits four launchers** (`run.sh`/`run.bat`/`serve.sh`/`serve.bat`, plus `serve-demo.*` for `-Distribution demo`)
    and `.gitignore` is per-module for `target/`. ✅ Since P3d (2026-10-08) none of them keeps a jar list: each reads the
    bundle's `modules.list` (one jar per line, classpath order) and `serve.*` read `edition.properties`, both written at
    package time by `tools/offering-classpath.mjs` from the Offering (`offerings/<edition>.toon`; since `PRODUCT-ASSEMBLY-1`

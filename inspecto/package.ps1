@@ -86,28 +86,27 @@ param(
     # for it yet.
     [ValidateSet('Basic', 'Standard', 'Advanced', 'Preview')]
     [string]$Edition = 'Basic',
-    # DEMO-AUTH-1: an OFFLINE DEMO BUILD, never an edition. Requires -Edition Advanced; swaps
-    # inspecto-oidc.jar for inspecto-demo-auth.jar (the Demo User sign-in), assembles into
-    # inspecto-demo/ (NOT inspecto-deploy/, which other launch configs run from), writes serve-demo.bat /
-    # serve-demo.sh bound to 127.0.0.1, removes serve.* and the service installers (without the security
-    # jar they would boot an auth-free server on every interface), and zips as inspecto-demo-<platform>.zip.
-    # The demo jar is deliberately outside the three jar enumerations tools/check-sbom-modules.mjs parses,
-    # because no edition ships it; the SBOM therefore still describes the Advanced module set.
-    # tools/check-demo-auth-isolation.mjs (CI) fails if the demo jar is named anywhere here outside an
-    # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list comes from
-    # tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
-    [switch]$DemoAuth,
-    # With -DemoAuth -Ui la-app the bundle ships the `la-showcase` Space PRE-SEEDED (operator 2026-10-12; step 6f, package-demo-bake.ps1):
-    # the staged bundle is booted against a scaffolded Space and seeded over HTTP before the zip. -NoBakeDemo skips that for a fast
-    # local package (the bundle then ships no Space, as every other bundle does). Ignored without -DemoAuth -Ui la-app.
-    [switch]$NoBakeDemo,
-    # UI flavor (D-5 step 7, la-separation-d5-design Decisions 6/7): WHICH single-page application the bundle's ui/ holds.
-    # NOT an edition (EDITIONS.md): every edition can ship either. 'gamma' is the Inspecto console (the default, the
-    # bundle as it always was); 'la-app' is the Link Analysis application (inspecto-ui/projects/la-app). The two
-    # Angular applications build to inspecto-ui/dist/<name>/, and ONLY the chosen one is copied: ui/ never holds both.
+    # PRODUCT-ASSEMBLY-1 PA-2 (2026-11-10; D-PA5: -Ui and -DemoAuth are gone, no aliases): WHICH Product to build. A Product is a
+    # definition under products/ (inspecto = the console, la = Inspecto LA); tools/assemble.mjs turns Product x Edition x
+    # Distribution into an ASSEMBLY PLAN, and this script executes it: the plan's `host` is the single-page application ui/
+    # holds (inspecto-ui/projects/<host>; only that one is copied), its `templates` are the Space templates staged under
+    # spaces/_templates, its `demo` is the demo sign-in swap, and its `seedSpace` the Space a demo bundle ships pre-seeded.
     # The IAM client id the chosen SPA signs in with is a DEPLOYMENT setting (AUTH_OIDC_CLIENT_ID), not decided here.
-    [ValidateSet('gamma', 'la-app')]
-    [string]$Ui = 'gamma',
+    [string]$Product = 'inspecto',
+    # How the build ships: 'production' (the default) or 'demo'. DEMO-AUTH-1: a demo build is an OFFLINE DEMO BUILD, never an
+    # edition, for Advanced or Preview only; it swaps inspecto-oidc.jar for inspecto-demo-auth.jar (the Demo User sign-in), assembles
+    # into inspecto-demo/ (NOT inspecto-deploy/, which other launch configs run from), writes serve-demo.bat / serve-demo.sh bound to
+    # 127.0.0.1, removes serve.* and the service installers (without the security jar they would boot an auth-free server on every
+    # interface), and zips as inspecto-demo-<platform>.zip. The demo jar is deliberately outside the three jar enumerations
+    # tools/check-sbom-modules.mjs parses, because no edition ships it; the SBOM therefore still describes the Advanced module set.
+    # tools/check-demo-auth-isolation.mjs (CI) fails if the demo jar is named anywhere here outside an `if ($DemoAuth)` block
+    # ($DemoAuth is set from the plan below), or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list
+    # comes from tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
+    [string]$Distribution = 'production',
+    # A demo build of a Product with a `demoSpace` ships that Space PRE-SEEDED (operator 2026-10-12; step 6f, package-demo-bake.ps1):
+    # the staged bundle is booted against a scaffolded Space and seeded over HTTP before the zip. -NoBakeDemo skips that for a fast
+    # local package (the bundle then ships no Space, as every other bundle does). Ignored when the plan names no seedSpace.
+    [switch]$NoBakeDemo,
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally
     # produces a GPG detached signature (.asc) per artifact so customers can verify AUTHENTICITY, not
@@ -230,16 +229,29 @@ if ($duckdbExtCacheDir) {
 } else {
     Write-Host "  (no DuckDB extension cache found — tried: $($duckdbExtCandidates -join ', '))" -ForegroundColor Yellow
 }
+# ── step 0: the Assembly Plan (PRODUCT-ASSEMBLY-1 PA-2) ──────────────────────────────────────────────
+# tools/assemble.mjs resolves Product x Edition x Distribution (products/, apps/, offerings/, the module manifests) and REFUSES,
+# naming the reason, anything the Product does not offer: an edition it does not come in, a distribution not built yet, a demo on
+# an edition without the demo sign-in swap. Everything Product-specific below reads $plan; nothing here names a Product.
+$planFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-assembly-$Product-$Edition-$Distribution.json"
+& node (Join-Path $sandboxRoot 'tools\assemble.mjs') --product $Product --edition $Edition --distribution $Distribution --out $planFile
+if ($LASTEXITCODE -ne 0) { throw "tools/assemble.mjs refused Product '$Product' x $Edition x $Distribution (the reason is above)" }
+$plan = Get-Content -Raw $planFile | ConvertFrom-Json
+$Ui = [string]$plan.host
+$DemoAuth = [bool]$plan.demo
+$planApps = (@($plan.apps | ForEach-Object { $_.id }) -join ',')
+Write-Host "Assembly Plan: $($plan.product.title) x $($plan.edition) x $Distribution - ui $Ui, $(@($plan.templates).Count) template(s), App(s) [$planApps]$(if ($plan.seedSpace) { ", demo Space $($plan.seedSpace)" })" -ForegroundColor Cyan
+foreach ($n in @($plan.notes)) { if ($n) { Write-Host "  note: $n" -ForegroundColor Yellow } }
+
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if ($DemoAuth) {
-    # LA-EDITIONS-1 ED-3: Preview is "everything with demo sign-in", so it takes -DemoAuth as Advanced does.
-    if ($Edition -ne 'Advanced' -and $Edition -ne 'Preview') { throw "-DemoAuth builds an Advanced-capability demo; pass -Edition Advanced or -Edition Preview (got '$Edition')." }
+    # The demo build's edition rule (Advanced or Preview) is the assembler's; it refused anything else above.
     $bundleDir = Join-Path $sandboxRoot 'inspecto-demo'
     # PACKAGE-DEMOAUTH-ADVANCED-1: -NoBuild builds nothing, and the demo-auth jar is built by the demo step (a module no edition
     # carries) - so say so up front, before any staging, instead of dying on a missing directory at the end of the staging steps.
     if ($NoBuild -and -not (Get-ChildItem (Join-Path $sandboxRoot 'providers\inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' })) {
-        throw "-DemoAuth -NoBuild: providers\inspecto-demo-auth\target holds no inspecto-demo-auth jar. Build it first (mvn package -pl :inspecto-demo-auth -am -DskipTests) or drop -NoBuild."
+        throw "-Distribution demo -NoBuild: providers\inspecto-demo-auth\target holds no inspecto-demo-auth jar. Build it first (mvn package -pl :inspecto-demo-auth -am -DskipTests) or drop -NoBuild."
     }
 }
 
@@ -669,7 +681,7 @@ Copy-Item $jarSrc "$libDir\inspecto.jar"
 # ── step 3-core: the first-party CORE libraries as THIN jars (MODULE-REORG-P3d stage 2, 2026-10-08) ───────────
 # inspecto.jar is no longer one fat jar of everything: inspecto/pom.xml's shade now carries only the processor's own classes plus
 # the THIRD-PARTY libraries. api, util, config, sql, etl, the three SPIs, access, entity-store, event, workflow, analytics, acquire, engine and graph
-# (tools/bundle-modules.mjs CORE_MODULES, printed by `offering-classpath.mjs --list-core`) ship as their own thin jars, named by
+# (tools/bundle-modules.mjs coreModules() - the manifests' offeringRole base - printed by `offering-classpath.mjs --list-core`) ship as their own thin jars, named by
 # artifactId, in the bundle root and on modules.list right behind inspecto.jar - so each can be signed and SBOM'd on its own and
 # the module.toon / ServiceLoader merge hacks of the shade are gone. Never the `-tests` jar (etl and engine attach one).
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -1306,6 +1318,9 @@ if ($SignJars) {
 # Runs AFTER the demo swap so the demo bundle's list names inspecto-demo-auth.jar and not the OIDC trio it removed.
 $classpathArgs = @('--edition', $Edition, '--bundle', $bundleDir)
 if ($DemoAuth) { $classpathArgs += '--demo' }
+# PRODUCT-ASSEMBLY-1 PA-2: stamp the Product build into edition.properties (product=, apps=); the launchers read only edition=.
+$classpathArgs += @('--product', [string]$plan.editionProperties.product)
+if ($plan.editionProperties.apps) { $classpathArgs += @('--apps', [string]$plan.editionProperties.apps) }
 & node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') @classpathArgs
 if ($LASTEXITCODE -ne 0) { throw "tools/offering-classpath.mjs failed - the staged jars and the Offering's classpath disagree (see above)" }
 
@@ -1347,8 +1362,8 @@ if (Test-Path $uiDist) {
 }
 
 # ── step 4: stage spaces/ — the Space-template gallery ONLY ───────────────────
-# BUNDLES SHIP NO SPACES (operator decision 2026-09-25), in every edition EXCEPT the demo-auth la-app flavor (operator 2026-10-12: it
-# ships the pre-seeded la-showcase Space, baked in step 6f below): the bundle's spaces/ holds
+# BUNDLES SHIP NO SPACES (operator decision 2026-09-25), in every edition EXCEPT a demo build whose Product names a demoSpace
+# (operator 2026-10-12, then Inspecto LA's la-showcase; generalised by PRODUCT-ASSEMBLY-1 PA-2: baked in step 6f below): the bundle's spaces/ holds
 # only _templates (the Space-template gallery - an underscore sentinel, never booted as a Space).
 # Spaces are ATTACHED at deploy time by dropping the Space folder(s) into spaces\ (or pointing
 # SPACES_ROOT / -Dspaces.root at a folder holding them); the server boots with zero Spaces and one can
@@ -1360,11 +1375,15 @@ if (Test-Path $uiDist) {
 # locally modified tracked file ships as COMMITTED; git is required (no fallback). Nothing is read
 # from the working tree, so a running ControlApi's lock on spaces/<id>/duckdb/*.db cannot fail the copy.
 . (Join-Path $adjParserDir 'package-spaces.ps1')
-$staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir
+# PRODUCT-ASSEMBLY-1 PA-2: only the Product build's templates (the Assembly Plan's `templates`: the Product's own plus its Apps').
+$staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir -Only @($plan.templates)
 if ($staged.Templates.Count -gt 0) {
     Write-Host "Bundled Space templates → $($staged.Out)\_templates ($($staged.Files) committed files; templates: $($staged.Templates -join ', '))" -ForegroundColor Green
 } else {
     Write-Host "  (no committed template under spaces/_templates — bundle carries an empty spaces\)" -ForegroundColor Yellow
+}
+if ($staged.NotShipped.Count -gt 0) {
+    Write-Host "  not in this Product build ($Product): $($staged.NotShipped -join ', ')" -ForegroundColor DarkGray
 }
 if ($staged.NotBundled.Count -gt 0) {
     Write-Host "  spaces/: NOT bundled (bundles ship no Spaces - attach them at deploy time): $($staged.NotBundled -join ', ')" -ForegroundColor DarkGray
@@ -2305,33 +2324,10 @@ The server listens on 127.0.0.1 only and refuses to start the demo sign-in on an
 The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
 omits inspecto-demo-auth (shipped here).
 "@
-    if ($Ui -eq 'la-app' -and -not $NoBakeDemo) {
-        # The la-app flavor ships the PRE-SEEDED la-showcase Space (step 6f, operator 2026-10-12): replace the "attach a Space" text.
-        $demoReadme = @"
-INSPECTO DEMO BUILD (LINK ANALYSIS) - INTERNAL EVALUATION ONLY
-===============================================================
-This build signs people in as Demo Users with NO password and NO identity provider (DEMO-AUTH-1).
-It is not secure and must never be given to a customer, exposed on a network, or used with real data.
-
-UNZIP, RUN, SIGN IN. The Space la-showcase is PRE-INSTALLED under .\spaces\la-showcase with its synthetic data and its seeded state:
-the Investigation mule-hub-case (8 steps, 3 members), Drafts, Entity Lists (smurf-accounts, telecom-watch-msisdn), an identity assertion,
-a Case, an Alert Rule with standing detection, and the Jobs (la_index_build, la_detect). Nothing needs a seed step; no node is required.
-
-1. Run bin\serve-demo.bat (Windows) or bin/serve-demo.sh (Linux). Set PORT to change the port (default 8080).
-2. Open http://127.0.0.1:8080 and pick a Demo User:
-     fm.analyst    Demo FM Analyst   Fraud analyst (lead): owns mule-hub-case; works Investigations, Alert Rules and Incidents
-     fm.manager    Demo FM Manager   Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user
-     admin         Demo Admin        Platform administrator: lead on the Investigation; can Reveal masked values and change LA settings
-     ra.analyst    Demo RA Analyst   Revenue Assurance reviewer: a member of the Investigation with no capability (view only)
-     demo.manager  Demo Manager      NOT a member of the Investigation: shows what a non-member sees (refused)
-
-RESET THE DEMO: stop the server, delete .\spaces\la-showcase, and restore that folder from the zip (re-extract spaces\la-showcase).
-Anything done during a session (new steps, Drafts, Alert Rules) lives in that folder, so a reset discards it.
-
-The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
-The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
-omits inspecto-demo-auth (shipped here).
-"@
+    if ($plan.seedSpace -and -not $NoBakeDemo) {
+        # A Product with a demoSpace ships it PRE-SEEDED (step 6f): its own DEMO-BUILD text (products/<id>.demo-build.txt, the
+        # Assembly Plan's demoText - the Space's story, Demo Users and reset) replaces the "attach a Space" text above.
+        $demoReadme = Get-Content -Raw (Join-Path $sandboxRoot ([string]$plan.demoText))
     }
     Write-CrlfScript -Path "$bundleDir\DEMO-BUILD.txt" -Content $demoReadme
     Write-Host "DEMO BUILD: serve-demo.bat / serve-demo.sh / DEMO-BUILD.txt written; serve.* and service installers removed" -ForegroundColor Yellow
@@ -2577,14 +2573,15 @@ if (-not $SkipBootCheck) {
     Write-Host "  verified: the staged $Edition bundle boots and answers /health" -ForegroundColor DarkGray
 }
 
-# ── step 6f: bake the pre-seeded la-showcase Space (ONLY the demo-auth la-app bundle; operator 2026-10-12) ──
+# ── step 6f: bake the Product's pre-seeded demo Space (ONLY a demo build whose Product names a demoSpace; operator 2026-10-12) ──
 # A deliberate, narrow reversal of "bundles ship no Spaces": a presenter unzips, runs serve-demo, signs in - no node, no seed step.
-# The helper boots THIS staged bundle on a loopback port against a scaffolded Space, seeds it over HTTP, stops it gracefully and
-# copies the Space in; any failure throws (never a half-seeded demo). tools/check-bundle-spaces.mjs guards the gate below.
-if ($DemoAuth -and $Ui -eq 'la-app' -and -not $NoBakeDemo) {
+# The helper boots THIS staged bundle on a loopback port against a scaffolded Space, seeds it over HTTP with the Space's seed tool,
+# stops it gracefully and copies the Space in; any failure throws (never a half-seeded demo). The Space and its seed tool come from
+# the Assembly Plan (PRODUCT-ASSEMBLY-1 PA-2; a plan has a seedSpace only for a demo build). tools/check-bundle-spaces.mjs guards the gate below.
+if ($DemoAuth -and $plan.seedSpace -and -not $NoBakeDemo) {
     . (Join-Path $adjParserDir 'package-demo-bake.ps1')
-    Invoke-DemoSpaceBake -RepoRoot $sandboxRoot -BundleDir $bundleDir -Java $(if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" } elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" } else { 'java' }) -ModuleJars @(Get-Content (Join-Path $libDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -DemoFlags ($demoFlags -split ' ') -Port ([int]$env:INSPECTO_BAKE_PORT)
-    & node (Join-Path $sandboxRoot 'tools/check-bundle-spaces.mjs') --bundle $bundleDir --demo-auth --ui la-app
+    Invoke-DemoSpaceBake -RepoRoot $sandboxRoot -BundleDir $bundleDir -Space ([string]$plan.seedSpace) -SeedTool ([string]$plan.seedTool) -Java $(if (Test-Path "$bundleDir/runtime/bin/java.exe") { "$bundleDir/runtime/bin/java.exe" } elseif (Test-Path "$bundleDir/runtime/bin/java") { "$bundleDir/runtime/bin/java" } else { 'java' }) -ModuleJars @(Get-Content (Join-Path $libDir 'modules.list') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -DemoFlags ($demoFlags -split ' ') -Port ([int]$env:INSPECTO_BAKE_PORT)
+    & node (Join-Path $sandboxRoot 'tools/check-bundle-spaces.mjs') --bundle $bundleDir --seed-space ([string]$plan.seedSpace)
     if ($LASTEXITCODE -ne 0) { throw "the baked demo bundle fails the bundle-spaces guard" }
 }
 

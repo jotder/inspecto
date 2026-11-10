@@ -10,7 +10,7 @@ end to end in a browser by this page's author (see "Not verified").
 
 ## 0. The default demo: unzip, run, sign in (since 2026-10-12)
 
-The `-Edition Advanced -DemoAuth -Ui la-app` bundle (`inspecto-demo-<platform>.zip`) ships `la-showcase` **pre-seeded** under
+The `-Edition Advanced -Product la -Distribution demo` bundle (`inspecto-demo-<platform>.zip`) ships `la-showcase` **pre-seeded** under
 `spaces\la-showcase` (operator decision 2026-10-12; the only bundle that ships a Space; `docs/okf/product/layer/platform/spec-build-test.md`).
 Pre-flight is: unzip, run `bin\serve-demo.bat` / `./bin/serve-demo.sh` (`PORT` overrides 8080), open the URL, pick a Demo User. No node, no scaffold, no seed.
 It carries the Investigation, members, Drafts, Entity Lists, identity assertion, Case, Alert Rule and Jobs; `DEMO-BUILD.txt` in the zip lists the five Demo Users.
@@ -81,7 +81,7 @@ If you need the full demo, use an Advanced or Standard bundle (filesystem store)
 
 - Variant A was RUN LIVE 2026-10-13 (la-seed-ingest lane): PostgreSQL 18 from `dev-infra/docker-compose.yml`, the contract test
   `PgInvestigationStoreContractTest` 45 run / 0 failed / 0 skipped (recipe in its javadoc; add `&loginTimeout=10` to the URL), then an
-  Advanced `-Ui la-app -NoBakeDemo` bundle with `INSPECTO_JAVA_OPTS="-Dla.embed.enabled=true -Dinvestigations.backend=db
+  Advanced `-Product la -NoBakeDemo` bundle with `INSPECTO_JAVA_OPTS="-Dla.embed.enabled=true -Dinvestigations.backend=db
   -Dinvestigations.db.url=jdbc:postgresql://localhost:5432/postgres?loginTimeout=10 -Dinvestigations.db.user=... -Dinvestigations.db.password=..."`;
   `seed-la-showcase.mjs --scaffold <bundle>\spaces` before start, `--apply` after: 0 failed, `la-demo-smoke` 17/17 (also after a
   restart: the log reads back, the manifest verifies, a tamper is detected), `investigationStoreInForce: db`, `space_la_showcase`

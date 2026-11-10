@@ -74,6 +74,10 @@ export function satisfies(version, range) {
 }
 
 const list = (x) => (Array.isArray(x) ? x : []);
+/** The tool that scaffolds and seeds a demo Space: `--scaffold <spacesRoot>` then `--base <url> --space <id> --apply` (the la-showcase contract). */
+export const seedToolOf = (space) => `tools/seed-${space}.mjs`;
+/** A Product's demo-bundle presenter text (written as the bundle's DEMO-BUILD.txt when its demoSpace is baked in). */
+export const demoTextOf = (product) => `products/${product}.demo-build.txt`;
 /** A Product's App ids: { required, optional }. */
 export const productApps = (p) => ({ required: list(p.apps?.required), optional: list(p.apps?.optional) });
 
@@ -168,6 +172,8 @@ export function checkModel(model) {
             }
         }
         if (p.demoSpace && !seen.has(p.demoSpace)) out.push(`${at}: demoSpace '${p.demoSpace}' is not one of the Product's templates`);
+        if (p.demoSpace && !exists(seedToolOf(p.demoSpace))) out.push(`${at}: demoSpace '${p.demoSpace}' has no seed tool ${seedToolOf(p.demoSpace)} (--scaffold / --apply, as tools/seed-la-showcase.mjs)`);
+        if (p.demoSpace && !exists(demoTextOf(file))) out.push(`${at}: demoSpace '${p.demoSpace}' has no presenter text ${demoTextOf(file)} (the bundle's DEMO-BUILD.txt)`);
         if (p.demoSpace && !list(p.distributions).includes('demo')) out.push(`${at}: demoSpace is set but the Product offers no demo distribution`);
     }
     for (const t of templates) if (!shipped.has(t)) out.push(`spaces/_templates/${t}: no Product or App ships this template - add it to one, or delete it`);

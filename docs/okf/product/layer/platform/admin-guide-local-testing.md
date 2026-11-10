@@ -28,7 +28,7 @@ Advanced-only by construction.)
 **`Preview`** (added 2026-09-21, `-Pedition-preview` / `package.ps1 -Edition Preview`) bundles **every**
 optional module unconditionally — see [`spec-editions.md` §Preview](spec-editions.md#preview--not-a-customer-facing-tier).
 It is not an auth bypass: it ships the real `inspecto-oidc.jar`/`inspecto-policy.jar` and fails
-closed exactly like Advanced without a real IdP. `package.ps1 -DemoAuth` accepts
+closed exactly like Advanced without a real IdP. `package.ps1 -Distribution demo` accepts
 `-Edition Advanced` or `-Edition Preview` (`inspecto/package.ps1`, LA-EDITIONS-1 ED-3).
 
 ## Path A — Demo User sign-in, no IAM, no Postgres (offline demo build)
@@ -104,14 +104,14 @@ users[2]{id,displayName,title,roles}:
   fail-closed and `ControlApi`'s constructor resolves it eagerly, so a demo build bound anywhere else
   **fails to boot** rather than serving an open sign-in.
 - **Never in a real bundle.** The jar is outside the jar enumerations `tools/check-sbom-modules.mjs`
-  parses, has no `tools/bundle-modules.mjs` entry, and only `package.ps1 -DemoAuth` stages it.
+  parses, has no `tools/bundle-modules.mjs` entry, and only `package.ps1 -Distribution demo` stages it.
   **`tools/check-demo-auth-isolation.mjs`** (CI, beside the SBOM guard) holds that: it fails if
   `inspecto-demo-auth` enters any edition's module set (Preview included), is named in `package.ps1`
   outside an `if ($DemoAuth)` block (the `$modules` list, staging steps, boot-smoke `$cp`, `serve.*`),
   is a dependency of any other module or a module of an edition profile, or is named — or
-  `-DemoAuth` passed — by any other launcher, script or workflow. Its fixture test
+  `-Distribution demo` passed — by any other launcher, script or workflow. Its fixture test
   `tools/check-demo-auth-isolation.test.mjs` plants each violation and requires red.
-- **Not with `inspecto-oidc`.** `-DemoAuth` removes `inspecto-oidc.jar` (the guard above
+- **Not with `inspecto-oidc`.** `-Distribution demo` removes `inspecto-oidc.jar` (the guard above
   fails if that removal goes, or if the demo launcher's classpath names the security jar). At runtime
   the fail-closed `Authenticator` slot (`SpiSlot`) **refuses to boot when more than one provider is
   registered**, naming both, before constructing either — so a hand-assembled classpath carrying both
@@ -121,10 +121,10 @@ users[2]{id,displayName,title,roles}:
 
 ```powershell
 $env:JAVA_HOME = "C:\.jdks\jdk-27-win"   # the JDK-27 toolchain
-pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth
+pwsh -File inspecto/package.ps1 -Edition Advanced -Distribution demo
 ```
 
-`-DemoAuth` (`inspecto/package.ps1`) requires `-Edition Advanced` or `-Edition Preview` and:
+`-Distribution demo` (`inspecto/package.ps1`) requires `-Edition Advanced` or `-Edition Preview` and:
 
 - assembles into `inspecto-demo/` (never `inspecto-deploy/`) and zips as `inspecto-demo-<platform>.zip`;
 - builds `inspecto-demo-auth` (unless `-NoBuild`), then, **after** the SBOM step (the SBOM describes
@@ -143,7 +143,7 @@ Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo
 inbox if needed (below), run `bin\serve-demo.bat` (or `./bin/serve-demo.sh`), open `http://127.0.0.1:8080`
 and pick a Demo User.
 
-> ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Advanced -DemoAuth`
+> ✅ **The `-DemoAuth` package run IS verified end to end (2026-09-30).** `package.ps1 -Edition Advanced -DemoAuth` *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 > built and the bundle booted (`authentication enforced via …DemoAuthenticator`); `/bootstrap` reported
 > `authMode: demo` with the Space's Demo Users; the SPA picker signed three users in with their real roles, and a
 > Link Analysis live check (identity resolution, value Measures, Case-team sharing, settings) ran 33/33 over it.

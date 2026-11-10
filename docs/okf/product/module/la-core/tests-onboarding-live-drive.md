@@ -10,7 +10,7 @@ results in §3 and §4. Re-run it after any change to the la-app first-run path;
 
 | Item | Value |
 |---|---|
-| Bundle | Basic, `la-app` UI: `pwsh -File inspecto\package.ps1 -Ui la-app -NoRuntime -SkipBootCheck` (Java 27 on the path) |
+| Bundle | Basic, `la-app` UI: `pwsh -File inspecto\package.ps1 -Ui la-app -NoRuntime -SkipBootCheck` (Java 27 on the path)  *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)* |
 | Spaces root | a NEW empty folder holding only a copy of the bundle's `spaces/_templates` (templates, no Space) |
 | Server | `serve.bat` with `PORT=18388`, `SPACES_ROOT=<that folder>`; own port, own browser tab |
 | Data | `transfers.csv` (2,215 transfers between 312 accounts: a mule ring `VICTIM-01 → MULE-1..6 → MULE-HUB → CASHOUT-A/B/C` and a busy `MERCHANT-BIG` with 700 transfers) and `accounts.csv` (312 accounts, `account_id, holder, kyc_level`); synthetic, kept outside the repository |
@@ -58,7 +58,7 @@ measured with real people (`LA-GROW-EXCLUDE-THINK-ALOUD-1` covers that kind of s
 
 ## 4. The sign-in variant (2026-10-22)
 
-**How it was run.** The demo sign-in bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app`) could not be packaged
+**How it was run.** The demo sign-in bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app`) could not be packaged *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 offline: it needs the PostgreSQL driver 42.7.12 in the local Maven repository, which this sandbox lacks. The variant was
 run instead from the Basic bundle's own jars plus `inspecto-ops.jar` (the Investigation surface) and
 `inspecto-demo-auth.jar` (built with `mvn -o -pl providers/inspecto-demo-auth -am package`), launched with the

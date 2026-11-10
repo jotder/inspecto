@@ -151,6 +151,8 @@ test('CLI --bundle writes lib/modules.list (lib/<jar> entries) + lib/edition.pro
 test('edition marker and edition-name handling', () => {
     assert.equal(renderEdition('standard'), 'edition=Standard\n');
     assert.equal(renderEdition('advanced', true), 'edition=Advanced\nvariant=demo\n');
+    // PRODUCT-ASSEMBLY-1 PA-2: the Product build's stamp follows; the launchers read only `edition=`.
+    assert.equal(renderEdition('advanced', true, { product: 'la', apps: 'link-analysis' }), 'edition=Advanced\nvariant=demo\nproduct=la\napps=link-analysis\n');
     assert.equal(normalizeEdition('Standard'), 'Standard');
     assert.throws(() => normalizeEdition('gold'), /unknown edition/);
 });

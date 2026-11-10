@@ -1,0 +1,23 @@
+INSPECTO DEMO BUILD (LINK ANALYSIS) - INTERNAL EVALUATION ONLY
+===============================================================
+This build signs people in as Demo Users with NO password and NO identity provider (DEMO-AUTH-1).
+It is not secure and must never be given to a customer, exposed on a network, or used with real data.
+
+UNZIP, RUN, SIGN IN. The Space la-showcase is PRE-INSTALLED under .\spaces\la-showcase with its synthetic data and its seeded state:
+the Investigation mule-hub-case (8 steps, 3 members), Drafts, Entity Lists (smurf-accounts, telecom-watch-msisdn), an identity assertion,
+a Case, an Alert Rule with standing detection, and the Jobs (la_index_build, la_detect). Nothing needs a seed step; no node is required.
+
+1. Run bin\serve-demo.bat (Windows) or bin/serve-demo.sh (Linux). Set PORT to change the port (default 8080).
+2. Open http://127.0.0.1:8080 and pick a Demo User:
+     fm.analyst    Demo FM Analyst   Fraud analyst (lead): owns mule-hub-case; works Investigations, Alert Rules and Incidents
+     fm.manager    Demo FM Manager   Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user
+     admin         Demo Admin        Platform administrator: lead on the Investigation; can Reveal masked values and change LA settings
+     ra.analyst    Demo RA Analyst   Revenue Assurance reviewer: a member of the Investigation with no capability (view only)
+     demo.manager  Demo Manager      NOT a member of the Investigation: shows what a non-member sees (refused)
+
+RESET THE DEMO: stop the server, delete .\spaces\la-showcase, and restore that folder from the zip (re-extract spaces\la-showcase).
+Anything done during a session (new steps, Drafts, Alert Rules) lives in that folder, so a reset discards it.
+
+The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
+The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
+omits inspecto-demo-auth (shipped here).

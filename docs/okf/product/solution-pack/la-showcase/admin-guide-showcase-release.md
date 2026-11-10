@@ -24,8 +24,8 @@ git fetch
 git worktree add --detach C:\sandbox\la-release origin/master
 cd C:\sandbox\la-release
 $env:MAVEN_ARGS = '-o -Dmaven.repo.local=C:/sandbox/.m2-la-release -Dmaven.repo.local.tail=C:/.m2/repository'
-pwsh -NoProfile -File inspecto\package.ps1 -Edition Basic -Ui la-app
-pwsh -NoProfile -File inspecto\package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo
+pwsh -NoProfile -File inspecto\package.ps1 -Edition Basic -Product la
+pwsh -NoProfile -File inspecto\package.ps1 -Edition Preview -Product la -Distribution demo -NoBakeDemo
 ```
 
 - Maven reads `MAVEN_ARGS` on every `mvn` call `package.ps1` makes; the build only packages, so the private repo stays

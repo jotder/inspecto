@@ -157,7 +157,7 @@ Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Ba
 the Maven [edition](architecture-editions-model.md) profile + assembles the per-edition fat-JAR). Generated
 launch scripts embed the native-access flag and the key [`-D` flags](admin-guide-launch-flags.md).
 
-**`-Ui gamma|la-app` (D-5 step 7, 2026-10-02; default `gamma`) picks WHICH single-page application `ui/` holds** - a UI flavor,
+**`-Product inspecto|la` (`PRODUCT-ASSEMBLY-1` PA-2, 2026-11-10; was `-Ui gamma|la-app` from D-5 step 7, 2026-10-02; default `inspecto`) picks WHICH single-page application `ui/` holds** - the Product's `host`,
 not an edition ([`spec-editions.md`](spec-editions.md)): any `-Edition` ships either. `gamma` is the Inspecto console and the bundle
 exactly as it always was; `la-app` is the Link Analysis application (`inspecto-ui/projects/la-app`). The script builds the chosen one
 (`npm run build -- <name>`) and copies `inspecto-ui/dist/<name>/` **by name**, never "the first `index.html` under `dist/`" (two
@@ -233,14 +233,14 @@ Verified by building both flavors 2026-08-27 (Basic 169.3 MB, Advanced 170.3 MB,
 | `inspecto-policy.jar` (ABAC `AccessDecider` SPI) | — | ✅ Advanced only |
 | `inspecto-connectors.jar` (shaded sidecar — `CONNECTORS-BUNDLE-1`) | ✅ | ✅ |
 | the **seven** EDG-01 sidecars (`notify-channels` shaded, `backup`, `geo-link`, `exchange`, `metrics`, `events`, `ops`) | — | ✅ Standard+ |
-| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ when Maven's local repository holds it; **required** only by a bundle that carries `inspecto-la-store-pg` (Advanced, Preview, not `-DemoAuth`) — see *Packaging prerequisites* below |
+| `postgresql.jar` (inert until `-Dinspecto.db=postgres` — `PG-1`) | — | ✅ Standard+ when Maven's local repository holds it; **required** only by a bundle that carries `inspecto-la-store-pg` (Advanced, Preview, not `-Distribution demo`) — see *Packaging prerequisites* below |
 | **`inspecto-agent` / `inspecto-intelligence`** | **never** | **never** |
 
 > **Packaging prerequisites (`PACKAGE-DEMOAUTH-ADVANCED-1`, 2026-10-23).** (1) **Maven's local repository is resolved, never assumed**:
 > `tools/maven-repo.mjs` = `$M2_REPO`, else `<localRepository>` in `~/.m2/settings.xml`, else `~/.m2/repository` (the same function
 > `tools/sbom.mjs` uses); `package.ps1` used to read `%USERPROFILE%\.m2` and failed on a box whose repository is `C:/.m2/repository`.
 > (2) **The PostgreSQL driver is needed only by a bundle that carries a Postgres module** — `needsPostgresDriver()` in
-> `tools/bundle-modules.mjs` (`inspecto-la-store-pg`: Advanced and Preview; the `-DemoAuth` build is loopback + DuckDB, so no). Basic,
+> `tools/bundle-modules.mjs` (`inspecto-la-store-pg`: Advanced and Preview; the `-Distribution demo` build is loopback + DuckDB, so no). Basic,
 > Standard and the demo bundle do not fail at the `postgresql.jar` step without it: the driver rides along when the repository holds
 > it (`modules.list` then names it, `tools/offering-classpath.mjs` drops it from the list when it was not staged) and is skipped with
 > a note when it does not; Advanced/Preview fail there with a message naming the repository path and the fix. ⚠ Not the whole
@@ -248,7 +248,7 @@ Verified by building both flavors 2026-08-27 (Basic 169.3 MB, Advanced 170.3 MB,
 > `tools/sbom.mjs` hashes it from the repository for every edition; a repository without it fails the SBOM step (`no hash`) after
 > the skip, which is correct and cannot arise on a box that has built the connectors sidecar. (3) **The jlink module set follows the
 > bundle**: `node tools/jlink-modules.mjs --edition Advanced --demo --staged-dir …` expects `inspecto-demo-auth.jar` where the
-> OIDC, secrets and geo-country jars were (`DEMO_JAR` / `DEMO_REPLACES` in `bundle-modules.mjs`). (4) `-DemoAuth -NoBuild` fails
+> OIDC, secrets and geo-country jars were (`DEMO_JAR` / `DEMO_REPLACES` in `bundle-modules.mjs`). (4) `-Distribution demo -NoBuild` fails
 > at the top, naming `mvn package -pl :inspecto-demo-auth -am -DskipTests`, when that jar was never built. Tests:
 > `tools/maven-repo.test.mjs`, `tools/offering-classpath.test.mjs`, `tools/jlink-modules.test.mjs`.
 
@@ -267,7 +267,7 @@ and restart, or create one in Settings → Spaces (`POST /spaces`, no restart). 
 Every other top-level entry (the committed `default`/`demo`/`ucc`, untracked or git-excluded dirs, `uat`,
 `_shared`) is named in the build log as not bundled.
 - ⚖ **Decision 2026-10-12 (operator): the Link Analysis demo bundle ships `la-showcase` PRE-SEEDED.** `package.ps1 -Edition Advanced
-  -DemoAuth -Ui la-app` (and only that flavor) runs step 6f, `Invoke-DemoSpaceBake` (`inspecto/package-demo-bake.ps1`): it scaffolds
+  -Product la -Distribution demo` (and only that flavor) runs step 6f, `Invoke-DemoSpaceBake` (`inspecto/package-demo-bake.ps1`): it scaffolds
   `la-showcase` into a temp spaces root (`node tools/seed-la-showcase.mjs --scaffold`), boots the staged bundle on a loopback port
   with the `serve-demo` flags, runs the seed script `--apply`, stops the server gracefully (Ctrl+C, so DuckDB checkpoints; a leftover
   `.wal` fails the build), scans the baked folder for the build-time path (any hit fails the build), and copies it to
@@ -276,7 +276,7 @@ Every other top-level entry (the committed `default`/`demo`/`ucc`, untracked or 
   (`tools/bundle-spaces-rule.mjs`, `--bundle <dir>`), and still fails every other bundle shape. Every other bundle still ships none.
 - 🔴 **Why no Spaces.** A hand-over built as "the bundle plus ONE Space folder" opened the sample `default`
   Space instead of the one dropped in beside it (2026-09-25 rehearsal); `0228534d0` pruned the samples for
-  `-DemoAuth` only, and this decision made it the rule for every edition.
+  `-Distribution demo` only, and this decision made it the rule for every edition.
 - 🔴 **Why committed content** (`BUNDLE-UNTRACKED-SPACES-1`). Step 4 used to copy the working-tree
   `Get-ChildItem spaces/` listing, and a demo bundle built in the shared sandbox checkout shipped a
   git-excluded client working set and a peer's untracked pilot Space.

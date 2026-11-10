@@ -27,7 +27,7 @@ Everything after authentication — capability gates, Access Profiles, sharing, 
 
 | Layer | Mechanism |
 |---|---|
-| Build | A module in the reactor but in no edition's module set (`offerings/*.toon`); only `inspecto/package.ps1 -DemoAuth` stages it, for Advanced or Preview |
+| Build | A module in the reactor but in no edition's module set (`offerings/*.toon`); only `inspecto/package.ps1 -Distribution demo` stages it, for Advanced or Preview |
 | Classpath | The demo branch removes `inspecto-oidc.jar`, so a bundle never carries two Authenticators |
 | CI | `tools/check-demo-auth-isolation.mjs` fails if the jar enters any edition module set or is named in `package.ps1` outside an `if ($DemoAuth …)` block |
 | Runtime | `LoopbackOnly` refuses to load unless `-Dcontrol.bind` is loopback; the Authenticator is resolved at boot, so boot fails instead of serving an open sign-in |

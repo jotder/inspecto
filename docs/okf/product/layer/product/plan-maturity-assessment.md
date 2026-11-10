@@ -1344,7 +1344,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Scores:** F 4 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**, as a demo asset. It is not a sellable SKU.
 - **Evidence:**
   - Template: 72 files, about 40 300 CSV rows (`spaces/_templates/la-showcase/`). It covers a mule ring, 5 telecom typologies (Wangiri, IRSF, SIM box, subscription fraud, mules) over 8 sixty-day feeds, a geo scene with 3 Geo Views, 3 Alert Rules, 3 pattern packs and 4 link-analysis views (`template.toon` `contents[11]`).
-  - It ships as a turnkey demo bundle. `-Edition Advanced -DemoAuth -Ui la-app` bakes `la-showcase` pre-seeded into `inspecto-demo-<platform>.zip`: unzip, `serve-demo`, pick a persona (`solution-pack/la-showcase/admin-guide-variants-runbook.md` §0).
+  - It ships as a turnkey demo bundle. `-Edition Advanced -Product la -Distribution demo` bakes `la-showcase` pre-seeded into `inspecto-demo-<platform>.zip`: unzip, `serve-demo`, pick a persona (`solution-pack/la-showcase/admin-guide-variants-runbook.md` §0).
   - Tests: `LaShowcaseTemplateTest` 6 @Test, `LaShowcaseGoldenTest` 3, `ControlApiLaShowcaseFiguresTest` 1, `ControlApiLaShowcaseGeoSceneTest` 3. Runners: `tools/la-demo-smoke.mjs`, `seed-la-showcase.mjs`, `gen-la-showcase-data.py`, `gen-la-telecom-data.py`.
   - Live, Postgres variant (2026-10-13): `la-demo-smoke` 17/17, also after a restart, and `PgInvestigationStoreContractTest` 45/0/0 (variants runbook, "Not verified" section).
   - Live, browser, 2026-10-15: analyst coverage (`module/la-core/tests-analyst-coverage.md`) on this Space. 11 use cases: 6 PASS, 4 PARTIAL, 1 with axe 0 violations. 16 findings: 5 fixed, 11 open, all P3 except fixed P2s.
@@ -1502,7 +1502,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **To reach the next level:** settle D1: set `minEdition: standard` or move the Alert Rules out of the Basic variant. Ship at least 4 sample days so the band demo works. Verify `owner: admin` behaviour on a Basic bundle and file a row for the result.
 
 #### Inspecto LA (`la-app`) — the standalone Link Analysis product (module.la-core and its la/ modules)
-- **What it is (customer view):** a graph investigation product over existing Datasets. Analysts explore who is connected to whom, run 29 graph algorithms, record the work as a sealed Investigation and hand it on as a verifiable Dossier, a Case link or a standing detection. It ships as a standalone app (`package.ps1 -Ui la-app`) or inside the console (`docs/GLOSSARY.md` "Inspecto LA", `docs/EDITIONS.md` "UI flavor").
+- **What it is (customer view):** a graph investigation product over existing Datasets. Analysts explore who is connected to whom, run 29 graph algorithms, record the work as a sealed Investigation and hand it on as a verifiable Dossier, a Case link or a standing detection. It ships as a standalone app (`package.ps1 -Ui la-app`) or inside the console (`docs/GLOSSARY.md` "Inspecto LA", `docs/EDITIONS.md` "UI flavor"). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 - **Scores:** F 3 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**.
 - **Evidence:**
   - Modules: `la-core`, `la-storage`, `la-api`, `geo-link`, `la-store-pg` (`la/`). Routes: `la-api` 90 (90 in OpenAPI), `geo-link` 7 (`module/la-api/api-routes.md`, `module/geo-link/api-routes.md`).

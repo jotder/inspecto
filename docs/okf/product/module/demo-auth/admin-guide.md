@@ -15,10 +15,10 @@ timestamp: 2026-10-19T00:00:00Z
 ## Build
 
 ```
-inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app
+inspecto\package.ps1 -Edition Advanced -Product la -Distribution demo
 ```
 
-`-DemoAuth` accepts `-Edition Advanced` or `-Edition Preview` only. It builds `inspecto-demo-auth.jar`, removes
+`-Distribution demo` accepts `-Edition Advanced` or `-Edition Preview` only. It builds `inspecto-demo-auth.jar`, removes
 `inspecto-oidc.jar` from the bundle, and writes `serve-demo.bat` / `serve-demo.sh`. Known defect: the jlink step
 fails on this combination; add `-NoRuntime` until `MODULE-REORG-P3-THIN-JARS` (1) is fixed
 ([BACKLOG](../../../../BACKLOG.md)). Full walk-through:
@@ -60,6 +60,6 @@ users[2]{id,displayName,title,roles,landing}:
 | Boot fails: "inspecto-demo-auth refuses to load: set -Dcontrol.bind=127.0.0.1" | Started without the loopback bind; use `serve-demo`. |
 | Log block "DEMO SIGN-IN IS DISABLED"; sign-in answers 409 `DEMO_ROSTER_CONFLICT` | The same Demo User is defined differently in two Spaces. Align or remove one `demo-users.toon`; no restart needed. |
 | Picker empty | No Space under `spaces.root`, or none defines Demo Users. |
-| 401 right after sign-in | The bundle is not a `-DemoAuth` build, or the user was removed from the roster. |
+| 401 right after sign-in | The bundle is not a `-Distribution demo` build, or the user was removed from the roster. |
 | Everyone signed out | The server restarted (new signing secret, by design). |
 | Signed in but menus missing | The user's role names do not exist in that Space's role table. |

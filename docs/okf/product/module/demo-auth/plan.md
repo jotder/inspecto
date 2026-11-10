@@ -20,7 +20,7 @@ give the same roles. It must never be able to reach a customer bundle.
 * Per-Space Demo User roster `demo-users.toon`, with an optional landing menu item (UIE-7).
 * Sign-in picker in the SPA under a "Not secure, local only" notice
   (`inspecto-ui/src/app/inspecto/auth/sign-in.component.ts`).
-* Packaging: `inspecto/package.ps1 -DemoAuth` swaps `inspecto-oidc.jar` for `inspecto-demo-auth.jar` and writes
+* Packaging: `inspecto/package.ps1 -Distribution demo` swaps `inspecto-oidc.jar` for `inspecto-demo-auth.jar` and writes
   `serve-demo` launchers.
 * Guardrails: loopback-only binding (`LoopbackOnly`), and the CI guard `tools/check-demo-auth-isolation.mjs`.
 * Global identity across Spaces (fix 2026-09-25) and the typed roster-conflict refusal `DEMO_ROSTER_CONFLICT`.
@@ -32,6 +32,6 @@ give the same roles. It must never be able to reach a customer bundle.
 
 ## Left
 
-* `MODULE-REORG-P3-THIN-JARS` packaging defect (1): `package.ps1 -Edition Advanced -DemoAuth -Ui la-app`
+* `MODULE-REORG-P3-THIN-JARS` packaging defect (1): `package.ps1 -Edition Advanced -Product la -Distribution demo`
   fails at the jlink step because the derived module set expects `inspecto-oidc.jar`; `-NoRuntime` works around
   it ([BACKLOG](../../../../BACKLOG.md)).

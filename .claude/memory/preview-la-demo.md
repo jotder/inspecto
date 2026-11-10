@@ -9,10 +9,10 @@ metadata:
 `C:\sandbox\spaces\<id>`: `inspecto-mfs` (MFS; `space.toon data_root: "C:/data/inspecto-mfs"` - the 28.9 GB state; the
 repo junction `spaces\inspecto-mfs` -> `C:\sandbox\inspecto-mfs-root\inspecto-mfs` is a stale 1 MB refill, not used),
 `mfs-demo` (IMS, 16 GB) and `la-mobile-money`. Each install boots them through `spaces\<id>.ref` files (one absolute path):
-- **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -DemoAuth -Ui la-app -NoBakeDemo`
+- **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -Product la -Distribution demo -NoBakeDemo`
   (demo sign-in); also holds the synthetic LA showcases (la-showcase, la-claims, la-audit, la-daily-feed, ...).
   Start `& C:\sandbox\inspecto-preview\inspecto-la\start-la-preview.ps1`.
-- **Basic** `C:\sandbox\ims-mfs-demo` on :8098, built `-Edition Basic -Ui la-app` (no sign-in, loopback), only the
+- **Basic** `C:\sandbox\ims-mfs-demo` on :8098, built `-Edition Basic -Product la` (no sign-in, loopback), only the
   three refs. Start `& C:\sandbox\ims-mfs-demo\start-la-basic.ps1`. Basic is the LA explorer: Investigations and index
   builds answer 503 by design, so exploration reads the Dataset (IMS ~9 s for 500 links).
 - ⛔ **ONE AT A TIME.** A Space's DuckDB files open in one process only and its Jobs would run twice; each `start-la-*.ps1`
@@ -25,7 +25,7 @@ started with `serve-preview-la.bat`, WSO2 at https://localhost:9443 (app
 the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux builds are wasted time — only when asked.
 
 - **Re-bake all Spaces (2026-10-24):** `scripts/preview-la/bake-all.ps1` — scaffolds the four seeders + la-daily-feed onto
-  ONE demo-auth server (`package.ps1 -Edition Preview -DemoAuth -NoBakeDemo -NoUi`, run from a sibling worktree), triggers
+  ONE demo-auth server (`package.ps1 -Edition Preview -Distribution demo -NoBakeDemo -NoUi`, run from a sibling worktree), triggers
   each Space's data-build jobs as its manager, seeds (idempotent, retried), stops gracefully, rebases the temp root to the
   relative `spaces`, parks the old Spaces under `parked\spaces-old-<stamp>` and copies the new ones in. Smoke:
   `scripts/preview-la/la-smoke.mjs` (real WSO2 sign-in of every user against every Space).
@@ -36,7 +36,7 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
   (4) `JAVA_HOME` is `C:\.jdks\jdk-27-win` (the old `Program Files\Java\latest` path is gone); the Maven repo is `C:\.m2`.
 
 - **UI-only change:** build `inspecto-ui/dist/la-app` and robocopy `/MIR` it into the bundle's `ui\`.
-- **Full redeploy:** worktree at origin/master, `npm ci --offline`, `package.ps1 -Edition Preview -Ui la-app`
+- **Full redeploy:** worktree at origin/master, `npm ci --offline`, `package.ps1 -Edition Preview -Product la`
   (~15 min); stop :8080; back up to `inspecto-preview\backup\predeploy-<stamp>`; robocopy over with `/XD spaces`;
   refresh only `spaces\_templates`; keep `serve-preview-la.bat`, the WSO2 setup script, `runtime-natives`, all Spaces.
 - **BUNDLE-LAYOUT-1 (2026-11-06) changed the install layout:** the root now holds `README.md` + folders only — launchers in
@@ -50,7 +50,7 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
 - **Restore `runtime\lib\security\cacerts`** from the backup (or exclude it): the fresh jlinked runtime lacks the
   imported WSO2 cert and boot dies with `SSLHandshakeException` on OIDC discovery.
 - **Redeploy as actually run 2026-10-25 (worked first time, ~15 min build + ~10 min swap):** (1) build with NO downtime in
-  a sibling worktree: `pwsh -NoProfile -File inspecto\package.ps1 -Edition Preview -Ui la-app` (JAVA_HOME `C:\.jdks\jdk-27-win`);
+  a sibling worktree: `pwsh -NoProfile -File inspecto\package.ps1 -Edition Preview -Product la` (JAVA_HOME `C:\.jdks\jdk-27-win`);
   the staged bundle is `<worktree>\inspecto-deploy\` (ignore the zip); (2) diff `ls -A` of live vs new to find what `/MIR`
   would delete: expect to PROTECT `runtime-natives`, `serve-preview-la.bat`, `wso2-preview-la-setup.mjs`, `cacerts`, and
   expect a stale module jar to disappear (`inspecto-la-graph.jar`); (3) back up the static parts to
@@ -70,7 +70,7 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
   Chrome does not carry over) and the Claude-in-Chrome extension may not be connected, so sign-in checks are often unreachable:
   ask the operator to sign in themselves, and say plainly that a visual/live check was NOT done.
 - **FAKE-AUTH ("demo sign-in") variant, the way to drive the preview in the built-in browser (2026-10-25):** build with
-  `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` (NoBake: otherwise it bakes its own la-showcase Space; the
+  `package.ps1 -Edition Preview -Product la -Distribution demo -NoBakeDemo` (NoBake: otherwise it bakes its own la-showcase Space; the
   stage dir is `<worktree>\inspecto-demo\`, the launcher `serve-demo.bat` binds 127.0.0.1 with `-Dauth.mode=demo
   -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb`). The swap DELETES `inspecto-oidc.jar`,
   `inspecto-secrets.jar`, `inspecto-geo-country.jar`, `serve.bat/.sh`, the Dockerfile and service files and adds

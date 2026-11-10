@@ -10,7 +10,7 @@ The stakeholder-facing sibling script is the [demo runbook](../../module/la-core
 
 | # | Step | Command / expectation |
 |---|---|---|
-| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` (`-DemoAuth` accepts Advanced or Preview only); unzip it inside the checkout, not under `%TEMP%` |
+| 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo` (`-Distribution demo` accepts Advanced or Preview only); unzip it inside the checkout, not under `%TEMP%` |
 | 2 | Lay the Space down (offline, before the server starts) | `node tools/seed-la-audit.mjs --scaffold <spacesRoot>` creates `la-audit` and the template gallery |
 | 3 | Start the server with `-Dla.embed.enabled=true` (only for the Embed scene) | without it the mint answers 503 |
 | 4 | Wait for the Jobs: `ap_links` runs on a 10-minute cron; its three derived Jobs and `la_index_build` follow it by signal | or press Run on each as `audit.manager` |

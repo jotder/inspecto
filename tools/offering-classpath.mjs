@@ -136,8 +136,12 @@ export function stagedClasspath(jars, dir, needsPg) {
 export const listEntries = (jars) => jars.map((j) => `${LIB_DIR}/${j}`);
 /** modules.list text: one jar per line, LF. Pass listEntries(jars) for a bundle's file. */
 export const renderList = (jars) => jars.join('\n') + '\n';
-/** edition.properties text. */
-export const renderEdition = (edition, demo = false) => `edition=${normalizeEdition(edition)}\n` + (demo ? 'variant=demo\n' : '');
+/**
+ * edition.properties text. `product` / `apps` (PRODUCT-ASSEMBLY-1 PA-2: the Product build's stamp, from the Assembly Plan) are
+ * written after `edition=` / `variant=`; the launchers read only `edition=`, so the extra lines are inert until PA-3 reads them.
+ */
+export const renderEdition = (edition, demo = false, { product, apps } = {}) =>
+    `edition=${normalizeEdition(edition)}\n` + (demo ? 'variant=demo\n' : '') + (product ? `product=${product}\n` : '') + (apps ? `apps=${apps}\n` : '');
 
 /** Problems between a staged bundle (its ROOT) and the list: a listed jar missing from lib/, or a jar in lib/ the list omits. A jar left at the root is refused too. */
 export function verifyBundle(jars, dir) {
@@ -168,8 +172,8 @@ function main() {
             if (problems.length) throw new Error(`the staged bundle and the Offering classpath disagree:\n  ${problems.join('\n  ')}`);
             const lib = join(bundle, LIB_DIR);
             writeFileSync(join(lib, MODULES_LIST), renderList(listEntries(jars)));
-            writeFileSync(join(lib, EDITION_FILE), renderEdition(edition, demo));
-            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} in ${lib}`);
+            writeFileSync(join(lib, EDITION_FILE), renderEdition(edition, demo, { product: val('--product'), apps: val('--apps') }));
+            console.log(`offering-classpath: ${normalizeEdition(edition)}${demo ? ' (demo)' : ''}${val('--product') ? ` [Product ${val('--product')}]` : ''} -> ${MODULES_LIST} (${jars.length} jars) + ${EDITION_FILE} in ${lib}`);
         } else process.stdout.write(renderList(jars));
     } catch (e) {
         console.error(`offering-classpath: ${e.message}`);

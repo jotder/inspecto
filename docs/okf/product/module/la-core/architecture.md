@@ -24,7 +24,7 @@ without paths; locate them with `codegraph_explore`. Source of truth for module 
 Link Analysis (LA) is an **optional, ServiceLoader-discovered extension of the one host process**. There is no LA
 main class and no LA server: `la/inspecto-la-api` contributes `RouteModule`s (the `/inv` and `/geo` routes) to the
 host `ControlApi`, `la/inspecto-geo-link` is the bridge that implements la-core's ports against engine services, and
-the standalone `la-app` is only a second Angular shell (`package.ps1 -Ui la-app`) served by that same host. The
+the standalone `la-app` is only a second Angular shell (`package.ps1 -Product la`) served by that same host. The
 domain is an **append-only, hash-sealed Investigation op log** folded deterministically into a Working Set; reads
 come either from a Dataset relation (flat recursive CTE in DuckDB) or, when switched on, from a **versioned Parquet
 link index**; graph algorithms run in a bounded in-process pool over either input.
@@ -2393,7 +2393,7 @@ D-LAE3, D-LAE4, D-LAE6 were answered 2026-10-25: `docs/superpower/link-analysis-
 The Postgres store also needs `-Dinvestigations.backend=db` plus a `jdbc:postgresql:` URL; the jar alone keeps the
 filesystem store.
 
-Jars are staged by `inspecto/package.ps1`; `-Ui la-app` swaps the bundled SPA, not the edition. Enablement then runs
+Jars are staged by `inspecto/package.ps1`; `-Product la` swaps the bundled SPA, not the edition. Enablement then runs
 Installed (jar present) → Enabled (`modules.toon` `geoLink`, per Space) → Permitted (capability + gates above).
 
 ## 9. Concurrency and resource bounds (summary)

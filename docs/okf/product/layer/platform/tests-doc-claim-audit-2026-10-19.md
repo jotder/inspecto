@@ -75,7 +75,7 @@ BACKLOG". The coordinator re-checked it and found `LA-19` in `docs/BACKLOG.md`, 
 
 | Doc | As written | Correction | Evidence |
 |---|---|---|---|
-| `layer/product/admin-guide.md` | `-DemoAuth` requires `-Edition Advanced` | Accepts `-Edition Advanced` **or** `-Edition Preview` | `inspecto/package.ps1` (`-DemoAuth` guard, LA-EDITIONS-1 ED-3) |
+| `layer/product/admin-guide.md` | `-DemoAuth` requires `-Edition Advanced` | Accepts `-Edition Advanced` **or** `-Edition Preview` | `inspecto/package.ps1` (`-DemoAuth` guard, LA-EDITIONS-1 ED-3)  *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)* |
 | `solution-pack/telco-ra/admin-guide.md` | Job `ra_switch_kpi_completeness_job` | That is the file name; the Job is `ra_switch_kpi_completeness` | the pack's `*_job.toon` |
 | `module/oidc/admin-guide.md` | `auth.oidc.tokenEndpoint` is never derived for `generic` / `wso2` | Discovery fills it for every provider; only the built-in URL paths are Keycloak-only | `OidcConfig.java` |
 | `module/oidc/admin-guide.md` | `auth.oidc.scopes` default "from discovery / preset" | No default; read only when set | `OidcTokenRelay.java` |
@@ -92,7 +92,7 @@ The 7 errors fall into four patterns. No pattern is systematic: no slot shows in
 made-up routes or made-up class names. Every pattern was still searched for across all of
 `docs/okf/product/**`:
 
-1. **Stale `-DemoAuth` edition rule** (it predates LA-EDITIONS-1). Fixed also in
+1. **Stale `-DemoAuth` edition rule** (it predates LA-EDITIONS-1). Fixed also in *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
    `layer/platform/admin-guide-local-testing.md`, which said "accepts only `-Edition Advanced`, so there is
    no Preview demo build". That doc was not agent-written, so it is outside the error-rate counts.
 2. **Allowed roots from before `CROSS-SPACE-JAIL-1`** ("every hosted Space base"). Fixed also in

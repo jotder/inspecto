@@ -925,7 +925,7 @@ This produces **`inspecto-deploy-<platform>.zip`** in the sandbox root, one per 
 
 ### Bundle contents
 
-Since `BUNDLE-LAYOUT-1` (2026-11-06) the bundle root holds `README.md` and folders only (a `-DemoAuth` build adds
+Since `BUNDLE-LAYOUT-1` (2026-11-06) the bundle root holds `README.md` and folders only (a `-Distribution demo` build adds
 `DEMO-BUILD.txt`). `package.ps1` step 7 asserts it: an unexpected entry at the root, a missing `bin/`, `lib/`, `logs/`,
 `docs/` or `sbom/`, or a staged `examples/` stops the package.
 
@@ -936,7 +936,7 @@ inspecto-deploy/
     serve.sh  serve.bat       ← control plane + UI (ControlApi; reads PORT/SPACES_ROOT/CORS_ORIGIN/AUTH_OIDC_*/INSPECTO_JAVA_OPTS)
     run.sh    run.bat         ← one-shot ETL (CollectorProcessor) for spaces/*/config/<adapter>/*_pipeline.toon
     install-service.sh  install-service.ps1   ← systemd unit / Windows boot Scheduled Task (SCR-3)
-    serve-demo.sh serve-demo.bat               ← -DemoAuth builds only (they replace serve.* and the installers)
+    serve-demo.sh serve-demo.bat               ← -Distribution demo builds only (they replace serve.* and the installers)
   lib/
     inspecto.jar              ← the product jar: processor classes + ALL third-party dependencies
     inspecto-api.jar … inspecto-engine.jar     ← the first-party CORE libraries as thin jars

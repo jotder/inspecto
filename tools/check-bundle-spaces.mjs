@@ -46,18 +46,19 @@ const fail = (msg) => { console.error(`✗ Bundle-spaces guard: ${msg}`); proces
 const abort = (msg) => { console.error(`✗ Bundle-spaces guard could not run: ${msg}`); process.exit(2); };
 
 // ── mode 2: check a BUILT bundle (package.ps1 runs this on the bundle it is about to zip) ───────
-//   node tools/check-bundle-spaces.mjs --bundle <dir> [--demo-auth --ui la-app]
-// Exception (operator 2026-10-12): only the demo-auth la-app bundle may carry exactly one Space, `la-showcase`
-// (the rule lives in tools/bundle-spaces-rule.mjs; see docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md).
+//   node tools/check-bundle-spaces.mjs --bundle <dir> [--seed-space <id>]
+// Exception (operator 2026-10-12): only a demo bundle built with a seedSpace (the Assembly Plan's; PRODUCT-ASSEMBLY-1 PA-2) may
+// carry exactly that one Space (the rule lives in tools/bundle-spaces-rule.mjs; see
+// docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md).
 const argv = process.argv.slice(2);
 if (argv.includes('--bundle')) {
   const dir = argv[argv.indexOf('--bundle') + 1];
-  const ui = argv.includes('--ui') ? argv[argv.indexOf('--ui') + 1] : 'gamma';
+  const seedSpace = argv.includes('--seed-space') ? argv[argv.indexOf('--seed-space') + 1] : null;
   if (!dir) abort('--bundle needs a directory.');
   const spacesDir = join(dir, 'spaces');
   let entries = [];
   try { entries = readdirSync(spacesDir); } catch { /* no spaces/ at all is fine */ }
-  const v = bundleSpacesVerdict(entries, { demoAuth: argv.includes('--demo-auth'), ui });
+  const v = bundleSpacesVerdict(entries, { seedSpace });
   if (!v.ok) fail(v.reason);
   console.log(`✓ Bundle-spaces guard: ${dir} carries ${entries.filter((n) => n !== '_templates').join(', ') || 'no Spaces'} (allowed for this flavor).`);
   process.exit(0);
@@ -77,8 +78,8 @@ if (/\$staged\.Spaces/.test(pkg))
 // The ONLY step that may add a Space to a bundle is the demo bake, and only behind this exact gate.
 const bakeCalls = pkg.match(/Invoke-DemoSpaceBake\s+-/g) || [];
 if (bakeCalls.length > 1) fail('inspecto/package.ps1 calls Invoke-DemoSpaceBake more than once.');
-if (bakeCalls.length === 1 && !/if \(\$DemoAuth -and \$Ui -eq 'la-app'[^\r\n]*\)\s*\{\s*[^}]*Invoke-DemoSpaceBake\s+-/.test(pkg))
-  fail("inspecto/package.ps1 calls Invoke-DemoSpaceBake outside `if ($DemoAuth -and $Ui -eq 'la-app' ...)` — only the demo-auth la-app bundle may ship a Space.");
+if (bakeCalls.length === 1 && !/if \(\$DemoAuth -and \$plan\.seedSpace[^\r\n]*\)\s*\{\s*[^}]*Invoke-DemoSpaceBake\s+-/.test(pkg))
+  fail("inspecto/package.ps1 calls Invoke-DemoSpaceBake outside `if ($DemoAuth -and $plan.seedSpace ...)` — only a demo bundle whose Assembly Plan names a seedSpace may ship a Space.");
 
 // ── fixture repository ────────────────────────────────────────────────────────────────────────
 const work = mkdtempSync(join(tmpdir(), 'inspecto-bundle-spaces-'));
@@ -165,7 +166,27 @@ try {
     fail(`reported modified files ${JSON.stringify(result.Modified)} — expected ["spaces/_templates/starter/config/a.toon"]`);
   if (result.Files !== expected.length) fail(`reported ${result.Files} files — expected ${expected.length}`);
 
-  console.log(`✓ Bundle-spaces guard: only spaces/_templates ships (${expected.length} committed files); committed/untracked/excluded Spaces and staged-only/untracked templates skipped; modified file shipped as committed.`);
+  // ── -Only: a Product build ships only its Assembly Plan's templates (PRODUCT-ASSEMBLY-1 PA-2) ───────────────────────
+  put('spaces/_templates/other/template.toon', 'id: other\n');
+  git('add', 'spaces/_templates/other/template.toon');
+  git('commit', '-q', '-m', 'second template');
+  const bundle2 = join(work, 'bundle2');
+  mkdirSync(bundle2, { recursive: true });
+  const only = (names, dir) => `$ErrorActionPreference='Stop'; Set-StrictMode -Version Latest; . ${q(HELPER)}; ` +
+    `Copy-SpaceTemplates -RepoRoot ${q(repo)} -BundleDir ${q(dir)} -Only @(${names.map(q).join(',')}) | ConvertTo-Json -Compress -Depth 3`;
+  let r2;
+  try { r2 = JSON.parse(execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', only(['starter'], bundle2)], { encoding: 'utf8' }).trim().split(/\r?\n/).pop()); }
+  catch (e) { fail(`Copy-SpaceTemplates -Only threw:\n${e.stdout ?? ''}${e.stderr ?? ''}`); }
+  const shipped2 = walk(bundle2).map((p) => relative(bundle2, join(bundle, p))).sort();
+  if (walk(bundle2).some((p) => p.includes('/other/'))) fail(`-Only @('starter') still shipped the template 'other': ${shipped2.join(', ')}`);
+  if (!same(arr(r2.Templates), ['starter']) || !same(arr(r2.NotShipped), ['other']))
+    fail(`-Only reported Templates ${JSON.stringify(r2.Templates)} / NotShipped ${JSON.stringify(r2.NotShipped)} — expected ["starter"] / ["other"]`);
+  let refused = false;
+  try { execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', only(['ghost'], join(work, 'bundle3'))], { encoding: 'utf8', stdio: 'pipe' }); }
+  catch (e) { refused = /not committed under spaces\/_templates: ghost/.test(`${e.stdout ?? ''}${e.stderr ?? ''}`); }
+  if (!refused) fail("-Only @('ghost') (a template that is not committed) did not throw naming it.");
+
+  console.log(`✓ Bundle-spaces guard: only spaces/_templates ships (${expected.length} committed files); committed/untracked/excluded Spaces and staged-only/untracked templates skipped; modified file shipped as committed; -Only ships exactly the named templates and refuses an uncommitted one.`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

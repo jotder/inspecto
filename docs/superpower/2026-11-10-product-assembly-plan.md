@@ -2,7 +2,7 @@
 
 *Status: APPROVED 2026-11-10. The operator affirmed the direction ("the plan holds") and signed every decision in §12
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
-as-built note); PA-2 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+as-built note); ✅ PA-2 built 2026-11-10 (§11 as-built note; pushed once its package runs pass); PA-3 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -303,7 +303,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 |---|---|---|
 | **PA-0** Words and decisions ✅ 2026-11-10 | `GLOSSARY.md` §15 *Product assembly*: Product (Domain / Platform), App, Industry, Suite, Distribution, Entitlement, Assembly Plan, Product lock, Base; §13 rename-map row; §12 signed | vocabulary guard green |
 | **PA-1** Definitions describe today ✅ 2026-11-10 | `products/{inspecto,la}.toon`, `apps/link-analysis/app.toon`, `industries/{telecom,mobile-money}/`; one guard, `tools/check-products.mjs` (rules in `tools/products.mjs`, shared with the assembler); the Offering as the only module table | ✅ guard + 21 tests green; the derived module table equals the hand-kept one row for row in every Edition and the core set (only the row order of Standard and up changed, to `CLASSPATH_ORDER`); all 735 tool tests green |
-| **PA-2** Assembler | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised |
+| **PA-2** Assembler ✅ 2026-11-10 | `tools/assemble.mjs`, Assembly Plan, Product lock; `package.ps1` as executor; content staged per Product; generic demo seeding | both bundles rebuilt through plans; `check-bundle-spaces.mjs` generalised (✅; package runs in the as-built note) |
 | **PA-3** Server | `product=` / `apps=` stamp; `/bootstrap` with Product, Apps and resolved nav; App gates (regenerate `openapi-v1.json`) | a real-HTTP test per gate combination |
 | **PA-4** Suite shell | shared shell library; generated hosts; Apps as lazy libraries; App switcher; My work across Apps | both shells' specs and axe green; bundle sizes within 5 % |
 | **PA-5** **Inspecto Telco** as proof | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
@@ -325,6 +325,31 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 - **Deliberately not done in PA-1:** `nav` and `brand` beyond the name (the TOON subset has no tabular arrays; they
   arrive with `/bootstrap` in PA-3). `products.mjs` resolves Add-ons, but the module set is still the whole Edition's;
   trimming per Product is customer-build's job until PA-10.
+
+**PA-2 as built (2026-11-10).**
+- **`tools/assemble.mjs`** writes the Assembly Plan (`inspecto.assembly-plan/1`): host, demo, Apps, Add-ons, the
+  Edition's Offering classpath and `-pl` list, templates, seedSpace + seed tool + presenter text, posture and the
+  `edition.properties` stamp. It refuses, with the reason, an edition, distribution or target the Product does not offer,
+  a demo outside Advanced/Preview, a chosen App whose Add-ons the edition lacks, and any `check-products` finding.
+  `--lock` writes the Product lock (Platform and App versions, Industry packs and templates by git tree hash, each
+  edition's classpath); `--diff-lock` prints the upgrade diff. No lock is committed yet: no Product has been released.
+- **`package.ps1` executes the plan.** `-Product` (default `inspecto`) and `-Distribution` (default `production`)
+  replace `-Ui` and `-DemoAuth` with no aliases (D-PA5). Step 0 runs the assembler, and `$Ui` / `$DemoAuth` are set from
+  the plan, so every downstream step and `tools/check-demo-auth-isolation.mjs` (which reads `if ($DemoAuth)` blocks) keep
+  their shape. `-Edition` keeps its four-name `ValidateSet`; the Edition names still live in about eight places.
+- **Content per Product.** `Copy-SpaceTemplates -Only` stages the plan's templates and names the rest. An LA bundle
+  now ships the 20 `la-*` templates, no longer all 30; the console still ships all 30.
+- **Generic demo seeding.** Step 6f runs for any demo plan with a `seedSpace`; `package-demo-bake.ps1` takes `-Space`
+  and `-SeedTool` (`tools/seed-<space>.mjs`, the `--scaffold` / `--apply` contract), and keeps only that Space from the
+  scaffold. The la-showcase presenter text moved out of `package.ps1` into `products/la.demo-build.txt`.
+  `bundle-spaces-rule.mjs` allows exactly the plan's seedSpace (`--seed-space`). Only la-showcase's seed tool is proven
+  against the contract; the other `tools/seed-la-*.mjs` exist but are not checked against it.
+- **The release guard follows the flag.** `check-demo-auth-isolation.mjs` refuses a workflow passing
+  `-Distribution demo` as it refused `-DemoAuth` (a RED case proves it).
+- **Docs.** 40 docs moved to `-Product` / `-Distribution`. Lines that record a past build (a commit, a date, a
+  rehearsal) keep their wording with a removal note, which the doc-flag guard accepts.
+- **Left as is:** Java and pom comments that say "the `-DemoAuth` build" (changing them would rebuild modules for a
+  comment; `OperationalDb.java`, `ObjectsBackendEditionBootTest.java`, two poms, `.gitignore`).
 
 ## 12. Decisions (operator, all signed 2026-11-10 as recommended)
 

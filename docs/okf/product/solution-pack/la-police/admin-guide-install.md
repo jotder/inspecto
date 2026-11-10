@@ -103,7 +103,7 @@ and Drafts in `config/link-analysis.toon`, and the Alert Rule `police_repeat_sel
 'police_repeat_seller_serial_matches'", and `police_serial_match_alerts` runs after each build and finds no rule
 breached. Nothing errors and nothing is refused.
 
-**To show it**, run a Demo Auth build (`package.ps1 -Edition Preview -DemoAuth`, started with `bin\serve-demo.bat`),
+**To show it**, run a Demo Auth build (`package.ps1 -Edition Preview -Distribution demo`, started with `bin\serve-demo.bat`),
 which binds to 127.0.0.1 only:
 
 1. Lay the Space down from the template before the first start, or unzip the Space and data downloads as above:

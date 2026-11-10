@@ -98,6 +98,11 @@ const RED = {
             'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Edition Advanced -DemoAuth\n'),
         /release\.yml:4 stages or builds the demo sign-in/,
     ],
+    'a workflow packaging with -Distribution demo (PRODUCT-ASSEMBLY-1 PA-2)': [
+        (root) => writeFileSync(join(root, '.github/workflows/release.yml'),
+            'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Edition Advanced -Product la -Distribution demo\n'),
+        /release\.yml:4 stages or builds the demo sign-in/,
+    ],
 };
 
 for (const [name, [plant, expected]] of Object.entries(RED)) {

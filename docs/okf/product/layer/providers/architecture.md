@@ -46,7 +46,7 @@ implementation (and the core falls back or fails closed). Modules whose Product 
 | [asn-decoders](../../module/asn-decoders/index.md) | `providers/asn-parser/asn-decoders` | none — a library reactor consumed by telecom-asn1 | default (aggregated) | via telecom-asn1 |
 | [policy](../../module/policy/index.md) | `providers/inspecto-policy` | `AccessDecider` (ABAC) | edition profiles | Advanced |
 | [agent-hosted](../../module/agent-hosted/index.md) | `providers/inspecto-agent-hosted` | `HostedProviderPlugin` (requires `agent`) | default | not a `tools/bundle-modules.mjs` row; the default air-gapped packaging omits it |
-| [demo-auth](../../module/demo-auth/index.md) | `providers/inspecto-demo-auth` | `Authenticator`, `TokenRelay` (demo) | default | no Edition; only `inspecto/package.ps1 -DemoAuth` stages it |
+| [demo-auth](../../module/demo-auth/index.md) | `providers/inspecto-demo-auth` | `Authenticator`, `TokenRelay` (demo) | default | no Edition; only `inspecto/package.ps1 -Distribution demo` stages it |
 
 "Reactor: default" means the root `pom.xml` `<modules>`; "edition profiles" means it is listed only inside
 the `edition-*` profiles, so a plain `mvn -o clean test` (Basic) neither compiles nor tests it — use

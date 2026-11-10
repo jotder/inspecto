@@ -12,20 +12,21 @@ test('a plain bundle with a Space fails, one with only the template gallery pass
   assert.equal(bundleSpacesVerdict([T, 'default']).ok, false);
 });
 
-test('a demo-auth la-app bundle with exactly la-showcase passes', () => {
-  assert.equal(bundleSpacesVerdict([T, 'la-showcase'], { demoAuth: true, ui: 'la-app' }).ok, true);
-  assert.equal(bundleSpacesVerdict(['la-showcase'], { demoAuth: true, ui: 'la-app' }).ok, true);
+test('a demo bundle built with a seedSpace carries exactly that Space', () => {
+  assert.equal(bundleSpacesVerdict([T, 'la-showcase'], { seedSpace: 'la-showcase' }).ok, true);
+  assert.equal(bundleSpacesVerdict(['la-showcase'], { seedSpace: 'la-showcase' }).ok, true);
+  // PRODUCT-ASSEMBLY-1 PA-2: the Space is the plan's, not a hard-coded la-showcase.
+  assert.equal(bundleSpacesVerdict([T, 'telco-demo'], { seedSpace: 'telco-demo' }).ok, true);
 });
 
-test('a demo-auth la-app bundle with an extra or another Space fails', () => {
-  const f = { demoAuth: true, ui: 'la-app' };
+test('a seedSpace bundle with an extra or another Space fails', () => {
+  const f = { seedSpace: 'la-showcase' };
   assert.equal(bundleSpacesVerdict([T, 'la-showcase', 'la-showcase-off'], f).ok, false);
   assert.equal(bundleSpacesVerdict([T, 'la-showcase', 'telco-assurance'], f).ok, false);
   assert.equal(bundleSpacesVerdict([T, 'default'], f).ok, false);
 });
 
-test('la-showcase in any other flavor fails', () => {
-  assert.equal(bundleSpacesVerdict([T, 'la-showcase'], { demoAuth: true, ui: 'gamma' }).ok, false);
-  assert.equal(bundleSpacesVerdict([T, 'la-showcase'], { demoAuth: false, ui: 'la-app' }).ok, false);
-  assert.equal(bundleSpacesVerdict([T, 'la-showcase'], { demoAuth: false, ui: 'gamma' }).ok, false);
+test('a Space in a bundle built with no seedSpace fails', () => {
+  assert.equal(bundleSpacesVerdict([T, 'la-showcase'], { seedSpace: null }).ok, false);
+  assert.match(bundleSpacesVerdict([T, 'la-showcase'], {}).reason, /allowed: none \(bundles ship no Spaces\)/);
 });

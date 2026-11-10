@@ -1,11 +1,12 @@
-# package-demo-bake.ps1 - bake the `la-showcase` Space INTO the Link Analysis demo bundle.
+# package-demo-bake.ps1 - bake a Product's demo Space (its `demoSpace`, e.g. Inspecto LA's `la-showcase`) INTO its demo bundle.
 #
-# Dot-sourced by package.ps1, and ONLY inside `if ($DemoAuth -and $Ui -eq 'la-app' ...)` (tools/check-bundle-spaces.mjs fails
+# Dot-sourced by package.ps1, and ONLY inside `if ($DemoAuth -and $plan.seedSpace ...)` (tools/check-bundle-spaces.mjs fails
 # the build if the call moves). OPERATOR DECISION 2026-10-12: a deliberate, narrow reversal of "BUNDLES SHIP NO SPACES"
-# (2026-09-25) - the demo-auth la-app bundle ships exactly ONE pre-seeded Space so a presenter unzips, runs serve-demo,
-# signs in and has the whole demo, with no node and no seed step. Every other bundle still ships spaces/_templates only.
+# (2026-09-25) - a demo bundle ships exactly ONE pre-seeded Space so a presenter unzips, runs serve-demo, signs in and has the
+# whole demo, with no node and no seed step. Every other bundle still ships spaces/_templates only. Which Space, and the seed
+# tool that builds it, come from the Assembly Plan (PRODUCT-ASSEMBLY-1 PA-2; tools/assemble.mjs, products/<id>.toon demoSpace).
 #
-# HOW: scaffold la-showcase into a TEMP spaces root (tools/seed-la-showcase.mjs --scaffold), boot the STAGED bundle on a loopback
+# HOW: scaffold the Space into a TEMP spaces root (<seed tool> --scaffold), boot the STAGED bundle on a loopback
 # port against it with the serve-demo flags, run the seed script (--apply) over HTTP as the Demo Users, stop the server
 # gracefully (Ctrl+C -> the JVM shutdown hook closes the Space: DuckDB checkpoints, the audit log flushes), then copy the
 # Space folder into the bundle's spaces\. Any failure THROWS: a half-seeded demo must never ship silently.
@@ -74,15 +75,17 @@ Start-Sleep -Milliseconds 500
 
 function Invoke-DemoSpaceBake {
     param(
-        [Parameter(Mandatory)][string]$RepoRoot,      # holds tools/seed-la-showcase.mjs
+        [Parameter(Mandatory)][string]$RepoRoot,      # holds the seed tool
         [Parameter(Mandatory)][string]$BundleDir,     # the staged bundle (spaces/ is written here)
+        [Parameter(Mandatory)][string]$Space,         # the Space to bake (the Assembly Plan's seedSpace, e.g. la-showcase)
+        [Parameter(Mandatory)][string]$SeedTool,      # repo-relative; `--scaffold <root>` then `--base <url> --space <id> --apply`
         [Parameter(Mandatory)][string]$Java,          # the bundle's java (embedded runtime when present)
         [Parameter(Mandatory)][string[]]$ModuleJars,  # modules.list entries (root-relative lib/<jar>), classpath order
         [Parameter(Mandatory)][string[]]$DemoFlags,   # the serve-demo JVM flags
         [int]$Port = 0                                # 0 = any free loopback port
     )
-    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "demo bake: node is required (tools/seed-la-showcase.mjs) - not found on PATH. Pass -NoBakeDemo to package without the pre-seeded Space." }
-    $seed = Join-Path $RepoRoot 'tools/seed-la-showcase.mjs'
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "demo bake: node is required ($SeedTool) - not found on PATH. Pass -NoBakeDemo to package without the pre-seeded Space." }
+    $seed = Join-Path $RepoRoot $SeedTool
     if (-not (Test-Path $seed)) { throw "demo bake: $seed not found" }
 
     $work = Join-Path ([System.IO.Path]::GetTempPath()) ("inspecto-bake-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -94,8 +97,10 @@ function Invoke-DemoSpaceBake {
     try {
         & node $seed --scaffold $spacesRoot | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "demo bake: seed --scaffold failed (exit $LASTEXITCODE)" }
-        # Only la-showcase is baked; the -off variant and the gallery (the bundle already carries its own) must not boot here.
-        Remove-Item (Join-Path $spacesRoot 'la-showcase-off'), (Join-Path $spacesRoot '_templates') -Recurse -Force -ErrorAction SilentlyContinue
+        # Only $Space is baked: anything else the scaffold wrote (la-showcase's -off companion, the gallery the bundle already
+        # carries) must not boot here.
+        Get-ChildItem -Path $spacesRoot -Directory | Where-Object { $_.Name -ne $Space } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path (Join-Path $spacesRoot $Space))) { throw "demo bake: $SeedTool --scaffold wrote no Space '$Space' under $spacesRoot" }
 
         if ($Port -le 0) {
             $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0); $l.Start(); $Port = $l.LocalEndpoint.Port; $l.Stop()
@@ -107,7 +112,7 @@ function Invoke-DemoSpaceBake {
         $ext = Join-Path $BundleDir "lib/duckdb/$plat"
         if (Test-Path $ext) { $jvm += "-Dduckdb.extension.dir=$ext" }
         $log = Join-Path $work 'server.log'
-        Write-Host "Demo bake: booting the staged bundle on 127.0.0.1:$Port with a scaffolded la-showcase ..." -ForegroundColor Cyan
+        Write-Host "Demo bake: booting the staged bundle on 127.0.0.1:$Port with a scaffolded $Space ..." -ForegroundColor Cyan
         $proc = Start-BakeServer -Java $Java -JvmArgs ($jvm + @('-cp', $cp, 'com.gamma.control.ControlApi')) -WorkDir $cwd -Log $log
         $healthy = $false
         foreach ($i in 1..120) {
@@ -120,8 +125,8 @@ function Invoke-DemoSpaceBake {
         # The seed script's extra stages (pending four-eyes request, fired Alert, Draft) run by default; its --no-pending /
         # --no-alert / --no-draft flags opt out, so the bake passes nothing extra.
         $extra = @()
-        Write-Host "Demo bake: seeding la-showcase (node tools/seed-la-showcase.mjs --apply $($extra -join ' ')) ..." -ForegroundColor Cyan
-        & node $seed --base "http://127.0.0.1:$Port" --space la-showcase --apply @extra | Out-Host
+        Write-Host "Demo bake: seeding $Space (node $SeedTool --apply $($extra -join ' ')) ..." -ForegroundColor Cyan
+        & node $seed --base "http://127.0.0.1:$Port" --space $Space --apply @extra | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "demo bake: the seed script failed (exit $LASTEXITCODE) - refusing to ship a half-seeded demo. Server log: $log" }
 
         if (-not (Stop-BakeServer -Proc $proc)) {
@@ -147,7 +152,7 @@ function Invoke-DemoSpaceBake {
         foreach ($o in @($oldBs, $oldFs, $oldEs)) { $pairs.Add([string[]]@($o, 'spaces')) }
         $needles = @($work, $work.Replace('\', '/'), $work.Replace('\', '\\')) | ForEach-Object { & $toLat $_ }
         $findHits = { param($root) foreach ($f in Get-ChildItem -Path $root -Recurse -File) { $s = $lat.GetString([System.IO.File]::ReadAllBytes($f.FullName)); foreach ($n in $needles) { if ($s.Contains($n)) { $f; break } } } }
-        $baked = Join-Path $spacesRoot 'la-showcase'
+        $baked = Join-Path $spacesRoot $Space
         $rebaseJava = Join-Path $PSScriptRoot 'package-demo-rebase.java'
         # NOT shipped: the event log. It is the server's own log (every line names the build-time absolute path, and the build machine's
         # user), not Space content; it restarts empty at first boot, and the file-gap Events are re-derived on the first poll.
@@ -165,14 +170,14 @@ function Invoke-DemoSpaceBake {
                 [System.IO.File]::WriteAllBytes($f.FullName, $lat.GetBytes($s))
             }
         }
-        $dest = Join-Path $BundleDir 'spaces/la-showcase'
+        $dest = Join-Path $BundleDir "spaces/$Space"
         Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue
         Copy-Item $baked -Destination $dest -Recurse -Force
         # PROOF: nothing in the shipped Space (text or binary) still names the build-time root.
         $hits = @(& $findHits $dest | ForEach-Object { $_.FullName.Substring($dest.Length + 1) })
         if ($hits.Count -gt 0) { $keep = $true; throw "demo bake: the baked Space is not relocatable - $($hits.Count) file(s) still embed the build-time path ${work} (kept for diagnosis):`n  $($hits -join "`n  ")" }
         $n = @(Get-ChildItem -Path $dest -Recurse -File).Count
-        Write-Host "Demo bake: spaces\la-showcase baked ($n files, no build-time path embedded)" -ForegroundColor Green
+        Write-Host "Demo bake: spaces\$Space baked ($n files, no build-time path embedded)" -ForegroundColor Green
     } finally {
         if ($proc -and -not $proc.HasExited) { & taskkill /F /T /PID $proc.Id 2>&1 | Out-Null; $proc.WaitForExit(5000) }
         if (-not $keep) { Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue }

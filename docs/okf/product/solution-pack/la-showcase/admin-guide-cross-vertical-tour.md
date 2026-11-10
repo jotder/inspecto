@@ -1,6 +1,6 @@
 # Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)
 
-*Status: written 2026-10-24 from a full browser rehearsal on one locally packaged Demo Auth bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`, build `31539d9c5`, `serve-demo.bat` on a free port with `-Dla.embed.enabled=true`), driven as the real Demo Users in the built-in browser. Row `LA-SHOWCASE-REHEARSAL-1`. Every figure below was read on screen in that pass unless marked **not driven**. The items left then were driven on 2026-10-28 on the reorganized Studio (section 5). Synthetic data only; the plants are planted, so no figure here is a detection rate.*
+*Status: written 2026-10-24 from a full browser rehearsal on one locally packaged Demo Auth bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`, build `31539d9c5`, `serve-demo.bat` on a free port with `-Dla.embed.enabled=true`), driven as the real Demo Users in the built-in browser. Row `LA-SHOWCASE-REHEARSAL-1`. Every figure below was read on screen in that pass unless marked **not driven**. The items left then were driven on 2026-10-28 on the reorganized Studio (section 5). Synthetic data only; the plants are planted, so no figure here is a detection rate.* *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 
 The tour shows three verticals back to back on **one server**: A [`la-mobile-money`](../la-mobile-money/admin-guide-showcase-runbook.md) (the agent who never sleeps), B [`la-audit`](../la-audit/admin-guide-showcase-runbook.md) (the vendor and the journal), C [`la-claims`](../la-claims/admin-guide-showcase-runbook.md) (one garage, one lawyer, twelve strangers). The per-vertical runbooks stay the detailed scripts; this page is the order, the clicks that worked and the numbers to expect. Beats: the ladder and masking (A), four-eyes (A), the algorithms (A, B, C), the Dossier tamper (B), the embed (C), Alert to Case (A).
 
@@ -8,7 +8,7 @@ The tour shows three verticals back to back on **one server**: A [`la-mobile-mon
 
 | # | Step | Expect |
 |---|---|---|
-| 1 | One bundle: `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` (unzip or use `inspecto-demo\`, inside the checkout) | `serve-demo.bat`; `-NoBakeDemo` because the bake needs an interactive console |
+| 1 | One bundle: `inspecto\package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo` (unzip or use `inspecto-demo\`, inside the checkout) | `serve-demo.bat`; `-NoBakeDemo` because the bake needs an interactive console |
 | 2 | Lay the four Spaces down offline: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces`, then `seed-la-mm.mjs`, `seed-la-audit.mjs`, `seed-la-claims.mjs` the same way | `la-showcase`, `la-showcase-off`, `la-mobile-money`, `la-audit`, `la-claims`; the Demo User roster merges (no id is defined two ways) |
 | 3 | Start with `PORT=<free>` and `INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true`; wait for the ingest | `/health` 200 |
 | 4 | **The seeds press Run on their link Job themselves** on a fresh Space (`mm_links` as `mm.manager`, `claims_links` as `siu.manager`, `ap_links` as `audit.manager`) and wait for its rows. Then `la_index_build` in each Space as the **manager** persona (`admin` has no `canOperateRuns`: 403) | Run `SUCCESS`; a re-run of a seed skips what exists (the identity is matched on its reason) |
@@ -88,7 +88,7 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 ### 1.5 Embed (C, 3 min)
 
-* **Click:** as `admin` (a lead member) in the claims Space: *⋯* > *Settings…* > *Investigation settings* > *Share and embed* > *Create link*, then *Create link* in the dialog (label, contents, masking, lifetime; the link is shown once; the viewer page ships in the `-Ui la-app` build only: the console opens it as "Page not found", defect `LA-CONSOLE-EMBED-VIEWER-1`; it looks like `…/embed/inv/<grant>.<secret>`). Open it in a second window with no session, then *Revoke* and confirm.
+* **Click:** as `admin` (a lead member) in the claims Space: *⋯* > *Settings…* > *Investigation settings* > *Share and embed* > *Create link*, then *Create link* in the dialog (label, contents, masking, lifetime; the link is shown once; the viewer page ships in the `-Product la` build only: the console opens it as "Page not found", defect `LA-CONSOLE-EMBED-VIEWER-1`; it looks like `…/embed/inv/<grant>.<secret>`). Open it in a second window with no session, then *Revoke* and confirm.
 * **Expect (read):** the viewer opens at `/embed/inv/shared` (the token is scrubbed from the address bar): title "Staged-accident ring (masked:…)", "Read-only view at step N. Entity ids may be masked", graph and Working Set table, Notes. With the Space allow-list (`127.0.0.1:8099`), `python -m http.server 8099 --bind 127.0.0.1` in `spaces/_templates/la-claims/portal` and `partner-portal.html?host=http://127.0.0.1:<PORT>&link=<grant>.<secret>`, the partner page frames the same masked view (44 entities on 5 rings). After the revoke the public read is **404**. On A the same Share panel and viewer worked (494 entities, step 13); the panel's "0 views" does not refresh until reload (the server counted 1).
 
 ### 1.6 Alert to Case (A, 2 min)
@@ -151,4 +151,4 @@ Click-path notes from this pass (the text above is updated): no *Connect several
 | A Alert to Case | PASS (API) | `mm-structuring` CRITICAL, aggregate only (no wallet in the message) |
 | B / C roles | PASS (API) | `audit.committee` and `partner.reviewer` read-only (403 on write), outsiders 404 |
 
-**Still open:** a spoken run with an audience (needs a person); the portal on `:8140`; the B Alert beat; a click-through of this second pass in the browser on an `-Ui la-app` bundle (with the embed viewer).
+**Still open:** a spoken run with an audience (needs a person); the portal on `:8140`; the B Alert beat; a click-through of this second pass in the browser on an `-Product la` bundle (with the embed viewer).

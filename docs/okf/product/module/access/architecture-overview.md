@@ -2,7 +2,7 @@
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
 > Offering: auth-free on Basic; OIDC sign-in and file/keystore secrets on Standard and up; Attribute-based
-> Access Policies (ABAC) on Advanced and Preview; Demo User sign-in only in a `-DemoAuth` demo bundle.
+> Access Policies (ABAC) on Advanced and Preview; Demo User sign-in only in a `-Distribution demo` demo bundle.
 > Checked against the code on 2026-10-17.
 
 ## 1. What it is
@@ -39,7 +39,7 @@ Maven profiles in `pom.xml`: `edition-standard`, `edition-preview` and `edition-
 `inspecto-secrets`; `edition-preview` and `edition-advanced` add `inspecto-policy` too (Basic is the default
 build, no profile).
 `inspecto-demo-auth` is a default reactor module but `inspecto/package.ps1` stages it only under
-`-DemoAuth`, replacing `inspecto-oidc.jar`; `tools/check-demo-auth-isolation.mjs` fails CI if it leaks into a
+`-Distribution demo`, replacing `inspecto-oidc.jar`; `tools/check-demo-auth-isolation.mjs` fails CI if it leaks into a
 non-demo bundle.
 
 ## 4. How it works

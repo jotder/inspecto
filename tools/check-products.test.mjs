@@ -55,6 +55,8 @@ const RED = {
     'a planned distribution': [(m) => m.products.la.distributions.push('trial'), /distribution 'trial' is not built yet \(PA-7/],
     'a demo distribution with no demo-capable edition': [(m) => { m.products.la.editions = ['basic', 'standard']; }, /offers the demo distribution but none of advanced, preview/],
     'a demoSpace outside the Product': [(m) => { m.products.la.demoSpace = 'telco-ra'; }, /demoSpace 'telco-ra' is not one of the Product's templates/],
+    'a demoSpace with no presenter text': [(m) => { const e = m.exists; m.exists = (p) => p !== 'products/la.demo-build.txt' && e(p); }, /demoSpace 'la-showcase' has no presenter text products\/la\.demo-build\.txt/],
+    'a demoSpace with no seed tool': [(m) => { m.products.la.demoSpace = 'la-showcase-off'; }, /demoSpace 'la-showcase-off' has no seed tool tools\/seed-la-showcase-off\.mjs/],
     'an unknown UI host': [(m) => { m.products.la.host = 'la-ap'; }, /host 'la-ap' is not an Angular project/],
     'an App whose Platform range excludes this version': [(m) => { m.apps['link-analysis'].platform = '>=5.0 <6'; }, /does not admit this Platform version/],
     'an unknown edition': [(m) => m.products.la.editions.push('enterprise'), /edition 'enterprise' has no offerings\/enterprise\.toon/],

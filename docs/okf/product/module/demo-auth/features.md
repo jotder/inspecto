@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Demo authenticator — features
 
-**Product Map Item:** [`module.demo-auth`](../../../../../product-map/module/demo-auth.toon) · **Status:** ga · **Availability:** Staged only in a `-DemoAuth` demo bundle, replacing OIDC; CI fails if it leaks into a non-demo bundle ([Identity and Access](../access/features-access.md)).
+**Product Map Item:** [`module.demo-auth`](../../../../../product-map/module/demo-auth.toon) · **Status:** ga · **Availability:** Staged only in a `-Distribution demo` demo bundle, replacing OIDC; CI fails if it leaks into a non-demo bundle ([Identity and Access](../access/features-access.md)).
 
 ## What it is
 

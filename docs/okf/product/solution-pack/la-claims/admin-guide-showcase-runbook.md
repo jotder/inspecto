@@ -15,7 +15,7 @@ stays in the [demo runbook](../../module/la-core/admin-guide-demo.md).
 
 | # | Step | Command | Expect |
 |---|---|---|---|
-| 1 | Build a Demo Auth bundle (Preview edition bundles everything) | `inspecto\package.ps1 -Edition Preview -DemoAuth -Ui la-app` | a bundle with `serve-demo.bat` |
+| 1 | Build a Demo Auth bundle (Preview edition bundles everything) | `inspecto\package.ps1 -Edition Preview -Product la -Distribution demo` | a bundle with `serve-demo.bat` |
 | 2 | Lay down the Space | `node tools/seed-la-claims.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-claims` (it also stamps the `la_index_build` owner; a plain file copy does not) |
 | 3 | Start with the embed flag | `set PORT=8096` then `set INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true` then `serve-demo.bat` | the Space ingests seven extracts on boot |
 | 4 | Seed the runtime state | `node tools/seed-la-claims.mjs --base http://127.0.0.1:8096 --apply` (without `--apply` it prints every call) | `created: ...`; it waits (up to 40 x 3 s) for the first `claims_links` build |

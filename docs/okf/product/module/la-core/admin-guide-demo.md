@@ -20,7 +20,7 @@ store) are in the [showcase variants runbook](../../solution-pack/la-showcase/ad
 
 | # | Step | Command / action | Expect |
 |---|---|---|---|
-| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -DemoAuth -Ui la-app` | A demo bundle folder (`inspecto-demo\`, zipped as `inspecto-demo-<platform>.zip`) with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-DemoAuth` accepts only Advanced or Preview. With `-DemoAuth -Ui la-app` the build **bakes** a pre-seeded `la-showcase` Space into the bundle (`package-demo-bake.ps1`; needs `node`; run it from an interactive terminal, see §7); `-NoBakeDemo` skips the bake, and the bundle then ships no Space. `-SkipBootCheck` skips the post-build boot smoke (local only). |
+| 1 | Build the bundle | `inspecto\package.ps1 -Edition Advanced -Product la -Distribution demo` | A demo bundle folder (`inspecto-demo\`, zipped as `inspecto-demo-<platform>.zip`) with `serve-demo.bat` / `serve-demo.sh` and `modules.list` naming `inspecto-demo-auth.jar` (not `inspecto-oidc.jar`). `-Distribution demo` accepts only Advanced or Preview. With `-Product la -Distribution demo` the build **bakes** a pre-seeded `la-showcase` Space into the bundle (`package-demo-bake.ps1`; needs `node`; run it from an interactive terminal, see §7); `-NoBakeDemo` skips the bake, and the bundle then ships no Space. `-SkipBootCheck` skips the post-build boot smoke (local only). |
 | 2 | Attach the Spaces | From a repo checkout: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces` | `scaffolded: _templates, la-showcase, la-showcase-off`. Needed on a `-NoBakeDemo` bundle (no Spaces); a baked bundle already holds `la-showcase` but not `la-showcase-off`. This lays down `la-showcase` (the demo) and `la-showcase-off` (LA switched off, used by the smoke runner's `MODULE_DISABLED` probe). To also show the tracked `demo` Space, copy `spaces\demo` beside them; for the other showcases see §0.3. Do it BEFORE the server starts. |
 | 3 | Start | `bin\serve-demo.bat` (Windows) or `./bin/serve-demo.sh`; port is 8080, override with the `PORT` env var (`set PORT=8096`). Optional extra JVM flags: `INSPECTO_JAVA_OPTS`. | Banner `[serve-demo] DEMO BUILD on http://127.0.0.1:<PORT>`. Bound to 127.0.0.1 only. |
 | 4 | Wait for the first ingest | The Space ingests `TRANSFERS_20260901..03.csv` from its inbox on boot. | The seed in step 5 retries a 422 "cannot read the columns" up to 30 times (2 s apart) until `mule_transfers_dataset` has rows. |
@@ -190,7 +190,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   lead is refused.
 * **Proves:** members and roles; non-members get 404-as-absence, a member lacking the role gets 403 only after the Dataset-visibility and policy checks
   (arch §3.1, §6.1 gate order step 6).
-* **If it goes wrong:** a 401 on a persona's token means the demo exchange was refused: wrong build (not `-DemoAuth`) or the Space does not define that user.
+* **If it goes wrong:** a 401 on a persona's token means the demo exchange was refused: wrong build (not `-Distribution demo`) or the Space does not define that user.
 
 ### S8. Four-eyes: a sensitive expand waits for a second person (3 min) [fm.analyst, fm.manager]
 * **Click:** as `fm.analyst`, Investigation tab > select `MULE-HUB-01` > **Expand one hop** with **Maximum fan-out per entity** left **blank**
@@ -311,7 +311,7 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 
 * **Scale:** proven to 10^8 edges (measured, synthetic corpus), **10^9 is an extrapolation**. The live demo corpus is small (about 1,800 ordinary
   transfers plus the planted ring); it demonstrates behaviour, not scale.
-* **Real IAM:** no real-IAM sign-in is verified on this bundle. Demo Users sign in with no password on a loopback-only, `-DemoAuth` build, which refuses
+* **Real IAM:** no real-IAM sign-in is verified on this bundle. Demo Users sign in with no password on a loopback-only, `-Distribution demo` build, which refuses
   to run bound elsewhere. Do not call it a security demonstration of SSO.
 * **Embed UI:** built (mint dialog, grant list, `/embed/inv/<token>` viewer, `-Dcontrol.frameDeny`, Space `embed.frame_ancestors`); this S14 script drives only the API. For a real deployment read *Embed links behind a reverse proxy* below.
 * **Fences:** the "engine names no la-* class" rule is guarded in CI by `tools/check-engine-names-no-la.mjs` (DR-T3); the dependency fences are shown by a named guard, not live.
@@ -331,7 +331,7 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 
 ## 6. Rehearsal record: fresh full bake, 2026-10-13
 
-Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` WITH the built-in bake, built from `origin/master` (`79212c613` plus later docs); served with `serve-demo.bat PORT=8107` and `-Dla.embed.enabled=true`; driven in the built-in browser as the Demo Users. Scripted smoke: `15/16` plain and `29/30` with `--telecom --embed`; the single FAIL is the `la-showcase-off` probe, because a baked bundle ships no `la-showcase-off` Space (expected, see §0 step 2).
+Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` WITH the built-in bake, built from `origin/master` (`79212c613` plus later docs); served with `serve-demo.bat PORT=8107` and `-Dla.embed.enabled=true`; driven in the built-in browser as the Demo Users. Scripted smoke: `15/16` plain and `29/30` with `--telecom --embed`; the single FAIL is the `la-showcase-off` probe, because a baked bundle ships no `la-showcase-off` Space (expected, see §0 step 2). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 
 | # | Beat | Result | Evidence |
 |---|---|---|---|
@@ -357,7 +357,7 @@ Not rehearsed this pass: Drafts cycle, Compare and seal, Settings editing, embed
 
 ## 7. Final go/no-go rehearsal: fresh full bake, 2026-10-14
 
-Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` with the built-in bake, from `origin/master` `66f63ef73`, unzipped to a fresh folder and served with `serve-demo.bat` (`PORT=8119`, `-Dla.embed.enabled=true`); driven in the built-in browser as the five Demo Users. Scripted smoke `la-demo-smoke.mjs --embed --telecom`: **29/30**, the single FAIL is the expected `la-showcase-off` probe (a baked bundle ships no such Space).
+Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` with the built-in bake, from `origin/master` `66f63ef73`, unzipped to a fresh folder and served with `serve-demo.bat` (`PORT=8119`, `-Dla.embed.enabled=true`); driven in the built-in browser as the five Demo Users. Scripted smoke `la-demo-smoke.mjs --embed --telecom`: **29/30**, the single FAIL is the expected `la-showcase-off` probe (a baked bundle ships no such Space). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 
 > **Build trap (new):** the bake's graceful stop sends Ctrl+C by attaching to the server's console, so `package.ps1` run from a console-less host (an agent shell, a CI step without a console) fails with "the server did not stop gracefully ... within 45 s" **every time**. Run the build from a real interactive terminal.
 
@@ -426,7 +426,7 @@ timings are in the [whitepaper](brochure-inspecto-la-whitepaper.md) §6.4. What 
 * **Four-eyes beat.** An expand carries the active Domain Profile's fan-out cap; where the profile sets none, the
   expand is unbounded and is held above the Space's `four_eyes_fan_out_above` (the *Investigate* card too). The held
   degree says so and what to do: ask an approver, or use *Expand…* with a fan-out at or below the threshold.
-* **Bundle.** `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo`. The la-app UI has no Incidents or Cases
+* **Bundle.** `package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo`. The la-app UI has no Incidents or Cases
   page, so show the Alert, Incident and Case through the full SPA or by API. The saved-view picker opens its submenu on
   hover; a plain click on the row only closes the menu.
 
@@ -452,7 +452,7 @@ For a CISO, lead architect and forensic reviewer: every PROVEN row of the [white
 
 Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA, native Hive / Kerberos (NOT YET); the demo build signs in Demo Users, so it is no SSO demonstration; a full-disk consistent rewrite (anchor the Dossier root externally). Prepare a tampered manifest (T9), a late file (T8), an admin token (T6, T11), two browser profiles (T7) and a recorded fallback for T8, T9, T11.
 
-**Rehearsal record, 2026-10-24 (assistant alone, no second person).** Bundle `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo -SkipBootCheck` from `31539d9c5`, four Spaces scaffolded on one server (port 8171, `-Dla.embed.enabled=true`), Demo Users only, synthetic data only; driven in the built-in browser. The T-scenes ran as written except where the table says otherwise. Defects found are on the board (`LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1`, `LA-BOUND-RULE-AUTHOR-READONLY-1`, `LA-SUSPICION-FACTORS-DEMO-1`, `LA-SEED-FIRST-RUN-1`, `LA-REVOKE-DISCARD-NO-CONFIRM-1`, `LA-DEMO-PICKER-NAMES-1`, `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`, `LA-SAVED-VIEW-DOMAIN-PROFILE-1`); runbook errors found were corrected in place (S2 drift is a checkbox, S6 label, the audit Maximum flow of 3, the mobile-money index trigger persona).
+**Rehearsal record, 2026-10-24 (assistant alone, no second person).** Bundle `package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo -SkipBootCheck` from `31539d9c5`, four Spaces scaffolded on one server (port 8171, `-Dla.embed.enabled=true`), Demo Users only, synthetic data only; driven in the built-in browser. The T-scenes ran as written except where the table says otherwise. Defects found are on the board (`LA-INVESTIGATE-CARD-FOUR-EYES-HOLD-1`, `LA-BOUND-RULE-AUTHOR-READONLY-1`, `LA-SUSPICION-FACTORS-DEMO-1`, `LA-SEED-FIRST-RUN-1`, `LA-REVOKE-DISCARD-NO-CONFIRM-1`, `LA-DEMO-PICKER-NAMES-1`, `LA-CLAIMS-PROVIDER-MONEY-LAYOUT-1`, `LA-SAVED-VIEW-DOMAIN-PROFILE-1`); runbook errors found were corrected in place (S2 drift is a checkbox, S6 label, the audit Maximum flow of 3, the mobile-money index trigger persona). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 
 **Still owed (row `LA-WHITEPAPER-DEMO-1`):** (1) one spoken rehearsal with a sceptical second person, timed against 45 and 35 minutes: an assistant cannot be its own reviewer, and nothing here was timed against an audience; (2) the operator's confirmation of the two calls below.
 
@@ -470,7 +470,7 @@ Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA,
 | T8 | PASS | *Replay*: "Replay is equivalent"; with *Re-read current data (drift check)*: Drift table step 2, 8 sealed, 8 now, "changed". Data strip "19 Sep 2034" after the smoke's far-future file |
 | T9 | PASS | *Build dossier* > *Verify this manifest*: Verified, root `sha256:fd88ab6e…`; *Verify an uploaded manifest…* with one flipped digit: NOT verified, "the manifest itself was edited", Self-consistent no, Changed `log.jsonl#1` |
 | T10 | PASS | seeded Draft: *Conflicts* "No conflicts", *Rebase* "Rebased onto step 8", *Promote* "the Draft's steps are now in the Investigation"; a fresh *Fork a Draft* > *Discard* now asks to confirm ("This cannot be undone") |
-| T11 | PASS (viewer: FAIL in the console) | *Share and embed* > *Create link* shows the link once; the console opens it as "Page not found" (no `/embed/inv` route outside `la-app`: defect `LA-CONSOLE-EMBED-VIEWER-1`; show T11 on an `-Ui la-app` bundle); public read 200 with `frame-ancestors 'none'`, DENY, no-store; revoke, then 404 |
+| T11 | PASS (viewer: FAIL in the console) | *Share and embed* > *Create link* shows the link once; the console opens it as "Page not found" (no `/embed/inv` route outside `la-app`: defect `LA-CONSOLE-EMBED-VIEWER-1`; show T11 on an `-Product la` bundle); public read 200 with `frame-ancestors 'none'`, DENY, no-store; revoke, then 404 |
 | T12 | PASS | "Data as of 19 Sep 2034 · 3 of 3 days · index v2" on `mule-hub-case` |
 | T13 | evidence only | `InvTraversalBench` and `tests-index-scale-run.md` exist |
 

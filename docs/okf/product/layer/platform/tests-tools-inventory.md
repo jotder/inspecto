@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-89 test file(s). Run one, or all:
+90 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -21,6 +21,7 @@ node --test tools/
 | test file | summary |
 |---|---|
 | `tools/affected-modules.test.mjs` | Fixture test for tools/affected-modules.mjs. Run: node --test tools/affected-modules.test.mjs |
+| `tools/assemble.test.mjs` | Tests for tools/assemble.mjs — PRODUCT-ASSEMBLY-1 PA-2. Run: node --test tools/assemble.test.mjs |
 | `tools/check-backlog-items.test.mjs` | Fixture test for tools/check-backlog-items.mjs. Run: node --test tools/check-backlog-items.test.mjs |
 | `tools/check-bundle-spaces.test.mjs` | node --test tools/check-bundle-spaces.test.mjs |
 | `tools/check-data-ops-duplication.test.mjs` | Fixture tests for tools/check-data-ops-duplication.mjs. Run: node --test tools/check-data-ops-duplication.test.mjs |

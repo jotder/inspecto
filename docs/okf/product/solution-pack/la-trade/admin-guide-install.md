@@ -41,7 +41,7 @@ bin\serve.bat
 Linux or macOS: `SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data bin/serve.sh`.
 
 Open the address the server prints and pick the Space **Link Analysis trade showcase**. The Link Analysis screens are
-in the product built with the Link Analysis app (`package.ps1 -Ui la-app`).
+in the product built with the Link Analysis app (`package.ps1 -Product la`).
 
 ## 3. Check that it loaded
 

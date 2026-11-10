@@ -28,10 +28,15 @@
 # GIT IS REQUIRED. There is no directory-listing fallback: falling back is precisely the leak this
 # replaces. No git, or not a git work tree → throw.
 
+# WHICH TEMPLATES (PRODUCT-ASSEMBLY-1 PA-2). -Only names the templates a Product build ships (the Assembly Plan's `templates`,
+# tools/assemble.mjs): every other committed template is left out and named in NotShipped. A name in -Only that is not a
+# committed template THROWS (the plan and the commit disagree). Without -Only every committed template ships, as before.
+
 function Copy-SpaceTemplates {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,   # the git work tree holding spaces/
-        [Parameter(Mandatory)][string]$BundleDir   # spaces/ is written to $BundleDir/spaces
+        [Parameter(Mandatory)][string]$BundleDir,  # spaces/ is written to $BundleDir/spaces
+        [string[]]$Only                            # the Product build's templates; $null = every committed template
     )
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
         throw "package: git is required to stage spaces/ from committed content (BUNDLE-UNTRACKED-SPACES-1) — not found on PATH"
@@ -52,6 +57,19 @@ function Copy-SpaceTemplates {
     # The template names: spaces/_templates/<name>/...
     $templates = @($keep | Where-Object { $_.Split('/').Count -ge 4 } |
                    ForEach-Object { $_.Split('/')[2] } | Sort-Object -Unique)
+
+    # The Product build's subset (-Only): every named template must be committed; the rest are left out and named.
+    $notShipped = @()
+    if ($null -ne $Only) {
+        $missing = @($Only | Where-Object { $templates -notcontains $_ })
+        if ($missing.Count -gt 0) { throw "package: the Assembly Plan names template(s) not committed under spaces/_templates: $($missing -join ', ')" }
+        $notShipped = @($templates | Where-Object { $Only -notcontains $_ })
+        $wanted = [System.Collections.Generic.HashSet[string]]::new([string[]]$Only)
+        $kept = [System.Collections.Generic.List[string]]::new()
+        foreach ($p in $keep) { $parts = $p.Split('/'); if ($parts.Count -lt 4 -or $wanted.Contains($parts[2])) { $kept.Add($p) } }
+        $keep = $kept
+        $templates = @($templates | Where-Object { $Only -contains $_ })
+    }
 
     # Every other top-level entry under spaces/, committed or only in the working tree. Named, never copied.
     $notBundled = @($committed | Where-Object { -not $_.StartsWith('spaces/_templates/') } |
@@ -98,6 +116,7 @@ function Copy-SpaceTemplates {
         Templates  = $templates
         Files      = $keep.Count
         NotBundled = $notBundled
+        NotShipped = $notShipped
         Modified   = $modified
     }
 }

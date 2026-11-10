@@ -140,8 +140,9 @@ for (const pom of poms) {
 for (const file of lsFiles('*.sh', '*.bat', '*.cmd', '*.ps1', '*Dockerfile*', '*.yml', '*.yaml')) {
     if (file === SCRIPT) continue;
     for (const [n, line] of readFileSync(join(root, file), 'utf8').split('\n').entries()) {
-        if (!isComment(line) && (line.includes(DEMO) || /-DemoAuth\b/.test(line))) {
-            problems.push(`${file}:${n + 1} stages or builds the demo sign-in outside package.ps1 -DemoAuth: ${line.trim()}`);
+        // PRODUCT-ASSEMBLY-1 PA-2: the demo build is `-Distribution demo` now; -DemoAuth stays matched so an old script is caught too.
+        if (!isComment(line) && (line.includes(DEMO) || /-DemoAuth\b/.test(line) || /-Distribution\s+['"]?demo\b/.test(line))) {
+            problems.push(`${file}:${n + 1} stages or builds the demo sign-in outside package.ps1's demo build: ${line.trim()}`);
         }
     }
 }

@@ -1,11 +1,11 @@
 # Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)
 
-*Status: run end to end 2026-10-13 against WSO2 IS 7.3.0 in Docker and a Professional `-Ui la-app` bundle (`LA-APP-REAL-SIGNIN-1`).
+*Status: run end to end 2026-10-13 against WSO2 IS 7.3.0 in Docker and a Professional `-Ui la-app` bundle (`LA-APP-REAL-SIGNIN-1`). *(`-DemoAuth` and `-Ui` were removed 2026-11-10, `PRODUCT-ASSEMBLY-1` PA-2: today `-Distribution demo` and `-Product la` / `-Product inspecto`.)*
 Rerun this after any change to `SessionService`, `CallbackComponent`, `OidcTokenRelay` or `OidcAuthenticator`.*
 
 Purpose: prove the whole sign-in against a real IAM - guard redirect, IdP login, callback, `/auth/exchange`, `groups` to
 capabilities, refresh/resume, sign-out, expired token, a user with no mapped group. The demo bundle uses Demo User auth
-(`-DemoAuth`) and proves none of the IdP half; this runbook is the other half. Background and WSO2 gotchas:
+(`-Distribution demo`) and proves none of the IdP half; this runbook is the other half. Background and WSO2 gotchas:
 [`api/deployment/README.md`](../../../../api/deployment/README.md) "Proven against a real provider".
 
 ## 1. Prerequisites
@@ -13,7 +13,7 @@ capabilities, refresh/resume, sign-out, expired token, a user with no mapped gro
 * Docker with the `wso2/wso2is` container up on `https://localhost:9443` (self-signed certificate). The console login is the
   local throwaway superadmin (the image default; never commit it, never paste it into a doc).
 * A **worktree** (never the main checkout), JDK 27 (`JAVA_HOME=C:\.jdks\jdk-27-win`), `pwsh` 7.
-* Do **not** pass `-DemoAuth`: the build must be a plain Standard (or Advanced) bundle.
+* Do **not** pass `-Distribution demo`: the build must be a plain Standard (or Advanced) bundle.
 
 ## 2. WSO2 side (once; through the console, or `/api/server/v1` and `/scim2`)
 
@@ -32,7 +32,7 @@ capabilities, refresh/resume, sign-out, expired token, a user with no mapped gro
 ## 3. Build and stage
 
 ```powershell
-pwsh -NoProfile -File inspecto\package.ps1 -Edition Standard -Ui la-app -NoBakeDemo   # 10-25 min; retry on a font-fetch failure
+pwsh -NoProfile -File inspecto\package.ps1 -Edition Standard -Product la -NoBakeDemo   # 10-25 min; retry on a font-fetch failure
 ```
 
 Output: `inspecto-deploy\` at the worktree root. Then:
