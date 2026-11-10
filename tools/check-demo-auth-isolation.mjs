@@ -5,7 +5,8 @@
  * WHY THIS EXISTS. `inspecto-demo-auth` (DEMO-AUTH-1) registers a permit-by-picker Authenticator: anyone
  * who can reach the sign-in page picks a Demo User and is signed in with that user's roles, no password.
  * It is for offline internal demos only. What keeps it out of a customer bundle was, until this guard,
- * convention alone: `inspecto/package.ps1` stages the jar only under `-DemoAuth`, and the jar sits outside
+ * convention alone: `inspecto/package.ps1` stages the jar only for the demo build (`-Distribution demo`, which sets
+ * `$DemoAuth` from the Assembly Plan since PRODUCT-ASSEMBLY-1 PA-2), and the jar sits outside
  * the three enumerations `tools/check-sbom-modules.mjs` parses. Nothing failed if either stopped being true.
  * The demo-auth plan promised a guard for exactly this and it was never built.
  *
@@ -22,8 +23,8 @@
  *      and no edition profile lists it as a module. A dependency would ride into a shaded shipped jar
  *      (inspecto.jar is a fat jar) without any staging line mentioning it.
  *   4. Every other tracked launcher / script / workflow (*.sh *.bat *.cmd *.ps1 Dockerfile* *.yml
- *      *.yaml) — none names inspecto-demo-auth or passes -DemoAuth on a non-comment line. A release
- *      workflow calling `package.ps1 -DemoAuth` would publish a demo build as the release.
+ *      *.yaml) — none names inspecto-demo-auth or asks for the demo build (`-Distribution demo` in any literal spelling,
+ *      or the old `-DemoAuth`) on a non-comment line. A release workflow doing that would publish a demo build as the release.
  *
  * The runtime backstop is in the core: the Authenticator slot refuses to boot when more than one
  * provider is registered (SpiSlot, fail-closed posture), so a hand-assembled classpath with both
@@ -91,7 +92,7 @@ const blocks = demoBlocks(ps);
 if (blocks.length < 3) {
     fail(
         `${SCRIPT}: found ${blocks.length} \`if ($DemoAuth)\` block(s), expected at least 3 (bundle dir, staging swap, ` +
-            `launchers). Either -DemoAuth was restructured (fix this parser) or removed (retire this guard deliberately).`,
+            `launchers). Either the demo build's $DemoAuth branches were restructured (fix this parser) or removed (retire this guard deliberately).`,
     );
 }
 const inBlock = (offset) => blocks.some(([s, e]) => offset >= s && offset < e);
@@ -106,7 +107,7 @@ for (const [n, line] of ps.split('\n').entries()) {
     }
     offset += line.length + 1;
 }
-if (!gatedRefs) fail(`${SCRIPT}: no gated ${DEMO} reference found at all — the -DemoAuth branch changed shape. Fix this parser.`);
+if (!gatedRefs) fail(`${SCRIPT}: no gated ${DEMO} reference found at all — the demo build's $DemoAuth branch changed shape. Fix this parser.`);
 const gated = blocks.map(([s, e]) => ps.slice(s, e)).join('\n');
 if (!/Remove-Item[^\n]*'inspecto-oidc.jar'/.test(gated)) {
     problems.push(`${SCRIPT}: no \`if ($DemoAuth)\` block removes inspecto-oidc.jar — a demo bundle would carry two Authenticators`);
@@ -138,10 +139,12 @@ for (const pom of poms) {
 
 // ── 4. every other launcher / script / workflow ─────────────────────────────────────────────────
 /**
- * `-Distribution demo` in every spelling PowerShell accepts: any unambiguous prefix from `-Di` (no other package.ps1
- * parameter starts with `Di`), any case, a space or a colon before the value, the value bare or quoted.
+ * `-Distribution demo` in every LITERAL spelling PowerShell accepts: any unambiguous prefix from `-Di` (no other package.ps1
+ * parameter starts with `Di`), any case, the parameter name itself quoted or not (`'-Distribution' 'demo'` binds from bash),
+ * a space or a colon before the value, the value bare or quoted. ⛔ Not caught (no static check can be): a value built at run
+ * time (`-Distribution $d`) or a splatted argument list - a release workflow that does that is for review to catch.
  */
-const DEMO_DISTRIBUTION =/(?<![\w$])-Di(?:s(?:t(?:r(?:i(?:b(?:u(?:t(?:i(?:o(?:n)?)?)?)?)?)?)?)?)?)?(?:\s*:\s*|\s+)['"]?demo\b/i;
+const DEMO_DISTRIBUTION = /(?<![\w$])['"]?-Di(?:s(?:t(?:r(?:i(?:b(?:u(?:t(?:i(?:o(?:n)?)?)?)?)?)?)?)?)?)?['"]?(?:\s*:\s*|\s+)['"]?demo\b/i;
 for (const file of lsFiles('*.sh', '*.bat', '*.cmd', '*.ps1', '*Dockerfile*', '*.yml', '*.yaml')) {
     if (file === SCRIPT) continue;
     for (const [n, line] of readFileSync(join(root, file), 'utf8').split('\n').entries()) {

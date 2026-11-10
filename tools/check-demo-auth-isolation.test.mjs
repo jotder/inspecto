@@ -112,6 +112,14 @@ const RED = {
         (root) => writeFileSync(join(root, '.github/workflows/release.yml'), 'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -Distr demo\n'),
         /release\.yml:4 stages or builds the demo sign-in/,
     ],
+    "a workflow packaging with a quoted parameter name '-Distribution' 'demo' (binds from bash)": [
+        (root) => writeFileSync(join(root, '.github/workflows/release.yml'), "jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 '-Distribution' 'demo'\n"),
+        /release\.yml:4 stages or builds the demo sign-in/,
+    ],
+    'a workflow packaging with "-Distribution:demo" quoted whole': [
+        (root) => writeFileSync(join(root, '.github/workflows/release.yml'), 'jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 "-Distribution:demo"\n'),
+        /release\.yml:4 stages or builds the demo sign-in/,
+    ],
     'a workflow packaging with -di \'Demo\' (case, quotes, shortest prefix)': [
         (root) => writeFileSync(join(root, '.github/workflows/release.yml'), "jobs:\n  b:\n    steps:\n      - run: pwsh -File inspecto/package.ps1 -di 'Demo'\n"),
         /release\.yml:4 stages or builds the demo sign-in/,
