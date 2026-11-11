@@ -33,7 +33,7 @@
 // Exit 1 with every finding named when something does not hold.
 
 import { spawn } from 'node:child_process';
-import { createHash, generateKeyPairSync } from 'node:crypto';
+import { createHash, generateKeyPairSync, verify as edVerify } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -42,7 +42,6 @@ import { fileURLToPath } from 'node:url';
 import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib';
 import { assemble } from './assemble.mjs';
 import { KEYS_FILE, publicResource, signBytes, trustedKeys } from './entitle.mjs';
-import { verify as edVerify } from 'node:crypto';
 import { gather } from './check-offerings.mjs';
 import { checkPlan } from './check-product-build.mjs';
 import { builtAddons, carryPartnerApps, checkModel, gatherModel } from './products.mjs';
@@ -398,30 +397,65 @@ export function packageApp(appRoot, out, { repo = REPO, key = null, keyId = null
     return { file, files: entries.length, bytes: statSync(file).size, signed: Boolean(key) };
 }
 
-/** The entries of a ZIP archive written by {@link zip} (stored or deflated), as { name: Buffer }. */
+/**
+ * The entries of a ZIP archive written by {@link zip} (stored or deflated), as a null-prototype { name: Buffer } (so an entry
+ * named `__proto__` is an ordinary key). Strict, because a package is verified by its entries: every local header must sit
+ * where the central directory says, carry the same name, and the local entries must tile the archive up to the central
+ * directory with nothing hidden between them. A duplicate name, a data descriptor, an encrypted entry or a name that escapes
+ * its folder is refused.
+ */
 export function unzip(buf) {
     let end = buf.length - 22;
     while (end >= 0 && buf.readUInt32LE(end) !== 0x06054b50) end--;
     if (end < 0) throw new Error('not a ZIP archive (no end record)');
     const count = buf.readUInt16LE(end + 10);
-    let p = buf.readUInt32LE(end + 16);
-    const out = {};
+    const cdStart = buf.readUInt32LE(end + 16);
+    const out = Object.create(null);
+    const byOffset = new Map();
+    let p = cdStart;
     for (let i = 0; i < count; i++) {
-        if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error('a broken ZIP central directory');
-        const method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20), nameLen = buf.readUInt16LE(p + 28);
-        const extraLen = buf.readUInt16LE(p + 30), commentLen = buf.readUInt16LE(p + 32), local = buf.readUInt32LE(p + 42);
+        if (p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50) throw new Error('a broken ZIP central directory');
+        const flags = buf.readUInt16LE(p + 8), method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20);
+        const nameLen = buf.readUInt16LE(p + 28), extraLen = buf.readUInt16LE(p + 30), commentLen = buf.readUInt16LE(p + 32);
+        const local = buf.readUInt32LE(p + 42);
         const name = buf.subarray(p + 46, p + 46 + nameLen).toString('utf8');
-        const at = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+        if (!name || name.split('/').some((s) => s === '..' || s === '.' || s === '') || name.startsWith('/') || name.includes('\\') || name.includes(':'))
+            throw new Error(`a ZIP entry escapes its folder: ${name}`);
+        if (Object.hasOwn(out, name)) throw new Error(`the archive holds ${name} twice`);
+        if (flags & 0x0009) throw new Error(`${name}: an encrypted entry or a data descriptor is not accepted`);
+        if (local + 30 > cdStart || buf.readUInt32LE(local) !== 0x04034b50) throw new Error(`${name}: its local header is not where the central directory says`);
+        const localNameLen = buf.readUInt16LE(local + 26), localExtra = buf.readUInt16LE(local + 28);
+        if (buf.subarray(local + 30, local + 30 + localNameLen).toString('utf8') !== name) throw new Error(`${name}: its local header names another file`);
+        const at = local + 30 + localNameLen + localExtra;
+        if (at + size > cdStart) throw new Error(`${name}: its data runs into the central directory`);
         const body = buf.subarray(at, at + size);
-        if (name.includes('..') || name.startsWith('/') || name.includes('\\')) throw new Error(`a ZIP entry escapes its folder: ${name}`);
         out[name] = method === 0 ? Buffer.from(body) : method === 8 ? inflateRawSync(body) : (() => { throw new Error(`${name}: compression method ${method} is not supported`); })();
+        byOffset.set(local, at + size);
         p += 46 + nameLen + extraLen + commentLen;
+    }
+    // the local entries must tile [0, central directory): no hidden entry the central directory does not list
+    for (let q = 0; q < cdStart;) {
+        const next = byOffset.get(q);
+        if (next === undefined) throw new Error(`bytes at offset ${q} belong to no listed entry - a hidden entry is not accepted`);
+        q = next;
     }
     return out;
 }
 
 /** Keys from a `keyId=base64(SPKI)` properties file (an install's conf/app-signers.properties), or {} when there is none. */
-export const signerKeys = (file) => (existsSync(file) ? trustedKeys(file) : {});
+export const signerKeys = (file) => {
+    if (!existsSync(file)) throw new Error(`${file}: no such signer allowlist`);
+    return trustedKeys(file);
+};
+
+/** Add `extra` signer keys to `trust`, refusing a key id already trusted (a partner key may never take the issuer's id). */
+export function addSigners(trust, extra) {
+    for (const [id, key] of Object.entries(extra)) {
+        if (Object.hasOwn(trust, id)) throw new Error(`key id '${id}' is trusted already - a signer allowlist never redefines it`);
+        trust[id] = key;
+    }
+    return trust;
+}
 
 /**
  * Verify a packaged App (PA-7c): one App folder; every file listed in MANIFEST.sha256 with its hash, and nothing unlisted;
@@ -435,8 +469,13 @@ export function verifyPackage(buf, trust) {
     const id = roots[0];
     const manifest = entries[`${id}/MANIFEST.sha256`] ?? (() => { throw new Error('no MANIFEST.sha256 - package the App with inspecto-app.mjs package'); })();
     const sig = entries[`${id}/MANIFEST.sig`] ?? (() => { throw new Error('the package is not signed (no MANIFEST.sig) - package it with --key'); })();
-    const fields = Object.fromEntries(sig.toString('utf8').split(/\r?\n/).filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()]));
-    const key = trust[fields.keyId] ?? (() => { throw new Error(`signed by key '${fields.keyId ?? ''}', which is not trusted here (${Object.keys(trust).join(', ') || 'no keys'})`); })();
+    const fields = Object.create(null);
+    for (const l of sig.toString('utf8').split(/\r?\n/).filter((x) => x.includes('='))) {
+        const k = l.slice(0, l.indexOf('=')).trim();
+        if (Object.hasOwn(fields, k)) throw new Error(`MANIFEST.sig names '${k}' twice`);
+        fields[k] = l.slice(l.indexOf('=') + 1).trim();
+    }
+    const key = (Object.hasOwn(trust, fields.keyId ?? '') ? trust[fields.keyId] : null) ?? (() => { throw new Error(`signed by key '${fields.keyId ?? ''}', which is not trusted here (${Object.keys(trust).join(', ') || 'no keys'})`); })();
     if (!edVerify(null, manifest, key, Buffer.from(fields.signature ?? '', 'base64'))) throw new Error('the manifest signature does not match - the package was changed after signing, or signed with another key');
     const listed = new Map(manifest.toString('utf8').split('\n').filter(Boolean).map((l) => [l.slice(66), l.slice(0, 64)]));
     for (const [name, hash] of listed) {
@@ -455,6 +494,7 @@ export function keygen(keyId, out) {
     if (!/^[a-z][a-z0-9-]{1,63}$/.test(keyId ?? '')) throw new Error(`--key-id '${keyId ?? ''}' must be lower-case letters, digits and hyphens`);
     const pem = join(resolve(out), `${keyId}.pem`), props = join(resolve(out), `${keyId}.properties`);
     if (existsSync(pem) || existsSync(props)) throw new Error(`${pem} or its .properties exists already - a key id is never reused`);
+    if (Object.hasOwn(trustedKeys(KEYS_FILE), keyId)) throw new Error(`'${keyId}' is an issuer key id - a partner key takes an id of its own`);
     const { publicKey, privateKey } = generateKeyPairSync('ed25519');
     mkdirSync(resolve(out), { recursive: true });
     writeFileSync(pem, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
@@ -492,8 +532,8 @@ async function main() {
             console.log(`✓ ${r.file} (${r.files} files, ${r.bytes} bytes${r.signed ? ', signed' : ', NOT signed - a server installs only a signed package'})`);
         } else if (cmd === 'verify') {
             const pkg = val('--package') ?? (() => { throw new Error('--package <zip> is required'); })();
-            const trust = { ...trustedKeys(KEYS_FILE) };
-            a.forEach((x, i) => { if (x === '--trust' && a[i + 1]) Object.assign(trust, signerKeys(a[i + 1])); });
+            const trust = Object.assign(Object.create(null), trustedKeys(KEYS_FILE));
+            a.forEach((x, i) => { if (x === '--trust' && a[i + 1]) addSigners(trust, signerKeys(a[i + 1])); });
             const r = verifyPackage(readFileSync(pkg), trust);
             console.log(`✓ ${pkg}: App '${r.app}' ${r.version}, ${r.files} files, signed by '${r.keyId}'`);
         } else if (cmd === 'keygen') {

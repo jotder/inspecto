@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
-import { STARTER, goldenConformance, isOidcJar, keygen, packageApp, scaffold, scaffoldSpace, signerKeys, staticConformance, unzip, validate, verifyPackage, zip } from './inspecto-app.mjs';
+import { STARTER, addSigners, goldenConformance, isOidcJar, keygen, packageApp, scaffold, scaffoldSpace, signerKeys, staticConformance, unzip, validate, verifyPackage, zip } from './inspecto-app.mjs';
 import { assemble } from './assemble.mjs';
 import { gather } from './check-offerings.mjs';
 import { gatherModel } from './products.mjs';
@@ -196,4 +196,34 @@ test('unzip reads back exactly what zip wrote', () => {
     assert.equal(back['a/x.txt'].toString(), 'hello');
     assert.ok(back['a/y.bin'].equals(Buffer.alloc(3000, 7)));
     assert.throws(() => unzip(zip([{ name: '../evil', data: Buffer.from('x') }])), /escapes its folder/);
+});
+
+test('the zip reader refuses forgeries: a __proto__ entry, a duplicate name, a local header that disagrees, a hidden entry (PA-7c review)', () => {
+    const ok = zip([{ name: 'a/x.txt', data: Buffer.from('hello') }]);
+    const proto = unzip(zip([{ name: 'a/x.txt', data: Buffer.from('x') }, { name: '__proto__', data: Buffer.from('y') }]));
+    assert.deepEqual(Object.keys(proto).sort(), ['__proto__', 'a/x.txt'], 'a __proto__ entry is an ordinary key, visible to every check');
+    assert.throws(() => unzip(zip([{ name: 'a/x.txt', data: Buffer.from('1') }, { name: 'a/x.txt', data: Buffer.from('2') }])), /twice/);
+    // the local header names another file than the central directory
+    const renamed = Buffer.from(ok);
+    renamed.write('b', 30, 'utf8');
+    assert.throws(() => unzip(renamed), /local header names another file/);
+    // a hidden local entry before the listed ones: prepend raw bytes and shift the central directory offsets
+    const hidden = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(26), ok]);
+    const end = hidden.length - 22;
+    hidden.writeUInt32LE(hidden.readUInt32LE(end + 16) + 30, end + 16);
+    const cd = hidden.readUInt32LE(end + 16);
+    hidden.writeUInt32LE(hidden.readUInt32LE(cd + 42) + 30, cd + 42);
+    assert.throws(() => unzip(hidden), /belong to no listed entry/);
+});
+
+test('a signer allowlist never redefines a trusted key id, and keygen never takes an issuer key id (PA-7c review)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'inspecto-app-keys-'));
+    try {
+        assert.throws(() => keygen('inspecto-issuer-1', dir), /issuer key id/);
+        const { props } = keygen('acme-signing-1', dir);
+        const trust = Object.create(null);
+        addSigners(trust, signerKeys(props));
+        assert.throws(() => addSigners(trust, signerKeys(props)), /trusted already/);
+        assert.throws(() => signerKeys(join(dir, 'missing.properties')), /no such signer allowlist/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
 });
