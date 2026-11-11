@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.util`](../../../../../product-map/module/util.toon).
 
-30 test class(es): 30 unit, 0 real-HTTP control-plane, 0 IT.
+31 test class(es): 31 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl platform/inspecto-util
-mvn -o test -pl platform/inspecto-util -Dtest=ModuleBuildIdTest,ModuleManifestsTest
+mvn -o test -pl platform/inspecto-util -Dtest=EntitlementsTest,ModuleBuildIdTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `EntitlementsTest` | `com.gamma.module` | unit | `platform/inspecto-util/src/test/java/com/gamma/module/EntitlementsTest.java` | PRODUCT-ASSEMBLY-1 PA-7a: the entitlement verifier, its narrowing rules, and parity with tools/entitle.mjs. |
 | `ModuleBuildIdTest` | `com.gamma.module` | unit | `platform/inspecto-util/src/test/java/com/gamma/module/ModuleBuildIdTest.java` | MODULE-REORG-1 P3a: the build-id gate, over real (synthetic) jars. An absent or {@code dev} stamp is never a mismatch. |
 | `ModuleManifestsTest` | `com.gamma.module` | unit | `platform/inspecto-util/src/test/java/com/gamma/module/ModuleManifestsTest.java` |  |
 | `BoundedHistoryTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/BoundedHistoryTest.java` |  |

@@ -66,6 +66,10 @@ class ImportLoaderInventoryTest {
             ALLOWED.put(p, SHARED);
         for (String p : List.of("template.toon"))
             ALLOWED.put(p, "the shipped Space template catalog under <spaces-root>/_templates/ — outside every Space");
+        // PRODUCT-ASSEMBLY-1 PA-7a: the install's entitlement, resolved against the server's working directory (the bundle root),
+        // never a Space root; and a planted copy would have to carry an issuer key's Ed25519 signature to be read at all.
+        ALLOWED.put("conf/entitlement.toon", "the install's signed entitlement under the bundle's conf/ — outside every Space, "
+                + "and refused unless signed by an issuer key the core jar carries");
         for (String p : List.of("bundle.toon", "manifest.toon", "backup-manifest.json"))
             ALLOWED.put(p, IN_ZIP);
         for (String p : List.of("config", "data", "data/events", "database", "duckdb", "errors", "logs", "poll",

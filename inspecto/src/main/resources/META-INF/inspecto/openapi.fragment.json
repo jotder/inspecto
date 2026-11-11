@@ -9746,7 +9746,27 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "featureId → one short line saying why that feature is locked and which edition or add-on has it (LA-ONBOARD-1 OB-10). Entries only for withheld features (today the route features investigations, geoMap and entityPages); a present feature has none."
+            "description" : "featureId → one short line saying why that feature is locked and which edition or add-on has it (LA-ONBOARD-1 OB-10). Entries only for withheld features (the route features investigations, geoMap and entityPages, and - PRODUCT-ASSEMBLY-1 PA-7a - every feature only modules the install's signed entitlement leaves out provide, as 'Not in this installation's entitlement.'); a present feature has none."
+          },
+          "entitlement" : {
+            "type" : "object",
+            "description" : "PRODUCT-ASSEMBLY-1 PA-7a: the install's signed entitlement, for an administrator only (canAdminister; everyone without sign-in). {installed: false} when no file is installed (D-PA23: today's behaviour). Otherwise installed: true with id, customer, title, product, edition, apps, addons, nodes (recorded, not enforced), notBefore, expires (null = never), daysLeft (null = never) and keyId.",
+            "properties" : {
+              "installed" : { "type" : "boolean" },
+              "id" : { "type" : "string" },
+              "customer" : { "type" : "string" },
+              "title" : { "type" : "string" },
+              "product" : { "type" : "string" },
+              "edition" : { "type" : "string" },
+              "apps" : { "type" : "array", "items" : { "type" : "string" } },
+              "addons" : { "type" : "array", "items" : { "type" : "string" } },
+              "nodes" : { "type" : "integer" },
+              "notBefore" : { "type" : "string", "format" : "date" },
+              "expires" : { "type" : [ "string", "null" ], "format" : "date" },
+              "daysLeft" : { "type" : [ "integer", "null" ] },
+              "keyId" : { "type" : "string" }
+            },
+            "required" : [ "installed" ]
           },
           "configSpecs" : {
             "type" : "object",

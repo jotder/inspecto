@@ -296,7 +296,7 @@ jobs:
       # PA-4 (2026-11-10): each host's product.generated.ts (brand + App nav) must be what the definitions generate.
       # PA-6c (2026-11-11): the Add-on picker (tools/pick-addons.mjs) - closure, Edition floor, the narrowed Platform product.
       - name: Guard — Product, App and Industry definitions resolve
-        run: node tools/check-products.mjs && node tools/render-product-hosts.mjs --check && node --test tools/check-products.test.mjs tools/assemble.test.mjs tools/render-product-hosts.test.mjs tools/compose-space.test.mjs tools/telecom-usage.test.mjs tools/check-product-build.test.mjs tools/seed-telco.test.mjs tools/inspecto-app.test.mjs tools/pick-addons.test.mjs
+        run: node tools/check-products.mjs && node tools/render-product-hosts.mjs --check && node --test tools/check-products.test.mjs tools/assemble.test.mjs tools/render-product-hosts.test.mjs tools/compose-space.test.mjs tools/telecom-usage.test.mjs tools/check-product-build.test.mjs tools/seed-telco.test.mjs tools/inspecto-app.test.mjs tools/pick-addons.test.mjs tools/entitle.test.mjs
 
       # PA-6b (2026-11-11): the sample partner App, made with the App kit outside apps/ (examples/partner-app), holds the
       # kit's static conformance: it validates and assembles into the Platform product on every Edition that builds it.

@@ -115,7 +115,8 @@ public final class EditionFeatures {
      * {@link #INVESTIGATIONS} only - the install holds the Investigations add-on ({@link #holdsInvestigationsAddon}).
      */
     public static boolean present(String feature) {
-        return declared(feature) && (!INVESTIGATIONS.equals(feature) || holdsInvestigationsAddon());
+        return declared(feature) && com.gamma.module.Entitlements.featureEntitled(feature)
+                && (!INVESTIGATIONS.equals(feature) || holdsInvestigationsAddon());
     }
 
     /** Whether a module of this build declares {@code feature} (or a test pinned it), add-ons aside. */
@@ -128,11 +129,13 @@ public final class EditionFeatures {
     }
 
     /**
-     * Whether this install holds the Investigations add-on. ⚠ THE HOOK (OB-5): today the proof is a plain install setting,
-     * {@link #LA_INVESTIGATIONS_SETTING} (anything but {@code true} removes it; read live, never cached), so whoever runs the
-     * server can claim the add-on. A signed entitlement replaces this method's body; every gate already reads it.
+     * Whether this install holds the Investigations add-on (OB-5; every gate reads this). PRODUCT-ASSEMBLY-1 PA-7a: with a
+     * signed entitlement installed, the entitlement decides ({@code addons} lists {@value #LA_INVESTIGATIONS_ADDON}) and the
+     * install setting is ignored. Without one (D-PA23: today's behaviour) the plain setting {@link #LA_INVESTIGATIONS_SETTING}
+     * still decides (anything but {@code true} removes it; read live, never cached).
      */
     public static boolean holdsInvestigationsAddon() {
+        if (com.gamma.module.Entitlements.installed()) return com.gamma.module.Entitlements.addonEntitled(LA_INVESTIGATIONS_ADDON);
         return Boolean.parseBoolean(System.getProperty(LA_INVESTIGATIONS_SETTING, "true").trim());
     }
 
@@ -142,6 +145,9 @@ public final class EditionFeatures {
      * error text a refused request carries; a feature with no short line of its own answers that.
      */
     public static String lockedReason(String feature) {
+        // PA-7a: built and declared, but the install's signed entitlement leaves it out.
+        if (declared(feature) && !com.gamma.module.Entitlements.featureEntitled(feature))
+            return "Not in this installation's entitlement.";
         if (INVESTIGATIONS.equals(feature))
             return declared(INVESTIGATIONS)
                     ? "Needs the Investigations add-on, which this installation does not hold."
@@ -158,6 +164,8 @@ public final class EditionFeatures {
     public static Map<String, String> lockedReasons() {
         Map<String, String> out = new TreeMap<>();
         for (String f : ROUTE_FEATURES) if (!present(f)) out.put(f, lockedReason(f));
+        // PRODUCT-ASSEMBLY-1 PA-7a: every feature only modules the install's signed entitlement leaves out provide.
+        for (String f : com.gamma.module.Entitlements.unentitledFeatures()) out.put(f, "Not in this installation's entitlement.");
         return out;
     }
 

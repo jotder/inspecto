@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); PA-7a is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); PA-7b is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -909,6 +909,57 @@ What exists to build on:
     (the existing inert-config semantics) and are listed in the answer.
   - Proof: the sample partner App, installed, upgraded to 0.2.0 and removed on a running Standard bundle, with every
     Space's config byte-identical before and after.
+
+**PA-7a as built (2026-11-11).** Guide: [`okf/product/layer/platform/admin-guide-entitlements.md`](../okf/product/layer/platform/admin-guide-entitlements.md).
+- **The file lists modules, so the server needs no Add-on map.** `tools/entitle.mjs issue` resolves the Product,
+  Edition, Apps and Add-ons (grown by their closure) and writes the optional modules the customer may run: the
+  Edition's own platform (modules no Add-on owns) plus each entitled Add-on's modules, as `customer-build` keeps them.
+  The server then decides by each module manifest's `offeringRole` and id: base and internal modules always run, and
+  an optional or provider module runs only when listed.
+- **The server side.** `com.gamma.module.Entitlements` lives in `inspecto-util`, beside the manifests, which `etl`, `engine` and
+  control all read.
+  - It verifies Ed25519 with the JDK alone, against `META-INF/inspecto/entitlement-keys.properties` in the core jar
+    (`keyId=base64 SPKI`; a classloader cannot list a folder in a jar).
+  - It caches the file once per boot.
+  - Enforcement points:
+    - route dispatch (`requireModuleEnabled`: 503 naming the entitlement);
+    - `EditionFeatures.present`, `lockedReason` and `holdsInvestigationsAddon` (the file decides once installed);
+    - `JobService` (an unentitled Job type is not registered);
+    - `ModuleActivator` (a third INERT reason, so dependants and Apps follow);
+    - `/bootstrap` (`features`, and `entitlement` for `canAdminister`).
+  - `ControlApi` refuses the boot, before binding a port, for a file that does not verify or that names another Product
+    or Edition. A Preview build reports Advanced.
+- **The issuer key** is `inspecto-issuer-1`. Its private half is in the shared checkout's gitignored
+  `product-map/private/keys/`, and its public half is committed.
+- **Deliberately not done.**
+  - The other extension points (Consequences, step kinds, Collector connectors, maintenance tasks, boot hooks):
+    `ENTITLEMENT-SPI-NARROWING-1`, held for demand.
+  - Expiry behaviour, renewal without a restart and the Home notice: PA-7b.
+
+**Proof (as built).**
+- `EntitlementsTest` 6/6: a file signed by `entitle.mjs` verifies in Java byte for byte; a changed byte, an unknown key,
+  another schema and a bad signature are refused; no file means everything is entitled; roles; the INERT reason and its
+  dependants; the core jar carries `inspecto-issuer-1`.
+- `ControlApiEntitlementTest` 6/6, over real HTTP on Basic:
+  - left out: `/screening/check` answers 503 naming the entitlement, `/modules` shows screening INERT, and
+    `/bootstrap.entitlement` holds the summary;
+  - listed (with the modules it requires): it reaches the module, ACTIVE;
+  - no file: today's behaviour and `{installed: false}`;
+  - a tampered file, an unknown key id or a missing signature fail the boot, naming the file;
+  - another Edition fails the boot;
+  - the screening Job type registers with no file and when listed, and not when left out.
+- `tools/entitle.test.mjs` 6/6. `EditionFeaturesTest` 7/7.
+- **Gates.**
+  - One full Advanced run before the review fixes: 16,142 tests, 1 failure. That failure was
+    `ImportLoaderInventoryTest`, which needed `conf/entitlement.toon` added to `ALLOWED` (it lies outside every Space and
+    must be signed). The modules after `inspecto-processor` were skipped once it failed.
+  - The review then found `featureReasons` missing for left-out optional modules; it is now filled through
+    `Entitlements.unentitledFeatures()`.
+  - After the fixes, by operator call, **only targeted tests ran, not the full gate**. They passed:
+    - `EntitlementsTest`, `ModuleManifestsTest`, `EditionFeaturesTest`;
+    - `ApiContractTest`, `ContractFragmentsTest`, `OpenApiPathsContractTest`, `ModuleManifestGuardTest`;
+    - `ControlApiBootstrapProductTest`, `ImportLoaderInventoryTest`;
+    - `ControlApiEntitlementTest`, which now also asserts the reason.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 

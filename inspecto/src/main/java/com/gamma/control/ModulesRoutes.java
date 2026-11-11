@@ -135,8 +135,10 @@ final class ModulesRoutes implements RouteModule {
      */
     static Map<String, Object> build(ModuleManifests.Loaded loaded, Set<String> disabled, List<ModuleManifest> known) {
         List<ModuleManifest> absent = KnownModules.absent(known, loaded.manifests());
+        // PA-7a: a module the install's entitlement leaves out is INERT, naming why ("not in this installation's entitlement").
         List<ModuleStatus> statuses = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(),
-                absent.stream().map(ModuleManifest::id).collect(java.util.stream.Collectors.toSet()));
+                absent.stream().map(ModuleManifest::id).collect(java.util.stream.Collectors.toSet()),
+                com.gamma.module.Entitlements.unentitledModules(loaded.manifests()));
         List<Object> modules = new ArrayList<>();
         for (int i = 0; i < statuses.size(); i++) {
             ModuleManifest m = loaded.manifests().get(i);

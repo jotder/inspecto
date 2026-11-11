@@ -294,6 +294,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // checked FIRST, before a port is bound, so a refused boot leaves nothing open. Absent is fine (target/classes, pre-PA-3).
         try {
             ProductDescriptor.current();
+            checkEntitlement();
         } catch (IllegalStateException bad) {
             throw new IOException(bad.getMessage(), bad);
         }
@@ -1738,6 +1739,28 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * modules now discoverable from other jars (EDG-01 cell 3a) it is the failure most worth preventing.
      * Census before adding this: 0 duplicates among the 332 built-in registrations.
      */
+    /**
+     * PRODUCT-ASSEMBLY-1 PA-7a (D-PA22): an entitlement file that does not verify fails the boot, naming the file
+     * ({@link com.gamma.module.Entitlements.Invalid}); so does a verified one issued for another Product or Edition than
+     * this build. No file is today's behaviour (D-PA23).
+     */
+    static void checkEntitlement() {
+        java.util.Optional<com.gamma.module.Entitlement> e = com.gamma.module.Entitlements.current();
+        if (e.isEmpty()) return;
+        com.gamma.module.Entitlement en = e.get();
+        java.util.Optional<ProductDescriptor> product = ProductDescriptor.current();
+        if (product.isPresent() && !product.get().id().equals(en.product()))
+            throw new IllegalStateException(en.file() + ": entitlement '" + en.id() + "' is for Product '" + en.product()
+                    + "', but this build is Product '" + product.get().id() + "'");
+        String built = BootstrapRoutes.edition();
+        String wanted = "preview".equals(en.edition()) ? "advanced" : en.edition();   // a Preview bundle reports Advanced
+        if (!built.equals(wanted))
+            throw new IllegalStateException(en.file() + ": entitlement '" + en.id() + "' is for the " + en.edition()
+                    + " Edition, but this build is " + built);
+        log.info("entitlement {} for {} verified (key {}): {} Add-on(s), {} optional module(s), expires {}", en.id(), en.customer(),
+                en.keyId(), en.addons().size(), en.modules().size(), en.expires() == null ? "never" : en.expires());
+    }
+
     /** Absent-module stubs (ApiContext.stub) — in the route table, but NOT counted by hasRoute. */
     private final java.util.Set<String> stubbedRoutes = new java.util.HashSet<>();
 
@@ -1755,6 +1778,11 @@ public final class ControlApi implements AutoCloseable, HostContext {
         for (String f : r.features())
             if (com.gamma.etl.EditionFeatures.gatesRoutes(f) && !com.gamma.etl.EditionFeatures.present(f))
                 throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, com.gamma.etl.EditionFeatures.refusal(f));
+        // PRODUCT-ASSEMBLY-1 PA-7a: installed, but the install's entitlement leaves out every module that provides the feature.
+        for (String f : r.features())
+            if (!com.gamma.module.Entitlements.featureEntitled(f))
+                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "the '" + f + "' module is "
+                        + com.gamma.module.Entitlements.NOT_ENTITLED + " (an administrator installs a new entitlement to add it)");
         java.util.Set<String> off = disabledFeatures();
         if (off.isEmpty()) return;
         for (String f : r.features())

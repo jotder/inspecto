@@ -60,7 +60,8 @@ final class BootstrapRoutes implements RouteModule {
             ModuleManifests.Loaded loaded = ModuleManifests.load(cl, BootstrapRoutes.class);
             Set<String> absent = KnownModules.absent(KnownModules.load(cl).manifests(), loaded.manifests()).stream()
                     .map(ModuleManifest::id).collect(Collectors.toSet());
-            Set<String> on = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(), absent).stream()
+            Set<String> on = ModuleActivator.resolve(loaded.manifests(), loaded.hostBuildId(), absent,
+                            com.gamma.module.Entitlements.unentitledModules(loaded.manifests())).stream()
                     .filter(s -> s.state() == ModuleStatus.State.ACTIVE).map(ModuleStatus::id).collect(Collectors.toSet());
             Map<String, List<String>> m = new LinkedHashMap<>();
             for (ModuleManifest mm : loaded.manifests()) if (on.contains(mm.id())) m.put(mm.id(), List.copyOf(mm.provides().features()));
@@ -137,6 +138,11 @@ final class BootstrapRoutes implements RouteModule {
             // PA-3: the Product's Apps and the nav this caller sees, inventory like the Space roster. Gates: the App's modules ACTIVE
             // (Installed) and not switched off in this Space (Enabled), the entry's feature true in THIS response's features, and the
             // caller's capability where an Authenticator is active (Permitted) - GLOSSARY.md §15's three gates, plus the Product.
+            // PRODUCT-ASSEMBLY-1 PA-7a (D-PA23): the install's entitlement, for an administrator only (who it is for, what it allows,
+            // days left), or {installed: false} - no file is today's behaviour, and Home says so. Basic has no sign-in: everyone is.
+            if (ApiContext.subject(ex).map(s -> s.capabilities().contains(com.gamma.access.Roles.CAN_ADMINISTER)).orElse(true))
+                data.put("entitlement", com.gamma.module.Entitlements.current()
+                        .map(en -> en.summary(java.time.LocalDate.now())).orElse(Map.of("installed", false)));
             if (productOut != null)
                 productOut.putAll(product.get().resolve(activeModules().keySet(), enabledModules(api.disabledFeatures()), features,
                         ApiContext.subject(ex).map(Subject::capabilities).orElse(Set.of()), Authenticators.active().isPresent()));
@@ -172,6 +178,8 @@ final class BootstrapRoutes implements RouteModule {
         // LA-EDITIONS-1 phase 3: AND included in this edition - a route feature the edition withholds (EditionFeatures.gatesRoutes,
         // the Link Analysis Investigation surface on Basic) is registered but answers 503, so it is reported false.
         on.removeIf(id -> com.gamma.etl.EditionFeatures.gatesRoutes(id) && !com.gamma.etl.EditionFeatures.present(id));
+        // PRODUCT-ASSEMBLY-1 PA-7a: AND entitled - a feature only modules the install's entitlement leaves out provide answers 503.
+        on.removeIf(id -> !com.gamma.module.Entitlements.featureEntitled(id));
         f.put("exchange", HostContext.of(api).spaces().containerRoot() != null && on.contains("exchange"));
         // EDITIONS CP-09 (EDG-01 cell 3b): true only when the optional inspecto-geo-link module actually
         // registered its routes — derived, never an edition guess. The SPA hides the two nav entries and

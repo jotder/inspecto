@@ -746,6 +746,12 @@ public final class JobService implements AutoCloseable {
         // none in the base build; a provider whose id collides with a built-in (registered first) is
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
         for (JobTypeProvider provider : ServiceLoader.load(JobTypeProvider.class)) {
+            // PRODUCT-ASSEMBLY-1 PA-7a: a Job type only modules the install's entitlement leaves out provide is not registered,
+            // so a Job of that type is refused as an unknown type, exactly as when its module is absent.
+            if (!com.gamma.module.Entitlements.jobTypeEntitled(provider.id())) {
+                log.info("job type {} not registered: {}", provider.id(), com.gamma.module.Entitlements.NOT_ENTITLED);
+                continue;
+            }
             try {
                 registry.registerClasspath(provider);
             } catch (RuntimeException e) {

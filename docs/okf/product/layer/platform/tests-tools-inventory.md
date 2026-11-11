@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-97 test file(s). Run one, or all:
+98 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -50,6 +50,7 @@ node --test tools/
 | `tools/compose-space.test.mjs` | Tests for tools/compose-space.mjs - PRODUCT-ASSEMBLY-1 PA-5 (D-PA14). Run: node --test tools/compose-space.test.mjs |
 | `tools/customer-build.test.mjs` | Fixture test for tools/customer-build.mjs. Run: node --test tools/customer-build.test.mjs |
 | `tools/dev-doctor.test.mjs` | Fixture test for tools/dev-doctor.mjs. Run: node --test tools/dev-doctor.test.mjs |
+| `tools/entitle.test.mjs` | tools/entitle.mjs - signed entitlements (PRODUCT-ASSEMBLY-1 PA-7a). |
 | `tools/fetch-duckdb-extensions.test.mjs` | Offline tests for tools/fetch-duckdb-extensions.mjs's --only / --platform selection (D-8, 2026-09-26). |
 | `tools/gen-la-audit-data.test.mjs` | Determinism of tools/gen-la-audit-data.py. Run: node --test tools/gen-la-audit-data.test.mjs |
 | `tools/gen-la-benefits-data.test.mjs` | Determinism and planted facts of tools/gen-la-benefits-data.py. Run: node --test tools/gen-la-benefits-data.test.mjs |

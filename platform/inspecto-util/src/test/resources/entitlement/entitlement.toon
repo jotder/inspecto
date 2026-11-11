@@ -1,0 +1,14 @@
+schema: inspecto.entitlement/1
+id: fixture-2026-11-11
+customer: fixture
+title: Fixture Customer (synthetic)
+product: inspecto
+edition: standard
+apps[0]:
+addons[2]: incidents,screening
+modules[2]: ops,screening
+nodes: 3
+notBefore: 2026-11-11
+expires: 2027-11-10
+issued: 2026-11-11
+keyId: fixture-issuer
