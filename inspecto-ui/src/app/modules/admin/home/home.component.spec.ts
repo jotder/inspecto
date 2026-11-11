@@ -4,6 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter, Router } from '@angular/router';
 import {
     ApprovalsService,
+    EntitlementSummary,
     EventsService,
     ExpectationsService,
     JobsService,
@@ -32,6 +33,7 @@ interface Stubs {
     approvals?: unknown[];
     authMode?: 'none' | 'oidc';
     loopbackOnly?: boolean;
+    entitlement?: EntitlementSummary | null;
     actor?: string | null;
     actorName?: string | null;
     opsEnabled?: boolean;
@@ -86,6 +88,7 @@ function create(s: Stubs = {}) {
         actorName: signal(s.actorName ?? s.actor ?? null),
         authMode: signal(s.authMode ?? 'none'),
         loopbackOnly: signal(s.loopbackOnly ?? false),
+        entitlement: signal<EntitlementSummary | null>(s.entitlement ?? null),
         opsEnabled: signal(s.opsEnabled ?? false),
         eventsEnabled: signal(s.eventsEnabled ?? false),
         capabilities: signal(s.capabilities ?? []),
@@ -299,6 +302,19 @@ describe('HomeComponent', () => {
     it('warns about the open listen address only where there is no authenticator', () => {
         expect(create({ runs: [RUN()], authMode: 'none' }).el.textContent).toContain('every network interface');
         expect(create({ runs: [RUN()], authMode: 'oidc' }).el.textContent).not.toContain('every network interface');
+    });
+
+    // PRODUCT-ASSEMBLY-1 PA-7b (D-PA23): an administrator is told when no entitlement is installed; nobody else, and not once one is.
+    it('tells an administrator, and only an administrator, that no entitlement is installed', () => {
+        const none = { installed: false, state: 'none' as const };
+        expect(create({ runs: [RUN()], entitlement: { ...none, forAdministrator: true } }).el.textContent).toContain(
+            'No entitlement installed',
+        );
+        expect(create({ runs: [RUN()], entitlement: none }).el.textContent).not.toContain('No entitlement installed');
+        expect(
+            create({ runs: [RUN()], entitlement: { installed: true, state: 'ok', forAdministrator: true } }).el
+                .textContent,
+        ).not.toContain('No entitlement installed');
     });
 
     // UIE-9: the notice follows the real bind — a loopback-only listener is not exposed, so it must not claim to be.

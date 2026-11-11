@@ -41,7 +41,10 @@ import java.util.TreeMap;
  *       and so are the features and Job types only such modules provide. Base and internal modules always are.</li>
  * </ul>
  *
- * <p>Read once and cached; PA-7b adds renewal without a restart. Expiry is carried and reported here; what it does is PA-7b.
+ * <p>PA-7b (D-PA24): {@link #state()} is OK / EXPIRING ({@value #WARN_DAYS} days left) / GRACE ({@value #GRACE_DAYS} days
+ * past expiry, warnings only) / READ_ONLY (after the grace, or a trial build without its file). Read-only is enforced by the
+ * control plane's dispatch (423), the Pipeline scheduler and {@code JobService}. A renewed file is picked up without a
+ * restart ({@link #current()}).
  */
 public final class Entitlements {
 
@@ -54,12 +57,41 @@ public final class Entitlements {
     /** The words a refusal and {@code /bootstrap.featureReasons} use for a feature the entitlement leaves out. */
     public static final String NOT_ENTITLED = "not in this installation's entitlement";
 
+    /** PA-7b (D-PA24): the days after expiry that only warn; read-only starts the day after the last of them. */
+    public static final int GRACE_DAYS = 14;
+    /** PA-7b: an administrator is warned this many days before expiry. */
+    public static final int WARN_DAYS = 30;
+    /** PA-7b: how often a running server looks for a renewed file (a stat of two files, never a re-verify unless changed). */
+    static final long RELOAD_CHECK_MS = 5_000;
+
+    /** What the entitlement allows today (PA-7b, D-PA24). */
+    public enum State {
+        /** No file, in a build that does not need one (D-PA23: today's behaviour). */
+        NONE,
+        /** Valid, and not near its expiry (or no expiry). */
+        OK,
+        /** Valid, {@value #WARN_DAYS} days or fewer left. */
+        EXPIRING,
+        /** Expired, within the {@value #GRACE_DAYS}-day grace: everything still runs, administrators are warned. */
+        GRACE,
+        /** Past the grace, or a trial build without its file: reads only. */
+        READ_ONLY
+    }
+
     private static final Set<String> ALWAYS = Set.of("base", "internal");
 
     /** null = not read yet; empty = no file. */
     private static volatile Optional<Entitlement> current;
     private static volatile Map<String, PublicKey> trustOverride;
     private static volatile List<ModuleManifest> manifests;
+    private static volatile java.time.Clock clock = java.time.Clock.systemDefaultZone();
+    /** The two files' size + mtime when last read, and when they were last looked at. */
+    private static volatile String stamp = "";
+    private static volatile long checkedAt;
+    /** Why a replacement file was not taken (the last verified one keeps running), or null. */
+    private static volatile String problem;
+    /** Why this build needs a file (a trial Distribution), or null. Set once at boot by the control plane. */
+    private static volatile String requiredBecause;
 
     private Entitlements() {}
 
@@ -68,16 +100,140 @@ public final class Entitlements {
         public Invalid(String message) { super(message); }
     }
 
-    /** The install's entitlement, verified, or empty when there is no file. Throws {@link Invalid} for a file that does not verify. */
+    /**
+     * The install's entitlement, verified, or empty when there is no file. Throws {@link Invalid} for a file that does not
+     * verify on the FIRST read (the boot). Afterwards (PA-7b) a changed file is picked up within {@link #RELOAD_CHECK_MS}
+     * without a restart: a replacement that verifies takes over; one that does not, or a removed file, leaves the last
+     * verified entitlement in force and names the {@link #problem()} - a running server never drops to "no file".
+     */
     public static Optional<Entitlement> current() {
         Optional<Entitlement> c = current;
         if (c == null) {
             synchronized (Entitlements.class) {
                 c = current;
-                if (c == null) current = c = read(file());
+                if (c == null) {
+                    Path f = file();
+                    c = read(f);
+                    stamp = stampOf(f);
+                    checkedAt = System.currentTimeMillis();
+                    current = c;
+                }
+            }
+            return c;
+        }
+        long now = System.currentTimeMillis();
+        if (now - checkedAt >= RELOAD_CHECK_MS) refresh(now);
+        Optional<Entitlement> r = current;
+        return r != null ? r : current();   // expectBuild cleared it meanwhile: read it again
+    }
+
+    private static synchronized void refresh(long now) {
+        if (now - checkedAt < RELOAD_CHECK_MS) return;
+        checkedAt = now;
+        Path f = file();
+        String s = stampOf(f);
+        if (s.equals(stamp)) return;
+        stamp = s;
+        Optional<Entitlement> before = current;
+        try {
+            Optional<Entitlement> next = read(f);
+            if (next.isEmpty() && before != null && before.isPresent()) {
+                problem = f + " was removed; the entitlement read earlier stays in force until the server restarts";
+                return;
+            }
+            current = next;
+            problem = null;
+            org.slf4j.LoggerFactory.getLogger(Entitlements.class).info("entitlement reloaded from {}: {}", f,
+                    next.map(e -> e.id() + ", expires " + (e.expires() == null ? "never" : e.expires())).orElse("none"));
+        } catch (Invalid bad) {
+            problem = bad.getMessage() + " - the entitlement read earlier stays in force";
+            org.slf4j.LoggerFactory.getLogger(Entitlements.class).error("entitlement not reloaded: {}", problem);
+        }
+    }
+
+    private static String stampOf(Path file) {
+        StringBuilder b = new StringBuilder();
+        for (Path p : List.of(file, signatureOf(file))) {
+            try {
+                b.append(Files.size(p)).append('@').append(Files.getLastModifiedTime(p).toMillis()).append(';');
+            } catch (IOException absent) {
+                b.append("-;");
             }
         }
-        return c;
+        return b.toString();
+    }
+
+    /** Why a renewed file was not taken (the last verified one is still in force), or null. */
+    public static String problem() { return problem; }
+
+    /** Today, by the server's clock (a test pins it with {@link #clockForTests}). */
+    public static LocalDate today() { return LocalDate.now(clock); }
+
+    /** A trial build needs its file: without one it runs read-only, naming {@code why}. Called once at boot. */
+    public static void requireFile(String why) { requiredBecause = why; }
+
+    /** The Product (null when the build carries no descriptor) and Edition this build is; every read refuses a file for others. */
+    private static volatile String buildProduct;
+    private static volatile String buildEdition;
+
+    /**
+     * Called once at boot by the control plane, BEFORE the first {@link #current()}: a file issued for another Product or Edition
+     * is then {@link Invalid} - at boot (the boot fails) and on a renewal (the last verified file stays in force).
+     */
+    public static synchronized void expectBuild(String product, String edition) {
+        buildProduct = product;
+        buildEdition = edition;
+        current = null;   // an engine service may have read it already: read it again under the expectation
+    }
+
+    /** The state today. */
+    public static State state() {
+        Optional<Entitlement> e = current();
+        if (e.isEmpty()) return requiredBecause == null ? State.NONE : State.READ_ONLY;
+        LocalDate exp = e.get().expires();
+        if (exp == null) return State.OK;
+        LocalDate t = today();
+        if (!t.isAfter(exp)) return t.plusDays(WARN_DAYS).isBefore(exp) ? State.OK : State.EXPIRING;
+        return t.isAfter(exp.plusDays(GRACE_DAYS)) ? State.READ_ONLY : State.GRACE;
+    }
+
+    /** True when only reads are allowed (D-PA24): ingest, Jobs, Pipeline runs and config saves are refused. */
+    public static boolean readOnly() { return state() == State.READ_ONLY; }
+
+    /** The first day the install is read-only (the day after the grace), or null when it never expires / has no file. */
+    public static LocalDate readOnlyFrom() {
+        return current().map(Entitlement::expires).map(x -> x.plusDays(GRACE_DAYS + 1L)).orElse(null);
+    }
+
+    /** One line saying why the install is read-only, or null when it is not. */
+    public static String readOnlyReason() {
+        if (!readOnly()) return null;
+        Optional<Entitlement> e = current();
+        if (e.isEmpty()) return "this " + requiredBecause;
+        return "this installation's entitlement expired on " + e.get().expires() + " and its " + GRACE_DAYS
+                + "-day grace ended - install a renewed entitlement (conf/entitlement.toon and .sig) to resume; reads continue";
+    }
+
+    /** What every signed-in caller may see: the state and, when it applies, when or why reads only. */
+    public static Map<String, Object> publicSummary() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        State s = state();
+        m.put("installed", current().isPresent());
+        m.put("state", s.name().toLowerCase(java.util.Locale.ROOT).replace("_", "-"));
+        LocalDate from = readOnlyFrom();
+        if (from != null && s != State.OK) m.put("readOnlyFrom", from.toString());
+        String why = readOnlyReason();
+        if (why != null) m.put("reason", why);
+        return m;
+    }
+
+    /** The administrator's summary: {@link #publicSummary} plus the file's own fields and any reload {@link #problem}. */
+    public static Map<String, Object> adminSummary() {
+        Map<String, Object> m = new LinkedHashMap<>(current().map(e -> e.summary(today())).orElse(Map.of()));
+        m.putAll(publicSummary());
+        if (problem != null) m.put("problem", problem);
+        m.put("forAdministrator", true);   // the shell warns an administrator only (D-PA23 Home line, expiring, grace)
+        return m;
     }
 
     /** The entitlement file this install reads. */
@@ -97,7 +253,16 @@ public final class Entitlements {
         Path sig = signatureOf(file);
         try {
             if (!Files.exists(sig)) throw new Invalid(file + ": an entitlement needs its signature " + sig.getFileName() + " beside it");
-            return Optional.of(verify(Files.readAllBytes(file), Files.readString(sig, StandardCharsets.US_ASCII), trustedKeys(), file));
+            Entitlement e = verify(Files.readAllBytes(file), Files.readString(sig, StandardCharsets.US_ASCII), trustedKeys(), file);
+            if (today().isBefore(e.notBefore()))
+                throw new Invalid(file + ": entitlement '" + e.id() + "' is not valid before " + e.notBefore());
+            String p = buildProduct, ed = buildEdition;
+            if (p != null && !p.equals(e.product()))
+                throw new Invalid(file + ": entitlement '" + e.id() + "' is for Product '" + e.product() + "', but this build is Product '" + p + "'");
+            String wanted = "preview".equals(e.edition()) ? "advanced" : e.edition();   // a Preview bundle reports Advanced
+            if (ed != null && !ed.equals(wanted))
+                throw new Invalid(file + ": entitlement '" + e.id() + "' is for the " + e.edition() + " Edition, but this build is " + ed);
+            return Optional.of(e);
         } catch (IOException e) {
             throw new Invalid(file + ": cannot be read (" + e.getMessage() + ")");
         }
@@ -221,6 +386,22 @@ public final class Entitlements {
     /** Test seam: read the file again on the next call. */
     public static void reset() {
         current = null;
+        stamp = "";
+        checkedAt = 0;
+        problem = null;
+        requiredBecause = null;
+        buildProduct = null;
+        buildEdition = null;
+    }
+
+    /** Test seam: the server's clock (null restores the system clock). Never a system property: a customer could pin it. */
+    public static void clockForTests(java.time.Clock c) {
+        clock = c == null ? java.time.Clock.systemDefaultZone() : c;
+    }
+
+    /** Test seam: look for a renewed file on the next call instead of waiting {@link #RELOAD_CHECK_MS}. */
+    public static void recheckNow() {
+        checkedAt = 0;
     }
 
     private static String required(Map<String, Object> m, String key, Path file) {

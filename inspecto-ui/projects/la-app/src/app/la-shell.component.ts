@@ -20,6 +20,7 @@ import { filter, map } from 'rxjs';
 import { SpaceSwitcherComponent } from 'app/layout/common/space-switcher/space-switcher.component';
 import { UserComponent } from 'app/layout/common/user/user.component';
 import { ConnectivityBannerComponent } from '@inspecto/core/components/connectivity-banner.component';
+import { EntitlementBannerComponent } from '@inspecto/core/components/entitlement-banner.component';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
@@ -80,6 +81,7 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ConnectivityBannerComponent,
+        EntitlementBannerComponent,
         InspectoSplitDirective,
         MatIconModule,
         MatMenuModule,
@@ -202,6 +204,7 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
         ></div>
         <div class="flex min-h-0 min-w-0 flex-1 flex-col">
             <inspecto-connectivity-banner></inspecto-connectivity-banner>
+            <inspecto-entitlement-banner></inspecto-entitlement-banner>
             <main class="flex min-h-0 flex-1 flex-col">
                 <router-outlet></router-outlet>
             </main>

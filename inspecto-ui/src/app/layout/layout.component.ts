@@ -16,6 +16,7 @@ import { GammaPlatformService } from '@gamma/services/platform';
 import { Subject, combineLatest, filter, map, takeUntil } from 'rxjs';
 // import { SettingsComponent } from './common/settings/settings.component';
 import { ConnectivityBannerComponent } from 'app/inspecto/components/connectivity-banner.component';
+import { EntitlementBannerComponent } from 'app/inspecto/components/entitlement-banner.component';
 import { EmptyLayoutComponent } from './layouts/empty/empty.component';
 import { ClassicLayoutComponent } from './layouts/vertical/classic/classic.component';
 import { DenseLayoutComponent } from './layouts/vertical/dense/dense.component';
@@ -28,6 +29,7 @@ import { DenseLayoutComponent } from './layouts/vertical/dense/dense.component';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ConnectivityBannerComponent,
+        EntitlementBannerComponent,
         EmptyLayoutComponent,
         ClassicLayoutComponent,
         DenseLayoutComponent,

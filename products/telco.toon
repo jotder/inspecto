@@ -10,7 +10,7 @@ apps:
   optional[2]: telco-fraud,link-analysis
 templates[0]:
 space: telco
-distributions[2]: production,demo
+distributions[3]: production,trial,demo
 demoSpace: telco
 brand:
   name: Inspecto Telco

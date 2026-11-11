@@ -1089,6 +1089,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             }
             authorize(ex, method, path);
             requireModuleEnabled(r);   // after authenticate + authorize, so a refused caller learns nothing about the Space
+            requireWritable(method, r);   // PA-7b: an expired entitlement past its grace leaves reads only
             if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
             try {
                 Object result = r.handler.handle(ex, m);
@@ -1745,20 +1746,42 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * this build. No file is today's behaviour (D-PA23).
      */
     static void checkEntitlement() {
-        java.util.Optional<com.gamma.module.Entitlement> e = com.gamma.module.Entitlements.current();
-        if (e.isEmpty()) return;
-        com.gamma.module.Entitlement en = e.get();
         java.util.Optional<ProductDescriptor> product = ProductDescriptor.current();
-        if (product.isPresent() && !product.get().id().equals(en.product()))
-            throw new IllegalStateException(en.file() + ": entitlement '" + en.id() + "' is for Product '" + en.product()
-                    + "', but this build is Product '" + product.get().id() + "'");
-        String built = BootstrapRoutes.edition();
-        String wanted = "preview".equals(en.edition()) ? "advanced" : en.edition();   // a Preview bundle reports Advanced
-        if (!built.equals(wanted))
-            throw new IllegalStateException(en.file() + ": entitlement '" + en.id() + "' is for the " + en.edition()
-                    + " Edition, but this build is " + built);
+        // PA-7b: a trial build needs its entitlement - without one it runs read-only (D-PA23 keeps "no file" open elsewhere).
+        if (product.isPresent() && "trial".equals(product.get().distribution()))
+            com.gamma.module.Entitlements.requireFile("trial build has no entitlement (conf/entitlement.toon) - reads continue");
+        // PA-7b: the Product and Edition check lives in Entitlements' every read, so a renewal for another build is refused too.
+        com.gamma.module.Entitlements.expectBuild(product.map(ProductDescriptor::id).orElse(null), BootstrapRoutes.edition());
+        java.util.Optional<com.gamma.module.Entitlement> e = com.gamma.module.Entitlements.current();
+        if (e.isEmpty()) {
+            if (com.gamma.module.Entitlements.readOnly()) log.warn("read-only: {}", com.gamma.module.Entitlements.readOnlyReason());
+            return;
+        }
+        com.gamma.module.Entitlement en = e.get();
         log.info("entitlement {} for {} verified (key {}): {} Add-on(s), {} optional module(s), expires {}", en.id(), en.customer(),
                 en.keyId(), en.addons().size(), en.modules().size(), en.expires() == null ? "never" : en.expires());
+    }
+
+    /**
+     * The mutating routes that stay open while the install is read-only (PA-7b, D-PA24 "reads, dashboards and exports keep
+     * working"): the capability manifest's own exemption categories for requests that read or sign in, never a list kept
+     * here - {@code read-shaped} (a Measure query, a search), {@code group-gated} (an operational-store read),
+     * {@code stateless-compute}, {@code identity-flow} (sign-in and sign-out) and {@code self-verifying-public}: a shared
+     * dashboard's query (D-PA24 keeps dashboards), and a provider's delivery-status callback, which only records the outcome
+     * of a message already sent.
+     */
+    static final java.util.Set<String> READ_ONLY_OPEN = java.util.Set.of("read-shaped", "group-gated", "stateless-compute", "identity-flow",
+            "self-verifying-public");
+
+    /** PA-7b: refuse a write with 423 while the install is read-only; GET and HEAD, and {@link #READ_ONLY_OPEN} routes, pass. */
+    private static void requireWritable(String method, Route r) {
+        if ("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method)) return;
+        if (!com.gamma.module.Entitlements.readOnly()) return;
+        String p = r.pattern().pattern();
+        String registered = p.startsWith("^") && p.endsWith("$") ? p.substring(1, p.length() - 1) : p;
+        CapabilityManifest.Exemption ex = CapabilityManifest.exemptionFor(method, registered);
+        if (ex != null && READ_ONLY_OPEN.contains(ex.category())) return;
+        throw new ApiException(423, ErrorCodes.ENTITLEMENT_READ_ONLY, "read-only: " + com.gamma.module.Entitlements.readOnlyReason());
     }
 
     /** Absent-module stubs (ApiContext.stub) — in the route table, but NOT counted by hasRoute. */

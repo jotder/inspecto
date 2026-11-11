@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-387 test class(es): 387 unit, 0 real-HTTP control-plane, 0 IT.
+388 test class(es): 388 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -193,6 +193,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobRunLedgerAuditSignalTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerAuditSignalTest.java` | {@code JOBRUN-STORE-SWALLOWED-WRITES-1}: a failed append to {@code jobs_runs.csv} loses the durable record |
 | `JobRunLedgerStreamedReadTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerStreamedReadTest.java` | {@code AUDIT-LOG-UNBOUNDED-READ-1}: the three read-backs of {@code jobs_runs.csv} stream the file instead of |
 | `JobServiceOrphanAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceOrphanAuditTest.java` | The default-on orphan {@code output_store:} audit ({@link JobService#auditOrphanOutputStores()}) — |
+| `JobServiceReadOnlyTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceReadOnlyTest.java` | PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): a read-only install runs no Job - the fire is recorded SKIPPED with the reason - and runs |
 | `JobServiceRetryAlarmTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceRetryAlarmTest.java` | D8: transient failures retry, permanent ones do not, and a final failure raises the alarm. |
 | `JobServiceSharedPipelineAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceSharedPipelineAuditTest.java` | The default-on shared-pipeline audit ({@link JobService#auditSharedPipelines()}) — |
 | `JobServiceTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceTest.java` | Tests for the {@link JobService} registry/scheduler: manual / cron / event triggers, |

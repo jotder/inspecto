@@ -59,6 +59,7 @@ describe('la-app shell and landing page', () => {
                         actor: signal(null),
                         features: signal(features),
                         product: signal(product),
+                        entitlement: signal(null),
                     },
                 },
                 // A set-up install (Space, data, columns, a graph): the landing page shows its area cards, no guide.

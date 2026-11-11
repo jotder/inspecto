@@ -77,6 +77,30 @@ interface Bootstrap {
     /** PRODUCT-ASSEMBLY-1 PA-3: the Product this server was built as; null from a server without a descriptor. */
     product?: BootstrapProduct | null;
     auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[]; spacesAttached?: number };
+    /** PRODUCT-ASSEMBLY-1 PA-7a/7b: the install's entitlement (every signed-in caller sees the state; an administrator more). */
+    entitlement?: EntitlementSummary;
+}
+
+/** The entitlement's state today (PA-7b, D-PA24): none · ok · expiring · grace (expired, warnings only) · read-only. */
+export type EntitlementState = 'none' | 'ok' | 'expiring' | 'grace' | 'read-only';
+
+/**
+ * `/bootstrap.entitlement`. Every signed-in caller gets `installed`, `state`, `readOnlyFrom` and `reason`; an administrator
+ * (or everyone on Basic) also gets who it is for (`customer`, `title`), `expires`, `daysLeft` and a renewal `problem`.
+ */
+export interface EntitlementSummary {
+    installed: boolean;
+    state: EntitlementState;
+    readOnlyFrom?: string;
+    reason?: string;
+    id?: string;
+    customer?: string;
+    title?: string;
+    expires?: string | null;
+    daysLeft?: number | null;
+    problem?: string;
+    /** True in the administrator's summary: the shell warns only an administrator (expiring, grace, no file on Home). */
+    forAdministrator?: boolean;
 }
 
 const VERIFIER_KEY = 'inspecto.pkce.verifier';
@@ -359,8 +383,15 @@ export class SessionService {
         if (boot.product !== undefined) this.product.set(boot.product);
     }
 
+    /**
+     * PA-7b: the install's entitlement from the last bootstrap, or null from a server that reports none (pre-PA-7a, or a
+     * caller before sign-in). The shell's entitlement banner reads it; `state === 'read-only'` means writes answer 423.
+     */
+    readonly entitlement = signal<EntitlementSummary | null>(null);
+
     /** `laLevel` and `featureReasons` from a bootstrap (a server without them reads as the Explorer, no reasons). */
     private applyLevel(boot: Bootstrap): void {
+        this.entitlement.set(boot.entitlement && typeof boot.entitlement.state === 'string' ? boot.entitlement : null);
         this.laLevel.set(boot.laLevel === 'investigations' ? 'investigations' : 'explorer');
         const reasons = boot.featureReasons ?? {};
         this.featureReasons.set(

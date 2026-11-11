@@ -93,7 +93,7 @@ param(
     # spaces/_templates, its `demo` is the demo sign-in swap, and its `seedSpace` the Space a demo bundle ships pre-seeded.
     # The IAM client id the chosen SPA signs in with is a DEPLOYMENT setting (AUTH_OIDC_CLIENT_ID), not decided here.
     [string]$Product = 'inspecto',
-    # How the build ships: 'production' (the default) or 'demo'. DEMO-AUTH-1: a demo build is an OFFLINE DEMO BUILD, never an
+    # How the build ships: 'production' (the default), 'trial' (production + a signed, expiring -EntitlementFile; PA-7b) or 'demo'. DEMO-AUTH-1: a demo build is an OFFLINE DEMO BUILD, never an
     # edition, for Advanced or Preview only; it swaps inspecto-oidc.jar for inspecto-demo-auth.jar (the Demo User sign-in), assembles
     # into inspecto-demo/ (NOT inspecto-deploy/, which other launch configs run from), writes serve-demo.bat / serve-demo.sh bound to
     # 127.0.0.1, removes serve.* and the service installers (without the security jar they would boot an auth-free server on every
@@ -109,6 +109,9 @@ param(
     # PRODUCT-ASSEMBLY-1 PA-6c: a picked Platform product (tools/pick-addons.mjs; product-map/private/products/<id>.toon), built in
     # place of the Platform product it narrows. Passed to the assembler as --product-file; -Product is then that file's id.
     [string]$ProductFile = '',
+    # PRODUCT-ASSEMBLY-1 PA-7b: a signed entitlement (tools/entitle.mjs issue) staged into the bundle's conf/ with its .sig beside it.
+    # REQUIRED for -Distribution trial, which also needs it to carry an expiry (D-PA24); refused for demo (Demo Users, no customer).
+    [string]$EntitlementFile = '',
     # A demo build of a Product with a `demoSpace` ships that Space PRE-SEEDED (operator 2026-10-12; step 6f, package-demo-bake.ps1):
     # the staged bundle is booted against a scaffolded Space and seeded over HTTP before the zip. -NoBakeDemo skips that for a fast
     # local package (the bundle then ships no Space, as every other bundle does). Ignored when the plan names no seedSpace.
@@ -239,6 +242,8 @@ if ($duckdbExtCacheDir) {
 # tools/assemble.mjs resolves Product x Edition x Distribution (products/, apps/, offerings/, the module manifests) and REFUSES,
 # naming the reason, anything the Product does not offer: an edition it does not come in, a distribution not built yet, a demo on
 # an edition without the demo sign-in swap. Everything Product-specific below reads $plan; nothing here names a Product.
+# PA-7b: refused before any build runs, so a trial without its entitlement fails in seconds, not after the build.
+if ($Distribution -eq 'trial' -and -not $EntitlementFile) { throw "-Distribution trial needs -EntitlementFile <entitlement.toon> (issue one with tools/entitle.mjs issue ... --expires YYYY-MM-DD)" }
 $productArgs = @('--product', $Product)
 if ($ProductFile) {
     if ($PSBoundParameters.ContainsKey('Product')) { throw "Pass -Product or -ProductFile, not both" }
@@ -1350,6 +1355,29 @@ if ($LASTEXITCODE -ne 0) { throw "tools/offering-classpath.mjs failed - the stag
 # PRODUCT-ASSEMBLY-1 PA-3: the server reads lib/product.json (beside the jar that holds it) to answer GET /bootstrap with its Product,
 # Apps and nav. Byte-for-byte the assembler's file: one writer, so the bundle cannot carry a hand-edited variant.
 Copy-Item -LiteralPath $descriptorFile -Destination (Join-Path $libDir 'product.json') -Force
+
+# PRODUCT-ASSEMBLY-1 PA-7b: the trial Distribution carries the customer's signed entitlement (D-PA24). It is verified here against the
+# issuer keys the core jar carries, must be for THIS Product and Edition, and (trial) must expire - then staged as conf/entitlement.toon
+# + conf/entitlement.sig, where the server reads it (the launchers cd to the bundle root). A production build may carry one too.
+if ($EntitlementFile) {
+    if ($Distribution -eq 'demo') { throw "-EntitlementFile is for a customer's build; a demo build signs in Demo Users and carries none" }
+    $entFile = (Resolve-Path -LiteralPath $EntitlementFile).Path
+    $entSig = Join-Path (Split-Path $entFile -Parent) (([System.IO.Path]::GetFileNameWithoutExtension($entFile)) + '.sig')
+    if (-not (Test-Path -LiteralPath $entSig)) { throw "-EntitlementFile ${entFile}: its signature $entSig is not beside it" }
+    & node (Join-Path $sandboxRoot 'tools\entitle.mjs') verify --file $entFile
+    if ($LASTEXITCODE -ne 0) { throw "-EntitlementFile ${entFile} does not verify (see above)" }
+    $entText = Get-Content -Raw -LiteralPath $entFile
+    $entProduct = ([regex]::Match($entText, '(?m)^product:\s*(\S+)\s*$')).Groups[1].Value
+    $entEdition = ([regex]::Match($entText, '(?m)^edition:\s*(\S+)\s*$')).Groups[1].Value
+    if ($entProduct -ne [string]$plan.product.id) { throw "-EntitlementFile is for Product '$entProduct', but this build is '$($plan.product.id)'" }
+    if ($entEdition -ne ([string]$plan.edition).ToLowerInvariant()) { throw "-EntitlementFile is for the $entEdition Edition, but this build is $($plan.edition)" }
+    if ($Distribution -eq 'trial' -and -not ($entText -match '(?m)^expires:\s*\d{4}-\d{2}-\d{2}\s*$')) { throw "-Distribution trial needs an entitlement that expires (issue it with --expires YYYY-MM-DD)" }
+    $confDir = Join-Path $bundleDir 'conf'
+    New-Item -ItemType Directory -Force -Path $confDir | Out-Null
+    Copy-Item -LiteralPath $entFile -Destination (Join-Path $confDir 'entitlement.toon') -Force
+    Copy-Item -LiteralPath $entSig -Destination (Join-Path $confDir 'entitlement.sig') -Force
+    Write-Host "  entitlement staged: conf/entitlement.toon ($entProduct x $entEdition)" -ForegroundColor DarkGray
+}
 
 # P3f: every jar on modules.list has its own per-module SBOM (written by tools/sbom.mjs above); hashes match the staged jars and every
 # third-party component is also in the combined SBOM. Not a warning: a bundle whose per-jar bill of materials disagrees with the jars does not ship.

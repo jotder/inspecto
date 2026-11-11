@@ -138,11 +138,13 @@ final class BootstrapRoutes implements RouteModule {
             // PA-3: the Product's Apps and the nav this caller sees, inventory like the Space roster. Gates: the App's modules ACTIVE
             // (Installed) and not switched off in this Space (Enabled), the entry's feature true in THIS response's features, and the
             // caller's capability where an Authenticator is active (Permitted) - GLOSSARY.md §15's three gates, plus the Product.
-            // PRODUCT-ASSEMBLY-1 PA-7a (D-PA23): the install's entitlement, for an administrator only (who it is for, what it allows,
-            // days left), or {installed: false} - no file is today's behaviour, and Home says so. Basic has no sign-in: everyone is.
-            if (ApiContext.subject(ex).map(s -> s.capabilities().contains(com.gamma.access.Roles.CAN_ADMINISTER)).orElse(true))
-                data.put("entitlement", com.gamma.module.Entitlements.current()
-                        .map(en -> en.summary(java.time.LocalDate.now())).orElse(Map.of("installed", false)));
+            // PRODUCT-ASSEMBLY-1 PA-7a/7b (D-PA23, D-PA24): the install's entitlement. Every signed-in caller sees its state
+            // (none | ok | expiring | grace | read-only), when reads-only starts and why - the shell locks writes on read-only. An
+            // administrator also sees who it is for, what it allows, days left and any renewal problem. Basic has no sign-in:
+            // everyone is an administrator there.
+            data.put("entitlement",
+                    ApiContext.subject(ex).map(s -> s.capabilities().contains(com.gamma.access.Roles.CAN_ADMINISTER)).orElse(true)
+                            ? com.gamma.module.Entitlements.adminSummary() : com.gamma.module.Entitlements.publicSummary());
             if (productOut != null)
                 productOut.putAll(product.get().resolve(activeModules().keySet(), enabledModules(api.disabledFeatures()), features,
                         ApiContext.subject(ex).map(Subject::capabilities).orElse(Set.of()), Authenticators.active().isPresent()));

@@ -284,6 +284,8 @@ final class InboxWatch {
             Runnable hook = afterSettleCheckForTest;
             if (hook != null) hook.run();
             final Path data = dataRoot;
+            // PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): read-only imports nothing; the waiting files stay for the first writable poll.
+            if (com.gamma.module.Entitlements.readOnly()) return true;
             record(writeRoot, dataRoot, id, content.get("importPipeline"), () ->
                     OnboardImport.importWaiting(new OnboardImport.Space(writeRoot, data, service, "inbox-watch"), id, content, checked));
             seen = new HashMap<>();

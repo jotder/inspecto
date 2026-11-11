@@ -101,7 +101,7 @@ const REFUSED = {
     'an unknown Product': [{ product: 'nope', edition: 'basic' }, /unknown Product 'nope'/],
     'an edition the Product does not list': [{ product: 'la', edition: 'enterprise' }, /does not come in edition 'enterprise'/],
     'a demo on Basic': [{ product: 'la', edition: 'basic', distribution: 'demo' }, /demo distribution exists for advanced and preview only/],
-    'a planned distribution': [{ product: 'la', edition: 'advanced', distribution: 'trial' }, /'trial' is not built yet: PA-7/],
+    'a planned distribution': [{ product: 'la', edition: 'advanced', distribution: 'pilot' }, /'pilot' is not built yet: PA-10/],
     'a planned target': [{ product: 'la', edition: 'advanced', target: 'container' }, /target 'container' is not built yet: PA-8/],
     'an App the Product does not have': [{ product: 'la', edition: 'advanced', apps: ['telco-ra'] }, /App 'telco-ra' is not one of Product 'la''s Apps/],
 };

@@ -2004,6 +2004,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             String pipelineName, boolean skipPostAction, boolean dryRun,
             java.util.function.Consumer<List<com.gamma.inspector.DryRunRejects.MemberRejects>> dryRunRejects) {
         refuseIfTemplate(pipelineName);
+        // PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): the one funnel every real run passes - the scheduler, a watched inbox, a trigger.
+        // Read-only runs nothing that writes (a dry run writes nothing, so it still runs).
+        if (!dryRun && com.gamma.module.Entitlements.readOnly())
+            throw new IllegalStateException("read-only: " + com.gamma.module.Entitlements.readOnlyReason());
         return underSpace(() -> {
             // policy-narrowing-design S2b (D8): the Space's effective Safety Policy is resolved once, before the
             // run claims anything, and pinned for the run; an unreadable policy file refuses the run (it throws

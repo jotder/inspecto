@@ -20,8 +20,10 @@ import { readModuleSources } from './bundle-modules.mjs';
 
 export const SHAPES = ['domain', 'platform'];
 /** Distributions the assembler builds today, and the ones the plan names for later phases. */
-export const DISTRIBUTIONS = ['production', 'demo'];
-export const PLANNED_DISTRIBUTIONS = { trial: 'PA-7 (signed entitlements)', pilot: 'PA-7 (signed entitlements)' };
+export const DISTRIBUTIONS = ['production', 'trial', 'demo'];
+// PA-7b: `trial` is built (a production build carrying a signed entitlement with an expiry, D-PA24). `pilot` needs the customer
+// record (its Collectors pre-wired), so it waits for PA-10.
+export const PLANNED_DISTRIBUTIONS = { pilot: 'PA-10 (customer Collectors pre-wired, from the customer record)' };
 /** The editions a demo build exists for (tools/offering-classpath.mjs: the demo sign-in swap is an Advanced-capability build). */
 export const DEMO_EDITIONS = ['advanced', 'preview'];
 export const INDUSTRY_PACK_DIR = 'platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs';

@@ -1440,6 +1440,13 @@ public final class JobService implements AutoCloseable {
                            String causationId, int chainDepth, Firing firing, SignalLane lane) {
         Job job = jobs.get(name);
         if (job == null) { if (lane != null) lane.pending().decrementAndGet(); return; }
+        // PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): read-only (an entitlement past its grace, or a trial build without one) runs no
+        // Job - cron, signal, catch-up and manual alike. The fire is recorded SKIPPED with the reason, so the run history says why.
+        if (com.gamma.module.Entitlements.readOnly()) {
+            if (lane != null) lane.pending().decrementAndGet();
+            recordSkipped(name, trigger, "read-only: " + com.gamma.module.Entitlements.readOnlyReason());
+            return;
+        }
         String start = LocalDateTime.now().format(TS);
         liveRuns.put(runId, new JobRun(runId, name, job.type(), trigger, start, null, "RUNNING", 0L, null));
         // The default space runs with no MDC (it is the fallback namespace everywhere); a named space sets it so

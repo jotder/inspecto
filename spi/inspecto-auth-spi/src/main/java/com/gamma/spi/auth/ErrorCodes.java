@@ -40,6 +40,9 @@ public final class ErrorCodes {
     public static final String MODULE_DISABLED          = "MODULE_DISABLED";
     /** 422 — a Safety Policy file in scope exists but cannot be read as a valid policy; every gate and run in scope fails closed. */
     public static final String SAFETY_POLICY_UNREADABLE = "ERR_SAFETY_POLICY_UNREADABLE";
+    /** 423 — the install is read-only (PRODUCT-ASSEMBLY-1 PA-7b, D-PA24): its entitlement expired and the grace ended, or a
+     *  trial build has no entitlement. Reads continue; a renewed entitlement lifts it without a restart. */
+    public static final String ENTITLEMENT_READ_ONLY    = "ENTITLEMENT_READ_ONLY";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     public static String defaultFor(int status) {
@@ -52,6 +55,7 @@ public final class ErrorCodes {
             case 409 -> CONFLICT;
             case 413 -> PAYLOAD_TOO_LARGE;
             case 422 -> CONFIG_VALIDATION_FAILED;
+            case 423 -> ENTITLEMENT_READ_ONLY;
             case 501 -> NOT_SUPPORTED;
             case 503 -> CAPABILITY_UNAVAILABLE;
             default  -> INTERNAL;

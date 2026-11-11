@@ -128,7 +128,11 @@ public final class EnrichmentService implements AutoCloseable {
         long s = job.triggers().scheduleSeconds();
         // initialDelay = interval so the timer (not an immediate run) drives this path
         ScheduledFuture<?> future = scheduler.everySeconds("enrich-" + name, s, s,
-                () -> config(name).ifPresent(j -> recompute(j, null, "schedule")));
+                () -> {
+                    // PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): read-only recomputes nothing; the next writable tick catches up.
+                    if (com.gamma.module.Entitlements.readOnly()) return;
+                    config(name).ifPresent(j -> recompute(j, null, "schedule"));
+                });
         scheduledFutures.put(name, future);
         return true;
     }

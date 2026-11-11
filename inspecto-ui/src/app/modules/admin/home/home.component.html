@@ -15,6 +15,15 @@
         </inspecto-alert>
     }
 
+    <!-- PRODUCT-ASSEMBLY-1 PA-7b (D-PA23): an administrator is told when no entitlement is installed - everything built runs. -->
+    @if (session.entitlement()?.state === 'none' && session.entitlement()?.forAdministrator) {
+        <inspecto-alert variant="info" title="No entitlement installed">
+            Every module this build carries is running. To limit this installation to what was bought, put the signed
+            <code class="font-mono">entitlement.toon</code> and <code class="font-mono">entitlement.sig</code> in the
+            server's <code class="font-mono">conf/</code> folder; it is picked up without a restart.
+        </inspecto-alert>
+    }
+
     <!-- Greeting (the shared header) + the Lens card, whose primary action is this Lens's landing route (plan D1). -->
     <inspecto-page-header
         [title]="greeting()"

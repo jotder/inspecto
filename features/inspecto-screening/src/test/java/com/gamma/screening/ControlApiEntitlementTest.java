@@ -28,6 +28,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,12 +49,19 @@ class ControlApiEntitlementTest {
     void trustATestIssuer() throws Exception {
         issuer = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         Entitlements.trustForTests(Map.of("test-issuer", issuer.getPublic()));
+        on("2026-11-11");
     }
 
     @AfterEach
     void restore() {
         System.clearProperty(Entitlements.FILE_PROPERTY);
         Entitlements.trustForTests(null);
+        Entitlements.clockForTests(null);
+    }
+
+    private static void on(String day) {
+        Entitlements.clockForTests(java.time.Clock.fixed(java.time.LocalDate.parse(day).atStartOfDay(java.time.ZoneOffset.UTC).toInstant(),
+                java.time.ZoneOffset.UTC));
     }
 
     private record Ctx(CollectorService svc, ControlApi api) implements AutoCloseable {
@@ -87,11 +95,15 @@ class ControlApiEntitlementTest {
 
     /** Write and sign an entitlement for the Basic edition (this test's build) listing {@code modules}; returns the file. */
     private Path entitlement(String edition, List<String> modules, String keyId) throws Exception {
+        return entitlement(edition, modules, keyId, "2027-11-11");
+    }
+
+    private Path entitlement(String edition, List<String> modules, String keyId, String expires) throws Exception {
         String toon = String.join("\n",
                 "schema: inspecto.entitlement/1", "id: acme-2026-11-11", "customer: acme", "title: Acme Ltd", "product: inspecto",
                 "edition: " + edition, "apps[0]:", "addons[1]: screening",
                 "modules[" + modules.size() + "]:" + (modules.isEmpty() ? "" : " " + String.join(",", modules)),
-                "nodes: 2", "notBefore: 2026-11-11", "expires: 2027-11-11", "issued: 2026-11-11", "keyId: " + keyId, "");
+                "nodes: 2", "notBefore: 2026-11-11", "expires: " + expires, "issued: 2026-11-11", "keyId: " + keyId, "");
         Path dir = Files.createDirectories(tmp.resolve("conf"));
         Path file = dir.resolve("entitlement.toon");
         Files.writeString(file, toon, StandardCharsets.UTF_8);
@@ -199,5 +211,40 @@ class ControlApiEntitlementTest {
         entitlement("standard", List.of("screening"), "test-issuer");
         IOException e = assertThrows(IOException.class, this::open);
         assertTrue(e.getMessage().contains("is for the standard Edition, but this build is basic"), e.getMessage());
+    }
+
+    /** PA-7b (D-PA24): past the grace a write answers 423 naming why; reads, a BI query and the state stay open; a renewal lifts it live. */
+    @Test
+    void pastTheGraceWritesAre423AndARenewalLiftsItWithoutARestart() throws Exception {
+        Path file = entitlement("basic", List.of("entity-list", "ops", "screening"), "test-issuer", "2027-11-11");
+        try (Ctx c = open()) {
+            assertEquals("ok", data(call(c, "GET", "/bootstrap", null)).path("entitlement").path("state").asText());
+            on("2027-11-20");   // expired, inside the grace: still writable, administrators warned
+            Entitlements.recheckNow();
+            JsonNode grace = data(call(c, "GET", "/bootstrap", null)).path("entitlement");
+            assertEquals("grace", grace.path("state").asText(), grace.toString());
+            assertEquals("2027-11-26", grace.path("readOnlyFrom").asText());
+            assertNotEquals(423, call(c, "PUT", "/settings/modules", "{\"disabled\":[]}").statusCode());
+
+            on("2027-11-26");   // the first read-only day
+            HttpResponse<String> write = call(c, "PUT", "/settings/modules", "{\"disabled\":[]}");
+            assertEquals(423, write.statusCode(), write.body());
+            assertTrue(write.body().contains("ENTITLEMENT_READ_ONLY") && write.body().contains("expired on 2027-11-11"), write.body());
+            assertEquals(200, call(c, "GET", "/modules", null).statusCode(), "reads continue");
+            assertNotEquals(423, call(c, "POST", "/bi/query", "{}").statusCode(), "a Measure query is read-shaped");
+            assertNotEquals(423, call(c, "POST", "/public/dashboards/no-such-token/query", "{}").statusCode(), "a shared dashboard reads");
+            // the funnel every real run passes (the scheduler, a watched inbox, a trigger) refuses; a dry run writes nothing
+            IllegalStateException run = assertThrows(IllegalStateException.class, () -> c.svc().runPipeline("any_pipeline"));
+            assertTrue(run.getMessage().startsWith("read-only: "), run.getMessage());
+            assertTrue(c.svc().runPipeline("any_pipeline", false, true).isEmpty(), "a dry run is not refused for read-only");
+            JsonNode ro = data(call(c, "GET", "/bootstrap", null)).path("entitlement");
+            assertEquals("read-only", ro.path("state").asText(), ro.toString());
+
+            entitlement("basic", List.of("entity-list", "ops", "screening"), "test-issuer", "2028-11-11");   // the renewal
+            Entitlements.recheckNow();
+            assertNotEquals(423, call(c, "PUT", "/settings/modules", "{\"disabled\":[]}").statusCode(), "renewed, no restart");
+            assertEquals("ok", data(call(c, "GET", "/bootstrap", null)).path("entitlement").path("state").asText());
+            assertTrue(Files.exists(file));
+        }
     }
 }

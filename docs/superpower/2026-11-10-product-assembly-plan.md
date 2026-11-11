@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); PA-7b is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); PA-7c is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -960,6 +960,70 @@ What exists to build on:
     - `ApiContractTest`, `ContractFragmentsTest`, `OpenApiPathsContractTest`, `ModuleManifestGuardTest`;
     - `ControlApiBootstrapProductTest`, `ImportLoaderInventoryTest`;
     - `ControlApiEntitlementTest`, which now also asserts the reason.
+
+**PA-7b as built (2026-11-11).** Guide: [`okf/product/layer/platform/admin-guide-entitlements.md`](../okf/product/layer/platform/admin-guide-entitlements.md) §§ Expiry
+and The trial Distribution.
+- **States (`Entitlements.state()`).** `NONE`, then `OK`, then `EXPIRING` (30 days or fewer left), then `GRACE` (14
+  days past expiry), then `READ_ONLY` (from expiry + 15 days, or a trial build without its file).
+  - `today()` reads a clock that only a code-level test seam pins (`clockForTests`). It is never a system property,
+    because a customer could pin it.
+- **Renewal.** `current()` checks the two files' size and mtime every 5 seconds and verifies only on a change.
+  - A replacement that does not verify, or a removed file, keeps the last verified entitlement in force and names a
+    `problem()`. A running server never drops to "no file".
+  - The Product and Edition check moved from the boot check into every read (`expectBuild`, set by `ControlApi` at
+    boot, which re-reads under it). So a renewal for another build is refused too.
+  - A file before its `notBefore` is refused.
+- **Read-only enforcement**, at three seams:
+  - `ControlApi.requireWritable`, after the module gates: 423 `ENTITLEMENT_READ_ONLY` (a new `ErrorCodes` entry and
+    OpenAPI enum value) unless GET/HEAD/OPTIONS or a route whose capability-manifest exemption category is in
+    `READ_ONLY_OPEN` (`read-shaped`, `group-gated`, `stateless-compute`, `identity-flow`);
+  - `PipelineScheduler.frozen()` at its five entry points (poll, acquire, upstream commit, Dataset write, stream
+    drain), logged once per change;
+  - `JobService.submitRun`, which records `SKIPPED` with the reason.
+  - Added after the review found background writers outside those seams:
+    - `CollectorService.runPipeline` refuses a real run, the funnel every caller passes (a dry run still runs);
+    - the watched-folder import (`InboxWatch`) leaves waiting files for the first writable poll;
+    - the scheduled Enrichment recompute (`EnrichmentService`) skips its tick;
+    - `ExchangeSnapshotSweep` publishes no snapshot.
+  - `self-verifying-public` joined `READ_ONLY_OPEN`, so a shared dashboard's query keeps working. So does a
+    delivery-status callback, which only records what happened to a message already sent.
+  - Known limit: "trial" is read from `lib/product.json`, which a customer can edit. Like every local check, it keeps
+    an honest customer honest; it is not tamper-proof.
+- **`/bootstrap.entitlement`.** Every signed-in caller gets `publicSummary` (state, `readOnlyFrom`, reason). An
+  administrator gets `adminSummary`, which adds the file's fields, `problem` and `forAdministrator: true`.
+- **The trial Distribution is built.**
+  - `DISTRIBUTIONS` gains `trial`. `pilot` stays planned, re-pointed to PA-10.
+  - All three Products list `trial`.
+  - `package.ps1 -EntitlementFile` verifies the file with `entitle.mjs`, checks the Product, the Edition and (for
+    trial) an expiry, and stages `conf/entitlement.toon` and `.sig`. It is required for trial and refused for demo.
+  - A trial descriptor makes `ControlApi` call `requireFile`. Zip and folder names are unchanged; `lib/product.json`
+    says `trial`.
+- **The UI.**
+  - `SessionService.entitlement` holds the summary.
+  - `<inspecto-entitlement-banner>`, built on `<inspecto-alert>`, is mounted beside the connectivity banner in the
+    console layout and in the la-app shell. Read-only is shown to everyone; expiring, grace and a renewal not taken
+    are shown to administrators only.
+  - Home tells an administrator when no entitlement is installed (D-PA23).
+
+**Proof (as built), targeted tests only (operator: no full gate).**
+- `EntitlementsTest` 12/12: the calendar state by state, no expiry, a trial without a file, renewal and a tampered
+  or removed replacement, a not-yet-valid file, and a file for another build at boot and on a renewal.
+- `JobServiceReadOnlyTest` 1/1: a fire is SKIPPED with the reason, then runs once writable. `JobServiceTest` 61/61.
+- `ControlApiEntitlementTest` 7/7 over real HTTP, with the clock pinned. Besides the points below, in read-only a shared
+  dashboard's query is not refused, `runPipeline` refuses a real run and a dry run still runs:
+  - grace is still writable and `readOnlyFrom` is reported;
+  - on the first read-only day, `PUT /settings/modules` answers 423 naming the expiry, while `GET /modules` and
+    `POST /bi/query` pass;
+  - a renewal lifts read-only with no restart.
+- The Product tools: 116/116, with `trial` assembling.
+- After the review fixes, also: `ControlApiPipelineRunTest`, `EnrichmentServiceTest` 12/12, `ExchangeSnapshotSweepTest`,
+  the OpenAPI contract tests and `ImportLoaderInventoryTest`. UI: the banner, Home and la-app shell specs.
+- **A packaged trial bundle, booted from its own root.** `package.ps1 -Product inspecto -Edition Basic -Distribution trial
+  -EntitlementFile <f> -NoRuntime -NoUi` used an entitlement issued by `inspecto-issuer-1` that expired 2026-10-01.
+  - Packaging staged `conf/entitlement.toon` and `.sig` and passed its boot smoke; `lib/product.json` says `trial`.
+  - Booted: `/bootstrap.entitlement` is `read-only` (customer `trial-proof`, `readOnlyFrom` 2026-10-16).
+    `PUT /settings/modules` answers 423 `ENTITLEMENT_READ_ONLY`, naming the expiry; `GET /modules` answers 200.
+  - `-Distribution trial` without `-EntitlementFile` is refused before the build starts.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 

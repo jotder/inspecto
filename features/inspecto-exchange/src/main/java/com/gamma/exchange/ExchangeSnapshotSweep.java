@@ -66,6 +66,7 @@ public final class ExchangeSnapshotSweep {
     private static void tick() {
         SpaceManager sm = spaces;
         if (sm == null) return;
+        if (com.gamma.module.Entitlements.readOnly()) return;   // PA-7b (D-PA24): read-only publishes no snapshot
         Exchange ex = Exchange.under(sm.containerRoot());
         if (!ex.enabled()) return;
         sweep(ex, System.currentTimeMillis(),

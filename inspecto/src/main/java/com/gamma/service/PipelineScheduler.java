@@ -303,11 +303,29 @@ final class PipelineScheduler {
     }
 
     /**
+     * PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): while the install is read-only (its entitlement expired past the grace, or a trial
+     * build has none) no Pipeline is polled, acquired, chained or drained; a renewed entitlement resumes them on the next tick.
+     * Logged once per change, not per tick.
+     */
+    private boolean frozen() {
+        boolean ro = com.gamma.module.Entitlements.readOnly();
+        if (ro != wasFrozen) {
+            wasFrozen = ro;
+            if (ro) log.warn("ingest paused - read-only: {}", com.gamma.module.Entitlements.readOnlyReason());
+            else log.info("ingest resumed - the install is no longer read-only");
+        }
+        return ro;
+    }
+
+    private volatile boolean wasFrozen;
+
+    /**
      * Pick the pipelines to run on this tick and claim each one. The <em>only</em> part of a cycle that needs
      * {@link #registryLock}, and it is bounded work — the lock is never held across a run, which is what lets
      * ticks overlap at all.
      */
     private List<Due> selectDue(long nowMs) {
+        if (frozen()) return List.of();
         List<Due> due = new ArrayList<>();
         registryLock.lock();
         try {
@@ -532,6 +550,7 @@ final class PipelineScheduler {
      */
     void onUpstreamCommit(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
+        if (frozen()) return;
         // PIPELINE-DRYRUN-1 step 5 — this consumer cannot honour the flag: a downstream pipeline run has
         // no dry-run mode of its own to inherit (that is CollectorProcessor.ingest's parameter, and
         // triggerWorkers reaches it through the scheduler's own real-run path). So it REFUSES, loudly,
@@ -588,6 +607,7 @@ final class PipelineScheduler {
      */
     void onDatasetWrite(String dataset, String producerPipeline) {
         if (dataset == null || dataset.isBlank()) return;
+        if (frozen()) return;
         for (Path p : registry) {
             PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
             if (cfg == null) continue;
@@ -669,6 +689,7 @@ final class PipelineScheduler {
      * fetch). A pipeline still fetching from an earlier tick keeps its claim and is skipped, not queued.
      */
     private List<Due> selectDueForAcquire() {
+        if (frozen()) return List.of();
         List<Due> due = new ArrayList<>();
         registryLock.lock();
         try {
@@ -811,6 +832,7 @@ final class PipelineScheduler {
 
     /** The lane's drain: fetch-and-land under the acquire claim, then ingest via the ordinary trigger path. */
     private void drainNow(String id) {
+        if (frozen()) return;
         PipelineConfig cfg = configRegistry.get(id).orElse(null);
         if (cfg == null || paused.contains(id) || !cfg.active()) return;   // paused since the last reconcile
         RunLease.Claim claim = acquireGuard.tryAcquire(id);
