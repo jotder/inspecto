@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); PA-6c is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); PA-6d is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -759,6 +759,50 @@ expectation changed to A-001, A-104 the same run fails, naming the keys it found
 - PA-6b's kit boots it without the OIDC jar and holds `acme_spend_findings` to exactly A-001, A-002, A-003. With the
   expectation changed to A-001, A-104, the same run fails, naming the keys it found.
 
+**PA-6c as built (2026-11-11; D-PA21).**
+- **The picker, `tools/pick-addons.mjs`.** With no arguments it lists the Inspecto Platform product's 17 Add-ons, each
+  with:
+  - its Order Code;
+  - its closure: the Add-ons that own a module its modules require, transitively, leaving out base and internal modules;
+  - its Edition floor: the lowest Edition that builds it and its closure;
+  - its list price, when `product-map/private/prices.csv` is present.
+- **A pick.** `--pick a,b --id <id> [--title T]` grows the pick by its closure until the floor stops moving, prices it as
+  Edition + Add-ons, and assembles it on every Edition from the floor up. It prints the definition; `--write` writes it
+  to `product-map/private/products/<id>.toon`.
+  - Example: Screening needs Incidents, LA Investigations, Scoring Lists and Workflow SLA, so its floor is Standard.
+  - Refused: an unknown Add-on, an id that is already a Product, a malformed id, an empty pick, and a pick no Edition
+    builds.
+- **The picked Platform product** (`narrows: inspecto`) keeps Inspecto's host, templates and docs. It keeps an optional
+  App only when the pick holds every Add-on the App requires, so Link Analysis rides only with `linkAnalysis`.
+- **Building it in Inspecto's place.** `narrowModel` (in `tools/products.mjs`) swaps it into the model where the Platform
+  product was, so the guard's "one default build per host" and "every committed template is shipped" rules still hold.
+  `narrowModel` refuses a file that:
+  - narrows nothing, or narrows a Domain product;
+  - moves to another host;
+  - names an Add-on its base lacks;
+  - takes another Product's id.
+- **Building it from the file.** `assemble.mjs --product-file <f>` and `package.ps1 -ProductFile <f>` take it; `-Product`
+  is then the file's id, and passing both is refused.
+- **Deliberately not done.**
+  - The page, which is `ADDON-PICKER-PAGE-1` on the board, held for demand.
+  - Trimming jars and templates to the pick: the module set is still the whole Edition's classpath, as in every
+    Product build since PA-2, and trimming stays with `customer-build` until PA-10. The pick decides the plan's
+    `addons`, the Editions and the Apps.
+
+**Proof (as built).**
+- `tools/pick-addons.test.mjs`: 6/6. It covers:
+  - every Add-on's floor builds its closure;
+  - a synthetic transitive closure;
+  - a pick assembling on each Edition and refused below its floor;
+  - the optional-App rule;
+  - the written file reading back and building through `loadProductFile`;
+  - priced and unpriced totals;
+  - every refusal.
+- With the other Product tools: 104/104 plus the picker's 6.
+- `package.ps1 -ProductFile <acme-console.toon> -Edition Standard -NoRuntime -NoUi` (Incidents + Screening, Standard
+  floor) built and passed its boot smoke. Its `lib/product.json` and `edition.properties` name `acme-console` /
+  "Acme Console" with no Apps. Passing `-Product` with it is refused.
+
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
 | Id | Call | Signed |
@@ -783,6 +827,7 @@ expectation changed to A-001, A-104 the same run fails, naming the keys it found
 | D-PA18 | Where a partner's App lives when built with the kit | any folder (`--app-root`); `apps/` stays first-party (signed 2026-11-11) |
 | D-PA19 | How deep the App conformance kit goes in PA-6 | boot a built bundle per listed Edition, seed the App's template, run its Jobs, check its declared golden findings (signed 2026-11-11) |
 | D-PA20 | The order of the PA-6 lanes | the App kit (6a), the sample partner App with its conformance in CI (6b), the Add-on picker (6c), the builder-kit docs (6d) (signed 2026-11-11) |
+| D-PA21 | Where a picked Platform product lives and how it builds | in `product-map/private/products/<id>.toon` (gitignored, per customer). It narrows the Inspecto Platform product (`narrows: inspecto`): the same host, Apps and templates, only the picked Add-ons and their closure, and the Editions from the floor up. `assemble.mjs --product-file` and `package.ps1 -ProductFile` build it in Inspecto's place (signed 2026-11-11) |
 
 ## 13. The open board, re-checked 2026-11-10
 

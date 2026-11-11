@@ -6,6 +6,8 @@
 //   node tools/assemble.mjs --product la --edition advanced [--distribution demo] [--apps a,b] [--target windows] [--out f]
 //   node tools/assemble.mjs --product la --lock [--out products/la.lock]     the Product lock (versions + content hashes)
 //   node tools/assemble.mjs --diff-lock <old.lock> <new.lock>                 the upgrade diff between two locks
+//   node tools/assemble.mjs --product-file <picked.toon> --edition standard   a picked Platform product (tools/pick-addons.mjs, PA-6c),
+//                                                                             built in place of the Platform product it narrows
 //
 // REFUSES (exit 1, the reason named): an unknown Product / App; an edition, distribution or target the Product does not
 // list or that is not built yet; a demo build on an edition without the demo sign-in swap; a chosen App whose Add-ons the
@@ -19,7 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addonModules, builtAddons, carryPartnerApps, checkModel, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
+import { addonModules, builtAddons, carryPartnerApps, checkModel, loadProductFile, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -195,9 +197,15 @@ function main() {
         }
         // PA-6a (D-PA18): `--app-root <folder>`, repeatable, adds an App that lives outside apps/.
         const appRoots = a.flatMap((x, i) => (x === '--app-root' && a[i + 1] ? [a[i + 1]] : []));
-        const model = gatherModel(REPO, { appRoots });
+        let model = gatherModel(REPO, { appRoots });
         const g = gather(REPO);
-        const product = val('--product') ?? fail('--product <id> is required');
+        // PA-6c: `--product-file <f>` takes a picked Platform product (product-map/private/products/<id>.toon) in place of --product.
+        let product = val('--product');
+        if (val('--product-file')) {
+            if (product) fail('pass --product or --product-file, not both');
+            ({ model, product } = loadProductFile(model, val('--product-file')));
+        }
+        if (!product) fail('--product <id> (or --product-file <picked.toon>) is required');
         carryPartnerApps(model, product);
         if (a.includes('--lock')) { write(productLock(model, g, product)); return; }
         const plan = assemble(model, g, {

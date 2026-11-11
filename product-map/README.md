@@ -25,4 +25,7 @@ Rules:
 - `node tools/customer-build.mjs <customer> [--bundle <edition-bundle-dir>]` reads `private/customers/<customer>.toon`
   (`id`, `title`, `edition`, `orderCodes[N]`) and writes the customer Offering, a priced bill of materials and, with `--bundle`,
   a trimmed copy of the Edition bundle to `target/customers/<customer>/`.
+- `node tools/pick-addons.mjs` lists the Platform product's Add-ons with their closure, Edition floor and price;
+  `--pick a,b --id <id> --write` writes a picked Platform product to `private/products/<id>.toon`, which
+  `inspecto/package.ps1 -ProductFile` builds in place of the Platform product it narrows.
 - `node tools/product-map-seed.mjs` adds items for new modules, Add-ons, packs and Editions. It never overwrites an existing file.

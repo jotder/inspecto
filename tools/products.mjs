@@ -93,6 +93,32 @@ export function carryPartnerApps(model, productId) {
     return model;
 }
 
+/**
+ * PA-6c: the model with a narrowed Platform product in place of the one it narrows (same host default build and templates), so
+ * the assembler and its checks see one Platform product. Refuses a definition that narrows no Platform product.
+ */
+export function narrowModel(model, definition) {
+    const base = model.products[definition.narrows];
+    if (!definition.narrows || !base || base.shape !== 'platform') refuse(`a picked Product narrows a Platform product (narrows: ${definition.narrows ?? 'missing'})`);
+    if (definition.host !== base.host) refuse(`a picked Product keeps the host of '${definition.narrows}' (${base.host}), not '${definition.host}'`);
+    const extra = list(definition.addons).filter((a) => !list(base.addons).includes(a));
+    if (extra.length) refuse(`Add-on(s) ${extra.join(', ')} are not in '${definition.narrows}', the Platform product it narrows`);
+    if (definition.id !== definition.narrows && model.products[definition.id]) refuse(`id '${definition.id}' is already the Product products/${definition.id}.toon - a picked Product takes an id of its own`);
+    const products = { ...model.products };
+    delete products[definition.narrows];
+    products[definition.id] = definition;
+    return { ...model, products };
+}
+
+/** Read a picked Product file and put it in the model (assemble.mjs --product-file). Returns { model, product }. */
+export function loadProductFile(model, file) {
+    const d = read(file);
+    if (!d.id) refuse(`${file}: no id`);
+    return { model: narrowModel(model, d), product: d.id };
+}
+
+const refuse = (msg) => { throw new Error(msg); };
+
 /** Every file under `dir`, as `/`-separated paths relative to it. */
 function walk(dir, rel = '') {
     if (!existsSync(join(dir, rel))) return [];

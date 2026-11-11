@@ -106,6 +106,9 @@ param(
     # PRODUCT-ASSEMBLY-1 PA-6a (D-PA18): folders holding a partner App (app.toon + templates/<id>/) built with tools/inspecto-app.mjs,
     # outside apps/. Passed to the assembler as --app-root; the App's templates are staged from those folders, not from git.
     [string[]]$AppRoot = @(),
+    # PRODUCT-ASSEMBLY-1 PA-6c: a picked Platform product (tools/pick-addons.mjs; product-map/private/products/<id>.toon), built in
+    # place of the Platform product it narrows. Passed to the assembler as --product-file; -Product is then that file's id.
+    [string]$ProductFile = '',
     # A demo build of a Product with a `demoSpace` ships that Space PRE-SEEDED (operator 2026-10-12; step 6f, package-demo-bake.ps1):
     # the staged bundle is booted against a scaffolded Space and seeded over HTTP before the zip. -NoBakeDemo skips that for a fast
     # local package (the bundle then ships no Space, as every other bundle does). Ignored when the plan names no seedSpace.
@@ -236,11 +239,20 @@ if ($duckdbExtCacheDir) {
 # tools/assemble.mjs resolves Product x Edition x Distribution (products/, apps/, offerings/, the module manifests) and REFUSES,
 # naming the reason, anything the Product does not offer: an edition it does not come in, a distribution not built yet, a demo on
 # an edition without the demo sign-in swap. Everything Product-specific below reads $plan; nothing here names a Product.
+$productArgs = @('--product', $Product)
+if ($ProductFile) {
+    if ($PSBoundParameters.ContainsKey('Product')) { throw "Pass -Product or -ProductFile, not both" }
+    $ProductFile = (Resolve-Path -LiteralPath $ProductFile).Path
+    $idLine = Select-String -LiteralPath $ProductFile -Pattern '^id:\s*(\S+)\s*$' | Select-Object -First 1
+    if (-not $idLine) { throw "-ProductFile ${ProductFile}: no id line" }
+    $Product = $idLine.Matches[0].Groups[1].Value
+    $productArgs = @('--product-file', $ProductFile)
+}
 $planFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-assembly-$Product-$Edition-$Distribution.json"
 # PA-3: the Product build's descriptor too (written into lib/product.json beside edition.properties at step 3a-ter).
 $descriptorFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-product-$Product-$Edition-$Distribution.json"
 $appRootArgs = @($AppRoot | Where-Object { $_ } | ForEach-Object { '--app-root'; (Resolve-Path $_).Path })
-& node (Join-Path $sandboxRoot 'tools\assemble.mjs') --product $Product --edition $Edition --distribution $Distribution --out $planFile --descriptor $descriptorFile @appRootArgs
+& node (Join-Path $sandboxRoot 'tools\assemble.mjs') @productArgs --edition $Edition --distribution $Distribution --out $planFile --descriptor $descriptorFile @appRootArgs
 if ($LASTEXITCODE -ne 0) { throw "tools/assemble.mjs refused Product '$Product' x $Edition x $Distribution (the reason is above)" }
 $plan = Get-Content -Raw $planFile | ConvertFrom-Json
 $Ui = [string]$plan.host
