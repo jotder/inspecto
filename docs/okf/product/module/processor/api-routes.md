@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-370 route(s) registered; 370 in the OpenAPI contract, 0 not.
+374 route(s) registered; 374 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -55,6 +55,10 @@ tags: [api, routes, generated]
 | PUT | `/alerts/rules/{ruleId}` | PUT /alerts/rules/{ruleId} (generated skeleton) | alerts | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java` |
 | GET | `/alerts/rules/pending` | GET /alerts/rules/pending (generated skeleton) | alerts | — | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java` |
 | GET | `/analytics/functions` | The Analytics function catalogue: every function the Analytics Kernel offers | analytics | — | `inspecto/src/main/java/com/gamma/control/AnalyticsCatalogueRoutes.java` |
+| GET | `/apps` | The Product's Apps, the Apps installed live, and the trusted signers (PRODUCT-ASSEMBLY-1 PA-7d) | settings | — | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java` |
+| POST | `/apps` | Install a signed App package (canAdminister; PA-7d) | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java` |
+| DELETE | `/apps/{id}` | Remove an installed App (canAdminister; PA-7d) | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java` |
+| PUT | `/apps/{id}` | Upgrade an installed App (canAdminister; PA-7d, D-PA25) | settings | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java` |
 | POST | `/assist/{assistId}` | POST /assist/{assistId} (generated skeleton) | assist | — | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java` |
 | GET | `/assist/diagnoses` | GET /assist/diagnoses (generated skeleton) | assist | — | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java` |
 | GET | `/assist/metrics` | GET /assist/metrics (generated skeleton) | assist | — | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java` |

@@ -141,11 +141,11 @@ node tools/inspecto-app.mjs verify --package ../acme-spend/dist/acme-spend-0.1.0
   the Platform product as an optional App, and its templates are staged from its own folder.
 - **The worked sample** is [`examples/partner-app/`](../../../../../examples/partner-app/) (App `acme-spend`). It is the
   kit's unedited output, and CI holds its conformance.
-- **Not in the kit yet:**
-  - installing a package on a running server (PA-7d). A server will install only a signed package whose key it trusts: the
-    issuer key for first-party Apps, or a partner key listed in the install's `conf/app-signers.properties` (the line
-    `keygen` writes to `<id>.properties`);
-  - an Alert Rule in the starter (`APP-KIT-ALERT-RULE-1` on the board).
+- **Installing on a running server.** `POST /apps` takes the signed zip. The server installs only a package whose key
+  it trusts: the issuer key for first-party Apps, or a partner key in the install's `conf/app-signers.properties` (the
+  line `keygen` writes to `<id>.properties`). Upgrade with `PUT /apps/{id}` and remove with `DELETE /apps/{id}`. Read
+  the [Apps admin guide](admin-guide-apps.md).
+- **Not in the kit yet:** an Alert Rule in the starter (`APP-KIT-ALERT-RULE-1` on the board).
 
 ## 6. The Add-on picker: `tools/pick-addons.mjs`
 

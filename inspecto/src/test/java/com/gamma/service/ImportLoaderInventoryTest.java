@@ -66,6 +66,12 @@ class ImportLoaderInventoryTest {
             ALLOWED.put(p, SHARED);
         for (String p : List.of("template.toon"))
             ALLOWED.put(p, "the shipped Space template catalog under <spaces-root>/_templates/ — outside every Space");
+        // PRODUCT-ASSEMBLY-1 PA-7d: an installed App's files live under the install's apps/ root (never a Space); app.toon is also
+        // read from inside a package, whose every file is held to its signed manifest.
+        ALLOWED.put("app.toon", "an App definition under the install's apps/<id>/ or inside a signed package - outside every Space");
+        ALLOWED.put("installed.toon", "the install record of a live-installed App under the install's apps/<id>/ - outside every Space");
+        ALLOWED.put("created-from.toon", "which App template made a Space, at <space>/.inspecto/ - outside config/, where an import writes, "
+                + "and it only shapes the upgrade's read-only offer");
         // PRODUCT-ASSEMBLY-1 PA-7a: the install's entitlement, resolved against the server's working directory (the bundle root),
         // never a Space root; and a planted copy would have to carry an issuer key's Ed25519 signature to be read at all.
         ALLOWED.put("conf/entitlement.toon", "the install's signed entitlement under the bundle's conf/ — outside every Space, "

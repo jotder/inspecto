@@ -121,7 +121,8 @@ final class BootstrapRoutes implements RouteModule {
         data.put("branding", branding(api));
         // PRODUCT-ASSEMBLY-1 PA-3: the Product this server was built as (lib/product.json). Its identity is pre-sign-in context like
         // branding - the sign-in page names the Product. null when the build carries no descriptor (target/classes, tests, pre-PA-3).
-        Optional<ProductDescriptor> product = ProductDescriptor.current();
+        // PA-7d: plus the Apps installed into this running server (POST /apps), so their nav shows at once.
+        Optional<ProductDescriptor> product = ProductDescriptor.current().map(p -> p.withInstalled(AppInstallRoutes.installed(api)));
         Map<String, Object> productOut = product.map(p -> (Map<String, Object>) new LinkedHashMap<>(p.identity())).orElse(null);
         data.put("product", productOut);
         // Landing-page plan D2 (2026-09-15): before sign-in a Standard/Advanced deployment tells an

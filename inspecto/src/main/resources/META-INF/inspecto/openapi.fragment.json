@@ -437,6 +437,8 @@
     "/datasets/{datasetId}/freshness",
     "/modules",
     "/settings/modules",
+    "/apps",
+    "/apps/{id}",
     "/alerts/{alertId}/ack",
     "/alerts/{alertId}/resolve"
   ],
@@ -8510,6 +8512,65 @@
           }
         },
         "x-generated" : true
+      }
+    },
+    "/apps" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "The Product's Apps, the Apps installed live, and the trusted signers (PRODUCT-ASSEMBLY-1 PA-7d)",
+        "operationId" : "getApps",
+        "description" : "shipped: the build's own Apps; installed: [{id, title, version, signedBy, installedAt, templates}]; signers: the key ids an App package may be signed with (the issuer keys plus conf/app-signers.properties); liveInstall: whether this server is a Product build of a Platform product (a write still needs a Spaces root: 503 without one).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "settings" ],
+        "summary" : "Install a signed App package (canAdminister; PA-7d)",
+        "operationId" : "postApps",
+        "description" : "The body is the package zip (tools/inspecto-app.mjs package --key). 503 no Spaces root; 409 not a Platform product build, the App is installed already or ships with the build, or a template collides; 422 a package that does not verify (signature, manifest, an untrusted signer), the App's Platform range, or an Add-on the entitlement leaves out; 423 read-only. The answer is the plan (templates and files added, nav) plus installed.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        },
+        "parameters" : [ { "name" : "dryRun", "in" : "query", "required" : false, "schema" : { "type" : "boolean" }, "description" : "true: answer the plan (templates, files, nav, and on an upgrade each Space's offered difference) and change nothing." } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : { "application/zip" : { "schema" : { "type" : "string", "format" : "binary" } } }
+        }
+      }
+    },
+    "/apps/{id}" : {
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "Upgrade an installed App (canAdminister; PA-7d, D-PA25)",
+        "operationId" : "putAppsId",
+        "description" : "The body is the new package. Replaces the App's templates and nav (new Spaces get the new version); a Space already made from it is never changed - the answer offers each one its file-by-file difference (new / update / customised / dropped), applied through the normal config routes. Gates as POST /apps, plus 404-as-409 when not installed.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        },
+        "parameters" : [ { "name" : "id", "in" : "path", "required" : true, "schema" : { "type" : "string" } }, { "name" : "dryRun", "in" : "query", "required" : false, "schema" : { "type" : "boolean" } } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : { "application/zip" : { "schema" : { "type" : "string", "format" : "binary" } } }
+        }
+      },
+      "delete" : {
+        "tags" : [ "settings" ],
+        "summary" : "Remove an installed App (canAdminister; PA-7d)",
+        "operationId" : "deleteAppsId",
+        "description" : "Takes the App's templates (only those it installed) and nav away. Spaces made from it keep every file and are named in spacesKept. 400 when {id} is not an App id; 404 when not installed live (an App the build ships is not removed here).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        },
+        "parameters" : [ { "name" : "id", "in" : "path", "required" : true, "schema" : { "type" : "string" } }, { "name" : "dryRun", "in" : "query", "required" : false, "schema" : { "type" : "boolean" } } ]
       }
     },
     "/settings/modules" : {

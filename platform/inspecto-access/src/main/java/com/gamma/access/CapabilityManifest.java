@@ -151,6 +151,10 @@ public final class CapabilityManifest {
             new Entry("POST", "/alerts/rules", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("PUT", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
             new Entry("DELETE", "/alerts/rules/([^/]+)", Roles.CAN_AUTHOR_ALERT_RULES),
+            // AppInstallRoutes — PRODUCT-ASSEMBLY-1 PA-7d: installing, upgrading and removing an App changes the whole install
+            new Entry("POST", "/apps", Roles.CAN_ADMINISTER),
+            new Entry("PUT", "/apps/([^/]+)", Roles.CAN_ADMINISTER),
+            new Entry("DELETE", "/apps/([^/]+)", Roles.CAN_ADMINISTER),
             // AssistRoutes — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). ⛔ A PAIR: the settings
             // are server-wide and /test makes a real outbound call to whatever baseUrl was last saved, so
             // gating either alone leaves the other as the injection point or the trigger. Live in every

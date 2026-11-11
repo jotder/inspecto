@@ -564,6 +564,7 @@ public final class SpaceManager implements AutoCloseable {
         List<Map<String, Object>> out = new ArrayList<>();
         try (Stream<Path> dirs = Files.list(root)) {
             for (Path dir : dirs.filter(Files::isDirectory).sorted().toList()) {
+                if (dir.getFileName().toString().startsWith(".")) continue;   // PA-7d: an App install's .staging-* / .old-* folders
                 Path meta = dir.resolve("template.toon");
                 if (!Files.exists(meta)) continue;
                 try {
@@ -765,13 +766,47 @@ public final class SpaceManager implements AutoCloseable {
             String desc = (description == null || description.isBlank())
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "tagline", "") : description.trim();
             new SpaceContext.SpaceManifest(name, desc, Instant.now().toString()).write(base.resolve("space.toon"));
-
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
+            recordProvenance(tpl, base, templateId);   // after every file the server writes at creation, so the hashes are the created state
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);
             log.info("Created space '{}' from template '{}' at {}", id.value(), templateId, base);
             return ctx;
+        }
+    }
+
+    /**
+     * PRODUCT-ASSEMBLY-1 PA-7d (D-PA25): a Space made from a template an installed App owns (its {@code .installed-by} marker)
+     * records {@code .inspecto/created-from.toon} - the template, the App and its version - so an upgrade of that App can offer
+     * the Space the difference. A shipped template records nothing. Best effort: the Space is created either way.
+     */
+    private static void recordProvenance(Path tpl, Path base, String templateId) {
+        Path marker = tpl.resolve(".installed-by");
+        if (!Files.isRegularFile(marker)) return;
+        try {
+            String app = "", version = "";
+            for (String line : Files.readAllLines(marker)) {
+                if (line.startsWith("app=")) app = line.substring(4).trim();
+                if (line.startsWith("version=")) version = line.substring(8).trim();
+            }
+            Path out = base.resolve(".inspecto").resolve("created-from.toon");
+            Files.createDirectories(out.getParent());
+            Files.writeString(out, "template: " + templateId + "\napp: " + app + "\nversion: \"" + version + "\"\n");
+            // each config file's SHA-256 as the Space now holds it (seeded and stamped): "not changed since created" for an upgrade
+            StringBuilder sums = new StringBuilder();
+            Path config = base.resolve("config");
+            if (Files.isDirectory(config))
+                try (java.util.stream.Stream<Path> files = Files.walk(config)) {
+                    for (Path f : files.filter(Files::isRegularFile).sorted().toList())
+                        sums.append(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(f))))
+                                .append("  ").append(config.relativize(f).toString().replace('\\', '/')).append('\n');
+                }
+            Files.writeString(out.resolveSibling("created-from.sha256"), sums.toString());
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        } catch (IOException e) {
+            log.warn("Could not record which App made Space {}: {}", base, e.toString());
         }
     }
 

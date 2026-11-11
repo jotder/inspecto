@@ -135,6 +135,43 @@ public record ProductDescriptor(String id, String title, String shape, String ho
         return new IllegalStateException("the Product descriptor " + where + " " + what);
     }
 
+    /**
+     * PRODUCT-ASSEMBLY-1 PA-7d: an App's nav as its {@code app.toon} declares it ({@code nav: <id>: {path, label, icon?, blurb?,
+     * feature?, capability?}}), in declaration order. An entry without a path or label is left out.
+     */
+    @SuppressWarnings("unchecked")
+    static List<NavEntry> navOf(Map<String, Object> appToon) {
+        List<NavEntry> out = new ArrayList<>();
+        if (!(appToon.get("nav") instanceof Map<?, ?> nav)) return out;
+        for (Map.Entry<?, ?> e : nav.entrySet()) {
+            if (!(e.getValue() instanceof Map<?, ?> raw)) continue;
+            Map<String, Object> n = (Map<String, Object>) raw;
+            String path = AppPackage.text(n, "path"), label = AppPackage.text(n, "label");
+            if (path.isEmpty() || label.isEmpty()) continue;
+            out.add(new NavEntry(String.valueOf(e.getKey()), path, label, blankToNull(AppPackage.text(n, "icon")),
+                    blankToNull(AppPackage.text(n, "blurb")), blankToNull(AppPackage.text(n, "feature")),
+                    blankToNull(AppPackage.text(n, "capability"))));
+        }
+        return out;
+    }
+
+    private static String blankToNull(String s) { return s == null || s.isEmpty() ? null : s; }
+
+    /**
+     * PA-7d: this descriptor with the Apps installed into the running server appended after the build's own (an id the build
+     * ships keeps the build's). An installed App needs no module of its own (its Add-ons are the build's), so it is installed
+     * whenever it is listed.
+     */
+    public ProductDescriptor withInstalled(List<InstalledApps.Installed> installed) {
+        if (installed.isEmpty()) return this;
+        List<App> all = new ArrayList<>(apps);
+        Set<String> ids = new java.util.HashSet<>();
+        apps.forEach(a -> ids.add(a.id()));
+        for (InstalledApps.Installed i : installed)
+            if (ids.add(i.id())) all.add(new App(i.id(), i.title(), i.version(), List.of(), List.copyOf(navOf(i.app()))));
+        return new ProductDescriptor(id, title, shape, host, brand, edition, distribution, List.copyOf(all));
+    }
+
     /** What every caller may see, signed in or not - the sign-in page shows the Product's name. */
     public Map<String, Object> identity() {
         Map<String, Object> m = new LinkedHashMap<>();

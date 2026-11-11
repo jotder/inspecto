@@ -108,6 +108,9 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:86` |
 | PUT | `/alerts/rules/([^/]+)` | gated | `canAuthorAlertRules` | `inspecto/src/main/java/com/gamma/control/AlertRoutes.java:83` |
 | POST | `/anomaly-scores/preview` | gated | `canWorkIncidents` | `features/inspecto-anomaly/src/main/java/com/gamma/anomaly/AnomalyScoreRoutes.java:69` |
+| POST | `/apps` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java:44` |
+| DELETE | `/apps/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java:46` |
+| PUT | `/apps/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AppInstallRoutes.java:45` |
 | POST | `/assist/(.+)` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:67` |
 | POST | `/assist/settings` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:60` |
 | POST | `/assist/settings/test` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:55` |

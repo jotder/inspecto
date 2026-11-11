@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); PA-7d is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1047,6 +1047,82 @@ and The trial Distribution.
   id, a reused key id); `unzip` round-trips and refuses `../`.
 - By hand, the sample partner App signed with a partner key verifies with `--trust`, is refused without it, and an
   unsigned package is refused.
+
+**PA-7d as built (2026-11-11).** Guide: [`okf/product/layer/platform/admin-guide-apps.md`](../okf/product/layer/platform/admin-guide-apps.md).
+- **The routes (`AppInstallRoutes`).** `GET /apps`, plus `POST /apps`, `PUT /apps/{id}` and `DELETE /apps/{id}`, each
+  `canAdminister` with a `?dryRun=true` plan. They are pod-scoped, in `CapabilityManifest` and in the core OpenAPI
+  fragment. The gates, in order:
+  - no Spaces root: 503;
+  - not a Product build of a Platform product: 409;
+  - a package that does not verify: 422;
+  - the App's Platform range, or an Add-on the entitlement leaves out: 422;
+  - an id or template conflict: 409.
+
+  Read-only is 423 before the handler. Every change is audited.
+- **The package (`AppPackage`)** is verified with the JDK alone, as the kit signs it (PA-7c):
+  - the zip is read with `ZipInputStream`, so every entry checked is an entry extracted;
+  - names that escape their folder and duplicate names are refused, and the size is capped;
+  - one App folder, an Ed25519 `MANIFEST.sig` by a trusted key, every file holding its manifest hash and nothing
+    unlisted, and `app.toon`'s id equal to the folder name.
+
+  Trust is the issuer keys plus `conf/app-signers.properties`, which never redefines a trusted id.
+- **The registry (`InstalledApps`).**
+  - The App unpacks into `apps/<id>/`, with `installed.toon` recording its version, signer and templates.
+  - Its templates go into `_templates/<t>/` with a `.installed-by` marker; a shipped template is never replaced.
+  - Each directory is staged and then swapped in, and the old copy is put back on failure.
+  - `/bootstrap` merges installed Apps into the descriptor (`ProductDescriptor.withInstalled`; their nav from
+    `app.toon`).
+- **Provenance and the D-PA25 offer.** `SpaceManager` writes `<space>/.inspecto/created-from.toon` for a Space made from a
+  marked template.
+  - An upgrade answers, per such Space, `new`, `update`, `customised` or `dropped` per config file.
+  - "Unchanged since created" reads `created-from.sha256`, written beside the provenance with each config file's hash as
+    the Space was created (after seeding and stamping). So it holds a Space one or more upgrades behind.
+  - A Space without hashes falls back to comparing decoded TOON with the server's Job stamp set aside.
+  - Applying a change goes through the existing config routes; there is deliberately no apply route.
+- **Decided here.**
+  - The entitlement's `apps` list is not checked: a partner App is unknown to the issuer's Product definitions.
+    Its Add-ons are checked against the entitlement when a file is installed.
+  - Spaces made before PA-7d record no origin, so they are offered nothing.
+  - The console host still draws its own nav (PA-6), so an installed App's nav shows where the host draws
+    `/bootstrap.product.nav` (la-app).
+
+- **Review fixes (2026-11-11).**
+  - One install-wide lock (`InstalledApps.LOCK`) held across plan and apply, since each request builds its own registry.
+  - Package names that Windows would rewrite are refused (`AppPackage.unsafeSegment`): a trailing dot or space,
+    `?*<>|"`, control characters, device names, a hidden file (only `.gitkeep` allowed), or two names one case apart.
+    So a package can never write the server's marker or record.
+  - `apply` stages every directory before swapping any, so a file that cannot be written changes nothing. A failure to
+    delete an old copy no longer fails the request.
+  - The upgrade baseline is the creation hash.
+  - `${SPACE}` is rendered only in `.toon` files, as `SpaceManager` copies.
+  - The template gallery skips dot folders.
+  - A Space whose record does not read is left out of the offer rather than failing the request.
+  - Accepted: removing an App while a Space is being created from its template is not locked against it. Space
+    creation copies the template in one step, and removal leaves Spaces alone.
+
+**Proof (as built), targeted tests only (operator: no full gate).**
+- `ControlApiAppInstallTest` 5/5 over real HTTP:
+  - the full cycle (dry run, install, a Space from the template, upgrade with `update`/`new` then `customised`
+    offers, remove), with every Space's config byte-identical at each step;
+  - 401/403/200 on the capability;
+  - each 422: unsigned, untrusted signer, tampered, not a zip, an id that disagrees, and the range rule;
+  - the 409s and the 404;
+  - Domain product and no descriptor give 409.
+  - After the review: `update` holds one upgrade behind with no local edit, and `customised` appears only after one;
+    a forged `.installed-by.` and a case-only duplicate are refused.
+- **Live, on a Standard bundle** (`package.ps1 -Product inspecto -Edition Standard -NoRuntime -NoUi`), booted from
+  its root with the sample partner App signed by a partner key listed in `conf/app-signers.properties`:
+  - `GET /apps` reports `liveInstall` and the signers `acme-proof-1` and `inspecto-issuer-1`;
+  - the dry run lists the Pipeline, Schema, Job, Datasets and sample data;
+  - install 200, and `/bootstrap` serves the App's nav;
+  - a Space is created from `acme-spend`;
+  - the upgrade 0.1.0 to 0.2.0 offers that Space `update config/jobs/acme_spend_detect_job.toon`;
+  - remove 200, with `spacesKept` `[acme-proof]`, the template and nav gone;
+  - every Space's config files stay byte-identical after install, upgrade and remove;
+  - a package with one byte of file data changed: 422.
+- `CapabilityManifestTest`, `OpenApiPathsContractTest`, `ApiContractTest`, `ContractFragmentsTest`,
+  `ControlApiBootstrapProductTest`, `ProductDescriptorTest`, `SpaceManagerTemplateGateTest` and
+  `ImportLoaderInventoryTest` pass.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 

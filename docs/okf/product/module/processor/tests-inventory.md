@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-397 test class(es): 155 unit, 242 real-HTTP control-plane, 0 IT.
+398 test class(es): 155 unit, 243 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -67,6 +67,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiAlertOwnerTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertOwnerTest.java` | DUCKLE-C1 residual 2 — <b>owner-routed alerting</b>, over real HTTP: the capture point and the feed. |
 | `ControlApiAlertRuleWriteTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertRuleWriteTest.java` | Integration tests for the alert-rule authoring routes ({@code POST/PUT/DELETE /alerts/rules[/{name}]}) |
 | `ControlApiAnalyticsCatalogueTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAnalyticsCatalogueTest.java` | {@code GET /analytics/functions} (ANALYTICS-CORE-1 C8) over real HTTP: a read-only, ungated description of the Analytics |
+| `ControlApiAppInstallTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAppInstallTest.java` | PRODUCT-ASSEMBLY-1 PA-7d over real HTTP: install, upgrade and remove a signed App on a running server, with every Space's |
 | `ControlApiApproverRosterTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiApproverRosterTest.java` | {@code GET/PUT /settings/approvers} over real HTTP with real Subjects ({@link ApproverRoster}): the canAdminister |
 | `ControlApiArrivalNewColumnsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiArrivalNewColumnsTest.java` | {@code LA-ARRIVAL-NEW-COLUMNS-1} over real HTTP (operator 2026-11-06, plan D-6): a later file's new column is kept as a |
 | `ControlApiAssistTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAssistTest.java` | Integration tests for the v3.3.0 assist route over real HTTP (P0): {@code POST /assist/{intent}} |

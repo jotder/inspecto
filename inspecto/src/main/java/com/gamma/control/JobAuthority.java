@@ -140,7 +140,7 @@ final class JobAuthority {
     }
 
     private static final String LA_INDEX_BUILD = "la.index.build";
-    private static final String LA_OWNER = "owner";
+    static final String LA_OWNER = "owner";   // package-visible: InstalledApps sets the stamp aside when it diffs a Space (PA-7d)
 
     /** {@link #stamp(HttpExchange, Map, String)} over a parsed Job; {@code existing} is the stored one, or null. */
     static JobConfig stamp(HttpExchange ex, JobConfig c, JobConfig existing) {
