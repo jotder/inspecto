@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); PA-6d is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -802,6 +802,26 @@ expectation changed to A-001, A-104 the same run fails, naming the keys it found
 - `package.ps1 -ProductFile <acme-console.toon> -Edition Standard -NoRuntime -NoUi` (Incidents + Screening, Standard
   floor) built and passed its boot smoke. Its `lib/product.json` and `edition.properties` name `acme-console` /
   "Acme Console" with no Apps. Passing `-Product` with it is refused.
+
+**PA-6d as built (2026-11-11).** The builder-kit guide is
+[`okf/product/layer/platform/user-guide-builder-kit.md`](../okf/product/layer/platform/user-guide-builder-kit.md), in the
+`layer/platform` hub. It opens with a table of which part to use for which job, then covers:
+- Studio and the Pipeline editor, in the Builder Lens;
+- the four extension points (Step, Job type, Consequence, Collector connector), with their interfaces, service files
+  and in-repo examples;
+- packs from `tools/scaffold.mjs` and the module manifest;
+- the Control API and its generated OpenAPI document;
+- `@PublicApi`;
+- the App kit and the Add-on picker.
+
+It links to the deeper pages rather than repeating them. The verification review checked its interfaces, paths
+and manifest keys against the code at 189c72a26, and corrected two points:
+- only `StepExecutor`, `PipelineNodeType` and `CollectorConnectorFactory` carry `@PublicApi`;
+- `processor` and `nodetype` scaffolds are classpath jars, not packs.
+
+**Deliberately not done.** Marking `JobTypeProvider`, `ConsequenceProvider` and `CollectorConnector` `@PublicApi`, and a
+guard that holds the marked surface stable: `PUBLIC-API-SURFACE-1` on the board, held for demand. The guide says
+which interfaces are marked and tells a pack author to pin the Platform version.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
