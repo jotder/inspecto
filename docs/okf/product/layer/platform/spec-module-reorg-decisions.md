@@ -32,7 +32,7 @@ Vocabulary: **Platform module** (horizontal module) is distinct from **Platform 
 |---|---|---|
 | D-MR1 | Contract modules | Keep three (`audit-spi`, `auth-spi`, `http-spi`); policy and state moved out (`AccessPolicies`, `EgressPolicy`, `AuditTrail`, `InMemoryEventStore`); `SpiSlot`, DTO validation, `ErrorCodes` stay. Shipped as the P7 contracts split: `com.gamma.control` no longer spans modules; `AuditChain` stays split by design (format + verifier in audit-spi, writer in `inspecto-event`) |
 | D-MR2 | Regroup directories | Yes, once. Done 2026-10-07 after path-agnostic guards (`tools/reactor-modules.mjs`, `ReactorModules`): `spi/ platform/ features/ la/ providers/`, artifactIds UNCHANGED, so `-pl :artifactId` |
-| D-MR3 | Licence / entitlement engine | None. Installed / Enabled / Permitted gate everything; `entitlementKey` reserved in the manifest |
+| D-MR3 | Licence / entitlement engine | None. Installed / Enabled / Permitted gate everything; `entitlementKey` reserved in the manifest. ⬆ **Superseded 2026-11-11 by D-PA22** (product assembly plan §12): an offline signed entitlement file narrows the Installed gate (PA-7) |
 | D-MR4 | Manifest | TOON at `META-INF/inspecto/module.toon` |
 | D-MR5 | `metrics` + `events` | Merged into one Observability module (included from Professional up) |
 | D-MR6 | Split `inspecto-security` | Done: OIDC authenticator + token relay, secrets provider, geo-country resolver |

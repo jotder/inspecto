@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); PA-7a is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -823,6 +823,93 @@ and manifest keys against the code at 189c72a26, and corrected two points:
 guard that holds the marked surface stable: `PUBLIC-API-SURFACE-1` on the board, held for demand. The guide says
 which interfaces are marked and tells a pack author to pin the Platform version.
 
+**PA-7 designed and sliced (2026-11-11; D-PA22…D-PA25 signed).** Proof (§11 table): install, upgrade and remove an
+App on a running server with no lost config, and a trial build that runs, warns, then turns read-only.
+
+What exists to build on:
+- **The Add-on gate.** `EditionFeatures.holdsInvestigationsAddon()` is the one runtime check today, and its comment
+  marks it as "the hook a signed entitlement replaces". `-Daddons.laInvestigations` is an honour-system setting.
+- **The entitlement key.** `ModuleManifest.entitlementKey` is reserved and never read (D-MR3, now superseded by
+  D-PA22).
+- **Pack trust.** The pack loader already trusts jars by SHA-256 allowlist and can require a jar signature
+  (`JobPackManager`).
+- **Live Product data.** The server learns its Product and Apps from `lib/product.json` (`ProductDescriptor`), read
+  once at boot.
+- **No read-only mode exists.**
+- **Signing needs nothing new.** The JDK verifies Ed25519 and Node's `crypto` signs it.
+
+**Decisions (operator, 2026-11-11, all as recommended).**
+- **D-PA22: an offline signed file.** An Ed25519-signed entitlement file, with no phone-home. It holds:
+  - customer, Product, Edition;
+  - the Apps and Add-ons it allows;
+  - a node count, which is recorded and shown but not enforced;
+  - `notBefore` and `expires`, and the key id.
+  - It is checked at boot and by every gate that reads the Installed state. This supersedes D-MR3 "no licence
+    engine".
+- **D-PA23: no file means today's behaviour.** A production bundle with no entitlement runs as it does now: every
+  built Add-on on, and Home telling the admin none is installed. Only a `trial` build must carry one, so nothing
+  installed today breaks.
+- **D-PA24: expiry gives grace, then read-only.**
+  - For 14 days the admin and Home show warnings.
+  - Then the server is read-only: ingest, Jobs, Pipeline runs and config saves are refused (`423 Locked`, naming the
+    expiry), while reads, dashboards and exports keep working.
+  - No data is removed, and a new file restores everything with no restart.
+- **D-PA25: an upgrade changes the template and offers the diff.** It replaces the App's templates and nav, so new
+  Spaces get the new version. Each Space already made from the App is offered a dry-run diff, applied through the
+  normal config-change path (SaveGate, audit), so nothing a customer authored changes without an admin's yes.
+
+**Decided here, not asked** (the standing preference to decide and record):
+- **Key custody.** The issuer's private key stays in `product-map/private/keys/`, which is gitignored. The trusted
+  public keys are compiled into the core jar as resources, by key id, so an installed bundle cannot be re-keyed by
+  editing a file beside it. Rotation adds a key id, and old ids stay trusted until they are removed in a release.
+- **The file is canonical TOON plus a detached signature.** `entitlement.toon` and `entitlement.sig` (base64 Ed25519
+  over the file's bytes) live in the install's `conf/` folder, or wherever `-Dentitlement.file` points. A file that
+  does not verify fails the boot, naming the file and the key id. It is never treated as "no file".
+- **An entitlement narrows; it never adds.** It cannot switch on an Add-on or App the build lacks. With a file
+  present, an Add-on the build has but the file omits is absent, through the existing Installed gate, with the
+  `/bootstrap` `featureReasons` wording "not in this installation's entitlement".
+- **The pilot Distribution moves to PA-10.** It is customer Collectors pre-wired, which needs the customer record.
+  `PLANNED_DISTRIBUTIONS.pilot` is re-pointed there.
+
+**Slices (one lane each, in this order):**
+- **PA-7a: signed entitlements.**
+  - `tools/entitle.mjs`: `issue` (from a private customer record, writing `entitlement.toon` + `.sig`), `verify` and
+    `show`.
+  - Server side, an `Entitlements` class (in `inspecto-util` or `inspecto-etl`, beside `EditionFeatures`):
+    - it verifies against the compiled-in keys;
+    - the Installed gate reads it;
+    - `holdsInvestigationsAddon()` reads it;
+    - `/bootstrap` gives admins a summary: customer, expiry, days left, and the node count.
+  - Tests: a real-HTTP gate test for an omitted Add-on, a tampered file failing the boot, an unknown key id, and no
+    file meaning today's behaviour.
+- **PA-7b: expiry and the trial Distribution.**
+  - The grace window and the read-only state, one check in the route dispatcher plus the scheduler and ingest.
+  - `423 Locked` on write routes, with an `/api/v1` error shape and an OpenAPI entry.
+  - A renewal file picked up without a restart.
+  - `trial` becomes a built Distribution: `package.ps1 -Distribution trial -EntitlementFile <f>` refuses a file with
+    no expiry and stages it into `conf/`. `PLANNED_DISTRIBUTIONS.trial` goes.
+  - Proof: a trial bundle with a clock pinned through a test property, in grace and then read-only.
+- **PA-7c: signed App packages.**
+  - `inspecto-app.mjs sign` (an Ed25519 signature over `MANIFEST.sha256`, with the signer's key id) and `verify`.
+  - A partner key is trusted by an install through an allowlist of key ids, like the pack allowlist. First-party Apps
+    are signed with the issuer key.
+  - The App kit's `package` output gains the signature.
+- **PA-7d: live App install.**
+  - Admin-only routes, through the `endpoint` skill's gate order:
+    - `GET /apps`;
+    - `POST /apps?dryRun=true` and `POST /apps` (a signed package);
+    - `PUT /apps/{id}` for an upgrade;
+    - `DELETE /apps/{id}`.
+  - Install verifies the signature and the manifest hashes. It checks the Platform range, the Add-ons it needs, and the
+    entitlement's Apps when a file is present. It refuses a template name collision.
+  - The dry-run diff lists the templates, Datasets, Jobs, Alert Rules and nav entries the App adds, changes or removes.
+  - Install unpacks the App to an install-owned `apps/` folder and registers its templates for Space create.
+  - The descriptor's Apps and nav become reloadable, so `/bootstrap` shows them at once.
+  - Upgrade follows D-PA25. Remove takes the App's templates and nav away, while Spaces made from it keep their config
+    (the existing inert-config semantics) and are listed in the answer.
+  - Proof: the sample partner App, installed, upgraded to 0.2.0 and removed on a running Standard bundle, with every
+    Space's config byte-identical before and after.
+
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
 | Id | Call | Signed |
@@ -848,6 +935,10 @@ which interfaces are marked and tells a pack author to pin the Platform version.
 | D-PA19 | How deep the App conformance kit goes in PA-6 | boot a built bundle per listed Edition, seed the App's template, run its Jobs, check its declared golden findings (signed 2026-11-11) |
 | D-PA20 | The order of the PA-6 lanes | the App kit (6a), the sample partner App with its conformance in CI (6b), the Add-on picker (6c), the builder-kit docs (6d) (signed 2026-11-11) |
 | D-PA21 | Where a picked Platform product lives and how it builds | in `product-map/private/products/<id>.toon` (gitignored, per customer). It narrows the Inspecto Platform product (`narrows: inspecto`): the same host, Apps and templates, only the picked Add-ons and their closure, and the Editions from the floor up. `assemble.mjs --product-file` and `package.ps1 -ProductFile` build it in Inspecto's place (signed 2026-11-11) |
+| D-PA22 | Licence engine (supersedes D-MR3 "none") | an offline Ed25519-signed entitlement file (customer, Product, Edition, Apps, Add-ons, node count, expiry), checked at boot and on each gated route, no phone-home; node count recorded and shown, not enforced (signed 2026-11-11) |
+| D-PA23 | A production bundle with no entitlement file | runs as today (every built Add-on on; Home tells the admin none is installed); only a trial build must carry one (signed 2026-11-11) |
+| D-PA24 | When an entitlement or trial expires | 14 days of warnings, then read-only: ingest, Jobs, runs and config saves refused, reads, dashboards and exports kept; no data removed; a new file restores it without a restart (signed 2026-11-11) |
+| D-PA25 | Upgrading an App whose templates made Spaces | the upgrade replaces the App's templates and nav; each existing Space is offered a dry-run diff applied through the normal config-change path (signed 2026-11-11) |
 
 ## 13. The open board, re-checked 2026-11-10
 
