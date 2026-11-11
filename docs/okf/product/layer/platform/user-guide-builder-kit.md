@@ -119,7 +119,9 @@ node tools/inspecto-app.mjs new acme-spend --dir ../acme-spend --title "Acme Spe
 node tools/inspecto-app.mjs validate --app-root ../acme-spend                               # the Product guard's App rules
 node tools/inspecto-app.mjs test --app-root ../acme-spend                                   # static conformance, every Edition
 node tools/inspecto-app.mjs test --app-root ../acme-spend --bundle inspecto-deploy          # + boot and golden data (D-PA19)
-node tools/inspecto-app.mjs package --app-root ../acme-spend                                # <id>-<version>.zip + MANIFEST.sha256
+node tools/inspecto-app.mjs keygen --key-id acme-signing-1 --out ../keys                    # your signing key (once)
+node tools/inspecto-app.mjs package --app-root ../acme-spend --key ../keys/acme-signing-1.pem # signed <id>-<version>.zip
+node tools/inspecto-app.mjs verify --package ../acme-spend/dist/acme-spend-0.1.0.zip --trust ../keys/acme-signing-1.properties
 ```
 
 - **`new`** writes a working App in ten files:
@@ -140,7 +142,9 @@ node tools/inspecto-app.mjs package --app-root ../acme-spend                    
 - **The worked sample** is [`examples/partner-app/`](../../../../../examples/partner-app/) (App `acme-spend`). It is the
   kit's unedited output, and CI holds its conformance.
 - **Not in the kit yet:**
-  - signing and installing an App package (PA-7);
+  - installing a package on a running server (PA-7d). A server will install only a signed package whose key it trusts: the
+    issuer key for first-party Apps, or a partner key listed in the install's `conf/app-signers.properties` (the line
+    `keygen` writes to `<id>.properties`);
   - an Alert Rule in the starter (`APP-KIT-ALERT-RULE-1` on the board).
 
 ## 6. The Add-on picker: `tools/pick-addons.mjs`

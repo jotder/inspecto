@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); PA-7c is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); PA-7d is next. Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1024,6 +1024,29 @@ and The trial Distribution.
   - Booted: `/bootstrap.entitlement` is `read-only` (customer `trial-proof`, `readOnlyFrom` 2026-10-16).
     `PUT /settings/modules` answers 423 `ENTITLEMENT_READ_ONLY`, naming the expiry; `GET /modules` answers 200.
   - `-Distribution trial` without `-EntitlementFile` is refused before the build starts.
+
+**PA-7c as built (2026-11-11).** The App kit signs and verifies packages (`tools/inspecto-app.mjs`, Node only).
+- **`package --key <pem> [--key-id <id>]`** adds `<id>/MANIFEST.sig` (`keyId=…`, `signature=<base64 Ed25519 over MANIFEST.sha256>`).
+  The key id defaults to the key file's name. A `.pem` in the App folder is never packaged. Without `--key` the
+  package is still written, and the command says that a server installs only a signed one.
+- **`verify --package <zip> [--trust <keys.properties>]…`** reads the zip back with the kit's own `unzip`, which
+  refuses an entry that escapes its folder. It holds:
+  - exactly one App folder;
+  - every manifest entry present with its SHA-256, and nothing unlisted;
+  - a `MANIFEST.sig` whose key is trusted and whose signature matches the manifest;
+  - `app.toon`'s id equal to the folder name.
+- **Trust.** The default is the issuer keys the core jar carries (first-party Apps are signed with `inspecto-issuer-1`).
+  Each `--trust` file adds partner keys: an install's `conf/app-signers.properties` lists them as `keyId=base64`, the
+  allowlist the server reads in PA-7d.
+- **`keygen --key-id <id> --out <dir>`** gives a partner `<id>.pem` and `<id>.properties`, the line an install adds to
+  that allowlist. A key id is never reused.
+
+**Proof (as built).**
+- `tools/inspecto-app.test.mjs` 11/11. The new cases: a signed package verifies; each of these is refused (an
+  untrusted key, a changed file, an extra file, a changed manifest, an unsigned package, two App folders, a bad key
+  id, a reused key id); `unzip` round-trips and refuses `../`.
+- By hand, the sample partner App signed with a partner key verifies with `--trust`, is refused without it, and an
+  unsigned package is refused.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 

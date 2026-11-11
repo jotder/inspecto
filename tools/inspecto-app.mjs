@@ -20,20 +20,29 @@
 //       product carrying it and check the plan and descriptor (tools/check-product-build.mjs). With --bundle (D-PA19) also
 //       boot that bundle on loopback with a Space from the conformance template, trigger its Pipelines and the listed
 //       Jobs for the corpus day, and hold each findings Dataset to its expected keys exactly.
-//   node tools/inspecto-app.mjs package --app-root <dir> [--out <dir>]
-//       <id>-<version>.zip of the App folder with MANIFEST.sha256 (signing and live install are PA-7)
+//   node tools/inspecto-app.mjs package --app-root <dir> [--out <dir>] [--key <private.pem> [--key-id <id>]]
+//       <id>-<version>.zip of the App folder with MANIFEST.sha256; with --key also MANIFEST.sig, an Ed25519 signature over the
+//       manifest naming its key id (PA-7c). A server installs only a signed package (PA-7d)
+//   node tools/inspecto-app.mjs verify --package <zip> [--trust <keys.properties>]...
+//       every file against the manifest, and the manifest's signature against a trusted key: the issuer keys the core jar
+//       carries (first-party Apps) plus each --trust file (an install's conf/app-signers.properties lists partner keys)
+//   node tools/inspecto-app.mjs keygen --key-id <id> --out <dir>
+//       a partner's Ed25519 signing key: <id>.pem (keep it private) and <id>.properties, the line an install adds to its
+//       conf/app-signers.properties to trust that partner
 //
 // Exit 1 with every finding named when something does not hold.
 
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { crc32, deflateRawSync } from 'node:zlib';
+import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib';
 import { assemble } from './assemble.mjs';
+import { KEYS_FILE, publicResource, signBytes, trustedKeys } from './entitle.mjs';
+import { verify as edVerify } from 'node:crypto';
 import { gather } from './check-offerings.mjs';
 import { checkPlan } from './check-product-build.mjs';
 import { builtAddons, carryPartnerApps, checkModel, gatherModel } from './products.mjs';
@@ -364,22 +373,93 @@ export function zip(entries) {
     return Buffer.concat([...local, cd, end]);
 }
 
-/** Write `<out>/<id>-<version>.zip` (the App folder plus MANIFEST.sha256); refuses an App that does not validate. */
-export function packageApp(appRoot, out, { repo = REPO } = {}) {
+/**
+ * Write `<out>/<id>-<version>.zip` (the App folder plus MANIFEST.sha256); refuses an App that does not validate. With `key` (a
+ * PEM Ed25519 private key) and `keyId` it also signs the manifest: `MANIFEST.sig` holds `keyId=<id>` and `signature=<base64>`.
+ */
+export function packageApp(appRoot, out, { repo = REPO, key = null, keyId = null } = {}) {
     const root = resolve(appRoot);
     const findings = validate(root, { repo });
     if (findings.length) throw new Error(`the App does not validate - fix it first:\n  ${findings.join('\n  ')}`);
     const app = read(join(root, 'app.toon'));
     // The App's own files only: no dot-entry (.git, .idea, ...), no node_modules, no dist/ output, no archive.
-    const skip = (f) => f.split('/').some((s) => (s.startsWith('.') && s !== '.gitkeep') || s === 'node_modules') || f.startsWith('dist/') || f === 'MANIFEST.sha256' || f.endsWith('.zip');
+    const skip = (f) => f.split('/').some((s) => (s.startsWith('.') && s !== '.gitkeep') || s === 'node_modules') || f.startsWith('dist/') || f === 'MANIFEST.sha256' || f === 'MANIFEST.sig' || f.endsWith('.zip') || f.endsWith('.pem');
     const files = walk(root).filter((f) => !skip(f));
     const entries = files.map((f) => ({ name: `${app.id}/${f}`, data: readFileSync(join(root, ...f.split('/'))) }));
     const manifest = entries.map((e) => `${createHash('sha256').update(e.data).digest('hex')}  ${e.name}`).join('\n') + '\n';
     entries.push({ name: `${app.id}/MANIFEST.sha256`, data: Buffer.from(manifest) });
+    if (key) {
+        if (!keyId || !/^[a-z][a-z0-9-]{1,63}$/.test(keyId)) throw new Error(`a signing key needs a key id (lower-case letters, digits and hyphens), was '${keyId ?? ''}'`);
+        entries.push({ name: `${app.id}/MANIFEST.sig`, data: Buffer.from(`keyId=${keyId}\nsignature=${signBytes(Buffer.from(manifest), key)}\n`) });
+    }
     mkdirSync(resolve(out), { recursive: true });
     const file = join(resolve(out), `${app.id}-${app.version}.zip`);
     writeFileSync(file, zip(entries));
-    return { file, files: entries.length, bytes: statSync(file).size };
+    return { file, files: entries.length, bytes: statSync(file).size, signed: Boolean(key) };
+}
+
+/** The entries of a ZIP archive written by {@link zip} (stored or deflated), as { name: Buffer }. */
+export function unzip(buf) {
+    let end = buf.length - 22;
+    while (end >= 0 && buf.readUInt32LE(end) !== 0x06054b50) end--;
+    if (end < 0) throw new Error('not a ZIP archive (no end record)');
+    const count = buf.readUInt16LE(end + 10);
+    let p = buf.readUInt32LE(end + 16);
+    const out = {};
+    for (let i = 0; i < count; i++) {
+        if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error('a broken ZIP central directory');
+        const method = buf.readUInt16LE(p + 10), size = buf.readUInt32LE(p + 20), nameLen = buf.readUInt16LE(p + 28);
+        const extraLen = buf.readUInt16LE(p + 30), commentLen = buf.readUInt16LE(p + 32), local = buf.readUInt32LE(p + 42);
+        const name = buf.subarray(p + 46, p + 46 + nameLen).toString('utf8');
+        const at = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+        const body = buf.subarray(at, at + size);
+        if (name.includes('..') || name.startsWith('/') || name.includes('\\')) throw new Error(`a ZIP entry escapes its folder: ${name}`);
+        out[name] = method === 0 ? Buffer.from(body) : method === 8 ? inflateRawSync(body) : (() => { throw new Error(`${name}: compression method ${method} is not supported`); })();
+        p += 46 + nameLen + extraLen + commentLen;
+    }
+    return out;
+}
+
+/** Keys from a `keyId=base64(SPKI)` properties file (an install's conf/app-signers.properties), or {} when there is none. */
+export const signerKeys = (file) => (existsSync(file) ? trustedKeys(file) : {});
+
+/**
+ * Verify a packaged App (PA-7c): one App folder; every file listed in MANIFEST.sha256 with its hash, and nothing unlisted;
+ * MANIFEST.sig names a key in `trust` and its Ed25519 signature matches the manifest. Returns { app, version, keyId, files } or
+ * throws naming the first thing that does not hold.
+ */
+export function verifyPackage(buf, trust) {
+    const entries = unzip(buf);
+    const roots = [...new Set(Object.keys(entries).map((n) => n.split('/')[0]))];
+    if (roots.length !== 1) throw new Error(`a package holds one App folder, found ${roots.join(', ') || 'none'}`);
+    const id = roots[0];
+    const manifest = entries[`${id}/MANIFEST.sha256`] ?? (() => { throw new Error('no MANIFEST.sha256 - package the App with inspecto-app.mjs package'); })();
+    const sig = entries[`${id}/MANIFEST.sig`] ?? (() => { throw new Error('the package is not signed (no MANIFEST.sig) - package it with --key'); })();
+    const fields = Object.fromEntries(sig.toString('utf8').split(/\r?\n/).filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()]));
+    const key = trust[fields.keyId] ?? (() => { throw new Error(`signed by key '${fields.keyId ?? ''}', which is not trusted here (${Object.keys(trust).join(', ') || 'no keys'})`); })();
+    if (!edVerify(null, manifest, key, Buffer.from(fields.signature ?? '', 'base64'))) throw new Error('the manifest signature does not match - the package was changed after signing, or signed with another key');
+    const listed = new Map(manifest.toString('utf8').split('\n').filter(Boolean).map((l) => [l.slice(66), l.slice(0, 64)]));
+    for (const [name, hash] of listed) {
+        const data = entries[name] ?? (() => { throw new Error(`${name} is in the manifest but not in the package`); })();
+        if (createHash('sha256').update(data).digest('hex') !== hash) throw new Error(`${name} does not match its manifest hash`);
+    }
+    for (const name of Object.keys(entries))
+        if (!listed.has(name) && name !== `${id}/MANIFEST.sha256` && name !== `${id}/MANIFEST.sig`) throw new Error(`${name} is in the package but not in the manifest`);
+    const app = parseToon((entries[`${id}/app.toon`] ?? Buffer.from('')).toString('utf8'));
+    if (app.id !== id) throw new Error(`the package folder is '${id}' but app.toon names '${app.id ?? ''}'`);
+    return { app: id, version: app.version, keyId: fields.keyId, files: listed.size };
+}
+
+/** A partner's signing key pair: <out>/<id>.pem (private) and <out>/<id>.properties (the install's trust line). */
+export function keygen(keyId, out) {
+    if (!/^[a-z][a-z0-9-]{1,63}$/.test(keyId ?? '')) throw new Error(`--key-id '${keyId ?? ''}' must be lower-case letters, digits and hyphens`);
+    const pem = join(resolve(out), `${keyId}.pem`), props = join(resolve(out), `${keyId}.properties`);
+    if (existsSync(pem) || existsSync(props)) throw new Error(`${pem} or its .properties exists already - a key id is never reused`);
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+    mkdirSync(resolve(out), { recursive: true });
+    writeFileSync(pem, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+    writeFileSync(props, `${keyId}=${publicResource(publicKey)}\n`);
+    return { pem, props };
 }
 
 // ── command line ──
@@ -406,10 +486,21 @@ async function main() {
             if (!findings.length && val('--bundle')) findings.push(...await bootConformance(appRoot(), val('--bundle'), { log: (m) => console.log(`  ${m}`) }));
             report(findings, `conformance: assembled on ${editions.join(', ')}${val('--bundle') ? `; golden data held on ${val('--bundle')}` : ''}`);
         } else if (cmd === 'package') {
-            const r = packageApp(appRoot(), val('--out') ?? join(resolve(appRoot()), 'dist'));
-            console.log(`✓ ${r.file} (${r.files} files, ${r.bytes} bytes)`);
+            const keyFile = val('--key');
+            const r = packageApp(appRoot(), val('--out') ?? join(resolve(appRoot()), 'dist'), keyFile
+                ? { key: readFileSync(keyFile, 'utf8'), keyId: val('--key-id') ?? keyFile.split(/[\\/]/).pop().replace(/\.pem$/, '') } : {});
+            console.log(`✓ ${r.file} (${r.files} files, ${r.bytes} bytes${r.signed ? ', signed' : ', NOT signed - a server installs only a signed package'})`);
+        } else if (cmd === 'verify') {
+            const pkg = val('--package') ?? (() => { throw new Error('--package <zip> is required'); })();
+            const trust = { ...trustedKeys(KEYS_FILE) };
+            a.forEach((x, i) => { if (x === '--trust' && a[i + 1]) Object.assign(trust, signerKeys(a[i + 1])); });
+            const r = verifyPackage(readFileSync(pkg), trust);
+            console.log(`✓ ${pkg}: App '${r.app}' ${r.version}, ${r.files} files, signed by '${r.keyId}'`);
+        } else if (cmd === 'keygen') {
+            const r = keygen(val('--key-id'), val('--out') ?? '.');
+            console.log(`✓ private key ${r.pem} (keep it private; never commit it)\n✓ ${r.props}: give this line to an install, which adds it to conf/app-signers.properties`);
         } else {
-            throw new Error('usage: inspecto-app.mjs new <id> --dir <folder> | validate --app-root <folder> | test --app-root <folder> [--bundle <dir>] | package --app-root <folder> [--out <dir>]');
+            throw new Error('usage: inspecto-app.mjs new <id> --dir <folder> | validate --app-root <folder> | test --app-root <folder> [--bundle <dir>] | package --app-root <folder> [--out <dir>] [--key <pem>] | verify --package <zip> [--trust <keys.properties>] | keygen --key-id <id> --out <dir>');
         }
     } catch (e) {
         console.error(`inspecto-app: ${e.message}`);

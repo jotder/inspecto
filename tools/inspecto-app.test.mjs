@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
-import { STARTER, goldenConformance, isOidcJar, packageApp, scaffold, scaffoldSpace, staticConformance, validate, zip } from './inspecto-app.mjs';
+import { STARTER, goldenConformance, isOidcJar, keygen, packageApp, scaffold, scaffoldSpace, signerKeys, staticConformance, unzip, validate, verifyPackage, zip } from './inspecto-app.mjs';
 import { assemble } from './assemble.mjs';
 import { gather } from './check-offerings.mjs';
 import { gatherModel } from './products.mjs';
@@ -162,4 +162,38 @@ test('the sample partner App (examples/partner-app) validates and holds static c
     const { findings, editions } = staticConformance(root);
     assert.deepEqual(findings, []);
     assert.deepEqual(editions, ['basic', 'standard', 'advanced', 'preview']);
+});
+
+test('a signed package verifies against its signer and refuses an untrusted key, a changed file, an extra file or a changed manifest (PA-7c)', () => withApp((root, dir) => {
+    const { pem, props } = keygen('acme-signing-1', join(dir, 'keys'));
+    assert.throws(() => keygen('acme-signing-1', join(dir, 'keys')), /never reused/);
+    writeFileSync(join(root, 'signing.pem'), 'a stray key the package must never carry');
+    const r = packageApp(root, join(dir, 'out'), { repo, key: readFileSync(pem, 'utf8'), keyId: 'acme-signing-1' });
+    assert.equal(r.signed, true);
+    const buf = readFileSync(r.file);
+    const trust = signerKeys(props);
+    const ok = verifyPackage(buf, trust);
+    assert.deepEqual([ok.app, ok.version, ok.keyId], ['acme-limits', '0.1.0', 'acme-signing-1']);
+    const entries = unzip(buf);
+    assert.ok(!Object.keys(entries).some((n) => n.endsWith('.pem')), 'a .pem in the App folder is never packaged');
+    assert.throws(() => verifyPackage(buf, {}), /'acme-signing-1', which is not trusted here/);
+
+    const repack = (change) => { const e = { ...entries }; change(e); return zip(Object.entries(e).map(([name, data]) => ({ name, data }))); };
+    assert.throws(() => verifyPackage(repack((e) => { e['acme-limits/app.toon'] = Buffer.concat([e['acme-limits/app.toon'], Buffer.from('\n')]); }), trust),
+        /acme-limits\/app.toon does not match its manifest hash/);
+    assert.throws(() => verifyPackage(repack((e) => { e['acme-limits/extra.toon'] = Buffer.from('x: 1\n'); }), trust), /extra.toon is in the package but not in the manifest/);
+    assert.throws(() => verifyPackage(repack((e) => { e['acme-limits/MANIFEST.sha256'] = Buffer.from(e['acme-limits/MANIFEST.sha256'].toString() + '\n'); }), trust),
+        /manifest signature does not match/);
+    assert.throws(() => verifyPackage(repack((e) => { delete e['acme-limits/MANIFEST.sig']; }), trust), /not signed/);
+    assert.throws(() => verifyPackage(repack((e) => { e['other/app.toon'] = Buffer.from('id: other\n'); }), trust), /one App folder/);
+    assert.throws(() => packageApp(root, join(dir, 'out2'), { repo, key: readFileSync(pem, 'utf8'), keyId: 'Bad Id' }), /key id/);
+}));
+
+test('unzip reads back exactly what zip wrote', () => {
+    const entries = [{ name: 'a/x.txt', data: Buffer.from('hello') }, { name: 'a/y.bin', data: Buffer.alloc(3000, 7) }];
+    const back = unzip(zip(entries));
+    assert.deepEqual(Object.keys(back), ['a/x.txt', 'a/y.bin']);
+    assert.equal(back['a/x.txt'].toString(), 'hello');
+    assert.ok(back['a/y.bin'].equals(Buffer.alloc(3000, 7)));
+    assert.throws(() => unzip(zip([{ name: '../evil', data: Buffer.from('x') }])), /escapes its folder/);
 });
