@@ -148,7 +148,7 @@ class ControlApiConfigImpactTest {
         Files.writeString(root.resolve("jobs").resolve("nightly_job.toon"), """
                 job:
                   name: nightly
-                on_pipeline: orders_feed
+                  on_pipeline: orders_feed
                 """);
         writeComponent(root, "expectations", "rowcount", "name: rowcount\ntarget: orders_feed\n");
         writeComponent(root, "decision-rules", "routing", "name: routing\ntarget: orders_feed\n");
@@ -163,6 +163,47 @@ class ControlApiConfigImpactTest {
             assertEquals("rowcount", d.get("expectation").get(0).get("name").asText());
             assertEquals("routing", d.get("decision-rule").get(0).get("name").asText());
             assertEquals("physicalRef", d.get("dataset").get(0).get("via").asText());
+        }
+    }
+
+    /**
+     * The loader reads the whole config tree, so the scan must too: an Enrichment and a Job in a sub-folder
+     * are dependents (the demo keeps {@code orders/orders_daily_enrich.toon}). A copy under {@code .history/}
+     * or a reserved state dir is not a live config and is not counted.
+     */
+    @Test
+    void findsDependentsInSubfoldersAndSkipsReservedCopies(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        writeOrigin(root);
+        String enrich = """
+                name: daily
+                transform: SELECT 1
+                triggers:
+                  on_pipeline: orders_feed
+                """;
+        String job = """
+                job:
+                  name: nightly
+                  type: pipeline
+                  on_pipeline: orders_feed
+                """;
+        Files.createDirectories(root.resolve("orders"));
+        Files.writeString(root.resolve("orders").resolve("daily_enrich.toon"), enrich);
+        Files.createDirectories(root.resolve("ops").resolve("nightly"));
+        Files.writeString(root.resolve("ops").resolve("nightly").resolve("nightly_job.toon"), job);
+        Files.createDirectories(root.resolve("orders").resolve(".history"));
+        Files.writeString(root.resolve("orders").resolve(".history").resolve("old_enrich.toon"), enrich);
+        Files.createDirectories(root.resolve("pending-changes"));
+        Files.writeString(root.resolve("pending-changes").resolve("held_job.toon"), job);
+        // A document with no job: section is still read at the top level.
+        Files.writeString(root.resolve("ops").resolve("flat_job.toon"), "name: flat\non_pipeline: orders_feed\n");
+
+        try (Ctx c = open(cfg, root)) {
+            JsonNode out = V1Body.of(get(c.port, "/config/pipeline/orders_feed/impact").body());
+            assertEquals(3, out.get("total").asInt(), out.toString());
+            JsonNode d = out.get("dependents");
+            assertEquals("daily_enrich", d.get("enrichment").get(0).get("name").asText());
+            assertEquals("flat_job", d.get("job").get(0).get("name").asText());
+            assertEquals("nightly_job", d.get("job").get(1).get("name").asText());
         }
     }
 

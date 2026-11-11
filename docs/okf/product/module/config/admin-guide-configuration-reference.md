@@ -32,11 +32,12 @@ container root — `-Dspaces.root=<dir>`, default `<install_dir>/spaces` when no
 spaces/
   <id>/                     # id: [a-z0-9-], 1–63 chars, not starting with '-'
     space.toon              # manifest: display_name, description, created_at, optional data_root
-    config/                 # this space's *.toon tree (scanned at boot; hot-reloadable)
+    config/                 # this space's *.toon tree (scanned at boot; hot-reloadable); every file in it:
+                            #   architecture-space-anatomy.md
+      pipelines/            # authored pipelines (`flows/` is read only as a legacy fallback)
     data/  ( data/events/ ) # partition output, inbox, backups  ( + rolling Parquet events )   ┐ under the
     audit/                  # run journal, watermarks, commit logs                               │ data root
     duckdb/                 # this space's *.duckdb / *.db stores                                ┘
-    pipelines/              # authored pipelines (`flows/` is read only as a legacy fallback)
   <id>.ref                  # a Space reference: one line, the absolute path of a Space folder kept elsewhere
 ```
 

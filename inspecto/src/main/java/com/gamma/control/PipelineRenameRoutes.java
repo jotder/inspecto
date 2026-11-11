@@ -13,6 +13,7 @@ import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.DbStatusStore;
+import com.gamma.service.PipelineDependents;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
@@ -30,7 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 import com.gamma.access.WriteGates;
 import static com.gamma.util.Values.mapAt;
 
@@ -554,60 +554,57 @@ final class PipelineRenameRoutes implements RouteModule {
                     + "first (so it can be approved), or rename with rewriteDependents:false");
     }
 
-    /** {@code triggers.on_pipeline} in every {@code *_enrich.toon} directly under the write root. */
+    /** {@code triggers.on_pipeline} in every live {@code *_enrich.toon} under the write root, at any depth
+     *  ({@code PipelineDependents.configFiles} — the same file set the impact scan reads). */
     private int rewriteEnrichTriggers(Path writeRoot, String oldId, String newId, List<String> planned) {
-        if (!Files.isDirectory(writeRoot)) return 0;
         int count = 0;
-        try (Stream<Path> files = Files.list(writeRoot)) {
-            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_enrich.toon")).toList()) {
-                try {
-                    Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                    if (!(raw.get("triggers") instanceof Map<?, ?> t)
-                            || !oldId.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) continue;
-                    Map<String, Object> triggers = new LinkedHashMap<>(mapAt(raw, "triggers"));
-                    triggers.put("on_pipeline", newId);
-                    Map<String, Object> out = new LinkedHashMap<>(raw);
-                    out.put("triggers", triggers);
-                    if (planned != null) {
-                        planned.add("enrichment '" + p.getFileName() + "'");
-                        continue;
-                    }
-                    AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".enr-");
-                    count++;
-                } catch (Exception ex) {
-                    log.warn("[PIPELINE-RENAME] skipping unreadable enrichment {}: {}", p, ex.getMessage());
+        for (Path p : PipelineDependents.configFiles(writeRoot, "_enrich.toon")) {
+            try {
+                Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
+                if (!(raw.get("triggers") instanceof Map<?, ?> t)
+                        || !oldId.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) continue;
+                Map<String, Object> triggers = new LinkedHashMap<>(mapAt(raw, "triggers"));
+                triggers.put("on_pipeline", newId);
+                Map<String, Object> out = new LinkedHashMap<>(raw);
+                out.put("triggers", triggers);
+                if (planned != null) {
+                    planned.add("enrichment '" + p.getFileName() + "'");
+                    continue;
                 }
+                AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".enr-");
+                count++;
+            } catch (Exception ex) {
+                log.warn("[PIPELINE-RENAME] skipping unreadable enrichment {}: {}", p, ex.getMessage());
             }
-        } catch (IOException ex) {
-            log.warn("[PIPELINE-RENAME] could not list enrichments under {}: {}", writeRoot, ex.getMessage());
         }
         return count;
     }
 
-    /** Top-level {@code on_pipeline} in every {@code jobs/*_job.toon} under the write root. */
+    /** {@code on_pipeline} in every live {@code *_job.toon} under the write root, at any depth — inside the
+     *  {@code job:} section {@code JobConfig} loads, or at the top level of a document without one. */
     private int rewriteJobTriggers(Path writeRoot, String oldId, String newId, List<String> planned) {
-        Path jobsDir = writeRoot.resolve("jobs");
-        if (!Files.isDirectory(jobsDir)) return 0;
         int count = 0;
-        try (Stream<Path> files = Files.list(jobsDir)) {
-            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_job.toon")).toList()) {
-                try {
-                    Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                    if (!oldId.equalsIgnoreCase(String.valueOf(raw.get("on_pipeline")))) continue;
-                    Map<String, Object> out = new LinkedHashMap<>(raw);
-                    out.put("on_pipeline", newId);
-                    if (planned != null) {
-                        planned.add("job '" + p.getFileName() + "'");
-                        continue;
-                    }
-                    AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".job-");
-                    count++;
-                } catch (Exception ex) {
-                    log.warn("[PIPELINE-RENAME] skipping unreadable job {}: {}", p, ex.getMessage());
+        for (Path p : PipelineDependents.configFiles(writeRoot, "_job.toon")) {
+            try {
+                Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
+                boolean nested = raw.get("job") instanceof Map<?, ?>;
+                Map<String, Object> section = new LinkedHashMap<>(nested ? mapAt(raw, "job") : raw);
+                if (!oldId.equalsIgnoreCase(String.valueOf(section.get("on_pipeline")).trim())) continue;
+                section.put("on_pipeline", newId);
+                Map<String, Object> out = section;
+                if (nested) {
+                    out = new LinkedHashMap<>(raw);
+                    out.put("job", section);
                 }
+                if (planned != null) {
+                    planned.add("job '" + p.getFileName() + "'");
+                    continue;
+                }
+                AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".job-");
+                count++;
+            } catch (Exception ex) {
+                log.warn("[PIPELINE-RENAME] skipping unreadable job {}: {}", p, ex.getMessage());
             }
-        } catch (IOException ex) {
-            log.warn("[PIPELINE-RENAME] could not list jobs under {}: {}", jobsDir, ex.getMessage());
         }
         return count;
     }

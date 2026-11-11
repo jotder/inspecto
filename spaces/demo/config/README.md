@@ -67,8 +67,7 @@ seed script copies it into the consumed inbox). Everything under `../data/` exce
 | Job: sql.template | `jobs/orders_summary_sql_job.toon` (`$status` param, Run Artifact + `job.dataset.produced` signal) | `*_job.toon` | Workbench → Jobs |
 | Job: on-signal | `jobs/orders_summary_followup_job.toon` (`on_signal` + `when` guard; `args`/`bind` shapes above) | `*_job.toon` | Workbench → Jobs |
 | Job: at-rest Pipeline chain | `jobs/orders_rollup_job.toon` runs `orders/orders_pipeline.toon`'s Stage-2 `steps:` chain over the landed `orders` store on each commit, writing `output_store: rollup` | `*_job.toon` (`pipeline_config:`) + `*_pipeline.toon` | Pipelines |
-| Incident queue | *no example in this space yet* — the kind loads, but the demo queue config was never authored | `*_queue.toon` | Incidents |
-| SLA escalation | *no example in this space yet* — the kind loads, but the demo escalation config was never authored | `*_escalation.toon` | Incidents |
+| Workflow · SLA policy · Escalation rule | *no example in this space yet* — governance kinds, written through their admin routes. The older `*_queue.toon` / `*_escalation.toon` files are no longer read (2026-09-14) | `registry/workflows/` · `registry/sla-policies/` · `registry/escalation-rules/` | Incidents |
 | RCA template | `ops/orders_rca.toon` | `*_rca.toon` | Incidents |
 | Dataset | `registry/datasets/orders_dataset.toon`, `…/orders_enriched_dataset.toon` (DAT-5 calculated columns) | `registry/datasets/` | Studio → Datasets |
 | Dataset: Link Analysis demos | `registry/datasets/roaming_tap_dataset.toon`, `…/mule_transfers_dataset.toon` (physicalRef over the two demo stores) | `registry/datasets/` | Studio → Datasets |
@@ -89,7 +88,8 @@ seed script copies it into the consumed inbox). Everything under `../data/` exce
 
 UI saves land in these exact locations: registry kinds → `registry/<type>/<id>.toon` (with
 version history in `registry/<type>/.history/`), connections → `<id>_connection.toon`, authored
-pipelines → `flows/<name>.toon`.
+pipelines → `pipelines/<name>.toon`. Every folder and file of a Space, and how the files link to each
+other: `docs/okf/product/module/config/architecture-space-anatomy.md`.
 
 ## Manual test loops
 

@@ -7,8 +7,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -17,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Read-only reverse-dependency scan for a pipeline (Catalog-lifecycle: "no dependent check on origin
@@ -116,7 +118,7 @@ public final class PipelineDependents {
 
     /** {@code triggers.on_pipeline} and by-name {@code references.<n>.ref} in every {@code *_enrich.toon}. */
     private static void enrichments(Path writeRoot, String id, List<Dependent> out) {
-        for (Path p : listing(writeRoot, "_enrich.toon")) {
+        for (Path p : configFiles(writeRoot, "_enrich.toon")) {
             String name = stem(p);
             try {
                 Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
@@ -142,12 +144,12 @@ public final class PipelineDependents {
         }
     }
 
-    /** Top-level {@code on_pipeline} in every {@code jobs/*_job.toon}. */
+    /** {@code on_pipeline} in every {@code *_job.toon} — under {@code job:} (what the loader reads) or at the top level. */
     private static void jobs(Path writeRoot, String id, List<Dependent> out) {
-        for (Path p : listing(writeRoot.resolve("jobs"), "_job.toon")) {
+        for (Path p : configFiles(writeRoot, "_job.toon")) {
             try {
                 Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                if (id.equalsIgnoreCase(String.valueOf(raw.get("on_pipeline")).trim())) {
+                if (id.equalsIgnoreCase(String.valueOf(jobSection(raw).get("on_pipeline")).trim())) {
                     out.add(new Dependent("job", stem(p), "on_pipeline"));
                 }
             } catch (Exception ex) {
@@ -249,15 +251,45 @@ public final class PipelineDependents {
         }
     }
 
-    /** Files directly under {@code dir} whose name ends with {@code suffix}; empty when the dir is absent. */
-    private static List<Path> listing(Path dir, String suffix) {
-        if (!Files.isDirectory(dir)) return List.of();
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(f -> f.getFileName().toString().endsWith(suffix)).sorted().toList();
-        } catch (IOException ex) {
-            log.warn("[IMPACT] could not list {}: {}", dir, ex.getMessage());
-            return List.of();
+    /**
+     * Every live config under {@code writeRoot} whose name ends with {@code suffix}, at any depth — the loader
+     * ({@code ServiceBootstrap.resolveBySuffix}) walks the whole tree, so a dependent in a sub-folder
+     * ({@code orders/orders_daily_enrich.toon}) is as live as one at the root. Skips what is not a live config:
+     * {@code .history/} copies and the server-written state dirs ({@link ReservedConfigPaths#reserved}).
+     * Shared with the rename path ({@code PipelineRenameRoutes}) so both see the same file set. Empty when
+     * the root is absent.
+     */
+    public static List<Path> configFiles(Path writeRoot, String suffix) {
+        if (writeRoot == null || !Files.isDirectory(writeRoot)) return List.of();
+        List<Path> out = new ArrayList<>();
+        try {
+            // walkFileTree, not Files.walk: one unreadable directory or a file deleted mid-walk must not empty
+            // the whole answer (an empty answer lets a delete through and leaves a rename half done).
+            Files.walkFileTree(writeRoot, new SimpleFileVisitor<>() {
+                @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes a) {
+                    return !dir.equals(writeRoot) && ReservedConfigPaths.reserved(writeRoot.relativize(dir).toString())
+                            ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                }
+                @Override public FileVisitResult visitFile(Path f, BasicFileAttributes a) {
+                    if (a.isRegularFile() && f.getFileName().toString().endsWith(suffix)
+                            && !ReservedConfigPaths.reserved(writeRoot.relativize(f).toString())) out.add(f);
+                    return FileVisitResult.CONTINUE;
+                }
+                @Override public FileVisitResult visitFileFailed(Path f, IOException ex) {
+                    log.warn("[IMPACT] skipping unreadable {}: {}", f, ex.getMessage());
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException | RuntimeException ex) {
+            log.warn("[IMPACT] could not finish listing {} under {}: {}", suffix, writeRoot, ex.getMessage());
         }
+        out.sort(Comparator.naturalOrder());
+        return List.copyOf(out);
+    }
+
+    /** The map holding a Job's keys: the {@code job:} section {@code JobConfig} loads, else the document itself. */
+    public static Map<?, ?> jobSection(Map<String, Object> raw) {
+        return raw.get("job") instanceof Map<?, ?> inner ? inner : raw;
     }
 
     /** A config file's id: its filename with the {@code .toon} extension dropped. */

@@ -227,12 +227,27 @@ class ControlApiPipelineRenameTest {
             enrich.put("transform", Map.of());
             Files.writeString(root.resolve("mini_enrich.toon"), ConfigCodec.toToon(enrich));
 
-            // jobs/*_job.toon under the write root.
+            // The same enrichment in a sub-folder (the demo keeps orders/orders_daily_enrich.toon): the loader
+            // reads the whole tree, so the rename must rewrite it too.
+            Files.createDirectories(root.resolve("orders"));
+            Files.writeString(root.resolve("orders").resolve("nested_enrich.toon"), ConfigCodec.toToon(enrich));
+            // A saved version under .history/ is not a live config: it keeps the old id.
+            Files.createDirectories(root.resolve("orders").resolve(".history"));
+            Files.writeString(root.resolve("orders").resolve(".history").resolve("old_enrich.toon"),
+                    ConfigCodec.toToon(enrich));
+
+            // jobs/*_job.toon under the write root, in the shape JobConfig loads: everything under `job:`.
             Files.createDirectories(root.resolve("jobs"));
-            Map<String, Object> job = new LinkedHashMap<>();
-            job.put("name", "mini_job");
-            job.put("on_pipeline", "mini_etl");
-            Files.writeString(root.resolve("jobs").resolve("mini_job_job.toon"), ConfigCodec.toToon(job));
+            Map<String, Object> jobSection = new LinkedHashMap<>();
+            jobSection.put("name", "mini_job");
+            jobSection.put("type", "pipeline");
+            jobSection.put("on_pipeline", "mini_etl");
+            Files.writeString(root.resolve("jobs").resolve("mini_job_job.toon"),
+                    ConfigCodec.toToon(Map.of("job", jobSection)));
+            // and one kept outside jobs/, in a feature folder.
+            Files.createDirectories(root.resolve("ops"));
+            Files.writeString(root.resolve("ops").resolve("ops_rollup_job.toon"),
+                    ConfigCodec.toToon(Map.of("job", jobSection)));
 
             // an expectation component targeting the pipeline.
             ComponentStore store = new ComponentStore(root.resolve("registry"));
@@ -266,14 +281,25 @@ class ControlApiPipelineRenameTest {
             HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/rename", "{\"newId\":\"mini_v2\"}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode out = V1Body.of(r.body());
-            assertEquals(7, out.get("dependentsRewritten").asInt(), "enrich + job + expectation + rule + 2 datasets + alert");
+            assertEquals(9, out.get("dependentsRewritten").asInt(),
+                    "2 enrich + 2 jobs + expectation + rule + 2 datasets + alert");
 
-            Map<String, Object> enrichAfter = ConfigLoader.filesystem().decode(root.resolve("mini_enrich.toon").toString());
-            assertEquals("mini_v2", String.valueOf(((Map<?, ?>) enrichAfter.get("triggers")).get("on_pipeline")));
+            for (Path p : List.of(root.resolve("mini_enrich.toon"), root.resolve("orders").resolve("nested_enrich.toon"))) {
+                Map<String, Object> enrichAfter = ConfigLoader.filesystem().decode(p.toString());
+                assertEquals("mini_v2", String.valueOf(((Map<?, ?>) enrichAfter.get("triggers")).get("on_pipeline")), p.toString());
+            }
+            Map<String, Object> historyAfter = ConfigLoader.filesystem().decode(
+                    root.resolve("orders").resolve(".history").resolve("old_enrich.toon").toString());
+            assertEquals("mini_etl", String.valueOf(((Map<?, ?>) historyAfter.get("triggers")).get("on_pipeline")),
+                    "a .history copy is never rewritten");
 
-            Map<String, Object> jobAfter = ConfigLoader.filesystem().decode(
-                    root.resolve("jobs").resolve("mini_job_job.toon").toString());
-            assertEquals("mini_v2", String.valueOf(jobAfter.get("on_pipeline")));
+            for (Path p : List.of(root.resolve("jobs").resolve("mini_job_job.toon"), root.resolve("ops").resolve("ops_rollup_job.toon"))) {
+                Map<String, Object> jobAfter = ConfigLoader.filesystem().decode(p.toString());
+                Map<?, ?> section = (Map<?, ?>) jobAfter.get("job");
+                assertEquals("mini_v2", String.valueOf(section.get("on_pipeline")), p.toString());
+                assertEquals("mini_job", String.valueOf(section.get("name")), "the rest of the job section is kept");
+                assertFalse(jobAfter.containsKey("on_pipeline"), "the trigger stays inside job:, not beside it");
+            }
 
             assertEquals("mini_v2", String.valueOf(store.get("expectation", "mini_exp").orElseThrow().content().get("target")));
             assertEquals("mini_v2", String.valueOf(store.get("decision-rule", "mini_rule").orElseThrow().content().get("target")));

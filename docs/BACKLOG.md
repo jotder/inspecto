@@ -25,7 +25,9 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **103<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 18<!--count:backlog-p2--> × P2 · 85<!--count:backlog-p3--> × P3** —
+> **106<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 19<!--count:backlog-p2--> × P2 · 87<!--count:backlog-p3--> × P3** —
+> ⬆ **105 → 106 (P3 86 → 87) on 2026-11-11**: filed P3 feature `SPACE-EVOLUTION-1` [items: module.config, module.engine · kind: feature] — the longer direction behind `SPACE-LINK-CENSUS-1`: a Space lock, permanent ids kept beside the files, a column contract, a state zone outside `config/`, template provenance, tests in a Space; every step report-only first and no file format change. Nothing built.
+> ⬆ **103 → 105 (P2 18 → 19, P3 85 → 86) on 2026-11-11**: filed P2 feature `SPACE-LINK-CENSUS-1` [items: module.config, module.engine · kind: feature] and P3 defect `PIPELINE-LINK-GAPS-1` [items: module.config, module.engine · kind: defect] — found while writing the Space anatomy page (`okf/product/module/config/architecture-space-anatomy.md` §12). The Pipeline rename and delete-impact scans now read Enrichments and Jobs at any folder depth and inside `job:`; what they still miss is the defect row, and the single link census that replaces six copies of the link keys is the feature row.
 > ⬆ **102 → 103 (P3 84 → 85) on 2026-11-11**: filed P3 feature `ENTITLEMENT-SPI-NARROWING-1` [items: layer.platform · kind: feature · hold: demand] — `PRODUCT-ASSEMBLY-1` PA-7a narrows a left-out module's routes, features, Job types and module state; its other extension points still load.
 > ⬆ **101 → 102 (P3 83 → 84) on 2026-11-11**: filed P3 feature `PUBLIC-API-SURFACE-1` [items: layer.platform · kind: feature · hold: demand] — found writing the builder-kit guide (`PRODUCT-ASSEMBLY-1` PA-6d): two of the four extension-point interfaces carry no `@PublicApi`, and no guard holds the marked surface stable.
 > ⬆ **100 → 101 (P3 82 → 83) on 2026-11-11**: filed P3 feature `ADDON-PICKER-PAGE-1` [items: layer.product · kind: feature · hold: demand] — `PRODUCT-ASSEMBLY-1` PA-6c built the Add-on picker as a CLI (`tools/pick-addons.mjs`); its page waits for a buyer of the Platform product.
@@ -487,11 +489,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 85<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 85<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 103<!--count:backlog-rows--> as pending work overstates it.
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 87<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 87<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 106<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -659,6 +661,9 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Datasets & lineage
 
+- **P2** · **`SPACE-LINK-CENSUS-1` one declared census of the links between a Space's config files** — the link keys are hard-coded in six checks (rename, impact, validate, import pre-check, two delete guards) and drift; path, column and `nav-menus.toon` links are checked by nothing; a hand edit is invisible. One `LinkCensus` read by every check, save-time and boot enforcement, column links, duplicate detection, a config ledger that names files changed outside the server. Nothing built; D-LC1…D-LC5 open. → `superpower/2026-11-11-space-link-census-plan.md` [items: module.config, module.engine · kind: feature · hold: operator]
+- **P3** · **`SPACE-EVOLUTION-1` a Space the server understands as a whole, reached without breaking one** — a derived Space lock (every live config, its permanent id, hash and resolved links), rename detection for hand edits, a column contract, server-written state moved out of `config/` by an explicit migrator, Space Template version and provenance with an assisted upgrade, tests that travel with a Space. Binding rules: no file format change, readers before writers, shadow → opt-in → default → retire, a Space always boots, nothing moves at boot. Builds on `SPACE-LINK-CENSUS-1` LC-1. Nothing built; D-SE1…D-SE8 open. → `superpower/2026-11-11-space-evolution-plan.md` [items: module.config, module.engine · kind: feature · hold: operator]
+- **P3** · **`PIPELINE-LINK-GAPS-1` links the Pipeline rename and impact scans still miss** — found 2026-11-11 while fixing their folder depth and `job:` nesting: (a) rename does not rewrite an Enrichment's by-name `references.<n>.ref` (impact lists it); (b) a comma-list `on_pipeline: a, b` (`JobConfig.onPipelines`) is neither listed nor rewritten; (c) `PipelineBundleRoutes.companionsOf` still reads only the config root, though its comment says it finds companions as `PipelineDependents` does; (d) `metadata_validate` checks no Job and walks four levels (`MetadataValidateTask`), and no shipped Space schedules it; (e) Reconciliation `thirdDataset` is not checked by `ComponentIntegrity`. Folded into `SPACE-LINK-CENSUS-1` LC-2 if that is built first. → `okf/product/module/config/architecture-space-anatomy.md` §12 [items: module.config, module.engine · kind: defect]
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises; ⬜ re-confirmed not fired 2026-09-15. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4 [items: module.config, module.etl · kind: feature · hold: demand]
 
 ### 3.5 Data quality, Observability, Signals & Alerting

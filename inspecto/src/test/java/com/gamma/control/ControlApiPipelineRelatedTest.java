@@ -186,7 +186,7 @@ class ControlApiPipelineRelatedTest {
         Files.writeString(cfg.resolve("jobs").resolve("nightly_job.toon"), """
                 job:
                   name: nightly
-                on_pipeline: mini_etl
+                  on_pipeline: mini_etl
                 """);
         Files.createDirectories(cfg.resolve("registry").resolve("datasets"));
         Files.writeString(cfg.resolve("registry").resolve("datasets").resolve("mini_ds.toon"),
