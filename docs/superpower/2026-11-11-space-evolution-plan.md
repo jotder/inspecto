@@ -1,6 +1,7 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** PROPOSED 2026-11-11 — nothing built; decisions D-SE1…D-SE8 open. Board row `SPACE-EVOLUTION-1`.
+**State:** DECIDED 2026-11-11 — D-SE1…D-SE8 answered (§6); nothing built; starts after the link census
+plan's LC-1 is built (its decisions D-LC1…D-LC5 were answered the same day). Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
 **As-built today:** [Space anatomy](../okf/product/module/config/architecture-space-anatomy.md).
@@ -33,7 +34,9 @@ Every workstream below obeys all of these. A step that cannot is not built.
    `space.toon` `min_product_version` (the key exists today and is checked at boot).
 3. **Shadow, then opt-in, then default, then retire.** Each capability first only *reports* (shadow). Then one
    Space may opt in. Then new Spaces get it by default. Existing Spaces change only by an explicit operator step.
-   The old path is retired only by a recorded operator decision, never by a release note.
+   The old path is retired only by a recorded operator decision, never by a release note. One recorded
+   exception: delete refusal for every kind reaches every existing Space once its shadow period is clean
+   (link census plan, D-LC3).
 4. **A Space always boots.** No integrity finding ever stops a Space from loading. In the strictest mode the
    *one broken object* stays inactive and says why; everything else runs.
 5. **Nothing moves at boot.** Files move only through an explicit migrator with `--dry-run`, copy → verify →
@@ -75,7 +78,7 @@ derived state: deleting it loses nothing but history of what the server last saw
 2. *Opt-in* (`safety-policy.toon` `links: refuse-activation`): a Pipeline or Job with a dangling link stays
    inactive; a save or delete that would break a link is refused with the dependents listed (`?force=true` as
    today).
-3. *Default for new Spaces*, after D-SE2.
+3. *Default for new Spaces*, after two releases of clean shadow (D-SE2).
 
 **Compatible.** No config file changes. The directory `.inspecto/` exists today (the fingerprint salt) and is
 not scanned by any loader. A Space without a lock is simply computed fresh.
@@ -189,19 +192,18 @@ a Space by construction.
 
 ## 6. Decisions for the operator
 
-- **D-SE1** Boot-time budget for computing the lock on the largest Space, and whether it runs on the boot path or
-  just after it. *(proposed: after boot, in the background; the integrity route says "computing")*
-- **D-SE2** When enforcement becomes the default for **new** Spaces. *(proposed: after two releases of clean shadow)*
-- **D-SE3** Auto-rewrite on a detected hand rename: report only, or rewrite under opt-in? *(proposed: opt-in)*
-- **D-SE4** Column contract refusal: ever a hard refusal, or warning plus `?force=true`? *(proposed: the latter)*
-- **D-SE5** `state/` beside `config/` in the Space folder, or under the data root? *(proposed: beside `config/` —
-  it is governance record, small, and must be backed up with the config)*
-- **D-SE6** Does `.history/` move to `state/` too, or stay beside each file? *(proposed: stay; it is read by the
-  editors next to the file)*
-- **D-SE7** Promotion into an existing Space — wanted at all, and only through Pending Changes?
-- **D-SE8** Retirement. The standing preference is "breaking changes are free, no shims"; this plan deliberately
-  keeps both paths alive. Name the release at which each old path (unlocked Space, state inside `config/`) may be
-  retired, or state that it never is.
+All eight answered by the operator on 2026-11-11.
+
+| # | Question | Decision |
+|---|---|---|
+| **D-SE1** | When is the Space lock computed? | **After boot, in the background.** A Space starts as fast as today; the integrity route answers "computing" until the lock is ready. |
+| **D-SE2** | When does enforcement become the default for **new** Spaces? | **After two releases of clean shadow** on the shipped Spaces (zero false findings). Existing Spaces never change on their own. |
+| **D-SE3** | A hand rename is detected — what happens to the files still using the old name? | **Report by default; rewrite only in a Space that opted in.** |
+| **D-SE4** | How strict is a Schema save that breaks a column consumers use? | **Stopped with the list of what breaks; `?force=true` goes ahead** — the pattern a Pipeline delete uses today. Never a hard refusal. |
+| **D-SE5** | Where does the state zone live? | **`spaces/<id>/state/`, beside `config/`** — small governance records, backed up and moved with the config. |
+| **D-SE6** | Does `.history/` move to `state/`? | **No. It stays beside each file.** |
+| **D-SE7** | Promotion into an existing Space? | **Yes, as a previewed change set through Pending Changes** — nothing lands in the target Space without review. ⚠ Open detail for SE-6b: what a Space with no approval policy does (Pending Changes need signed-in users). |
+| **D-SE8** | When may the old paths be retired (a Space without a lock; state inside `config/`)? | **At a named major release.** Both paths live until then; that release ships the migrator, runs it as a documented upgrade step, and removes the old path. This is the agreed exception to "breaking changes are free, no shims" for this plan. The release is named when SE-4 ships. |
 
 ## 7. Risks
 

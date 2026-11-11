@@ -1,6 +1,7 @@
 # Space link census — one declaration of every link between config files
 
-**State:** PROPOSED 2026-11-11 — nothing built, decisions D-LC1…D-LC5 open. Board row `SPACE-LINK-CENSUS-1`.
+**State:** DECIDED 2026-11-11 — D-LC1…D-LC5 answered (§4); nothing built. Board row
+`SPACE-LINK-CENSUS-1`.
 **Home when shipped:** `docs/okf/product/module/config/architecture-space-anatomy.md` §12.
 
 ## 1. Problem
@@ -101,13 +102,22 @@ retired.
 
 ## 4. Decisions for the operator
 
-- **D-LC1** Save-time refusal: hard 422, or 422 only when the config is `active: true`? *(proposed: active only)*
-- **D-LC2** Boot mode default: `report` or `refuse-activation`? *(proposed: `report`, Advanced may set refuse)*
-- **D-LC3** Delete refusal for every kind is a behaviour change for existing API clients — accept? *(proposed: yes,
-  `?force=true` keeps the old outcome)*
-- **D-LC4** Hand-edit detection: report only, or hold the edited file inactive until accepted under maker-checker
-  on Spaces with an approval policy? *(proposed: report; hold only where `approval.toon` governs the kind)*
-- **D-LC5** Edition: integrity report on every edition; refuse modes and the ledger on Standard and Advanced?
+All five answered by the operator on 2026-11-11.
+
+| # | Question | Decision |
+|---|---|---|
+| **D-LC1** | When is a save with a broken link refused? | **Only when the config is active.** A draft (`active: false`) saves with broken links; activating it is refused (422) until they resolve. |
+| **D-LC2** | Boot mode default? | **`report`.** `refuse-activation` becomes the default for **new** Spaces after two releases of clean shadow — answered as D-SE2 of the [Space evolution plan](2026-11-11-space-evolution-plan.md). Existing Spaces never change on their own. |
+| **D-LC3** | Delete refusal for every kind — accept the behaviour change for API clients? | **Yes.** Every kind refuses a delete while something uses it, listing the dependents; `?force=true` gives the old outcome. |
+| **D-LC4** | A file changed outside the server? | **Reported, with what it broke; the edit takes effect.** In a Space whose approval policy (`approval.toon`) governs that kind, the edited file stays inactive until accepted. |
+| **D-LC5** | Editions? | **The integrity report on every edition; the refuse modes and the config ledger on Standard and Advanced.** |
+
+**Reach of D-LC3 (operator, 2026-11-11): every edition, every Space.** The wider delete refusal is not one of
+D-LC5's opt-in refuse modes. Once its shadow period is clean (the delete goes through and the report lists what
+it broke, with zero false findings on the shipped Spaces), every Space on every edition refuses a delete while
+something uses the target, and `?force=true` gives the old outcome. This is the one accepted exception to the
+evolution plan's rule 3 (an existing Space changes only by an explicit operator step): it is announced as a
+behaviour change in the release that turns it on, and it keeps its own kill switch.
 
 ## 5. Not in scope
 
