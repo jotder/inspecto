@@ -103,7 +103,7 @@ class CrossSpaceFraudIncidentAcceptanceTest {
     /**
      * One opco Run emitting 20 cases (one shared correlation id): the forwarder delivers all 20 to hub, none
      * undeliverable, and the hub opens EXACTLY one Incident per case, none carrying the MSISDN. incident.open
-     * defaults to {@code coalesce: false} (operator 2026-09-28, design §8), so the per-Job TriggerCoalescer's
+     * defaults to {@code coalesce: false} (operator 2026-09-28, design §8), so the per-Job coalescing
      * storm guard does not fold real cases together. Mutation-checked: forcing coalescing on turns this red.
      */
     @Test

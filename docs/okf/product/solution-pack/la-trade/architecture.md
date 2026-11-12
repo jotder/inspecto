@@ -60,9 +60,9 @@ see below):
 `sql.template` Job fired on `job.dataset.produced` (as `la-police` does): over-invoicing 23 rows, phantom shipment 90,
 circular trade 102, shell importers 199.
 
-**Two triggers on the link Job.** A `pipeline.commit` run can be skipped while the previous run is still in flight
-(`JOB-SIGNAL-OVERLAP-SKIP-1`), which would leave the last landed file out of the link Dataset; the 5-minute cron catches
-up.
+**Two triggers on the link Job.** Until 2026-11-13 a `pipeline.commit` run could be skipped while the previous run was
+still in flight (`JOB-SIGNAL-OVERLAP-SKIP-1`, fixed: the follow-up now waits), which left the last landed file out of
+the link Dataset; the 5-minute cron caught up and is kept as a harmless catch-up.
 
 **SQL guard gotcha.** The `sql.template` guard scans the statement lexically: the word `from` inside a string literal
 (first draft: `' from ' || b.port_from`) is read as a FROM clause naming a file, and the Job is refused. The `via` text

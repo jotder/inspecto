@@ -297,8 +297,9 @@ What "inert" means, as seen live on Basic:
   Synthetic identity only (invented names, a reserved phone range, invented streets, real cities at city level).
   Several Spaces are smaller than first specified to keep the committed corpus small (for example `la-utility`: 1 000
   premises, not 8 000); each hub says so.
-- **Link Jobs also run on `cron: "*/5 * * * *"`**, because a `pipeline.commit` that lands while a run is in flight is
-  skipped, not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`). Exception: `la-ownership`'s `ownership_links` has no cron yet
+- **Link Jobs also run on `cron: "*/5 * * * *"`**, because until 2026-11-13 a `pipeline.commit` that landed while a
+  run was in flight was skipped, not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`, fixed: it now queues one follow-up Run that
+  waits). The cron is kept as a harmless catch-up. Exception: `la-ownership`'s `ownership_links` has no cron yet
   (BACKLOG `LA-OWNERSHIP-NO-CRON-FALLBACK-1`). A counts or link Job that judges a month waits until that month's
   every side has landed (`la-utility`'s `transformer_loss` joins both reads; `la-telco-ra` waits for the billing file).
 

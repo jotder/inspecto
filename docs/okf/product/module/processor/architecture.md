@@ -179,7 +179,7 @@ Real symmetry, not coincidence — several of these were built to the same shape
 | **Dry run** | `PipelineDryRun` (T18) — bounded sample through a scratch DuckDB, commits nothing | `JobContext.dryRun()` — a destructive Job Type previews instead of acting; `POST /jobs/{name}/trigger?dryRun=true` |
 | **Prometheus metrics** | `inspecto_batches_total`, `inspecto_batch_duration_seconds`, `inspecto_output_rows_total`, … | `inspecto_jobs_total`, `inspecto_job_duration_seconds` |
 | **Durable audit** | `ConsignmentAuditWriter` — `status` (per file), `batches`, `lineage` (ledger file names keep the pre-rename spelling — BACKLOG §4 residual) | `JobRunLedger` (`jobs_runs.csv`) + optional DuckDB projection |
-| **Repeat safety** | `.processed` markers + the acquisition dedup ledger | `TriggerCoalescer`, signal chain-depth cut, `catch_up` |
+| **Repeat safety** | `.processed` markers + the acquisition dedup ledger | one queued follow-up per coalescing Job, signal chain-depth cut, `catch_up` |
 | **UI surface** | `/pipelines` | `/jobs`, `/jobs/:name` |
 | **Timeout / cancellation** | ⛔ none | ⛔ none — a `CronHandle.cancel()` only un-arms *future* fires |
 
@@ -237,7 +237,9 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
    `StepContext`, services ceiling, watchdog; shipped 2026-09-28). `scaffold.mjs new nodetype` builds the
    former; `new step` builds the latter. Since S2-3 a pack may no longer carry a raw executor (D-2); see
    [Platform Services §7c](spec-platform-services.md).
-3. **`TriggerCoalescer` lives in `com.gamma.pipeline.exec` but is Job-only.** Package placement misleads.
+3. **`TriggerCoalescer` (`com.gamma.pipeline.exec`) serves Pipeline triggers only** (`PipelineScheduler`).
+   Jobs stopped using it on 2026-11-13 (`JOB-SIGNAL-OVERLAP-SKIP-1`): `JobService` folds a Signal burst into one
+   queued follow-up Run that waits for the Run in flight.
 4. **`transform.join` against a Reference Dataset is compile-only** — no runtime executor. So "a Step
    cannot read a second Dataset" is true *today* but is a missing executor, **not** part of the boundary.
    Do not state it as the rule; the rule is in-motion vs at-rest.

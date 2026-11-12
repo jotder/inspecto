@@ -173,8 +173,8 @@ the origin: the grant is not ACTIVE, the consumer is not hosted in this Pod, the
 the delivered depth would exceed `jobs.signal.maxChainDepth`. Nothing is queued. The depth is the chain's:
 a Run always stamps its system `chainDepth` (payload values are overwritten), and Jobs and Decision Rules
 cannot emit `exchange.*`. Many Signals that share a correlation id are independent deliveries.
-A Job may declare `coalesce: false` (D13, 2026-09-28): one Run per matching Signal instead of the per-Job
-`TriggerCoalescer` folding a burst into one follow-up Run. The consumer acts with its own Job, e.g. the
+A Job may declare `coalesce: false` (D13, 2026-09-28): one Run per matching Signal instead of the default
+folding of a burst into one follow-up Run, which waits for a Run in flight ([Jobs](../processor/spec-jobs.md)). The consumer acts with its own Job, e.g. the
 `incident.open` Job type (defaults to `coalesce: false`), which reads `JobContext.signalPayload()`. The D10
 acceptance test asserts 20 cases open 20 Incidents, no MSISDN. The emitter is a Decision Rule `emit-signal`
 payload (D14; see `../processor/spec-decision-rules.md`); a Collector connector emitting typed Signals is no longer planned.

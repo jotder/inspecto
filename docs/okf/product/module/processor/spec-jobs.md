@@ -24,8 +24,14 @@ virtual-thread `workers` executor. Four trigger modes:
   exact (case-insensitive) match or a `prefix.*` glob, optionally narrowed by a `when:` guard over the
   firing Signal's payload (`WhenGuard`, fail-closed on an unparsable expression — there is no
   authoring-time validator). Self-loops are suppressed. **Authorable in the UI since 2026-08-10.**
-  **Coalescing (operator, 2026-09-28):** by default a per-Job `TriggerCoalescer` folds a burst of matching
-  Signals into one follow-up Run (the storm guard). A Job with `coalesce: false` gets **one Run per Signal**,
+  **Coalescing (operator, 2026-09-28):** by default a burst of matching Signals folds into one follow-up Run
+  (the storm guard). Each coalescing Job holds at most ONE queued follow-up; a Signal that lands while it is
+  queued folds into it, and a Signal that lands while a Run is in flight queues one that **waits** for that Run
+  (signal, cron or manual) instead of being `SKIPPED` "previous run still in flight" — so the last landing of a
+  burst is always run after it (`JOB-SIGNAL-OVERLAP-SKIP-1`, 2026-11-13; before it a per-Job `TriggerCoalescer`
+  only queued the Run, so the lock skipped every Signal during a Run). A waiting follow-up holds one pool slot
+  under `setMaxConcurrentRuns`, and re-checks shutdown, the module gate and read-only when it gets the lock, so
+  it is `SKIPPED` with the reason if any changed while it waited. A cross-node arming claim held elsewhere still skips. A Job with `coalesce: false` gets **one Run per Signal**,
   each carrying its own Signal's payload, queued in order on a fair per-Job lane instead of being `SKIPPED`.
   `incident.open` defaults to `coalesce: false` (one Incident per case — cross-Space D10); every other type
   defaults to `true`. The key lives in `params` and round-trips. Bound: at most 1000 queued Runs per Job

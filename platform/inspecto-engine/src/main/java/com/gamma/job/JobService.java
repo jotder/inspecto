@@ -5,7 +5,6 @@ import com.gamma.consignment.ConsignmentProcessor;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.pipeline.DeletionFence;
 import com.gamma.pipeline.PipelineStore;
-import com.gamma.pipeline.exec.TriggerCoalescer;
 import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
@@ -289,8 +288,17 @@ public final class JobService implements AutoCloseable {
      *  ⚠ Typed as the seam, not the domain service: {@code com.gamma.ops} is an optional edition module
      *  (EDG-01 cell 7) and this class is in the mandatory engine. */
     private volatile com.gamma.objects.ObjectAccess objects;
-    /** One coalescer per on-signal Job, so a burst of matching signals folds into one follow-up Run (§8.4). */
-    private final Map<String, TriggerCoalescer> signalCoalescers = new ConcurrentHashMap<>();
+    /**
+     * Coalescing on-signal Jobs (§8.4): the runId of the ONE follow-up Run queued but not yet started, or
+     * {@code null}. A matching Signal while a follow-up is queued folds into it (the follow-up has not read its
+     * inputs yet); otherwise it queues a new follow-up, which WAITS for any Run of the Job in flight instead of
+     * being SKIPPED by the non-overlap lock. The slot is freed the moment the follow-up starts, so a Signal that
+     * lands during a Run always gets one Run after it (JOB-SIGNAL-OVERLAP-SKIP-1). ⚠ This replaced a
+     * {@code TriggerCoalescer}, whose drain only queued the Run and returned, so it never held a Signal back and
+     * every Signal during a Run was recorded SKIPPED and lost.
+     */
+    private final Map<String, java.util.concurrent.atomic.AtomicReference<String>> signalFollowUps =
+            new ConcurrentHashMap<>();
 
     /**
      * Per-Signal firing for a {@code coalesce: false} Job (operator, 2026-09-28): each matching Signal gets its
@@ -803,7 +811,7 @@ public final class JobService implements AutoCloseable {
             if (!c.enabled()) continue;
             if (c.hasCron()) { armCron(c); cronCount++; }
             if (c.hasEvent()) eventCount++;
-            if (c.hasSignal()) { signalCoalescers.put(c.name(), new TriggerCoalescer()); signalCount++; }
+            if (c.hasSignal()) signalCount++;
         }
         // On-signal Triggers (P1c): subscribe to THIS space's ledger (per-instance subscriber list ⇒
         // space-correct), and mirror each ConsignmentEvent as a pipeline.commit signal so on_signal:pipeline.commit
@@ -862,7 +870,6 @@ public final class JobService implements AutoCloseable {
         configs.add(c);
         if (c.enabled()) {
             jobs.put(c.name(), build(c));
-            if (c.hasSignal()) signalCoalescers.put(c.name(), new TriggerCoalescer());
             if (c.hasCron() && started) armCron(c);
         } else {
             buildDisabled(c);
@@ -886,7 +893,7 @@ public final class JobService implements AutoCloseable {
         configs.removeIf(c -> c.name().equals(name));
         jobs.remove(name);
         crons.remove(name);
-        signalCoalescers.remove(name);
+        signalFollowUps.remove(name);
         signalLanes.remove(name);
         jobPackOwner.remove(name);
         unavailableJobs.remove(name);
@@ -1084,7 +1091,7 @@ public final class JobService implements AutoCloseable {
     /**
      * On-signal dispatch (P1c, §8.2): a Signal landed on this space's ledger — fire every enabled Job whose
      * {@code on_signal:} matches its dotted type (exact or {@code prefix.*}), that isn't the emitter (self-loop
-     * guard), and whose {@code when:} guard passes. Firings fold through a per-Job {@link TriggerCoalescer} so a
+     * guard), and whose {@code when:} guard passes. Firings fold into the Job's one queued follow-up ({@link #signalFollowUps}) so a
      * storm collapses into one follow-up Run; the Run inherits the signal's correlation id and chain depth + 1,
      * and a chain deeper than {@link #maxChainDepth} is cut instead of fired (§8.4).
      */
@@ -1121,11 +1128,13 @@ public final class JobService implements AutoCloseable {
                         firing, lane);
                 continue;
             }
-            signalCoalescers.computeIfAbsent(c.name(), k -> new TriggerCoalescer())
-                    .signal(() -> submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid,
-                            // 🔴 THE causation link: every signal this Run emits nests under the signal
-                            // that fired it. Without it /signals/tree is permanently flat.
-                            sig.signalId(), newDepth, firing));
+            var followUp = signalFollowUps.computeIfAbsent(c.name(), k -> new java.util.concurrent.atomic.AtomicReference<>());
+            String runId = newRunId(c.name());
+            if (!followUp.compareAndSet(null, runId)) continue;           // folded into the queued follow-up
+            submitRun(runId, c.name(), "signal:" + sig.type(), cid,
+                    // 🔴 THE causation link: every signal this Run emits nests under the signal
+                    // that fired it. Without it /signals/tree is permanently flat.
+                    sig.signalId(), newDepth, firing, null, followUp);
         }
     }
 
@@ -1438,12 +1447,25 @@ public final class JobService implements AutoCloseable {
     /** As above; a non-null {@code lane} serialises this Run behind the Job's earlier per-Signal Runs. */
     private void submitRun(String runId, String name, String trigger, String correlationId,
                            String causationId, int chainDepth, Firing firing, SignalLane lane) {
+        submitRun(runId, name, trigger, correlationId, causationId, chainDepth, firing, lane, null);
+    }
+
+    /** As above; a non-null {@code followUp} makes this the coalesced follow-up Run of {@link #signalFollowUps}:
+     *  it waits for a Run in flight instead of being skipped, and frees the slot when it starts or gives up. */
+    private void submitRun(String runId, String name, String trigger, String correlationId,
+                           String causationId, int chainDepth, Firing firing, SignalLane lane,
+                           java.util.concurrent.atomic.AtomicReference<String> followUp) {
         Job job = jobs.get(name);
-        if (job == null) { if (lane != null) lane.pending().decrementAndGet(); return; }
+        if (job == null) {
+            if (lane != null) lane.pending().decrementAndGet();
+            if (followUp != null) followUp.compareAndSet(runId, null);
+            return;
+        }
         // PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): read-only (an entitlement past its grace, or a trial build without one) runs no
         // Job - cron, signal, catch-up and manual alike. The fire is recorded SKIPPED with the reason, so the run history says why.
         if (com.gamma.module.Entitlements.readOnly()) {
             if (lane != null) lane.pending().decrementAndGet();
+            if (followUp != null) followUp.compareAndSet(runId, null);
             recordSkipped(name, trigger, "read-only: " + com.gamma.module.Entitlements.readOnlyReason());
             return;
         }
@@ -1459,7 +1481,7 @@ public final class JobService implements AutoCloseable {
                 try {
                     if (!acquireRunPermit()) return;
                     try {
-                        runJob(runId, name, trigger, start, correlationId, causationId, chainDepth, firing);
+                        runJob(runId, name, trigger, start, correlationId, causationId, chainDepth, firing, followUp);
                     } finally {
                         releaseRunPermit();
                     }
@@ -1467,6 +1489,8 @@ public final class JobService implements AutoCloseable {
                     if (lane != null) { lane.serial().release(); lane.pending().decrementAndGet(); }
                 }
             } finally {
+                // a follow-up that never reached its start (skipped by a gate, interrupted) frees the slot too
+                if (followUp != null) followUp.compareAndSet(runId, null);
                 if (scoped) MDC.remove(EventLog.SPACE_MDC_KEY);
             }
         });
@@ -1519,11 +1543,17 @@ public final class JobService implements AutoCloseable {
     }
 
     private void runJob(String runId, String name, String trigger, String start, String correlationId,
-                        String causationId, int chainDepth, Firing firing) {
+                        String causationId, int chainDepth, Firing firing,
+                        java.util.concurrent.atomic.AtomicReference<String> followUp) {
         Job job = jobs.get(name);
         if (job == null) return;
         runJob(job, configFor(name).orElse(null), runId, name, trigger, start, correlationId, causationId,
-                chainDepth, firing);
+                chainDepth, firing, followUp);
+    }
+
+    private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
+                        String correlationId, String causationId, int chainDepth, Firing firing) {
+        runJob(job, cfg, runId, name, trigger, start, correlationId, causationId, chainDepth, firing, null);
     }
 
     /** The run lifecycle with the {@link Job} + config carried explicitly — shared by the registered path
@@ -1531,27 +1561,28 @@ public final class JobService implements AutoCloseable {
      *  inert no-op) and the ad-hoc pipeline path ({@link #triggerPipelineRun}), whose synthetic config is never
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
-                        String correlationId, String causationId, int chainDepth, Firing firing) {
-        if (closing) {   // JOB-SHUTDOWN-FAILED-1
-            log.info("job '{}' ({}) skipped: shutting down", name, trigger);
-            recordSkip(runId, name, job, trigger, start, SHUTTING_DOWN);
-            return;
-        }
-        // The Space's module gate comes before the three exclusions: a Job whose module is switched off here is not
-        // run at all, and says why. Config untouched; the next fire after the module is back on runs normally.
-        String off = typeGate.apply(job.type());
-        if (off == null) off = taskDisabledReason(job, cfg).orElse(null);
-        if (off != null) {
-            log.info("job '{}' ({}) not run: {}", name, trigger, off);
-            recordSkip(runId, name, job, trigger, start, off);
-            return;
-        }
+                        String correlationId, String causationId, int chainDepth, Firing firing,
+                        java.util.concurrent.atomic.AtomicReference<String> followUp) {
+        if (skippedBeforeStart(job, cfg, runId, name, trigger, start)) return;
         // Three exclusions, cheapest first, each a SKIP and never a queue (scale-out plan §5.2): this
         // pod's own non-overlap lock, then the cross-pod arming claim on the job NAME, then — for a
         // pipeline job — the authored PIPELINE it targets.
         // ⚠ Every claim is held for the WHOLE run, not just the submit: releasing at submit time lets the
         // next pod claim and submit the same firing, which is the double run this exists to stop.
-        runner.runExclusiveOrSkip(name, () -> {
+        // JOB-SIGNAL-OVERLAP-SKIP-1: a coalesced signal follow-up is the one exception to "skip, never queue" on
+        // this pod's lock — it WAITS for the Run in flight (holding its pool slot; at most one per Job), then frees
+        // its slot in signalFollowUps the moment it starts, so a Signal landing during it queues the next one.
+        Runnable task = () -> {
+            if (followUp != null) {
+                followUp.compareAndSet(runId, null);
+                // it may have waited: the Space may have begun to close, or the module been switched off, meanwhile
+                if (skippedBeforeStart(job, cfg, runId, name, trigger, start)) return;
+                if (com.gamma.module.Entitlements.readOnly()) {   // PA-7b, as submitRun checks it
+                    recordSkip(runId, name, job, trigger, start,
+                            "read-only: " + com.gamma.module.Entitlements.readOnlyReason());
+                    return;
+                }
+            }
             RunClaims.Claim arming = armingClaims.tryClaim(name);
             if (arming == null) {
                 recordSkip(runId, name, job, trigger, start, "another node is running this job");
@@ -1595,8 +1626,30 @@ public final class JobService implements AutoCloseable {
             } finally {
                 arming.close();
             }
-        }, () ->   // a previous run on THIS pod is still in flight — don't overlap
+        };
+        if (followUp != null) runner.runExclusive(name, task);
+        else runner.runExclusiveOrSkip(name, task, () ->   // a previous run on THIS pod is still in flight — don't overlap
             recordSkip(runId, name, job, trigger, start, "previous run still in flight"));
+    }
+
+    /** The checks before a Run starts, each recording a SKIP that says why; {@code true} when the Run must not
+     *  start. Run before the non-overlap lock, and again by a coalesced follow-up that waited for it. */
+    private boolean skippedBeforeStart(Job job, JobConfig cfg, String runId, String name, String trigger, String start) {
+        if (closing) {   // JOB-SHUTDOWN-FAILED-1
+            log.info("job '{}' ({}) skipped: shutting down", name, trigger);
+            recordSkip(runId, name, job, trigger, start, SHUTTING_DOWN);
+            return true;
+        }
+        // The Space's module gate comes before the three exclusions: a Job whose module is switched off here is not
+        // run at all, and says why. Config untouched; the next fire after the module is back on runs normally.
+        String off = typeGate.apply(job.type());
+        if (off == null) off = taskDisabledReason(job, cfg).orElse(null);
+        if (off != null) {
+            log.info("job '{}' ({}) not run: {}", name, trigger, off);
+            recordSkip(runId, name, job, trigger, start, off);
+            return true;
+        }
+        return false;
     }
 
     /** The weaker of the run's claims: a run holds its lease only while it holds both. */

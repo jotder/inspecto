@@ -2207,7 +2207,9 @@ Also: `enterprise-scale-out-plan.md:82` still says D14–D16 are unsigned; D14 a
 
 **Applied 2026-11-12**, each row rewritten on the board after one check:
 - `JOB-SIGNAL-OVERLAP-SKIP-1`: ✅ **done**. Confirmed: the coalescing path calls `submitRun` without a `SignalLane`
-  (the non-coalescing path has one); the guard is now at `JobService.java:1554`, not 1541.
+  (the non-coalescing path has one); the guard is now at `JobService.java:1554`, not 1541. **Fixed 2026-11-13**:
+  the per-Job `TriggerCoalescer` is replaced by one queued follow-up Run that waits for the Run in flight
+  (`JobSignalCoalesceTest`); the row is closed.
 - `LA-INDEX-SCALE-MEASURE-1`: ✅ **done**, `hold: demand` (`index.enabled` default ON since 2026-10-10, confirmed in `IndexRoutes`).
 - `LA-DAILY-INGEST-1`: ✅ **done**, narrowed in a "What is left" lead; `DATA-TIERS-1` is still an open row.
 - `LA-INVESTIGATION-STORE-DESIGN-1`: ✅ **done**; `nightly-postgres.yml` runs both Pg suites, green 2026-11-09 … 2026-11-12.

@@ -45,7 +45,8 @@ Module-level architecture pages were not read for this ranking, so observability
 | M7 | `ASSURE-OPERABILITY-1`, Deployment topology live validation, `DEPLOY-SERVICE-WRAPPER-1` | No recorded restore drill, RPO and RTO unmeasured, the kill -9 and reboot acceptance of the service wrapper unrun, the chart never installed. | The wrapper is the recovery mechanism; recovery that was never exercised is a claim, not a property. | Operator: targets and host access. |
 | M8 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | `SqlTemplateJob.swapIn` deletes the old snapshot while a running reader still reads it. | A dependent Job fails all its retries (seen in `la-banking`). | Nothing. |
 
-M2 is done (2026-11-12). Two of the remaining seven (M3 and M8) need no decision from anyone and can start now.
+M2 is done (2026-11-12). M3 is done (2026-11-13: a coalesced Signal follow-up now waits for the Run in flight).
+Of the remaining six, M8 needs no decision from anyone and can start now.
 
 ## 3. Should — 16 items
 
