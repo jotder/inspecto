@@ -1767,4 +1767,11 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
 2. ✅ Board row `PRODUCT-ASSEMBLY-1` filed (P2 feature, §3.10). Still to do: apply §13.1 and §13.2 to the board. Each
    closure is marked in its owning hub first, and the counts are re-derived (`tools/check-doc-counts.mjs`).
 3. Run §13.3 as parallel lanes (at most three at a time), one push per lane.
-4. Build PA-0 → PA-5. PA-5 is the proof: Inspecto Telco, four Apps over one ingest, with no new Java.
+4. ✅ PA-0 … PA-8 and PA-10 shipped 2026-11-10 … 2026-11-12. The full Advanced reactor gate and the UI checks owed
+   by PA-6/PA-7 were run on `fc8b5d1f0` on 2026-11-12 (Maven green; result recorded in `SESSION_STATUS.local.md`).
+   PA-8 and PA-10 shipped on targeted tests, so the next full gate covers them.
+5. **PA-9** (D-PA38 … D-PA47 signed 2026-11-12): the 9a spike decides gate G-RT, then 9b … 9f in order (D-PA46).
+6. **The operator signs** D-PA26 … D-PA37, decided and recorded 2026-11-12 while the operator was away.
+7. **Owed proofs on real hosts:** `CONTAINER-AIRGAP-PROOFS-1` (a Kubernetes install; a complete air-gapped bundle).
+8. Held for demand: `ADDON-PICKER-PAGE-1`, `PRODUCT-MAP-APP-EDITION-PRICES-1`, `CUSTOMER-BUILD-DOMAIN-APPS-1`,
+   `REALTIME-INLINE-DECISION-1`; open: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`.
