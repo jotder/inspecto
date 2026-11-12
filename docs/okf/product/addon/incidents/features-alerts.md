@@ -22,8 +22,8 @@ reaches it. No model runs here: the agent's `diagnose-and-alert` skill only draf
 
 Platform base, engine layer. Rules persist as `alert-rule` components under `<write-root>/registry`, with
 the same CRUD contract as Expectations and Decision Rules. Fired Alerts go to an `AlertStore`
-(`DbAlertStore` or `InMemoryAlertStore`). High-severity breaches cross into the [Incidents](architecture-incidents.md)
-add-on only through the `incidents` Platform Service. Delivery to people is the [Notifications](../../module/notify-channels/architecture-overview.md)
+(`DbAlertStore` or `InMemoryAlertStore`). High-severity breaches cross into the [Incidents](architecture.md)
+add-on only through the `incidents` Platform Service. Delivery to people is the [Notifications](../../module/notify-channels/architecture.md)
 module's job: an Alert carries a recipient attribute taken from the rule's `owner`.
 
 More: [screens](user-guide-alerts.md) · [API](api-alerts.md) · [architecture](architecture-alerts.md).

@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
 | spec | current | [Observability — spec](spec.md) |
-| architecture | current | [Observability and backup](architecture-observability-backup.md) |
+| architecture | current | [Observability and backup](architecture.md) |
 | features | current | [Observability and backup — features](features-observability-backup.md) |
 | feature-db | current | [Observability (metrics endpoint + events feed API) — feature database](feature-db.md) |
 | user-guide | current | [Observability and backup — screens](user-guide-observability-backup.md) |

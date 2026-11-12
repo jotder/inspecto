@@ -31,7 +31,7 @@ Code homes:
 ## 3. Where it sits
 
 Collectors are the first stage of the platform base: a remote system feeds a Collector, the Collector
-lands bytes, and a [Pipeline](../etl/architecture-pipelines-steps.md) parses and loads them into [storage](../entity-store/architecture-storage.md).
+lands bytes, and a [Pipeline](../etl/architecture.md) parses and loads them into [storage](../entity-store/architecture.md).
 The connector schemes are pluggable through `ServiceLoader`: `CollectorConnectors.forConfig` resolves
 `local` to the built-in `LocalFileSystemConnector` and any other scheme to a registered
 `CollectorConnectorFactory` matched on `scheme()`. An unknown scheme fails fast; there is no fall-back
@@ -120,13 +120,13 @@ Moved to [Collectors — API](api-collectors.md).
 ## 8. Interactions
 
 - [parsing-ingest](../etl/architecture-parsing-ingest.md) — consumes the landed inbox.
-- [pipelines-steps](../etl/architecture-pipelines-steps.md) — the `collector:` block lives in a Pipeline.
-- [identity-access](../access/architecture-overview.md) — `canOperateRuns`, `canOnboardConnections`.
-- [observability-backup](../observability/architecture-observability-backup.md) — acquisition metrics and the completeness KPI that reads `gap_detection`.
-- [events](../event/architecture-overview.md) — `SEQUENCE_GAP`, `FILE_CHANGED`.
-- [spaces](../config/architecture-spaces.md) — ledgers and stability gates are per Space.
+- [pipelines-steps](../etl/architecture.md) — the `collector:` block lives in a Pipeline.
+- [identity-access](../access/architecture.md) — `canOperateRuns`, `canOnboardConnections`.
+- [observability-backup](../observability/architecture.md) — acquisition metrics and the completeness KPI that reads `gap_detection`.
+- [events](../event/architecture.md) — `SEQUENCE_GAP`, `FILE_CHANGED`.
+- [spaces](../config/architecture.md) — ledgers and stability gates are per Space.
 - Mechanism detail: [connectors](../connectors/spec-connectors.md),
-  [framework](architecture-framework.md).
+  [framework](architecture.md).
 
 ## 9. Limits and gotchas
 

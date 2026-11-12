@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Observability and backup — screens
 
-Screens for Observability and backup. Design and internals: [Observability and backup architecture](architecture-observability-backup.md).
+Screens for Observability and backup. Design and internals: [Observability and backup architecture](architecture.md).
 
 - **Overview** (`inspecto-ui/src/app/modules/admin/dashboard/dashboard.component.ts`): readiness,
   status, report percentiles, acquisition tiles, raw `/metrics` behind a toggle.

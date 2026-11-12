@@ -33,8 +33,8 @@ The as-built references are the [pipeline-graph bundle](../../index.md) and the
 ## 3. Where it sits
 
 A Pipeline binds a [Collector](../acquire/architecture-collectors.md), the [parse stage](architecture-parsing-ingest.md), transform Steps
-and one or more sinks into [storage](../entity-store/architecture-storage.md). Its at-rest half runs as a Job of type `pipeline`
-on the [scheduler](../processor/architecture-jobs-scheduler.md). Code homes:
+and one or more sinks into [storage](../entity-store/architecture.md). Its at-rest half runs as a Job of type `pipeline`
+on the [scheduler](../processor/architecture.md). Code homes:
 
 - Model, lift and validator: `platform/inspecto-engine/src/main/java/com/gamma/pipeline`
   (`PipelineGraph`, `PipelineLift`, `PipelineValidator`, `PipelineEditable`, `BuiltinNodeType`,
@@ -110,9 +110,9 @@ Moved to [Pipelines and Steps — API](api-pipelines-steps.md).
 
 ## 8. Interactions
 
-- **Jobs:** the at-rest lane is a `pipeline` Job ([jobs-scheduler](../processor/architecture-jobs-scheduler.md)).
+- **Jobs:** the at-rest lane is a `pipeline` Job ([jobs-scheduler](../processor/architecture.md)).
 - **Analytics kernel:** `transform.profile`, `transform.timeseries.*` and `transform.similarity` call
-  the kernel ([analytics-kernel](../analytics/architecture-overview.md)).
+  the kernel ([analytics-kernel](../analytics/architecture.md)).
 - **Maker-checker:** a Pipeline save can be held as a pending change ([maker-checker](../workflow/architecture-maker-checker.md)).
 - **Platform Services:** a dry run substitutes stand-ins ([platform-services](../../layer/platform/architecture-platform-services.md)).
 

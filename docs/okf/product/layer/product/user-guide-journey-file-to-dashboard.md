@@ -74,13 +74,13 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 
 [collectors](../../module/acquire/architecture-collectors.md) ·
 [parsing-ingest](../../module/etl/architecture-parsing-ingest.md) ·
-[storage](../../module/entity-store/architecture-storage.md) ·
-[pipelines-steps](../../module/etl/architecture-pipelines-steps.md) ·
-[jobs-scheduler](../../module/processor/architecture-jobs-scheduler.md) ·
-[analytics-kernel](../../module/analytics/architecture-overview.md) ·
+[storage](../../module/entity-store/architecture.md) ·
+[pipelines-steps](../../module/etl/architecture.md) ·
+[jobs-scheduler](../../module/processor/architecture.md) ·
+[analytics-kernel](../../module/analytics/architecture.md) ·
 [studio-bi](architecture-studio-bi.md) ·
 [alerts](../../addon/incidents/architecture-alerts.md) ·
-[observability-backup](../../module/observability/architecture-observability-backup.md)
+[observability-backup](../../module/observability/architecture.md)
 
 Concepts: [Studio](plan-studio.md) ·
 [ingestion](../../module/etl/plan-ingestion.md) ·

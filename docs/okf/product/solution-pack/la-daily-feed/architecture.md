@@ -31,4 +31,4 @@ Template: `spaces/_templates/la-daily-feed/` (LA-DAILY-INGEST-1 T2).
 
 ## Modules used
 
-[Link Analysis](../../module/la-core/architecture.md) · [ETL ingestion plan](../../module/etl/plan-ingestion.md) (export contract for a database origin).
+[Link Analysis](../../module/la-core/architecture-backend.md) · [ETL ingestion plan](../../module/etl/plan-ingestion.md) (export contract for a database origin).

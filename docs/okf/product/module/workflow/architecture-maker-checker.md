@@ -27,7 +27,7 @@ Code: `inspecto/src/main/java/com/gamma/control/PendingChanges.java` (hold, stor
 
 Core control plane (`inspecto` module), not an add-on. It sits between every config-writing route's validation
 gates and its first side effect. The same approver-eligibility reading (`ApproverCheck`) and the same per-Space
-HMAC key are reused by [Action Requests](../action-requests/architecture-overview.md), which has its own mandatory approval and is never
+HMAC key are reused by [Action Requests](../action-requests/architecture.md), which has its own mandatory approval and is never
 held as a Pending Change.
 
 ## 4. How it works
@@ -86,7 +86,7 @@ Moved to [Maker-checker (Pending Changes) — API](api-maker-checker.md).
 
 ## 8. Interactions
 
-- [Action Requests](../action-requests/architecture-overview.md) reuse `ApproverCheck`, the roster and the HMAC key (domain-separated).
+- [Action Requests](../action-requests/architecture.md) reuse `ApproverCheck`, the roster and the HMAC key (domain-separated).
 - [Decision Kernel](../scoring/architecture-decision-kernel.md): Decision Rules are a governed kind.
 - [Platform Services](../../layer/platform/architecture-platform-services.md): a Job's run-time writes are not held (by decision).
 - Details: [config safety - Maker-checker](../config/spec-config-safety.md),

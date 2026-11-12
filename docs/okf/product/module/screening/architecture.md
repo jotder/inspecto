@@ -5,7 +5,7 @@
 
 ## 1. What it is
 
-Screening matches subjects (a key, a name, an identifier) against [Entity Lists](../scoring/architecture-scoring-entity-lists.md) and keeps
+Screening matches subjects (a key, a name, an identifier) against [Entity Lists](../scoring/architecture.md) and keeps
 a reviewable record of every match a scheduled run finds. Two paths share one matcher:
 
 - **Check** - an ad-hoc, read-shaped call that returns Match Scores and persists nothing.
@@ -24,8 +24,8 @@ notes: [Screening concept](spec.md).
 ## 3. Where it sits
 
 An add-on over the platform base. It reads Entity Lists (`entity-list` module), runs as a Job through the
-[Jobs scheduler](../processor/architecture-jobs-scheduler.md), and on confirm opens an [Incident](../../addon/incidents/architecture-incidents.md) and a
-[Case](../case-management/architecture-overview.md). Bundles without the jar answer the routes with the manifest's `absentMessage`
+[Jobs scheduler](../processor/architecture.md), and on confirm opens an [Incident](../../addon/incidents/architecture.md) and a
+[Case](../case-management/architecture.md). Bundles without the jar answer the routes with the manifest's `absentMessage`
 ("Standard edition and above").
 
 ## 4. How it works
@@ -70,11 +70,11 @@ Moved to [Screening — API](api-screening.md).
 
 ## 8. Interactions
 
-- [Scoring and Entity Lists](../scoring/architecture-scoring-entity-lists.md) - the lists screened against.
-- [Jobs scheduler](../processor/architecture-jobs-scheduler.md) - runs `screening.run`.
-- [Incidents](../../addon/incidents/architecture-incidents.md) and [Case management](../case-management/architecture-overview.md) - opened on confirm.
-- [Action requests](../action-requests/architecture-overview.md) - same signed-document storage pattern.
-- [Events](../event/architecture-overview.md) - the `screening.hits.raised` Signal.
+- [Scoring and Entity Lists](../scoring/architecture.md) - the lists screened against.
+- [Jobs scheduler](../processor/architecture.md) - runs `screening.run`.
+- [Incidents](../../addon/incidents/architecture.md) and [Case management](../case-management/architecture.md) - opened on confirm.
+- [Action requests](../action-requests/architecture.md) - same signed-document storage pattern.
+- [Events](../event/architecture.md) - the `screening.hits.raised` Signal.
 - [AML solution](../../solution-pack/aml/architecture.md).
 
 ## 9. Limits and gotchas

@@ -29,4 +29,4 @@ synchronous bus that writes each event to an `EventStore` and hands it to subscr
 - Gates: Installed (every Offering ships the bus); the `/events*` routes follow the `observability` module's
   Enabled gate; Permitted per the table in section 7.
 
-More: [screens](user-guide-events.md) · [API](api-events.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-events.md) · [API](api-events.md) · [architecture](architecture.md).

@@ -182,7 +182,7 @@ Three facts about discovery are worth knowing before adding one:
 
 1. **Collect.** Collectors pull from local directories, SFTP, FTP and FTPS, databases, object stores
    (S3, Azure Blob, GCS) and Kafka, with deduplication and watermark ledgers and a stability gate.
-   See the [acquisition framework](../../module/acquire/architecture-framework.md).
+   See the [acquisition framework](../../module/acquire/architecture.md).
 2. **Parse and ingest.** Stage-1 parsing (M files to N record types) writes typed Parquet into the
    lakehouse; bad rows are quarantined. See [Stage-1](../../module/engine/architecture-stage1.md) and
    [ingestion](../../module/engine/spec-ingestion.md).

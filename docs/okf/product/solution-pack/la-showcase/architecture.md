@@ -76,15 +76,15 @@ home; `tools/seed-la-showcase.mjs` and `tools/seed-la-mm.mjs` create them agains
 
 ## Modules used
 
-- [Link Analysis](../../module/la-core/architecture-overview.md) — index, views, Investigations,
+- [Link Analysis](../../module/la-core/architecture.md) — index, views, Investigations,
   four-eyes, masking, standing detection.
-- [Graph library](../../module/graph/architecture-overview.md) — cycles, paths, pattern packs.
-- [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md),
-  [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md).
-- [Identity and access](../../module/access/architecture-overview.md) — roles, reveal.
+- [Graph library](../../module/graph/architecture.md) — cycles, paths, pattern packs.
+- [Pipelines and Steps](../../module/etl/architecture.md),
+  [Jobs and scheduler](../../module/processor/architecture.md).
+- [Identity and access](../../module/access/architecture.md) — roles, reveal.
 - [Maker-checker](../../module/workflow/architecture-maker-checker.md) — the second approver.
 - [Alerts](../../addon/incidents/architecture-alerts.md),
-  [Case management](../../module/case-management/architecture-overview.md).
+  [Case management](../../module/case-management/architecture.md).
 
 ## Diagram
 

@@ -95,13 +95,13 @@ Moved to [Notifications — API](api-notifications.md).
 
 ## 8. Interactions
 
-- [Events](../event/architecture-overview.md) — the input stream; see also
+- [Events](../event/architecture.md) — the input stream; see also
   [events and metrics](../event/spec-events-metrics.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md) and [Incidents](../../addon/incidents/architecture-incidents.md) raise events that rules turn into notifications.
+- [Alerts](../../addon/incidents/architecture-alerts.md) and [Incidents](../../addon/incidents/architecture.md) raise events that rules turn into notifications.
 - [Platform Services](../../layer/platform/architecture-platform-services.md) — `notifications` and `mail` services granted to Runs.
-- [Pipelines and Steps](../etl/architecture-pipelines-steps.md) — the webhook sink posts through `HttpWebhookSinkTransport`.
-- [Spaces](../config/architecture-spaces.md) — channel destinations are per Space; webhook egress uses the Space's allowlist.
-- [Identity and access](../access/architecture-overview.md) — the capability gates above.
+- [Pipelines and Steps](../etl/architecture.md) — the webhook sink posts through `HttpWebhookSinkTransport`.
+- [Spaces](../config/architecture.md) — channel destinations are per Space; webhook egress uses the Space's allowlist.
+- [Identity and access](../access/architecture.md) — the capability gates above.
 
 ## 9. Limits and gotchas
 

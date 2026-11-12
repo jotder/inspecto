@@ -19,7 +19,7 @@ Connection under one idempotency key, with every answer recorded on the request
 ## Built
 
 - `ASSURE-ACTION-REQUESTS-1` shipped 2026-09-27 ([BACKLOG](../../../../BACKLOG.md)). Mechanism: [spec](spec.md);
-  overview: [architecture](architecture-overview.md).
+  overview: [architecture](architecture.md).
 - `WEBHOOK-EGRESS-POLICY-1` (P2, closed 2026-09-27): the dispatcher, the `sink.webhook` Step and the webhook
   channel all pass the egress policy with a pinned connect ([spec, *The egress policy*](spec.md)).
 - Approver roster and `approverCheck` (2026-09-28 / 2026-10-04): [spec, *Approval*](spec.md).
@@ -31,10 +31,10 @@ Connection under one idempotency key, with every answer recorded on the request
 
 P3 `ASSURE-ACTION-REQUESTS-RESIDUALS-1` was closed 2026-10-06; its limits are kept as known gaps, not rows:
 no per-request path below the Connection's base path, and no request history in a restored Space
-([spec, *Deferred / known gaps*](spec.md); [architecture § 9](architecture-overview.md)).
+([spec, *Deferred / known gaps*](spec.md); [architecture § 9](architecture.md)).
 
 ## Refused
 
 - Holding a request also as a Pending Change, or making four-eyes an Approval Policy option: one call, one
-  approval, always on ([architecture § 4](architecture-overview.md)).
+  approval, always on ([architecture § 4](architecture.md)).
 - Automatic re-send of a request left `dispatched` by a process stop; an approver must `mark-failed`, then retry.

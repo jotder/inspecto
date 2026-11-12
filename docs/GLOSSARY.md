@@ -1148,7 +1148,7 @@ industry word (AC-09). Further packs whose Entity Types and Record types join th
 means one Entity Type in every pack); the Domain Profile alone gives the vocabulary. ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
 **Entity Profile** pages below (facts about the data). ⛔ Never bare *pack* for it: *pack* alone is ambiguous (pattern
 pack, Job Pack, Solution pack); say *Industry pack* (§15). As built:
-[`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §3.6.
+[`okf/product/module/la-core/architecture-backend.md`](okf/product/module/la-core/architecture-backend.md) §3.6.
 
 **Entity Type Profile** *(Link Analysis, decided 2026-10-15, D-EP1; plan [`archived-documents/plans-archive/la-entity-profile-plan.md`](archived-documents/plans-archive/la-entity-profile-plan.md))* — What the Space's Datasets say about one **Entity Type**, computed on demand and cached until a new File lands: the Dataset columns bound to it, volume and fill rate, sentinel values, value shapes, time span and per-day timeline, freshness, lineage, link and relationship statistics. Aggregates only: it never names an identifier. Read by `GET /inv/entity-types/{id}/profile`; shown on the **Entities** page. ⛔ Not an *Access Profile* or a *Decode Profile* (different concepts); ⛔ not a Dataset profile (it spans every Dataset the type appears in).
 

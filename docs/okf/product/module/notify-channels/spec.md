@@ -40,6 +40,6 @@ id `notify-channels`, `bindingTime: boot`, contracts `NotificationChannel` and `
 
 ## Dispatch, configuration, limits
 
-Dispatch steps: [architecture § 4](architecture-overview.md). `notify.*` flags:
-[architecture § 5](architecture-overview.md). Routes: [API](api-notifications.md).
-Limits: [architecture § 9](architecture-overview.md).
+Dispatch steps: [architecture § 4](architecture.md). `notify.*` flags:
+[architecture § 5](architecture.md). Routes: [API](api-notifications.md).
+Limits: [architecture § 9](architecture.md).

@@ -6,7 +6,7 @@ Spaces, Space Templates, Demo Users) re-checked against `package.ps1`, the seed 
 on the exact bundle you will present, then again the evening before.*
 
 What this is: the step-by-step script for presenting the Inspecto LA demo on the **standalone Inspecto LA app
-bundle**. It defends the architecture page ([`okf/product/module/la-core/architecture.md`](architecture.md),
+bundle**. It defends the architecture page ([`okf/product/module/la-core/architecture-backend.md`](architecture-backend.md),
 cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
 the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (all built by 2026-10-13; history only). The
 technical / security review cut of this script (T1-T13) is section 9 below: rehearsed by the
@@ -262,7 +262,7 @@ unless you tell it not to.** Anyone who reads that log can open the link until i
 * give that log the retention you would give a credential, and do not ship it to a third-party log service unmasked;
 * a leaked link is revoked at once from the Share panel (or `POST .../embeds/<grantId>/revoke`); links default to 72 h and a Space can lower `embed.max_ttl_hours`.
 Not built: token delivery by a header, a fragment or a POST exchange. A fragment would hide the token from every server log but the page could then not tell the token's Space to
-send the right `frame-ancestors` (see `okf/product/module/la-core/architecture.md` §6.2); a POST exchange is a new route and a new client flow. Both are a larger change than the redaction rule above, so this stays a documented operator duty.
+send the right `frame-ancestors` (see `okf/product/module/la-core/architecture-backend.md` §6.2); a POST exchange is a new route and a new client flow. Both are a larger change than the redaction rule above, so this stays a documented operator duty.
 
 ### S14. Embed API aside, API only (2 min) [admin by curl]
 No SPA exists for embed links (the SPA shell is deferred). Start the server with `-Dla.embed.enabled=true` (§0 step 8). Mint needs `canShareInvestigation` AND a lead

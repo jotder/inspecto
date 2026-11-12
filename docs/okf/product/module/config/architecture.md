@@ -162,11 +162,11 @@ Moved to [Spaces — API](api-spaces.md).
 
 ## 8. Interactions
 
-- [Identity & access](../access/architecture-overview.md) — the Permitted gate and per-Space role tables.
-- [Jobs & scheduler](../processor/architecture-jobs-scheduler.md) — Jobs of a disabled module are skipped (`JobModuleGate`).
-- [Exchange](../exchange/architecture-overview.md) — the only sanctioned cross-Space path, by grant; its ledger lives under `_shared/`.
-- [Storage](../entity-store/architecture-storage.md) — every per-Space store default comes from `SpaceRoot`.
-- [Observability & backup](../observability/architecture-observability-backup.md) — the `space` label on metrics and events.
+- [Identity & access](../access/architecture.md) — the Permitted gate and per-Space role tables.
+- [Jobs & scheduler](../processor/architecture.md) — Jobs of a disabled module are skipped (`JobModuleGate`).
+- [Exchange](../exchange/architecture.md) — the only sanctioned cross-Space path, by grant; its ledger lives under `_shared/`.
+- [Storage](../entity-store/architecture.md) — every per-Space store default comes from `SpaceRoot`.
+- [Observability & backup](../observability/architecture.md) — the `space` label on metrics and events.
 - Content packs ([telecom fraud](../../solution-pack/telco-fraud/architecture.md),
   [revenue assurance](../../solution-pack/business-assurance/architecture-revenue-assurance.md)) ship as Space Templates.
 

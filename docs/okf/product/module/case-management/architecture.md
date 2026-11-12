@@ -29,7 +29,7 @@ The module `features/inspecto-case-management` (id `case-management`, feature id
 
 ## 3. Where it sits
 
-An add-on on top of [incidents](../../addon/incidents/architecture-incidents.md): it needs the `ops` module, which supplies the objects, links,
+An add-on on top of [incidents](../../addon/incidents/architecture.md): it needs the `ops` module, which supplies the objects, links,
 workflow engine and SLA sweep. The chain is Alert → Incident → Case
 ([Incidents capability](../../addon/incidents/plan-incidents.md)).
 
@@ -74,7 +74,7 @@ skipped with a warning) or a rule saved with `POST /cases/rules`.
 | `category`, `tags` | stamped on the Case |
 | `groupBy` | a plain column name; one Case per `key.<col>` value |
 
-Unknown keys are kept. The workflow can be replaced per object type (see [workflow-sla](../workflow/architecture-workflow-sla.md));
+Unknown keys are kept. The workflow can be replaced per object type (see [workflow-sla](../workflow/architecture.md));
 an SLA Policy accepts `objectType: CASE`. Scheduled evaluation: Job Type `caserule.evaluate` with required
 parameter `rule` ([jobs](../processor/spec-jobs.md)).
 
@@ -88,13 +88,13 @@ Moved to [Case Management — API](api-case-management.md).
 
 ## 8. Interactions
 
-- [incidents](../../addon/incidents/architecture-incidents.md) — members are Incidents; an Alert Rule's `key.<column>` attributes feed `groupBy`.
+- [incidents](../../addon/incidents/architecture.md) — members are Incidents; an Alert Rule's `key.<column>` attributes feed `groupBy`.
 - [alerts](../../addon/incidents/architecture-alerts.md) — first link of the Alert → Incident → Case chain.
-- [link-analysis](../la-core/architecture-overview.md) — from-entities opens a Case from investigated entities; a classified
+- [link-analysis](../la-core/architecture.md) — from-entities opens a Case from investigated entities; a classified
   Dataset needs `canRevealLinkEntities`.
-- [jobs-scheduler](../processor/architecture-jobs-scheduler.md) — `caserule.evaluate`.
-- [events](../event/architecture-overview.md) — `OBJECT_ACTIVITY` events for transitions and merges.
-- [action-requests](../action-requests/architecture-overview.md) — shown on the detail page (UI panel only).
+- [jobs-scheduler](../processor/architecture.md) — `caserule.evaluate`.
+- [events](../event/architecture.md) — `OBJECT_ACTIVITY` events for transitions and merges.
+- [action-requests](../action-requests/architecture.md) — shown on the detail page (UI panel only).
 
 ## 9. Limits and gotchas
 

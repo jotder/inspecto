@@ -42,7 +42,7 @@ Investigation whose time column is `last_seen`.
 ## 3. Re-drive after the fixes (2026-11-02)
 
 `LA-INVESTIGATE-TIMECOL-DATE-1`, `-THIS-MASKED-1` and `-CLICKS-2` fixed (as built in
-[`architecture.md`](architecture.md) §6.9). Same set-up as §1: `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Preview -Product la -Distribution demo -NoBakeDemo`)*
+[`architecture.md`](architecture-backend.md) §6.9). Same set-up as §1: `package.ps1 -Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Preview -Product la -Distribution demo -NoBakeDemo`)*
 built from the fix worktree, `serve-demo.bat` on `127.0.0.1:8092`, a COPY of `la-showcase`, Demo User `admin`, 1024 px.
 
 | Defect | Workflow | Result | Evidence |

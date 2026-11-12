@@ -65,7 +65,7 @@ Content packs sit on feature modules, which sit on platform modules, which sit o
 
 [Module pages](../../index.md) — 29 pages, one per module, on one nine-heading template (what it is, who uses
 it, where it sits, how it works, configuration, screens, API, interactions, limits). Start with
-[maker-checker](../../module/workflow/architecture-maker-checker.md) for governance, [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md) for data
+[maker-checker](../../module/workflow/architecture-maker-checker.md) for governance, [Pipelines and Steps](../../module/etl/architecture.md) for data
 flow, or [Alerts](../../addon/incidents/architecture-alerts.md) for detection.
 
 ## 6. Where to go next

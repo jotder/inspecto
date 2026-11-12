@@ -97,11 +97,11 @@ Callers found in the code (`grep com.gamma.analytics`):
 
 - **Engine:** `ReportService` (percentiles), `BaselineEvaluator` (Expectation baselines),
   `PendingAlertRules` (score kinds), `FileSequenceGaps` in `inspecto-acquire`.
-- **[Anomaly](../anomaly/architecture-overview.md) and [scoring](../scoring/architecture-scoring-entity-lists.md):** baselines and the score contract.
-- **[Screening](../screening/architecture-overview.md):** `NameMatcher` uses the similarity kit.
-- **[AI assist](../intelligence/architecture-overview.md):** triage run similarity and the assistant's statistics tools.
-- **[Link Analysis](../la-core/architecture-overview.md):** `ColumnProfile`, `DatasetLinkStats`, `LinkTemporalDetector`.
-- **[Graph library](../graph/architecture-overview.md):** the temporal motif matcher lives there, not here.
+- **[Anomaly](../anomaly/architecture.md) and [scoring](../scoring/architecture.md):** baselines and the score contract.
+- **[Screening](../screening/architecture.md):** `NameMatcher` uses the similarity kit.
+- **[AI assist](../intelligence/architecture.md):** triage run similarity and the assistant's statistics tools.
+- **[Link Analysis](../la-core/architecture.md):** `ColumnProfile`, `DatasetLinkStats`, `LinkTemporalDetector`.
+- **[Graph library](../graph/architecture.md):** the temporal motif matcher lives there, not here.
 
 ## 9. Limits and gotchas
 
@@ -111,4 +111,4 @@ Callers found in the code (`grep com.gamma.analytics`):
 - SQL-side `quantile_cont` / `quantile_disc` strings in other modules stay SQL by decision.
 - Deterministic entity grouping (blocking keys plus union-find) is built: `com.gamma.analytics.entity.EntityGrouping`
   in the kernel and the Step `enrichment.entity.link` (`transform.entity.link`, `EntityLinkStep`), delivered in
-  `ProcessorCatalog`. The shared `UnionFind` lives in the [graph library](../graph/architecture-overview.md).
+  `ProcessorCatalog`. The shared `UnionFind` lives in the [graph library](../graph/architecture.md).

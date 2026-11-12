@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Notifications — requirement of record](plan.md) |
 | spec | current | [Notifications — specification](spec.md) |
-| architecture | current | [Notifications](architecture-overview.md) |
+| architecture | current | [Notifications](architecture.md) |
 | features | current | [Notifications — features](features-notifications.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Notifications — screens](user-guide-notifications.md) |

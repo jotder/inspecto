@@ -6,7 +6,7 @@
 
 ## 1. What it is
 
-Regulatory Reporting turns a [Case](../case-management/architecture-overview.md) or an [Incident](../../addon/incidents/architecture-incidents.md) into a regulator-format
+Regulatory Reporting turns a [Case](../case-management/architecture.md) or an [Incident](../../addon/incidents/architecture.md) into a regulator-format
 document (XML, CSV or JSON) from a **Report Template**, has a second person approve it, and submits the exact
 approved bytes to a jailed **file drop**. No live regulator API is built; file drop is the one delivery kind.
 
@@ -21,8 +21,8 @@ Module: `features/inspecto-regulatory-reporting` (manifest id `regulatory-report
 
 ## 3. Where it sits
 
-An add-on over the platform base. It reads the operational objects of [Case management](../case-management/architecture-overview.md) and
-[Incidents](../../addon/incidents/architecture-incidents.md), reuses the [Maker-checker](../workflow/architecture-maker-checker.md) signing key and decision pattern, and writes
+An add-on over the platform base. It reads the operational objects of [Case management](../case-management/architecture.md) and
+[Incidents](../../addon/incidents/architecture.md), reuses the [Maker-checker](../workflow/architecture-maker-checker.md) signing key and decision pattern, and writes
 into the same path jail as the `report` Job's `out_dir`.
 
 ## 4. How it works
@@ -66,9 +66,9 @@ Moved to [Regulatory Reporting — API](api-regulatory-reporting.md).
 
 ## 8. Interactions
 
-- [Case management](../case-management/architecture-overview.md), [Incidents](../../addon/incidents/architecture-incidents.md) - report subjects.
-- [Maker-checker](../workflow/architecture-maker-checker.md), [Action requests](../action-requests/architecture-overview.md) - four-eyes pattern and storage.
-- [Identity and access](../access/architecture-overview.md) - scope checks on subject and member Incidents.
+- [Case management](../case-management/architecture.md), [Incidents](../../addon/incidents/architecture.md) - report subjects.
+- [Maker-checker](../workflow/architecture-maker-checker.md), [Action requests](../action-requests/architecture.md) - four-eyes pattern and storage.
+- [Identity and access](../access/architecture.md) - scope checks on subject and member Incidents.
 - [AML solution](../../solution-pack/aml/architecture.md) — the only pack that ships a report template (`aml-str`).
 
 ## 9. Limits and gotchas

@@ -49,7 +49,7 @@ Only `ARCHIVED` is terminal; the SLA clock stops at `RESOLVED`. Openers:
 - `POST /objects` (a title and at least one link);
 - `AlertService.promoteToIncident` — a critical Alert Rule firing opens one deduped Incident linked
   `ESCALATED_FROM` the Alert, and re-opens it on relapse;
-- `POST /recon/promote` and the `recon.run` Job ([reconciliation](../../module/reconciliation/architecture-overview.md));
+- `POST /recon/promote` and the `recon.run` Job ([reconciliation](../../module/reconciliation/architecture.md));
 - the `incident.open` Job (`platform/inspecto-engine/src/main/java/com/gamma/job/IncidentOpenJob.java`);
 - a Decision Rule `create-incident` consequence (`CreateIncidentConsequence`);
 - `EventAlertBridge` on a sequence-gap event.
@@ -65,10 +65,10 @@ No dedicated `incidents:` keys exist beyond the offering entry. Governance is au
 - `registry/sla-policies/` (`SlaPolicy`) and `registry/escalation-rules/` (`EscalationRule`, at most 50
   loaded) — read by `GovernanceRegistry`, re-read on file change, a broken file keeps its last valid version;
 - component kinds `workflow`, `sla-policy`, `escalation-rule`;
-- Job types `incident.open`, `objects.analytics`, `incident_purge` (see [jobs-scheduler](../../module/processor/architecture-jobs-scheduler.md)).
+- Job types `incident.open`, `objects.analytics`, `incident_purge` (see [jobs-scheduler](../../module/processor/architecture.md)).
 
 An authored workflow is validated at save and load (reachable states, a way out of every non-terminal state,
-`RESOLVED` present for an Incident). SLA details: [workflow-sla](../../module/workflow/architecture-workflow-sla.md).
+`RESOLVED` present for an Incident). SLA details: [workflow-sla](../../module/workflow/architecture.md).
 
 ## 6. Screens
 
@@ -81,9 +81,9 @@ Moved to [Incidents — API](api-incidents.md).
 ## 8. Interactions
 
 - [alerts](architecture-alerts.md) — critical Alerts promote to Incidents; stored Alerts are worked separately.
-- [events](../../module/event/architecture-overview.md) — `OBJECT_*` events record every change.
-- [notifications](../../module/notify-channels/architecture-overview.md) — SLA notifications key on `sla:{{correlationId}}` (`NotificationRules`).
-- [case-management](../../module/case-management/architecture-overview.md) — Cases group Incidents.
+- [events](../../module/event/architecture.md) — `OBJECT_*` events record every change.
+- [notifications](../../module/notify-channels/architecture.md) — SLA notifications key on `sla:{{correlationId}}` (`NotificationRules`).
+- [case-management](../../module/case-management/architecture.md) — Cases group Incidents.
 - [maker-checker](../../module/workflow/architecture-maker-checker.md) — governance files can be applied through an approval.
 - [decision-kernel](../../module/scoring/architecture-decision-kernel.md) — the `create-incident` consequence.
 

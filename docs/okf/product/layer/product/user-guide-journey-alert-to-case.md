@@ -71,15 +71,15 @@ Script: `tools/doc-diagrams/journey-alert-to-case.py`.
 
 ## Related modules
 
-[events](../../module/event/architecture-overview.md) ·
+[events](../../module/event/architecture.md) ·
 [alerts](../../addon/incidents/architecture-alerts.md) ·
 [decision-kernel](../../module/scoring/architecture-decision-kernel.md) ·
-[incidents](../../addon/incidents/architecture-incidents.md) ·
-[case-management](../../module/case-management/architecture-overview.md) ·
-[action-requests](../../module/action-requests/architecture-overview.md) ·
-[workflow-sla](../../module/workflow/architecture-workflow-sla.md) ·
-[notifications](../../module/notify-channels/architecture-overview.md) ·
+[incidents](../../addon/incidents/architecture.md) ·
+[case-management](../../module/case-management/architecture.md) ·
+[action-requests](../../module/action-requests/architecture.md) ·
+[workflow-sla](../../module/workflow/architecture.md) ·
+[notifications](../../module/notify-channels/architecture.md) ·
 [platform-services](../platform/architecture-platform-services.md) ·
-[identity-access](../../module/access/architecture-overview.md)
+[identity-access](../../module/access/architecture.md)
 
 Concept: [incidents](../../addon/incidents/plan-incidents.md)

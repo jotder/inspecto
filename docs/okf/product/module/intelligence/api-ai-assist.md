@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # AI assist — API
 
-Routes for AI assist. Design and internals: [AI assist architecture](architecture-overview.md).
+Routes for AI assist. Design and internals: [AI assist architecture](architecture.md).
 
 | Route | Gate |
 |---|---|

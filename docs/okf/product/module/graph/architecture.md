@@ -13,7 +13,7 @@ It is plain JDK with no dependency on any other Inspecto module.
 It began as a port of the Link Analysis SPA's algorithms and was moved into the platform by the
 analytics core plan (decision D-AN2) so Fraud, AML and Case Management can use it without depending
 on Link Analysis. The backend description of Link Analysis, which is its main caller, is
-[link-analysis (backend)](../la-core/architecture.md).
+[link-analysis (backend)](../la-core/architecture-backend.md).
 
 ## 2. Who uses it
 
@@ -68,7 +68,7 @@ and a `truncated` flag (match `limit` reached, or the 500,000 leg-examination bu
 ## 5. Configuration
 
 None. Limits (node ceilings, cost classes, budgets) are set by the caller; for Link Analysis see
-`/settings/link-analysis/limits` and [link-analysis](../la-core/architecture-overview.md).
+`/settings/link-analysis/limits` and [link-analysis](../la-core/architecture.md).
 
 ## 6. Screens
 
@@ -80,10 +80,10 @@ Moved to [Graph library — API](api-graph.md).
 
 ## 8. Interactions
 
-- **[Link Analysis](../la-core/architecture-overview.md)** is the main caller.
-- **[Analytics kernel](../analytics/architecture-overview.md):** statistics over vectors live there; graph searches
+- **[Link Analysis](../la-core/architecture.md)** is the main caller.
+- **[Analytics kernel](../analytics/architecture.md):** statistics over vectors live there; graph searches
   live here. The motif matcher moved here for that reason.
-- **[Scoring and Entity Lists](../scoring/architecture-scoring-entity-lists.md)** and the entity store use `UnionFind`.
+- **[Scoring and Entity Lists](../scoring/architecture.md)** and the entity store use `UnionFind`.
 
 ## 9. Limits and gotchas
 
@@ -91,6 +91,6 @@ Moved to [Graph library — API](api-graph.md).
   fail on one side.
 - The library holds no limits; an uncapped caller can run an expensive algorithm on a large graph.
   Always pass a `RunControl` with a budget or deadline.
-- Deterministic entity grouping is built in the [Analytics Kernel](../analytics/architecture-overview.md) (`EntityGrouping`, Step
+- Deterministic entity grouping is built in the [Analytics Kernel](../analytics/architecture.md) (`EntityGrouping`, Step
   `enrichment.entity.link`); `UnionFind` is also used by the entity store's `EntityRegistry`.
 - Its pom's enforcer `bannedDependencies` rule fences out `inspecto-*` dependencies; adding one fails the build.

@@ -1,6 +1,6 @@
 # Link Analysis audit showcase — architecture
 
-The `la-audit` Space Template (`spaces/_templates/la-audit/template.toon`). The studio, index and store seams it runs on are the same as in the [la-showcase architecture](../la-showcase/architecture.md) and the [la-core architecture](../../module/la-core/architecture.md); this page covers only what is specific to audit.
+The `la-audit` Space Template (`spaces/_templates/la-audit/template.toon`). The studio, index and store seams it runs on are the same as in the [la-showcase architecture](../la-showcase/architecture.md) and the [la-core architecture](../../module/la-core/architecture-backend.md); this page covers only what is specific to audit.
 
 ## Data flow
 

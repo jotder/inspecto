@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Screening — screens
 
-Screens for Screening. Design and internals: [Screening architecture](architecture-overview.md).
+Screens for Screening. Design and internals: [Screening architecture](architecture.md).
 
 - **Screening** (`/screening`, `inspecto-ui/src/app/modules/admin/screening/`): the hit queue filtered by state,
   hit detail with history, decide actions, and the **Check name** dialog

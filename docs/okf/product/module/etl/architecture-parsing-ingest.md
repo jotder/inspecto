@@ -37,8 +37,8 @@ Code homes:
 ## 3. Where it sits
 
 Ingest starts where a [Collector](../acquire/architecture-collectors.md) has landed a file in `dirs.poll`. It ends at a
-committed store that [Datasets](../../layer/product/architecture-studio-bi.md) and at-rest [Steps](architecture-pipelines-steps.md) read. Typing
-rules come from the Schema registry (metamodel); storage layout is described in [storage](../entity-store/architecture-storage.md).
+committed store that [Datasets](../../layer/product/architecture-studio-bi.md) and at-rest [Steps](architecture.md) read. Typing
+rules come from the Schema registry (metamodel); storage layout is described in [storage](../entity-store/architecture.md).
 Every Consignment runs on a virtual thread bounded by `processing.threads`; many Pipelines share one
 JVM under `MultiCollectorProcessor`.
 
@@ -111,11 +111,11 @@ Moved to [Parsing and ingest — API](api-parsing-ingest.md).
 
 - **Collectors** land files; ingest never fetches ([collectors](../acquire/architecture-collectors.md)).
 - **Pipelines and Steps:** a `route:` Pipeline forks the write per branch on the ingest lane; the
-  at-rest chain runs after commit as a Job ([pipelines-steps](architecture-pipelines-steps.md)).
-- **Jobs:** an `on_pipeline` Job fires on a committed Consignment ([jobs-scheduler](../processor/architecture-jobs-scheduler.md)).
-- **Events:** commit and failure outcomes are published as Signals ([events](../event/architecture-overview.md)).
-- **Storage:** the committed store and the status ledgers ([storage](../entity-store/architecture-storage.md)).
-- **Observability:** batch counters and the status ledger feed run reports ([observability-backup](../observability/architecture-observability-backup.md)).
+  at-rest chain runs after commit as a Job ([pipelines-steps](architecture.md)).
+- **Jobs:** an `on_pipeline` Job fires on a committed Consignment ([jobs-scheduler](../processor/architecture.md)).
+- **Events:** commit and failure outcomes are published as Signals ([events](../event/architecture.md)).
+- **Storage:** the committed store and the status ledgers ([storage](../entity-store/architecture.md)).
+- **Observability:** batch counters and the status ledger feed run reports ([observability-backup](../observability/architecture.md)).
 
 ## 9. Limits and gotchas
 

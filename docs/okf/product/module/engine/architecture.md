@@ -17,7 +17,7 @@ dependencies**: remote protocols live in [connectors](../connectors/architecture
 > **Not the engine anymore.** Before the WS-D reactor split (2026-07-22) `inspecto/` held the whole
 > engine; the engine was then extracted into the sibling modules below, and `inspecto/` now depends
 > *down* on them. Authoritative build order, version management, and the extraction playbook live in
-> [../../layer/platform/architecture-reactor.md](../../layer/platform/architecture-modules.md).
+> [../../layer/platform/architecture-modules.md](../../layer/platform/architecture-modules.md).
 
 ## What lives here now
 
@@ -38,7 +38,7 @@ The concept docs are unchanged by the move; only the home module changed:
   ingesters, batch planning, quarantine, lineage, [partitioned Parquet output](spec-output-sinks.md).
 - **`inspecto-event`** (`inspecto-event`) — [`event` + `metrics`](../event/spec-events-metrics.md):
   the Operational-Intelligence event store + metric registry; owns `logback.xml`.
-- **`inspecto-acquire`** (`inspecto-acquire`) — the [acquisition framework](../acquire/architecture-framework.md):
+- **`inspecto-acquire`** (`inspecto-acquire`) — the [acquisition framework](../acquire/architecture.md):
   connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate,
   retry/circuit-breaker/rate-limit policies.
 - Foundation leaves **`inspecto-api`** (`@PublicApi`), **`inspecto-util`** (DuckDB access + CSV/file/tar

@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Analytics Kernel — plan](plan.md) |
 | spec | current | [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts](spec.md) |
-| architecture | current | [Analytics kernel](architecture-overview.md) |
+| architecture | current | [Analytics kernel](architecture.md) |
 | features | current | [Analytics kernel — features](features-analytics.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Analytics functions](user-guide-analytics-functions.md) · [Analytics kernel — screens](user-guide-analytics.md) · [KPI & Reports](user-guide-kpi-reports.md) |

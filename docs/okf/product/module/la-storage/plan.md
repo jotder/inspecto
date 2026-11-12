@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 `la-storage` is the versioned Parquet **link index** and the index-backed graph engine. Design of record:
 [la-separation-d3-design](../../../../archived-documents/plans-archive/la-separation-d3-design.md) (D-3). As built:
-[architecture](architecture.md) and [la-core architecture](../la-core/architecture.md) §4.
+[architecture](architecture.md) and [la-core architecture](../la-core/architecture-backend.md) §4.
 
 ## Required
 
@@ -45,7 +45,7 @@ Open rows in [`docs/BACKLOG.md`](../../../../BACKLOG.md):
   extrapolation today. Measurements: [tests-index-scale-run](tests-index-scale-run.md).
 - `LA-DAILY-INGEST-1` (P2): scheduled index builds on daily partitions, follow-ups.
 - Per-key lookup cost is linear in the key's degree; the frontier cap bounds key count, not hub cost
-  ([la-core architecture](../la-core/architecture.md) §10).
+  ([la-core architecture](../la-core/architecture-backend.md) §10).
 
 ## Refused
 

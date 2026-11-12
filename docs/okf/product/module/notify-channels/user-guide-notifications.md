@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Notifications — screens
 
-Screens for Notifications. Design and internals: [Notifications architecture](architecture-overview.md).
+Screens for Notifications. Design and internals: [Notifications architecture](architecture.md).
 
 - Bell menu in the shell: `inspecto-ui/src/app/layout/common/notifications/notifications.component.ts`.
 - Notification center (channels, rules, deliveries):

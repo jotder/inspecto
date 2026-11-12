@@ -29,7 +29,7 @@ the boundary with Steps is [job-vs-step](architecture-job-vs-step.md).
 
 Jobs are the platform's scheduler. Add-ons register Job Types (for example `alert.evaluate`,
 `caserule.evaluate`, `incident.open`), and Pipelines run their at-rest chain as a `pipeline` Job
-([pipelines-steps](../etl/architecture-pipelines-steps.md)). A Job reaches shared capabilities only through
+([pipelines-steps](../etl/architecture.md)). A Job reaches shared capabilities only through
 [Platform Services](../../layer/platform/architecture-platform-services.md) it declares in `requires:`.
 
 Job Types come from `JobTypeRegistry`, which records each type's source as `builtin`, `classpath`
@@ -98,10 +98,10 @@ Moved to [Jobs and scheduler — API](api-jobs-scheduler.md).
 
 ## 8. Interactions
 
-- **Events:** Runs emit Signals that can trigger other Jobs ([events](../event/architecture-overview.md)).
+- **Events:** Runs emit Signals that can trigger other Jobs ([events](../event/architecture.md)).
 - **Alerts and Decision Rules:** a Decision Rule's `start-job` consequence starts a Job
   ([decision-kernel](../scoring/architecture-decision-kernel.md), [alerts](../../addon/incidents/architecture-alerts.md)).
-- **Maintenance and backup** are tasks on the `maintenance` Job Type ([observability-backup](../observability/architecture-observability-backup.md)).
+- **Maintenance and backup** are tasks on the `maintenance` Job Type ([observability-backup](../observability/architecture.md)).
 - **Studio:** scheduled report delivery is the `report` Job Type ([studio-bi](../../layer/product/architecture-studio-bi.md)).
 
 ## 9. Limits and gotchas

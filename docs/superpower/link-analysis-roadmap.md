@@ -22,7 +22,7 @@
 | Embed view | **built** 2026-10-12/14 (`LA-EMBED-VIEW-1` closed 2026-10-14; as-built la-core architecture §6.2); §3 below is the design record | nothing |
 | Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; WP3 index builder still unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
 | Daily ingestion (CSV / Hive / database to the index) | **ingest chain built and accepted (T1-T9)** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6/T7/T9 done, T5/T8 built; open: follow-ups in the BACKLOG row |
-| Configurable limits (`LA-CONFIG-LIMITS-1`) | **built 2026-10-15** (every limit a server-gated configuration item; plan archived) | `LA-CONFIG-LIMITS-RESIDUALS-1`; as-built: [`okf/product/module/la-core/architecture.md`](../okf/product/module/la-core/architecture.md) §9 |
+| Configurable limits (`LA-CONFIG-LIMITS-1`) | **built 2026-10-15** (every limit a server-gated configuration item; plan archived) | `LA-CONFIG-LIMITS-RESIDUALS-1`; as-built: [`okf/product/module/la-core/architecture-backend.md`](../okf/product/module/la-core/architecture-backend.md) §9 |
 | Investigation store | S0–S7 closed | demand-gated items (§2) |
 | Entity model LA-17 | slice 1 + slice 2 built | SPA member browsing, `excludeBy` range/CIDR (§3) |
 | Live detection | LD-1…LD-7 built | operator confirmation of D-LD2…D-LD18; template sharing (§3) |
@@ -574,7 +574,7 @@ Hard invariants: narrow only (a refusal is EMPTY, never a value); aggregate outp
 
 ## Demos, showcases, edition placement and upload - what is still open (folded 2026-10-22)
 
-Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture.md`](../okf/product/module/la-core/architecture.md) §6.6 (upload) and §8 (editions), [`spec-editions.md`](../okf/product/layer/platform/spec-editions.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
+Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture-backend.md`](../okf/product/module/la-core/architecture-backend.md) §6.6 (upload) and §8 (editions), [`spec-editions.md`](../okf/product/layer/platform/spec-editions.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
 
 ### D1. Demo readiness (`la-demo-readiness-plan`) - nothing open
 

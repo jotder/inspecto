@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Regulatory Reporting — API
 
-Routes for Regulatory Reporting. Design and internals: [Regulatory Reporting architecture](architecture-overview.md).
+Routes for Regulatory Reporting. Design and internals: [Regulatory Reporting architecture](architecture.md).
 
 | Route | Capability |
 |---|---|

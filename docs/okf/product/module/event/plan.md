@@ -29,7 +29,7 @@ records what falls to the `inspecto-event` module.
 
 - Event model, `EventLog` (global plus one per Space), capture of SLF4J INFO+ records via
   `EventStoreAppender`, the in-memory ring, rolling Parquet with a write-ahead journal, and the shared
-  `DbEventStore` — see [spec](spec-events-metrics.md) and [architecture](architecture-overview.md).
+  `DbEventStore` — see [spec](spec-events-metrics.md) and [architecture](architecture.md).
 - The audit hash chain (`AuditChainLinker`), anchors, verification and prune records —
   `ASSURE-AUDIT-CHAIN-1`; residuals (5) and (7) accepted as stated limits, (8) D-P8 built.
 - Saved views (`SavedViewStore`) and the `inspecto_events_total{level,type}` counter.

@@ -2,7 +2,7 @@
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
 > Offering: all editions (the BI screens carry no feature gate). The investigation studios mounted under
-> `/studio` have their own page, [link-analysis](../../module/la-core/architecture-overview.md): the Link
+> `/studio` have their own page, [link-analysis](../../module/la-core/architecture.md): the Link
 > Analysis graph studio ships in every edition, the Geo map and the Entity profile pages in Standard and
 > above (`docs/EDITIONS.md`). Checked against the code on 2026-11-12.
 
@@ -30,7 +30,7 @@ are in [data-plane](../platform/plan-data-plane.md).
 
 ## 3. Where it sits
 
-Studio reads committed stores from [storage](../../module/entity-store/architecture-storage.md) through Datasets; it writes nothing to
+Studio reads committed stores from [storage](../../module/entity-store/architecture.md) through Datasets; it writes nothing to
 business data. Widgets, Dashboards and Datasets are ordinary component kinds, so they get versions,
 ETags and history from the component registry. Code homes:
 
@@ -136,10 +136,10 @@ there; its relation is validated when it is read, by
 ## 8. Interactions
 
 - **Alerts:** Measure-shape Alert Rules and freshness Alert Rules ([alerts](../../addon/incidents/architecture-alerts.md)).
-- **Jobs:** the `report` Job Type delivers exports on a schedule ([jobs-scheduler](../../module/processor/architecture-jobs-scheduler.md)).
-- **Analytics kernel:** time grains and statistics ([analytics-kernel](../../module/analytics/architecture-overview.md)).
-- **Exchange:** shared Datasets and Widgets across Spaces ([exchange](../../module/exchange/architecture-overview.md)).
-- **Identity and access:** public routes and HMAC share tokens ([identity-access](../../module/access/architecture-overview.md)).
+- **Jobs:** the `report` Job Type delivers exports on a schedule ([jobs-scheduler](../../module/processor/architecture.md)).
+- **Analytics kernel:** time grains and statistics ([analytics-kernel](../../module/analytics/architecture.md)).
+- **Exchange:** shared Datasets and Widgets across Spaces ([exchange](../../module/exchange/architecture.md)).
+- **Identity and access:** public routes and HMAC share tokens ([identity-access](../../module/access/architecture.md)).
 
 ## 9. Limits and gotchas
 

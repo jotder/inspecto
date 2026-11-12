@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Workflow and SLA models — plan](plan.md) |
 | spec | current | [Workflow and SLA models — spec](spec.md) |
-| architecture | current | [Maker-checker (Pending Changes)](architecture-maker-checker.md) · [Workflow and SLA](architecture-workflow-sla.md) |
+| architecture | current | [Maker-checker (Pending Changes)](architecture-maker-checker.md) · [Workflow and SLA](architecture.md) |
 | features | current | [Maker-checker (Pending Changes) — features](features-maker-checker.md) · [Workflow and SLA — features](features-workflow-sla.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md) · [Workflow and SLA — screens](user-guide-workflow-sla.md) |

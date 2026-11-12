@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Action Requests — requirement of record](plan.md) |
 | spec | current | [Action Requests — approved outbound API calls](spec.md) |
-| architecture | current | [Action Requests](architecture-overview.md) |
+| architecture | current | [Action Requests](architecture.md) |
 | features | current | [Action Requests — features](features-action-requests.md) |
 | feature-db | current | [Action Requests — feature database](feature-db.md) |
 | user-guide | current | [Action Requests — screens](user-guide-action-requests.md) |

@@ -41,7 +41,7 @@ carry no capability of their own ([api-routes](api-routes.md)).
 | `recon.run` Job, `day` | latest day on any side | `yyyy-mm-dd` |
 
 Every side's Dataset must declare a temporal column (`role: temporal`) or a `dateField`; the component keys are in
-[architecture § 5](architecture-overview.md).
+[architecture § 5](architecture.md).
 
 ## Storage and retention
 

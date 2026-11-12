@@ -34,8 +34,8 @@ Code homes:
 ## Where it fits
 
 Ingest starts where a [Collector](../acquire/architecture-collectors.md) has landed a file in `dirs.poll`. It ends at a
-committed store that [Datasets](../../layer/product/architecture-studio-bi.md) and at-rest [Steps](architecture-pipelines-steps.md) read. Typing
-rules come from the Schema registry (metamodel); storage layout is described in [storage](../entity-store/architecture-storage.md).
+committed store that [Datasets](../../layer/product/architecture-studio-bi.md) and at-rest [Steps](architecture.md) read. Typing
+rules come from the Schema registry (metamodel); storage layout is described in [storage](../entity-store/architecture.md).
 Every Consignment runs on a virtual thread bounded by `processing.threads`; many Pipelines share one
 JVM under `MultiCollectorProcessor`.
 

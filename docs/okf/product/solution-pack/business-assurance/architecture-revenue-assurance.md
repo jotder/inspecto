@@ -68,12 +68,12 @@ Every tolerance and threshold is configuration in these files.
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md) — the eight feeds.
+- [Pipelines and Steps](../../module/etl/architecture.md) — the eight feeds.
 - [Collectors](../../module/acquire/architecture-collectors.md) and
   [Parsing and ingest](../../module/etl/architecture-parsing-ingest.md) — inbox polling and Schemas.
-- [Reconciliation](../../module/reconciliation/architecture-overview.md) — the two `recon.run` controls.
-- [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md) — cron and signal chaining.
-- [Alerts](../../addon/incidents/architecture-alerts.md) and [Incidents](../../addon/incidents/architecture-incidents.md).
+- [Reconciliation](../../module/reconciliation/architecture.md) — the two `recon.run` controls.
+- [Jobs and scheduler](../../module/processor/architecture.md) — cron and signal chaining.
+- [Alerts](../../addon/incidents/architecture-alerts.md) and [Incidents](../../addon/incidents/architecture.md).
 - [Studio BI](../../layer/product/architecture-studio-bi.md) — KPIs, Widgets, the dashboard.
 - [Platform services](../../layer/platform/architecture-platform-services.md) — `objects.analytics`.
 

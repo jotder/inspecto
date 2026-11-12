@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Risk Scores and Entity Lists — screens
 
-Screens for Risk Scores and Entity Lists. Design and internals: [Risk Scores and Entity Lists architecture](architecture-scoring-entity-lists.md).
+Screens for Risk Scores and Entity Lists. Design and internals: [Risk Scores and Entity Lists architecture](architecture.md).
 
 - `/risk-scores` — `inspecto-ui/src/app/modules/admin/risk-scores/risk-scores.component.ts`, with
   `risk-score-form.dialog.ts`, `risk-score-factors.component.ts`, `risk-score-actions.component.ts`.

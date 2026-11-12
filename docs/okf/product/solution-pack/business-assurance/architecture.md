@@ -54,9 +54,9 @@ The pack ships **no Collector or Pipeline**. It brings:
 
 ## Modules used
 
-- [Analytics kernel](../../module/analytics/architecture-overview.md) — SQL views and Datasets.
-- [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture-incidents.md).
+- [Analytics kernel](../../module/analytics/architecture.md) — SQL views and Datasets.
+- [Jobs and scheduler](../../module/processor/architecture.md).
+- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture.md).
 - [Studio BI](../../layer/product/architecture-studio-bi.md).
 
 ## Diagram

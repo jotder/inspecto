@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Incidents — screens
 
-Screens for Incidents. Design and internals: [Incidents architecture](architecture-incidents.md).
+Screens for Incidents. Design and internals: [Incidents architecture](architecture.md).
 
 Route `/incidents` (`inspecto-ui/src/app/modules/admin/objects/incidents.routes.ts`):
 

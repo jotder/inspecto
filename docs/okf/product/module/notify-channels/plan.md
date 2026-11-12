@@ -24,7 +24,7 @@ core and email / webhook in the Standard flavour, no message broker.
 - Email (`SmtpEmailChannel`) and webhook (`WebhookChannel`) in `providers/inspecto-notify-channels`, built only
   under the Standard, Advanced and Preview profiles (EDG-01; [features](features-notifications.md)).
 - Digest batching, delivery receipts, bounce suppression and per-Space channel destinations
-  ([architecture § 4](architecture-overview.md)).
+  ([architecture § 4](architecture.md)).
 - `WEBHOOK-EGRESS-POLICY-1` (closed 2026-09-27): webhook egress passes the egress policy with a pinned connect.
 - `ASSURE-MAKER-CHECKER-RESIDUALS-1` (closed 2026-10-06): `channel` and `notification-rule` writes are
   governable and replay on approval ([config safety](../config/spec-config-safety.md)).
@@ -32,7 +32,7 @@ core and email / webhook in the Standard flavour, no message broker.
 ## Left
 
 No open [BACKLOG](../../../../BACKLOG.md) row names this module. Known limits are in
-[architecture § 9](architecture-overview.md): no retry inside a channel except the soft-bounce retry, and
+[architecture § 9](architecture.md): no retry inside a channel except the soft-bounce retry, and
 suppression only for persisted destinations.
 
 ## Refused

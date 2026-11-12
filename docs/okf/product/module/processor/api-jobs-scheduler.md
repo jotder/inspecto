@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Jobs and scheduler — API
 
-Routes for Jobs and scheduler. Design and internals: [Jobs and scheduler architecture](architecture-jobs-scheduler.md).
+Routes for Jobs and scheduler. Design and internals: [Jobs and scheduler architecture](architecture.md).
 
 | Route | Purpose |
 |---|---|

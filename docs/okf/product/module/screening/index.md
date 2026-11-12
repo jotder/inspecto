@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Screening — plan](plan.md) |
 | spec | current | [Screening — Match Scores against Entity Lists and the review of Screening Hits](spec.md) |
-| architecture | current | [Screening](architecture-overview.md) |
+| architecture | current | [Screening](architecture.md) |
 | features | current | [Screening — features](features-screening.md) |
 | feature-db | current | [Screening — feature database](feature-db.md) |
 | user-guide | current | [Screening — screens](user-guide-screening.md) |

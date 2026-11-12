@@ -25,12 +25,12 @@ Two modules sold as one add-on:
 - **Analysts** (`canWorkIncidents`) read and preview scores.
 - **Incident managers** (`canManageIncidents`) create lists, change members, retire lists.
 - **Authors** (`canAuthorWorkbench`) define `risk-score` models and register a list's sidecar as a Dataset.
-- Consumers: [screening](../screening/architecture-overview.md), [anomaly](../anomaly/architecture-overview.md), [link-analysis](../la-core/architecture-overview.md).
+- Consumers: [screening](../screening/architecture.md), [anomaly](../anomaly/architecture.md), [link-analysis](../la-core/architecture.md).
 
 ## 3. Where it sits
 
 Add-ons over the platform base. Scores are written through the shared score output contract (engine
-`ScoreOutputWriter`, see [analytics-kernel](../analytics/architecture-overview.md)); Incidents come from the ordinary Alert Rule
+`ScoreOutputWriter`, see [analytics-kernel](../analytics/architecture.md)); Incidents come from the ordinary Alert Rule
 machinery ([alerts](../../addon/incidents/architecture-alerts.md)). Without the modules `/risk-scores*` and `/entity-lists*` answer 503 and
 `/bootstrap` reports `features.scoring` / `features.entityList` false.
 
@@ -72,7 +72,7 @@ Output names are derived; sending `scoresDataset` is a 422, and `risk_scores_` i
 Entity Lists have no TOON file: they are created through the API. Four-eyes is the approval policy
 `approval: {entity-list: {required: true}}` (see [maker-checker](../workflow/architecture-maker-checker.md)).
 
-Schedule `risk.score` with parameter `model` on a `cron` or `on_pipeline:` trigger ([jobs-scheduler](../processor/architecture-jobs-scheduler.md)).
+Schedule `risk.score` with parameter `model` on a `cron` or `on_pipeline:` trigger ([jobs-scheduler](../processor/architecture.md)).
 For Incidents, declare the `_latest` Dataset and a per-entity Alert Rule with `by: [model, entity_key]`.
 
 ## 6. Screens
@@ -85,11 +85,11 @@ Moved to [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md).
 
 ## 8. Interactions
 
-- [alerts](../../addon/incidents/architecture-alerts.md) / [incidents](../../addon/incidents/architecture-incidents.md) — a per-entity Alert Rule over `_latest` opens an Incident per
+- [alerts](../../addon/incidents/architecture-alerts.md) / [incidents](../../addon/incidents/architecture.md) — a per-entity Alert Rule over `_latest` opens an Incident per
   high entity and heals when the score drops.
-- [anomaly](../anomaly/architecture-overview.md) — feeds the same watch lists and uses an `exclusionList`; its `_latest` can be a factor.
-- [screening](../screening/architecture-overview.md) — matches against Entity Lists.
-- [link-analysis](../la-core/architecture-overview.md) — `excludeBy` / `seedBy` seal live list members.
+- [anomaly](../anomaly/architecture.md) — feeds the same watch lists and uses an `exclusionList`; its `_latest` can be a factor.
+- [screening](../screening/architecture.md) — matches against Entity Lists.
+- [link-analysis](../la-core/architecture.md) — `excludeBy` / `seedBy` seal live list members.
 - [maker-checker](../workflow/architecture-maker-checker.md) — model saves and list changes go through Pending Changes.
 
 ## 9. Limits and gotchas

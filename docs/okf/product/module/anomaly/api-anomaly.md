@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Anomaly Detection — API
 
-Routes for Anomaly Detection. Design and internals: [Anomaly Detection architecture](architecture-overview.md).
+Routes for Anomaly Detection. Design and internals: [Anomaly Detection architecture](architecture.md).
 
 Handler: `features/inspecto-anomaly/src/main/java/com/gamma/anomaly/AnomalyScoreRoutes.java`.
 

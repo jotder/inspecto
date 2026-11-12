@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Action Requests — API
 
-Routes for Action Requests. Design and internals: [Action Requests architecture](architecture-overview.md).
+Routes for Action Requests. Design and internals: [Action Requests architecture](architecture.md).
 
 | Route | Gate |
 |---|---|

@@ -26,9 +26,9 @@ A **Sink** is where a Pipeline writes business data. The capability spec of reco
 
 ## 3. Where it sits
 
-Everything else sits on it: [parsing-ingest](../etl/architecture-parsing-ingest.md) and [Pipelines](../etl/architecture-pipelines-steps.md)
+Everything else sits on it: [parsing-ingest](../etl/architecture-parsing-ingest.md) and [Pipelines](../etl/architecture.md)
 write business data; [Studio](../../layer/product/architecture-studio-bi.md) reads it through Datasets; every add-on keeps its
-records in the operational stores; [Spaces](../config/architecture-spaces.md) decide where each Space's roots are. Code homes:
+records in the operational stores; [Spaces](../config/architecture.md) decide where each Space's roots are. Code homes:
 
 - Space roots: `inspecto/src/main/java/com/gamma/service/SpaceRoot.java` (`DirSpaceRoot`,
   `LegacySpaceRoot`).
@@ -94,11 +94,11 @@ Moved to [Storage — API](api-storage.md).
 
 ## 8. Interactions
 
-- **Spaces** own the roots and the per-Space store files ([spaces](../config/architecture-spaces.md)).
+- **Spaces** own the roots and the per-Space store files ([spaces](../config/architecture.md)).
 - **Maker-checker** can hold a configuration write as a pending change ([maker-checker](../workflow/architecture-maker-checker.md)).
 - **Backup** archives a Space's configuration tree; retention Jobs prune stores
-  ([observability-backup](../observability/architecture-observability-backup.md)).
-- **Exchange** reads `shared/…` store references across Spaces ([exchange](../exchange/architecture-overview.md)).
+  ([observability-backup](../observability/architecture.md)).
+- **Exchange** reads `shared/…` store references across Spaces ([exchange](../exchange/architecture.md)).
 
 ## 9. Limits and gotchas
 

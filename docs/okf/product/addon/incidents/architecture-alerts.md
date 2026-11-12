@@ -21,8 +21,8 @@ reaches it. No model runs here: the agent's `diagnose-and-alert` skill only draf
 
 Platform base, engine layer. Rules persist as `alert-rule` components under `<write-root>/registry`, with
 the same CRUD contract as Expectations and Decision Rules. Fired Alerts go to an `AlertStore`
-(`DbAlertStore` or `InMemoryAlertStore`). High-severity breaches cross into the [Incidents](architecture-incidents.md)
-add-on only through the `incidents` Platform Service. Delivery to people is the [Notifications](../../module/notify-channels/architecture-overview.md)
+(`DbAlertStore` or `InMemoryAlertStore`). High-severity breaches cross into the [Incidents](architecture.md)
+add-on only through the `incidents` Platform Service. Delivery to people is the [Notifications](../../module/notify-channels/architecture.md)
 module's job: an Alert carries a recipient attribute taken from the rule's `owner`.
 
 ## 4. How it works
@@ -49,7 +49,7 @@ Rule shapes evaluated (`AlertRule.java`):
   per-entity Alerts, capped by `stormCap` (default 100) above which one storm Alert replaces N.
 - **Freshness** — `maximumAge` on a Dataset's last publication.
 - **Investigation** — `investigation` + `relation` (`entities` | `links` | `excluded`) over a Link Analysis
-  Working Set; see [Link Analysis](../../module/la-core/architecture-overview.md).
+  Working Set; see [Link Analysis](../../module/la-core/architecture.md).
 
 Re-fire suppression: ledger rules use a per-rule+Pipeline cooldown equal to the window (10 minutes for
 batch-count windows, minimum 1 minute). Measure rules are edge-triggered and re-arm only after
@@ -58,7 +58,7 @@ the open Alert's value, message and fired record in place when the value moved (
 a `by` rule's aggregate Alert does the same, `ALERT-PER-RULE-1`), so an Alert raised while data was still landing ends
 up carrying the full figure; nothing new is emitted, and when the breach began is kept. An Incident promoted from
 that Alert keeps the value it was opened with, and a resolved Alert is never rewritten. A breach emits `ALERT_FIRED` and a heal
-`ALERT_CLEARED` to the [event log](../../module/event/architecture-overview.md); a CRITICAL breach is promoted to an Incident.
+`ALERT_CLEARED` to the [event log](../../module/event/architecture.md); a CRITICAL breach is promoted to an Incident.
 
 Separately, `EventAlertBridge` turns `SEQUENCE_GAP` and `PIPELINE_CONSERVATION_IMBALANCE` Events (and file-problem
 and LA index-build failures) into Alerts via `raiseFromEvent`, deduplicated against a still-active Alert.
@@ -84,10 +84,10 @@ Moved to [Alerts — API](api-alerts.md).
 ## 8. Interactions
 
 - [Platform Services](../../layer/platform/architecture-platform-services.md) — `alerts` = `AlertAccess.evaluateRules()`, `evaluateFreshnessRules()`, `evaluateInvestigationRules()`.
-- [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md) — `alert.evaluate`, the freshness system job.
-- [Incidents](architecture-incidents.md) — CRITICAL promotion via `IncidentAccess`.
-- [Notifications](../../module/notify-channels/architecture-overview.md), [Events](../../module/event/architecture-overview.md), [Decision Kernel](../../module/scoring/architecture-decision-kernel.md) (shared condition-tree shape).
-- [AI assist](../../module/intelligence/architecture-overview.md) — `AlertRuleTool` / `AlertRuleValidator` draft rules.
+- [Jobs and scheduler](../../module/processor/architecture.md) — `alert.evaluate`, the freshness system job.
+- [Incidents](architecture.md) — CRITICAL promotion via `IncidentAccess`.
+- [Notifications](../../module/notify-channels/architecture.md), [Events](../../module/event/architecture.md), [Decision Kernel](../../module/scoring/architecture-decision-kernel.md) (shared condition-tree shape).
+- [AI assist](../../module/intelligence/architecture.md) — `AlertRuleTool` / `AlertRuleValidator` draft rules.
 
 ## 9. Limits and gotchas
 

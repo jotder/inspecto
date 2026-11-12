@@ -29,7 +29,7 @@ the boundary with Steps is [job-vs-step](architecture-job-vs-step.md).
 
 Jobs are the platform's scheduler. Add-ons register Job Types (for example `alert.evaluate`,
 `caserule.evaluate`, `incident.open`), and Pipelines run their at-rest chain as a `pipeline` Job
-([pipelines-steps](../etl/architecture-pipelines-steps.md)). A Job reaches shared capabilities only through
+([pipelines-steps](../etl/architecture.md)). A Job reaches shared capabilities only through
 [Platform Services](../../layer/platform/architecture-platform-services.md) it declares in `requires:`.
 
 Job Types come from `JobTypeRegistry`, which records each type's source as `builtin`, `classpath`
@@ -37,4 +37,4 @@ or `pack:<owner>`. Built-ins include `pipeline`, `enrich`, `report`, `maintenanc
 `mail.send`, `consignment.process`, `objectstore.export` and `space.comparison`. `GET /jobs/types`
 lists exactly what registered, so a switched-off module's types disappear.
 
-More: [screens](user-guide-jobs.md) · [API](api-jobs-scheduler.md) · [architecture](architecture-jobs-scheduler.md).
+More: [screens](user-guide-jobs.md) · [API](api-jobs-scheduler.md) · [architecture](architecture.md).

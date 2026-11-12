@@ -28,7 +28,7 @@ server-side operational state (`ReconBreaks` + `ReconStateStore`).
 
 An add-on over the platform base. It reads Datasets through their trusted relation SQL (`DatasetRelation`),
 computes in an ephemeral DuckDB sandbox (`SqlSandbox`), schedules through the Jobs layer
-([jobs-scheduler](../processor/architecture-jobs-scheduler.md)) and opens Incidents through the `objects` Platform Service
+([jobs-scheduler](../processor/architecture.md)) and opens Incidents through the `objects` Platform Service
 ([platform-services](../../layer/platform/architecture-platform-services.md)). Without `inspecto-ops` the `objects` grant is empty: the Job
 stays signal-only and `POST /recon/promote` answers 503.
 
@@ -72,7 +72,7 @@ A `reconciliation` component (read in `ReconConfigLoader`):
 | `bands` | `{okBelow, warnAbove}` percent bands, `0 <= okBelow <= warnAbove <= 100` |
 
 Scheduled runs: a Job of type `recon.run` with parameter `reconciliation` (required) and `day` (optional,
-`yyyy-mm-dd`; absent = latest day on any side). See [jobs-scheduler](../processor/architecture-jobs-scheduler.md).
+`yyyy-mm-dd`; absent = latest day on any side). See [jobs-scheduler](../processor/architecture.md).
 
 State: `<write-root>/recon-state/<id>.json`, written atomically and jailed under the write root.
 
@@ -86,10 +86,10 @@ Moved to [Reconciliation — API](api-reconciliation.md).
 
 ## 8. Interactions
 
-- [incidents](../../addon/incidents/architecture-incidents.md) — a breach opens an Incident; single Breaks are promoted with `POST /recon/promote`.
-- [events](../event/architecture-overview.md) / [alerts](../../addon/incidents/architecture-alerts.md) — `recon.run.completed` is a Signal an Alert Rule can watch.
-- [jobs-scheduler](../processor/architecture-jobs-scheduler.md) — `recon.run` Job Type (`ReconRunJobType`), `requires: [objects]`.
-- [case-management](../case-management/architecture-overview.md) — Incidents opened here can be escalated to Cases.
+- [incidents](../../addon/incidents/architecture.md) — a breach opens an Incident; single Breaks are promoted with `POST /recon/promote`.
+- [events](../event/architecture.md) / [alerts](../../addon/incidents/architecture-alerts.md) — `recon.run.completed` is a Signal an Alert Rule can watch.
+- [jobs-scheduler](../processor/architecture.md) — `recon.run` Job Type (`ReconRunJobType`), `requires: [objects]`.
+- [case-management](../case-management/architecture.md) — Incidents opened here can be escalated to Cases.
 - Deleting a `reconciliation` component triggers `ReconComponentDeleteHook`.
 
 ## 9. Limits and gotchas

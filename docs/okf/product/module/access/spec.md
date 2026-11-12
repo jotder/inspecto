@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 Module `platform/inspecto-access`, package `com.gamma.access` (descriptor
 [module.toon](../../../../../platform/inspecto-access/src/main/resources/META-INF/inspecto/module.toon): `buildRole: platform`,
 `offeringRole: base`, `bindingTime: build`). It stores and serves tables; it holds no authenticator. Sign-in and
-the ABAC engine plug in from providers (see [architecture-overview](architecture-overview.md)).
+the ABAC engine plug in from providers (see [architecture-overview](architecture.md)).
 
 ## Classes
 

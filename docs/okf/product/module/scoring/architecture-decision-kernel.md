@@ -54,7 +54,7 @@ fails the batch. `targetType: job` rules apply to `sql.template` job results and
 
 **Platform consequences on apply.** `POST /decision-rules/{name}/apply` runs `emit-signal`, `start-job`,
 `trigger-pipeline`, `create-alert`, `create-incident` (contributed by `inspecto-ops`), `invoke-api` (contributed by
-`inspecto-action-requests`, proposes an [Action Request](../action-requests/architecture-overview.md)), plus stub `render-widget` /
+`inspecto-action-requests`, proposes an [Action Request](../action-requests/architecture.md)), plus stub `render-widget` /
 `generate-report`. Each reports `executed`, `skipped` or `unavailable` (a known action whose module is absent).
 
 ## 5. Configuration
@@ -84,7 +84,7 @@ Moved to [Decision Kernel (Decision Rules and the Condition Language) — API](a
 
 ## 8. Interactions
 
-- [Action Requests](../action-requests/architecture-overview.md) via `invoke-api`; [maker-checker](../workflow/architecture-maker-checker.md) governs rule saves.
+- [Action Requests](../action-requests/architecture.md) via `invoke-api`; [maker-checker](../workflow/architecture-maker-checker.md) governs rule saves.
 - [Platform Services](../../layer/platform/architecture-platform-services.md): Jobs run by `start-job`.
 - Concept detail: [Decision Rules and the condition-tree evaluator](../processor/spec-decision-rules.md).
 

@@ -26,8 +26,8 @@ server-side operational state (`ReconBreaks` + `ReconStateStore`).
 
 An add-on over the platform base. It reads Datasets through their trusted relation SQL (`DatasetRelation`),
 computes in an ephemeral DuckDB sandbox (`SqlSandbox`), schedules through the Jobs layer
-([jobs-scheduler](../processor/architecture-jobs-scheduler.md)) and opens Incidents through the `objects` Platform Service
+([jobs-scheduler](../processor/architecture.md)) and opens Incidents through the `objects` Platform Service
 ([platform-services](../../layer/platform/architecture-platform-services.md)). Without `inspecto-ops` the `objects` grant is empty: the Job
 stays signal-only and `POST /recon/promote` answers 503.
 
-More: [screens](user-guide-reconciliation.md) · [API](api-reconciliation.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-reconciliation.md) · [API](api-reconciliation.md) · [architecture](architecture.md).

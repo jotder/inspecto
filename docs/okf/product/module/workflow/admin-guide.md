@@ -46,5 +46,5 @@ Authenticator, so on Basic it cannot be switched on through the API. Screens:
 | A rule fired once and never again | Fire-once per breach, recorded in `attributes.escalations` | Expected |
 | A save answers `202 pending` | Approval Policy requires approval for that kind | Approve under Operations > Pending Changes |
 
-Design: [architecture-workflow-sla](architecture-workflow-sla.md) · routes: [api-workflow-sla](api-workflow-sla.md),
+Design: [architecture-workflow-sla](architecture.md) · routes: [api-workflow-sla](api-workflow-sla.md),
 [api-maker-checker](api-maker-checker.md).

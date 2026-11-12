@@ -37,4 +37,4 @@ mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); th
 | Permitted gate | `ApiContext.withCapability` in `spi/inspecto-http-spi/src/main/java/com/gamma/spi/http/ApiContext.java` |
 | Template catalog | `spaces/_templates/` (one directory per template) |
 
-More: [screens](user-guide-spaces.md) · [API](api-spaces.md) · [architecture](architecture-spaces.md).
+More: [screens](user-guide-spaces.md) · [API](api-spaces.md) · [architecture](architecture.md).

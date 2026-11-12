@@ -26,7 +26,7 @@ models", `offeringRole: base`); the runtime sweep lives in `features/inspecto-op
 The models are platform base; they are applied to `INCIDENT` and `CASE` objects by `ObjectService` in
 `features/inspecto-ops` (`sweepIncidentSla`), with authored files loaded by `GovernanceRegistry`. Without
 `inspecto-ops` there are no objects to govern and `GET /workflows/{type}` answers 503. See
-[incidents](../../addon/incidents/architecture-incidents.md) and [case-management](../case-management/architecture-overview.md).
+[incidents](../../addon/incidents/architecture.md) and [case-management](../case-management/architecture.md).
 
 ## 4. How it works
 
@@ -71,11 +71,11 @@ Moved to [Workflow and SLA — API](api-workflow-sla.md).
 
 - [maker-checker](architecture-maker-checker.md) — all three kinds are governable; a held write reads "submitted for
   approval". Imports refuse them.
-- [notifications](../notify-channels/architecture-overview.md) — a `notify` escalation emits a warning `OBJECT_ESCALATED` event that the
+- [notifications](../notify-channels/architecture.md) — a `notify` escalation emits a warning `OBJECT_ESCALATED` event that the
   `builtin-escalation` rule in `NotificationRules` delivers.
-- [identity-access](../access/architecture-overview.md) — `reassign` targets are checked at save time (id shape only; no
+- [identity-access](../access/architecture.md) — `reassign` targets are checked at save time (id shape only; no
   directory implementation ships).
-- [jobs-scheduler](../processor/architecture-jobs-scheduler.md) — not used: the sweep is a timed cadence, not a Job Type.
+- [jobs-scheduler](../processor/architecture.md) — not used: the sweep is a timed cadence, not a Job Type.
 
 ## 9. Limits and gotchas
 

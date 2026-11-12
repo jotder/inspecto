@@ -1,7 +1,7 @@
 # Security review: inbound OIDC client-credentials tokens for Link Analysis
 
 Reviewed 2026-11-01 against master `a24fca153`, for item (5b) of `LA-EDITIONS-RESIDUALS-1` ([BACKLOG](../../../../BACKLOG.md)).
-The checklist is the one in [la-core architecture §6.5](../la-core/architecture.md), *Machine-to-machine trust (I1) is NOT enabled*.
+The checklist is the one in [la-core architecture §6.5](../la-core/architecture-backend.md), *Machine-to-machine trust (I1) is NOT enabled*.
 The task also asked about four more points: the `azp` check, Space binding, token lifetime and logging of the principal.
 This is a review only. No product code was changed.
 
@@ -9,7 +9,7 @@ This is a review only. No product code was changed.
 
 **There is no switch to turn on.** `OidcAuthenticator` does not tell a client-credentials (machine-to-machine) token from a
 user's token. A machine token that is signed by the trusted issuer, has a `sub`, and is in date is accepted today, and its
-roles map to capabilities exactly as a person's do ([la-core architecture §6.4](../la-core/architecture.md), *Auth*). So the
+roles map to capabilities exactly as a person's do ([la-core architecture §6.4](../la-core/architecture-backend.md), *Auth*). So the
 real question is whether a deployment may give such a token a role. The answer is yes, for one named integration at a time,
 under the **deployment conditions** below. Without them the token can get much more than one integration role. Five BACKLOG
 rows (end of this page) would move the conditions from the runbook into code; one is still open. `OIDC-KEYCLOAK-AZP-ROLES-1`

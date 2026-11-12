@@ -17,7 +17,7 @@ synchronous bus that writes each event to an `EventStore` and hands it to subscr
 - **Builders** save named filters (`/events/views`, capability `canAuthorWorkbench`).
 - **Auditors / administrators** search and export the audit trail and verify the hash chain (`canAdminister`
   for `/audit/verify` and `/audit/anchors`).
-- Internally, [Alerts](../../addon/incidents/architecture-alerts.md), [Notifications](../notify-channels/architecture-overview.md) and freshness probes subscribe to it.
+- Internally, [Alerts](../../addon/incidents/architecture-alerts.md), [Notifications](../notify-channels/architecture.md) and freshness probes subscribe to it.
 
 ## 3. Where it sits
 
@@ -85,8 +85,8 @@ Moved to [Events and event log — API](api-events.md).
 - Every mutating control-plane request is recorded as `AUDIT` by the central audit interceptor; denials on a
   matched route become `ACCESS_DENIED` with the missing capability in `AuditAttrs`.
 - [Alerts](../../addon/incidents/architecture-alerts.md) evaluate on terminal batch events and emit `ALERT_FIRED` / `ALERT_CLEARED`.
-- [Notifications](../notify-channels/architecture-overview.md) subscribe and deliver off the bus.
-- [Jobs and scheduler](../processor/architecture-jobs-scheduler.md) runs `event_prune`; [Observability and backup](../observability/architecture-observability-backup.md)
+- [Notifications](../notify-channels/architecture.md) subscribe and deliver off the bus.
+- [Jobs and scheduler](../processor/architecture.md) runs `event_prune`; [Observability and backup](../observability/architecture.md)
   exposes `/metrics`. Deep detail: [Events and metrics](spec-events-metrics.md).
 
 ## 9. Limits and gotchas

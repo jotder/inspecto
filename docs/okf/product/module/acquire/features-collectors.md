@@ -31,7 +31,7 @@ Code homes:
 ## Where it fits
 
 Collectors are the first stage of the platform base: a remote system feeds a Collector, the Collector
-lands bytes, and a [Pipeline](../etl/architecture-pipelines-steps.md) parses and loads them into [storage](../entity-store/architecture-storage.md).
+lands bytes, and a [Pipeline](../etl/architecture.md) parses and loads them into [storage](../entity-store/architecture.md).
 The connector schemes are pluggable through `ServiceLoader`: `CollectorConnectors.forConfig` resolves
 `local` to the built-in `LocalFileSystemConnector` and any other scheme to a registered
 `CollectorConnectorFactory` matched on `scheme()`. An unknown scheme fails fast; there is no fall-back

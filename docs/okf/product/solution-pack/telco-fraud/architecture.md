@@ -62,13 +62,13 @@ The golden corpus ships in `data/samples`; copy it into `data/inbox/<feed>` to i
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md),
+- [Pipelines and Steps](../../module/etl/architecture.md),
   [Collectors](../../module/acquire/architecture-collectors.md).
 - [Decision kernel](../../module/scoring/architecture-decision-kernel.md) — the two Decision Rules.
-- [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture-incidents.md).
-- [Case management](../../module/case-management/architecture-overview.md) — the Case Rule.
-- [Anomaly](../../module/anomaly/architecture-overview.md) — the subscriber-usage model.
+- [Jobs and scheduler](../../module/processor/architecture.md).
+- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture.md).
+- [Case management](../../module/case-management/architecture.md) — the Case Rule.
+- [Anomaly](../../module/anomaly/architecture.md) — the subscriber-usage model.
 - [Studio BI](../../layer/product/architecture-studio-bi.md).
 
 ## Diagram

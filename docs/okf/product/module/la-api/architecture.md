@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link analysis and geo routes - architecture
 
-The full Link Analysis backend design is [la-core architecture](../la-core/architecture.md); this page is the la-api
+The full Link Analysis backend design is [la-core architecture](../la-core/architecture-backend.md); this page is the la-api
 slice of it. Layer overview: [layer/la architecture](../../layer/la/architecture.md).
 
 ## How it plugs in
@@ -24,7 +24,7 @@ slice of it. Layer overview: [layer/la architecture](../../layer/la/architecture
 - **Editions.** Staged from Basic (`offerings/basic.toon`). The explorer route modules (`InvRoutes`, `GeoRoutes`,
   `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`) own `geoLink` only; the
   Investigation route modules also name `investigations`, which only `inspecto-ops` declares, so on Basic they answer 503
-  "available in Standard and above" ([la-core architecture](../la-core/architecture.md) §8).
+  "available in Standard and above" ([la-core architecture](../la-core/architecture-backend.md) §8).
 
 ## Composition
 
@@ -50,7 +50,7 @@ Authenticate (401) → rate class (`linkAnalysis` bucket for expensive reads, 42
 (`geoLink` in the Space's `modules.toon`, 404 `MODULE_DISABLED`) → capability (403) → `InvestigationRoutes.open`:
 write root (503), safe id (422), header (404), membership role, Dataset visibility (404), Advanced PDP (404), deferred
 role refusal (403) → handler → masking → audit. Non-members get 404-as-absence. Detail:
-[la-core architecture](../la-core/architecture.md) §6.1.
+[la-core architecture](../la-core/architecture-backend.md) §6.1.
 
 ## Key flows
 
@@ -61,13 +61,13 @@ role refusal (403) → handler → masking → audit. Non-members get 404-as-abs
   validation and read, then `evaluate` over the would-be entry with no write; `GrowPreview` shapes the counts (held hubs,
   per-list removed counts rounded unless the list is open) and masking uses the would-be log. `POST
   /inv/projection/neighbors/preview` (`InvRoutes.neighboursPreview`) is the explorer's flat equivalent for a set of ids.
-  Detail: [la-core architecture](../la-core/architecture.md) (Grow preview).
+  Detail: [la-core architecture](../la-core/architecture-backend.md) (Grow preview).
 - **Draft promote.** `DraftPromote` rebases to the main head (`DraftRebase`) and appends under the main lock, all or
   nothing, or files a four-eyes pending request when the Draft carries a sensitive expand.
 - **Index build.** `IndexRoutes` (on request) and `ScheduledIndexBuild` (the `la.index.build` Job via geo-link) submit
   to la-storage's `IndexBuildService` with the plan's advice (`full` / `append` / `compact`).
 - **Embed view.** Mint and revoke in `InvestigationEmbedRoutes`; the public GET in `PublicInvestigationRoutes` is
-  authenticated by its token alone; every failure is one 404 ([la-core architecture](../la-core/architecture.md) §6.2).
+  authenticated by its token alone; every failure is one 404 ([la-core architecture](../la-core/architecture-backend.md) §6.2).
 - **Dataset read faults** are translated in one place, `DatasetReadFault` (409 for an empty store, 422 with paths
   stripped otherwise).
 

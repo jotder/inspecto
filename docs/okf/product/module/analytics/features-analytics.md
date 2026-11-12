@@ -41,4 +41,4 @@ Packages under `platform/inspecto-analytics/src/main/java/com/gamma/analytics`:
 | `.similarity` | `Similarity`, `JaroWinkler`, `TextUnit`, `SimilaritySql` |
 | `.accuracy`, `.split` | `Accuracy`, `AccuracySql`, `Backtest`; `HoldoutSplit` |
 
-More: [screens](user-guide-analytics.md) · [API](api-analytics.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-analytics.md) · [API](api-analytics.md) · [architecture](architecture.md).

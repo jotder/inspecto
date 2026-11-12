@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 Package `com.gamma.la.core` in `la/inspecto-la-core/`. Manifest
 `la/inspecto-la-core/src/main/resources/META-INF/inspecto/module.toon`: `buildRole: platform`, `offeringRole:
 optional`, `bindingTime: boot`, requires `graph`. No HTTP routes and no `META-INF/services` registrations of its own:
-it defines the SPIs other modules register. Narrative design: [architecture](architecture.md).
+it defines the SPIs other modules register. Narrative design: [architecture](architecture-backend.md).
 
 ## Classes by concern
 
@@ -66,9 +66,9 @@ published as `live.investigations` on `/health/details`; `probeAtBoot` tries onc
 - The log is append-only; a write carries `expectedVersion`, and a mismatch raises
   `InvestigationVersionConflictException`.
 - Filesystem layout `<writeRoot>/audit/snapshots/investigations/<id>/`, or the data root's `audit/snapshots/…`
-  for a Space with a data root ([architecture](architecture.md) §3.2). Serialised by a JVM monitor plus an OS `FileChannel.lock` on `.store.lock`.
+  for a Space with a data root ([architecture](architecture-backend.md) §3.2). Serialised by a JVM monitor plus an OS `FileChannel.lock` on `.store.lock`.
 - Graph Run checks size before work and the deadline at checkpoints; overrun ends `BUDGET_EXCEEDED` with no result.
-- Library code takes every limit as a parameter from its la-api caller ([architecture](architecture.md) §9).
+- Library code takes every limit as a parameter from its la-api caller ([architecture](architecture-backend.md) §9).
 
 ## Tests
 

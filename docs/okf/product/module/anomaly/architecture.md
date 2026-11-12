@@ -13,7 +13,7 @@ package `com.gamma.anomaly`): `AnomalyModel` (parse, fail closed), `AnomalyLists
 `AnomalyScoreEvaluator` (one DuckDB statement per Feature), `AnomalyScorer` (pure maths), `AnomalyScoreJobType`
 (Job Type `anomaly.score`), `AnomalyScoreRoutes` and `AnomalyKindValidator`.
 
-It is distinct from a Risk Score (absolute weighted factors — see [scoring-entity-lists](../scoring/architecture-scoring-entity-lists.md)),
+It is distinct from a Risk Score (absolute weighted factors — see [scoring-entity-lists](../scoring/architecture.md)),
 a `baseline` Expectation and the Link Analysis `suspicionScore`. Full concept:
 [Anomaly Scores](spec-anomaly-scores.md).
 
@@ -27,7 +27,7 @@ a `baseline` Expectation and the Link Analysis `suspicionScore`. Full concept:
 
 An add-on that requires `entity-list` (`requires.modules` in its `module.toon`) but **not** `scoring`. The
 baseline maths come from the Analytics Kernel (`com.gamma.analytics.baseline`, see
-[analytics-kernel](../analytics/architecture-overview.md)); the score output contract and its writer `ScoreOutputWriter` are shared
+[analytics-kernel](../analytics/architecture.md)); the score output contract and its writer `ScoreOutputWriter` are shared
 with Risk Scores in the engine. Without the module `/anomaly-scores*` answers 503 and the SPA hides every anomaly
 surface.
 
@@ -73,7 +73,7 @@ The band is re-decided every run: an entity back to `normal` lets its Alert heal
 | `peers` | `by` (1..3 columns), `dataset`, `key`, `minGroupSize` (default 30), `fallback` (`none` \| `population`) |
 | `features[]` | `id`, `label`, `dataset`, `key`, measure, time, `filters`, `unit`, evidence, weight, direction |
 
-Schedule an `anomaly.score` Job (see [jobs-scheduler](../processor/architecture-jobs-scheduler.md)). Incidents come from a pending Alert
+Schedule an `anomaly.score` Job (see [jobs-scheduler](../processor/architecture.md)). Incidents come from a pending Alert
 Rule declaring `afterScore: {kind: anomaly-model, model: <id>}` over the `_latest` Dataset. The prefix
 `anomaly_scores_` is reserved for Dataset and sink writes.
 
@@ -87,12 +87,12 @@ Moved to [Anomaly Detection — API](api-anomaly.md).
 
 ## 8. Interactions
 
-- [scoring-entity-lists](../scoring/architecture-scoring-entity-lists.md) — watch-list feed and exclusion list; a model's `_latest`
+- [scoring-entity-lists](../scoring/architecture.md) — watch-list feed and exclusion list; a model's `_latest`
   Dataset can be a Risk Score factor.
-- [alerts](../../addon/incidents/architecture-alerts.md) / [incidents](../../addon/incidents/architecture-incidents.md) — the `afterScore` pending Alert Rule opens an Incident per
+- [alerts](../../addon/incidents/architecture-alerts.md) / [incidents](../../addon/incidents/architecture.md) — the `afterScore` pending Alert Rule opens an Incident per
   high entity.
-- [analytics-kernel](../analytics/architecture-overview.md) — baselines and the score output contract.
-- [link-analysis](../la-core/architecture-overview.md) — the entity panel.
+- [analytics-kernel](../analytics/architecture.md) — baselines and the score output contract.
+- [link-analysis](../la-core/architecture.md) — the entity panel.
 - [maker-checker](../workflow/architecture-maker-checker.md) — model saves go through the component hold.
 
 ## 9. Limits and gotchas
