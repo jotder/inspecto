@@ -308,6 +308,29 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
             return { ...h, c, setPlugins, options: () => options };
         }
 
+        it('a layout pick takes the hulls off before the layout and puts them back after it (N4)', async () => {
+            const { comp, graph, create, c, options } = withPlugins({ minimap: true, hulls: null });
+            c.plugins = { minimap: true, hulls: members };
+            comp.ngOnChanges({ plugins: {} });
+            expect(options().map((p) => p['key'])).toEqual(['minimap', 'hull-0']); // the hulls are on the live graph
+            let hullsDuringLayout: unknown[] = [];
+            Object.assign(graph, {
+                setLayout: vi.fn(),
+                layout: vi.fn(() => {
+                    hullsDuringLayout = options().map((p) => p['key']);
+                    return Promise.resolve();
+                }),
+                fitView: vi.fn(() => Promise.resolve()),
+            });
+            comp.layout = 'circular' as GraphViewComponent['layout'];
+            comp.ngOnChanges({ layout: {} });
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(create).not.toHaveBeenCalled();
+            expect(hullsDuringLayout).toEqual(['minimap']);
+            expect(options().map((p) => p['key'])).toEqual(['minimap', 'hull-0']);
+        });
+
         it('turning hulls ON adds the hull plugins in place: no create, no layout, no data reset', () => {
             const { comp, graph, create, c, setPlugins, options } = withPlugins({ minimap: true, hulls: null });
             c.plugins = { minimap: true, hulls: members };
@@ -408,6 +431,17 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
             live['layout'] = vi.fn(() => Promise.resolve());
             comp.ngOnChanges({ layout: {} });
             expect(create).not.toHaveBeenCalled();
+            expect(live['layout']).not.toHaveBeenCalled();
+        });
+
+        it('a node size change still rebuilds: the icon size is fixed at construction', () => {
+            const { comp, graph, create } = harness(graphOf(['a']));
+            const live = graph as unknown as Record<string, unknown>;
+            live['setLayout'] = vi.fn();
+            live['layout'] = vi.fn(() => Promise.resolve());
+            comp.display = { nodeSize: 48 } as GraphViewComponent['display'];
+            comp.ngOnChanges({ display: {} });
+            expect(create).toHaveBeenCalledTimes(1);
             expect(live['layout']).not.toHaveBeenCalled();
         });
 
