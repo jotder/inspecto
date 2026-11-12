@@ -319,19 +319,20 @@ check found in the code.
 | Pipeline Collector `connection` | Connection | id | delete 409 (`ConnectionRoutes`) |
 | Job `template` | `*_job_template.toon` | name | load |
 | Enrichment `triggers.on_pipeline` | Pipeline | id | rename, impact, validate |
-| Enrichment `references.<n>.ref` | Pipeline | id | impact, validate — ⚠ not rewritten by rename |
+| Enrichment `references.<n>.ref` | Pipeline | id | rename, impact, validate |
 | Enrichment `input.database`, `references.<n>.path` | a store directory / a file | path | none |
-| Job `on_pipeline` | Pipeline | id | rename, impact |
+| Job `on_pipeline` | Pipeline | id, or several comma-separated (each member is a link) | rename, impact |
 | Job `pipeline_config` | a `*_pipeline.toon` file | path | none |
 | Job `dataset`, `target`, `dir`, params | Dataset / directory | id / path | none |
 | Job `on_signal` + `when` | a signal and its payload | text | none |
 | Expectation / Decision Rule `target` | Pipeline | id | rename, impact, validate |
 | Alert Rule `onPipeline` / `dataset` | Pipeline / Dataset | id | rename, impact |
 | Dataset `physicalRef`, `sourceName` | the store a Pipeline writes | store name | rename, impact; validate (the data exists) |
+| Dataset `sql` (a virtual Dataset) | the store its `sourceName` names | SQL relation | rename (with `sourceName`) |
 | Widget `datasetId`, `queryId` | Dataset / Query | id | impact (`datasetId`), validate, import |
 | Dashboard `tiles[].widgetId` | Widget | id | impact, validate, import |
 | Link Analysis / Geo Map view `query.projection.datasetId` | Dataset | id | validate, import |
-| Reconciliation `leftDataset`, `rightDataset` (or `datasets[]`) | Dataset | id | validate, import — ⚠ `thirdDataset` is not checked |
+| Reconciliation `leftDataset`, `rightDataset`, `thirdDataset` (or `datasets[]`) | Dataset | id | validate, import |
 | Dataset-consumer Pipeline (`collector.connector: dataset`) | Dataset | id | fails at poll (`unknown dataset`) |
 | `nav-menus.toon` `binding.componentId` | Dashboard / component | id | none |
 | Column names: Dataset `dateField`, Widget `controls`, Expectation `column`, Decision Rule `field`, Reconciliation `keyColumns` / `compareColumns`, Enrichment `transform` SQL | the Schema's mapped columns | column name | none |
@@ -345,11 +346,18 @@ Two things this table means in practice:
 
 ### 12.3 What the rename and impact scans read
 
-The Pipeline rename (`PipelineRenameRoutes.rewriteEnrichTriggers`, `rewriteJobTriggers`) and the delete-impact
-scan (`PipelineDependents`) read one shared file set, `PipelineDependents.configFiles`: every `*_enrich.toon` and
-`*_job.toon` under `config/` **at any depth**, as the loader does, minus `.history/` copies and the
-server-written state directories (§4.6). A Job's `on_pipeline` is read inside its `job:` section (the form
-`JobConfig` loads), or at the top level of a document without one.
+Both scans read the link census (`LinkCensus`, resolved by `LinkGraph.of`), so they read the same keys in the
+same files. The delete-impact scan (`PipelineDependents`) lists every link that names the Pipeline; the Pipeline
+rename (`PipelineRenameRoutes`, `POST /pipelines/{name}/rename` and its resume) rewrites the links
+`LinkCensus.renamedWithPipeline` names — `onRename` REWRITE and naming the Pipeline or its store — and the
+maker-checker check that refuses a rename touching a governed kind selects through the same list. A Job's
+`pipeline_config` path is not rewritten: the rename moves the file, and rewriting paths is not part of it.
+
+The file set is `LinkGraph.configFiles`: every `*_enrich.toon` and `*_job.toon` under `config/` **at any depth**,
+as the loader does, minus `.history/` copies and the server-written state directories (§4.6). A Job's
+`on_pipeline` is read inside its `job:` section (the form `JobConfig` loads), or at the top level of a document
+without one; a comma list is read member by member (`JobConfig.onPipelines`), and a rename replaces only the
+member that names the Pipeline. A Pipeline bundle export finds its companion Enrichments in the same file set.
 
 One unreadable folder does not empty the answer: it is logged and skipped, and the rest is still listed.
 
@@ -357,7 +365,11 @@ One unreadable folder does not empty the answer: it is logged and skipped, and t
 read `on_pipeline` at the top level only — so a rename left `orders/orders_daily_enrich.toon` and every shipped
 Job (all of them nest the key under `job:`) pointing at the old id, and a delete did not list them.
 
-The links these scans still miss are one board row, `PIPELINE-LINK-GAPS-1` in [`BACKLOG.md`](../../../../BACKLOG.md).
+*Census, 2026-11-12 (`SPACE-LINK-CENSUS-1` LC-2).* The rename now rewrites an Enrichment's by-name
+`references.<n>.ref` and one member of a comma-list `on_pipeline`, which impact also lists; a bundle export finds
+companions at any depth; and `metadata_validate` / the bundle import judge a Reconciliation's `thirdDataset`.
+`metadata_validate` itself still walks four folder levels and checks no Job — board row `PIPELINE-LINK-GAPS-1`
+in [`BACKLOG.md`](../../../../BACKLOG.md).
 
 ### 12.4 Duplicates — one definition per thing
 

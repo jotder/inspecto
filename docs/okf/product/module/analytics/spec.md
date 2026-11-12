@@ -31,7 +31,7 @@ timestamp: 2026-10-18T00:00:00Z
 > review candidates, never a group (§ [Entity grouping](#entity-grouping)).
 > **S3, the distribution Steps, are built (2026-10-17):** `transform.stats.outlier`, `transform.data.binning` and
 > `transform.stats.correlation` on the definitions here (§ [Distribution Steps](#distribution-steps)).
-> **Could batch, lane A, built 2026-10-18 (D-AN10…D-AN13 in the plan, assistant-decided, pending operator confirmation):**
+> **Could batch, lane A, built 2026-10-18 (D-AN10…D-AN13 in the plan, assistant-decided, operator-confirmed 2026-11-12):**
 > C5 [hour of week and seasonal profile](#hour-of-week-and-seasonal-profile), C6
 > [change-point and regime detection](#change-point-and-regime-detection), C1
 > [windowed and ratio Measures](#windowed-and-ratio-measures), C9 [cohort retention and funnel](#cohort-retention-and-funnel).
@@ -40,7 +40,7 @@ timestamp: 2026-10-18T00:00:00Z
 >
 > **The model kernels are built (2026-10-18, Could C2, C3, C4 and the Spearman residual of S3):** rank correlation
 > (`method: spearman`), k-means, logistic regression with the holdout split, and an isolation forest behind the Anomaly
-> Score (§ [Model kernels](#model-kernels)). Decisions D-AN20…D-AN29, assistant-decided, pending operator confirmation.
+> Score (§ [Model kernels](#model-kernels)). Decisions D-AN20…D-AN29, assistant-decided, operator-confirmed 2026-11-12.
 
 ## The module
 

@@ -138,7 +138,7 @@ class MetadataGraphStudioLayerTest {
 
     /**
      * ⛔ Regression for a mirror drift. {@code PipelineDependents.datasets} and
-     * {@code PipelineRenameRoutes.rewriteDatasetRefs} check {@code sourceName} <em>and</em>
+     * {@code PipelineRenameRoutes.names} check {@code sourceName} <em>and</em>
      * {@code physicalRef}; an earlier revision of the builder let a {@code sourceName} shadow the
      * {@code physicalRef}, so a Dataset naming an unmodelled sourceName lost a binding the
      * dependents route reports.

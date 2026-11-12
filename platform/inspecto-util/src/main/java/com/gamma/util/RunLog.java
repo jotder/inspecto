@@ -1,11 +1,14 @@
 package com.gamma.util;
 
+import com.gamma.api.PublicApi;
+
 /**
  * Structured per-Run logging (R5, {@code docs/job-framework-design.md} §9). Entries are persisted
  * append-only under the jobs audit dir and served at {@code GET /jobs/{name}/runs/{runId}/log}. The
  * {@code kv} varargs are flattened to key/value pairs. Secrets never reach the log by construction
  * (a {@code ${ENV:KEY}} value is resolved server-side, outside any config a Run sees).
  */
+@PublicApi(since = "4.0.0")
 public interface RunLog {
 
     void info(String message, Object... kv);

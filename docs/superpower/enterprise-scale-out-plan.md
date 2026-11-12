@@ -1,6 +1,6 @@
 # Enterprise Scale-Out on Kubernetes — Design Plan
 
-> **Status (audited 2026-10-12): SIGNED 2026-09-10 (operator) — D1′–D13 (D9 refined by D8); D14–D16 still UNSIGNED. PHASE A (shared state) and PHASE B (the run lease) are BUILT; PHASE C is PARTLY BUILT** — §5.3 (Space→pod map, inbox ownership) is built, §5.4 is built on local/mounted storage plus the object-store write lane, and what remains is `dirs.database` as an `s3://` URI with object-store containment (§5.4 bullet 6), the Helm chart for N pods (`deploy/helm/inspecto` is a replicas-1 chart that says so), ingress routing and `/spaces` from the map (§5.5, D14–D16), U1/U2 distribution, D13 and the live halves of S1/S5. The per-item verdicts with evidence are in **Audit 2026-10-12** below. The §2 amendments are applied.
+> **Status (audited 2026-10-12): SIGNED 2026-09-10 (operator) — D1′–D13 (D9 refined by D8); D14 and D16 SIGNED yes 2026-10-20 (operator accepted the recommended answer; board `SCALEOUT-D14-D16-DECISIONS-1`); D15's status is on that row. PHASE A (shared state) and PHASE B (the run lease) are BUILT; PHASE C is PARTLY BUILT** — §5.3 (Space→pod map, inbox ownership) is built, §5.4 is built on local/mounted storage plus the object-store write lane, and what remains is `dirs.database` as an `s3://` URI with object-store containment (§5.4 bullet 6), the Helm chart for N pods (`deploy/helm/inspecto` is a replicas-1 chart that says so), ingress routing and `/spaces` from the map (§5.5, D14–D16), U1/U2 distribution, D13 and the live halves of S1/S5. The per-item verdicts with evidence are in **Audit 2026-10-12** below. The §2 amendments are applied.
 >
 > ✅ **SPIKES RUN 2026-09-10 — S2, S3 and S4 are CLOSED; S1 and S5 are answered in part and their live
 > halves are still owed** (they need a reachable Postgres and an S3-compatible endpoint, which the sandbox
@@ -77,12 +77,12 @@ and the heap lease is `PipelineRunGuard implements RunLease` (there is no `HeapR
 | C 5.4 bullet 6: `dirs.database` as `s3://` + containment in `PathJail` | PARTLY BUILT 2026-11-01 | the containment rule is built (2026-10-18: `PathJail.requireObjectStore` + `-Dassist.safety.object_roots`, blank = refused) and the ingest lane WRITES there (2026-11-01: `output.connection` names the `s3` Connection, route (a); `ObjectStoreDatabase` creates a prefix-scoped DuckDB secret and the seal admits the prefix alone; every `dirs.database` consumer dispatches on `PathJail.isUri`; tested live against MinIO; 2026-11-01 later: DuckLake registration of that output, the registrar's connection given the same prefix-scoped secret). Left: `sinks:`, `produces: reference` and the readers, each refused by name (BACKLOG `SCALEOUT-OBJSTORE-DATABASE-DIR-1`; module.engine `spec-output-sinks.md`) |
 | C: `CatalogCommit` / `RenameReveal` as named strategies | SUPERSEDED | The plan's own names; no such classes — the object-store lane writes straight to final paths (5.4); the local lane keeps the inline reveal |
 | C: Helm chart for N pods | NOT BUILT | `deploy/helm/inspecto/values.yaml:3-7` — replicas 1, "NOT MULTI-REPLICA SAFE"; no ingress template |
-| 5.5 / D16: `/spaces` from the map, ingress rules generated from the map, SPA off the pods | NOT BUILT (D16 unsigned) | board `SPACES-FROM-PARTITION-MAP-1` (blocked); `grep ingress` in `inspecto/src/main` is empty |
+| 5.5 / D16: `/spaces` from the map, ingress rules generated from the map, SPA off the pods | NOT BUILT (D16 signed 2026-10-20) | board `SPACES-FROM-PARTITION-MAP-1` (blocked); `grep ingress` in `inspecto/src/main` is empty |
 | 5.5: `/auth/refresh` statelessness; live SSE tail across pods | UNKNOWN / NOT BUILT | statelessness not verified by grep; `EventLog` stays an in-heap registry |
-| D14 (inbox-group as unit), D15 posture, D16 | UNSIGNED | section 9; the fencing half of D15 is built in `DbRunLease` regardless |
+| D14 (inbox-group as unit), D15 posture, D16 | D14 and D16 SIGNED yes 2026-10-20; D15: see board `SCALEOUT-D14-D16-DECISIONS-1` | section 9; the fencing half of D15 is built in `DbRunLease` regardless |
 | U1 distributed remote acquisition | NOT BUILT (precondition exists: ledgers on Postgres) | `AcquisitionLedgers.java`; `StabilityGate.SHARED` scope unverified (section 12) |
 | U2 distributed Consignment execution | NOT BUILT | admission pools built JVM-local (`ConcurrencyBroker`, 4.1); ordering undecided |
-| U3 inbox-group partition | NOT BUILT (D14 unsigned) | — |
+| U3 inbox-group partition | NOT BUILT (D14 signed 2026-10-20) | — |
 | D13 external SQL surface (pg_duckdb views) | NOT BUILT | no `pg_duckdb` reference in code; S5 live half owed |
 | D11 dynamic rebalancing | DEFERRED by decision (phase C+1) | section 9 |
 | Spikes S2, S3, S4 | CLOSED | section 10 |
@@ -392,7 +392,7 @@ in the first sales conversation.
 case.** An operator asked the obvious question — *what if there is only one Space, under huge load?* —
 and under D3 as written, N pods buy that customer **nothing**. For a tier-1 telecom that most likely has
 one Space with many feeds, that is the common case, not an edge case, and it is the flagship Enterprise
-story. This section records the grounding; the resulting choices are **D14–D16** in §9, unsigned.
+story. This section records the grounding; the resulting choices are **D14–D16** in §9 (D14 and D16 signed 2026-10-20; D15: board `SCALEOUT-D14-D16-DECISIONS-1`).
 
 D3's stated justification is that pipelines in a Space share **inboxes**, **ledgers** and **dedup state**.
 Two of those three do not survive grounding:
@@ -1115,7 +1115,7 @@ Work under (ii):
 
 ### 5.5 Request distribution — the UI and the API *(added 2026-09-11)*
 
-> **Status (audited 2026-10-12):** NOT BUILT - D16 unsigned; `/spaces` still pod-local; `/auth/refresh` statelessness UNKNOWN.
+> **Status (audited 2026-10-12):** NOT BUILT - D16 signed 2026-10-20, nothing built yet; `/spaces` still pod-local; `/auth/refresh` statelessness UNKNOWN.
 
 **Invariant:** *What an operator sees must not depend on which pod answered.*
 
@@ -1171,7 +1171,7 @@ Work:
 and is worth having if the next phase never happens. Stop between any two.
 
 ⚠ **This sequencing is UNCHANGED by the 2026-09-11 amendment and does not yet incorporate it.** §4.1's
-units `U1`–`U4` and §5.5's routing work hang on **D14–D16, which are unsigned**. If D14 is signed, the
+units `U1`–`U4` and §5.5's routing work hang on **D14–D16** (D14 and D16 signed 2026-10-20; D15 on the board). With D14 signed, the
 natural revision is to pull `U1` (distributed remote acquisition) into phase A — it needs only the claim
 surfaces phase A already moves to Postgres, and it is the cheapest horizontal scale in the system — and to
 place `U2` in phase B beside the lease. ⛔ Do not re-sequence before the decisions are signed; ⚠ and note

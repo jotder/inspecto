@@ -6,6 +6,7 @@ import { Observable } from 'rxjs';
 import { SessionService, SpacesService } from '@inspecto/core/api';
 import { InvService, MaskingNote, NeighborsRequest, ProjectionRequest, ProjectionResult } from './inv.service';
 import { ConditionalReadCache } from './conditional-read-cache';
+import { decodeEdges, type EdgeWire } from './edge-wire';
 import { environment } from 'environments/environment';
 
 const base = environment.apiBaseUrl + '/v1';
@@ -15,12 +16,16 @@ const REQ = { dataset: 'calls', sourceCol: 'A', targetCol: 'B' } as unknown as P
 const NREQ = { ...REQ, value: 'x' } as unknown as NeighborsRequest;
 const NOTE = { maskingMode: 'mask', masked: true } as unknown as MaskingNote;
 const NOT_MODIFIED = { status: 304, statusText: 'Not Modified' };
+/** PERF-P10-1: the compact wire body the server sends; the service decodes it once, before holding it. */
 const body = (n = 1, masking?: MaskingNote): ProjectionResult =>
     ({
-        edges: [{ source: 'a', target: 'b', count: n }],
+        columns: ['source', 'target', 'kind', 'count'],
+        attrCols: [],
+        rows: [['a', 'b', null, n]],
         truncated: false,
         ...(masking ? { masking } : {}),
     }) as unknown as ProjectionResult;
+const dec = (b: ProjectionResult) => decodeEdges(b as unknown as EdgeWire);
 const tag = (t: string) => ({ headers: { ETag: t } });
 
 describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
@@ -98,10 +103,10 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
         seed('"v1"');
         const fresh = body(7);
         const second = read(project, (r) => r.flush(fresh, tag('"v2"')));
-        expect(second.got).toBe(fresh);
+        expect(second.got).toEqual(dec(fresh));
         const third = read(project, (r) => r.flush(null, NOT_MODIFIED));
         expect(third.r.request.headers.get('If-None-Match')).toBe('"v2"');
-        expect(third.got).toBe(fresh);
+        expect(third.got).toBe(second.got);
     });
 
     it('(d) a 404 on revalidation propagates, drops the entry, and the next call sends NO header', () => {
@@ -154,10 +159,11 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
         svc.reads.clear();
         const fresh = body(9);
         const hard = read(project, (r) => r.flush(fresh, tag('"v9"')));
+        expect(hard.got).toEqual(dec(fresh));
         expect(hasHeader(hard.r)).toBe(false);
         const next = read(project, (r) => r.flush(null, NOT_MODIFIED));
         expect(next.r.request.headers.get('If-None-Match')).toBe('"v9"');
-        expect(next.got).toBe(fresh);
+        expect(next.got).toBe(hard.got);
     });
 
     it('(g) a response without an ETag stores nothing: the next call is not conditional', () => {
@@ -200,7 +206,7 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
             const b = body(2);
             read(project, (r) => r.flush(b, { headers: { ETag: '"b"', 'Content-Length': cl } }));
             expect(svc.reads.size).toBe(1);
-            expect(svc.reads.bytes).toBe(JSON.stringify(b).length);
+            expect(svc.reads.bytes).toBe(JSON.stringify(dec(b)).length); // the DECODED body is what is held
         },
     );
 
@@ -212,7 +218,7 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
         expect(hasHeader(retry)).toBe(false);
         const b = body();
         retry.flush(b, tag('"r"'));
-        expect(got).toBe(b);
+        expect(got).toEqual(dec(b));
     });
 
     it('(j) neighbour list and /multi never carry a conditional header and store nothing', () => {
@@ -242,7 +248,7 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
             vi.advanceTimersByTime(2000);
             const b = body();
             http.expectOne(PROJ).flush(b, tag('"k"'));
-            expect(got).toBe(b);
+            expect(got).toEqual(dec(b));
 
             project().subscribe({ next: () => undefined, error: (e) => (err = e) });
             http.expectOne(PROJ).flush(body(), tag('"k"')); // conditional read of the held entry: answer fresh

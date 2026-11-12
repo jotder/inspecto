@@ -200,7 +200,7 @@ turns it into a gate.
   scans `alert-rule` components — `onPipeline` naming the Pipeline (case-insensitive, a space read as `_`,
   as `AlertService` matches it) or `dataset` naming one of its Datasets — as kind `alert-rule`, and
   `ContractVerdicts` judges each as a Pipeline reader (REVALIDATE; BREAKING when the producer is deleted).
-  The rename path (`PipelineRenameRoutes.rewriteAlertRules`) rewrites `onPipeline` key-for-key; an alert's
+  The rename path (`PipelineRenameRoutes.rewriteDependents`) rewrites `onPipeline` key-for-key; an alert's
   `dataset` names a Dataset, not the Pipeline, so a rename leaves it alone.
 
 ## Related

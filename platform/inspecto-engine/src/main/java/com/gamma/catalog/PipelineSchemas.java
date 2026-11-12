@@ -23,7 +23,7 @@ import java.util.stream.Stream;
  * Stream (a pipeline's {@code stream}, default its own name) or a {@code produces: reference} pipeline,
  * compared case-insensitively. ⚠ Still mirrored, not shared, in {@code MetadataGraphBuilder.originNode},
  * {@code PipelineDependents.datasets}, {@code DataSourceBundleResolver.datasetReadsStore} and
- * {@code PipelineRenameRoutes.rewriteDatasetRefs} (other modules / node-set based) — change them together.
+ * {@code PipelineRenameRoutes.names} (other modules / node-set based) — change them together.
  */
 public final class PipelineSchemas {
 

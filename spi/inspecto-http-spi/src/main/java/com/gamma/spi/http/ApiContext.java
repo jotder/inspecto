@@ -440,7 +440,9 @@ public interface ApiContext extends WriteRootProvider {
     static Object respondJson(HttpExchange ex, int status, Object body) throws IOException {
         Object payload = v1(ex) ? Envelope.shape(ex, status, body) : body;
         byte[] bytes = JSON.writeValueAsBytes(payload);
-        ex.getResponseHeaders().set("Content-Type", "application/json");
+        // PERF-P10-1: a success keeps a versioned JSON media type its handler set (`application/vnd.…+json`); an error is plain JSON
+        String own = ex.getResponseHeaders().getFirst("Content-Type");
+        if (status >= 400 || own == null || !own.endsWith("+json")) ex.getResponseHeaders().set("Content-Type", "application/json");
         Idempotency.capture(ex, status, bytes);   // cache the pre-compression body for a keyed-write replay (W5)
         if (status != 204 && status != 304) bytes = maybeGzip(ex, bytes);
         if ("HEAD".equals(ex.getRequestMethod())) {   // headers only: a body on HEAD makes the JDK warn, then the write throws

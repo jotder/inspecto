@@ -527,7 +527,7 @@ are the values four-eyes approved (below).
     lineage masks every id.
   - ⚠ The Catalog/rename/bundle origin-rule walks (not classification consumers) are still mirrored in four other places (`MetadataGraphBuilder.originNode`,
     `PipelineDependents.datasets`, `DataSourceBundleResolver.datasetReadsStore`,
-    `PipelineRenameRoutes.rewriteDatasetRefs`): change the origin rule in all of them.
+    `PipelineRenameRoutes.names`): change the origin rule in all of them.
   - **Decided 2026-10-04 (operator): KEEP** for Job-output and sidecar stores (P3 `ASSURE-CLASSIFICATION-PROPAGATION-1`): no new refusal, no inheritance; they publish unmasked unless some Dataset classifies the store. Accepted residual; revisit when a customer publishes such a store.
   - ⚠ **Known limit (operator, 2026-10-06; row closed):** Job-output and sidecar stores publish UNMASKED unless a Dataset classifies them - classification does not flow into a store no pipeline claims.
 
@@ -687,7 +687,8 @@ artifact or lineage graphs (`GLOSSARY.md` §11 keeps the four graph planes disti
 source Entity, another the target, optional columns carry the Link type and attributes. It is
 **backend-first only** — `POST /inv/projection` folds server-side in DuckDB
 (`GROUP BY` with `COUNT(*)`, **heaviest-first**, default cap 2,000 and maximum 20,000, returning
-`{rows[{source,target,kind,count,attrs?}], truncated}`), `POST /inv/projection/neighbors` does one-hop
+`{columns, attrCols, rows[[source,target,kind,count,total?,…attrs]], truncated}` as
+`application/vnd.inspecto.la-edges.v2+json` since PERF-P10-1, 2026-11-12; the SPA decodes it to `{source,target,kind,count,attrs?}`), `POST /inv/projection/neighbors` does one-hop
 expansion with bound parameters, and `GET /inv/schema/relationships` infers naming-convention foreign
 keys across Datasets (`<base>_id` → a Dataset named `<base>`) so a multi-mapping projection can be
 pre-filled instead of hand-picked. `attrCols` are extra validated identifiers that join the group-by

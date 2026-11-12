@@ -121,7 +121,7 @@ final class EntityProfileFixture {
 
     static JsonNode data(HttpResponse<String> r) throws Exception {
         assertEquals(200, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     /**

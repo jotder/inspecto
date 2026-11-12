@@ -39,7 +39,8 @@ import static com.gamma.util.SqlIdent.q;
  * ({@code docs/superpower/link-analysis-and-graphsource.md} §7).
  *
  * <p>{@code POST /inv/projection} — body {@code {dataset, sourceCol, targetCol, linkKindCol?, attrCols?, limit?, filter?}}
- * → {@code {rows:[{source,target,kind,count,attrs?}], truncated}}: distinct {@code (source, target[, kind]
+ * → {@code {columns:[source,target,kind,count,total?,...attrCols], attrCols, rows:[[...]], truncated, columnTypes}} served as
+ * {@link #EDGES_MEDIA_TYPE} (PERF-P10-1: column names once, rows as arrays): distinct {@code (source, target[, kind]
  * [, ...attrCols])} tuples with folded row counts, heaviest first. When {@code attrCols} is given, each
  * column joins the fold key — a folded edge with differing attribute values across rows becomes separate
  * output rows, one per distinct attribute combination, consistent with the "identical tuples fold" contract
@@ -1022,6 +1023,7 @@ public final class InvRoutes implements RouteModule {
             audit(ex, datasetId, neighborsOf, hit.rows(), hit.truncated(), (IndexedRead.Outcome<?>) hit.auditSource());
             if (ProjectionCache.notModified(ex, hit.etag())) return ProjectionCache.respond304(ex, hit.etag());
             ProjectionCache.tag(ex, cacheKey);
+            ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);   // PERF-P10-1: set on a success return only
             return hit.body();
         }
 
@@ -1033,12 +1035,8 @@ public final class InvRoutes implements RouteModule {
             indexed = IndexedNeighbors.attempt(writeRoot, api.dataRoot(), relationSql, new IndexedNeighbors.Request(datasetId, sourceCol,
                     targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit, measureCol), traversalPolicy(writeRoot));
             if (indexed.served()) {
-                List<Map<String, Object>> rows = new ArrayList<>(indexed.result().rows().size());
-                for (Map<String, Object> row : indexed.result().rows())
-                    rows.add(maskEnds(mask, edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols)));
-                Map<String, Object> out = new LinkedHashMap<>();
-                out.put("masking", mask.describe());
-                out.put("rows", rows);
+                List<Object[]> rows = edgeArrays(indexed.result().rows(), kindCol != null, measureCol != null, attrCols, mask);
+                Map<String, Object> out = edgeBody(mask, rows, measureCol != null, attrCols);
                 out.put("truncated", indexed.result().truncated());
                 out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
                 out.put("source", indexed.source());
@@ -1046,6 +1044,7 @@ public final class InvRoutes implements RouteModule {
                 if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13
                 ProjectionCache.READS.increment();
                 if (ProjectionCache.put(cacheKey, out, rows.size(), indexed.result().truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
+                ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);
                 return out;
             }
         }
@@ -1071,18 +1070,15 @@ public final class InvRoutes implements RouteModule {
             ProjectionCache.READS.increment();
             DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
                     datasetId, relationSql, sql, limit, 0, List.of(), List.of(), binds));
-            List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
-            for (Map<String, Object> row : r.rows())
-                rows.add(maskEnds(mask, edgeRow(row, kindCol != null ? row.get("kind") : null, attrCols)));
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("masking", mask.describe());
-            out.put("rows", rows);
+            List<Object[]> rows = edgeArrays(r.rows(), kindCol != null, measureCol != null, attrCols, mask);
+            Map<String, Object> out = edgeBody(mask, rows, measureCol != null, attrCols);
             out.put("truncated", r.truncated());
             out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
             if (indexed != null) out.put("source", indexed.source());
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
             if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13: a graph was drawn
             if (ProjectionCache.put(cacheKey, out, rows.size(), r.truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
+            ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);
@@ -1166,8 +1162,57 @@ public final class InvRoutes implements RouteModule {
                 + " ORDER BY cnt DESC, source, target";
     }
 
+    /**
+     * PERF-P10-1 (PERF-D3, operator 2026-11-12): the media type of the compact edge body that {@code /inv/projection} and
+     * {@code /inv/projection/neighbors} answer with. It REPLACES the per-row object shape (no-shim rule: the old shape is not
+     * served any more). A media type, not a {@code v2} path, because every path-keyed table (rate classes, capability
+     * manifest, OpenAPI, absent-module stubs, the projection cache's route key, the SPA's conditional-read key) stays as it is.
+     */
+    static final String EDGES_MEDIA_TYPE = "application/vnd.inspecto.la-edges.v2+json";
+
+    /** The fixed leading columns of a compact edge row; {@code total} follows when a Measure is read, then the attribute columns. */
+    static final List<String> EDGE_COLUMNS = List.of("source", "target", "kind", "count");
+    private static final List<String> EDGE_COLUMNS_TOTAL = List.of("source", "target", "kind", "count", "total");
+
+    /**
+     * PERF-P10-1: the compact body - {@code columns} named once, {@code attrCols} naming the trailing attribute columns,
+     * {@code rows} as arrays in that column order. The caller adds {@code truncated}, {@code columnTypes} and {@code source}.
+     */
+    private static Map<String, Object> edgeBody(ExplorationMasking mask, List<Object[]> rows, boolean total, List<String> attrCols) {
+        List<String> columns = new ArrayList<>(total ? EDGE_COLUMNS_TOTAL : EDGE_COLUMNS);
+        columns.addAll(attrCols);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("masking", mask.describe());
+        out.put("columns", columns);
+        out.put("attrCols", attrCols);
+        out.put("rows", rows);
+        return out;
+    }
+
+    /**
+     * PERF-P10-1: {@link #edgeSql} (or index) rows as compact arrays, one allocation per row; the two ends are masked in place
+     * only when the read masks (no copy otherwise).
+     */
+    static List<Object[]> edgeArrays(List<Map<String, Object>> in, boolean kind, boolean total, List<String> attrCols,
+                                             ExplorationMasking mask) {
+        int fixed = total ? 5 : 4;
+        boolean masked = mask.active();
+        List<Object[]> out = new ArrayList<>(in.size());
+        for (Map<String, Object> row : in) {
+            Object[] a = new Object[fixed + attrCols.size()];
+            a[0] = masked ? mask.out(row.get("source")) : row.get("source");
+            a[1] = masked ? mask.out(row.get("target")) : row.get("target");
+            a[2] = kind ? row.get("kind") : null;
+            a[3] = row.get("cnt");
+            if (total) a[4] = row.get("total");
+            for (int i = 0; i < attrCols.size(); i++) a[fixed + i] = row.get("attr_" + i);
+            out.add(a);
+        }
+        return out;
+    }
+
     /** DR-D2: an edge row's two endpoints as the caller may see them (the row is this read's own copy). */
-    private static Map<String, Object> maskEnds(ExplorationMasking mask, Map<String, Object> row) {
+    static Map<String, Object> maskEnds(ExplorationMasking mask, Map<String, Object> row) {
         if (mask.active()) {
             row.put("source", mask.out(row.get("source")));
             row.put("target", mask.out(row.get("target")));
@@ -1186,7 +1231,7 @@ public final class InvRoutes implements RouteModule {
     }
 
     /** One {@link #edgeSql} result row in the response shape {@code {source,target,kind,count,attrs?}}. */
-    private static Map<String, Object> edgeRow(Map<String, Object> row, Object kind, List<String> attrCols) {
+    static Map<String, Object> edgeRow(Map<String, Object> row, Object kind, List<String> attrCols) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("source", row.get("source"));
         out.put("target", row.get("target"));

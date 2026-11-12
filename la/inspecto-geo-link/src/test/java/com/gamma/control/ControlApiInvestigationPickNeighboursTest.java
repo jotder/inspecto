@@ -90,7 +90,7 @@ class ControlApiInvestigationPickNeighboursTest {
 
     private static JsonNode data(HttpResponse<String> r, int expected) throws Exception {
         assertEquals(expected, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private String investigation(Ctx c) throws Exception {

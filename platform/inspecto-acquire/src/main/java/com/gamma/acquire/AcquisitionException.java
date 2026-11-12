@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.api.PublicApi;
+
 import java.io.IOException;
 
 /**
@@ -9,6 +11,7 @@ import java.io.IOException;
  * {@code throws IOException} contracts (e.g. {@link com.gamma.inspector.CollectorProcessor#collectCandidates})
  * — callers that already handle I/O failures need no change.
  */
+@PublicApi(since = "4.0.0")
 public class AcquisitionException extends IOException {
 
     public AcquisitionException(String message) {

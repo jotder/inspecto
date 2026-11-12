@@ -42,11 +42,10 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | defect | PIPELINE-LINK-GAPS-1 links the Pipeline rename and impact scans still miss | — |
 | `ALERT-EVALUATE-NO-BREACH-WORDING-1` | P3 | defect | an alert.evaluate Job logs "no rule breached" on every run while an Alert it raised stays OPEN. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
-| `JOB-SIGNAL-OVERLAP-SKIP-1` | P2 | defect | an on_signal Job loses the last landing when a signal arrives while it runs. | — |
+| `JOB-SIGNAL-OVERLAP-SKIP-1` | P2 | defect | every coalescing on_signal Job can lose its last landing when a signal arrives while it runs (wider than first filed; S-sized). | — |
 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` | P3 | defect | the Job loader reads a saved view whose file name ends in _job.toon. | — |
 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | P3 | defect | a Job reading a snapshot Dataset fails when the Job that writes that Dataset publishes a new snapshot during the read. | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
-| `DEMO-BAKE-WAL-RACE-1` | P3 | defect | ⬇ narrowed 2026-11-11 (PRODUCT-ASSEMBLY-1 PA-5d) to the engine: the Space close abandons a busy Space after 10 s and leaves .wal files. T… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | external |

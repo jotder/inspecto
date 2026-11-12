@@ -250,6 +250,31 @@ class ControlApiConfigImpactTest {
     }
 
     @Test
+    void aJobNamingThePipelineInACommaListCounts(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        writeOrigin(root);
+        // JobConfig.onPipelines splits `on_pipeline` on commas (PIPELINE-LINK-GAPS-1 b); one Job is one dependent
+        // even when the list names the pipeline twice, and a member that only starts with the id is not it.
+        Files.createDirectories(root.resolve("jobs"));
+        Files.writeString(root.resolve("jobs").resolve("both_job.toon"), """
+                job:
+                  name: both
+                  type: pipeline
+                  on_pipeline: "fx_feed, orders_feed ,orders_feed"
+                """);
+        Files.writeString(root.resolve("jobs").resolve("other_job.toon"), """
+                job:
+                  name: other
+                  type: pipeline
+                  on_pipeline: "fx_feed, orders_feed_v2"
+                """);
+        try (Ctx c = open(cfg, root)) {
+            JsonNode out = V1Body.of(get(c.port, "/config/pipeline/orders_feed/impact").body());
+            assertEquals(1, out.get("total").asInt(), out.toString());
+            assertEquals("both_job", out.get("dependents").get("job").get(0).get("name").asText());
+        }
+    }
+
+    @Test
     void limitTruncatesButReportsTheTrueTotal(@TempDir Path cfg, @TempDir Path root) throws Exception {
         writeOrigin(root);
         for (int i = 0; i < 4; i++) {

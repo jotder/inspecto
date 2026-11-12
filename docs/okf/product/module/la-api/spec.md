@@ -49,6 +49,17 @@ Registered in `la/inspecto-la-api/src/main/resources/META-INF/services/com.gamma
   PDP are checked in one order; a non-member always gets 404.
 - **Masking is applied after any cache** (Graph Run results, coverage), never baked into a cached value.
 - **Index and flat answers never mix** in one response, except the documented hub-degree case.
+- **`POST /inv/projection` and `/inv/projection/neighbors` answer the compact edge format** (PERF-P10-1, 2026-11-12),
+  media type `application/vnd.inspecto.la-edges.v2+json`: `columns` named once (`source, target, kind, count`, then
+  `total` when a Measure is read, then the `attrCols`), `attrCols`, and `rows` as arrays in that order; `masking`,
+  `truncated`, `columnTypes` and (neighbours) `source` are unchanged. It REPLACED the per-row object shape; nothing serves
+  the old one. A media type rather than a `v2` path because every path-keyed table (rate classes, capability manifest,
+  OpenAPI, absent-module stubs, the projection cache key, the SPA's conditional-read key) stays put. `ApiContext.respondJson`
+  keeps a handler's `…+json` type on a success and writes plain `application/json` on any error. The arrays are built
+  straight from the statement row (`InvRoutes.edgeArrays`), the ends masked in place only when the read masks. The
+  neighbours `list: true` page, `/inv/projection/multi` and the Investigation routes keep their object shapes. The SPA
+  decodes once in `edge-wire.ts` (`decodeEdges`) before the conditional-read cache holds the body, so a 304 still returns
+  the same decoded object. Parity: `EdgeWireParityTest`; route: `ControlApiEdgeWireFormatTest`.
 - **Limits are read through `SpaceLimits`** per request; library modules receive values as parameters.
 - **A Dataset read failure is translated only by `DatasetReadFault`**: 409 for a store with no files, 422 with the JDBC
   preamble and absolute paths stripped otherwise.

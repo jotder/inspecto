@@ -49,7 +49,8 @@ renderings (Widgets, Dashboards, exports). Vocabulary: [`GLOSSARY.md`](../../../
   Requirement of record: [DAT capability spec](../../layer/platform/plan-data-plane.md).
   (Widgets don't execute *any* bound query server-side yet — a separate, pre-existing follow-on.)
   Pagination is offset-based in this slice. `graph`/`spatial`/`search`/`api` query types are
-  deliberately not built (geo/link views keep their own query shapes).
+  deliberately not built (geo/link views keep their own query shapes); their board row, with its
+  "more `$`-resolvers", was deleted as obsolete on 2026-11-12 — add a resolver only when a caller asks by name.
 * **Contract** — part of the versioned [`/api/v1`](api-v1.md) surface; envelope + error codes apply.
 
 ## Calculated columns (DAT-5, shipped 2026-07-08; authoring UI 2026-07-10)
