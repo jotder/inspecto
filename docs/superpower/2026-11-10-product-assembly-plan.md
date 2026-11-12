@@ -1637,6 +1637,37 @@ marked and committed current; every link resolves; the Telco brochure and datash
 Edition × App table; a hand-written file in a generated slot is refused. `check-product-docs`, `check-doc-links`, the
 vocabulary and doc-count guards pass.
 
+**`PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` as built (2026-11-12; D-PA37 "fix it next").** §9's declared needs, for Space
+Templates.
+- A template declares the modules no manifest derives: `requiresModules[N]: a,b` in its `template.toon`. Decided here: the
+  declaration lives on the template, not in a module manifest. Whether Alert Rules need `ops` depends on the template's
+  tier (a Basic-tier template ships them unarmed), so no module can say it for every template.
+- `check-offerings.mjs` check 8 holds it honest, judging the config as the server does
+  (`SpaceManager.missingFeatures`): Alert Rules or a Decision Rule `create-alert` need `ops` unless `minEdition: basic`;
+  a `*_caserule.toon` needs `case-management`; each declared module has a manifest; an Offering listing the template ships it.
+- Declared: `ops` on `aml`, `business-assurance`, `mobile-money`, `payment-fraud`, `telco-ra`; `case-management,ops` on
+  `telco-fraud`, `telco-bypass`, `partner-settlement`.
+- Found by the guard: `la-daily-feed`, a Basic content pack, had Alert Rules and no `minEdition`, so a Basic install
+  refused to create it. Decided here: it gets `minEdition: basic` like every other LA template, so its Alert Rules ship
+  unarmed on Basic (operator 2026-11-08, "A: allow, unarmed").
+- `customer.mjs templateNeeds` adds the declaration, so the pilot customer now keeps `ops` and `case-management`, billed as
+  `required` and listed in the entitlement's `modules`. This changes the pilot's jars: 11 removed instead of 13.
+- `customer-build.mjs` trims the combined edition SBOM (`sbom/inspecto-<edition>.{cdx,spdx}.json`): the removed jars'
+  components go, and so does every third-party component that only removed jars carry (from the per-jar SBOMs, read before
+  they are deleted).
+
+**Proof (as built).** `customer-build.test.mjs` 15/15 (new: declared needs keep `ops` and `case-management`, billed and
+entitled, and a template declaring nothing keeps neither; `templateNeeds` reads the declaration; the trim's combined
+SBOM in both serialisations, keeping a shared and an unattributed component). `check-offerings.test.mjs` 21/21 (check 8
+each way, `templateConfigNeeds` per rule, the repo's declarations). Live, on a Standard bundle
+(`package.ps1 -Product inspecto -Edition Standard -NoRuntime -NoUi`, 43 jars) and the pilot record unchanged (scratch
+copy):
+- 11 jars and 29 templates removed; the combined SBOM 90 → 66 components, equal to the union of the 32 kept jars'
+  per-jar SBOMs; `sbom-modules.mjs --verify` passes; `entitle.mjs verify`: valid, modules include `ops` and `case-management`;
+- booted against a throwaway local OIDC issuer: `/bootstrap.entitlement` state `ok`, Add-ons `linkAnalysis` only; the
+  gallery says `telco-fraud` creatable; `POST /spaces {template: telco-fraud}` **200** (422 before); its Case Rule
+  `fraud_critical_burst` is listed by `GET /cases/rules`.
+
 ## 12. Decisions (operator, signed 2026-11-10 … 2026-11-12; D-PA26 … D-PA37 reviewed 2026-11-12, six changed)
 
 | Id | Call | Signed |
@@ -1677,7 +1708,7 @@ vocabulary and doc-count guards pass.
 | D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (**signed 2026-11-12, operator, as built**) |
 | D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`) |
 | D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`) |
-| D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable |
+| D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable. **Done 2026-11-12** (`requiresModules` in `template.toon`, check 8; the combined SBOM trimmed too; §11) |
 | D-PA38 | The streaming runtime for PA-9 | **Signed 2026-11-12 (operator, as recommended):** micro-batches on the existing `trigger: stream` lane, with windowed Alert Rules evaluated on each commit, scoped to the touched keys; no second execution model. Rejected: an in-process per-record operator (kept as the gate G-RT fallback), Kafka Streams, Flink, Esper or Siddhi, and a detection Job on the commit event (the PA-9a baseline only) |
 | D-PA39 | The stated latency | **Signed 2026-11-12 (operator, as recommended):** p95 ≤ 5 s from broker to Alert and ≤ 10 s to Incident, with `max_wait: 1s`, windows ≤ 1 h, one 4-core node, up to the rate PA-9a measures (proposed floor 5,000 events/s); proven by an engine harness in CI, one recorded real-broker run, and the `inspecto_detection_latency_seconds` metric in production |
 | D-PA40 | The window and state model | **Signed 2026-11-12 (operator, as recommended):** a `window:` block (tumbling or sliding, event time, `lateness`) on a Measure Alert Rule, plus `sequence` and `absence` patterns; the state is the committed Dataset plus a table of what has fired; windows ≤ 1 h; a window buffer table only if gate G-RT trips |

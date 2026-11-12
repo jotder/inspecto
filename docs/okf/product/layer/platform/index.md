@@ -61,5 +61,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
-| `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P2 | defect | ⬆ P2, fix next (operator 2026-11-12, D-PA37). | — |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |

@@ -15,8 +15,9 @@
 // CLOSURE a kept module's `requires.modules` are kept too; a module pulled in that way is listed on the bill of materials as
 //         `required` ("needed by X"), so whether to charge for it is a decision, not an accident.
 // PACKS   a bought Space Template's needs are DERIVED from the manifests: each `type:` in its config/jobs/*.toon against
-//         provides.jobTypes, each config/registry/<kind>s/ folder against provides.configKinds. ⚠ Ops configs under config/ops/
-//         (e.g. a Case Rule) name no owner in any manifest, so they are not derived (PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1, D-PA37).
+//         provides.jobTypes, each config/registry/<kind>s/ folder against provides.configKinds. What no manifest derives (Alert
+//         Rules need `ops`, a Case Rule `case-management`) the template DECLARES in template.toon, `requiresModules[N]: a,b`, held
+//         honest by tools/check-offerings.mjs check 8 (PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1, D-PA37).
 // APPS    (PA-10b) an `app` item's Order Code buys the App: its Add-ons' modules are kept and its templates staged. A Domain
 //         product's required Apps must be bought; a Platform product's optional App comes along when every Add-on it needs is held.
 
@@ -26,7 +27,7 @@ import { parseToon } from './check-offerings.mjs';
 import { assemble } from './assemble.mjs';
 import { resolveEntitlement } from './entitle.mjs';
 import { gatherModel, productApps } from './products.mjs';
-import { gather as gatherOfferings } from './check-offerings.mjs';
+import { gather as gatherOfferings, templateRequires } from './check-offerings.mjs';
 import { gather as gatherMap } from './check-product-map.mjs';
 import { readPrices } from './render-product-map.mjs';
 
@@ -149,6 +150,9 @@ export function templateNeeds(root, manifests) {
         }
         const reg = join(cfg, 'registry');
         for (const d of existsSync(reg) ? listDirs(reg) : []) { const k = d.replace(/s$/, ''); if (owner[`kind:${k}`]) need.add(owner[`kind:${k}`]); }
+        // what no manifest derives (Alert Rules, a Case Rule) the template declares; check-offerings holds the declaration honest
+        const meta = join(tdir, t, 'template.toon');
+        if (existsSync(meta)) templateRequires(readFileSync(meta, 'utf8')).forEach((m) => need.add(m));
         out[t] = [...need].sort();
     }
     return out;

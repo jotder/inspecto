@@ -12,7 +12,7 @@
 //          Edition into <out>/bundle and executes the plan's customer block: removes the jars and per-jar SBOMs of modules not kept
 //          and the Space Templates not kept, filters modules.list, writes lib/product.json from the plan, stamps edition.properties
 //          with customer= and offering=, stages conf/entitlement.toon + .sig, and writes customer-bom.csv WITHOUT prices. The combined
-//          edition SBOM (sbom/inspecto-<edition>.*) is left as is and OVER-declares the trimmed bundle (recorded residual).
+//          edition SBOM (sbom/inspecto-<edition>.*) is trimmed too: the removed jars and the third-party components only they carry go.
 // PILOT    (PA-10c, D-PA35) --distribution pilot: the record's `pilot:` block wires one bought template's Pipelines to the customer's
 //          folders; the bundle gains the Space Template `<customer>-pilot` (no sample data) and lib/product.json says `pilot`.
 
@@ -55,13 +55,14 @@ export function trimBundle(src, dest, plan, entitlement) {
     }
     rmSync(dest, { recursive: true, force: true });
     cpSync(src, dest, { recursive: true });
-    const jars = [];
-    for (const jar of c.removedJars) {
-        if (!existsSync(join(dest, 'lib', jar))) fail(`bundle has no lib/${jar}, which the plan removes`);
-        rmSync(join(dest, 'lib', jar)); rmSync(join(dest, 'sbom', jar.replace(/\.jar$/, '.sbom.cdx.json')), { force: true }); jars.push(jar);
-    }
+    for (const jar of c.removedJars) if (!existsSync(join(dest, 'lib', jar))) fail(`bundle has no lib/${jar}, which the plan removes`);
     const ml = join(dest, 'lib', 'modules.list');
-    writeFileSync(ml, readFileSync(ml, 'utf8').split(/\r?\n/).filter((l) => l && !jars.includes(l.trim().replace(/^lib\//, ''))).join('\n') + '\n');
+    const listed = readFileSync(ml, 'utf8').split(/\r?\n/).filter(Boolean);
+    const kept = listed.filter((l) => !c.removedJars.includes(l.trim().replace(/^lib\//, '')));
+    const sbom = trimCombinedSbom(join(dest, 'sbom'), ed, c.removedJars, kept.map((l) => l.trim().replace(/^lib\//, '')));
+    const jars = [];
+    for (const jar of c.removedJars) { rmSync(join(dest, 'lib', jar)); rmSync(join(dest, 'sbom', perJarSbom(jar)), { force: true }); jars.push(jar); }
+    writeFileSync(ml, kept.join('\n') + '\n');
     const keepT = new Set([...plan.templates, ...(plan.space ? [plan.space.id] : [])]);
     const tdir = join(dest, 'spaces', '_templates');
     const templates = [];
@@ -77,7 +78,49 @@ export function trimBundle(src, dest, plan, entitlement) {
     mkdirSync(join(dest, 'conf'), { recursive: true });
     writeFileSync(join(dest, 'conf', 'entitlement.toon'), entitlement.toon);
     writeFileSync(join(dest, 'conf', 'entitlement.sig'), entitlement.sig);
-    return { jars, templates };
+    return { jars, templates, sbom };
+}
+
+const perJarSbom = (jar) => jar.replace(/\.jar$/, '.sbom.cdx.json');
+const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
+/**
+ * The combined edition SBOM (sbom/inspecto-<edition>.cdx.json and .spdx.json, tools/sbom.mjs) trimmed to the jars the customer
+ * keeps (PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1): each removed jar's own component goes, and so does every third-party component that
+ * only removed jars carry, read from the per-jar SBOMs (tools/sbom-modules.mjs) - so call it before those are deleted. A component
+ * no per-jar SBOM names stays. Returns the purls removed; [] for a bundle without SBOMs.
+ */
+export function trimCombinedSbom(sbomDir, edition, removedJars, keptJars) {
+    const cdxFile = join(sbomDir, `inspecto-${String(edition).toLowerCase()}.cdx.json`);
+    const spdxFile = join(sbomDir, `inspecto-${String(edition).toLowerCase()}.spdx.json`);
+    if (!existsSync(cdxFile)) return [];
+    const carried = (jars) => {
+        const out = new Set();
+        for (const jar of jars) {
+            const f = join(sbomDir, perJarSbom(jar));
+            if (!existsSync(f)) continue;
+            const doc = readJson(f);
+            if (doc.metadata?.component?.purl) out.add(doc.metadata.component.purl);
+            for (const x of doc.components ?? []) out.add(x.purl);
+        }
+        return out;
+    };
+    const keep = carried(keptJars);
+    const cdx = readJson(cdxFile);
+    const bundleFile = (x) => (x.properties ?? []).find((p) => p.name === 'inspecto:bundleFile')?.value?.replace(/^.*[\\/]/, '');
+    const gone = new Set([...carried(removedJars)].filter((p) => !keep.has(p)));
+    for (const x of cdx.components ?? []) if (removedJars.includes(bundleFile(x))) gone.add(x.purl);
+    cdx.components = (cdx.components ?? []).filter((x) => !gone.has(x.purl));
+    for (const d of cdx.dependencies ?? []) if (d.dependsOn) d.dependsOn = d.dependsOn.filter((p) => !gone.has(p));
+    writeFileSync(cdxFile, JSON.stringify(cdx, null, 2) + '\n');
+    if (existsSync(spdxFile)) {
+        const spdx = readJson(spdxFile);
+        const purlOf = (pk) => (pk.externalRefs ?? []).find((r) => r.referenceType === 'purl')?.referenceLocator;
+        const ids = new Set((spdx.packages ?? []).filter((pk) => gone.has(purlOf(pk))).map((pk) => pk.SPDXID));
+        spdx.packages = (spdx.packages ?? []).filter((pk) => !ids.has(pk.SPDXID));
+        spdx.relationships = (spdx.relationships ?? []).filter((r) => !ids.has(r.relatedSpdxElement) && !ids.has(r.spdxElementId));
+        writeFileSync(spdxFile, JSON.stringify(spdx, null, 2) + '\n');
+    }
+    return [...gone].sort();
 }
 /**
  * PA-10c (D-PA35): write the pilot's Space Template beside the one it is made from: each Pipeline's `dirs.poll` set to the
@@ -148,7 +191,7 @@ function main() {
         for (const b of bom) console.log(`  ${b.line.padEnd(19)} ${b.orderCode.padEnd(28)} ${b.reason}`);
         if (args.includes('--bundle')) {
             const t = trimBundle(arg('--bundle'), join(out, 'bundle'), plan, entitlement);
-            console.log(`  bundle -> ${join(out, 'bundle')}: removed ${t.jars.length} jar(s), ${t.templates.length} Space Template(s); conf/entitlement.toon staged; the combined edition SBOM still lists the removed jars`);
+            console.log(`  bundle -> ${join(out, 'bundle')}: removed ${t.jars.length} jar(s), ${t.templates.length} Space Template(s); conf/entitlement.toon staged; ${t.sbom.length} component(s) left out of the combined SBOM`);
         }
     } catch (e) {
         console.error(`customer-build: ${e.message}`);
