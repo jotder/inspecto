@@ -703,10 +703,24 @@ open; appended from each committed Consignment's own files, trimmed past `size +
 files at boot. Never a second record — the Dataset is the record. Beside it, the **fired table** keeps one row per
 (rule, key, window start) that has fired, so an Alert is raised effectively once. ⛔ Not a *state store* or *cache*.
 
-**Pattern** *(added 2026-11-12 — PA-9 design; built in PA-9c)* — A **windowed Alert Rule shape an aggregate cannot
-express**: `sequence` (event A, then event B for the same key within T, each step its own Condition Language `when`) or
-`absence` (no event for a key, or for the whole Stream, in T — judged only once the Window has closed). ⛔ Not a
-*rule* (the rule is the Alert Rule; the Pattern is its shape), not a *regex* pattern.
+**Pattern** *(added 2026-11-12 — PA-9 design; built in PA-9c, `AlertPattern.java`)* — A **windowed Alert Rule shape
+an aggregate cannot express**, authored as `pattern:` beside the rule's `window:` block: `sequence` (an event matching
+step A, then one matching step B for the same key, `a ≤ b ≤ a + size` on event time; each step its own Condition
+Language tree; fires once per key and A event) or `absence` (a key — or the whole Stream — that had an event in the slide
+before a Window and none in it; judged only once the **close frontier** passes the Window's `hi + lateness`; one Alert
+per silence). A Pattern rule's Measure, comparator and threshold are fixed. ⛔ Not a *rule* (the rule is the Alert
+Rule; the Pattern is its shape), not a *regex* pattern, not a Link Analysis pattern tool.
+
+**Close frontier** *(added 2026-11-12 — PA-9c, `WindowedRuleEvaluator`)* — **How far an absence Pattern has judged its
+Windows**: `max(Watermark, clock floor)`; a Window is judged once, when the frontier first reaches `hi + lateness`. ⛔
+Not the **Watermark** itself (the frontier may run ahead of it on the clock) and not a *committed frontier* (how far a
+Stream's lane has made input durable).
+
+**Clock floor** *(added 2026-11-12 — PA-9 design D-PA40; built in PA-9c, `WindowedRuleEvaluator.tick`)* — **The wall
+clock standing in for the Watermark when a Stream is silent**: a silent feed sends no commit, so its Watermark never
+reaches the end of the Window an absence waits on; a tick raises the close frontier to the clock and judges absence
+Windows only. It never moves the Watermark. Called only while the Stream has no backlog. ⛔ Not a *cron sweep* (the
+batch Alert Rule floor) and not processing time.
 
 **Detection latency** *(added 2026-11-12 — PA-9 design, D-PA39)* — **The time from an event's arrival at the broker to
 the Alert that names it** (the newest event in its window; `inspecto_detection_latency_seconds{rule}`, PA-9d). The

@@ -39,6 +39,12 @@ import java.util.stream.Stream;
  * kept in {@link FiredWindows}, so nothing raises twice. Alerts go through {@link AlertService#raiseFromEvent} with
  * the dedupe key {@code <rule>:<key>:<window start>}; a CRITICAL rule's Alert is promoted to an Incident there.
  *
+ * <p><b>Patterns (PA-9c).</b> A {@code sequence} rule pairs a step-A event with a later step-B event of the same key
+ * that arrived in this commit or an earlier one ({@link WindowSql#sequence}); it fires once per (key, A's event time).
+ * An {@code absence} rule is judged only when a Window closes, so it moves on a <b>close frontier</b>: the event-time
+ * Watermark, raised by {@link #tick the clock floor} when the Stream is silent and no commit comes. Each Window is
+ * judged once, when the frontier first passes its {@code hi + lateness} ({@link WindowSql#absence}).
+ *
  * <p>One evaluator serves one (Dataset, rule set): every rule names the same Dataset, event-time column and
  * {@code distinctOn}. Not thread-safe across instances on one Dataset; each method is synchronized.
  */
@@ -59,6 +65,12 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
     private final Connection duck;
     private boolean buffered;
     private long watermarkUs = Long.MIN_VALUE;
+    /** The clock floor (epoch µs) the last {@link #tick} set. */
+    private long clockUs = Long.MIN_VALUE;
+    /** The close frontier up to which absence Windows have been judged (epoch µs). */
+    private long judgedUs = Long.MIN_VALUE;
+    /** The number of the last append; a buffered row carries the number of the append that brought it. */
+    private long seq;
 
     /** One evaluated breach: what fired (or was already recorded) for one key and window. */
     public record Breach(String rule, Map<String, Object> key, long windowStartMs, long windowEndMs, double value,
@@ -100,7 +112,7 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
         this.time = first.time();
         this.distinctOn = first.distinctOn();
         this.maxSpanUs = this.rules.stream()
-                .mapToLong(r -> WindowSql.micros(r.eventWindow().size().plus(r.eventWindow().lateness()))).max().orElseThrow();
+                .mapToLong(r -> r.eventWindow().spanUs()).max().orElseThrow();
         this.fired = fired;
         this.alerts = alerts;
         this.duck = DuckDbUtil.openInMemory(spillDir, readRoots);
@@ -125,9 +137,13 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
         }
     }
 
-    /** Rebuild the buffer from committed files at boot: buffered, the Watermark advanced, nothing evaluated. */
+    /**
+     * Rebuild the buffer from committed files at boot: buffered, the Watermark advanced, nothing evaluated. Absence
+     * Windows that closed before the loaded Watermark count as judged: they were judged before the restart.
+     */
     public synchronized void load(List<Path> committed) throws SQLException {
         append(committed);
+        judgedUs = Math.max(judgedUs, watermarkUs);
         trim();
     }
 
@@ -135,12 +151,42 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
     public synchronized Outcome commit(List<Path> consignmentFiles) throws SQLException {
         long before = watermarkUs;
         if (!append(consignmentFiles)) return new Outcome(List.of(), Map.of(), watermarkUs);
+        return evaluate(before, true);
+    }
+
+    /**
+     * The clock floor (PA-9c, D-PA40): a silent Stream sends no commit, so its Watermark never reaches the end of the
+     * Window an absence rule waits on. A tick raises the close frontier to {@code nowMs} and judges the absence Windows
+     * it closes ({@code hi + lateness <= now}); Measure and sequence rules are judged on commit only.
+     *
+     * <p>⚠ Call it only while the Stream has no backlog (the lane drained): events still queued would land in Windows
+     * the clock already judged silent. {@code lateness} must also cover how far behind the clock a feed's event times
+     * run.
+     */
+    public synchronized Outcome tick(long nowMs) throws SQLException {
+        clockUs = Math.max(clockUs, Math.multiplyExact(nowMs, 1000L));
+        return evaluate(watermarkUs, false);
+    }
+
+    /** The close frontier absence Windows have been judged up to (epoch µs; {@link Long#MIN_VALUE} before any). */
+    public synchronized long judgedUs() {
+        return judgedUs;
+    }
+
+    private Outcome evaluate(long before, boolean committed) throws SQLException {
         List<Breach> out = new ArrayList<>();
         Map<String, Long> late = new LinkedHashMap<>();
         long nowMs = System.currentTimeMillis();
+        long frontier = Math.max(watermarkUs, clockUs), judgedBefore = judgedUs;
         for (AlertRule rule : rules) {
-            late.put(rule.name(), lateRows(rule, before));
-            List<Breach> found = breaches(rule, before);
+            AlertWindow rw = rule.eventWindow();
+            boolean absence = rw.isPattern() && rw.pattern().isAbsence();
+            if (!committed && !absence) continue;
+            if (committed) late.put(rule.name(), lateRows(rule, absence ? Math.max(before, judgedBefore) : before));
+            List<Breach> found = !buffered ? List.of()
+                    : absence ? read(rule, WindowSql.absence(rule, BUFFER, judgedBefore, frontier), rw.size().toMillis())
+                    : rw.isPattern() ? read(rule, WindowSql.sequence(rule, BUFFER, seq, before), rw.size().toMillis())
+                    : breaches(rule, before);
             // the newly breaching windows, grouped by key in window order: a burst in a sliding window breaches every
             // window it falls in at once, and raises ONE Alert for its key (the earliest window), not one per window
             Map<String, List<Breach>> fresh = new LinkedHashMap<>();
@@ -163,6 +209,7 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
             // a window whose end + lateness is at or below the Watermark is never evaluated again
             if (watermarkUs != Long.MIN_VALUE) fired.purgeBefore(rule.name(), (watermarkUs - WindowSql.micros(w.size().plus(w.lateness()))) / 1000);
         }
+        judgedUs = Math.max(judgedUs, frontier);
         trim();
         return new Outcome(out, late, watermarkUs);
     }
@@ -194,7 +241,8 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
         String ts = SqlIdent.q(time);
         try (Statement st = duck.createStatement()) {
             // the Dataset's own store read (union by name, hive keys as VARCHAR), over the named files only
-            String read = "SELECT " + cols + " FROM " + com.gamma.sql.SqlViews.reader("PARQUET", paths, true)
+            seq++;
+            String read = "SELECT " + cols + ", CAST(" + seq + " AS BIGINT) AS " + SqlIdent.q(WindowSql.SEQ) + " FROM " + com.gamma.sql.SqlViews.reader("PARQUET", paths, true)
                     + " WHERE " + ts + " IS NOT NULL";
             if (!distinctOn.isEmpty())
                 read += " QUALIFY row_number() OVER (PARTITION BY "
@@ -232,8 +280,11 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
     }
 
     private List<Breach> breaches(AlertRule rule, long before) throws SQLException {
-        WindowSql.Compiled c = WindowSql.breaches(rule, BUFFER, FRESH, before);
-        long sizeMs = rule.eventWindow().size().toMillis();
+        return read(rule, WindowSql.breaches(rule, BUFFER, FRESH, before), rule.eventWindow().size().toMillis());
+    }
+
+    /** Run a compiled breach statement; a Window ends {@code sizeMs} after its start. */
+    private List<Breach> read(AlertRule rule, WindowSql.Compiled c, long sizeMs) throws SQLException {
         List<Breach> out = new ArrayList<>();
         try (PreparedStatement ps = prepare(c); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -276,9 +327,18 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
         evidence.put("firstEvent", Instant.ofEpochMilli(b.firstEventMs()).toString());
         evidence.put("lastEvent", Instant.ofEpochMilli(b.lastEventMs()).toString());
         evidence.put("windows", String.valueOf(windows));
-        String message = rule.measure() + " = " + number(b.value()) + " (" + rule.comparator() + " " + number(rule.threshold())
-                + ") for " + keyLabel + " in the window " + window
-                + (windows > 1 ? " (and " + (windows - 1) + " overlapping window(s))" : "");
+        AlertPattern pattern = rule.eventWindow().pattern();
+        if (pattern != null) evidence.put("pattern", pattern.type());
+        String more = windows > 1 ? " (and " + (windows - 1) + " overlapping window(s))" : "";
+        String message = pattern == null
+                ? rule.measure() + " = " + number(b.value()) + " (" + rule.comparator() + " " + number(rule.threshold())
+                        + ") for " + keyLabel + " in the window " + window + more
+                : pattern.isSequence()
+                ? "sequence for " + keyLabel + ": step A at " + Instant.ofEpochMilli(b.firstEventMs()) + ", then step B at "
+                        + Instant.ofEpochMilli(b.lastEventMs()) + " (within " + AlertWindow.text(rule.eventWindow().size()) + ")"
+                        + (windows > 1 ? " (and " + (windows - 1) + " more step-A event(s))" : "")
+                : "absence: no event for " + keyLabel + " in the window " + window + "; last seen "
+                        + Instant.ofEpochMilli(b.lastEventMs()) + more;
         Alert alert = new Alert(rule.name(), rule.severity(), dataset, rule.measure(), b.value(), rule.comparator(),
                 rule.threshold(), AlertWindow.text(rule.eventWindow().size()), nowMs, message, evidence);
         String title = b.key().isEmpty() ? Alert.title(rule, dataset) : Alert.keyTitle(rule, dataset, keyLabel);

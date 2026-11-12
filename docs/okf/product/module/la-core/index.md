@@ -55,7 +55,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture-backend.md §9-§10; plan ar… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
-| `LA-PERF-N3-1` | P2 | feature | Cold first-open of a graph freezes 2.7–4.1 s (N3, measured 2026-10-25). | — |
-| `LA-PERF-N4-1` | P2 | feature | Fruchterman, Force and Layered layouts take 2.3–3.6 s and box-select 579 ms on the main thread (N4), with layout on expand (P6). | operator |
+| `LA-PERF-N4-1` | P2 | feature | Layouts and large-selection repaints still block the main thread on 767 nodes / 4,000 links (N4, re-measured 2026-11-12): first open 7.4… | operator |
 | `LA-PERF-P5-1` | P3 | feature | Betweenness in a Web Worker, or approximated (P5). | operator |
 | `LA-PERF-P10A5-1` | P3 | feature | Expand and Grow fetch only the delta (P10a-5). | — |
