@@ -15,12 +15,14 @@
 //          edition SBOM (sbom/inspecto-<edition>.*) is trimmed too: the removed jars and the third-party components only they carry go.
 // PILOT    (PA-10c, D-PA35) --distribution pilot: the record's `pilot:` block wires one bought template's Pipelines to the customer's
 //          folders; the bundle gains the Space Template `<customer>-pilot` (no sample data) and lib/product.json says `pilot`.
+//          PILOT-PRECREATED-SPACE-1 (D-PA35 changed): the Space `<customer>-pilot` is also created in the bundle (spaces/<id>).
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bomCsv, customerPlan } from './customer.mjs';
 import { signBytes, toText } from './entitle.mjs';
+import { egressToon, toonValue } from './package-la-showcase.mjs';
 
 export { bomCsv, resolve, templateNeeds } from './customer.mjs';
 
@@ -67,7 +69,11 @@ export function trimBundle(src, dest, plan, entitlement) {
     const tdir = join(dest, 'spaces', '_templates');
     const templates = [];
     if (existsSync(tdir)) for (const t of listDirs(tdir)) { if (keepT.has(t)) continue; rmSync(join(tdir, t), { recursive: true }); templates.push(t); }
-    if (plan.pilot) { pilotTemplate(tdir, plan.pilot); writeFileSync(join(dest, 'PILOT.txt'), pilotText(plan)); }
+    if (plan.pilot) {
+        pilotTemplate(tdir, plan.pilot);
+        pilotSpace(join(dest, 'spaces'), plan.pilot);
+        writeFileSync(join(dest, 'PILOT.txt'), pilotText(plan));
+    }
     writeFileSync(join(dest, 'lib', 'product.json'), JSON.stringify(plan.descriptor, null, 2) + '\n');
     // The bundle's `apps=` line is the Product build's selection; the customer's is the plan's.
     const apps = plan.editionProperties?.apps ?? '';
@@ -147,6 +153,56 @@ export function pilotTemplate(tdir, pilot) {
         // the shipped description tells the reader to copy data/samples into the inbox, which the pilot does not have
         .replace(/^description:.*$/m, `description: "The ${safe(pilot.from)} Space Template with each Pipeline reading the customer's own folder (see PILOT.txt at the install root). No sample data ships: the first files are the customer's."`));
 }
+/**
+ * PILOT-PRECREATED-SPACE-1 (D-PA35 as changed by the operator 2026-11-12): the pilot Space `<customer>-pilot`, created inside the
+ * bundle at build time from the pilot template, the way SpaceManager.createFromTemplate creates one: the convention folders
+ * (config, data, audit, duckdb), the template's config/** with `${SPACE}` replaced by the id in every .toon, its data/** (the
+ * zero-row seeds; the pilot template has no samples), a space.toon from template.toon (name, tagline), and an empty
+ * config/egress.toon (a new Space is never seeded). template.toon and portal/ stay in the gallery.
+ * NOT done, because no server runs at build time: the server's seed gate (TemplateSeedGate - each seeded Pipeline, Job,
+ * Connection and Alert Rule judged as its own route would judge it) and its Job stamp (each Job's author, from the
+ * caller). The template is the bought, committed one, held by its own golden tests. A Job whose RUN depends on a recorded
+ * author would not run unstamped (JobAuthority: administrator-only maintenance, la.index.build's owner, publish.postgres
+ * acting as its editor), so a template with a maintenance, la.index.build or publish.postgres Job is refused here, and so is
+ * one with a Job template (a `*_job_template.toon`, or a Job naming one with `template:`), whose type is read only at boot.
+ */
+export function pilotSpace(spacesDir, pilot, now = new Date()) {
+    const id = pilot.template;
+    const from = join(spacesDir, '_templates', id), to = join(spacesDir, id);
+    if (!existsSync(join(from, 'template.toon'))) fail(`the bundle has no Space Template '${id}' to create the pilot Space from`);
+    if (existsSync(to)) fail(`the bundle already has a Space '${id}'`);
+    const cfg = join(from, 'config');
+    const jobFiles = existsSync(cfg) ? listFiles(cfg) : [];
+    const authored = (f, what) => fail(`${f}: ${what} depends on the author the server stamps, which a Space created at build time cannot record - create the pilot Space on the install instead`);
+    for (const f of jobFiles.filter((f) => f.endsWith('_job_template.toon'))) authored(f, 'a Job template');
+    for (const f of jobFiles.filter((f) => f.endsWith('_job.toon'))) {
+        const t = readFileSync(f, 'utf8');
+        const type = /^\s*type:\s*"?([\w.-]+)"?\s*$/m.exec(t)?.[1]?.toLowerCase();
+        if (AUTHORED_JOB_TYPES.includes(type)) authored(f, `a ${type} Job`);
+        if (/^\s+template:/m.test(t)) authored(f, 'a Job made from a Job template');
+    }
+    for (const sub of ['config', 'data', 'audit', 'duckdb']) mkdirSync(join(to, sub), { recursive: true });
+    const copy = (src, dst, rewrite) => {
+        if (!existsSync(src)) return;
+        for (const e of readdirSync(src, { withFileTypes: true })) {
+            const s = join(src, e.name), d = join(dst, e.name);
+            if (e.isDirectory()) { mkdirSync(d, { recursive: true }); copy(s, d, rewrite); }
+            else if (rewrite && e.name.endsWith('.toon')) writeFileSync(d, readFileSync(s, 'utf8').split('${SPACE}').join(id));
+            else cpSync(s, d);
+        }
+    };
+    copy(join(from, 'config'), join(to, 'config'), true);
+    copy(join(from, 'data'), join(to, 'data'), false);
+    const meta = readFileSync(join(from, 'template.toon'), 'utf8');
+    const q = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    writeFileSync(join(to, 'space.toon'), `display_name: ${q(toonValue(meta, 'name') || id)}\ndescription: ${q(toonValue(meta, 'tagline'))}\ncreated_at: ${q(now.toISOString())}\n`);
+    writeFileSync(join(to, 'config', 'egress.toon'), egressToon());
+    return to;
+}
+const listFiles = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listFiles(join(d, e.name)) : [join(d, e.name)]));
+/** Job types whose runs depend on the author the server stamps (inspecto JobAuthority). */
+const AUTHORED_JOB_TYPES = ['maintenance', 'la.index.build', 'publish.postgres'];
+
 /** PILOT.txt: what the pilot wires and how to start the install so its Collectors may read the customer's folders. */
 export function pilotText(plan) {
     const p = plan.pilot, roots = p.roots.join(';');
@@ -160,7 +216,8 @@ export function pilotText(plan) {
         `  Windows:  set "INSPECTO_JAVA_OPTS=-Dassist.safety.roots=${roots}"   then bin\\serve.bat`,
         `  Linux:    INSPECTO_JAVA_OPTS="-Dassist.safety.roots=${roots}" bin/serve.sh`,
         '',
-        `Then, as an administrator, create a Space from the template '${p.template}' (Settings, Spaces).`,
+        `The Space '${p.template}' is already created (spaces/${p.template}): it boots with the server and polls those folders.`,
+        `The template '${p.template}' stays in the gallery, to create another Space like it.`,
         '',
     ].join('\r\n');
 }

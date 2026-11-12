@@ -83,7 +83,18 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   Pipeline of it. The bundle gains the Space Template `<customer>-pilot` (those `dirs.poll` set, `data/samples` left out)
   and a `PILOT.txt` naming the folders and the `INSPECTO_JAVA_OPTS=-Dassist.safety.roots=…` line the install starts with:
   the server's path jail refuses a poll folder outside the Space, and the build never widens it. `lib/product.json`
-  says `pilot`. No Space is created at build time.
+  says `pilot`. **The Space `<customer>-pilot` is created in the bundle at build time** (`PILOT-PRECREATED-SPACE-1`, D-PA35 as
+  changed by the operator 2026-11-12): `spaces/<customer>-pilot/` is made from the pilot template the way
+  `SpaceManager.createFromTemplate` makes one — `config/**` with `${SPACE}` replaced in each `.toon`, `data/**` (the zero-row
+  seeds, no samples), the `audit` and `duckdb` folders, `space.toon` from the template's name and tagline, and an empty
+  `config/egress.toon`. It boots with the server and polls the customer's folders. With no server at build time, two
+  things the server does at creation are not done: its seed gate (`TemplateSeedGate`, each seeded Pipeline, Job,
+  Connection and Alert Rule judged as its route would judge it; the bought template is held by its own golden tests
+  instead) and its Job stamp (each Job's author). A Job whose run depends on that author (`JobAuthority`) — any
+  `maintenance`, `la.index.build` or `publish.postgres` Job, or a Job template (a `*_job_template.toon`, or a Job naming
+  one with `template:`) — refuses the
+  build, and leaves no folder; `la-claims` (an `la.index.build` Job) is refused, every Standard Solution pack passes. The
+  template stays in the gallery.
 - **A Space Template declares the modules no manifest derives** (`PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`, 2026-11-12, D-PA37):
   `requiresModules[N]: a,b` in its `template.toon`. Alert Rules (`alert-rules/`, registry or pending) and a Decision
   Rule's `create-alert` need `ops` (the server refuses `POST /spaces` with 422 without it), unless the template has a

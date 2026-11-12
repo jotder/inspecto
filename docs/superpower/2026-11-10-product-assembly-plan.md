@@ -1816,6 +1816,45 @@ copy):
   gallery says `telco-fraud` creatable; `POST /spaces {template: telco-fraud}` **200** (422 before); its Case Rule
   `fraud_critical_burst` is listed by `GET /cases/rules`.
 
+**`PILOT-PRECREATED-SPACE-1` as built (2026-11-12; D-PA35 as changed by the operator).** `customer-build --distribution
+pilot` now also creates the Space `<customer>-pilot` inside the bundle (`customer-build.mjs pilotSpace`), after it writes
+the pilot template.
+- It is made the way `SpaceManager.createFromTemplate` makes one:
+  - the folders `config`, `data`, `audit` and `duckdb`;
+  - the template's `config/**`, with `${SPACE}` replaced by the id in each `.toon`;
+  - its `data/**`: the zero-row seeds, and no samples, since the pilot template has none;
+  - `space.toon` from the template's name and tagline;
+  - an empty `config/egress.toon`, because a new Space is never seeded.
+- `template.toon` and `portal/` stay in the gallery, and so does the template, for a second Space.
+- It reuses `egressToon` and `toonValue` from `package-la-showcase.mjs`, which pre-creates Showcase Spaces the same way.
+- Not done, because no server runs at build time: the seed gate (`TemplateSeedGate` judges each seeded Pipeline, Job,
+  Connection and Alert Rule as its route would; the bought template is held by its own golden tests instead) and the
+  Job stamp (each Job's author, from the caller).
+- Decided here, the Jobs' author: some Jobs run only as their recorded author (`JobAuthority`: an administrator-only
+  maintenance task, `la.index.build`'s owner, `publish.postgres` acting as its editor). So `pilotSpace` refuses a template
+  with any `maintenance`, `la.index.build` or `publish.postgres` Job (type compared ignoring case), or with a Job template
+  (a `*_job_template.toon`, or a Job naming one with `template:`, whose type is read only at boot), before writing anything. It is deliberately wider than the server's rule, not a copy of it. Every
+  Standard Solution pack passes; `la-claims` (an `la.index.build` Job) is refused, and such a pilot is created on the
+  install instead. Found by the verification review: the first version refused only three maintenance tasks, and the
+  second missed the real Job template shape.
+- `PILOT.txt` says the Space is already created and boots with the server.
+
+**Proof (as built).** `customer-build.test.mjs` 17/17. The two new tests cover:
+- the folders, `${SPACE}` replaced in `.toon` files only, the seeds kept, the gallery files left out, `space.toon` and
+  the empty egress list;
+- each refusal (a Space that exists, a template that is missing, and each author-dependent Job shape), with no folder
+  left behind;
+- on the repo's own templates: `telco-fraud` made into a Space, `la-claims` refused.
+
+Live, on the same Standard bundle:
+- the pilot record, unchanged, in a scratch copy plus a `pilot:` block wiring the three Pipelines to three scratch folders;
+- the bundle holds `spaces/demo-telco-pilot`, with each `dirs.poll` the customer's folder, no CSV, and the seeds;
+- booted with the `INSPECTO_JAVA_OPTS` line from `PILOT.txt`:
+  - `GET /spaces` lists `demo-telco-pilot`, with the Pipelines `cdr`, `payments` and `subscriber_events`;
+  - the log shows each Collector polling its customer folder, and no refusal;
+  - a CDR file dropped into the customer's `cdr` folder was taken within one poll, written to
+    `data/cdr/database/CDR_20260701_out.parquet`, and marked processed.
+
 ## 12. Decisions (operator, signed 2026-11-10 … 2026-11-12; D-PA26 … D-PA37 reviewed 2026-11-12, six changed)
 
 | Id | Call | Signed |
@@ -1854,7 +1893,7 @@ copy):
 | D-PA32 | Product Map kinds for Products, Apps and Industries | `product`, `app` and `industry` items linked to their definitions; an App is billable (`INS-APP-<ID>`), a Product and an Industry are not; one Order Code per App, a price per App × Edition held for demand (**signed 2026-11-12, operator, as built**) |
 | D-PA33 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (**signed 2026-11-12, operator, as built**) |
 | D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (**signed 2026-11-12, operator, as built**) |
-| D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`) |
+| D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`). **Done 2026-11-12** (`customer-build.mjs pilotSpace`; §11) |
 | D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`, built 2026-11-12: `brochure-demo-script.md`, `brochure-video-script.md`) |
 | D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable. **Done 2026-11-12** (`requiresModules` in `template.toon`, check 8; the combined SBOM trimmed too; §11) |
 | D-PA38 | The streaming runtime for PA-9 | **Signed 2026-11-12 (operator, as recommended):** micro-batches on the existing `trigger: stream` lane, with windowed Alert Rules evaluated on each commit, scoped to the touched keys; no second execution model. Rejected: an in-process per-record operator (kept as the gate G-RT fallback), Kafka Streams, Flink, Esper or Siddhi, and a detection Job on the commit event (the PA-9a baseline only) |
