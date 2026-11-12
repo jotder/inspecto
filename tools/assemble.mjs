@@ -8,14 +8,16 @@
 //   node tools/assemble.mjs --diff-lock <old.lock> <new.lock>                 the upgrade diff between two locks
 //   node tools/assemble.mjs --product-file <picked.toon> --edition standard   a picked Platform product (tools/pick-addons.mjs, PA-6c),
 //                                                                             built in place of the Platform product it narrows
+//   node tools/assemble.mjs --customer <id|record.toon> [--distribution ...]   one customer's build (PA-10b, tools/customer.mjs): the
+//                                                                             plan narrowed to the record, with a `customer` block
 //
 // REFUSES (exit 1, the reason named): an unknown Product / App; an edition, distribution or target the Product does not
 // list or that is not built yet; a demo build on an edition without the demo sign-in swap; a chosen App whose Add-ons the
 // edition lacks; and any finding of tools/check-products.mjs (a plan is never assembled from broken definitions).
 //
-// WHAT A PLAN DOES NOT DO YET (PA-2 scope): the module set is the whole Edition's Offering classpath, exactly as before -
-// trimming to the Product's Apps is customer-build's job until PA-10. The container and air-gap targets (PA-8) add the
-// plan's `ship` field, which tools/ship.mjs reads (`chart` stamps the Product's Helm chart).
+// MODULES: a Product plan holds the whole Edition's Offering classpath; a customer plan (--customer, PA-10b) narrows it to the
+// modules that customer keeps, and tools/customer-build.mjs trims a Product bundle to it (D-PM8). The container and air-gap
+// targets (PA-8) add the plan's `ship` field, which tools/ship.mjs reads (`chart` stamps the Product's Helm chart).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -194,7 +196,7 @@ export function diffLocks(a, b) {
     return out;
 }
 
-function main() {
+async function main() {
     const a = process.argv.slice(2);
     const val = (k) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : undefined; };
     const write = (obj) => {
@@ -220,6 +222,14 @@ function main() {
         if (val('--product-file')) {
             if (product) fail('pass --product or --product-file, not both');
             ({ model, product } = loadProductFile(model, val('--product-file')));
+        }
+        // PA-10b (D-PA33): `--customer <id|record.toon>` - the plan of one customer's build, narrowed to what the record buys, with
+        // the entitlement to sign (tools/customer-build.mjs signs it and trims a bundle to it). The record names its Product.
+        if (val('--customer')) {
+            if (product || val('--edition')) fail('--customer takes its Product and Edition from the record; pass neither --product nor --edition');
+            const { customerPlan } = await import('./customer.mjs');
+            write(customerPlan(REPO, val('--customer'), { distribution: val('--distribution') ?? 'production', target: val('--target') ?? 'windows' }).plan);
+            return;
         }
         if (!product) fail('--product <id> (or --product-file <picked.toon>) is required');
         carryPartnerApps(model, product);

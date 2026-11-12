@@ -4,7 +4,13 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bomCsv, resolve, templateNeeds, trimBundle } from './customer-build.mjs';
+import { generateKeyPairSync } from 'node:crypto';
+import { bomCsv, resolve, signedEntitlement, templateNeeds, trimBundle } from './customer-build.mjs';
+import { customerAssembly } from './customer.mjs';
+import { gather as gatherOfferings } from './check-offerings.mjs';
+import { gather } from './check-product-map.mjs';
+import { gatherModel } from './products.mjs';
+import { verifyBytes } from './entitle.mjs';
 
 const world = () => ({
     manifests: {
@@ -88,27 +94,91 @@ test('templateNeeds derives needs from Job types and registry folders', () => {
         assert.deepEqual(templateNeeds(root, world().manifests), { t: ['anomaly'], u: [] });
     } finally { rmSync(root, { recursive: true, force: true }); }
 });
-test('trimBundle removes unbought jars, SBOMs and Templates and stamps the customer', () => {
+// PA-10b (D-PA33, D-PA34): a customer build is an assembly and carries a signed entitlement. Over the repo's own definitions,
+// with SYNTHETIC customer records (never a real customer's).
+const repo = () => {
+    const [files, world] = gather('.');
+    world.templateNeeds = templateNeeds('.', world.manifests);
+    return { model: gatherModel('.'), g: gatherOfferings('.'), files, world };
+};
+const record = (extra) => ({ id: 'acme', title: 'Acme', product: 'inspecto', edition: 'standard', ...extra });
+const now = new Date('2026-11-12T00:00:00Z');
+
+test('PA-10b a Platform customer: the plan keeps what resolve() keeps, the bought template, and the Apps its Add-ons cover', () => {
+    const R = repo();
+    const c = record({ orderCodes: ['INS-AO-LINK-ANALYSIS', 'INS-SP-TELCO-FRAUD'] });
+    const { plan, bom } = customerAssembly({ ...R, customer: c, now });
+    const r = resolve(c, R.files, R.world);
+    assert.deepEqual(plan.customer.keep, r.keep);
+    assert.deepEqual(plan.customer.removed, r.removed);
+    assert.deepEqual(plan.templates, ['telco-fraud']);
+    assert.deepEqual(plan.apps.map((a) => a.id), ['link-analysis']);
+    for (const m of r.removed) assert.ok(!plan.modules.includes(`inspecto-${m}.jar`), `${m} is not on the classpath`);
+    assert.ok(plan.modules.includes('inspecto-la-core.jar'));
+    assert.deepEqual(plan.customer.entitlement.modules, r.keep, 'the file entitles exactly the kept optional modules');
+    assert.deepEqual(plan.customer.entitlement.addons, ['linkAnalysis']);
+    assert.equal(plan.editionProperties.customer, 'acme');
+    assert.ok(plan.customer.bom.every((b) => !('listPrice' in b)), 'the plan carries no prices');
+    assert.ok(bom.every((b) => 'listPrice' in b), 'the private bill does');
+});
+test('PA-10b a Domain customer buys Apps by their Order Codes; a required App must be bought; a foreign App is refused', () => {
+    const R = repo();
+    const { plan } = customerAssembly({ ...R, customer: record({ product: 'telco', orderCodes: ['INS-APP-TELCO-RA', 'INS-APP-CASE-MANAGEMENT'] }), now });
+    assert.deepEqual(plan.apps.map((a) => a.id), ['telco-ra', 'case-management']);
+    assert.deepEqual(plan.space.parts.map((p) => p.app), ['telco-ra']);
+    assert.deepEqual(plan.customer.entitlement.apps, ['case-management', 'telco-ra']);
+    assert.throws(() => customerAssembly({ ...R, customer: record({ product: 'telco', orderCodes: ['INS-APP-TELCO-RA'] }), now }),
+        /App 'case-management' is required by Product 'telco'/);
+    assert.throws(() => customerAssembly({ ...R, customer: record({ product: 'la', edition: 'basic', orderCodes: ['INS-APP-TELCO-RA'] }), now }),
+        /App 'telco-ra' is not one of Product 'la''s Apps/);
+    assert.throws(() => customerAssembly({ ...R, customer: record({ product: 'nope', orderCodes: [] }), now }), /unknown Product 'nope'/);
+});
+test('PA-10b the record\'s expiry and nodes reach the entitlement, and it verifies against the issuing key', () => {
+    const R = repo();
+    const { plan } = customerAssembly({ ...R, customer: record({ orderCodes: ['INS-AO-LINK-ANALYSIS'], expires: '2027-12-31', nodes: '3' }), keyId: 'test-1', now });
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const e = signedEntitlement(plan, privateKey.export({ type: 'pkcs8', format: 'pem' }));
+    const f = verifyBytes(Buffer.from(e.toon), e.sig, { 'test-1': publicKey });
+    assert.equal(f.expires, '2027-12-31');
+    assert.equal(String(f.nodes), '3');
+    assert.equal(f.customer, 'acme');
+});
+test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, stamp, entitlement', () => {
     const root = mkdtempSync(join(tmpdir(), 'pm-tb-'));
     try {
         const src = join(root, 'src');
         mkdirSync(join(src, 'sbom'), { recursive: true });
         mkdirSync(join(src, 'lib'), { recursive: true });
         for (const t of ['fraud', 'starter']) mkdirSync(join(src, 'spaces', '_templates', t), { recursive: true });
-        const jars = ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-la.jar', 'inspecto-ops.jar', 'inspecto-cases.jar', 'inspecto-anomaly.jar', 'inspecto-lists.jar'];
+        const jars = ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-la.jar', 'inspecto-ops.jar'];
         for (const j of jars) { writeFileSync(join(src, 'lib', j), 'x'); writeFileSync(join(src, 'sbom', j.replace('.jar', '.sbom.cdx.json')), '{}'); }
         writeFileSync(join(src, 'lib', 'modules.list'), jars.map((j) => `lib/${j}`).join('\n') + '\n');
-        writeFileSync(join(src, 'lib', 'edition.properties'), 'edition=Standard\n');
-        const r = resolve(cust(['AO-LA'], 'standard'), files(), world(), { 'AO-LA': { listPrice: '900', currency: 'USD' } });
+        writeFileSync(join(src, 'lib', 'edition.properties'), 'edition=Standard\nproduct=inspecto\napps=link-analysis\n');
+        writeFileSync(join(src, 'lib', 'product.json'), JSON.stringify({ id: 'inspecto', apps: [{ id: 'link-analysis' }] }));
+        const plan = {
+            product: { id: 'inspecto' }, edition: 'Standard', templates: ['fraud'], space: null,
+            descriptor: { schema: 'inspecto.product/1', id: 'inspecto', apps: [] },
+            editionProperties: { apps: '' },
+            customer: { id: 'acme', offering: 'id: customer-acme\n', productApps: ['link-analysis'], removedJars: ['inspecto-ops.jar'], bom: [{ line: 'bought', orderCode: 'AO-LA' }] },
+        };
         const dest = join(root, 'out');
-        const t = trimBundle(src, dest, cust(['AO-LA']), r);
-        assert.deepEqual(t.jars.sort(), ['inspecto-anomaly.jar', 'inspecto-cases.jar', 'inspecto-lists.jar', 'inspecto-ops.jar']);
+        const t = trimBundle(src, dest, plan, { toon: 'schema: x\n', sig: 'c2ln\n' });
+        assert.deepEqual(t, { jars: ['inspecto-ops.jar'], templates: ['starter'] });
         assert.equal(readFileSync(join(dest, 'lib', 'modules.list'), 'utf8'), 'lib/inspecto.jar\nlib/inspecto-oidc.jar\nlib/inspecto-la.jar\n');
         assert.ok(!existsSync(join(dest, 'sbom', 'inspecto-ops.sbom.cdx.json')) && existsSync(join(dest, 'sbom', 'inspecto-la.sbom.cdx.json')));
-        assert.ok(!existsSync(join(dest, 'spaces', '_templates', 'fraud')) && !existsSync(join(dest, 'spaces', '_templates', 'starter')));
-        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\ncustomer=acme\noffering=customer-acme\n$/);
-        assert.doesNotMatch(readFileSync(join(dest, 'customer-bom.csv'), 'utf8'), /900/);
+        assert.ok(existsSync(join(dest, 'spaces', '_templates', 'fraud')) && !existsSync(join(dest, 'spaces', '_templates', 'starter')));
+        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\nproduct=inspecto\ncustomer=acme\noffering=customer-acme\n$/, 'the Product build\'s apps= line follows the plan');
+        assert.deepEqual(JSON.parse(readFileSync(join(dest, 'lib', 'product.json'), 'utf8')), plan.descriptor);
+        assert.equal(readFileSync(join(dest, 'conf', 'entitlement.toon'), 'utf8'), 'schema: x\n');
+        assert.equal(readFileSync(join(dest, 'conf', 'entitlement.sig'), 'utf8'), 'c2ln\n');
         assert.ok(existsSync(join(src, 'lib', 'inspecto-ops.jar')), 'the source bundle is untouched');
-        assert.throws(() => trimBundle(src, dest, cust([], 'advanced'), r), /edition 'standard', the customer's Edition is 'advanced'/);
+        assert.throws(() => trimBundle(src, dest, { ...plan, edition: 'Advanced' }, {}), /edition 'Standard', the customer's Edition is 'Advanced'/);
+        assert.throws(() => trimBundle(src, dest, { ...plan, product: { id: 'la' } }, {}), /is Product 'inspecto', the customer's Product is 'la'/);
+        assert.throws(() => trimBundle(src, dest, { ...plan, customer: { ...plan.customer, removedJars: ['inspecto-ghost.jar'] } }, {}), /no lib\/inspecto-ghost.jar/);
+        trimBundle(src, dest, { ...plan, editionProperties: { apps: 'link-analysis' } }, { toon: '', sig: '' });
+        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\nproduct=inspecto\napps=link-analysis\ncustomer=acme\n/);
+        assert.throws(() => trimBundle(src, dest, { ...plan, customer: { ...plan.customer, productApps: [] } }, {}),
+            /built with App\(s\) link-analysis, which Product 'inspecto' does not define/);
+        assert.throws(() => trimBundle(src, dest, { ...plan, space: { id: 'telco' }, descriptor: { apps: [{ id: 'x' }] } }, {}), /not a composed Space/);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });

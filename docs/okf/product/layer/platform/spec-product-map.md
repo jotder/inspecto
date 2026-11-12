@@ -65,6 +65,16 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   `edition.properties` with `customer=` / `offering=`, and adds `customer-<id>.toon` and an unpriced `customer-bom.csv`.
   Pilot 2026-10-18: a 42-jar Standard bundle trimmed to 30 jars and one Space Template; both booted healthy
   (`telco-fraud` pulled in Anomaly Detection, which pulled in `entity-list`, both as `required`).
+- **Since `PRODUCT-ASSEMBLY-1` PA-10b (2026-11-12, D-PA33/D-PA34) a customer build is an assembly.** The resolution above
+  moved unchanged into `tools/customer.mjs`; `assemble.mjs --customer <id|record.toon>` turns the record into an
+  Assembly Plan narrowed to the kept modules and templates, with a `customer` block. The record names its Product
+  (`product:`, default `inspecto`), and an App's Order Code (`INS-APP-<ID>`) buys that App: its Add-ons' modules and its
+  templates. A Domain product's required Apps must be bought; a Platform product's optional App comes along when every
+  Add-on it needs is bought. `customer-build.mjs` executes the plan on a **Product** bundle (`lib/product.json` must name
+  the same Product), rewrites `lib/product.json` from the plan, and always stages a **signed entitlement**
+  (`conf/entitlement.toon` + `.sig`) whose `modules` are exactly the kept optional modules, so a jar copied back in stays
+  inert. It is refused without the issuer key. A Domain product whose composed Space joins Apps the customer did not buy is
+  refused (`package.ps1` builds every optional App; trimming cannot recompose a Space).
 
 ## Known residuals
 
