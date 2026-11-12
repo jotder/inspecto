@@ -34,8 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| — | P3 | feature | Platform Services Stage 2 / 3 | — |
-| — | P3 | feature | Queries / BI | demand |
+| — | P3 | feature | Platform Services Stage 2 / 3 | demand |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
 | `SPACE-TEST-SUITE-RED-1` | P2 | defect | two more red tests around the space.test Job Type, found by running the whole inspecto-processor suite on fe87aa121 (2,733 run, 3 failure… | — |
