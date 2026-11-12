@@ -1,0 +1,9 @@
+pipeline: orders
+inputs[3]: ORDERS_20260701.csv,ORDERS_20260702.csv,ORDERS_20260703.csv
+expect:
+  rows: 34
+  rejects: 2
+  columns[3]{column,check,value}:
+    ORDER_ID,not_null,""
+    ORDER_ID,distinct,34
+    REGION,distinct,4
