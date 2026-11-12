@@ -60,7 +60,9 @@ import com.gamma.audit.EventType;
  * <h3>Crash durability — the write-ahead journal (operator, 2026-09-26)</h3>
  * Every buffered event is ALSO appended as one JSON line to {@value #JOURNAL} in the store's root, and forced
  * to disk for {@link EventType#AUDIT} / {@link EventType#ACCESS_DENIED}. A successful flush truncates the
- * journal; opening a store replays a leftover journal into Parquet first. So a hard kill (no {@link #close()},
+ * journal; opening a store replays a leftover journal into Parquet first. The journal write runs on the
+ * appending thread; the threshold / time-roll flush runs on a background thread (LA-PERF-N9-1), so a request
+ * that trips it does not wait for the Parquet write. So a hard kill (no {@link #close()},
  * no shutdown hook) loses no buffered event — before this, up to 10 s or 1 000 events, audit rows included,
  * vanished (found 2026-09-26: a demo build stopped by kill came back with none of its audit trail). It adds no
  * Parquet files. A torn last line (a kill mid-write) is skipped. The journal is not a {@code .parquet} file, so
@@ -87,6 +89,13 @@ public final class ParquetEventStore implements EventStore {
     /** Journalled events a replay HELD BACK because an unreadable Parquet file may already hold them; retried on
      *  every open (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9)). Not a {@code .parquet} file, so no read sees it. */
     public static final String HELD = "pending.held.jsonl";
+
+    /** A rotated journal segment ({@code pending.seg-<n>.jsonl}): the batch a background flush is writing. It is
+     *  deleted once that batch is in place; a leftover one is replayed on open like the journal (LA-PERF-N9-1). */
+    static final String SEGMENT_PREFIX = "pending.seg-";
+    /** Where a background flush writes its batch before the files move into place: under {@code .staging/}, so no
+     *  read sees it. A leftover one is deleted on open; its events are still in their segment. */
+    private static final String SCRATCH = ".staging/flush-";
 
     /** Flush when this many events are buffered. */
     public static final int DEFAULT_FLUSH_THRESHOLD = 1000;
@@ -118,6 +127,20 @@ public final class ParquetEventStore implements EventStore {
     /** Give-up cap on retained unflushed events; not final only as a test hook. */
     static int maxRetained = 50_000;
     private boolean closed;
+    /** A background flush is queued and has not started yet: append queues at most one (LA-PERF-N9-1). */
+    private boolean flushQueued;
+    /** The batch a background flush is writing: still unflushed, so every read merges it like the buffer. */
+    private List<Event> inFlight = List.of();
+    /** The background flush's own DuckDB connection: its Parquet write runs outside the store lock. */
+    private final Connection flushConn;
+    /**
+     * Runs the threshold / time-roll flush off the appending thread (LA-PERF-N9-1, operator 2026-11-13). The
+     * journal write stays on the caller's thread, so an event is durable before append returns. The flush holds
+     * the lock only to rotate the journal into a segment and, at the end, to move the written files into place;
+     * the Parquet write between runs outside it, on {@link #flushConn}, so appends and reads do not wait for it.
+     */
+    private final java.util.concurrent.ExecutorService flusher = java.util.concurrent.Executors.newSingleThreadExecutor(
+            Thread.ofPlatform().daemon().name("event-store-flush").factory());
     /** The open journal (append); null when it could not be opened — the store then degrades to buffer-only. */
     private FileChannel journal;
 
@@ -136,22 +159,32 @@ public final class ParquetEventStore implements EventStore {
             Files.createDirectories(root);
             DuckDbUtil.loadDriver();
             this.conn = DuckDbUtil.openInMemory(null, java.util.List.of(root));   // in-memory scratch + reader; no Space context: capped, spills under java.io.tmpdir
-            try (Statement st = conn.createStatement()) {
-                // DuckDB caches file contents keyed by path + modification time. This store must re-read a file that
-                // was rewritten in place with its size and mtime restored (a repaired or forged Parquet file), so a
-                // cached copy would answer for bytes no longer on disk — seen on Linux CI, where a repaired file
-                // stayed "unreadable" after rebuildChainIndex().
-                st.execute("SET enable_external_file_cache = false");
-                st.execute("CREATE TABLE " + BUF_TABLE + " ("
-                        + "event_id VARCHAR, ts_ms BIGINT, type VARCHAR, source VARCHAR, "
-                        + "pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR, attributes VARCHAR, "
-                        + "payload VARCHAR, "
-                        + "level VARCHAR, year VARCHAR, month VARCHAR, day VARCHAR)");
+            this.flushConn = DuckDbUtil.openInMemory(null, java.util.List.of(root));   // the background flush's writer
+            for (Connection c : List.of(conn, flushConn)) {
+                try (Statement st = c.createStatement()) {
+                    // DuckDB caches file contents keyed by path + modification time. This store must re-read a file
+                    // that was rewritten in place with its size and mtime restored (a repaired or forged Parquet
+                    // file), so a cached copy would answer for bytes no longer on disk — seen on Linux CI, where a
+                    // repaired file stayed "unreadable" after rebuildChainIndex().
+                    st.execute("SET enable_external_file_cache = false");
+                    st.execute("CREATE TABLE " + BUF_TABLE + " ("
+                            + "event_id VARCHAR, ts_ms BIGINT, type VARCHAR, source VARCHAR, "
+                            + "pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR, attributes VARCHAR, "
+                            + "payload VARCHAR, "
+                            + "level VARCHAR, year VARCHAR, month VARCHAR, day VARCHAR)");
+                }
             }
+            deleteScratch();
         } catch (Exception e) {
             throw new IllegalStateException("Could not initialise Parquet event store at " + root, e);
         }
         replayJournal();
+        // A replay that failed leaves its segments for the next open: never rotate onto one of their names, which
+        // the rename would silently replace (and the landed flush then delete).
+        for (Path seg : segments()) {
+            long n = segmentSeq(seg);
+            if (n != Long.MAX_VALUE) flushSeq = Math.max(flushSeq, n + 1);
+        }
         try {
             journal = FileChannel.open(root.resolve(JOURNAL), StandardOpenOption.CREATE, StandardOpenOption.WRITE,
                     StandardOpenOption.APPEND);
@@ -167,11 +200,16 @@ public final class ParquetEventStore implements EventStore {
     private void replayJournal() {
         Path file = root.resolve(JOURNAL);
         Path held = root.resolve(HELD);
-        if (!Files.exists(file) && !Files.exists(held)) return;
+        List<Path> segments = segments();
+        if (!Files.exists(file) && !Files.exists(held) && segments.isEmpty()) return;
         try {
             List<Event> replay = new ArrayList<>();
             java.util.Set<String> seen = new java.util.HashSet<>();
-            for (Path f : List.of(held, file)) {
+            List<Path> sources = new ArrayList<>();
+            sources.add(held);
+            sources.addAll(segments);   // rotated out of the journal earlier, so older than it; oldest first
+            sources.add(file);
+            for (Path f : sources) {
                 if (!Files.exists(f)) continue;
                 int torn = 0;
                 for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
@@ -232,6 +270,7 @@ public final class ParquetEventStore implements EventStore {
                 // touches, and are retried from it on the next open.
                 writeHeld(held, pending);
                 Files.deleteIfExists(file);
+                for (Path seg : segments) Files.deleteIfExists(seg);
                 // A give-up dropped the buffer: its chained rows now live ONLY in the held file, invisible to
                 // chainHead, so they block linking like any held row. A retained buffer still shows them.
                 if (buffer.isEmpty())
@@ -241,6 +280,7 @@ public final class ParquetEventStore implements EventStore {
                 if (hold.isEmpty()) Files.deleteIfExists(held);
                 else writeHeld(held, hold);
                 Files.deleteIfExists(file);
+                for (Path seg : segments) Files.deleteIfExists(seg);
             }
         } catch (IOException | RuntimeException e) {
             log.warn("Event journal {} could not be replayed: {}", file, e.getMessage());
@@ -352,21 +392,256 @@ public final class ParquetEventStore implements EventStore {
         journalLocked(event);
         boolean full = buffer.size() >= flushThreshold;
         boolean stale = rollMillis > 0 && System.currentTimeMillis() - bufferOpenedAt >= rollMillis;
-        if (full || stale) flushLocked();
+        if ((full || stale) && !flushQueued) {
+            flushQueued = true;
+            flusher.execute(this::backgroundFlush);
+        }
     }
 
+    /**
+     * The queued flush, off the appending thread. (1) Under the lock: the buffer becomes the in-flight batch and the
+     * journal is rotated into a segment holding exactly that batch. (2) Without the lock: the batch is written to a
+     * scratch directory on {@link #flushConn}. (3) Under the lock: the files move into place, the batch leaves
+     * memory and its segment is deleted, in one step, so no read sees the batch twice or not at all. A crash at any
+     * point leaves the segment, which the next open replays (skipping any event already in place).
+     */
+    private void backgroundFlush() {
+        List<Event> batch;
+        Path segment;
+        long seq;
+        synchronized (this) {
+            flushQueued = false;
+            if (closed || buffer.isEmpty()) return;
+            seq = flushSeq++;
+            segment = rotateJournalLocked(seq);
+            if (segment == null) {   // no journal to rotate (degraded store, or the rename failed): flush as before
+                flushLocked();
+                return;
+            }
+            batch = new ArrayList<>(buffer);
+            inFlight = batch;
+            buffer.clear();
+        }
+        Runnable hook = afterRotateForTest;
+        if (hook != null) hook.run();
+        Path scratch = root.resolve(SCRATCH + seq);
+        Exception failure = null;
+        try {
+            writeParquet(flushConn, batch, scratch, "events_" + System.currentTimeMillis() + "_" + seq);
+        } catch (Exception e) {
+            failure = e;
+        }
+        synchronized (this) {
+            if (failure == null) {
+                try {
+                    revealLocked(scratch);
+                } catch (IOException e) {
+                    failure = e;
+                }
+            }
+            finishLocked(batch, segment, failure);
+        }
+        try {
+            deleteTree(scratch);
+        } catch (IOException ignore) { /* removed on the next open */ }
+    }
+
+    /** Close the journal, rename it to a new segment and open a fresh journal. Null when there is no journal or the
+     *  rename failed (the journal is then reopened as it was). */
+    private Path rotateJournalLocked(long seq) {
+        if (journal == null) return null;
+        Path file = root.resolve(JOURNAL);
+        Path segment = root.resolve(SEGMENT_PREFIX + seq + ".jsonl");
+        try {
+            journal.close();
+            Files.move(file, segment, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            log.warn("Event journal could not be rotated; flushing under the lock instead: {}", e.getMessage());
+            segment = null;
+        }
+        try {
+            journal = FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            journal = null;
+            log.warn("Event journal {} could not be reopened; buffered events will not survive a crash: {}",
+                    file, e.getMessage());
+        }
+        return segment;
+    }
+
+    /** Move every Parquet file under {@code scratch} to the same relative path under the root. */
+    private void revealLocked(Path scratch) throws IOException {
+        if (!Files.isDirectory(scratch)) return;
+        List<Path> files;
+        try (Stream<Path> w = Files.walk(scratch)) {
+            files = w.filter(p -> p.getFileName().toString().endsWith(".parquet")).toList();
+        }
+        for (Path src : files) {
+            Path dst = root.resolve(scratch.relativize(src).toString());
+            Files.createDirectories(dst.getParent());
+            Files.move(src, dst, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        }
+    }
+
+    /** End a background flush. Landed: the batch leaves memory and its segment goes. Failed: the events not already
+     *  in place go back to the front of the buffer and into the current journal, then the segment goes. */
+    private void finishLocked(List<Event> batch, Path segment, Exception failure) {
+        inFlight = List.of();
+        if (failure == null) {
+            flushFailures = 0;
+            deleteQuietly(segment);
+            return;
+        }
+        flushFailures++;
+        log.warn("Event flush to Parquet failed ({} consecutive), retaining {} event(s): {}",
+                flushFailures, batch.size(), failure.getMessage());
+        java.util.Set<String> landed = flushedIds(batch);   // a reveal can fail part-way: never write those twice
+        List<Event> back = new ArrayList<>();
+        for (Event e : batch) if (!landed.contains(e.eventId())) back.add(e);
+        if (buffer.isEmpty() && !back.isEmpty()) bufferOpenedAt = System.currentTimeMillis();
+        for (int i = back.size() - 1; i >= 0; i--) buffer.addFirst(back.get(i));
+        boolean journalled = journal != null;
+        if (journalled) {
+            try {
+                StringBuilder sb = new StringBuilder();
+                for (Event e : back) sb.append(toJournal(e)).append('\n');
+                journal.write(ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8)));
+                journal.force(false);
+            } catch (IOException e) {
+                journalled = false;
+                log.warn("Event journal: a retained batch could not be journalled again; its segment {} is kept: {}",
+                        segment, e.getMessage());
+            }
+        }
+        if (journalled) deleteQuietly(segment);
+        if (buffer.size() >= maxRetained) flushLocked();   // the give-up cap, as before
+    }
+
+    /** The unflushed events: the in-flight batch, then the buffer (both oldest-first). */
+    private List<Event> unflushed() {
+        List<Event> all = new ArrayList<>(inFlight);
+        all.addAll(buffer);
+        return all;
+    }
+
+    /** Leftover journal segments, oldest first. */
+    private List<Path> segments() {
+        try (Stream<Path> s = Files.list(root)) {
+            return s.filter(p -> {
+                        String n = p.getFileName().toString();
+                        return n.startsWith(SEGMENT_PREFIX) && n.endsWith(".jsonl");
+                    })
+                    .sorted(Comparator.comparingLong(ParquetEventStore::segmentSeq)).toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
+    private static long segmentSeq(Path p) {
+        String n = p.getFileName().toString();
+        try {
+            return Long.parseLong(n.substring(SEGMENT_PREFIX.length(), n.length() - ".jsonl".length()));
+        } catch (NumberFormatException e) {
+            return Long.MAX_VALUE;
+        }
+    }
+
+    /** Remove leftover background-flush scratch directories: never moved into place, their events are in segments. */
+    private void deleteScratch() {
+        Path staging = root.resolve(".staging");
+        if (!Files.isDirectory(staging)) return;
+        try (Stream<Path> s = Files.list(staging)) {
+            for (Path p : s.filter(p -> p.getFileName().toString().startsWith("flush-")).toList()) deleteTree(p);
+        } catch (IOException ignore) { /* best effort */ }
+    }
+
+    private static void deleteQuietly(Path p) {
+        try {
+            Files.deleteIfExists(p);
+        } catch (IOException e) {
+            log.warn("Event journal segment {} could not be deleted; a restart replays it (no event written twice): {}",
+                    p, e.getMessage());
+        }
+    }
+
+    /** Test seam: runs on the flush thread right after the journal was rotated, before the Parquet write. */
+    volatile Runnable afterRotateForTest;
+
+    /** Test seam: occupy the flush thread until {@code release} opens, so a queued flush cannot start. */
+    void parkBackgroundFlushForTest(java.util.concurrent.CountDownLatch release) {
+        flusher.execute(() -> {
+            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        });
+    }
+
+    /** Test seam: wait until every flush queued so far has run. */
+    void awaitBackgroundFlushForTest() throws Exception {
+        flusher.submit(() -> { }).get();
+    }
+
+    /** Everything appended so far is on disk when this returns: a background flush in flight finishes first. */
     @Override
-    public synchronized void flush() {
-        flushLocked();
+    public void flush() {
+        awaitBackgroundFlush();
+        synchronized (this) {
+            flushLocked();
+        }
+    }
+
+    /** Wait (without the lock, which the background flush needs) for every background flush queued so far. */
+    private void awaitBackgroundFlush() {
+        try {
+            flusher.submit(() -> { }).get();
+        } catch (java.util.concurrent.RejectedExecutionException closedAlready) {
+            // shut down: nothing more will run
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.ExecutionException impossible) {
+            // the no-op task cannot fail
+        }
     }
 
     /** Write the buffer to a fresh partitioned Parquet file set, then clear it. Caller holds the lock. */
     private boolean flushLocked() {
         if (buffer.isEmpty()) return true;
         try {
-            try (PreparedStatement ps = conn.prepareStatement(
+            writeParquet(conn, buffer, root, "events_" + System.currentTimeMillis() + "_" + (flushSeq++));
+            flushFailures = 0;
+        } catch (Exception e) {
+            // Never propagate to the caller (often the log appender). But do NOT drop the batch on the
+            // first failure: this store holds AUDIT events, and a transient fault (disk full, a locked
+            // file) would otherwise destroy the only durable copy — the live-tail ring is a bounded
+            // in-memory ring, not a durability guarantee. Retain and retry on the next append/flush,
+            // and only give up once the buffer would grow without bound.
+            flushFailures++;
+            boolean giveUp = buffer.size() >= maxRetained;
+            log.warn("Event flush to Parquet failed ({} consecutive), {} {} buffered event(s): {}",
+                    flushFailures, giveUp ? "dropping" : "retaining", buffer.size(), e.getMessage());
+            if (!giveUp) return false;   // keep `buffer` for the next attempt
+            log.error("Event buffer reached {} undrained events; dropping them to bound memory."
+                    + " Durable event/audit history for this window is lost.", buffer.size());
+            buffer.clear();
+            truncateJournal();
+            flushFailures = 0;
+            return false;   // the buffer is empty, but NOT because it landed
+        }
+        buffer.clear();
+        truncateJournal();
+        return true;
+    }
+
+    /**
+     * Stage {@code events} on {@code c} and write them as one partitioned Parquet file set under {@code dir}. The
+     * staging rows are always dropped: a retained batch is re-inserted from scratch on the next attempt, so leaving
+     * rows behind would double-write every event that did land.
+     */
+    private static void writeParquet(Connection c, java.util.Collection<Event> events, Path dir, String baseName)
+            throws Exception {
+        try {
+            try (PreparedStatement ps = c.prepareStatement(
                     "INSERT INTO " + BUF_TABLE + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
-                for (Event e : buffer) {
+                for (Event e : events) {
                     LocalDate d = Instant.ofEpochMilli(e.ts()).atZone(ZoneOffset.UTC).toLocalDate();
                     int i = 1;
                     ps.setString(i++, e.eventId());
@@ -386,43 +661,13 @@ public final class ParquetEventStore implements EventStore {
                 }
                 ps.executeBatch();
             }
-            String baseName = "events_" + System.currentTimeMillis() + "_" + (flushSeq++);
-            PartitionWriter.write(conn, BUF_TABLE, root.toString(), "PARQUET", "zstd", baseName,
+            PartitionWriter.write(c, BUF_TABLE, dir.toString(), "PARQUET", "zstd", baseName,
                     List.of("level", "year", "month", "day"), List.of());
-            flushFailures = 0;
-        } catch (Exception e) {
-            // Never propagate to the caller (often the log appender). But do NOT drop the batch on the
-            // first failure: this store holds AUDIT events, and a transient fault (disk full, a locked
-            // file) would otherwise destroy the only durable copy — the live-tail ring is a bounded
-            // in-memory ring, not a durability guarantee. Retain and retry on the next append/flush,
-            // and only give up once the buffer would grow without bound.
-            flushFailures++;
-            boolean giveUp = buffer.size() >= maxRetained;
-            log.warn("Event flush to Parquet failed ({} consecutive), {} {} buffered event(s): {}",
-                    flushFailures, giveUp ? "dropping" : "retaining", buffer.size(), e.getMessage());
-            clearBufferTable();
-            if (!giveUp) return false;   // keep `buffer` for the next attempt
-            log.error("Event buffer reached {} undrained events; dropping them to bound memory."
-                    + " Durable event/audit history for this window is lost.", buffer.size());
-            buffer.clear();
-            truncateJournal();
-            flushFailures = 0;
-            return false;   // the buffer is empty, but NOT because it landed
+        } finally {
+            try (Statement st = c.createStatement()) {
+                st.execute("DELETE FROM " + BUF_TABLE);
+            } catch (SQLException ignore) { /* best effort */ }
         }
-        buffer.clear();
-        clearBufferTable();
-        truncateJournal();
-        return true;
-    }
-
-    /**
-     * Drop the staging rows. Always safe to call: a retained buffer is re-inserted from scratch on the
-     * next attempt, so leaving rows behind here would double-write every event that did land.
-     */
-    private void clearBufferTable() {
-        try (Statement st = conn.createStatement()) {
-            st.execute("DELETE FROM " + BUF_TABLE);
-        } catch (SQLException ignore) { /* best effort */ }
     }
 
     // ── reads ─────────────────────────────────────────────────────────────────────
@@ -436,7 +681,7 @@ public final class ParquetEventStore implements EventStore {
     public synchronized List<Event> query(EventQuery q) {
         List<Event> merged = new ArrayList<>();
         // 1) unflushed buffer (newest facts) — filter in memory
-        for (Event e : buffer) if (q.matches(e)) merged.add(e);
+        for (Event e : unflushed()) if (q.matches(e)) merged.add(e);
         // 2) on-disk Parquet — filter + page in SQL
         merged.addAll(queryParquet(q));
         merged.sort(Comparator.comparingLong(Event::ts).reversed());
@@ -470,7 +715,7 @@ public final class ParquetEventStore implements EventStore {
         int n = Math.max(0, limit);
         List<Event> merged = new ArrayList<>();
         // 1) unflushed buffer (newest facts) — keyset-filter in memory
-        for (Event e : buffer) if (EventStore.afterKey(e, afterTs, afterId)) merged.add(e);
+        for (Event e : unflushed()) if (EventStore.afterKey(e, afterTs, afterId)) merged.add(e);
         // 2) on-disk Parquet — keyset predicate + order in SQL
         merged.addAll(pageParquet(n, afterTs, afterId));
         merged.sort(KEYSET_ORDER);
@@ -494,7 +739,7 @@ public final class ParquetEventStore implements EventStore {
 
     @Override
     public synchronized long count() {
-        long total = buffer.size();
+        long total = inFlight.size() + buffer.size();
         for (Long n : readFiles(parquetFiles(), "SELECT COUNT(*)", "", List.of(), rs -> rs.getLong(1))) total += n;
         signalUnreadable();
         return total;
@@ -511,7 +756,7 @@ public final class ParquetEventStore implements EventStore {
     @Override
     public synchronized Event chainHead() {
         Event best = null;
-        for (Event e : buffer)
+        for (Event e : unflushed())
             if (AuditChain.chained(e) && AuditChain.seq(e) > 0
                     && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
         // Only the file(s) holding the highest indexed seq can hold the head.
@@ -531,7 +776,7 @@ public final class ParquetEventStore implements EventStore {
     public synchronized List<Event> chainPage(long fromSeq, int limit) {
         int n = Math.max(0, limit);
         List<Event> merged = new ArrayList<>();
-        for (Event e : buffer) if (AuditChain.chained(e) && AuditChain.seq(e) >= fromSeq) merged.add(e);
+        for (Event e : unflushed()) if (AuditChain.chained(e) && AuditChain.seq(e) >= fromSeq) merged.add(e);
         if (n > 0)
             merged.addAll(chainRead(idx -> pageFiles(idx, fromSeq, n), "WHERE " + CHAINED_SQL + " AND " + SEQ_SQL
                     + " >= ? ORDER BY " + SEQ_SQL + ", event_id LIMIT ?", List.of(fromSeq, (long) n)));
@@ -573,7 +818,7 @@ public final class ParquetEventStore implements EventStore {
     @Override
     public synchronized long unlinkedSince(long fromTs) {
         long n = 0;
-        for (Event e : buffer)
+        for (Event e : unflushed())
             if (AuditChain.TYPES.contains(e.type()) && e.ts() >= fromTs && AuditChain.unlinked(e)) n++;
         n += chainRead(idx -> {
             List<Path> with = new ArrayList<>();
@@ -588,7 +833,7 @@ public final class ParquetEventStore implements EventStore {
     @Override
     public synchronized java.util.Set<String> presentIds(java.util.Collection<String> ids) {
         java.util.Set<String> found = new java.util.HashSet<>();
-        for (Event e : buffer) if (ids.contains(e.eventId())) found.add(e.eventId());
+        for (Event e : unflushed()) if (ids.contains(e.eventId())) found.add(e.eventId());
         List<Event> probe = new ArrayList<>();
         for (String id : ids) probe.add(new Event(id, 0, null, null, null, null, null, null, null, null));
         found.addAll(flushedIds(probe));
@@ -850,8 +1095,8 @@ public final class ParquetEventStore implements EventStore {
     /** Every Parquet file under the root, in path order; forgets the unreadable ones that are gone. */
     private List<Path> parquetFiles() {
         if (!Files.isDirectory(root)) return List.of();
-        try (Stream<Path> w = Files.walk(root)) {
-            List<Path> files = w.filter(this::isEventFile).sorted().toList();
+        try {
+            List<Path> files = eventFiles().stream().sorted().toList();
             java.util.Set<Path> present = new java.util.HashSet<>(files);
             unreadable.keySet().retainAll(present);
             signalled.keySet().retainAll(present);
@@ -859,6 +1104,27 @@ public final class ParquetEventStore implements EventStore {
         } catch (IOException e) {
             throw new IllegalStateException("event store listing failed under " + root + ": " + e.getMessage(), e);
         }
+    }
+
+    /** Every event file under the root. {@code .staging/} is never entered: a background flush writes and deletes
+     *  there without the store lock (LA-PERF-N9-1), so walking it would race that write. */
+    private List<Path> eventFiles() throws IOException {
+        Path staging = root.resolve(".staging");
+        List<Path> out = new ArrayList<>();
+        Files.walkFileTree(root, new java.nio.file.SimpleFileVisitor<>() {
+            @Override
+            public java.nio.file.FileVisitResult preVisitDirectory(Path d, java.nio.file.attribute.BasicFileAttributes a) {
+                return d.equals(staging) ? java.nio.file.FileVisitResult.SKIP_SUBTREE
+                        : java.nio.file.FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public java.nio.file.FileVisitResult visitFile(Path f, java.nio.file.attribute.BasicFileAttributes a) {
+                if (isEventFile(f)) out.add(f);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
+        return out;
     }
 
     /** A revealed event file: a {@code .parquet} outside {@code <root>/.staging/}, where a failed or crashed
@@ -962,6 +1228,7 @@ public final class ParquetEventStore implements EventStore {
      *  (a killed process holds no lock). The store is unusable afterwards. */
     synchronized void simulateCrash() {
         closed = true;
+        flusher.shutdown();
         if (journal != null) {
             try { journal.close(); } catch (IOException ignore) { /* as a kill */ }
         }
@@ -978,8 +1245,8 @@ public final class ParquetEventStore implements EventStore {
     /** {@code true} when at least one Parquet file exists under the root (else read_parquet would error). */
     private boolean hasParquet() {
         if (!Files.isDirectory(root)) return false;
-        try (Stream<Path> w = Files.walk(root)) {
-            return w.anyMatch(this::isEventFile);
+        try {
+            return !eventFiles().isEmpty();
         } catch (Exception e) {
             return false;
         }
@@ -998,8 +1265,14 @@ public final class ParquetEventStore implements EventStore {
         flushLocked();
         if (!Files.isDirectory(root)) return 0;
         int removed = 0;
-        try (Stream<Path> days = Files.walk(root, 4)) {
-            for (Path day : days.filter(ParquetEventStore::isDayPartition).toList()) {
+        try (Stream<Path> levels = Files.list(root)) {
+            // Only the level=X trees: .staging/ is written without the lock by a background flush (LA-PERF-N9-1).
+            List<Path> dayDirs = new ArrayList<>();
+            for (Path lv : levels.filter(p -> p.getFileName().toString().startsWith("level=")).toList())
+                try (Stream<Path> w = Files.walk(lv, 3)) {
+                    dayDirs.addAll(w.filter(ParquetEventStore::isDayPartition).toList());
+                }
+            for (Path day : dayDirs) {
                 LocalDate d = partitionDate(day);
                 if (d == null || !d.isBefore(before)) continue;
                 removed++;
@@ -1049,14 +1322,24 @@ public final class ParquetEventStore implements EventStore {
     }
 
     @Override
-    public synchronized void close() {
-        if (closed) return;
-        flushLocked();
-        closed = true;
-        if (journal != null) {
-            try { journal.close(); } catch (IOException e) { log.warn("Error closing event journal: {}", e.getMessage()); }
+    public void close() {
+        awaitBackgroundFlush();   // without the lock: an in-flight flush needs it to finish
+        flusher.shutdown();
+        synchronized (this) {
+            if (closed) return;
+            flushLocked();
+            closed = true;
+            if (journal != null) {
+                try { journal.close(); } catch (IOException e) { log.warn("Error closing event journal: {}", e.getMessage()); }
+            }
+            releaseWriter();
+            try { conn.close(); } catch (SQLException e) { log.warn("Error closing event store: {}", e.getMessage()); }
         }
-        releaseWriter();
-        try { conn.close(); } catch (SQLException e) { log.warn("Error closing event store: {}", e.getMessage()); }
+        try {   // a flush queued between the wait and the shutdown finds the store closed and does nothing
+            flusher.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        try { flushConn.close(); } catch (SQLException e) { log.warn("Error closing event store: {}", e.getMessage()); }
     }
 }

@@ -114,10 +114,11 @@ class ParquetEventStoreTest {
     }
 
     @Test
-    void sizeThresholdAutoFlushes(@TempDir Path dir) {
+    void sizeThresholdAutoFlushes(@TempDir Path dir) throws Exception {
         try (ParquetEventStore store = new ParquetEventStore(dir, 2, 0, 100)) {
             store.append(ev(1, EventLevel.INFO, EventType.LOG, "p", "a"));
-            store.append(ev(2, EventLevel.INFO, EventType.LOG, "p", "b"));   // hits threshold → flush
+            store.append(ev(2, EventLevel.INFO, EventType.LOG, "p", "b"));   // hits threshold → background flush
+            store.awaitBackgroundFlushForTest();
             // a fresh reader-only store over the same dir sees the auto-flushed rows on disk
             try (ParquetEventStore reader = new ParquetEventStore(dir, 1000, 0, 100)) {
                 assertEquals(2, reader.query(EventQuery.recent(100)).size(),
@@ -148,6 +149,125 @@ class ParquetEventStoreTest {
         // replayed into Parquet and the journal cleared: a third open does not duplicate them
         try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
             assertEquals(3, again.query(EventQuery.recent(100)).size(), "replayed exactly once");
+        }
+    }
+
+    /**
+     * LA-PERF-N9-1 (option c): the journal write stays on the appending thread, so an audit event is in the journal
+     * file when append returns (the HTTP reply follows it). Read straight from disk, no wait, no flush: a journal
+     * write moved off the caller's thread fails this.
+     */
+    @Test
+    void anAuditEventIsInTheJournalFileWhenAppendReturns(@TempDir Path dir) throws Exception {
+        ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100);
+        try {
+            store.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "admin object.updated INC-7"));
+            String onDisk = java.nio.file.Files.readString(dir.resolve(ParquetEventStore.JOURNAL));
+            assertTrue(onDisk.contains("admin object.updated INC-7"), "journalled before append returned: " + onDisk);
+        } finally {
+            store.simulateCrash();
+        }
+    }
+
+    /**
+     * LA-PERF-N9-1 (option c): a request that trips the threshold no longer waits for the Parquet flush. A kill
+     * after append returned but before that flush ran loses nothing: the reopened store replays the journal.
+     */
+    @Test
+    void aKillBeforeTheBackgroundFlushRunsLosesNoEvent(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 2, 0, 100);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        crashed.parkBackgroundFlushForTest(release);   // the flush thread is busy: a queued flush cannot start
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "a1"));
+        crashed.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "a2"));   // trips the threshold, returns
+        try (var w = java.nio.file.Files.walk(dir)) {
+            assertTrue(w.noneMatch(p -> p.toString().endsWith(".parquet")), "append did not wait for the flush");
+        }
+        crashed.simulateCrash();   // the kill lands while the flush is still queued
+        release.countDown();       // the queued flush then finds the store closed and writes nothing
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(List.of("a2", "a1"), reopened.query(EventQuery.recent(100)).stream().map(Event::message)
+                    .toList(), "the journalled, never-flushed events are replayed");
+        }
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(2, again.query(EventQuery.recent(100)).size(), "replayed exactly once");
+        }
+    }
+
+    /**
+     * LA-PERF-N9-1: the background flush rotates the journal into a segment, then writes the batch outside the
+     * lock. A kill after the rotation and before the batch reached Parquet leaves the segment; the reopened store
+     * replays it with the journal's newer events, and drops it once they are in place.
+     */
+    @Test
+    void aKillAfterTheJournalRotatedReplaysTheSegment(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 2, 0, 100);
+        java.util.concurrent.CountDownLatch rotated = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch killed = new java.util.concurrent.CountDownLatch(1);
+        crashed.afterRotateForTest = () -> {
+            rotated.countDown();
+            try { killed.await(); } catch (InterruptedException ignore) { }
+            throw new IllegalStateException("killed mid-flush");   // the flush never writes or moves anything
+        };
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "s1"));
+        crashed.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "s2"));   // rotation into a segment
+        rotated.await();
+        crashed.append(ev(3_000L, EventLevel.INFO, EventType.AUDIT, null, "j3"));   // into the fresh journal
+        assertEquals(3, crashed.query(EventQuery.recent(100)).size(), "an in-flight batch is still read");
+        try (var s = java.nio.file.Files.list(dir)) {
+            assertEquals(1, s.filter(p -> p.getFileName().toString().startsWith(ParquetEventStore.SEGMENT_PREFIX))
+                    .count(), "the rotated segment is on disk");
+        }
+        crashed.simulateCrash();
+        killed.countDown();
+
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(List.of("j3", "s2", "s1"), reopened.query(EventQuery.recent(100)).stream()
+                    .map(Event::message).toList(), "segment and journal both replayed");
+        }
+        try (var s = java.nio.file.Files.list(dir)) {
+            assertTrue(s.noneMatch(p -> p.getFileName().toString().startsWith(ParquetEventStore.SEGMENT_PREFIX)),
+                    "the segment is gone once its events are in place");
+        }
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(3, again.query(EventQuery.recent(100)).size(), "replayed exactly once");
+        }
+    }
+
+    /**
+     * LA-PERF-N9-1 (verification finding): a replay that fails leaves its segments on disk; the next background
+     * flush must not rotate onto a leftover segment's name (the rename replaces it) and then delete it.
+     */
+    @Test
+    void aLeftoverSegmentIsNeverOverwrittenByTheNextRotation(@TempDir Path dir) throws Exception {
+        java.nio.file.Files.writeString(dir.resolve(ParquetEventStore.SEGMENT_PREFIX + "0.jsonl"), "kept-as-is\n");
+        // a journal torn inside a multi-byte character makes this open's replay fail (a separate, older defect)
+        java.nio.file.Files.write(dir.resolve(ParquetEventStore.JOURNAL), new byte[] {'{', (byte) 0xC3});
+        try (ParquetEventStore store = new ParquetEventStore(dir, 2, 0, 100)) {
+            store.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "y1"));
+            store.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "y2"));   // background flush + rotation
+            store.flush();
+        }
+        assertEquals("kept-as-is\n", java.nio.file.Files.readString(dir.resolve(ParquetEventStore.SEGMENT_PREFIX
+                + "0.jsonl")), "the leftover segment is untouched");
+    }
+
+    /** LA-PERF-N9-1: a landed background flush leaves every event counted once and no segment behind. */
+    @Test
+    void aBackgroundFlushLandsEveryEventOnce(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 3, 0, 100)) {
+            for (int i = 0; i < 10; i++) {
+                store.append(ev(1_000L + i, EventLevel.INFO, EventType.AUDIT, null, "e" + i));
+                assertEquals(i + 1, store.count(), "each event counted once while flushes run");
+            }
+            store.flush();
+            assertEquals(10, store.count());
+            try (var s = java.nio.file.Files.list(dir)) {
+                assertTrue(s.noneMatch(p -> p.getFileName().toString().startsWith(ParquetEventStore.SEGMENT_PREFIX)));
+            }
+        }
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(10, again.count(), "all on disk, none twice");
         }
     }
 

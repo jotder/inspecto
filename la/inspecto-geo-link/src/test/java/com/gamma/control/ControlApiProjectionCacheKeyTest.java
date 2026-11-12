@@ -63,6 +63,7 @@ class ControlApiProjectionCacheKeyTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String OWNER = "tok-owner", VIEWER = "tok-viewer";
+    private static final String VIEWER_TWIN = "tok-viewer-twin", SCOPE_X = "tok-scope-x", SCOPE_Y = "tok-scope-y";
     private static final String COLS = "\"dataset\":\"d_ds\",\"sourceCol\":\"s\",\"targetCol\":\"t\"";
     private static final String BODY = "{" + COLS + "}";
     private static final String NB = "{" + COLS + ",\"value\":\"B\"}";
@@ -89,6 +90,9 @@ class ControlApiProjectionCacheKeyTest {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case OWNER -> Optional.of(new Subject("analyst-1", Set.of("canBuildLinkIndex", "canManageIncidents")));
             case VIEWER -> Optional.of(new Subject("analyst-2", Set.of()));
+            case VIEWER_TWIN -> Optional.of(new Subject("analyst-2", Set.of()));                 // a second token, identical access
+            case SCOPE_X -> Optional.of(new Subject("analyst-2", Set.of(), Set.of("x")));        // same viewer, another row scope
+            case SCOPE_Y -> Optional.of(new Subject("analyst-2", Set.of(), Set.of("y")));
             default -> Optional.empty();
         });
         AtomicLong tick = new AtomicLong();
@@ -272,6 +276,28 @@ class ControlApiProjectionCacheKeyTest {
     }
 
     // ── each key component alone ──────────────────────────────────────────────────────────────────────────────────
+
+    // ── PERF-D2: the cache scope is the viewer's access (masking profile and row scope) ────────────────────────────
+
+    /** Two viewers whose row scope differs ask for the same Dataset: two entries, never one served to the other. */
+    @Test
+    void aDifferentRowScopeIsADifferentEntry(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String tag = warm(c, "inv/projection", BODY, SCOPE_X);
+            assertMissWith(c, "inv/projection", BODY, SCOPE_Y, tag, "another row scope (data scopes)");
+            assertMissWith(c, "inv/projection", BODY, OWNER, tag, "another viewer (masking profile: capabilities)");
+        }
+    }
+
+    /** Identical access shares the entry: the other token's ETag is a 304. */
+    @Test
+    void identicalAccessSharesOneEntry(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String tag = warm(c, "inv/projection", BODY, VIEWER);
+            HttpResponse<String> twin = post(c, "inv/projection", BODY, VIEWER_TWIN, tag);
+            assertEquals(304, twin.statusCode(), "identical access must share the entry: " + twin.body());
+        }
+    }
 
     @Test
     void theRouteIsPartOfTheKey(@TempDir Path cfg, @TempDir Path root) throws Exception {
