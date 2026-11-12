@@ -152,8 +152,10 @@ liveness/readiness delays are therefore 0. The image tag defaults to the chart's
 per-process. Scale-out is the Advanced partitioned topology, not this chart.
 
 **One chart source, a chart per Product (PRODUCT-ASSEMBLY-1 PA-8a, 2026-11-12).** `deploy/helm/inspecto/` is the
-only chart source. `node tools/ship.mjs chart --plan <plan> --out <dir>` stamps a copy for a Product build. The plan
-comes from `tools/assemble.mjs --target container|airgap`. The copy gets:
+only chart template source. Each Product commits its own `Chart.yaml` and `values.yaml` in `deploy/helm/products/<id>/`
+(HELM-PRODUCT-VALUES-1, 2026-11-12); its values override the source's defaults key by key. `node tools/ship.mjs chart
+--plan <plan> --out <dir>` builds the Product's chart from that folder and the source's templates. The plan comes from
+`tools/assemble.mjs --target container|airgap`. The chart gets:
 - the chart name and `image.repository` set to the image name, `inspecto-<product>` (the Platform product stays `inspecto`);
 - the chart version set to the platform version, and `appVersion` to the image tag `<version>-<edition>[-trial]`;
 - the `product` values block, which labels every object `inspecto.io/product` and `inspecto.io/edition`.
@@ -161,7 +163,9 @@ comes from `tools/assemble.mjs --target container|airgap`. The copy gets:
 The packed `<name>-<version>.tgz` has the layout `helm package` writes. Selectors use only `app.kubernetes.io/name` and
 `/instance`, so upgrading a release with a newer chart of the same Product never changes the StatefulSet's immutable selector.
 Moving a release to another Product's chart (from `inspecto` to `inspecto-telco`, say) changes the name label, and
-Kubernetes refuses it: install the new Product as a new release instead. Edit the source, never a copy.
+Kubernetes refuses it: install the new Product as a new release instead. Edit the source or the Product's folder,
+never a built copy; `node tools/ship.mjs check` refuses a template copied anywhere else. Rules and layout:
+[container image, Helm chart and air-gapped install](admin-guide-container-airgap.md) § The chart per Product.
 
 ✅ **Linted and rendered 2026-11-12** with Helm v3.19.0 (from a local Helm container, `--network none`).
 `helm lint --strict` passes on the source and on the stamped charts for inspecto, la and telco. `helm template` of

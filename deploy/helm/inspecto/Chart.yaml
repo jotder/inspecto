@@ -2,7 +2,8 @@ apiVersion: v2
 name: inspecto
 description: >-
   Single-replica Inspecto control plane (StatefulSet, replicas 1, one PVC).
-  NOT multi-replica safe - see values.yaml. This is the chart SOURCE: tools/ship.mjs stamps a copy per Product build.
+  NOT multi-replica safe - see values.yaml. This is the ONE template source: each Product has its own Chart.yaml and values.yaml in deploy/helm/products/<id>/,
+  and tools/ship.mjs chart builds that Product's chart from them and these templates.
 type: application
 version: 0.1.0
 # The image tag the chart deploys (values.image.tag overrides). tools/ship.mjs sets it to the Product build's image tag.

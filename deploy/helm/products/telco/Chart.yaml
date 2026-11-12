@@ -1,0 +1,14 @@
+# Inspecto Telco's Helm chart (HELM-PRODUCT-VALUES-1; PRODUCT-ASSEMBLY-1 D-PA27). This folder holds the Product's chart
+# metadata and values only. The templates are deploy/helm/inspecto/templates, the ONE source every Product shares:
+# `tools/ship.mjs chart` builds the chart from both, and `tools/ship.mjs check` refuses a template copied here.
+# version, appVersion, edition and distribution are the build's: ship.mjs stamps them.
+apiVersion: v2
+name: inspecto-telco
+description: "Inspecto Telco: single-replica control plane (StatefulSet, replicas 1, one PVC). Not multi-replica safe - see values.yaml."
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+annotations:
+  inspecto.io/product: "telco"
+  inspecto.io/edition: ""
+  inspecto.io/distribution: ""
