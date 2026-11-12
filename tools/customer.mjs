@@ -180,9 +180,10 @@ export function customerAssembly({ model, g, files, world, customer, prices = {}
     const { optional } = productApps(p);
     const apps = p.shape === 'domain' ? optional.filter((a) => r.apps.includes(a))
         : optional.filter((a) => r.apps.includes(a) || list(model.apps[a]?.requires?.addons).every((x) => held.has(x)));
-    const plan = assemble(model, g, { product: p.id, edition: customer.edition, distribution, apps, target });
+    const plan = assemble(model, g, { product: p.id, edition: customer.edition, distribution, apps, target, customer: true });
     const removedJars = new Set(r.removed.map((m) => `inspecto-${m}.jar`));
     const templates = plan.templates.filter((t) => r.packs.includes(t) || plan.apps.some((a) => list(model.apps[a.id]?.templates).includes(t)));
+    const pilot = distribution === 'pilot' ? pilotOf(customer, templates, model) : null;
     const { fields } = resolveEntitlement(model, g, {
         customer: customer.id, title: customer.title ?? customer.id, product: p.id, edition: customer.edition,
         addons: [...held], apps: plan.apps.map((a) => a.id), nodes: customer.nodes, expires: customer.expires, keyId, now,
@@ -195,6 +196,7 @@ export function customerAssembly({ model, g, files, world, customer, prices = {}
         templates,
         partnerTemplates: plan.partnerTemplates.filter((t) => templates.includes(t.id)),
         editionProperties: { ...plan.editionProperties, customer: customer.id, offering: `customer-${customer.id}` },
+        pilot,
         customer: {
             id: customer.id, title: customer.title ?? customer.id, offering: r.offering, keep: r.keep, removed: r.removed,
             // the Product's own Apps: a bundle built with any other (a partner App, --app-root) is refused by the trim
@@ -202,6 +204,62 @@ export function customerAssembly({ model, g, files, world, customer, prices = {}
             removedJars: [...removedJars].sort(), bom: r.bom.map(({ listPrice, currency, ...b }) => b), entitlement: fields,
         },
     } };
+}
+
+// ── PA-10c: the pilot Distribution (D-PA35) ──
+// The record's `pilot:` block names one bought Space Template and, for each of its Pipelines, the customer's poll folder:
+//   pilot:
+//     template: telco-fraud
+//     poll:
+//       cdr: D:/feeds/cdr
+//       payments: D:/feeds/payments
+//       subscriber_events: D:/feeds/subscriber_events
+// The bundle then gains the Space Template `<customer>-pilot`: that template with each Pipeline's `dirs.poll` set to the
+// customer's folder and its golden corpus (`data/samples`) left out. Every Pipeline of the template must be wired.
+
+/** A poll folder the pipeline file can carry: an absolute path, `/`-separated, with no quote, `#`, `$` or control character. */
+const POLL = /^(?:[A-Za-z]:\/|\/)[^"#$\u0000-\u001f]*$/;
+
+/** The Pipelines of a template's config: [{ name, file (relative, /-separated), poll }] - each `*.toon` with a `dirs.poll`. */
+export function templatePipelines(dir) {
+    const out = [];
+    const cfg = join(dir, 'config');
+    const walk = (rel) => {
+        for (const e of readdirSync(join(cfg, rel), { withFileTypes: true })) {
+            const r = rel ? `${rel}/${e.name}` : e.name;
+            if (e.isDirectory()) walk(r);
+            else if (e.name.endsWith('.toon')) {
+                const t = readFileSync(join(cfg, r), 'utf8');
+                const name = /^name:\s*(\S+)\s*$/m.exec(t)?.[1];
+                const poll = /^dirs:\s*\r?\n(?:[ \t]+.*\r?\n)*?[ \t]+poll:\s*(.+?)\s*$/m.exec(t)?.[1];
+                if (name && poll) out.push({ name, file: `config/${r}`, poll });
+            }
+        }
+    };
+    if (existsSync(cfg)) walk('');
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The plan's `pilot` block from the record, checked against the template's Pipelines. */
+export function pilotOf(customer, templates, model) {
+    const pb = customer.pilot ?? fail(`the pilot distribution needs a pilot: block in the customer record (template, and a poll folder per Pipeline)`);
+    const t = pb.template ?? fail('pilot.template: name one bought Space Template');
+    if (!templates.includes(t)) fail(`pilot.template '${t}' is not one of this customer's templates (${templates.join(', ') || 'none'})`);
+    const id = `${customer.id}-pilot`;
+    if (model.templates.includes(id)) fail(`the pilot template id '${id}' is already a Space Template`);
+    const dir = model.templateDirs?.[t] ?? join(model.root, 'spaces', '_templates', t);
+    const pipelines = templatePipelines(dir);
+    const poll = pb.poll && typeof pb.poll === 'object' ? pb.poll : {};
+    const unknown = Object.keys(poll).filter((n) => !pipelines.some((p) => p.name === n));
+    if (unknown.length) fail(`pilot.poll names no Pipeline of '${t}': ${unknown.join(', ')} (it has ${pipelines.map((p) => p.name).join(', ')})`);
+    const missing = pipelines.filter((p) => poll[p.name] === undefined).map((p) => p.name);
+    if (missing.length) fail(`pilot.poll does not wire every Pipeline of '${t}': ${missing.join(', ')}`);
+    for (const [n, f] of Object.entries(poll)) if (!POLL.test(String(f))) fail(`pilot.poll.${n} '${f}' must be an absolute folder with / separators and no quote, # or $`);
+    // The server reads a Pipeline's folders only under its allowed roots (ConfigSafetyValidator's path jail), so the install
+    // starts with these folders allowed (-Dassist.safety.roots); the build names them and never widens the jail itself.
+    const roots = [...new Set(Object.values(poll).map(String))].sort();
+    return { template: id, from: t, title: `${customer.title ?? customer.id} pilot`, roots,
+        pipelines: pipelines.map((p) => ({ name: p.name, file: p.file, poll: String(poll[p.name]) })) };
 }
 
 /** customerAssembly() over a repo root: the record (an id or a .toon path), the definitions, the map and private prices. */

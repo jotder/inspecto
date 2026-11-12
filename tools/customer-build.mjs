@@ -2,7 +2,7 @@
 // customer-build — one customer's build, assembled (PRODUCT-ASSEMBLY-1 PA-10b; plan docs/superpower/2026-11-10-product-assembly-plan.md
 // §11 PA-10, D-PA33 and D-PA34; first built as PRODUCT-MAP-1 slice S5).
 //
-//   node tools/customer-build.mjs <customer|record.toon> [--bundle <product-bundle-dir>] [--key <issuer.pem>] [--out target/customers/<customer>]
+//   node tools/customer-build.mjs <customer|record.toon> [--bundle <product-bundle-dir>] [--key <issuer.pem>] [--distribution production|pilot] [--out target/customers/<customer>]
 //
 // RESOLVE  tools/customer.mjs customerAssembly(): the customer record (its Product, Edition and Order Codes) becomes an Assembly
 //          Plan (tools/assemble.mjs) narrowed to the modules and templates the customer keeps, with the entitlement to sign.
@@ -13,6 +13,8 @@
 //          and the Space Templates not kept, filters modules.list, writes lib/product.json from the plan, stamps edition.properties
 //          with customer= and offering=, stages conf/entitlement.toon + .sig, and writes customer-bom.csv WITHOUT prices. The combined
 //          edition SBOM (sbom/inspecto-<edition>.*) is left as is and OVER-declares the trimmed bundle (recorded residual).
+// PILOT    (PA-10c, D-PA35) --distribution pilot: the record's `pilot:` block wires one bought template's Pipelines to the customer's
+//          folders; the bundle gains the Space Template `<customer>-pilot` (no sample data) and lib/product.json says `pilot`.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -64,6 +66,7 @@ export function trimBundle(src, dest, plan, entitlement) {
     const tdir = join(dest, 'spaces', '_templates');
     const templates = [];
     if (existsSync(tdir)) for (const t of listDirs(tdir)) { if (keepT.has(t)) continue; rmSync(join(tdir, t), { recursive: true }); templates.push(t); }
+    if (plan.pilot) { pilotTemplate(tdir, plan.pilot); writeFileSync(join(dest, 'PILOT.txt'), pilotText(plan)); }
     writeFileSync(join(dest, 'lib', 'product.json'), JSON.stringify(plan.descriptor, null, 2) + '\n');
     // The bundle's `apps=` line is the Product build's selection; the customer's is the plan's.
     const apps = plan.editionProperties?.apps ?? '';
@@ -76,18 +79,58 @@ export function trimBundle(src, dest, plan, entitlement) {
     writeFileSync(join(dest, 'conf', 'entitlement.sig'), entitlement.sig);
     return { jars, templates };
 }
+/**
+ * PA-10c (D-PA35): write the pilot's Space Template beside the one it is made from: each Pipeline's `dirs.poll` set to the
+ * customer's folder, the golden corpus (`data/samples`) left out, and its name and tagline saying it is the customer's pilot.
+ */
+export function pilotTemplate(tdir, pilot) {
+    const from = join(tdir, pilot.from), to = join(tdir, pilot.template);
+    if (!existsSync(join(from, 'template.toon'))) fail(`the bundle has no Space Template '${pilot.from}' to make the pilot from`);
+    if (existsSync(to)) fail(`the bundle already has a Space Template '${pilot.template}'`);
+    cpSync(from, to, { recursive: true });
+    rmSync(join(to, 'data', 'samples'), { recursive: true, force: true });
+    for (const p of pilot.pipelines) {
+        const f = join(to, ...p.file.split('/'));
+        const text = readFileSync(f, 'utf8');
+        const next = text.replace(/^(dirs:[ \t]*\r?\n(?:[ \t]+.*\r?\n)*?[ \t]+poll:[ \t]*).+?([ \t]*)$/m, `$1"${p.poll}"$2`);
+        if (next === text) fail(`${pilot.from}/${p.file}: no dirs.poll line to wire`);
+        writeFileSync(f, next);
+    }
+    const safe = (s) => String(s).replace(/["\\#\r\n]/g, '');
+    const tf = join(to, 'template.toon');
+    writeFileSync(tf, readFileSync(tf, 'utf8')
+        .replace(/^name:.*$/m, `name: "${safe(pilot.title)}"`)
+        .replace(/^tagline:.*$/m, `tagline: "Pilot of ${safe(pilot.from)}: its Collectors read the customer's own folders, and it ships no sample data"`));
+}
+/** PILOT.txt: what the pilot wires and how to start the install so its Collectors may read the customer's folders. */
+export function pilotText(plan) {
+    const p = plan.pilot, roots = p.roots.join(';');
+    return [
+        `Pilot build for ${plan.customer.title} (${plan.customer.id}): ${plan.product.title} ${plan.edition}.`,
+        '',
+        `Space Template '${p.template}' (made from '${p.from}') ships no sample data. Its Collectors read the customer's folders:`,
+        ...p.pipelines.map((x) => `  ${x.name}: ${x.poll}`),
+        '',
+        'The server reads files only under its allowed roots, so start it with these folders allowed:',
+        `  Windows:  set "INSPECTO_JAVA_OPTS=-Dassist.safety.roots=${roots}"   then bin\\serve.bat`,
+        `  Linux:    INSPECTO_JAVA_OPTS="-Dassist.safety.roots=${roots}" bin/serve.sh`,
+        '',
+        `Then, as an administrator, create a Space from the template '${p.template}' (Settings, Spaces).`,
+        '',
+    ].join('\r\n');
+}
 const listDirs = (d) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
 
 function main() {
     const args = process.argv.slice(2);
     const arg = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
-    const id = args.find((a, i) => !a.startsWith('--') && !['--bundle', '--out', '--root', '--key'].includes(args[i - 1]));
-    if (!id) { console.error('usage: node tools/customer-build.mjs <customer|record.toon> [--bundle <product-bundle-dir>] [--key <issuer.pem>] [--out <dir>]'); process.exit(2); }
+    const id = args.find((a, i) => !a.startsWith('--') && !['--bundle', '--out', '--root', '--key', '--distribution'].includes(args[i - 1]));
+    if (!id) { console.error('usage: node tools/customer-build.mjs <customer|record.toon> [--bundle <product-bundle-dir>] [--key <issuer.pem>] [--distribution production|pilot] [--out <dir>]'); process.exit(2); }
     try {
         const root = arg('--root', REPO);
         const keyFile = arg('--key', DEFAULT_KEY);
         if (!existsSync(keyFile)) fail(`no issuer key ${keyFile}: every customer build carries a signed entitlement (D-PA34) - pass --key <issuer.pem>`);
-        const { plan, bom } = customerPlan(root, id, { keyId: keyFile.split(/[\\/]/).pop().replace(/\.pem$/, '') });
+        const { plan, bom } = customerPlan(root, id, { distribution: arg('--distribution', 'production'), keyId: keyFile.split(/[\\/]/).pop().replace(/\.pem$/, '') });
         const customer = plan.customer;
         const entitlement = signedEntitlement(plan, readFileSync(keyFile, 'utf8'));
         const out = arg('--out', join(root, 'target', 'customers', customer.id));

@@ -1323,6 +1323,43 @@ kinds; they are now roots of their own, with their link in the CSV.
   - booted from its root (OIDC jars pointed at a dead JWKS, as the boot smoke does): `/health` 200, `/bootstrap` answers;
   - the same bundle with one byte of the entitlement changed refuses to boot ("the signature does not match").
 - The pilot's record and outputs stay out of git (the record is in `product-map/private/`, the outputs in a scratch folder).
+- Review fixes: a bundle built with an App its Product does not define (a partner App, `--app-root`) is refused rather
+  than silently dropped, and the bundle's `edition.properties` `apps=` line follows the plan. The pilot diff above was
+  re-run after them: still identical apart from the entitlement.
+
+**PA-10c as built (2026-11-12).**
+- `pilot` is in `DISTRIBUTIONS` and in every Product's `distributions`; `PLANNED_DISTRIBUTIONS` is empty.
+  `CUSTOMER_DISTRIBUTIONS = ['pilot']`: `assemble.mjs` refuses it unless called for a customer, naming
+  `customer-build.mjs --distribution pilot`, so `package.ps1 -Distribution pilot` is refused the same way.
+- The record's `pilot:` block (`template`, and `poll:` one folder per Pipeline) is checked in `customer.mjs pilotOf`:
+  the template must be bought; every Pipeline of it must be wired and no unknown one named; each folder absolute, `/`
+  separated, with no quote, `#` or `$`.
+- `customer-build.mjs --distribution pilot` adds `spaces/_templates/<customer>-pilot` (the template with each `dirs.poll`
+  set, `data/samples` left out, the zero-row seeds kept, name and tagline saying pilot), writes `lib/product.json` with
+  `distribution: pilot`, and writes `PILOT.txt` at the bundle root.
+- **Decided here: the build never widens the server's path jail.** The live run found that `ConfigSafetyValidator`
+  refuses a `dirs.poll` outside the Space. An install allows more folders with `-Dassist.safety.roots`, so `PILOT.txt`
+  names the folders and the exact `INSPECTO_JAVA_OPTS` line for `serve.bat` and `serve.sh`. Widening it from a file in
+  the bundle would let a bundle edit open the server's disk.
+- **Found: the pilot customer cannot create a Space from the template it bought, today or now.** `telco-fraud` ships
+  Alert Rules, which need `ops` (the Incidents Add-on), and the resolution trims `ops` because no manifest declares
+  that need. Creating the Space answers 422 ("Alert Rules ... this build (Basic) does not include it") on the pilot's
+  bundle built by today's tool and by this one alike. So `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` is worse than "a Case Rule
+  loads inert", and the row now says so. D-PA37 keeps it out of PA-10, because closing it changes the pilot's jars.
+
+**Proof (as built).**
+- `customer-build.test.mjs` 14/14 (3 new): a pilot plan wires all three `telco-fraud` Pipelines, lists the roots and
+  says `pilot`; each refusal (no block, a template not bought, a Pipeline unwired, an unknown one, a relative or quoted
+  folder); `pilotTemplate` on a fixture tree. `assemble.test.mjs` refuses a pilot outside a customer build.
+- **A pilot build, live** (the same Standard bundle; the pilot record plus `INS-AO-INCIDENTS`, in a scratch copy, so
+  that `ops` ships):
+  - booted with `-Dassist.safety.roots` from `PILOT.txt`, against a throwaway local OIDC issuer and an administrator
+    token;
+  - `/bootstrap.entitlement`: installed, customer `demo-telco`, state `ok`, Add-ons `incidents` and `linkAnalysis`;
+  - the gallery lists `demo-telco-pilot`; `POST /spaces {template: demo-telco-pilot}` 200;
+  - the new Space's three Pipelines poll the customer's folders, and it holds no `data/samples` and no CSV.
+- The same build without `INS-AO-INCIDENTS` and without the roots: 422 for the Alert Rules (above), and, with `ops`
+  shipped but no roots, 422 naming the path jail.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
