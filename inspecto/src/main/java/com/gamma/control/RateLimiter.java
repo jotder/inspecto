@@ -137,6 +137,12 @@ final class RateLimiter {
     /** Number of live buckets - visible for the bounded-memory test. */
     int size() { return buckets.size(); }
 
+    /** Whole seconds (at least 1) until {@code key}'s bucket holds its next token - the {@code Retry-After} of a 429. */
+    long retryAfterSeconds(String key) {
+        Bucket b = buckets.get(key);
+        return b == null || refillPerSecond <= 0 ? 1 : Math.max(1, b.secondsToNextToken(clock.getAsLong()));
+    }
+
     /** True when {@code key} has a token to spend (and spends it); false when exhausted. */
     boolean tryConsume(String key) {
         long now = clock.getAsLong();
@@ -190,6 +196,11 @@ final class RateLimiter {
             if (tokens < 1.0) return false;
             tokens -= 1.0;
             return true;
+        }
+
+        synchronized long secondsToNextToken(long now) {
+            refill(now);
+            return tokens >= 1.0 ? 0 : (long) Math.ceil((1.0 - tokens) / refillPerSecond);
         }
 
         synchronized boolean evictIfFull(long now) {

@@ -14,6 +14,7 @@ import {
     projectionNodeCapValue,
     resolveRunQuery,
     sumTotals,
+    truncationNotice,
     withColumnTypes,
 } from './entity-projection';
 import { endpointId } from '@inspecto/core/graph';
@@ -532,5 +533,13 @@ describe('link totals of the primary Measure (LA-COLUMN-ROLES-2 D-2)', () => {
         expect(totalOf(grown, 'entity:a->entity:b:link')).toBe(5.5);
         await src.query({ projection: p });
         expect(sent[2]['measureCol']).toBeUndefined();
+    });
+});
+
+describe('truncationNotice (N14)', () => {
+    it('names the node cap when the graph holds that many nodes, the row limit when it holds fewer', () => {
+        expect(truncationNotice(1000, 1000)).toContain('node cap (1000)');
+        expect(truncationNotice(767, 1000)).toContain('row limit');
+        expect(truncationNotice(767, 1000)).not.toContain('node cap');
     });
 });

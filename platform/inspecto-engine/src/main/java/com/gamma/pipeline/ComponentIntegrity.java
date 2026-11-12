@@ -2,74 +2,33 @@ package com.gamma.pipeline;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import static com.gamma.util.Values.blankToNull;
 
 /**
  * Cross-component referential-integrity rules (System Maintenance MNT-7/MNT-16), shared by the
- * {@code metadata_validate} maintenance task and the bundle-import pre-check. Rules are grounded in
- * the reference component shapes the demo space ships — never guessed: a widget's
- * {@code datasetId}/{@code queryId} must name an existing Dataset/Query; a dashboard tile's
- * {@code widgetId} must name an existing Widget; a Link Analysis / Geo Map view's
- * {@code query.projection.datasetId} must name an existing Dataset; two components of one type must not be
- * content-identical apart from {@code name}. Extend here as further kinds declare their reference
- * keys. Pure functions over an in-memory universe — no I/O, so callers decide what the universe is
- * (the live registry, or registry ∪ an incoming bundle).
+ * {@code metadata_validate} maintenance task and the bundle-import pre-check. Which keys are references lives in
+ * {@link LinkCensus} (`SPACE-LINK-CENSUS-1` LC-1): the findings here are the {@link LinkGraph} edges of the
+ * links this audit reads ({@link LinkCensus.Check#VALIDATE}) that dangle — a widget's
+ * {@code datasetId}/{@code queryId}, a dashboard tile's {@code widgetId}, a Link Analysis / Geo Map view's
+ * {@code query.projection.datasetId}, a reconciliation's sides; plus two components of one type that are
+ * content-identical apart from {@code name}. Pure functions over an in-memory universe — no I/O, so callers
+ * decide what the universe is (the live registry, or registry ∪ an incoming bundle).
  */
 public final class ComponentIntegrity {
 
     private ComponentIntegrity() {}
 
-    /** Broken widget→Dataset/Query and dashboard-tile→Widget references over {@code byType}
-     *  (missing type keys are treated as empty). Human-readable, stable finding strings. */
+    /** Broken widget→Dataset/Query, dashboard-tile→Widget, view→Dataset and reconciliation→Dataset references
+     *  over {@code byType} (missing type keys are treated as empty). Human-readable, stable finding strings. */
     public static List<String> brokenRefs(Map<String, List<ComponentRegistry.Component>> byType) {
         List<String> findings = new ArrayList<>();
-        Set<String> datasets = names(byType.getOrDefault("dataset", List.of()));
-        Set<String> queries = names(byType.getOrDefault("query", List.of()));
-        Set<String> widgets = names(byType.getOrDefault("widget", List.of()));
-        for (ComponentRegistry.Component w : byType.getOrDefault("widget", List.of())) {
-            String datasetId = blankToNull(w.content().get("datasetId"));
-            if (datasetId != null && !datasets.contains(datasetId))
-                findings.add("broken reference: widget '" + w.name() + "' → missing dataset '" + datasetId + "'");
-            String queryId = blankToNull(w.content().get("queryId"));
-            if (queryId != null && !queries.contains(queryId))
-                findings.add("broken reference: widget '" + w.name() + "' → missing query '" + queryId + "'");
-        }
-        for (ComponentRegistry.Component d : byType.getOrDefault("dashboard", List.of())) {
-            if (!(d.content().get("tiles") instanceof List<?> tiles)) continue;
-            for (Object t : tiles) {
-                if (!(t instanceof Map<?, ?> tile)) continue;
-                String widgetId = blankToNull(tile.get("widgetId"));
-                if (widgetId != null && !widgets.contains(widgetId))
-                    findings.add("broken reference: dashboard '" + d.name() + "' tile → missing widget '" + widgetId + "'");
-            }
-        }
-        // A Link Analysis / Geo Map view projects one Dataset, named at `query.projection.datasetId`.
-        for (String type : List.of("link-analysis-view", "geo-map-view")) {
-            for (ComponentRegistry.Component v : byType.getOrDefault(type, List.of())) {
-                if (!(v.content().get("query") instanceof Map<?, ?> q) || !(q.get("projection") instanceof Map<?, ?> p)) continue;
-                String datasetId = blankToNull(p.get("datasetId"));
-                if (datasetId != null && !datasets.contains(datasetId))
-                    findings.add("broken reference: " + type + " '" + v.name() + "' → missing dataset '" + datasetId + "'");
-            }
-        }
-        // A reconciliation compares Datasets — every side (v2 `datasets` list, or v1 left/right) must exist.
-        for (ComponentRegistry.Component r : byType.getOrDefault("reconciliation", List.of())) {
-            List<String> sides = new ArrayList<>();
-            if (r.content().get("datasets") instanceof List<?> ds) {
-                for (Object o : ds) if (o != null) sides.add(o.toString());
-            } else {
-                String left = blankToNull(r.content().get("leftDataset"));
-                String right = blankToNull(r.content().get("rightDataset"));
-                if (left != null) sides.add(left);
-                if (right != null) sides.add(right);
-            }
-            for (String side : sides)
-                if (!datasets.contains(side))
-                    findings.add("broken reference: reconciliation '" + r.name() + "' → missing dataset '" + side + "'");
+        for (LinkGraph.Edge e : LinkGraph.ofComponents(byType, null).dangling()) {
+            if (!e.link().checks().contains(LinkCensus.Check.VALIDATE) || e.toKind().equals("pipeline")) continue;
+            findings.add("broken reference: " + e.fromKind() + " '" + e.fromName() + "'"
+                    + (e.fromKind().equals("dashboard") ? " tile" : "")
+                    + " → missing " + e.toKind() + " '" + e.value() + "'");
         }
         return findings;
     }
@@ -90,17 +49,10 @@ public final class ComponentIntegrity {
     public static List<String> brokenPipelineRefs(Map<String, List<ComponentRegistry.Component>> byType,
                                                   Set<String> pipelineIds) {
         List<String> findings = new ArrayList<>();
-        Set<String> ids = new HashSet<>();
-        for (String p : pipelineIds) ids.add(p.toLowerCase());
-        for (String type : List.of("expectation", "decision-rule")) {
-            for (ComponentRegistry.Component c : byType.getOrDefault(type, List.of())) {
-                String targetType = String.valueOf(c.content().getOrDefault("targetType", "pipeline"));
-                if (!"pipeline".equalsIgnoreCase(targetType)) continue;
-                String target = blankToNull(c.content().get("target"));
-                if (target != null && !ids.contains(target.trim().toLowerCase()))
-                    findings.add("broken reference: " + type + " '" + c.name() + "' → missing pipeline '"
-                            + target.trim() + "'");
-            }
+        for (LinkGraph.Edge e : LinkGraph.ofComponents(byType, pipelineIds).dangling()) {
+            if (!e.link().checks().contains(LinkCensus.Check.VALIDATE) || !e.toKind().equals("pipeline")) continue;
+            findings.add("broken reference: " + e.fromKind() + " '" + e.fromName() + "' → missing pipeline '"
+                    + e.value().trim() + "'");
         }
         return findings;
     }
@@ -120,11 +72,5 @@ public final class ComponentIntegrity {
             }
         }
         return findings;
-    }
-
-    private static Set<String> names(List<ComponentRegistry.Component> list) {
-        Set<String> out = new HashSet<>();
-        for (ComponentRegistry.Component c : list) out.add(c.name());
-        return out;
     }
 }
