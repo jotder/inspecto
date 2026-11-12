@@ -1489,11 +1489,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * handler previously sent no cache headers and no validator at all, which does NOT mean "do not
      * cache" — with neither a directive nor a validator a browser falls back to HEURISTIC freshness
      * and may reuse a response without revalidating. Serving an upgraded UI from the same host:port
-     * then combines the new {@code index.html} with stale chunks, and because Angular reuses its short
-     * chunk names across builds a stale {@code chunk-<hash>.js} can hold a DIFFERENT module than the
-     * one the new graph imports from it — the import resolves to undefined and bootstrap dies on a
-     * missing helper ("w$1 is not a function"). The failure looks like a corrupt bundle, so it costs
-     * far more to diagnose than the revalidation costs to avoid.
+     * then combines the new {@code index.html} with stale UNHASHED files. (The 2026-08-17 fix for "w$1 is not a function" blamed
+     * Angular reusing chunk names across builds; N6 re-checked that on 2026-11-12 against 31 builds on this host - 2,713 hashed
+     * files, 1,765 names, no name ever held different bytes - so the hashed files above are immutable. The failure's real cause
+     * was the keep-alive desync handled in the catch below: a chunk arriving under another chunk's URL.)
      *
      * {@code no-cache} means "revalidate before reuse", not "do not store": the ETag makes that
      * revalidation cheap, answering an unchanged file with a bodiless 304 instead of the bytes.

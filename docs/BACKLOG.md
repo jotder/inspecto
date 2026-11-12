@@ -1038,7 +1038,7 @@ someone asks what is still gated.
 
 #### Web UI
 
-- **BUNDLE-1 perf question** — `no-cache` on content-hashed chunks vs `immutable`; unmeasured; only if a revalidation storm is observed
+- **BUNDLE-1 perf question** — ✅ decided 2026-11-12 (la-performance-plan N6): content-hashed files are `immutable`, everything else `no-cache` + ETag; no chunk name held two contents across 31 builds on this host (2,713 hashed files, 1,765 names)
 
 #### Link Analysis & Geo
 
