@@ -28,17 +28,24 @@ ratcheting duplication guard (Must items M1–M10).
 - **Coulds:** C1 windowed and ratio Measures (first consumer: Customer Segments, `PREDICTIVE-SEGMENT-RFM-1`, 2026-11-01 — [`spec-segmentation.md`](../predictive/spec-segmentation.md)), C2 k-means, C3 logistic regression, C4 isolation forest
   (`ANOMALY-ML-SCORING-1`), C5 hour-of-week seasonality, C6 change-point kernel, C8 function catalogue
   (`GET /analytics/functions`), C9 cohort retention and funnel.
+- **Operator confirmed D-AN10…D-AN35 on 2026-11-12** (interview): D-AN12 (D10 / D11 stand), D-AN13 (unobservable cohort
+  cells absent, never 0), D-AN22 (k-means has no Step), D-AN25 / D-AN28 (fit offline only, no forest preview), D-AN26
+  (the forest is an opt-in option over the existing deviations), D-AN30 (dead `Summarize*` classes deleted) and D-AN32
+  (scratch-name sites stay listed on the board row) one by one; the rest as built.
+- **Could-batch kernels in the function catalogue (2026-11-12):** provider `CouldBatchFunctions` lists the calendar
+  slot, seasonal profile, change points, cohort retention, funnel, k-means, logistic regression and the isolation
+  forest; `stats.correlation` names `method: pearson | spearman`. Windowed and ratio Measures are Measure grammar, not
+  a kernel function, so they are not catalogued.
+- **Anomaly Model form authors `method` / `forest`** (D-AN29, closed 2026-10-20 with `ANOMALY-ML-SCORING-1`).
 - **Steps for C6 and C9 (2026-11-01, `ANALYTICS-STEPS-TS-1`):** `transform.timeseries.changepoint`,
   `transform.cohort.retention`, `transform.cohort.funnel` (`steps:` kinds `changepoint`, `retention`, `funnel`) —
   [spec § Change-point and cohort Steps](spec.md#change-point-and-cohort-steps).
 
 ## Left
 
-- Operator confirmation of decisions D-AN10…D-AN35 (assistant-decided).
-- Register the lane A and B kernels in the C8 catalogue (only `KernelFunctions` is listed today).
-- The Anomaly Model form does not author `method` / `forest` (D-AN29).
 - Hand-wrapped scratch-name sites listed on the row; `PartitionCompactor` `union_by_name` (operator-owned).
-- C7 graph traversal in SQL — blocked on DuckDB 2.0 adoption; it is candidate C1 / C2 of
+- C7 graph traversal in SQL — no longer blocked (DuckDB 2.0.0.0 is pinned since 2026-10-23); it waits for its
+  benchmark on board row `DUCKDB-2-LOOP-QUERIES-1`, candidate C1 / C2 of
   [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md) §7.
 
 ## Refused (Won't, this horizon)

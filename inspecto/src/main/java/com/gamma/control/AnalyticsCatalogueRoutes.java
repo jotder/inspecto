@@ -18,7 +18,7 @@ import java.util.Map;
 /**
  * The Analytics function catalogue over HTTP (ANALYTICS-CORE-1 C8).
  * <pre>
- *   GET /analytics/functions[?kernel=statistics|profiler|time_series|forecast|similarity|grouping|graph]
+ *   GET /analytics/functions[?kernel=statistics|profiler|time_series|forecast|similarity|grouping|graph|cohort|model]
  *       {total, kernels[{id, label, count}], functions[{id, label, kernel, cost, result, forms[], step, summary, params[]}]}
  * </pre>
  * Read-only and ungated like {@code GET /inv/graph/algorithms}: it DESCRIBES what the kernel offers and runs nothing, and

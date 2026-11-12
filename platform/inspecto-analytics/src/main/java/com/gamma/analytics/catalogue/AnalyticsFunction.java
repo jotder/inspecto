@@ -18,7 +18,8 @@ public record AnalyticsFunction(String id, String label, Kernel kernel, Cost cos
     /** The kernel a function belongs to: the unit a reader of the catalogue groups by. */
     public enum Kernel {
         STATISTICS("Statistics"), PROFILER("Column profiler"), TIME_SERIES("Time series"), FORECAST("Forecasting"),
-        SIMILARITY("Similarity"), GROUPING("Entity grouping"), GRAPH("Graph");
+        SIMILARITY("Similarity"), GROUPING("Entity grouping"), GRAPH("Graph"), COHORT("Cohort analysis"),
+        MODEL("Model kernels");
 
         private final String label;
 

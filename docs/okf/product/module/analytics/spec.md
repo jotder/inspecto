@@ -31,7 +31,7 @@ timestamp: 2026-10-18T00:00:00Z
 > review candidates, never a group (§ [Entity grouping](#entity-grouping)).
 > **S3, the distribution Steps, are built (2026-10-17):** `transform.stats.outlier`, `transform.data.binning` and
 > `transform.stats.correlation` on the definitions here (§ [Distribution Steps](#distribution-steps)).
-> **Could batch, lane A, built 2026-10-18 (D-AN10…D-AN13 in the plan, assistant-decided, pending operator confirmation):**
+> **Could batch, lane A, built 2026-10-18 (D-AN10…D-AN13 in the plan, assistant-decided, operator-confirmed 2026-11-12):**
 > C5 [hour of week and seasonal profile](#hour-of-week-and-seasonal-profile), C6
 > [change-point and regime detection](#change-point-and-regime-detection), C1
 > [windowed and ratio Measures](#windowed-and-ratio-measures), C9 [cohort retention and funnel](#cohort-retention-and-funnel).
@@ -40,7 +40,7 @@ timestamp: 2026-10-18T00:00:00Z
 >
 > **The model kernels are built (2026-10-18, Could C2, C3, C4 and the Spearman residual of S3):** rank correlation
 > (`method: spearman`), k-means, logistic regression with the holdout split, and an isolation forest behind the Anomaly
-> Score (§ [Model kernels](#model-kernels)). Decisions D-AN20…D-AN29, assistant-decided, pending operator confirmation.
+> Score (§ [Model kernels](#model-kernels)). Decisions D-AN20…D-AN29, assistant-decided, operator-confirmed 2026-11-12.
 
 ## The module
 
@@ -65,7 +65,7 @@ Packages:
 * `com.gamma.analytics.cohort` — `Retention` and `Funnel` (C9, § [Cohort retention and funnel](#cohort-retention-and-funnel)).
 * `com.gamma.analytics.forecast` — the forecast kernel and its prediction-interval output (S5 (a) + (e), § Forecasting).
 * `com.gamma.analytics.catalogue` — the function catalogue (C8): `AnalyticsFunction`, `AnalyticsFunctionProvider`,
-  `AnalyticsCatalogue`, `KernelFunctions` (§ [Function catalogue](#function-catalogue)).
+  `AnalyticsCatalogue`, `KernelFunctions`, `CouldBatchFunctions` (§ [Function catalogue](#function-catalogue)).
 * `com.gamma.analytics.similarity` — the similarity kit (S1): `Similarity`, `JaroWinkler`, `TextUnit`,
   `SimilaritySql` (§ [Similarity kit](#similarity-kit)).
 * `com.gamma.analytics.entity` — deterministic entity grouping (S2): `EntityGrouping`, `EntityGroupingSql`,
@@ -131,7 +131,8 @@ Menu row, grants and dry run: [platform-services](../processor/spec-platform-ser
 
 ANALYTICS-CORE-1 C8 (2026-10-18; D-AN33…D-AN35). `com.gamma.analytics.catalogue` DESCRIBES what the kernel offers and
 runs nothing: an `AnalyticsFunction` is an id (dotted lower-case, `stats.quantile`), a label, its `Kernel`
-(statistics · profiler · time series · forecasting · similarity · entity grouping · graph), a `Cost` hint
+(statistics · profiler · time series · forecasting · similarity · entity grouping · graph · cohort analysis ·
+model kernels), a `Cost` hint
 (constant · linear · linearithmic · quadratic), a `ResultKind` (scalar · column · table · sql · groups · forecast ·
 catalogue), the `Form`s it runs as (JVM, SQL, or both with parity tests), the pipeline Step id when it is also a Step,
 and its `Param`s (type, default, bounds, choices) — the same facts LA's `Algorithm` enum publishes for graphs.
@@ -141,6 +142,9 @@ and its `Param`s (type, default, bounds, choices) — the same facts LA's `Algor
   `platform/inspecto-analytics/src/main/resources/META-INF/services/com.gamma.analytics.catalogue.AnalyticsFunctionProvider`.
   `AnalyticsCatalogue.load()` (ServiceLoader) merges every provider, orders by kernel then id and **fails at load on a
   duplicate id**. `KernelFunctions` is the S-tier provider (26 entries, 2026-10-18); do not extend it for a new kernel.
+  `CouldBatchFunctions` (8 entries, 2026-11-12) is the second provider: calendar slot, seasonal profile and change
+  points under time series, the cohort kernel (retention, funnel) and the model kernels (k-means, logistic regression,
+  isolation forest). Windowed and ratio Measures are Measure grammar, not a kernel function, and are not listed.
 * **Route.** `GET /analytics/functions[?kernel=…]` (`AnalyticsCatalogueRoutes`, core): read-only and ungated — no write
   root, no capability, no data — so the endpoint skill's 503 / 403 / 409 gates do not apply; an unknown `kernel` is 422
   naming the valid ones; the kernel counts stay whole when the list is narrowed. In `openapi.fragment.json`; the UI pane is
