@@ -207,6 +207,9 @@ test('REFUSED chart: a Product value the source does not have, a block set as a 
         ['env:\n  CORS_ORIGIN: x\n', /'env\.CORS_ORIGIN' is not a value/],
         ['resources: big\n', /'resources' is a block in deploy\/helm\/inspecto\/values\.yaml; override its keys one by one/],
         ['extra:\n  - a\n', /only 'key: value' and 'key:' lines are understood here/],
+        // A folded block scalar whose indented line looks like a key must not be read as one (verification, 2026-11-12).
+        ['javaOpts: >\n  port: 1\n', /'javaOpts' is a multi-line value \(>\): write it on one line/],
+        ['javaOpts: |-\n  -Xmx6g\n', /'javaOpts' is a multi-line value/],
     ];
     for (const [extra, re] of cases) {
         const fake = fakeRepo();
@@ -231,6 +234,14 @@ test('guard: one template source, one folder per Product that agrees with produc
     one([...tracked(), 'examples/k8s/Chart.yaml'], /examples\/k8s\/Chart\.yaml: a second chart/);
     one(tracked().filter((x) => !x.includes('/telco/')), /Product 'telco' has no chart folder/);
     one([...tracked(), `${PRODUCT_CHARTS}/ghost/Chart.yaml`], /products\/ghost\/: no Product products\/ghost\.toon/);
+    one([...tracked(), `${CHART_SOURCE}/charts/x/Chart.yaml`], /a subchart inside the chart source/);
+    const copied = tmp();
+    try {
+        mkdirSync(join(copied, 'deploy', 'k8s', 'templates'), { recursive: true });
+        cpSync(join(repo, CHART_SOURCE, 'templates', 'statefulset.yaml'), join(copied, 'deploy', 'k8s', 'templates', 'statefulset.yaml'));
+        const f = checkChartFolders({ repo: copied, products: {}, files: ['deploy/k8s/templates/statefulset.yaml'] });
+        assert.ok(f.some((x) => /deploy\/k8s\/templates\/statefulset\.yaml: a copy of a chart template/.test(x)), f.join('\n'));
+    } finally { rmSync(copied, { recursive: true, force: true }); }
     const fake = fakeRepo();
     try {
         const vf = join(fake, PRODUCT_CHARTS, 'la', 'values.yaml');

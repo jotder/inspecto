@@ -87,7 +87,8 @@ rules:
 - install-time choices still go to `helm install -f` or `--set`.
 
 `node tools/ship.mjs check` is the guard; CI runs it in the Product guard step. It refuses a `Chart.yaml` anywhere
-outside these folders, a file in a Product folder other than `Chart.yaml` and `values.yaml` (so no copied template), a
+outside these folders, a subchart inside the source, a file in a Product folder other than `Chart.yaml` and `values.yaml`,
+a template anywhere else that calls the source's `inspecto.*` helpers (so no copied template, chart or not), a
 Product without a folder or a folder without a Product, a name, image or Product that disagrees with
 `products/<id>.toon`, and a value the source does not have.
 

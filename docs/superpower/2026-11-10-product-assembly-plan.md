@@ -1239,7 +1239,7 @@ Lanes: 8a `46f5a646f` (the chart per Product), 8b `7a3d74d62` (the image per Pro
   inspecto, la and telco charts (and the chart inside the air-gap tar). `helm template` of Telco renders the Product's
   labels and the image `inspecto-telco:4.0.0-SNAPSHOT-advanced`.
 
-**HELM-PRODUCT-VALUES-1 as built (2026-11-12; D-PA27 as changed by the operator; lane this lane).**
+**HELM-PRODUCT-VALUES-1 as built (2026-11-12; D-PA27 as changed by the operator; lane commits `8f8b472b7` and its verification fix).**
 - **Each Product commits its own chart folder**, `deploy/helm/products/<id>/`, with `Chart.yaml` (name = image name,
   description, `inspecto.io/product`) and `values.yaml` (the Product's own defaults; today the image repository and the
   `product` id and title). `deploy/helm/inspecto/` stays the one template source and the shared defaults.

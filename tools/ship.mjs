@@ -74,6 +74,8 @@ export function yamlPaths(text, file) {
         if (!m) fail(`${file}:${i + 1}: only 'key: value' and 'key:' lines are understood here (no lists, no multi-line values): ${line.trim()}`);
         while (stack.length && stack[stack.length - 1].indent >= m[1].length) stack.pop();
         const path = [...stack.map((s) => s.key), m[2]].join('.');
+        // A block scalar (`key: |` / `key: >-`) spans the lines below it: refused, never read as keys of the parent.
+        if (/^[|>][-+0-9]*\s*(#.*)?$/.test(m[3] ?? '')) fail(`${file}:${i + 1}: '${path}' is a multi-line value (${m[3].trim()}): write it on one line`);
         if (!m[3] || m[3].startsWith('#')) { blocks.add(path); stack.push({ indent: m[1].length, key: m[2] }); }
         else leaves.set(path, { i, indent: m[1], key: m[2], value: m[3] });
     });
@@ -95,7 +97,15 @@ function overlay(text, overrides, file) {
 }
 
 const q = (s) => JSON.stringify(String(s)); // a JSON string is a valid YAML double-quoted scalar
-const unq = (v) => { const s = String(v ?? '').replace(/\s+#.*$/, '').trim(); return /^".*"$/.test(s) ? JSON.parse(s) : s.replace(/^'(.*)'$/, '$1'); };
+/** A one-line YAML scalar's text: a "double" or 'single' quoted value is read whole (a ` #` inside it is not a comment). */
+const unq = (v) => {
+    const s = String(v ?? '').trim();
+    const dq = s.match(/^("(?:[^"\\]|\\.)*")\s*(#.*)?$/);
+    if (dq) return JSON.parse(dq[1]);
+    const sq = s.match(/^'((?:[^']|'')*)'\s*(#.*)?$/);
+    if (sq) return sq[1].replace(/''/g, "'");
+    return s.replace(/\s+#.*$/, '');
+};
 
 /**
  * The committed chart folder a Product build uses (D-PA27 as changed 2026-11-12): deploy/helm/products/<id>/, or the
@@ -158,7 +168,14 @@ export function checkChartFolders({ repo = REPO, products, files }) {
     const findings = [];
     const isChart = (f) => /(^|\/)Chart\.yaml$/.test(f);
     for (const f of files) {
+        if (f.startsWith(`${CHART_SOURCE}/charts/`)) { findings.push(`${f}: a subchart inside the chart source - the one source carries its templates in ${CHART_SOURCE}/templates only`); continue; }
         if (f.startsWith(`${CHART_SOURCE}/`)) continue;
+        // A template copied anywhere else, chart or not: a file under a templates/ folder that calls the source's helpers.
+        if (/(^|\/)templates\/[^/]+\.(ya?ml|tpl)$/.test(f)) {
+            let text = '';
+            try { text = readFileSync(join(repo, f), 'utf8'); } catch { /* listed but absent: nothing to read */ }
+            if (/\{\{-?\s*(include|template)\s+"inspecto\./.test(text)) { findings.push(`${f}: a copy of a chart template - the one template source is ${CHART_SOURCE}/templates`); continue; }
+        }
         const m = f.match(new RegExp(`^${PRODUCT_CHARTS}/([^/]+)/(.+)$`));
         if (m) { if (!['Chart.yaml', 'values.yaml'].includes(m[2])) findings.push(`${f}: a Product's chart folder holds Chart.yaml and values.yaml only - templates live in ${CHART_SOURCE}/templates`); continue; }
         if (isChart(f)) findings.push(`${f}: a second chart - the one template source is ${CHART_SOURCE}; a Product's chart is ${PRODUCT_CHARTS}/<id>/`);
@@ -166,7 +183,7 @@ export function checkChartFolders({ repo = REPO, products, files }) {
     }
     const folders = new Set(files.map((f) => f.match(new RegExp(`^${PRODUCT_CHARTS}/([^/]+)/`))?.[1]).filter(Boolean));
     for (const id of folders) if (!products[id]) findings.push(`${PRODUCT_CHARTS}/${id}/: no Product products/${id}.toon`);
-    const sourceValues = readFileSync(join(repo, CHART_SOURCE, 'values.yaml'), 'utf8');
+    const sourceValues = () => readFileSync(join(repo, CHART_SOURCE, 'values.yaml'), 'utf8');
     for (const [id, p] of Object.entries(products)) {
         const dir = `${PRODUCT_CHARTS}/${id}`;
         if (!folders.has(id)) { findings.push(`${dir}/: Product '${id}' has no chart folder (Chart.yaml and values.yaml over ${CHART_SOURCE})`); continue; }
@@ -183,7 +200,7 @@ export function checkChartFolders({ repo = REPO, products, files }) {
             want('values.yaml', values, 'image.repository', repository);
             want('values.yaml', values, 'product.id', id);
             want('values.yaml', values, 'product.title', p.title);
-            overlay(sourceValues, [...values].map(([path, l]) => ({ path, value: l.value, from: `${dir}/values.yaml` })), `${CHART_SOURCE}/values.yaml`);
+            overlay(sourceValues(), [...values].map(([path, l]) => ({ path, value: l.value, from: `${dir}/values.yaml` })), `${CHART_SOURCE}/values.yaml`);
         } catch (e) { findings.push(e.message); }
     }
     return findings;
