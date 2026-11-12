@@ -11,7 +11,9 @@ import java.util.Set;
  *
  * <p>{@link Link#checks()} records which existing check reads the link today; an empty set means nothing checks
  * it yet ({@link Link#enforced()} is false) — it is declared so the census is the complete list
- * (Space anatomy §12.2). {@code onDelete} / {@code onRename} state the intended policy; LC-1 enforces neither.
+ * (Space anatomy §12.2). {@code onDelete} / {@code onRename} state the intended policy; the Pipeline rename
+ * enforces {@code onRename} for the links {@link #renamedWithPipeline()} names (LC-2); nothing enforces
+ * {@code onDelete} yet.
  *
  * <p><b>Key paths</b> are read against the document root of the {@code fromKind} (for a Job, its {@code job:}
  * section when present — {@link LinkGraph#jobSection}): {@code a.b} nested maps, {@code a[]} each list element,
@@ -72,12 +74,12 @@ public final class LinkCensus {
             link("pipeline", "collector.dataset", "dataset", Type.ID, REFUSE, REWRITE),
             // ── Enrichment ───────────────────────────────────────────────────────────────────────
             link("enrichment", "triggers.on_pipeline", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
-            link("enrichment", "references.*.ref", "pipeline", Type.ID, REFUSE, REWRITE, IMPACT, VALIDATE),
+            link("enrichment", "references.*.ref", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
             link("enrichment", "input.database", "store", Type.PATH, WARN, REPORT),
             link("enrichment", "references.*.path", "file", Type.PATH, WARN, REPORT),
             link("enrichment", "transform", "column", Type.SQL_RELATION, WARN, REPORT),
             // ── Job (keys read inside the job: section) ──────────────────────────────────────────
-            link("job", "on_pipeline", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT),
+            link("job", "on_pipeline", "pipeline", Type.ID_LIST, REFUSE, REWRITE, RENAME, IMPACT),
             link("job", "template", "job-template", Type.ID, REFUSE, REPORT, LOAD),
             link("job", "pipeline_config", "pipeline-file", Type.PATH, REFUSE, REWRITE),
             link("job", "dataset", "dataset", Type.ID, REFUSE, REWRITE),
@@ -105,7 +107,7 @@ public final class LinkCensus {
             link("reconciliation", "datasets[]", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
             link("reconciliation", "leftDataset", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
             link("reconciliation", "rightDataset", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
-            link("reconciliation", "thirdDataset", "dataset", Type.ID, REFUSE, REWRITE),
+            link("reconciliation", "thirdDataset", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
             link("reconciliation", "keyColumns", "column", Type.COLUMN, WARN, REPORT),
             link("reconciliation", "compareColumns", "column", Type.COLUMN, WARN, REPORT),
             // ── Space settings ───────────────────────────────────────────────────────────────────
@@ -115,6 +117,16 @@ public final class LinkCensus {
     public static Link of(String fromKind, String keyPath) {
         for (Link l : LINKS) if (l.fromKind().equals(fromKind) && l.keyPath().equals(keyPath)) return l;
         throw new IllegalArgumentException("no census link " + fromKind + ":" + keyPath);
+    }
+
+    /**
+     * The links a Pipeline rename rewrites (`SPACE-LINK-CENSUS-1` LC-2): {@code onRename = REWRITE} and naming the
+     * Pipeline itself or the store its id names. A Job's {@code pipeline_config} (a file path) is not one: the
+     * rename moves the file, and rewriting paths is not part of it yet.
+     */
+    public static List<Link> renamedWithPipeline() {
+        return LINKS.stream().filter(l -> l.onRename() == OnRename.REWRITE
+                && (l.toKind().equals("pipeline") || l.toKind().equals("store"))).toList();
     }
 
     /** The links held by {@code fromKind}, in census order. */

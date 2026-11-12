@@ -312,6 +312,72 @@ class ControlApiPipelineRenameTest {
     }
 
     /**
+     * `PIPELINE-LINK-GAPS-1` (a) and (b), closed by reading the link census: an Enrichment's by-name
+     * {@code references.<n>.ref} is rewritten, and so is the one member of a Job's comma-list {@code on_pipeline}
+     * that names the pipeline — every other member, reference and trigger stays as written.
+     */
+    @Test
+    void renameRewritesByNameReferencesAndOneMemberOfACommaList() throws Exception {
+        Path root = Files.createTempDirectory("rename-census-gaps");
+        try (Ctx c = open(root, false)) {
+            Files.writeString(root.resolve("lookup_enrich.toon"), """
+                    name: lookup
+                    input:
+                      database: data/fx
+                      partitions[1]: day
+                    output:
+                      database: data/lookup
+                      partitions[1]: day
+                    transform: SELECT 1
+                    triggers:
+                      on_pipeline: fx
+                    references:
+                      mini:
+                        ref: mini_etl
+                      rates:
+                        ref: fx
+                      lut:
+                        path: data/lut.csv
+                    """);
+            Files.createDirectories(root.resolve("jobs"));
+            Files.writeString(root.resolve("jobs").resolve("both_job.toon"), """
+                    job:
+                      name: both
+                      type: pipeline
+                      on_pipeline: "fx, mini_etl ,other"
+                    """);
+            Files.writeString(root.resolve("jobs").resolve("near_job.toon"), """
+                    job:
+                      name: near
+                      type: pipeline
+                      on_pipeline: "fx, mini_etl_x"
+                    """);
+
+            HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/rename", "{\"newId\":\"mini_v2\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(2, V1Body.of(r.body()).get("dependentsRewritten").asInt(), "the enrichment + one job");
+
+            com.gamma.enrich.EnrichmentConfig enrich = com.gamma.enrich.EnrichmentConfig.fromMap(
+                    ConfigLoader.filesystem().decode(root.resolve("lookup_enrich.toon").toString()), null, root);
+            Map<String, String> refs = new LinkedHashMap<>();
+            for (var ref : enrich.references()) refs.put(ref.name(), ref.ref() != null ? ref.ref() : "path");
+            assertEquals(Map.of("mini", "mini_v2", "rates", "fx", "lut", "path"), refs,
+                    "the by-name reference moves; another pipeline's and a file path stay");
+            assertEquals("fx", enrich.triggers().onPipeline(), "a trigger on another pipeline is left alone");
+
+            com.gamma.job.JobConfig both = com.gamma.job.JobConfig.load(root.resolve("jobs").resolve("both_job.toon").toString());
+            assertEquals(List.of("fx", "mini_v2", "other"), both.onPipelines());
+            assertEquals("fx, mini_v2 ,other", String.valueOf(((Map<?, ?>) ConfigLoader.filesystem()
+                    .decode(root.resolve("jobs").resolve("both_job.toon").toString()).get("job")).get("on_pipeline")),
+                    "only the renamed member changes; the rest keeps its spelling");
+            assertEquals(List.of("fx", "mini_etl_x"), com.gamma.job.JobConfig.load(
+                    root.resolve("jobs").resolve("near_job.toon").toString()).onPipelines(), "a member is matched whole");
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
+    /**
      * VIRTUAL-DATASET-SQL-RENAME-1: a SQL-authored (virtual) Dataset's {@code sql} names the store in its
      * FROM; the rename rewrites that relation reference (via the DuckDB parse tree) beside
      * {@code sourceName}, so the Dataset still reads — while a column and a string literal spelled like the

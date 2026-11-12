@@ -323,6 +323,33 @@ class ControlApiPipelineBundleTest {
         }
     }
 
+    /** `PIPELINE-LINK-GAPS-1` (c): a companion in a sub-folder travels (the file set PipelineDependents reads),
+     *  a {@code .history/} copy does not, and two companions under one file name are refused, never collapsed. */
+    @Test
+    void aCompanionInASubFolderTravelsAndTwoUnderOneNameAreRefused(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Path toon = fixture(dir);
+        String sourceDb = String.valueOf(((Map<?, ?>) ConfigCodec.toMap(Files.readString(toon)).get("dirs")).get("database"));
+        companion(wr, sourceDb);
+        Path nested = Files.createDirectories(wr.resolve("orders")).resolve("test_daily_enrich.toon");
+        Files.move(wr.resolve("test_daily_enrich.toon"), nested);
+        Files.createDirectories(wr.resolve("orders/.history"));
+        Files.copy(nested, wr.resolve("orders/.history/old_daily_enrich.toon"));
+
+        try (Ctx c = open(dir, wr, toon)) {
+            HttpResponse<byte[]> zip = sendZip(c.port, "GET", "/pipelines/test_etl/bundle", null);
+            assertEquals(200, zip.statusCode());
+            Map<String, byte[]> entries = unzip(zip.body());
+            assertTrue(entries.containsKey("test_daily_enrich.toon"), "the nested companion travels: " + entries.keySet());
+            assertFalse(entries.containsKey("old_daily_enrich.toon"), "a .history copy is not a companion");
+
+            Files.createDirectories(wr.resolve("ops"));
+            Files.copy(nested, wr.resolve("ops/test_daily_enrich.toon"));
+            HttpResponse<byte[]> clash = sendZip(c.port, "GET", "/pipelines/test_etl/bundle", null);
+            assertEquals(409, clash.statusCode(), new String(clash.body(), StandardCharsets.UTF_8));
+        }
+    }
+
     private record Profiled(Path pipeline, Path profile, String grammarText, String rootType) {}
 
     /** Copy the committed msc_cdr demo to {@code cfg/msc/}, then move its grammar, root_type, strictness and
