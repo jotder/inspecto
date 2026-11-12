@@ -32,21 +32,20 @@ before `4.0.0` is tagged and installed for a first customer?**
 [maturity assessment](../product/plan-maturity-assessment.md) and `compliance/controls-matrix.md`.
 Module-level architecture pages were not read for this ranking, so observability has no item of its own.
 
-## 2. Must — 9 items
+## 2. Must — 8 items
 
 | # | Item | What is open | Why it is a Must | Waits on |
 |---|---|---|---|---|
 | M1 | `IMPORT-LOADER-CASE-TOON-1` and `SPACE-TEST-SUITE-RED-1` | Three tests of `inspecto-processor` are red on master, all around the `space.test` Job Type of SE-6a: a loader reads the fixed name `case.toon`, which is neither reserved nor allow-listed; `space.test` reports `classpath` where a test expects `builtin`; and one test fails only inside the full suite. | Master is red, and an import could plant the file. | The SE-6a owner: reserve or allow, and which provenance is right. |
-| M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | The last full reactor gate ran on `fc8b5d1f0`; later work shipped on targeted tests. | Nobody can say master is green. Two of the three red tests in M1 surfaced only because one module's whole suite was run on 2026-11-12 (2,733 tests). | Nothing: one run. |
+| M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | Two records of 2026-11-12 disagree on whether master is green. The product-assembly plan records a green full Advanced reactor gate over `6a7d8c20b` plus PA-9b. A run of the whole `inspecto-processor` suite on `fe87aa121` (2,733 tests) had the three failures of M1, and two of them fail alone on `e45b25f9d`. | Until one full gate on current master settles it, nobody can say master is green. | Nothing: one run. |
 | M3 | `JOB-SIGNAL-OVERLAP-SKIP-1` | An `on_signal` Job loses the last landing when a signal arrives while it runs. | A Dataset missed a month of data until another commit; three packs carry a cron workaround. | Nothing. |
 | M4 | Release notes for the next MAJOR (§2 of the board) | Breaking route removals are typed `docs:` in git, so a `feat!:` scan misses them; every `since = "4.0.0"` type is unpublished. | The release notes are generated from commit types; they would be wrong. | The MAJOR tag. |
 | M5 | `ARCH-MOSCOW-UNTRACKED-1` item 2 *(no row of its own)* and `MODULE-REORG-P3-THIN-JARS` | `release.yml` signing, SBOM and scan have never run on a tag; the keystore, secrets and TSA URL are owed. | Supply-chain claims are unproven and jars would ship unsigned. | Operator: keys and a release date. |
 | M6 | `ARCH-MOSCOW-UNTRACKED-1` item 3 *(no row of its own)* | Columns classed `CONFIDENTIAL` (for example AML `account_id`, `wallet_id`, `msisdn`) sit outside `ColumnClassification.SENSITIVE`, so they are not masked. | Exposure of personal data; the maturity assessment calls it a due-diligence finding and sizes it in days. | Verify in code first. |
 | M7 | `ASSURE-OPERABILITY-1`, Deployment topology live validation, `DEPLOY-SERVICE-WRAPPER-1` | No recorded restore drill, RPO and RTO unmeasured, the kill -9 and reboot acceptance of the service wrapper unrun, the chart never installed. | The wrapper is the recovery mechanism; recovery that was never exercised is a claim, not a property. | Operator: targets and host access. |
-| M8 | `TEST-ENV-PG-ASN-UNRUN-1` | Postgres-backed tests and five `asn-*` modules cannot run on the shared profile; `PostgresStateStoreTest` skips all 11 tests here. | A green reactor does not cover the Postgres stores Advanced ships. | Operator (postponed): a Postgres on the build box. |
-| M9 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | `SqlTemplateJob.swapIn` deletes the old snapshot while a running reader still reads it. | A dependent Job fails all its retries (seen in `la-banking`). | Nothing. |
+| M8 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | `SqlTemplateJob.swapIn` deletes the old snapshot while a running reader still reads it. | A dependent Job fails all its retries (seen in `la-banking`). | Nothing. |
 
-Three of the nine (M2, M3 and M9) need no decision from anyone and can start now.
+Three of the eight (M2, M3 and M8) need no decision from anyone and can start now.
 
 ## 3. Should — 16 items
 
@@ -66,10 +65,10 @@ Three of the nine (M2, M3 and M9) need no decision from anyone and can start now
 | S12 | `ARCH-MOSCOW-UNTRACKED-1` item 7 *(no row of its own)* | Retention and legal hold cover Incidents only. | The Advanced brochure promises legal hold; either build it or narrow the claim. |
 | S13 | `DEMO-BAKE-WAL-RACE-1` | Closing a busy Space gives up after 10 s and leaves `.wal` files. | Seen while baking demo images; the row itself says it is open for a production stop. |
 | S14 | `ARCH-MOSCOW-UNTRACKED-1` item 8 *(no row of its own)* | UI: "the core never imports a feature" is not lint-enforced, and 48 feature-to-feature imports rest on review. Link Analysis graph layouts run on the main thread (2.3 to 3.6 s at 767 nodes). | The convention holds today; the freeze is a usability cost. The lint is small. |
-| S15 | `ARCH-DOC-CONTRADICTIONS-1` | Fourteen places where current docs contradict each other (thin-jar count, shading, Postgres multi-user state, D15, old Edition names and more). | Docs, not behaviour; but a reader acting on the wrong page gets the wrong answer. |
+| S15 | `ARCH-DOC-CONTRADICTIONS-1` | Fourteen places (one settled since) where current docs contradict each other (thin-jar count, shading, Postgres multi-user state, D15, old Edition names and more). | Docs, not behaviour; but a reader acting on the wrong page gets the wrong answer. |
 | S16 | `DOCS-AGENT-WRITTEN-REVIEW-1` | A work list of wrong claims in plan and admin-guide pages remains; module architecture pages were not re-checked. | Same reason as S15; done a module at a time when next touched. |
 
-## 4. Could — 15 items
+## 4. Could — 14 items
 
 | # | Item | What is open |
 |---|---|---|
@@ -81,13 +80,12 @@ Three of the nine (M2, M3 and M9) need no decision from anyone and can start now
 | C6 | `ANALYTICS-CORE-1` (Could batch) | Decisions D-AN10 to D-AN13 and D-AN20 to D-AN29 await confirmation. |
 | C7 | Consignment addressing | The ingest-side accessor has no consumer; `retire_superseded` is off by default. |
 | C8 | Branch-aware executor residuals | The pre-fetch intake cap needs a listing-with-sizes connector seam. |
-| C9 | `REALTIME-DECISIONING-1` | The engine is batch; windowed Alert Rules on a `trigger: stream` Pipeline are designed. Large, and worth it only for card-authorisation or pre-call-blocking bids. |
-| C10 | `LA-INVESTIGATION-STORE-DESIGN-1` with `LA-INVESTIGATION-DELETE-PG-1` | An `InvestigationStore` port so Investigations leave the file system. Postponed by the operator. |
-| C11 | `LA-INDEX-SCALE-MEASURE-1` | Link index behaviour is measured to about 10^8, not 10^9. |
-| C12 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` · `UI-SCHEMA-FORM-EDITOR-1` | A WARN on every boot; the last file on the forms lint allow-list. |
-| C13 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` · `CODEGRAPH-AFFECTED-UNUSABLE-1` · `AGT-5` | Three upstream reports or seams owed outside this repo. |
-| C14 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` · `NATIVE-LICENCE-LINUX-MACOS-1` | The Linux product zip; two licence calls on native libraries. |
-| C15 | `DOCS-FUNCTIONALITY-HUBS-1` | Whether `functionality/` items get hubs. |
+| C9 | `REALTIME-DECISIONING-1` | The engine is batch; windowed Alert Rules on a `trigger: stream` Pipeline are in progress (PA-9a and PA-9b built, the rest designed). Large, and worth it only for card-authorisation or pre-call-blocking bids. |
+| C10 | `LA-INDEX-SCALE-MEASURE-1` | Link index behaviour is measured to about 10^8, not 10^9. |
+| C11 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` · `UI-SCHEMA-FORM-EDITOR-1` | A WARN on every boot; the last file on the forms lint allow-list. |
+| C12 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` · `CODEGRAPH-AFFECTED-UNUSABLE-1` · `AGT-5` | Three upstream reports or seams owed outside this repo. |
+| C13 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` · `NATIVE-LICENCE-LINUX-MACOS-1` | The Linux product zip; two licence calls on native libraries. |
+| C14 | `DOCS-FUNCTIONALITY-HUBS-1` | Whether `functionality/` items get hubs. |
 
 ## 5. Won't (this time) — refused or postponed, each with its reopen trigger
 
@@ -101,19 +99,19 @@ Three of the nine (M2, M3 and M9) need no decision from anyone and can start now
 | Storage shapes: Kafka as the data path, a whole Space on S3, a database per Space, PgBouncer, a rollup cache | Declined in the data-plane plan. | Not stated. |
 | Active/active, ZooKeeper or etcd, a cluster engine, the Kubernetes Lease API | Declined in the scale-out plan. | Not stated. |
 | Horizontal scale-out beyond what is built: `SCALEOUT-HELM-NPOD-1`, `SCALEOUT-U1-REMOTE-ACQUIRE-1`, `SCALEOUT-LIVE-HALVES-1`, `SPACES-FROM-PARTITION-MAP-1`, distributed Consignment execution | Postponed by the operator. `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` (a duplicate output after failover) stays acceptable only while that path is kept off. | A multi-Pod deployment is scheduled. Before it: verify `/auth/refresh` statelessness and SPA chunk skew on a rolling update. |
-| Postgres multi-user beyond the pool and schema-per-Space | Postponed by the operator, 2026-10-23. | The Postgres release is scheduled. |
+| Postgres multi-user beyond the pool and schema-per-Space; `TEST-ENV-PG-ASN-UNRUN-1` (the Postgres-backed tests and five `asn-*` modules cannot run on the shared profile; 36 processor tests skip here); `LA-INVESTIGATION-STORE-DESIGN-1` with `LA-INVESTIGATION-DELETE-PG-1` | Postponed by the operator: the next release ships without Postgres. The cost is stated, not hidden: a green reactor does not cover the Postgres stores. | The Postgres release is scheduled. The test environment comes first. |
 | Compliance certification (NFR-7, SOC 2 Type II) | Externally gated: auditor, pen test, an observation window not started. Months. | An engagement starts. |
 | Masking edges, `PATH-2`, Decision Kernel step 7 | Refused or declined. Step 7 leaves the condition tree failing open where `Conditions` fails closed. | Not stated; step 7 deserves a second look if Access Policy text is ever compiled. |
-| Hashed-chunk caching (`BUNDLE-1`), mid-write interrupt, fetch-lane FIFO, startup backfill, `PKG-5`, connector sidecar gating, publishing eoiagent to a registry | Refused, board §6. | Each row states its own trigger. |
+| Mid-write interrupt, fetch-lane FIFO, startup backfill, `PKG-5`, connector sidecar gating, publishing eoiagent to a registry | Refused, board §6. | Each row states its own trigger. |
 
 ## 6. What this ranking says
 
-1. **Master is not known to be green.** M1 and M2 come before everything else: fix or decide the two red
-   tests, run the full gate once, and keep it as the daily gate the lane workflow already calls for.
-2. **The release path is the largest unproven piece.** M4, M5, M7 and M8 are all "it exists and has never
-   run": the release workflow, the recovery drill, the service wrapper acceptance, the Postgres tests.
-   None needs design; each needs an operator input and one execution.
-3. **Two correctness defects in Jobs (M3, M9) are the only Musts that are plain engineering.**
+1. **Master is not known to be green.** M1 and M2 come before everything else: decide the red tests, run
+   the full gate once on current master, and keep it as the daily gate the lane workflow already calls for.
+2. **The release path is the largest unproven piece.** M4, M5 and M7 are all "it exists and has never
+   run": the release workflow, the recovery drill, the service wrapper acceptance. None needs design; each
+   needs an operator input and one execution.
+3. **Two correctness defects in Jobs (M3, M8) are the only Musts that are plain engineering.**
 4. **Structure is in good shape.** No Must is about module boundaries: the split-package count is 0, the
    remaining cycles are inside one module each, and the refusals in §5 have held.
 5. **Eleven items have no board row.** They come from docs, not code. `ARCH-MOSCOW-UNTRACKED-1` checks each
