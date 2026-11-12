@@ -455,9 +455,11 @@ final class BundleRoutes implements RouteModule {
 
     // ── helpers ────────────────────────────────────────────────────────────────────
 
-    /** The integrity kinds the shared rules cover (see {@link com.gamma.pipeline.ComponentIntegrity}). */
-    private static final List<String> INTEGRITY_KINDS = List.of("dataset", "query", "widget", "dashboard", "reconciliation",
-            "link-analysis-view", "geo-map-view");
+    /** The integrity kinds the import pre-check covers: both ends of every census link it reads
+     *  ({@link com.gamma.pipeline.LinkCensus.Check#IMPORT}, judged by {@link com.gamma.pipeline.ComponentIntegrity}). */
+    private static final List<String> INTEGRITY_KINDS = com.gamma.pipeline.LinkCensus.LINKS.stream()
+            .filter(l -> l.checks().contains(com.gamma.pipeline.LinkCensus.Check.IMPORT))
+            .flatMap(l -> java.util.stream.Stream.of(l.fromKind(), l.toKind())).distinct().toList();
 
     /** Broken-reference findings the incoming items would introduce: findings over
      *  (registry ∪ incoming) minus the findings the registry already has on its own. */
