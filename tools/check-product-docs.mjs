@@ -7,6 +7,8 @@
 // CHECKS  1 the hub's frontmatter `item:` equals `<kind>.<name>` of its folder, and that Product Map Item exists
 //         2 the slot table has every SLOT exactly once, in order, each with a status from STATUSES
 //         3 the Product Map Item's `docs:` points at its hub
+//         4 architecture slot names (ARCH-DOCS-CONSOLIDATE-1): a hub with architecture pages has architecture.md, and no
+//           topic page is named overview / module / technical / change-log
 // Links inside the table are resolved by check-doc-links.mjs, not here. Items with no hub yet are listed, not failed (wave 2).
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -33,6 +35,19 @@ export function checkHub(kind, name, hub, mapText) {
     return { findings, slots };
 }
 
+const ARCH_BANNED = ['overview', 'module', 'technical', 'change-log'];
+/** ARCH-DOCS-CONSOLIDATE-1 naming rule. files: the hub folder's file names. Returns findings. */
+export function checkArchitectureNames(id, files) {
+    const arch = files.filter((f) => f === 'architecture.md' || (f.startsWith('architecture-') && f.endsWith('.md'))), findings = [];
+    for (const f of arch) {
+        const topic = f.slice('architecture-'.length, -3);
+        if (f !== 'architecture.md' && ARCH_BANNED.includes(topic))
+            findings.push(`${id}: ${f} — '${topic}' is not a subject; the hub's entry page is architecture.md, a dated journal belongs in docs/archived-documents/`);
+    }
+    if (arch.length && !arch.includes('architecture.md')) findings.push(`${id}: has ${arch.join(', ')} but no architecture.md — every hub's entry page is architecture.md`);
+    return findings;
+}
+
 function main() {
     const ri = process.argv.indexOf('--root');
     const root = ri > 0 ? process.argv[ri + 1] : '.';
@@ -45,7 +60,7 @@ function main() {
             if (!existsSync(hubFile)) { findings.push(`${k}.${n}: folder has no index.md`); continue; }
             hubs.add(`${k}/${n}`);
             const r = checkHub(k, n, readFileSync(hubFile, 'utf8'), existsSync(mapFile) ? readFileSync(mapFile, 'utf8') : undefined);
-            findings.push(...r.findings);
+            findings.push(...r.findings, ...checkArchitectureNames(`${k}.${n}`, readdirSync(join(hubRoot, k, n))));
             for (const [s, st] of Object.entries(r.slots)) if (coverage[s]?.[st] !== undefined) coverage[s][st]++;
         }
     }

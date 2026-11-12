@@ -17,13 +17,13 @@ Vocabulary (`docs/GLOSSARY.md`): **Pipeline**, **Collector** (acquisition entity
 | Need | Hub / slot file |
 |---|---|
 | Pipeline model, editor, steps | `module/etl/architecture.md`, `module/etl/spec-step-catalog.md`, `module/etl/user-guide-pipelines.md`, `module/etl/user-guide-pipeline-editor.md` |
-| Parsing / schema mapping / enrichment | `module/etl/architecture-parsing-ingest.md`, `module/etl/user-guide-schema-mapping.md`, `module/etl/user-guide-enrichment.md` |
+| Parsing / schema mapping / enrichment | `module/etl/architecture.md`, `module/etl/user-guide-schema-mapping.md`, `module/etl/user-guide-enrichment.md` |
 | Execution: graph, node types, lanes | `module/engine/architecture-pipeline-graph.md`, `module/engine/spec-node-types.md`, `module/engine/spec-execution-lanes.md` |
 | Test run / dry run | `module/engine/spec-pipeline-test-run.md` |
 | Sinks, grammar, parser options | `module/engine/spec-output-sinks.md`, `module/engine/spec-parsing-grammar.md`, `module/engine/spec-parsing-options.md` |
 | TOON syntax + keys | `module/config/spec-toon-config.md`, `module/config/spec-pipeline-config-keys.md`, `module/config/admin-guide-configuration-reference.md` |
 | Safety gates | `module/config/spec-config-safety.md` |
-| Collectors (acquisition) | `module/acquire/architecture-collectors.md`, `module/acquire/user-guide-collector-config.md` |
+| Collectors (acquisition) | `module/acquire/architecture.md`, `module/acquire/user-guide-collector-config.md` |
 | Spaces (where config lives) | `module/config/architecture.md` |
 
 ## Config-safety rules (from `spec-config-safety.md`)

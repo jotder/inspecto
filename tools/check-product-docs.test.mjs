@@ -1,7 +1,7 @@
 // Fixture test for tools/check-product-docs.mjs. Run: node --test tools/check-product-docs.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkHub, SLOTS } from './check-product-docs.mjs';
+import { checkArchitectureNames, checkHub, SLOTS } from './check-product-docs.mjs';
 
 const hub = (rows = SLOTS.map((s) => [s, 'missing']), item = 'module.acquire') =>
     `---\nitem: ${item}\n---\n\n| Slot | Status | Document |\n|---|---|---|\n${rows.map(([s, t]) => `| ${s} | ${t} | x |`).join('\n')}\n`;
@@ -23,6 +23,17 @@ test('product-map docs: must point at the hub', () => {
 });
 test('a dropped slot is refused', () => {
     assert.match(checkHub('module', 'acquire', hub(SLOTS.slice(1).map((s) => [s, 'missing'])), map).findings.join(), /slot rows/);
+});
+test('architecture.md alone or with a subject page passes; no architecture page passes', () => {
+    assert.deepEqual(checkArchitectureNames('module.engine', ['index.md', 'architecture.md', 'architecture-stage1.md', 'spec.md']), []);
+    assert.deepEqual(checkArchitectureNames('module.engine', ['index.md', 'spec.md']), []);
+});
+test('an overview or change-log architecture page is refused', () => {
+    assert.match(checkArchitectureNames('module.graph', ['architecture.md', 'architecture-overview.md']).join(), /'overview' is not a subject/);
+    assert.match(checkArchitectureNames('layer.product', ['architecture.md', 'architecture-change-log.md']).join(), /'change-log'/);
+});
+test('topic pages without architecture.md are refused', () => {
+    assert.match(checkArchitectureNames('module.etl', ['architecture-parsing-ingest.md']).join(), /no architecture\.md/);
 });
 test('an unknown status is refused', () => {
     assert.match(checkHub('module', 'acquire', hub(SLOTS.map((s) => [s, 'done'])), map).findings.join(), /unknown status 'done'/);

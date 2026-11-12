@@ -112,7 +112,9 @@ ${work.text}
         const docsLine = `docs: ${hubRel}`;
         const next = /^docs:.*$/m.test(toon) ? toon.replace(/^docs:.*$/m, docsLine) : toon.replace(/\n?$/, `\n${docsLine}\n`);
         put(mapPath, next);
-        items.push({ kind, name, id, title, count: files.length, open: work.count });
+        const arch = files.filter((f) => f === 'architecture.md' || f.startsWith('architecture-'))
+            .map((f) => ({ f, title: titleOf(readFileSync(join(dir, f), 'utf8'), f) }));
+        items.push({ kind, name, id, title, count: files.length, open: work.count, arch });
     }
 }
 
@@ -137,5 +139,20 @@ counts come from the item tags on [\`BACKLOG.md\`](../../BACKLOG.md) (${board.le
 
 ${list}
 `);
+// ARCH-DOCS-CONSOLIDATE-1: the architecture map — every hub's architecture page, listed once, between the two
+// markers of the platform entry page. The rest of that page is hand-written.
+const ENTRY = join(HUBS, 'layer/platform/architecture.md'), MAP_START = '<!-- architecture-map:start -->', MAP_END = '<!-- architecture-map:end -->';
+const entry = readFileSync(ENTRY, 'utf8'), from = entry.indexOf(MAP_START), to = entry.indexOf(MAP_END);
+if (from < 0 || to < from) throw new Error(`${ENTRY}: needs ${MAP_START} … ${MAP_END}`);
+const archMap = KIND_ORDER.filter((k) => items.some((i) => i.kind === k && i.arch.length)).map((k) => `### ${KIND_TITLE[k]}
+
+| Item | Architecture | Topic pages |
+|---|---|---|
+${items.filter((i) => i.kind === k && i.arch.length).map((i) => {
+        const link = (a, label) => `[${cell(label)}](../../${i.kind}/${i.name}/${a.f})`;
+        const main = i.arch.find((a) => a.f === 'architecture.md');
+        return `| ${cell(i.title)} (\`${i.id}\`) | ${main ? link(main, 'architecture') : '—'} | ${i.arch.filter((a) => a !== main).map((a) => link(a, a.title)).join(' · ')} |`;
+    }).join('\n')}`).join('\n\n');
+put(ENTRY, `${entry.slice(0, from)}${MAP_START}\n\n${archMap}\n\n${entry.slice(to)}`);
 console.log(`render-product-docs: ${items.length} hub(s); ${stale} file(s) ${check ? 'stale' : 'written'}`);
 if (check && stale) process.exit(1);

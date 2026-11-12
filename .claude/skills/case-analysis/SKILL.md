@@ -20,7 +20,7 @@ check `docs/GLOSSARY.md` before naming anything (Entity List, Expectation, Decis
 | Case model, routes, permissions | `module/case-management/architecture.md` (add-on index: `addon/caseManagement/index.md`) |
 | Case Rules within Incidents | `addon/incidents/plan-incidents.md` (Case Rules section) |
 | Link analysis (investigations, graph) | `module/la-core/architecture.md`, `module/la-core/user-guide-link-analysis.md`, `module/la-core/user-guide-investigation-pivot.md` |
-| Scoring + Decision kernel | `module/scoring/architecture-decision-kernel.md`, `module/scoring/spec-risk-scores.md`, `module/scoring/architecture.md` |
+| Scoring + Decision kernel | `module/scoring/architecture.md`, `module/scoring/spec-risk-scores.md`, `module/scoring/architecture.md` |
 | Entity Lists | `module/entity-list/spec.md` |
 | Screening | `module/screening/architecture.md`, `module/screening/spec.md` |
 | Anomaly scores | `module/anomaly/` hub |
