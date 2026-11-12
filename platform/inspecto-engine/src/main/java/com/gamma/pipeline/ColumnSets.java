@@ -95,20 +95,23 @@ final class ColumnSets {
         List<?> fields = proc.get("map") instanceof Map<?, ?> map && map.get("fields") instanceof List<?> l ? l : null;
         String origin = "pipeline:" + id;
         List<String> named = new ArrayList<>();
+        // The Schema is read even when processing.map.fields outranks its mapping: its partitions[] still apply
+        // (PartitionDef.fromSchema). An unreadable Schema leaves the set unknown.
+        if (blank(proc.get("schema_file"))) return null;
+        Path schema = schemaPath(file, String.valueOf(proc.get("schema_file")).trim());
+        if (schema == null || !Files.isRegularFile(schema)) return null;
+        Map<String, Object> s = LinkGraph.decodeQuietly(schema);
+        if (s == null) return null;
+        // a Schema's own partition columns are store columns too (excel_example: item_category)
+        if (s.get("partitions") instanceof List<?> parts)
+            for (Object pt : parts)
+                if (pt instanceof Map<?, ?> pm && !blank(pm.get("column")))
+                    named.add(String.valueOf(pm.get("column")));
         if (fields == null) {
-            if (blank(proc.get("schema_file"))) return null;
-            Path schema = schemaPath(file, String.valueOf(proc.get("schema_file")).trim());
-            if (schema == null || !Files.isRegularFile(schema) || Files.exists(MappingCsv.siblingFor(schema))) return null;
-            Map<String, Object> s = LinkGraph.decodeQuietly(schema);
-            if (s == null || !(s.get("mapping") instanceof Map<?, ?> mapping)
-                    || !(mapping.get("fields") instanceof List<?> l)) return null;
+            if (Files.exists(MappingCsv.siblingFor(schema))) return null;
+            if (!(s.get("mapping") instanceof Map<?, ?> mapping) || !(mapping.get("fields") instanceof List<?> l)) return null;
             fields = l;
             origin = schemaOrigin(schema);
-            // a Schema's own partition columns are store columns too (excel_example: item_category)
-            if (s.get("partitions") instanceof List<?> parts)
-                for (Object pt : parts)
-                    if (pt instanceof Map<?, ?> pm && !blank(pm.get("column")))
-                        named.add(String.valueOf(pm.get("column")));
         }
         Map<String, String> out = new LinkedHashMap<>();
         for (Object f : fields) {

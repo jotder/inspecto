@@ -242,6 +242,19 @@ class LinkGraphColumnsTest {
                     ITEM,ITEM,keep
                 """);
         w("registry/expectations/e_part.toon", "target: part\ncolumn: item_category\nkind: non_null\n");
+        // processing.map.fields outranks the mapping, but the Schema's partitions still apply
+        w("mf/mf_pipeline.toon", """
+                name: mf
+                processing:
+                  schema_file: mf_schema.toon
+                  map:
+                    fields[1]{name,from,fn}:
+                      IMSI,IMSI,keep
+                """);
+        w("mf/mf_schema.toon", "partitions[1]{column,source,type}:\n  served_imsi,IMSI,VARCHAR\n");
+        w("registry/expectations/e_mf.toon", "target: mf\ncolumn: served_imsi\nkind: non_null\n");
+        assertEquals(List.of("e_mf column=served_imsi RESOLVED"), view(graph().edges("expectation", "column").stream()
+                .filter(e -> e.fromName().equals("e_mf")).toList()));
         // schema/<id> names registry/schemas/<id>.toon (PipelineConfigParser.SCHEMA_REF_PREFIX)
         w("reg/reg_pipeline.toon", "name: reg\nprocessing:\n  schema_file: schema/regs\n");
         w("reg/registry/schemas/regs.toon", "mapping:\n  fields[1]{name,from,fn}:\n    A,A,keep\n");
