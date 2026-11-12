@@ -113,7 +113,10 @@ git worktree remove C:\sandbox\<lane>                          # lane dies when 
   fast-forward and the pre-push guards read the tree they run from). The shared checkout later runs `git merge --ff-only origin/master`.
 - No per-person/topic branches, no parked worktrees. Before deleting any branch: `git cherry origin/master <branch>`;
   bundle what differs into `C:\sandbox\archive\`. `git branch --merged` lies after cherry-pick/squash.
-- Unpushed work may stay for ONE shift, listed in `SESSION_STATUS.local.md` with owner and date.
+- Unpushed work may stay for ONE shift, listed in `SESSION_STATUS.local.md` with owner and date; anything unlisted
+  and unpushed at the next shift is removed. Bundle first: `git bundle create C:\sandbox\archive\<lane>.bundle <refs> ^origin/master`.
+- One session per lane; archive the session when the lane is pushed. `.githooks/pre-push` prints a note (never blocks)
+  when it runs from a dirty tree.
 - A `fix:` for a retired line does not apply (see CURRENT STATE); the old `git checkout 4.x` recipe is gone with the branch.
 
 End commit messages with the required co-author trailer when committing on the user's behalf.
