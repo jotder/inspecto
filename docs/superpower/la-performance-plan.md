@@ -300,6 +300,9 @@ checkpoints, the main log does not. Cost grows with the number of steps.
   projection cache's route key and the SPA's conditional-read key. With no dual serving, a new path would only rename. To carry
   it, `ApiContext.respondJson` now keeps a `…+json` type the handler set on a success; any error is plain
   `application/json` and carries no ETag, as before.
+  The type is set on the three success returns only. Known low gap: a request replayed by `Idempotency-Key` (`Idempotency.replay`)
+  is sent as `application/json`; the SPA never sends that key on these reads. The decoder counts columns (`5 + attrCols` means a
+  `total` is present), so an attribute column named `total` stays an attribute (verification finding, fixed).
 - **Mask copy.** Each row is built once as an array straight from the statement row (`InvRoutes.edgeArrays`); the two ends are
   masked in place only when the read masks. The old path built a `LinkedHashMap` (and an `attrs` map) per row.
 - **`columnTypes` cache: NOT built** (session decision). On a ProjectionCache hit it is not computed at all (the cached body

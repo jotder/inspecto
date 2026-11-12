@@ -1018,12 +1018,12 @@ public final class InvRoutes implements RouteModule {
         // this lookup is the neighbours degree COUNT above (when four_eyes_fan_out_above is set): that gate judges the live degree.
         ProjectionCache.Key cacheKey = ProjectionCache.key(ex, neighborsOf != null ? "neighbors" : "projection", writeRoot,
                 api.dataRoot(), datasetId, relationSql, body, limit, mask);
-        ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);   // PERF-P10-1: every answer from here on is the compact shape
         ProjectionCache.Hit hit = ProjectionCache.get(cacheKey);
         if (hit != null) {
             audit(ex, datasetId, neighborsOf, hit.rows(), hit.truncated(), (IndexedRead.Outcome<?>) hit.auditSource());
             if (ProjectionCache.notModified(ex, hit.etag())) return ProjectionCache.respond304(ex, hit.etag());
             ProjectionCache.tag(ex, cacheKey);
+            ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);   // PERF-P10-1: set on a success return only
             return hit.body();
         }
 
@@ -1044,6 +1044,7 @@ public final class InvRoutes implements RouteModule {
                 if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13
                 ProjectionCache.READS.increment();
                 if (ProjectionCache.put(cacheKey, out, rows.size(), indexed.result().truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
+                ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);
                 return out;
             }
         }
@@ -1077,6 +1078,7 @@ public final class InvRoutes implements RouteModule {
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
             if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13: a graph was drawn
             if (ProjectionCache.put(cacheKey, out, rows.size(), r.truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
+            ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);

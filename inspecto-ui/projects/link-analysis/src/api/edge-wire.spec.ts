@@ -46,6 +46,11 @@ describe('decodeEdges (PERF-P10-1 compact edge wire format)', () => {
         expect(got.rows[0]).toEqual({ source: 'a', target: 'b', kind: 'k', count: 1, attrs: { via: 'x' } });
     });
 
+    it('an attribute column named total is an attribute, not the Measure total', () => {
+        const got = decodeEdges({ columns: ['source', 'target', 'kind', 'count', 'total'], attrCols: ['total'], rows: [['a', 'b', null, 3, 'gold']], truncated: false });
+        expect(got.rows[0]).toEqual({ source: 'a', target: 'b', kind: null, count: 3, attrs: { total: 'gold' } });
+    });
+
     it('an empty read decodes to no rows', () => {
         expect(decodeEdges({ columns: ['source', 'target', 'kind', 'count'], attrCols: [], rows: [], truncated: false }).rows).toEqual([]);
     });

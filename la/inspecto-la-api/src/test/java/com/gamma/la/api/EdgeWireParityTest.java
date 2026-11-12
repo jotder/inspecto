@@ -41,7 +41,7 @@ class EdgeWireParityTest {
 
     /** The SPA's decodeEdges, in Java. */
     private static List<Map<String, Object>> decode(List<String> columns, List<String> attrCols, List<Object[]> rows) {
-        boolean total = columns.size() > 4 && columns.get(4).equals("total");
+        boolean total = columns.size() == 5 + attrCols.size();
         int first = total ? 5 : 4;
         List<Map<String, Object>> out = new ArrayList<>();
         for (Object[] a : rows) {
@@ -78,7 +78,7 @@ class EdgeWireParityTest {
         Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");
         for (boolean kind : new boolean[] {true, false})
             for (boolean total : new boolean[] {true, false})
-                for (List<String> attrs : List.of(List.<String>of(), List.of("via"), List.of("via", "cell")))
+                for (List<String> attrs : List.of(List.<String>of(), List.of("via"), List.of("via", "cell"), List.of("total")))
                     assertParity(root, kind, total, attrs);
     }
 

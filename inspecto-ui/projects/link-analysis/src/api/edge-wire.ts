@@ -14,7 +14,8 @@ export interface EdgeWire extends Omit<ProjectionResult, 'rows'> {
 /** Decode the compact body into the `ProjectionResult` every fold already reads (one object per row, built once). */
 export function decodeEdges(w: EdgeWire): ProjectionResult {
     const { columns, attrCols, rows, ...rest } = w;
-    const hasTotal = columns[4] === 'total';
+    // counted, not named: an attribute column may itself be called `total`
+    const hasTotal = columns.length === 5 + attrCols.length;
     const first = hasTotal ? 5 : 4;
     const out: ProjectionTriple[] = new Array(rows.length);
     for (let r = 0; r < rows.length; r++) {

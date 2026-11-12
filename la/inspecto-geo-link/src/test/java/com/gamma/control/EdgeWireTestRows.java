@@ -17,7 +17,7 @@ final class EdgeWireTestRows {
     static JsonNode decoded(JsonNode data) {
         if (data == null || !data.has("attrCols") || !data.path("columns").isArray() || !data.path("rows").isArray()) return data;
         JsonNode columns = data.get("columns"), attrCols = data.get("attrCols");
-        boolean total = columns.size() > 4 && "total".equals(columns.get(4).asText());
+        boolean total = columns.size() == 5 + attrCols.size();
         int first = total ? 5 : 4;
         ObjectNode out = ((ObjectNode) data).deepCopy();
         out.remove("columns");
