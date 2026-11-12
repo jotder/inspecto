@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-405 test class(es): 160 unit, 245 real-HTTP control-plane, 0 IT.
+406 test class(es): 161 unit, 245 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -414,6 +414,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ShippedJobStoreKeyNamesARealStoreTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ShippedJobStoreKeyNamesARealStoreTest.java` | A job's {@code store:} key is a <b>data-store id</b>, never a path. It is read at |
 | `SlaSweepModuleGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SlaSweepModuleGateTest.java` | {@code MODULE-REORG-1 P4f}: the SLA sweep tick of {@code CollectorService} consults the Space's module gate. The |
 | `SpaceBootstrapTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceBootstrapTest.java` | Builds one space's runtime from its own {@code config/} directory (the per-space analogue of ServiceBootstrap). |
+| `SpaceCloseFlushTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCloseFlushTest.java` | {@code DEMO-BAKE-WAL-RACE-1}: a graceful stop of a Space that is still busy when its close budget runs out must not |
 | `SpaceCorpusEquivalenceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCorpusEquivalenceTest.java` | SE-0 corpus equivalence gate ({@code docs/superpower/2026-11-11-space-evolution-plan.md} §3): every tracked |
 | `SpaceDataRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDataRootTest.java` | SPACE-DATA-ROOT-1: where a Space's data, audit and DuckDB stores live, and the load-time checks. |
 | `SpaceDiscoveryRuleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDiscoveryRuleTest.java` | Which folders under the Spaces root {@link SpaceManager#discover} admits — real folder trees, no mocks. |

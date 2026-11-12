@@ -223,7 +223,7 @@ with no `BINDS_TO` edge; an edge is drawn only to a node that exists (broken com
 ⚠ **That binding rule is mirrored in FOUR places and cannot be shared** (different modules):
 `MetadataGraphBuilder.addStudioLayer`, `PipelineDependents.datasets` (the delete-impact and dependents
 routes), `DataSourceBundleResolver.datasetReadsStore` (`physicalRef` half only) and
-`PipelineRenameRoutes.rewriteDatasetRefs`. ⛔ Do not let `sourceName` shadow `physicalRef` — the mirrors
+`PipelineRenameRoutes.names`. ⛔ Do not let `sourceName` shadow `physicalRef` — the mirrors
 check both, so a Dataset naming two origins binds to two.
 
 ⚠ **A Dataset node's `binding` attr is a DIFFERENT question from `resolved`, and a FIFTH mirror.**

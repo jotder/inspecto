@@ -37,7 +37,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
 | P11 polish | ⬜ OPEN — not measured, so not built (§P11); board row `LA-PERF-P11-1` | — |
 | P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
-| P10 wire format | ⬜ DEFERRED — PERF-D3 | — |
+| P10 wire format | ✅ SHIPPED 2026-11-12 (PERF-D3 answered: build it) — compact edge rows; raw bytes −41 %, gzip bytes only −1 to −7 %, no measurable server or parse time change (§P10 "Measured") | see §P10 |
 
 **Known low items left open:** no test pins the production ETag-cache budget (a mutation to 3.2 billion passes); `deepEqual` overflows the stack at about 5,000 levels of nesting (real fold output never gets there); a fresh 200 at the full budget blocks the main thread about 70 ms; `menu-landing.spec` fails four tests when it runs after `session.service.spec` (that spec leaves `inspecto.currentSpace=gone` in localStorage, pre-existing on master); `FsInvestigationStore.promoteBeforeMarkHook` is a pre-existing public mutable static; the Postgres store, an ABA token change inside one mtime tick, and a real serialisation failure through the full HTTP stack were never exercised. The LA user guide still states the old caps (500 / 2,000; the defaults are now 1,000 / 2,500).
 
@@ -305,6 +305,60 @@ checkpoints, the main log does not. Cost grows with the number of steps.
 |---|---|---|
 | PERF-P10-1 | Send column names once and rows as arrays, or stream via a generator; cache `columnTypes` per Dataset fingerprint; skip the mask copy when masking is off | Versioned API change (new media type or `v2` path, per the no-compat rule); P0-3 bytes and GC drop |
 
+**✅ SHIPPED 2026-11-12 (PERF-D3 answered "let's take on D3").** As built:
+- **Routes (re-grounded).** `POST /inv/projection` and `POST /inv/projection/neighbors` (`InvRoutes.project`, both the index
+  and the flat branch). "Investigation expand" is NOT an edge-row response: `POST /inv/investigations/{id}/ops` answers the
+  appended log entry, and the graph comes from the Working Set / replay, so it is unchanged. Also unchanged: the neighbours
+  `list: true` page, `/inv/projection/multi` and the Grow preview.
+- **Shape.** `{masking, columns, attrCols, rows, truncated, columnTypes, source?}`: `columns` = `source, target, kind, count`,
+  then `total` when a Measure is read, then the `attrCols`; each row is an array in that order. It REPLACED the object rows
+  (no-shim rule); nothing serves the old shape.
+- **Versioning: a media type, `application/vnd.inspecto.la-edges.v2+json`, not a `v2` path** (session decision). Every
+  path-keyed table stays as it is: the rate classes, the capability manifest, OpenAPI, the absent-module stubs, the
+  projection cache's route key and the SPA's conditional-read key. With no dual serving, a new path would only rename. To carry
+  it, `ApiContext.respondJson` now keeps a `…+json` type the handler set on a success; any error is plain
+  `application/json` and carries no ETag, as before.
+  The type is set on the three success returns only. Known low gap: a request replayed by `Idempotency-Key` (`Idempotency.replay`)
+  is sent as `application/json`; the SPA never sends that key on these reads. The decoder counts columns (`5 + attrCols` means a
+  `total` is present), so an attribute column named `total` stays an attribute (verification finding, fixed).
+- **Mask copy.** Each row is built once as an array straight from the statement row (`InvRoutes.edgeArrays`); the two ends are
+  masked in place only when the read masks. The old path built a `LinkedHashMap` (and an `attrs` map) per row.
+- **`columnTypes` cache: NOT built** (session decision). On a ProjectionCache hit it is not computed at all (the cached body
+  holds it); on a miss it is one registry lookup beside a DuckDB `GROUP BY`. With no measured cost, caching it would add a
+  key and an invalidation rule for nothing.
+- **Masking, row scope, cache, 304.** Unchanged order: every gate and the masking run before the ProjectionCache lookup; the
+  cached body is the compact body; ETag/304 (P4-2) and the client's revalidation (P10a-2) work as before. The SPA decodes once
+  in `edge-wire.ts` (`decodeEdges`) BEFORE the conditional-read cache holds the body, so a 304 returns the same decoded object
+  and the cache key stays viewer-scoped. The cache budget therefore still counts decoded JSON.
+- **Tests.** `ControlApiEdgeWireFormatTest` (real HTTP, armed: shape and media type on both routes, masking off and on, the
+  304 path, the R3 404 as plain JSON with no ETag, 401); `EdgeWireParityTest` (decoded compact rows equal the old rows,
+  masking off and on, with and without a Measure and attribute columns); `edge-wire.spec.ts` and
+  `inv-conditional-read.spec.ts` (vitest). The 28 geo-link tests that read projection rows decode through
+  `EdgeWireTestRows`. Targeted runs only; the full gate was NOT run.
+
+**Measured (2026-11-12, la-showcase `telecom_links_dataset`, the 767-node view: `a_msisdn` → `b_msisdn`, kind `link_kind`,
+attribute `via`, limit 4,000 minus a varied 1–9 so every timed call misses the cache; medians of 9).** Before = the
+installed Preview build; after = the same install with this lane's `inspecto-la-api` and `inspecto-http-spi` jars swapped
+in (the install's other jars are older; probe script `la-perf-wire-probe.mjs` in the session notes, not in the repo).
+
+| Scenario | Rows | Bytes decoded before → after | Bytes gzip before → after | Server ms, cache miss | Server ms, cache hit | V8 parse (+ decode) ms |
+|---|---|---|---|---|---|---|
+| Projection | 3,991 | 477,874 → 282,387 (**−41 %**) | 27,841 → 26,009 (**−6.6 %**) | 678 → 620 | 390 → 423 | 5.2 → 5.5 |
+| Neighbours of the hub 99970000100 | 730 | 87,190 → 51,489 (−41 %) | 8,951 → 8,785 (−1.9 %) | 601 → 760 | 460 → 590 | 1.0 → 0.8 |
+| Neighbours of the suspect 99979100001 | 403 | 48,666 → 28,989 (−40 %) | 5,452 → 5,398 (−1.0 %) | 599 → 661 | 472 → 761 | 0.6 → 0.5 |
+
+Server serialisation alone (Jackson, in-process, 4,000 rows with one attribute column, warm, median of 25;
+`EdgeWireParityTest.serialisationCostOfBothShapes`): **13.7 ms → 4.9 ms**, 356 KB → 160 KB (the fixture ids are shorter than the showcase's). Real, but 9 ms against a ~400 ms per-request floor.
+
+**Verdict, plainly: the gain on the wire is negligible.** gzip already removed the repetition the compact shape removes, so
+the bytes a browser downloads fall by 1–7 % (1.8 KB on the largest graph). Server time is unchanged within noise: even a
+cache HIT costs about 400 ms on this install, a per-request floor that has nothing to do with the body shape (see N9 and
+`spec-server-profile`). Parse plus decode in V8 is the same (about 5.5 ms for 3,991 rows), because the client still builds
+one object per row for the folds. The real gains are the uncompressed size (−41 %, which matters only where gzip is not
+negotiated) and one fewer map per row on the server. Not measured: browser heap and GC (the Node heap probe was not
+reliable, so no figure is claimed), a browser performance trace, and the fold time, which this change does not touch
+(the folds read the same decoded objects).
+
 ### P10a — browser: smart data fetch (high gain for repeated work; depends on P4)
 
 **Principle (operator, 2026-10-24):** fetch from the server only when the server's answer can have changed or
@@ -387,7 +441,8 @@ with different row scope.
 
 **PERF-D3 — API change for P10.** A new media type / `v2` path for the edge wire format, or defer P10 entirely?
 *Recommendation:* defer until P0-3 shows bytes are still a problem after P4 (gzip removes most of the cost).
-**Answer:**
+**Answer:** 2026-11-12, operator: "let's take on D3" — build it now rather than defer. Built as PERF-P10-1 with a versioned
+media type (§P10); the measurement bore out the recommendation's caution (gzip bytes −1 to −7 %).
 
 **PERF-D5 — Heavy graph work off the main thread (NEW 2026-10-25, from §0b).** The live measurement found the freezes are LAYOUTS and HULLS, not betweenness: Radial blocks the tab for more than 3 minutes at 767 nodes / 4,000 links, Fruchterman / Force / Layered take 2.3–3.6 s, the hulls toggle 3.1 s, a cold first-open 2.7–4.1 s, while betweenness is 385 ms at 465 nodes and is already refused above 500. The standing refusals LA-06 / LA-07 (viewport culling, Web Worker for the algorithms) were reasoned at a 500-node canvas cap and one slow algorithm. Choose: (a) keep the refusals and fix by CAPS and MEMOISATION only (N1 cap on Radial, N2 memoised hulls, prefetch the graph chunk), or (b) reopen LA-07 to cover layouts and Louvain in a Web Worker (G6 supports worker layouts for some algorithms).
 *Recommendation:* (a) first — N1 and N2 are small and remove the worst freezes (both SHIPPED 2026-10-25) — then re-measure; reopen (b) only if layouts above the caps are still a felt freeze. This also supersedes PERF-D1's framing: betweenness alone does not justify a worker.

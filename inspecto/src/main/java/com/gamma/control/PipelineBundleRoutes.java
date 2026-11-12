@@ -177,11 +177,17 @@ final class PipelineBundleRoutes implements RouteModule {
             satellites.add(row);
         }
 
-        // The Stage-2 companion(s): every *_enrich.toon at the write root whose triggers.on_pipeline
+        // The Stage-2 companion(s): every *_enrich.toon under the write root whose triggers.on_pipeline
         // names this pipeline — the same match attachCompanionEnrichments/PipelineDependents use.
         List<String> enrichments = new ArrayList<>();
+        Map<String, Path> companionByName = new LinkedHashMap<>();
         for (Map.Entry<Path, Map<String, Object>> comp : companionsOf(api, id).entrySet()) {
             String entry = comp.getKey().getFileName().toString();
+            // companions come from any folder depth, but travel under their bare file name
+            Path prior = companionByName.putIfAbsent(entry, comp.getKey());
+            if (prior != null)
+                throw new ApiException(409, ErrorCodes.CONFLICT, "two companions collide on the portable name '" + entry
+                        + "' (" + prior + " and " + comp.getKey() + ") — rename one before exporting");
             Map<String, Object> body = comp.getValue();
             boolean m2 = maskSecrets(body, entry + ":", notes);
             entries.put(entry, m2 ? ConfigCodec.toToon(body).getBytes(StandardCharsets.UTF_8)
@@ -783,24 +789,19 @@ final class PipelineBundleRoutes implements RouteModule {
         throw new ApiException(409, ErrorCodes.CONFLICT, "no free name near '" + base + "'");
     }
 
-    /** The {@code *_enrich.toon} companions of one pipeline at the write root, decoded (read-only). */
+    /** The {@code *_enrich.toon} companions of one pipeline under the write root at any depth — the file set
+     *  {@code PipelineDependents.configFiles} reads (no {@code .history/} copies) — decoded (read-only). */
     private static Map<Path, Map<String, Object>> companionsOf(ApiContext api, String pipeline) {
         Map<Path, Map<String, Object>> out = new LinkedHashMap<>();
-        Path root = api.writeRoot();
-        if (root == null || !Files.isDirectory(root)) return out;
-        try (var files = Files.list(root)) {
-            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_enrich.toon")).toList()) {
-                try {
-                    Map<String, Object> enrich = ConfigLoader.filesystem().decode(p.toString());
-                    if (enrich.get("triggers") instanceof Map<?, ?> t
-                            && pipeline.equalsIgnoreCase(String.valueOf(t.get("on_pipeline"))))
-                        out.put(p, enrich);
-                } catch (RuntimeException | IOException unreadable) {
-                    // an unreadable companion never breaks the pipeline's own export
-                }
+        for (Path p : com.gamma.service.PipelineDependents.configFiles(api.writeRoot(), "_enrich.toon")) {
+            try {
+                Map<String, Object> enrich = ConfigLoader.filesystem().decode(p.toString());
+                if (enrich.get("triggers") instanceof Map<?, ?> t
+                        && pipeline.equalsIgnoreCase(String.valueOf(t.get("on_pipeline"))))
+                    out.put(p, enrich);
+            } catch (RuntimeException | IOException unreadable) {
+                // an unreadable companion never breaks the pipeline's own export
             }
-        } catch (IOException ignored) {
-            // listing failed — export the pipeline without companions
         }
         return out;
     }

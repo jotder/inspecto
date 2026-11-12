@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-realtime</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Real-time Detection (optional)</name>
+    <description>
+        OPTIONAL add-on module (PRODUCT-ASSEMBLY-1 PA-9d, add-on realtimeDetection, Standard and above per D-PA44): the
+        commit hook that evaluates windowed and Pattern Alert Rules on each commit of a trigger: stream Pipeline
+        (RealtimeDetectionProvider / RealtimeSession over the engine's WindowedRuleEvaluator), the clock floor of absence
+        Patterns while a Stream is drained, the evaluated ledger that replays Consignments committed but never evaluated,
+        and the detection latency and late-event metrics. Declares the edition feature realtime. Package com.gamma.realtime.
+        Zero third-party jars (D-PA44). THIN: no shade. Built only under the edition-standard / -advanced / -preview
+        profiles.
+    </description>
+
+    <dependencies>
+        <!-- The core: the RealtimeDetection contract, WindowedRuleEvaluator, FiredWindows, AlertService, ComponentStore,
+             PipelineTrigger and DuckDB. Compile scope, as every optional feature module has it. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Test only: the faketest connector (FakeRemoteConnectorFactory) the latency harness drains, as the PA-9a spike did. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- Test only: Incidents (the Object Engine) for the harness's Alert -> Incident hop; required beside this module. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Test only: the real KafkaConnector (and kafka-clients' producer) for the one real-broker run, which skips
+             unless a broker answers. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-connectors-kafka</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

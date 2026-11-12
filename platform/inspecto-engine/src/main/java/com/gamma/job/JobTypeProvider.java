@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 import java.util.List;
 import java.util.function.Function;
 
@@ -10,6 +12,7 @@ import java.util.function.Function;
  * the four built-ins register through it today, and it becomes the {@code ServiceLoader} SPI that optional
  * modules and hot-deployable Job Packs implement (P2b/P2c).
  */
+@PublicApi(since = "4.0.0")
 public interface JobTypeProvider {
 
     JobTypeDescriptor descriptor();

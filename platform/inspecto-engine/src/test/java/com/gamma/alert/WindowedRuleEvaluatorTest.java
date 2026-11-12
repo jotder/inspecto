@@ -94,7 +94,12 @@ class WindowedRuleEvaluatorTest {
             assertEquals(T0 + 4000, b.lastEventMs());
             List<Map<String, Object>> raised = alerts.recent(10);
             assertEquals(1, raised.size());
-            assertTrue(String.valueOf(raised.get(0).get("message")).contains("a_number=A1"), raised.toString());
+            // PA-9d (D-PA43): the rule's ONE Alert counts its keys and names none; the Window is its evidence
+            assertTrue(String.valueOf(raised.get(0).get("message")).contains("1 key (by a_number) breach"), raised.toString());
+            Map<String, String> attrs = alerts.openAlerts().get(0).attributes();
+            assertEquals(java.time.Instant.ofEpochMilli(T0).toString(), attrs.get("lastWindow.windowStart"), attrs.toString());
+            assertEquals("5.0", attrs.get("lastWindow.value"));
+            assertFalse(attrs.containsKey("lastWindow.key"), "the rule's Alert names no entity: " + attrs);
 
             var more = ev.commit(List.of(parquet(db, burst("A1", 3, T0 + 10_000, 100).stream()
                     .map(c -> new Cdr(c.a, "x" + c.b, 1, c.tsMs, c.offset)).toList())));
@@ -103,6 +108,49 @@ class WindowedRuleEvaluatorTest {
             assertEquals(8, more.breaches().get(0).value());
             assertEquals(1, alerts.recent(10).size(), "no second Alert");
             assertEquals(1, fired.size());
+        }
+    }
+
+    /**
+     * PA-9d (D-PA43): a CRITICAL windowed rule folds into ONE Alert per rule and ONE Incident per key (the Window's
+     * message and evidence on the key's Incident); a key heals off the Alert once every Window it fired in has closed, and
+     * the Alert resolves when no key is left. A heal never resolves an Incident.
+     */
+    @Test
+    void aCriticalRuleOpensOneAlertAndOneIncidentPerKeyAndHealsWhenItsWindowsClose(@TempDir Path root) throws Exception {
+        Map<String, Object> raw = new HashMap<>(wangiri(Map.of("type", "tumbling", "slide", "10m"), 3).toMap());
+        raw.put("severity", "CRITICAL");
+        AlertRule rule = AlertRule.fromMap(raw);
+        com.gamma.objects.FakeObjectAccess objects = new com.gamma.objects.FakeObjectAccess();
+        AlertService alerts = new AlertService(List.of(), AlertWindowTest.noPipelines(), null, objects);
+        Path db = root.resolve("db");
+        try (FiredWindows fired = new FiredWindows(null); var ev = evaluator(root, rule, fired, alerts)) {
+            List<Cdr> rows = new ArrayList<>(burst("A1", 3, T0, 0));
+            rows.addAll(burst("A2", 3, T0 + 1000, 10));
+            ev.commit(List.of(parquet(db, rows)));
+            assertEquals(1, alerts.openAlerts().size(), "one Alert for the rule");
+            assertEquals("2", alerts.openAlerts().get(0).attributes().get("breachedKeys"));
+            List<com.gamma.objects.FakeObjectAccess.Opened> incidents = objects.opened.stream()
+                    .filter(o -> o.kind() == com.gamma.workflow.ObjectType.INCIDENT).toList();
+            assertEquals(2, incidents.size(), "one Incident per key: " + incidents);
+            var a1 = incidents.stream().filter(i -> "a_number=A1".equals(i.attributes().get("key"))).findFirst().orElseThrow();
+            assertTrue(a1.description().startsWith("countDistinct(b_number) = 3 (gte 3) for a_number=A1 in the window "),
+                    a1.description());
+            assertEquals(java.time.Instant.ofEpochMilli(T0).toString(), a1.attributes().get("windowStart"));
+
+            // A1 again in the same, still open Window: already fired, nothing new
+            ev.commit(List.of(parquet(db, burst("A1", 4, T0 + 20_000, 100))));
+            assertEquals(2, objects.opened.stream().filter(o -> o.kind() == com.gamma.workflow.ObjectType.INCIDENT).count());
+
+            // the Watermark passes the Window's close: both keys heal, the Alert resolves; the Incidents stay
+            ev.commit(List.of(parquet(db, List.of(new Cdr("Z9", "z", 1, T0 + 10 * 60_000 + 1, 500)))));
+            assertTrue(alerts.openAlerts().isEmpty(), "every fired Window closed: the all-clear " + alerts.openAlerts());
+            assertTrue(objects.transitioned.isEmpty(), "a heal never resolves an Incident: " + objects.transitioned);
+
+            // the same key breaching in a later Window is a new breach on a new rule Alert; its Incident is deduped per key
+            ev.commit(List.of(parquet(db, burst("A1", 3, T0 + 20 * 60_000, 600))));
+            assertEquals(1, alerts.openAlerts().size());
+            assertEquals("1", alerts.openAlerts().get(0).attributes().get("breachedKeys"));
         }
     }
 
@@ -212,7 +260,8 @@ class WindowedRuleEvaluatorTest {
             assertEquals(3, out.newlyFired().size(), "three keys breached and are recorded as fired");
             List<Map<String, Object>> raised = alerts.recent(10);
             assertEquals(1, raised.size(), "one storm Alert stands for them: " + raised);
-            assertTrue(String.valueOf(raised.get(0).get("message")).contains("3 keys breached"), raised.toString());
+            assertTrue(String.valueOf(raised.get(0).get("message")).contains("3 keys (by a_number) breach"), raised.toString());
+            assertTrue(String.valueOf(raised.get(0).get("message")).contains("above the storm cap of 2"), raised.toString());
             assertEquals(3, fired.size());
         }
     }

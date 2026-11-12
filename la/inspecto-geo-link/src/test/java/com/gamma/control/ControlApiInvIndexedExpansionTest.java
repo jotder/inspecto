@@ -143,7 +143,7 @@ class ControlApiInvIndexedExpansionTest {
 
     private JsonNode data(HttpResponse<String> r, int expected) throws Exception {
         assertEquals(expected, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private interface Check {
@@ -576,7 +576,7 @@ class ControlApiInvIndexedExpansionTest {
             assertEquals(1, dossier.at("/renderings/json/log/1/read/index/version").asInt(), "the Dossier's json rendering says so too");
             String plain = replayData(c, id);
             String reread1 = send(c, "POST", "/inv/investigations/" + id + "/replay", "{\"reread\":true}", OWNER).body();
-            JsonNode r1 = JSON.readTree(reread1).get("data");
+            JsonNode r1 = EdgeWireTestRows.decoded(JSON.readTree(reread1).get("data"));
             assertFalse(r1.get("diverged").asBoolean(), reread1);
             assertEquals(1, r1.at("/drift/0/indexVersionSealed").asInt());
             assertEquals(1, r1.at("/drift/0/indexVersionNow").asInt());

@@ -7,7 +7,7 @@ posture:
   objectsBackend: default
   postgresSidecar: bundled
 includes[1]: basic
-modules[19]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,exchange,observability,ops,case-management,action-requests,regulatory-reporting,reconciliation,scoring,screening,anomaly,predictive,agent
+modules[20]: oidc,secrets,geo-country,connectors-kafka,telecom-asn1,notify-channels,backup,exchange,observability,ops,case-management,action-requests,regulatory-reporting,reconciliation,scoring,screening,anomaly,predictive,realtime,agent
 contentPacks[9]: business-assurance,mobile-money,aml,payment-fraud,telco-fraud,telco-ra,telco-bypass,partner-settlement,telco-rerating
 addons:
   aiAssist:
@@ -46,6 +46,9 @@ addons:
   predictiveAnalytics:
     status: built
     modules[1]: predictive
+  realtimeDetection:
+    status: built
+    modules[1]: realtime
   workflowSla:
     status: built
     modules[1]: ops

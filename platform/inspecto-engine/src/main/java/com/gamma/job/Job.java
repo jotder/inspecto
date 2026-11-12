@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 /**
  * A single unit of schedulable work. Implementations wrap an engine call (ingest,
  * enrichment), a report computation, or a maintenance task behind one uniform contract,
@@ -7,6 +9,7 @@ package com.gamma.job;
  * way. Implementations should be safe to invoke repeatedly; {@code JobService} serialises
  * concurrent fires of the <em>same</em> job.
  */
+@PublicApi(since = "4.0.0")
 public interface Job {
 
     /** Stable job name (from config); used for scheduling, audit and the API. */

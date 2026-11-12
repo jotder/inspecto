@@ -63,12 +63,24 @@ class LinkGraphTest {
     void reconciliationReadsItsDatasetsListElseLeftAndRight() {
         Map<String, List<ComponentRegistry.Component>> byType = Map.of(
                 "reconciliation", List.of(
-                        c("reconciliation", "v2", Map.of("datasets", List.of("a", ""), "leftDataset", "ignored")),
+                        c("reconciliation", "v2", Map.of("datasets", List.of("a", ""), "leftDataset", "ignored",
+                                "thirdDataset", "ignored")),
                         c("reconciliation", "v1", Map.of("leftDataset", "a", "rightDataset", "b", "thirdDataset", "c"))),
                 "dataset", List.of(c("dataset", "a", Map.of())));
         List<String> dangling = LinkGraph.ofComponents(byType, null).dangling().stream()
                 .map(e -> e.fromName() + ":" + e.value()).toList();
-        assertEquals(List.of("v2:", "v1:b"), dangling, "a blank list side dangles; thirdDataset is not judged yet");
+        assertEquals(List.of("v2:", "v1:b", "v1:c"), dangling,
+                "a blank list side dangles; a v1 thirdDataset is judged like left/right (PIPELINE-LINK-GAPS-1 e)");
+    }
+
+    @Test
+    void aCommaListOnPipelineIsOneEdgePerMember(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("orders_pipeline.toon"), "id: orders\n");
+        Files.writeString(root.resolve("fx_pipeline.toon"), "id: fx\n");
+        Files.writeString(root.resolve("both_job.toon"), "job:\n  on_pipeline: \"orders, fx ,gone\"\n");
+        LinkGraph g = LinkGraph.of(root, rel -> false);
+        assertEquals(List.of("orders=RESOLVED", "fx=RESOLVED", "gone=DANGLING"), g.edges("job", "on_pipeline").stream()
+                .map(e -> e.value() + "=" + e.status()).toList(), "JobConfig.onPipelines: split, trimmed, each judged");
     }
 
     @Test

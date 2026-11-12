@@ -1,5 +1,7 @@
 package com.gamma.signal;
 
+import com.gamma.api.PublicApi;
+
 import java.util.Map;
 
 /**
@@ -7,6 +9,7 @@ import java.util.Map;
  * only the domain facts — {@code type}, {@code severity}, {@code payload}; the framework stamps the
  * signal id, timestamp, source ref, correlation id and space, then persists it to the one ledger.
  */
+@PublicApi(since = "4.0.0")
 public interface SignalEmitter {
 
     void emit(String type, Severity severity, Map<String, Object> payload);

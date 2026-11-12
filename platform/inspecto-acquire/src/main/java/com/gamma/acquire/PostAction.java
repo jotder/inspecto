@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.api.PublicApi;
+
 import java.util.Map;
 
 /**
@@ -10,6 +12,7 @@ import java.util.Map;
  * <p>{@code archiveTemplate} is used by {@link Kind#MOVE} (e.g. {@code archive/yyyy/MM/dd}) and
  * {@code tags} by {@link Kind#TAG}; both are ignored by the other kinds.
  */
+@PublicApi(since = "4.0.0")
 public record PostAction(Kind kind, String archiveTemplate, Map<String, String> tags) {
 
     /** Leave the source untouched (the legacy behaviour, and the default). */

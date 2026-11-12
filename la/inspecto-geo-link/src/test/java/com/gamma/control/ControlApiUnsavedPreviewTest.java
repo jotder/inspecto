@@ -99,7 +99,7 @@ class ControlApiUnsavedPreviewTest {
 
     private static JsonNode data(HttpResponse<String> r, int status) throws Exception {
         assertEquals(status, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private JsonNode preview(Ctx c, String steps) throws Exception {

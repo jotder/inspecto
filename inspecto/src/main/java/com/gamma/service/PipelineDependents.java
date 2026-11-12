@@ -20,8 +20,7 @@ import java.util.stream.Collectors;
  *
  * <p>The keys are not kept here: they are the {@link com.gamma.pipeline.LinkCensus} links, read from one
  * {@link LinkGraph} of the write root (`SPACE-LINK-CENSUS-1` LC-1). The rename path
- * ({@code PipelineRenameRoutes.rewriteDependents}) still keeps its own copy until LC-2 —
- * {@code LinkCensusParityTest} fails when it reads a key the census does not declare.
+ * ({@code PipelineRenameRoutes.rewriteDependents}) reads the same graph (LC-2).
  *
  * <p>Matching mirrors each consumer exactly: enrichment triggers and job triggers compare the whole
  * value case-insensitively, rule targets honour {@code targetType} defaulting to {@code pipeline}
@@ -119,10 +118,12 @@ public final class PipelineDependents {
         }
     }
 
-    /** {@code on_pipeline} in every {@code *_job.toon} — under {@code job:} (what the loader reads) or at the top level. */
+    /** {@code on_pipeline} in every {@code *_job.toon} — under {@code job:} (what the loader reads) or at the top
+     *  level; a comma list is one edge per member, and one Job is one dependent however many members name it. */
     private static void jobs(LinkGraph graph, String id, List<Dependent> out) {
+        Set<Path> hit = new LinkedHashSet<>();
         for (LinkGraph.Edge e : graph.edges("job", "on_pipeline"))
-            if (names(e, id)) out.add(new Dependent("job", e.fromName(), "on_pipeline"));
+            if (names(e, id) && hit.add(e.file())) out.add(new Dependent("job", e.fromName(), "on_pipeline"));
     }
 
     /** {@code target} on every expectation / decision-rule whose {@code targetType} is {@code pipeline}. */

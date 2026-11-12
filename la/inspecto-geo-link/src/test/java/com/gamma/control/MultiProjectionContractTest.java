@@ -316,6 +316,6 @@ class MultiProjectionContractTest {
 
     private static JsonNode json(String raw) throws Exception {
         JsonNode n = JSON.readTree(raw);
-        return n.has("data") ? n.get("data") : n;
+        return EdgeWireTestRows.decoded(n.has("data") ? n.get("data") : n);
     }
 }

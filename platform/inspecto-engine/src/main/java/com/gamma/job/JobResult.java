@@ -1,10 +1,13 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 /**
  * The outcome of one {@link Job} execution: a terminal status, a human-readable
  * message, and the wall-clock duration. {@code SKIPPED} is used when a job fires while a
  * previous run of the same job is still in flight (non-overlap guard).
  */
+@PublicApi(since = "4.0.0")
 public record JobResult(String status, String message, long durationMs) {
 
     public static JobResult ok(String message, long durationMs)     { return new JobResult("SUCCESS", message, durationMs); }

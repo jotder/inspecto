@@ -113,7 +113,7 @@ src/app/
   `graph/` are, while `query/`, `viz/`, `rule/` and `format/` all import `@angular/*` — treat purity as the
   target for new code, not as a property you can assume.
 - ⛔ **The R1–R8 per-pane review protocol is RETIRED** ("no pane is shipped again without a sheet"). Its 37
-  sheets are in `docs/archived-documents/superpower-reviews/` and `docs/superpower/reviews/` is empty; its R6
+  sheets are in `docs/archived-documents/superpower-reviews/` (`docs/superpower/reviews/` is gone); its R6
   step was mock parity, which no longer exists. The Definition of Done in §12 is the live gate.
 - **Vendored** gamma/Fuse code (`src/@gamma/**`, `modules/auth/**`) is out of scope — don't restyle, audit, or guard it.
 

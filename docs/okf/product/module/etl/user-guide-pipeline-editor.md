@@ -642,10 +642,11 @@ entirely with the metadata grid (D2) — (it IS an output column, stamped at wri
   evidence**, never that Step's presence or status. Since 2026-09-25 an empty slot reads `configured`,
   not `unconfigured` (`computeNodeStatus` exempts `isProjectionSlot`): it is the pass-through, and the
   old "Needs config" chip on every new Pipeline's Record Transformer was false.
-- **Test mapping** posts `{raw: <parser schema's raw>, mapping: {rules}}` over the rows the parse
-  drawer already parsed — the rules being EDITED, not the node's. The result is written back as
-  the thread's cast hop; an edited rule clears the grid (a result may never outlive the config it
-  came from). Reachable only where the parse Step is per-format (the dialog has no thread).
+- **Test mapping is gone** (removed with the Load drawer and `transform.map` in `42fa41fe5`; nothing in
+  `inspecto-ui/` names it). A mapping is previewed in the standalone Mapping component
+  (`mapping-editor.dialog.ts`): *Preview with sample data* dry-runs a synthesized graph with the edited
+  rules carried inline. The board row "P4 Test mapping on a generic `parser` node" was deleted as
+  obsolete on 2026-11-12.
 - 🔴 **Read path only since 2026-09-05** (the Load pane is deleted; nothing AUTHORS these any more)
   — but every constraint below is still armed on a stored `mapping.rules[]`, which
   `RecordTransform.fromMappingRules` converts to `fields[]`. A transform type nothing has heard of (a

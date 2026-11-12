@@ -608,6 +608,20 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                             : probe.read(wr, (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd), rule);
                 }));
         bus.subscribe(alerting::onEvent);
+        // PRODUCT-ASSEMBLY-1 PA-9d (D-PA43/D-PA44): the Real-time Detection commit hook, from the optional
+        // inspecto-realtime module. Absent, windowed and Pattern rules stay inert; present, its session evaluates them on
+        // each commit of a stream Pipeline and checks the Add-on's entitlement itself.
+        this.realtime = OptionalSpi.first(com.gamma.alert.RealtimeDetection.class).map(p -> p.open(
+                new com.gamma.alert.RealtimeDetection.Context(root.id(), alerting, configRegistry::configs, () -> {
+                    java.nio.file.Path wr = root.config();
+                    if (wr == null) {
+                        String w = System.getProperty("assist.write.root");
+                        wr = (w == null || w.isBlank()) ? null : java.nio.file.Path.of(w.trim());
+                    }
+                    return wr == null ? null : wr.resolve("registry");
+                }, realtimeStateDir(root))))
+                .orElse(null);
+        if (realtime != null) bus.subscribe(realtime::onCommit);
         alerting.onRulesChanged(this::syncFreshnessSweep);   // DUCKLE-C1 (1): re-derive the freshness sweep
         if (!alertRules.isEmpty()) log.info("Alert engine armed with {} rule(s)", alertRules.size());
         // Event engine (Phase 1, v4.2.0): the append-only record of "what happened". Built from
@@ -733,6 +747,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 this.registryLock, this.bus, this.triggerWorkers,
                 this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
+        if (realtime != null) this.pipelineScheduler.onStreamIdle(realtime::onStreamIdle);   // PA-9d: the clock floor
     }
 
     // ── hot-tunable cadence (scheduler-system-config plan: poll-cadence hot-apply) ──────────────
@@ -856,6 +871,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /** The alert execution engine (v4.1, B5); always present (empty until a rule is armed). */
     private final com.gamma.alert.AlertService alerting;
+    /** PA-9d: this Space's Real-time Detection session, or {@code null} when the inspecto-realtime module is absent. */
+    private final com.gamma.alert.RealtimeDetection.Session realtime;
     /** The Space's Alert records (slice 2) — closed with the service. */
     private final com.gamma.alert.AlertStore alertStore;
 
@@ -1022,6 +1039,17 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** A registered RCA template by name, if any (Phase 4). */
     public java.util.Optional<com.gamma.objects.RcaTemplate> rcaTemplate(String name) {
         return rcaTemplates.byName(name);
+    }
+
+    /**
+     * PA-9d: where a Space's Real-time Detection state (fired table, evaluated ledger) lives. ⚠ Per Space: a Space folder
+     * uses its own audit folder and never the process-wide {@code -Djobs.audit.dir}, which every Space of the process
+     * shares - two Spaces sharing one fired table would suppress each other's Alerts for the same rule, key and Window.
+     * The legacy single-tenant root keeps the override.
+     */
+    static java.nio.file.Path realtimeStateDir(SpaceRoot root) {
+        String audit = root.config() != null ? root.auditDir() : System.getProperty("jobs.audit.dir", root.auditDir());
+        return java.nio.file.Path.of(audit).resolve("realtime");
     }
 
     /** Register a connection profile (Data Acquisition), keyed by {@link com.gamma.acquire.ConnectionProfile#id};
@@ -2301,6 +2329,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // dispatch path handles that rejection, but not generating the work is the correct order.
         scheduler.close();
         pipelineScheduler.closeStreamLanes();          // the continuous lanes are timers too (ASSURE-PUSH-INGEST-1)
+        if (realtime != null) realtime.close();        // PA-9d: after the lanes, so no tick arrives once it closed
         triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)
         enrichment.close();   // drain in-flight recomputes first
         this.eventLog.removeSubscriber(eventAlertBridge);   // de-register the D2 gap→Alert bridge
@@ -2313,8 +2342,34 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.removeSubscriber(datasetWriteSubscriber);   // de-register the S3b dataset-write trigger
         securityTriggers.detach();   // …and release the log, so a later service's evaluator takes over
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
-        try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log
+        closeStores(true);
+    }
+
+    private final Object storesCloseLock = new Object();
+    private boolean storesClosed;
+
+    /**
+     * DEMO-BAKE-WAL-RACE-1: close this Space's stores now, without waiting for its in-flight work to drain. A closing
+     * DuckDB store checkpoints, so none keeps a {@code .wal}. {@code SpaceManager} calls it when {@link #close()} has
+     * overrun its stop budget (a long Job Run, a backed-up notification queue): the abandoned drain would otherwise
+     * reach the store closes only after the JVM had exited. Work still running then fails on a closed store, which is
+     * the stop it was already asked to make ({@link #beginClose}). Each store serialises its connection, so a close
+     * waits for a statement in flight on it, never cuts it. Idempotent with {@link #close()}.
+     */
+    void closeStoresNow() {
+        closeStores(false);
+    }
+
+    private void closeStores(boolean drained) {
+        synchronized (storesCloseLock) {   // a second caller waits until the first has closed everything
+            if (storesClosed) return;
+            storesClosed = true;
+            JobService j = jobs;
+            if (j != null) {
+                try { j.closeStores(); } catch (Exception e) { log.warn("Error closing Job stores: {}", e.getMessage()); }
+            }
+            try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         // Release the output-file registry this service registered (+ its DB handle); no-op when default-off.
         com.gamma.consignment.ConsignmentOutputStores.unregister(spaceId);
         com.gamma.consignment.FileStages.unregister(spaceId);
@@ -2328,13 +2383,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         objectEngine.ifPresent(e -> {
             try { e.close(); } catch (Exception ex) { log.warn("Error closing object engine: {}", ex.getMessage()); }
         });
-        try { alertStore.close(); } catch (Exception e) { log.warn("Error closing Alert store: {}", e.getMessage()); }
-        log.info("CollectorService stopped");
-        // Close last so the "stopped" log line above is itself captured, then flushed to disk.
-        try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }
-        // …then detach it, or the next service on this log (the default Space shares EventLog.global()) drains
-        // this closed store's history into its own store and chain on installStore.
-        this.eventLog.releaseStore(events);
+            try { alertStore.close(); } catch (Exception e) { log.warn("Error closing Alert store: {}", e.getMessage()); }
+            if (drained) log.info("CollectorService stopped");
+            else log.warn("CollectorService stores closed before its in-flight work drained");
+            // Close last so the log line above is itself captured, then flushed to disk.
+            try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }
+            // …then detach it, or the next service on this log (the default Space shares EventLog.global()) drains
+            // this closed store's history into its own store and chain on installStore.
+            this.eventLog.releaseStore(events);
+        }
     }
 
     // ── CLI ────────────────────────────────────────────────────────────────────

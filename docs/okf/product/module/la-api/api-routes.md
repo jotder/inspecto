@@ -102,9 +102,9 @@ tags: [api, routes, generated]
 | GET | `/inv/pending` | GET /inv/pending — the four-eyes approver inbox | inv | `canApproveLinkExpansions` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java` |
 | GET | `/inv/presets` | List the preset queries a Dataset can answer | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PresetRoutes.java` |
 | POST | `/inv/presets/{presetId}/run` | Run one preset query over a Dataset | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/PresetRoutes.java` |
-| POST | `/inv/projection` | POST /inv/projection (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
+| POST | `/inv/projection` | Fold a Dataset into distinct links (compact edge rows) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/projection/multi` | POST /inv/projection/multi (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
-| POST | `/inv/projection/neighbors` | POST /inv/projection/neighbors (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
+| POST | `/inv/projection/neighbors` | One entity's one-hop links (compact edge rows) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/projection/neighbors/preview` | Grow preview for the explorer: what one neighbours step from a set of entities would add | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/reference-rows` | Reference Dataset rows for at most 500 entity keys, masked under the Space's maskingMode | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |
 | POST | `/inv/schema/overlap-profile` | POST /inv/schema/overlap-profile (generated skeleton) | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvRoutes.java` |

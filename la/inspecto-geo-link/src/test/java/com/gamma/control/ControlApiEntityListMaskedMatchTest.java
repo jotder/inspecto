@@ -87,7 +87,7 @@ class ControlApiEntityListMaskedMatchTest {
 
     private static JsonNode data(HttpResponse<String> r, int status) throws Exception {
         assertEquals(status, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private HttpResponse<String> match(Ctx c, String list, String... values) throws Exception {

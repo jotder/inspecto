@@ -94,7 +94,7 @@ class ControlApiInvFilterBindTest {
                 .method("POST", BodyPublishers.ofString(JSON.writeValueAsString(body))).build(), BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), r.body());
         JsonNode n = JSON.readTree(r.body());
-        return n.has("data") ? n.get("data") : n;       // peel the v1 envelope
+        return EdgeWireTestRows.decoded(n.has("data") ? n.get("data") : n);       // peel the v1 envelope
     }
 
     private static Map<String, Object> base() {
