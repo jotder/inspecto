@@ -1519,7 +1519,8 @@ What exists to build on:
     - `user-guide.md`;
     - `admin-guide.md`.
   - Each says it is generated, and `--check` holds it current.
-  - Demo and video scripts are not generated. The demo script is `products/<id>.demo-build.txt`.
+  - ~~Demo and video scripts are not generated.~~ **Changed by the operator 2026-11-12:** a demo script and a video
+    script are generated too (`PRODUCT-SCRIPTS-GENERATED-1`, built the same day; see §11 PA-10d as built).
 - **D-PA37: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` stays open.** Declaring a template's ops needs would keep `ops` and
   `case-management` for `telco-fraud`'s Case Rule. That changes the pilot's jars, and PA-10's proof is that the jars
   do not change. §9's "declared needs" moves to that row.
@@ -1630,11 +1631,32 @@ hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md`
   refused (`refuseHandWritten`). `render-product-docs --check` holds them current in CI.
 - A Product's own Space Templates (Inspecto's 30, Inspecto LA's 20) are listed in its datasheet, and their
   hubs' guides in a section of their own (found by the review: the LA datasheet first showed none).
-- Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs would say so; none does today.
+- An App with no guide in those hubs would say so; none does today.
+- **Demo and video scripts (`PRODUCT-SCRIPTS-GENERATED-1`, 2026-11-12, D-PA36 as changed by the operator).** Two more
+  generated files per Product hub, `brochure-demo-script.md` and `brochure-video-script.md`: topics of the `brochure`
+  slot, as the hand-written LA series is `module/la-core/brochure-video-scripts.md`, so no new slot. `refuseHandWritten`
+  now accepts exactly the six generated names (`GENERATED_FILES`) with the marker in a generated slot; any other
+  `brochure-*` file in a Product hub is refused.
+  - The demo script: the demo Distribution and its Space (`demoSpace`; the composed Space's parts are the Apps'
+    templates), the Demo Users table parsed from the presenter text (`products/<id>.demo-build.txt`, the lines under
+    "pick a Demo User:"), a walk-through per App (its nav pages and blurbs, the Alert Rules its templates ship), a
+    table of the demo Space's Alert Rules (`config/registry/alert-rules/*.toon` of its templates: name, severity,
+    template, the description's first sentence; plus those the demo's seed tool `tools/seed-<demoSpace>.mjs` POSTs to
+    `.../alert-rules`, found by review: la-showcase's `mule-pass-through` is the Alert the LA demo is known to raise),
+    the tagline, Editions, and the presenter text's reset paragraph. The scripts never claim a given Alert Rule fired;
+    they point at **Alerts**. Telco: 4 Apps, 5 Demo Users, 19 Alert Rules; Inspecto LA: 4 Alert Rules. The review also
+    found "new Rules" (bare *Rule*, banned) in `products/telco.demo-build.txt`, copied into the demo script; fixed at
+    the presenter text. A Product with no demo Space (Inspecto) says to demo on a trial or
+    production install.
+  - The video script: a brief (film on, what it shows, claims only from this script) and one overview video in the
+    beats of the hand-written series: Problem (tagline, sign-in body), Sign in (sign-in title), one shot per App (its
+    pages, its blurbs), Outcome (the seeded Alerts), Explore it (the demo Space), Edition. Lengths are left to the
+    agency.
+  - Not generated: per-story industry videos like the LA series; those stay hand-written in their module hub.
 
-**Proof (as built).** `product-documents.test.mjs` 4/4 (in the CI guards job): every Product's four files are generated,
+**Proof (as built).** `product-documents.test.mjs` 5/5 (in the CI guards job; 4/4 before the scripts): every Product's six files are generated,
 marked and committed current; every link resolves; the Telco brochure and datasheet carry its Apps, roles and the
-Edition × App table; a hand-written file in a generated slot is refused. `check-product-docs`, `check-doc-links`, the
+Edition × App table; the Telco demo script names its four Apps, five Demo Users and every seeded Alert Rule (read from the templates independently), its video script one shot per App; a hand-written file in a generated slot is refused, a hand-written or unknown `brochure-*` file too. `check-product-docs`, `check-doc-links`, the
 vocabulary and doc-count guards pass.
 
 ## 12. Decisions (operator, signed 2026-11-10 … 2026-11-12; D-PA26 … D-PA37 reviewed 2026-11-12, six changed)
@@ -1676,7 +1698,7 @@ vocabulary and doc-count guards pass.
 | D-PA33 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (**signed 2026-11-12, operator, as built**) |
 | D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (**signed 2026-11-12, operator, as built**) |
 | D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`) |
-| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`) |
+| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`, built 2026-11-12: `brochure-demo-script.md`, `brochure-video-script.md`) |
 | D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable |
 | D-PA38 | The streaming runtime for PA-9 | **Signed 2026-11-12 (operator, as recommended):** micro-batches on the existing `trigger: stream` lane, with windowed Alert Rules evaluated on each commit, scoped to the touched keys; no second execution model. Rejected: an in-process per-record operator (kept as the gate G-RT fallback), Kafka Streams, Flink, Esper or Siddhi, and a detection Job on the commit event (the PA-9a baseline only) |
 | D-PA39 | The stated latency | **Signed 2026-11-12 (operator, as recommended):** p95 ≤ 5 s from broker to Alert and ≤ 10 s to Incident, with `max_wait: 1s`, windows ≤ 1 h, one 4-core node, up to the rate PA-9a measures (proposed floor 5,000 events/s); proven by an engine harness in CI, one recorded real-broker run, and the `inspecto_detection_latency_seconds` metric in production |
