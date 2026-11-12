@@ -27,8 +27,9 @@ Both targets need:
 - **The `linux_amd64` zip.** Its JVM is the image's JVM. Point `-GraalvmCache` at a folder holding a `*linux*` JDK with
   `jmods/`. The build is refused when no Linux zip was made.
 
-The demo Distribution is refused for both, because it binds 127.0.0.1 and signs in Demo Users. A `trial` build works and
-tags its image `-trial`.
+A `trial` build works and tags its image `-trial`. The demo Distribution builds a **demo image** with `-Target container`
+(see *The demo image* below) and is refused for `-Target airgap`: it signs in Demo Users with no password, so it is never
+an install.
 
 `-Target airgap` implies `-RequireExtensions`: every DuckDB extension `package.ps1` stages must be in the cache, because
 an offline host cannot `INSTALL` one. Populate the cache first with `node tools/fetch-duckdb-extensions.mjs`. The switch
@@ -92,6 +93,44 @@ a template anywhere else that calls the source's `inspecto.*` helpers (so no cop
 Product without a folder or a folder without a Product, a name, image or Product that disagrees with
 `products/<id>.toon`, and a value the source does not have.
 
+## The demo image
+
+A Product with a demo Distribution also ships as a seeded **demo image** (CONTAINER-DEMO-IMAGE-1, D-PA26 as changed by
+the operator on 2026-11-12):
+
+```powershell
+.\inspecto\package.ps1 -Product telco -Edition Advanced -Distribution demo -Target container -GraalvmCache C:\.jdks
+```
+
+- It is `inspecto-<product>:<platform version>-<edition>-demo`, saved as
+  `inspecto-ship/<image>-<tag>/<image>-<tag>.image.tar`. Its label `io.inspecto.distribution` is `demo`.
+- It is built from the demo bundle (`inspecto-demo-linux_amd64.zip`). It carries the baked demo Space in `/app/spaces`
+  (Inspecto Telco: `telco`, seeded with RA, FM and bypass findings and their Alerts) and the Demo User sign-in. It starts
+  `bin/serve-demo.sh`.
+- **It ships no Helm chart.** It is run on a desk, never installed on a cluster.
+- **Its server listens on the container's own 127.0.0.1.** The demo sign-in refuses to load on any other address, so a
+  published port (`-p 8080:8080`) reaches nothing. That is deliberate: a container on a shared network must not offer a
+  password-free sign-in.
+
+Run it on a desk, in one of two ways:
+- **The host's network** (Linux, or Docker Desktop with host networking turned on in its settings): the server's
+  127.0.0.1 is then the host's, and only this machine reaches it.
+  ```bash
+  docker run --rm --name telco-demo --network host inspecto-telco:<version>-advanced-demo
+  ```
+- **A forwarder beside it** (Docker Desktop without host networking). Publish the port on the host's loopback only, and
+  let a small forwarder in the same network namespace carry it to the server:
+  ```bash
+  docker run -d --rm --name telco-demo -p 127.0.0.1:8080:8081 inspecto-telco:<version>-advanced-demo
+  docker run -d --rm --network container:telco-demo alpine/socat TCP-LISTEN:8081,fork,reuseaddr TCP:127.0.0.1:8080
+  ```
+  Never publish it on every interface (`-p 8080:8081`): anyone who reaches the port signs in as any Demo User.
+
+Then open `http://127.0.0.1:8080` and pick a Demo User; `DEMO-BUILD.txt` in the image lists them.
+
+To reset the demo, remove the container and start a new one: each container starts from the image's pristine Space.
+`-v <folder>:/app/spaces` keeps a session's changes, and it hides the baked Space unless the folder already holds it.
+
 ## How the build is checked
 
 `tools/ship.mjs` does this work (`chart`, `image`, `airgap`). Before it builds anything, it checks that the bundle is the
@@ -133,6 +172,12 @@ identity provider must be reachable from the site; it is the one service the ins
     `lib/product.json` is Inspecto Telco Standard, and the Telco templates are present.
   - The local copy of the image was removed. `install-offline.sh load` then loaded it from a fresh extraction of the
     tar, and it booted with `--network none` and a read-only root: `/health` `UP`, `/ready` `READY`.
+- **The demo image** (CONTAINER-DEMO-IMAGE-1). `package.ps1 -Product telco -Edition Advanced -Distribution demo -Target container
+  -NoUi -GraalvmCache C:\.jdks` built `inspecto-telco:4.0.0-SNAPSHOT-advanced-demo` with the baked `telco` Space. Booted,
+  it answered `/ready` `READY`; the Demo Users `fm.manager` and `ra.analyst` signed in, and the seeded Alerts were there,
+  one per rule, RA's `ra_leakage_found`, FM's `fraud_irsf` and bypass's `tb_box_suspected` among them. A directly
+  published port reached nothing; a forwarder sidecar carried `/health` and a Demo User sign-in from the host. Host
+  networking was not tried: it is off in this desk's Docker Desktop.
 - **Not proven here:**
   - **A Kubernetes install.** The build desk has no cluster, so `helm install` has never run against one.
   - **A complete air-gapped bundle.** The desk holds no DuckDB 2.0 Linux extensions, so the proof bundle was made with

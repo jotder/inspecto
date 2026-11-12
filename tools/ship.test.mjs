@@ -251,3 +251,50 @@ test('guard: one template source, one folder per Product that agrees with produc
         assert.ok(f.some((x) => /'replicas' is not a value/.test(x)), f.join('\n'));
     } finally { rmSync(fake, { recursive: true, force: true }); }
 });
+
+/** A fake inspecto-demo bundle: the demo jar, serve-demo.sh, a Dockerfile starting it, and the baked Space. */
+function fakeDemoBundle(plan, { jar = true, launcher = true, entry = './bin/serve-demo.sh', space = true } = {}) {
+    const dir = fakeBundle(plan);
+    writeFileSync(join(dir, 'deploy', 'Dockerfile'), `FROM x\nLABEL io.inspecto.product=${JSON.stringify(plan.product.id)}\nENTRYPOINT ["${entry}"]\n`);
+    mkdirSync(join(dir, 'bin'), { recursive: true });
+    if (jar) writeFileSync(join(dir, 'lib', 'inspecto-demo-auth.jar'), 'jar');
+    if (launcher) writeFileSync(join(dir, 'bin', 'serve-demo.sh'), '#!/usr/bin/env bash\n');
+    if (space) mkdirSync(join(dir, 'spaces', plan.seedSpace, 'config'), { recursive: true });
+    return dir;
+}
+
+test('CONTAINER-DEMO-IMAGE-1 image: the demo bundle builds inspecto-<product>:<tag>-demo and ships no chart', () => {
+    const plan = assemble(model, g, { product: 'telco', edition: 'advanced', distribution: 'demo', target: 'container' });
+    const bundle = fakeDemoBundle(plan);
+    const out = tmp();
+    const calls = [];
+    const docker = (cmd, args) => { calls.push(args); return args[1] === 'inspect' ? 'telco' : null; };
+    try {
+        const r = buildImage(plan, bundle, out, { docker });
+        assert.equal(r.ref, `inspecto-telco:${plan.platformVersion}-advanced-demo`);
+        assert.equal(r.chart, null);
+        assert.deepEqual(readdirSync(out), [], 'no chart folder or .tgz beside the image (the stubbed save writes nothing)');
+        assert.deepEqual(calls.map((a) => a[0]), ['build', 'image', 'save']);
+    } finally { rmSync(bundle, { recursive: true, force: true }); rmSync(out, { recursive: true, force: true }); }
+});
+
+test('REFUSED demo image: no demo jar, no loopback launcher, a serve.sh entrypoint, no baked Space; the demo jar in a production image', () => {
+    const plan = assemble(model, g, { product: 'telco', edition: 'advanced', distribution: 'demo', target: 'container' });
+    const never = () => assert.fail('docker must not run for a refused bundle');
+    const cases = [
+        [{ jar: false }, /needs lib\/inspecto-demo-auth\.jar/],
+        [{ launcher: false }, /needs bin\/serve-demo\.sh/],
+        [{ entry: './bin/serve.sh' }, /Dockerfile must start bin\/serve-demo\.sh/],
+        [{ space: false }, /baked demo Space spaces\/telco\//],
+    ];
+    for (const [opts, re] of cases) {
+        const b = fakeDemoBundle(plan, opts);
+        try { assert.throws(() => buildImage(plan, b, tmp(), { docker: never }), re); } finally { rmSync(b, { recursive: true, force: true }); }
+    }
+    const prod = assemble(model, g, { product: 'telco', edition: 'advanced', target: 'container' });
+    const b = fakeBundle(prod);
+    try {
+        writeFileSync(join(b, 'lib', 'inspecto-demo-auth.jar'), 'jar');
+        assert.throws(() => buildImage(prod, b, tmp(), { docker: never }), /inspecto-demo-auth\.jar is the Demo User sign-in: it never goes into a production or trial image/);
+    } finally { rmSync(b, { recursive: true, force: true }); }
+});

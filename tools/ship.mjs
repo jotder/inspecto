@@ -21,7 +21,8 @@
 //
 // `image` (D-PA26; package.ps1 -Target container runs it) builds `inspecto-<product>:<tag>` with the bundle's own
 // deploy/Dockerfile, checks the image's io.inspecto.product label, saves it as <out>/<image>-<tag>.image.tar and stamps
-// and packs the chart beside it.
+// and packs the chart beside it. A demo build (CONTAINER-DEMO-IMAGE-1, tag `-demo`) is the inspecto-demo bundle with its
+// baked demo Space and Demo User sign-in; its server stays on the container's loopback and it ships no chart.
 //
 //   node tools/ship.mjs airgap --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>
 //                              [--allow-missing-extensions]
@@ -35,8 +36,8 @@
 //
 // REFUSES (exit 1, the reason named): a plan without `ship`; a Product with no committed chart folder; a value the
 // Product's folder sets that the chart source does not have (a Product overrides values, it never adds one); a bundle that is not the plan's
-// linux_amd64 build (lib/product.json, an ELF runtime/bin/java, the Dockerfile's product label); an image whose label
-// disagrees with the plan; an air-gapped bundle missing a DuckDB extension (unless --allow-missing-extensions).
+// linux_amd64 build (lib/product.json, an ELF runtime/bin/java, the Dockerfile's product label; the Demo User sign-in jar
+// in a demo bundle only, with its launcher and baked Space); an image whose label disagrees with the plan; an air-gapped bundle missing a DuckDB extension (unless --allow-missing-extensions).
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -238,6 +239,14 @@ export function checkBundleForImage(plan, bundleDir) {
     if (java && !(java[0] === 0x7f && java.subarray(1, 4).toString('latin1') === 'ELF')) findings.push('runtime/bin/java is not a Linux (ELF) executable: the image needs the linux_amd64 bundle');
     const df = read('deploy/Dockerfile');
     if (df && !df.toString('utf8').includes(`io.inspecto.product=${JSON.stringify(plan.product.id)}`)) findings.push(`deploy/Dockerfile carries no io.inspecto.product label for '${plan.product.id}'`);
+    // CONTAINER-DEMO-IMAGE-1: the Demo User sign-in (no password) is in a demo image and in no other.
+    const demoJar = existsSync(join(bundleDir, 'lib', 'inspecto-demo-auth.jar'));
+    if (plan.demo) {
+        if (!demoJar) findings.push('a demo build needs lib/inspecto-demo-auth.jar (the Demo User sign-in): this is not the inspecto-demo bundle');
+        if (!existsSync(join(bundleDir, 'bin', 'serve-demo.sh'))) findings.push('a demo build needs bin/serve-demo.sh, its loopback-only launcher');
+        if (df && !/^ENTRYPOINT \["\.\/bin\/serve-demo\.sh"\]\s*$/m.test(df.toString('utf8'))) findings.push('a demo build\'s deploy/Dockerfile must start bin/serve-demo.sh');
+        if (plan.seedSpace && !existsSync(join(bundleDir, 'spaces', plan.seedSpace))) findings.push(`a demo build carries its baked demo Space spaces/${plan.seedSpace}/, and the bundle has none`);
+    } else if (demoJar) findings.push('lib/inspecto-demo-auth.jar is the Demo User sign-in: it never goes into a production or trial image');
     return findings;
 }
 
@@ -245,11 +254,11 @@ const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore'
 
 /**
  * Build the plan's image from an unpacked linux_amd64 bundle with the bundle's own Dockerfile (D-PA26), check its
- * io.inspecto.product label, save it as <out>/<image>-<tag>.image.tar and stamp the chart beside it.
- * `docker` is injectable for tests. Returns { ref, imageTar, chart }.
+ * io.inspecto.product label, save it as <out>/<image>-<tag>.image.tar and stamp the chart beside it (none for a demo
+ * build: its plan's ship.chart is null). `docker` is injectable for tests. Returns { ref, imageTar, chart, chartDir }.
  */
 export function buildImage(plan, bundleDir, out, { docker = run, chartOut = out } = {}) {
-    const { image } = shipOfPlan(plan);
+    const { image, chart } = shipOfPlan(plan);
     const findings = checkBundleForImage(plan, bundleDir);
     if (findings.length) fail(`the bundle at ${bundleDir} is not this plan's linux_amd64 build:\n  ${findings.join('\n  ')}`);
     const ref = `${image.repository}:${image.tag}`;
@@ -259,8 +268,8 @@ export function buildImage(plan, bundleDir, out, { docker = run, chartOut = out 
     if (label !== plan.product.id) fail(`image ${ref} is labelled io.inspecto.product='${label}', the plan '${plan.product.id}'`);
     const imageTar = join(out, `${image.repository}-${image.tag}.image.tar`);
     docker('docker', ['save', '-o', imageTar, ref]);
-    const stamped = stampChart(plan, chartOut);
-    return { ref, imageTar, chart: packChart(stamped), chartDir: stamped.dir };
+    const stamped = chart ? stampChart(plan, chartOut) : null;
+    return { ref, imageTar, chart: stamped ? packChart(stamped) : null, chartDir: stamped?.dir ?? null };
 }
 
 /** The DuckDB extension names package.ps1 stages, read from it so the list lives once (as fetch-duckdb-extensions does). */
@@ -373,7 +382,7 @@ function main() {
         if (cmd === 'image') {
             const r = buildImage(plan, resolve(val('--bundle-dir') ?? fail('--bundle-dir <unpacked linux_amd64 bundle> is required')), out);
             console.log(`ship: image ${r.ref} -> ${r.imageTar}`);
-            console.log(`ship: chart ${r.chart}`);
+            console.log(r.chart ? `ship: chart ${r.chart}` : 'ship: no chart (a demo image runs on a desk, never on a cluster)');
             return;
         }
         const stamped = stampChart(plan, out);
