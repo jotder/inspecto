@@ -44,7 +44,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     <!-- T-001: the card says "Choose a user to continue." once; the panel does not repeat it. -->
                     @if (demo()) {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-                            {{ product }} MFS
+                            {{ demoHeadline }}
                         </h1>
                     } @else {
                         <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
@@ -187,6 +187,8 @@ export class SignInComponent implements OnInit {
         title: 'Every Pipeline, every Run, one place to see it.',
         body: 'Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a Dataset it can trust.',
     };
+    /** SIGNIN-DEMO-HEADLINE-1: the demo headline is the Product's brand.signInTitle, else the bare Product name. */
+    readonly demoHeadline = this.env.signInPitch?.title ?? this.product;
     readonly footer = computed(() => this.session.branding().footerText ?? this.env.footerText);
     /** HOME-VERSION-1: the version the backend reports — the field a support call reads aloud. Absent until known. */
     readonly version = computed(() => this.session.version());

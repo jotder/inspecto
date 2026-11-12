@@ -44,10 +44,10 @@ export function rows(files, world, prices = {}) {
         if (it.module) { const role = manifests[it.module]?.offeringRole; return role === 'base' || role === 'internal' || r.modules.has(it.module); }
         return false;
     });
-    const order = ['layer', 'module', 'functionality', 'addon', 'solution-pack', 'edition'];
+    const order = ['layer', 'module', 'functionality', 'addon', 'solution-pack', 'edition', 'product', 'app', 'industry'];
     return items.map((it) => ({
         id: it.id, kind: it.kind, title: it.title ?? '', parent: it.parent ?? '',
-        link: it.module ?? it.offeringAddon ?? it.template ?? it.industryPack ?? it.offering ?? '',
+        link: it.module ?? it.offeringAddon ?? it.template ?? it.industryPack ?? it.offering ?? it.product ?? it.app ?? it.industry ?? '',
         billable: it.billable ?? '', orderCode: it.orderCode ?? '', enforcement: it.enforcement ?? '', billingModel: it.billing?.model ?? '',
         supportTier: it.support?.tier ?? '', supportOwner: it.support?.owner ?? '', status: it.status ?? '',
         editions: editionsOf(it).join(';'), modules: it.offeringAddon ? (addonModules[it.offeringAddon] ?? []).join(';') : '',
@@ -120,7 +120,8 @@ export function workbook(rs, editions) {
 }
 
 // ---------- Mind map (standalone HTML, collapsible) ----------
-const KIND_TITLE = { module: 'Modules with no layer', functionality: 'Functionalities with no parent', layer: 'Layers and modules', addon: 'Add-ons', 'solution-pack': 'Solution packs', edition: 'Editions' };
+const KIND_TITLE = { module: 'Modules with no layer', functionality: 'Functionalities with no parent', layer: 'Layers and modules', addon: 'Add-ons', 'solution-pack': 'Solution packs', edition: 'Editions',
+    product: 'Products', app: 'Apps', industry: 'Industries' };
 export function toHtml(rs, editions) {
     const kids = {};
     for (const r of rs) (kids[r.parent || `kind:${r.kind}`] ??= []).push(r);
@@ -135,7 +136,8 @@ export function toHtml(rs, editions) {
         return ch.length ? `<li><details><summary>${label} <span class="n">${ch.length}</span></summary><ul>${ch.map(node).join('')}</ul></details></li>` : `<li><div class="leaf">${label}</div></li>`;
     };
     // The four usual roots always show; any other kind shows only when it has parentless items, so nothing is silently dropped.
-    const kinds = ['layer', 'addon', 'solution-pack', 'edition', ...['module', 'functionality'].filter((k) => kids[`kind:${k}`])];
+    // PA-10a: Products, Apps and Industries are parentless roots of their own.
+    const kinds = ['product', 'app', 'industry', 'layer', 'addon', 'solution-pack', 'edition', ...['module', 'functionality'].filter((k) => kids[`kind:${k}`])];
     const roots = kinds.map((k) => {
         const ch = kids[`kind:${k}`] ?? [];
         return `<li><details open><summary><span class="t k">${KIND_TITLE[k]}</span> <span class="n">${ch.length}</span></summary><ul>${ch.map(node).join('')}</ul></details></li>`;

@@ -1,0 +1,7 @@
+id: product.la
+kind: product
+title: Inspecto LA
+product: la
+billable: false
+status: ga
+docs: docs/okf/product/product/la/index.md

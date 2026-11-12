@@ -11,7 +11,8 @@ description: >
 
 Every current doc lives in **one hub per Product Map Item**: `docs/okf/product/<kind>/<name>/`, mirroring
 `product-map/<kind>/<name>.toon` (PRODUCT-DOCS-HUB-1, 2026-10-19). Kinds: `module`, `addon`, `layer`,
-`edition`, `solution-pack`. All hubs are listed in `docs/okf/product/index.md`.
+`edition`, `solution-pack`, and since PA-10 `product`, `app`, `industry` (a Product's brochure, datasheet and guides
+live in its `product/<id>` hub). All hubs are listed in `docs/okf/product/index.md`.
 
 ## Procedure
 

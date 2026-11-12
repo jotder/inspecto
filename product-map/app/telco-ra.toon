@@ -1,0 +1,13 @@
+id: app.telco-ra
+kind: app
+title: Revenue Assurance
+app: telco-ra
+billable: true
+orderCode: INS-APP-TELCO-RA
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/app/telco-ra/index.md

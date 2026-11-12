@@ -88,3 +88,11 @@ test('the real tree renders', () => {
     assert.equal(rs.length, Object.keys(f).length);
     assert.ok(rs.every((r) => r.kind && r.id));
 });
+test('PA-10a: Product, App and Industry items are drawn in the mind map and carry their link', () => {
+    const [f, w] = gather('.');
+    const rs = rows(f, w);
+    assert.equal(rs.find((r) => r.id === 'app.telco-ra')?.link, 'telco-ra');
+    const html = toHtml(rs, Object.keys(w.offerings));
+    for (const id of ['product.telco', 'app.telco-ra', 'industry.telecom']) assert.ok(html.includes(id), `${id} is drawn`);
+    assert.match(html, /INS-APP-TELCO-RA/);
+});

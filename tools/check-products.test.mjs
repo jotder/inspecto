@@ -52,7 +52,7 @@ const RED = {
     'an Industry whose pack does not exist': [(m) => { m.industries.telecom.pack = 'nope'; }, /pack 'nope' is not an Industry pack/],
     'a Platform product with no Add-ons': [(m) => { m.products.inspecto.addons = []; }, /a Platform product names its Add-ons/],
     'a Domain product with no required App': [(m) => { m.products.la.apps.required = []; }, /needs at least one required App/],
-    'a planned distribution': [(m) => m.products.la.distributions.push('pilot'), /distribution 'pilot' is not built yet \(PA-10/],
+    'an unknown distribution': [(m) => m.products.la.distributions.push('saas'), /distribution 'saas' is not one of/],
     'a demo distribution with no demo-capable edition': [(m) => { m.products.la.editions = ['basic', 'standard']; }, /offers the demo distribution but none of advanced, preview/],
     'a demoSpace outside the Product': [(m) => { m.products.la.demoSpace = 'telco-ra'; }, /demoSpace 'telco-ra' is not one of the Product's templates/],
     'a demoSpace with no presenter text': [(m) => { const e = m.exists; m.exists = (p) => p !== 'products/la.demo-build.txt' && e(p); }, /demoSpace 'la-showcase' has no presenter text products\/la\.demo-build\.txt/],

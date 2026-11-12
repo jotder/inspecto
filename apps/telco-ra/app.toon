@@ -18,4 +18,4 @@ nav:
     label: KPIs
     icon: heroicons_outline:chart-bar
     blurb: Follow completeness, leakage found and leakage recovered over time.
-docs: docs/okf/product/solution-pack/telco-ra/index.md
+docs: docs/okf/product/app/telco-ra/index.md

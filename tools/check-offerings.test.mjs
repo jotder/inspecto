@@ -1,7 +1,10 @@
 // Fixture test for tools/check-offerings.mjs. Run: node --test tools/check-offerings.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { check, gather, parsePom, parseToon } from './check-offerings.mjs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { check, gather, parsePom, parseToon, templateConfigNeeds, templateRequires } from './check-offerings.mjs';
 
 const mf = (offeringRole, requires) => ({ offeringRole, requires: requires ? { modules: requires } : undefined });
 const manifests = () => ({ processor: mf('base'), connectors: mf('provider'), ops: mf('optional'), la: mf('optional', ['core']), core: mf('optional') });
@@ -58,6 +61,37 @@ test('a content pack whose minEdition is above the Offering tier is RED; at or b
     assert.match(run((g) => { g.templateMinEdition = { t1: 'standard' }; }).join(' | '), /basic: content pack 't1' needs minEdition standard but the Offering is tier basic/);
     assert.match(run((g) => { g.templateMinEdition = { t1: 'gold' }; }).join(' | '), /unknown minEdition 'gold'/);
     assert.deepEqual(run((g) => { g.templateMinEdition = { t1: 'basic' }; }), []);
+});
+test('check 8 (GAPS-1): a template\'s declared modules exist and are in the Offering; what its config needs is declared', () => {
+    assert.match(run((g) => { g.templateRequires = { t1: ['ops'] }; }).join(' | '), /basic: content pack 't1' requires module 'ops', which the Offering does not include/);
+    assert.match(run((g) => { g.templateRequires = { t1: ['ghost'] }; }).join(' | '), /spaces\/_templates\/t1: requiresModules names 'ghost', which has no manifest/);
+    assert.match(run((g) => { g.templateConfigNeeds = { t1: [['ops', 'an Alert Rule']] }; }).join(' | '), /t1: an Alert Rule needs module 'ops' - declare it/);
+    assert.deepEqual(run((g) => { g.offerings.basic.contentPacks = []; g.offerings.standard.contentPacks = ['t1'];
+        g.templateRequires = { t1: ['ops'] }; g.templateConfigNeeds = { t1: [['ops', 'an Alert Rule']] }; }), []);
+});
+test('templateConfigNeeds judges a template as the server does; templateRequires reads the declaration', () => {
+    const root = mkdtempSync(join(tmpdir(), 'co-tn-'));
+    const put = (rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text); };
+    try {
+        put('a/config/registry/alert-rules/r.toon', 'name: r\n');
+        put('a/config/ops/x_caserule.toon', 'case_rule:\n  name: x\n');
+        put('b/config/registry/decision-rules/d.toon', 'consequences:\n  - kind: create-alert\n');
+        put('c/config/pending/alert-rules/r.toon', 'name: r\n');
+        put('d/config/registry/decision-rules/d.toon', 'consequences:\n  - kind: tag\n');
+        assert.deepEqual(templateConfigNeeds(join(root, 'a'), 'standard'), [['case-management', 'a Case Rule'], ['ops', 'an Alert Rule']]);
+        assert.deepEqual(templateConfigNeeds(join(root, 'a'), 'basic'), [['case-management', 'a Case Rule']], 'a Basic tier ships its Alert Rules unarmed');
+        assert.deepEqual(templateConfigNeeds(join(root, 'b'), 'basic'), [['ops', 'a Decision Rule create-alert']]);
+        assert.deepEqual(templateConfigNeeds(join(root, 'c'), undefined), [['ops', 'an Alert Rule']], 'no minEdition is no Basic tier');
+        assert.deepEqual(templateConfigNeeds(join(root, 'd'), 'standard'), []);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+    assert.deepEqual(templateRequires('name: x\nrequiresModules[2]: case-management, ops\n'), ['case-management', 'ops']);
+    assert.deepEqual(templateRequires('name: x\n'), []);
+});
+test('the repo: every Standard Solution pack with Alert Rules declares ops; the three with a Case Rule declare case-management', () => {
+    const g = gather('.');
+    for (const t of ['telco-fraud', 'telco-bypass', 'partner-settlement']) assert.deepEqual(g.templateRequires[t], ['case-management', 'ops'], t);
+    for (const t of ['aml', 'business-assurance', 'mobile-money', 'payment-fraud', 'telco-ra']) assert.deepEqual(g.templateRequires[t], ['ops'], t);
+    assert.deepEqual(check(g).filter((f) => /requiresModules|declare it/.test(f)), []);
 });
 test('posture: a complete in-vocabulary section is GREEN, and so is its absence', () => {
     assert.deepEqual(withPosture(), []);

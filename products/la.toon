@@ -7,11 +7,11 @@ apps:
   required[1]: link-analysis
   optional[0]:
 templates[20]: la-audit,la-benefits,la-card,la-claims,la-crypto,la-daily-feed,la-health,la-insider,la-logistics,la-mfs,la-mobile-money,la-ownership,la-police,la-procurement,la-sample,la-showcase,la-showcase-off,la-telco-ra,la-trade,la-utility
-distributions[3]: production,trial,demo
+distributions[4]: production,trial,demo,pilot
 demoSpace: la-showcase
 brand:
   name: Inspecto LA
   tagline: Find the links between entities in your data: explore them as a graph, place them on a map, and keep lists of the ones that matter.
   signInTitle: Follow every link, one case at a time.
   signInBody: Explore who is connected to whom, investigate a number, and build a Dossier you can stand behind.
-docs: docs/okf/product/layer/la/index.md
+docs: docs/okf/product/product/la/index.md

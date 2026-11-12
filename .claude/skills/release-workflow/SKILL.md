@@ -90,6 +90,10 @@ A `fix:` lands on the **oldest still-supported branch it affects**, then merges 
    needs a **human** to set `UCC_RELEASE_GUARD_DISABLE=1` and document it — agents ask, never self-authorize.
 6. **Editions** are build flavors — never create/push `basic`/`standard` branches.
 7. **Tag** releases `vX.Y.Z` on the branch they ship from.
+8. **Old-reader check** (release gate, `docs/superpower/2026-11-11-space-evolution-plan.md` §3) — for a release that
+   *writes* a new Space file shape: "the previous release's bundle boots a Space the new release wrote, or the Space
+   carries the `min_product_version` that makes the old release warn." The corpus gate `SpaceCorpusEquivalenceTest`
+   must be green too.
 
 ## Lane workflow — how work reaches `origin/master` TODAY (operator 2026-10-20 / 2026-10-26, binding)
 

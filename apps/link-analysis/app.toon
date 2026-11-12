@@ -40,4 +40,4 @@ nav:
     icon: heroicons_outline:bell-alert
     feature: investigations
     blurb: See fired Alerts, and open the Investigation behind a standing detection.
-docs: docs/okf/product/layer/la/index.md
+docs: docs/okf/product/app/link-analysis/index.md
