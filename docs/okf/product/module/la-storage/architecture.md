@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link analysis storage - architecture
 
-Full as-built detail: [la-core architecture](../la-core/architecture-backend.md) §4. Layer overview:
+Full as-built detail: [la-core architecture-backend](../la-core/architecture-backend.md) §4. Layer overview:
 [layer/la architecture](../../layer/la/architecture.md). Class reference: [spec](spec.md).
 
 ## Where it sits

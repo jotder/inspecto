@@ -19,7 +19,7 @@ Consignment atomically. A file that cannot be read goes to the **quarantine** tr
 parsing go to a reject file beside it.
 
 The capability spec of record is [ingestion.md](plan-ingestion.md); the design is
-[stage1-architecture.md](../engine/architecture-stage1.md). This page is the module summary.
+[architecture-stage1.md](../engine/architecture-stage1.md). This page is the module summary.
 
 Code homes:
 

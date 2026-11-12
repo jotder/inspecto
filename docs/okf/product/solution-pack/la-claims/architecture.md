@@ -1,6 +1,6 @@
 # Link Analysis claims showcase — architecture
 
-The `la-claims` Space Template (`spaces/_templates/la-claims/template.toon`). Shared studio, index and store seams: [la-showcase architecture](../la-showcase/architecture.md) and [la-core architecture](../../module/la-core/architecture-backend.md). This page covers what is specific to claims.
+The `la-claims` Space Template (`spaces/_templates/la-claims/template.toon`). Shared studio, index and store seams: [la-showcase architecture](../la-showcase/architecture.md) and [la-core architecture-backend](../../module/la-core/architecture-backend.md). This page covers what is specific to claims.
 
 ## Data flow
 

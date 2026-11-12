@@ -45,7 +45,7 @@ Files: `la/inspecto-geo-link/src/main/resources/META-INF/services/`. Manifest:
   on a virtual thread, HMAC-SHA256 signature, no entity ids, audited as `link.webhook.delivered` / `.failed`.
 - **Embed expiry sweep**: a daemon timer every 10 minutes over Spaces with `geoLink` on.
 
-Diagram of the whole Link Analysis stack: [la-core architecture](../la-core/architecture-backend.md).
+Diagram of the whole Link Analysis stack: [la-core architecture-backend](../la-core/architecture-backend.md).
 
 ## Editions
 
@@ -59,4 +59,4 @@ Standard and up).
 ## References
 
 - [spec](spec.md) · [admin-guide](admin-guide.md) · [plan](plan.md) · [api-routes](api-routes.md)
-- [la-core architecture-overview](../la-core/architecture.md)
+- [la-core architecture](../la-core/architecture.md)

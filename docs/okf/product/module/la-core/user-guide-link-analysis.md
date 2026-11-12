@@ -15,7 +15,7 @@ support them. **Part I** is the analyst's path through today's Studio (the layou
 as-built reference: limits, server analysis, the link index, evidence and the design records. This one guide replaces
 the former end-user guide, user manual and Link Analysis feature page (merged 2026-10-28). Moving between table, graph,
 map and timeline on one selection is in [Investigation Pivot](user-guide-investigation-pivot.md); the backend is in
-[architecture.md](architecture-backend.md).*
+[architecture-backend.md](architecture-backend.md).*
 
 **Contents.** Part I: [1 What it is](#1-what-link-analysis-is) · [2 Quick start](#2-quick-start-from-a-blank-install-to-a-first-finding)
 · [3 Getting started and Add data](#3-signing-in-getting-started-and-add-data) · [4 The screen](#4-the-screen) ·
@@ -3545,7 +3545,7 @@ The analyst's answer to *what data am I looking at*: a **Data strip** above the 
 This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the older controls are gone; see
 [Part I §18](#18-if-you-used-the-old-studio)). The end-user walk-through is
 [Part I §4–§11](#4-the-screen); the design is archived as `docs/archived-documents/plans-archive/la-studio-ui-reorg-plan.md` and the as-built
-facts are in [architecture.md](architecture-backend.md) §6.14.
+facts are in [architecture-backend.md](architecture-backend.md) §6.14.
 
 - **One header row (visual polish, operator 2026-10-28):** `header[data-testid="la-header"]` holds the title
   **Link Analysis** (the page's one `<h1>`, `la-title`, `text-lg` since 2026-10-29), then the tool rail and the canvas

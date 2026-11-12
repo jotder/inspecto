@@ -1,6 +1,6 @@
 # Link Analysis mobile money — architecture
 
-The `la-mobile-money` Space Template (`spaces/_templates/la-mobile-money/template.toon`). Shared studio, index and store seams: [la-showcase architecture](../la-showcase/architecture.md) and [la-core architecture](../../module/la-core/architecture-backend.md). This page covers what is specific to mobile money.
+The `la-mobile-money` Space Template (`spaces/_templates/la-mobile-money/template.toon`). Shared studio, index and store seams: [la-showcase architecture](../la-showcase/architecture.md) and [la-core architecture-backend](../../module/la-core/architecture-backend.md). This page covers what is specific to mobile money.
 
 ## Data flow
 

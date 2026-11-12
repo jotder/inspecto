@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 The Link Analysis layer (`layer.la`) is the set of modules under `la/` whose Product Map Items name `parent: layer.la`
 in `product-map/module/`. Link Analysis is an **optional, ServiceLoader-discovered extension of the one host process**:
 there is no LA main class and no LA server. The deep as-built design is
-[la-core architecture](../../module/la-core/architecture-backend.md); this page is the map.
+[la-core architecture-backend](../../module/la-core/architecture-backend.md); this page is the map.
 
 ## Modules
 
@@ -52,7 +52,7 @@ Platform modules the layer builds on (not part of it): `platform/inspecto-graph`
 Installed (jar staged by the edition) → Enabled (feature `geoLink` per Space in `modules.toon`) → Permitted
 (capability, Investigation membership, Dataset visibility, Advanced PDP). The Investigation surface additionally needs
 the `investigations` edition feature, which only `inspecto-ops` declares, so Basic is the Link Analysis explorer only
-([la-core architecture](../../module/la-core/architecture-backend.md) §8).
+([la-core architecture-backend](../../module/la-core/architecture-backend.md) §8).
 
 ## A request end to end
 

@@ -63,6 +63,6 @@ provider ([providers layer](../providers/architecture.md)).
 
 ## References
 
-- [platform architecture-module-taxonomy](../platform/architecture-modules.md) — manifest fields and the module taxonomy
-- [platform architecture-editions-model](../platform/architecture-editions.md) — the Edition model
+- [platform architecture-modules](../platform/architecture-modules.md) — manifest fields and the module taxonomy
+- [platform architecture-editions](../platform/architecture-editions.md) — the Edition model
 - [providers layer architecture](../providers/architecture.md)
