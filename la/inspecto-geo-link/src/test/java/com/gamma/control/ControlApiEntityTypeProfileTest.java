@@ -344,6 +344,52 @@ class ControlApiEntityTypeProfileTest {
         }
     }
 
+    /**
+     * PERF-D2: the profile cache is scoped to the caller's view of the bindings (the Datasets R3 lets them read; masking is the
+     * Space's, so it is the same for every caller). A viewer who sees fewer Datasets gets their own entry, never the wider one;
+     * two viewers who see the same Datasets share one.
+     */
+    @Test
+    void theProfileCacheIsScopedToTheDatasetsTheCallerCanView(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String twin = "Bearer twin";
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case OWNER -> Optional.of(new com.gamma.spi.auth.Subject("analyst-1", java.util.Set.of()));
+            case STRANGER -> Optional.of(new com.gamma.spi.auth.Subject("analyst-3", java.util.Set.of()));
+            case "Bearer twin" -> Optional.of(new com.gamma.spi.auth.Subject("analyst-4", java.util.Set.of()));
+            default -> Optional.empty();
+        });
+        AtomicLong tick = new AtomicLong();
+        InputFingerprintCache.forTest(() -> tick.addAndGet(60_000L), 30_000L);
+        String wide = "ep_scope_w_" + System.nanoTime(), narrow = "ep_scope_n_" + System.nanoTime();
+        boolean hadDatabase = Files.isDirectory(Path.of("database"));
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            List<Object> cellCol = List.of(Map.of("name", "s", "classification", "CELL"));
+            ComponentStore reg = new ComponentStore(root.resolve("registry"));
+            reg.write("dataset", "owner_only", Map.of("physicalRef", wide, "owner", "analyst-1", "shares", List.of(), "columns", cellCol));
+            reg.write("dataset", "shared", Map.of("physicalRef", narrow, "owner", "analyst-1", "columns", cellCol, "shares", List.of(
+                    Map.of("subjectType", "user", "subjectId", "analyst-3", "access", "view"),
+                    Map.of("subjectType", "user", "subjectId", "analyst-4", "access", "view"))));
+            plant(Path.of("database").resolve(wide).resolve("p1.parquet"), "('CELL-1'),('CELL-2')", 1_700_000_000_000L);
+            plant(Path.of("database").resolve(narrow).resolve("p1.parquet"), "('CELL-9')", 1_700_000_000_000L);
+            String path = "/inv/entity-types/cell/profile?sections=volume";
+
+            assertEquals(3, data(get(c, path, OWNER)).at("/volume/rows").asLong());
+            assertTrue(data(get(c, path, OWNER)).get("cached").asBoolean(), "control: the owner's entry is warm");
+
+            JsonNode stranger = data(get(c, path, STRANGER));
+            assertFalse(stranger.get("cached").asBoolean(), "a narrower Dataset scope is its own entry, never the owner's");
+            assertEquals(1, stranger.at("/volume/rows").asLong(), "only the Dataset the stranger can view is counted");
+
+            JsonNode sameAccess = data(get(c, path, twin));
+            assertTrue(sameAccess.get("cached").asBoolean(), "identical access shares the stranger's entry");
+            assertEquals(1, sameAccess.at("/volume/rows").asLong());
+        } finally {
+            rmTree(Path.of("database").resolve(wide));
+            rmTree(Path.of("database").resolve(narrow));
+            if (!hadDatabase) Path.of("database").toFile().delete();
+        }
+    }
+
     @Test
     void everyGateRefuses(@TempDir Path cfg, @TempDir Path root, @TempDir Path cfg2) throws Exception {
         subjects();
