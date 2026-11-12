@@ -109,6 +109,13 @@ test('PA-8: a container or air-gap build names its image and chart; a zip build 
     assert.equal(plan({ product: 'la', edition: 'basic', target: 'linux' }).ship, null);
 });
 
+test('CONTAINER-DEMO-IMAGE-1: a demo container build names a -demo image and no chart', () => {
+    const demo = plan({ product: 'telco', edition: 'advanced', distribution: 'demo', target: 'container' });
+    assert.deepEqual(demo.ship, { image: { repository: 'inspecto-telco', tag: `${demo.platformVersion}-advanced-demo` }, chart: null });
+    assert.equal(demo.demo, true);
+    assert.equal(demo.seedSpace, 'telco', 'the image carries the baked demo Space');
+});
+
 test('PA-8: a Product id that cannot be an image name is refused', () => {
     assert.throws(() => shipOf('Acme Platform', 'standard', 'production', '4.0.0'), /does not make an image name/);
 });
@@ -120,7 +127,6 @@ const REFUSED = {
     // PA-10c (D-PA35): a pilot is a customer build only.
     'a pilot outside a customer build': [{ product: 'la', edition: 'advanced', distribution: 'pilot' }, /'pilot' distribution is a customer build: .*customer-build.mjs/],
     'an unknown target': [{ product: 'la', edition: 'advanced', target: 'saas' }, /target 'saas' is not one of windows, linux, container, airgap/],
-    'a demo container': [{ product: 'telco', edition: 'advanced', distribution: 'demo', target: 'container' }, /demo distribution is not built for the 'container' target/],
     'a demo air-gapped bundle': [{ product: 'la', edition: 'advanced', distribution: 'demo', target: 'airgap' }, /demo distribution is not built for the 'airgap' target/],
     'an App the Product does not have': [{ product: 'la', edition: 'advanced', apps: ['telco-ra'] }, /App 'telco-ra' is not one of Product 'la''s Apps/],
 };

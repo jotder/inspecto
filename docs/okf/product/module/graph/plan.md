@@ -22,7 +22,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## Built
 
-- The move (D-AN2) and the algorithm set listed in [architecture](architecture-overview.md) §4 —
+- The move (D-AN2) and the algorithm set listed in [architecture](architecture.md) §4 —
   built 2026-10-17 with the `ANALYTICS-CORE-1` Must items M1–M10.
 - **S6 temporal motif matcher** (`TemporalMotifMatcher`) — Should batch 2 of `ANALYTICS-CORE-1`, built
   2026-10-17.

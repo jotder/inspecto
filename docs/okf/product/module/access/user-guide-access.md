@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Identity and Access — screens
 
-Screens for Identity and Access. Design and internals: [Identity and Access architecture](architecture-overview.md).
+Screens for Identity and Access. Design and internals: [Identity and Access architecture](architecture.md).
 
 - **Sign-in** — `inspecto-ui/src/app/inspecto/auth/sign-in.component.ts`: SSO button, or the Demo User picker
   with a "not secured" warning in a demo build.

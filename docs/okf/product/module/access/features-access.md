@@ -39,4 +39,4 @@ build, no profile).
 `-Distribution demo`, replacing `inspecto-oidc.jar`; `tools/check-demo-auth-isolation.mjs` fails CI if it leaks into a
 non-demo bundle.
 
-More: [screens](user-guide-access.md) · [API](api-access.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-access.md) · [API](api-access.md) · [architecture](architecture.md).

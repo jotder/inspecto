@@ -177,7 +177,7 @@ by [spec-execution-lanes.md](spec-execution-lanes.md); the branch-aware ingest f
   through a per-flow `TriggerCoalescer` (an event storm collapses to one non-overlapping run);
   `MANUAL` runs only via the trigger endpoint. A flow never overlaps itself (`PipelineRunGuard`).
 - **Two drivers, one responsibility each** (the boundary rule's owner is
-  [`control-plane/job-vs-step.md`](../processor/architecture-job-vs-step.md)): the **loop scheduler** drives
+  [`control-plane/job-vs-step.md`](../processor/architecture.md)): the **loop scheduler** drives
   pipelines and owns ingest exclusively; the **job scheduler** (`JobService`, cron/event/manual)
   drives jobs over data at rest and never ingests (`JobType.INGEST` was deleted — an `ingest` job
   is a config error). The dividing line is **in-motion (pipeline) vs at-rest (job)**, not the

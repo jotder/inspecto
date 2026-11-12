@@ -31,4 +31,4 @@ Split across two layers:
 A bundle without `inspecto-ops` reports `features.ops=false`; the object routes answer 503 and openers fall
 back to signal-only behaviour. See [platform-services](../../layer/platform/architecture-platform-services.md) (`objects` service).
 
-More: [screens](user-guide-incidents.md) · [API](api-incidents.md) · [architecture](architecture-incidents.md).
+More: [screens](user-guide-incidents.md) · [API](api-incidents.md) · [architecture](architecture.md).

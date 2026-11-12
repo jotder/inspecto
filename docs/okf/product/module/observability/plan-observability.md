@@ -813,7 +813,7 @@ the form authors the kind), and per-measure limits.
 | Baseline Expectations | `inspecto/src/main/java/com/gamma/expectation/BaselineEvaluator.java`, `BaselineProfileStore.java`, `Expectation.java` (`Baseline`); `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java`; tests `BaselineEvaluatorTest`, `BaselineProfileStoreTest`, `ControlApiExpectationBaselineTest` | §3.10; [`step-catalog.md`](../etl/spec-step-catalog.md) § Expectations |
 | Launch flags | `inspecto/src/main/java/com/gamma/control/ControlApi.java` (`PUBLIC_PATHS`, `isInfraRoute`, `-Dcontrol.bind`) | [`operations.md`](../../layer/platform/admin-guide-launch-flags.md) |
 | UI consumers | `inspecto-ui/src/app/modules/admin/{events,audit-logs,dashboard,runs,run-detail,jobs,processing-status,settings}/`, `inspecto-ui/src/app/app.routes.ts` | [`events.md`](../event/user-guide-events.md), [`runs.md`](../engine/user-guide-runs.md), [`run-detail.md`](../engine/user-guide-run-detail.md), [`dashboard.md`](../../layer/product/user-guide-dashboard.md), [`jobs.md`](../processor/user-guide-jobs.md) |
-| North star | — | [`living-operational-system.md`](../../layer/platform/architecture-living-system.md) (shape only, no state column) |
+| North star | — | [`living-operational-system.md`](../../layer/platform/architecture.md) (shape only, no state column) |
 
 **Gap rows** (a pointer that *should* exist and does not): a Feature page for Audit log / Processing
 status / settings panes (§5.2 #5); a `PipelineScheduler` test class (none exists — `jobs.md` says so);

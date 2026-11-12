@@ -35,4 +35,4 @@ optional modules add only surfaces:
 Absent `inspecto-observability`, core `AbsentModuleRoutes` answers `503`. Absent `inspecto-backup`,
 `backup`, `backup_verify` and `restore` are unknown maintenance tasks and vanish from the Jobs form.
 
-More: [screens](user-guide-observability-backup.md) · [API](api-observability-backup.md) · [architecture](architecture-observability-backup.md).
+More: [screens](user-guide-observability-backup.md) · [API](api-observability-backup.md) · [architecture](architecture.md).

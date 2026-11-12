@@ -27,4 +27,4 @@ Investigators who need to see where activity happens and how entities connect.
 
 [linkAnalysis](../../addon/linkAnalysis/index.md) · [la-core](../../module/la-core/index.md) · [la-api](../../module/la-api/index.md)
 
-More in this hub: [feature-db](feature-db.md) · [user-guide-geo-map](user-guide-geo-map.md).
+More in this hub: [feature-db](feature-db.md) · [user-guide-geo-map](user-guide-geo-map.md)

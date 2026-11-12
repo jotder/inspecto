@@ -37,5 +37,5 @@ A profile-gated Maven module (`inspecto-oidc`, in the `edition-standard`/`editio
   by the CI release and while the jlink *step* is re-proven on a host with no stale JVM holding
   `runtime/bin/server/jvm.dll` ([build & test](../../layer/platform/spec-build-test.md)).
 
-Edition context: [editions model](../../layer/platform/architecture-editions-model.md) ·
+Edition context: [editions model](../../layer/platform/architecture-editions.md) ·
 [auth & security](../access/admin-guide-auth-security.md) · consumer flow: [`/api/v1`](../processor/api-v1.md).

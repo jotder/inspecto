@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Observability and backup — API
 
-Routes for Observability and backup. Design and internals: [Observability and backup architecture](architecture-observability-backup.md).
+Routes for Observability and backup. Design and internals: [Observability and backup architecture](architecture.md).
 
 | Route | Purpose |
 |---|---|

@@ -201,7 +201,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 - **Deep dives (design of record):** the [`module.engine` hub](okf/product/module/engine/index.md)
   — `architecture-pipeline-graph.md`, `spec-editable-round-trip.md`, `spec-live-execution.md` (views,
   provenance, incremental watermarks, failure modes), `spec-step-park-drain.md`; plus
-  `architecture-multi-location-ingest.md` in the [`module.acquire` hub](okf/product/module/acquire/index.md).
+  `architecture.md` (part *Multi-location ingest*) in the [`module.acquire` hub](okf/product/module/acquire/index.md).
   Reusable `use:` components (`ComponentStore`/`ComponentRegistry`) →
   [`component-registry.md`](okf/product/module/processor/spec-component-registry.md).
 
@@ -537,7 +537,7 @@ are computed at scrape time by `MetricsService`'s collector. Confirm the service
 - Acquisition feature depth (connectors, watermark, retry/circuit/post-actions, bastion) → [`data-acquisition-framework.md`](okf/product/module/acquire/spec-framework-design.md)
 - Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md), [`live-execution.md`](okf/product/module/engine/spec-live-execution.md)
 - Editions / build flavors → [`EDITIONS.md`](EDITIONS.md) · Branch & release policy → [`BRANCHING.md`](BRANCHING.md)
-- Architecture overview → [`stage1-architecture.md`](okf/product/module/engine/architecture-stage1.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
+- Architecture overview → [`architecture-stage1.md`](okf/product/module/engine/architecture-stage1.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
 - Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md)
 
 ---

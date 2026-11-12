@@ -20,7 +20,7 @@ is no token paste / guard / interceptor. The removed hand-rolled bearer-token pl
 tests — measured 2026-09-08: 24 + 7 + 3; an earlier "41" was never true of the tree) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
 `OidcTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
 build never compiles it (verify with `-Pedition-standard`); because it's a
-[build flavor](../../layer/platform/architecture-editions-model.md), the core still carries zero auth code.
+[build flavor](../../layer/platform/architecture-editions.md), the core still carries zero auth code.
 
 **BFF session shape.** The browser never holds tokens: `POST /auth/exchange|refresh|logout` run the OIDC
 exchange server-side and keep the refresh token in an **httpOnly `inspecto_rt` cookie**

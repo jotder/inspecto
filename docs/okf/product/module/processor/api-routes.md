@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-374 route(s) registered; 374 in the OpenAPI contract, 0 not.
+376 route(s) registered; 376 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -384,6 +384,8 @@ tags: [api, routes, generated]
 | POST | `/system/operational-db/test` | POST /system/operational-db/test (generated skeleton) | system | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java` |
 | GET | `/system/scheduler` | GET /system/scheduler (generated skeleton) | system | — | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java` |
 | PUT | `/system/scheduler` | PUT /system/scheduler (generated skeleton) | system | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java` |
+| GET | `/tests` | GET /tests - list the test cases of the bound Space | spaces | — | `inspecto/src/main/java/com/gamma/control/SpaceTestRoutes.java` |
+| POST | `/tests/run` | POST /tests/run - run the bound Space's test cases in scratch storage | spaces | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SpaceTestRoutes.java` |
 | POST | `/trigger` | POST /trigger (generated skeleton) | trigger | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 | POST | `/validate` | Validate a config file or draft | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java` |
 | GET | `/views` | GET /views (generated skeleton) | views | — | `inspecto/src/main/java/com/gamma/control/ViewRoutes.java` |

@@ -35,9 +35,9 @@ id `case-management`, feature `cases`, contracts `JobTypeProvider` and `ObjectEn
 ## Behaviour
 
 Workflow, merge, split, Case Rule grouping (`attributes.raisedByRule`, `caseGroup` digest) and from-entities
-compensation: [architecture § 4](architecture-overview.md). Rule file keys:
-[architecture § 5](architecture-overview.md). Routes and capability gates: [API](api-case-management.md).
-Limits: [architecture § 9](architecture-overview.md).
+compensation: [architecture § 4](architecture.md). Rule file keys:
+[architecture § 5](architecture.md). Routes and capability gates: [API](api-case-management.md).
+Limits: [architecture § 9](architecture.md).
 
 ## Dry run
 

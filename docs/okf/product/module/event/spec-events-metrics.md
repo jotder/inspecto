@@ -27,7 +27,7 @@ timestamp: 2026-07-16T00:00:00Z
   routes that stay **unversioned** — see [versioned API](../processor/api-v1.md). *(The sunset counter
   `inspecto_legacy_api_requests_total` was removed 2026-07-25 with the unversioned business surface.)*
 * **`StabilityGate`** (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/StabilityGate.java`) — the acquisition
-  file-readiness gate (not a health gate); one shared instance per space (see [acquisition](../acquire/architecture-framework.md)).
+  file-readiness gate (not a health gate); one shared instance per space (see [acquisition](../acquire/architecture.md)).
 
 ## Notifications & audit trail (shipped 2026-06-29, `ddfa288`)
 

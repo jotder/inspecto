@@ -20,7 +20,7 @@ It is plain JDK with no dependency on any other Inspecto module.
 It began as a port of the Link Analysis SPA's algorithms and was moved into the platform by the
 analytics core plan (decision D-AN2) so Fraud, AML and Case Management can use it without depending
 on Link Analysis. The backend description of Link Analysis, which is its main caller, is
-[link-analysis (backend)](../la-core/architecture.md).
+[link-analysis (backend)](../la-core/architecture-backend.md).
 
 ## Where it fits
 
@@ -35,4 +35,4 @@ module keeps only the algorithms. Callers found in the code:
 | `la/inspecto-la-api` (`PatternRoutes`, `GraphResultJson`) | route and JSON shape |
 | `platform/inspecto-entity-store` (`EntityRegistry`) | `UnionFind` for entity merging |
 
-More: [screens](user-guide-graph.md) · [API](api-graph.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-graph.md) · [API](api-graph.md) · [architecture](architecture.md).

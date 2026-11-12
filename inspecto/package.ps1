@@ -106,7 +106,9 @@ param(
     # PRODUCT-ASSEMBLY-1 PA-8 (D-PA26, D-PA29): what the build ships beyond the zips. 'windows' and 'linux' are the zips alone.
     # 'container' also builds the Product's OCI image (inspecto-<product>:<version>-<edition>[-trial]) from the linux_amd64 zip and
     # stamps its Helm chart, both into inspecto-ship/<image>-<tag>/ (tools/ship.mjs). It needs Docker and the linux_amd64 zip
-    # (the Linux jmods: -GraalvmCache). Refused for -Distribution demo.
+    # (the Linux jmods: -GraalvmCache). With -Distribution demo (CONTAINER-DEMO-IMAGE-1) it builds the demo image
+    # inspecto-<product>:<version>-<edition>-demo instead: the baked demo Space, the Demo User sign-in on the container's own
+    # loopback, serve-demo.sh as entrypoint, and no chart. 'airgap' refuses the demo Distribution.
     # 'airgap' (D-PA28) does the same, then lays out inspecto-ship/<image>-<tag>-airgap/ and its .tar: the unpacked Linux bundle,
     # the saved image, the chart, install-offline.sh, airgap.json and SHA256SUMS. It implies -RequireExtensions.
     [ValidateSet('windows', 'linux', 'container', 'airgap')]
@@ -277,10 +279,12 @@ foreach ($n in @($plan.notes)) { if ($n) { Write-Host "  note: $n" -ForegroundCo
 if ($plan.ship) {
     & docker version --format '{{.Server.Version}}' *> $null
     if ($LASTEXITCODE -ne 0) { throw "-Target ${Target}: Docker is not reachable (docker version failed); the image is built with docker build" }
-    Write-Host "  ships: image $($plan.ship.image.repository):$($plan.ship.image.tag), chart $($plan.ship.chart.name) $($plan.ship.chart.version)" -ForegroundColor Cyan
+    Write-Host "  ships: image $($plan.ship.image.repository):$($plan.ship.image.tag), $(if ($plan.ship.chart) { "chart $($plan.ship.chart.name) $($plan.ship.chart.version)" } else { 'no chart (a demo image)' })" -ForegroundColor Cyan
 }
 # PA-8c (D-PA28): an offline host cannot INSTALL a DuckDB extension, so an air-gapped build stages every one or fails.
 if ($Target -eq 'airgap') { $RequireExtensions = $true }
+# CONTAINER-DEMO-IMAGE-1: a demo image carries its Product's baked demo Space (tools/ship.mjs image refuses one without it), so say so before the build.
+if ($Target -eq 'container' -and $plan.seedSpace -and $NoBakeDemo) { throw "-Target container -NoBakeDemo: a demo image carries the baked demo Space $($plan.seedSpace); drop -NoBakeDemo" }
 
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if ($DemoAuth) {
@@ -2320,8 +2324,23 @@ if (-not $NoRuntime) {
 #                             serve.* leaves it unset (default none) -- job reporting is opt-in there; a demo
 #                             whose Home says "Run history needs the DuckDB jobs backend" is not a demo
 if ($DemoAuth) {
+    # CONTAINER-DEMO-IMAGE-1 (D-PA26 as changed 2026-11-12): -Target container keeps the Dockerfile for the demo image, rewritten
+    # below to start serve-demo.sh. The server still binds the container's own 127.0.0.1, so the demo sign-in is never published.
+    $demoImage = ($Target -eq 'container')
     foreach ($f in 'bin\serve.sh', 'bin\serve.bat', 'deploy\Dockerfile', 'deploy\Dockerfile.dockerignore', 'deploy\inspecto.service', 'bin\install-service.sh', 'bin\install-service.ps1') {
+        if ($demoImage -and $f -like 'deploy\Dockerfile*') { continue }
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
+    }
+    if ($demoImage) {
+        $df = Get-Content -Raw (Join-Path $deployDir 'Dockerfile')
+        foreach ($pair in @(
+                @('(?m)^# Run:  docker run -p 8080:8080 inspecto\r?$', "# DEMO IMAGE (CONTAINER-DEMO-IMAGE-1): Demo User sign-in, NO real authentication, the baked demo Space in /app/spaces.`n# The server listens on the container's 127.0.0.1 only, so a published port reaches nothing. Run it on a desk with the`n# host's network:  docker run --network host <image>  then open http://127.0.0.1:8080 (docs: admin-guide-container-airgap.md)."),
+                @('chmod \+x bin/serve\.sh ', 'chmod +x bin/serve-demo.sh '),
+                @('(?m)^ENTRYPOINT \["\./bin/serve\.sh"\]', 'ENTRYPOINT ["./bin/serve-demo.sh"]'))) {
+            if ($df -notmatch $pair[0]) { throw "step 6c-demo: the demo image's Dockerfile has no line matching '$($pair[0])' (step 6b-2 changed it)" }
+            $df = $df -replace $pair[0], $pair[1]
+        }
+        Write-LfScript -Path (Join-Path $deployDir 'Dockerfile') -Content $df
     }
     # MODULE-REORG-P3d stage 1: the demo launchers READ modules.list too (written above by `offering-classpath.mjs --demo`: the
     # OIDC trio replaced by the demo jar) instead of embedding a jar list of their own. No FALLBACK glob here: a demo bundle is
@@ -2924,7 +2943,7 @@ if ($plan.ship) {
 Write-Host ""
 Write-Host "Deployment bundle(s) ready:" -ForegroundColor Green
 foreach ($plat in $outZips.Keys) { Write-Host "  $($outZips[$plat])  (+ .sha256$sigNote)  [$plat]" }
-if ($shipDir) { Write-Host "  $shipDir$(if ($Target -eq 'airgap') { '(.tar)' })  (image $($plan.ship.image.repository):$($plan.ship.image.tag) + Helm chart$(if ($Target -eq 'airgap') { ' + Linux bundle + install-offline.sh' }))  [$Target]" }
+if ($shipDir) { Write-Host "  $shipDir$(if ($Target -eq 'airgap') { '(.tar)' })  (image $($plan.ship.image.repository):$($plan.ship.image.tag)$(if ($plan.ship.chart) { ' + Helm chart' })$(if ($Target -eq 'airgap') { ' + Linux bundle + install-offline.sh' }))  [$Target]" }
 # A bundle with no ui/ still starts and still serves /api/v1 — but every browser hit returns
 # ControlApi's `{"error":"not found — API routes are served under /api/v1"}` 404, which looks like a
 # broken deployment rather than a packaging choice. It shipped that way once (2026-07-31) precisely

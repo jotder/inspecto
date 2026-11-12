@@ -683,7 +683,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
     `ExchangeSnapshotMultiPodTest` and the end-to-end `CrossSpaceFraudIncidentAcceptanceTest`. UI: about 6 sharing specs.
   - Gating (grep of the module source): `canRequestShares`, `canOfferDatasets`, `canOfferSignals`, `canRender*`.
   - Open: only P3 `IMPORT-WHOLE-SPACE-SPLIT-1` (demand hold) and the "load as draft" browser pass.
-  - Known limits (`architecture-overview.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
+  - Known limits (`architecture.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
     events are possible from two pods.
 - **Strengths vs market:**
   - The matrix says no RAFM peer shows a multi-entity / group-regulator model on its public pages. Here sharing fails closed and masks under
@@ -872,7 +872,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - The add-on holds one module, `notify-channels` (`offerings/standard.toon`). The code is 5 classes in `providers/inspecto-notify-channels/src/main/java/com/gamma/notify/channel/`: `SmtpEmailChannel`, `WebhookChannel`, `HttpWebhookSinkTransport`, `PinnedHttp` and `WebhookEgress`.
   - `plan.md`: email and webhook are built only under Standard and above, with digest batching, receipts, bounce suppression and per-Space destinations. `WEBHOOK-EGRESS-POLICY-1` gives a pinned connect, and channel and notification-rule writes go through maker-checker (`ASSURE-MAKER-CHECKER-RESIDUALS-1`). No open rows.
   - Module tests: 9 unit classes, including two channel TCKs, `SmtpEmailChannelStarttlsRequiredTest`, `SmtpEmailChannelTlsIdentityTest` and `PinnedHttpTlsTest`. The core holds 5 real-HTTP notification tests (`inspecto/src/test/java/com/gamma/control/ControlApiNotification*Test`, `NotificationContentMaskingTest`).
-  - Known limits (`architecture-overview.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
+  - Known limits (`architecture.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
   - There is no feature-db row (`addon/integrationDelivery/index.md`: "no feature rows derive to this item").
   - No HMAC or signature code exists in `providers/inspecto-notify-channels` (grep `signature|hmac`). Signing of notification webhooks is unverified. Link Analysis has its own signed webhooks (`IntegrationWebhooksTest`).
 - **Strengths vs market:**
@@ -1029,7 +1029,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` (6 tests, 502 lines). Every control flags exactly its planted leakages (15 completeness Breaks / 9 lost xDRs, 4 rated-vs-billed, 5+N re-rating, 6 roll-forward, 10 settlement) against 24 benign boundary look-alikes. `theTemplateIngestsEvaluatesAndAlertsEndToEnd` ingests through all 8 Pipelines and checks 6 Alerts and KPIs of 161.16 USD / 17 / 17.
   - Mutation-checked: about 20 rule and tolerance mutations, each run separately and each red (`plan-spaces.md` §3.5). `ControlApiSpaceTemplateSeedGateTest` and `KpiCompletenessWidgetTest` (3 tests) cover apply and the completeness tile.
   - BACKLOG: `ASSURE-PACK-TELCO-RA-1` was closed 2026-10-04 (`docs/BACKLOG.md` line 169). Its vendor-feed-mapping half is parked in `docs/archived-documents/plans-archive/assurance-capability-plan.md` §4. The hub shows "No open rows".
-  - Decided limits: the impact ledger stays manual (`PUT /objects/{id}/impact`, no automatic write); timestamps are naive (one agreed timezone); the `kpi.completeness` tile ships `enabled: false` (`business-assurance/architecture-revenue-assurance.md` "Limits").
+  - Decided limits: the impact ledger stays manual (`PUT /objects/{id}/impact`, no automatic write); timestamps are naive (one agreed timezone); the `kpi.completeness` tile ships `enabled: false` (`business-assurance/architecture.md` "Limits").
   - Every feed Schema column is classified `INTERNAL`, `SUBSCRIBER_ID` and `B_NUMBER` included (`config/switch_xdr/switch_xdr_schema.toon`). No `MSISDN`/`PII` classification exists anywhere in the pack (grep: 0 hits), so masking never applies to RA records.
   - Competitive matrix: A = **Y**, C re-rating = **P**, Q settlement = **P** (`brochure-competitive-matrix.md` rows A, C, Q).
 - **Strengths vs market:**
@@ -1479,7 +1479,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Template: 12 files. Pipeline plus schema; poll Collector (`XDR_{yyyyMMdd}.csv`); freshness and index-lag Alert Rules; row-band Expectation; `la_index_build` and `la_rows_band_evaluate` Jobs. Only **2 sample days of a few rows each** (`data/samples/daily_xdr/`).
   - Tests: `LaDailyFeedTemplateRulesTest` 6. `LaDailyIngestAcceptanceTest` covers 7 days, a late day, a re-run, a correction, a part-count change, a missing day and a dimension change. `ScheduledDailyChainTest` (geo-link) runs on the scheduler alone. Benches `LaDailyIngestScaleBench` / `DailyIndexScaleBench`: 10^7 rows a day ingest in 35–40 s, 10^8 in 489 s, APPEND 31 s onto 10^8 (BACKLOG `LA-DAILY-INGEST-1`).
   - Live drive on 2026-10-14 (`module/la-core/tests-data-trust-live-drive.md`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
-  - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions-model.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, open, hold: operator). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
+  - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, open, hold: operator). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
   - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java:59`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
   - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
 - **Strengths vs market:**
@@ -1550,7 +1550,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Its own content is mis-tiered. `business-assurance` and `la-daily-feed` ship Alert Rules whose dispatcher is Standard+ (`OFFERING-DECLARATION-DRIFT-1` D1).
 - **Strengths vs market:**
   - The install is zero-dependency (one process, no database, no IdP), which suits a presales or analyst desk. That is comparable to i2 ANB desktop or Neo4j Desktop/Bloom free use (general market).
-  - It is upgraded by swapping the build, not migrating: Spaces and configuration carry over (`edition/basic/brochure.md`). This is held by the build-flavor model (`architecture-editions-model.md`).
+  - It is upgraded by swapping the build, not migrating: Spaces and configuration carry over (`edition/basic/brochure.md`). This is held by the build-flavor model (`architecture-editions.md`).
 - **Gaps vs market / RFP risk:**
   - No authentication at all. Competitors' entry tiers (Linkurious, Neo4j Enterprise starter, general market) still have users and roles. Basic cannot answer any SSO/RBAC RFP line (by design; no row needed, but it limits Basic to non-regulated use).
   - Per-node billing with no metering or licence key. The node count is honour-system: no row (D-MR3 decided "none").
@@ -1653,7 +1653,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **What it is (customer view):** three nested builds sold per node, differing by who uses them (one analyst, a team, an organisation), how much data and how much governance. Preview is an evaluation build.
 - **Scores:** F 3 · B 4 · Q 4 · E 2 · R 3 → **Level L2 (Prototype)** *(calibrated 2026-10-20: E 2 caps the level; the mechanism alone is L3)* as a mechanism. The commercial enforcement is L2.
 - **Evidence:**
-  - Mechanism: build flavors with no branches. Absent modules answer 503 with an explanation (never 404), `/bootstrap` flags derive from registered routes, and each gated cell has a falsification test (`layer/platform/architecture-editions-model.md` recipe items 1–7, 28; 20+ edition test classes listed above).
+  - Mechanism: build flavors with no branches. Absent modules answer 503 with an explanation (never 404), `/bootstrap` flags derive from registered routes, and each gated cell has a falsification test (`layer/platform/architecture-editions.md` recipe items 1–7, 28; 20+ edition test classes listed above).
   - Offering == bundle == pom profile is enforced in CI (`tools/check-offerings.mjs`, `tools/offering-classpath.mjs`, `tools/bundle-modules.mjs`). Customer trimming is available via `tools/customer-build.mjs` (`product-map/README.md`).
   - Enforcement is `build` only, with no licence engine (D-MR3) and no node metering, although every edition is billed `per-node`.
   - The ladder is clean on modules: Basic ⊂ Standard ⊂ Advanced ⊂ Preview through `includes:` in `offerings/*.toon`.

@@ -46,4 +46,4 @@ Route table with capabilities: [api-routes](api-routes.md).
 
 ## References
 
-- [architecture](architecture.md) · [la-core architecture](../la-core/architecture.md)
+- [architecture](architecture.md) · [la-core architecture-backend](../la-core/architecture-backend.md)

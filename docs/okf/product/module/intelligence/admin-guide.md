@@ -55,4 +55,4 @@ ledger and the Case store (256 entries).
 | 403 from `POST /agent/tools/{name}` | The tool is mutating; it goes through approvals, not direct dispatch |
 | Agent actions stop | Kill switch on, budget exhausted, or the class mode is OFF |
 
-More: [AI assist — limits](architecture-overview.md), [Embedded intelligence](architecture-embedded-intelligence.md).
+More: [AI assist — limits](architecture.md), [Embedded intelligence](architecture-embedded-intelligence.md).

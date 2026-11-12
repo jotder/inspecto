@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 Package `com.gamma.recon` in
 [`features/inspecto-reconciliation`](../../../../../features/inspecto-reconciliation/src/main/java/com/gamma/recon/).
-The overview and lifecycle diagram are in [architecture](architecture-overview.md); the full as-built behaviour of
+The overview and lifecycle diagram are in [architecture](architecture.md); the full as-built behaviour of
 the Board and its screens, including the performance history, is in the [user guide](user-guide-reconciliation.md);
 routes are in [api-routes](api-routes.md). This page maps the code.
 

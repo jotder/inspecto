@@ -28,7 +28,7 @@ Three convictions anchor every requirement:
 3. **Operable by design** — every Run is crash-isolated and idempotent; everything is captured as
    Signals, Metrics, audit, and managed objects.
 
-The north star ([`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md))
+The north star ([`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md))
 frames the platform as **seven cooperating networks over one Component metamodel** (Data · Signal ·
 Decision · Execution · Metadata · Presentation · Security), so it can evolve from deterministic rules to
 AI-driven autonomy without redesign.
@@ -285,7 +285,7 @@ template gallery + apply).*
 | Document | What it grounds |
 |---|---|
 | [`api/README.md`](api/README.md) · [`okf/product/module/processor/api-v1.md`](okf/product/module/processor/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
-| [`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
+| [`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
 | [`BACKLOG.md`](BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
 | [`okf/product/module/intelligence/architecture-embedded-intelligence.md`](okf/product/module/intelligence/architecture-embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
 | [`okf/product/layer/platform/plan-roadmap.md`](okf/product/layer/platform/plan-roadmap.md) · [`okf/product/layer/product/brochure-stakeholder-overview.md`](okf/product/layer/product/brochure-stakeholder-overview.md) | Horizons; value proposition; maturity |

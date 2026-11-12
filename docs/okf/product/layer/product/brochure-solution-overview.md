@@ -40,7 +40,7 @@ Each pack page names the modules the pack switches on and walks the end-to-end s
 
 | Solution | For | Page |
 |---|---|---|
-| Revenue Assurance | telecom revenue leakage between switch, mediation, rating and billing | [revenue-assurance](../../solution-pack/business-assurance/architecture-revenue-assurance.md) |
+| Revenue Assurance | telecom revenue leakage between switch, mediation, rating and billing | [revenue-assurance](../../solution-pack/business-assurance/architecture.md) |
 | Telecom Fraud | IRSF, Wangiri, SIM box and related typologies | [telecom-fraud](../../solution-pack/telco-fraud/architecture.md) |
 | Payment Fraud | card and wallet fraud patterns | [payment-fraud](../../solution-pack/payment-fraud/architecture.md) |
 | AML | laundering typologies, screening, suspicious transaction reports | [aml](../../solution-pack/aml/architecture.md) |
@@ -59,14 +59,14 @@ Three journeys follow one piece of work across modules: [from a file to a dashbo
 
 One Java application with an embedded DuckDB engine and one Angular console, shipped as thin per-module jars.
 Content packs sit on feature modules, which sit on platform modules, which sit on contracts and providers.
-[`../platform/architecture-technical.md`](../platform/architecture-technical.md) is the architect's view.
+[`../platform/architecture.md`](../platform/architecture.md) is the architect's view.
 
 ## 5. How each part works (level 3)
 
 [Module pages](../../index.md) — 29 pages, one per module, on one nine-heading template (what it is, who uses
 it, where it sits, how it works, configuration, screens, API, interactions, limits). Start with
-[maker-checker](../../module/workflow/architecture-maker-checker.md) for governance, [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md) for data
-flow, or [Alerts](../../addon/incidents/architecture-alerts.md) for detection.
+[maker-checker](../../module/workflow/architecture.md) for governance, [Pipelines and Steps](../../module/etl/architecture.md) for data
+flow, or [Alerts](../../addon/incidents/architecture.md) for detection.
 
 ## 6. Where to go next
 
@@ -74,6 +74,6 @@ flow, or [Alerts](../../addon/incidents/architecture-alerts.md) for detection.
 |---|---|
 | Executive or sponsor | [Executive Brief](brochure-executive-brief.md) |
 | Evaluating a solution | its page in §3, then [Product Capabilities](features-product-capabilities.md) |
-| Architect or integrator | [Technical Architecture](../platform/architecture-technical.md), the [OpenAPI contract](../../../../api/openapi-v1.json) |
+| Architect or integrator | [Technical Architecture](../platform/architecture.md), the [OpenAPI contract](../../../../api/openapi-v1.json) |
 | Operator or admin | [Operations Guide](../platform/admin-guide-operations.md), the module pages |
 | End user | [User Guide](../../../../USER_GUIDE.md) |

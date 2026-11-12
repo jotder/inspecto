@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Maker-checker (Pending Changes) — API
 
-Routes for Maker-checker (Pending Changes). Design and internals: [Maker-checker (Pending Changes) architecture](architecture-maker-checker.md).
+Routes for Maker-checker (Pending Changes). Design and internals: [Maker-checker (Pending Changes) architecture](architecture.md).
 
 | Route | Gate | Notes |
 |---|---|---|

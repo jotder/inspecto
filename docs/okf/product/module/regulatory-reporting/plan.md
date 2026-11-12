@@ -22,7 +22,7 @@ prerequisite of `PACK-AML-1`). Design and decisions D-RR1 … D-RR12:
 
 - MVP shipped 2026-10-09: Report Templates (XML / CSV / JSON), draft → pending → approved → submitted, four-eyes
   decide gates, the signed store, the file drop and the submission log ([spec](spec.md);
-  [architecture](architecture-overview.md)).
+  [architecture](architecture.md)).
 - Template authoring, `PUT` / `DELETE /regulatory-reports/templates/{id}` (2026-10-11) ([spec](spec.md)).
 - Demo rehearsal passed 2026-10-14 ([spec, *Demo rehearsal*](spec.md)).
 - `REGULATORY-REPORTING-1` (P2) closed 2026-10-18 with its seven owed decisions taken: XSD validation at draft and

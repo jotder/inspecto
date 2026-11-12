@@ -28,4 +28,4 @@ Operators and administrators responsible for recoverability and disaster-recover
 
 [observability](../../module/observability/index.md) · [platform](../../layer/platform/index.md)
 
-More in this hub: [admin-guide-backup-restore](admin-guide-backup-restore.md).
+More in this hub: [admin-guide-backup-restore](admin-guide-backup-restore.md)

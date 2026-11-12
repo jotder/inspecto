@@ -60,7 +60,7 @@ never rejected** — so a misspelled trigger key yields a job with no trigger an
 `ControlApiJobCrudTest`; the full trap and the read side's deliberate asymmetry are in
 [`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md) §4.
 
-`submit()` binds the `space` MDC (for non-default spaces — see [multi-space](architecture-multi-space.md)) and runs on a
+`submit()` binds the `space` MDC (for non-default spaces — see [multi-space](architecture.md)) and runs on a
 virtual thread. `runJob()` uses `runner.runExclusiveOrSkip(name, …)` for a non-overlap guarantee (a job
 already in flight records `SKIPPED`); different jobs run in parallel. On startup, `catchUpMissedFires()`
 replays a single missed cron fire for `catch_up: true` jobs from the durable `jobs_runs.csv` ledger.

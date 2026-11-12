@@ -9,7 +9,7 @@ timestamp: 2026-11-09T00:00:00Z
 # Link Analysis showcase release — build and boot-test
 
 A showcase release is two product downloads plus a Space download and a data download for each of the 18 showcases,
-all built from **one commit** (layout and packer: [catalogue architecture](architecture-showcase-catalogue.md)).
+all built from **one commit** (layout and packer: [catalogue architecture](architecture.md)).
 Operator decisions 2026-11-09: the downloads carry the **product version as is** (no tag of their own), the release
 is **built locally only** and the operator publishes it, and there are **two products**: Basic with the Link Analysis
 UI, and Preview with Demo Auth.

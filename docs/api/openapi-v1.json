@@ -2795,6 +2795,32 @@
         "x-generated" : true
       }
     },
+    "/tests" : {
+      "get" : {
+        "tags" : [ "spaces" ],
+        "summary" : "GET /tests - list the test cases of the bound Space",
+        "operationId" : "getTests",
+        "description" : "SE-6a. Reached as /spaces/{id}/tests. Lists the case folders under <space>/tests/ (each holding a case.toon): name, pipeline and input count, or the reason a case file is malformed. 503 when the Space has no config root. A read: no capability. Spec: docs/okf/product/module/config/spec-space-tests.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {cases:[{name, pipeline, inputs, error?}]}."
+          }
+        }
+      }
+    },
+    "/tests/run" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "POST /tests/run - run the bound Space's test cases in scratch storage",
+        "operationId" : "postTestsRun",
+        "description" : "SE-6a. Reached as /spaces/{id}/tests/run. Optional body {cases:[name,...]}; every case when absent. Each case runs through the run-to-here engine into a scratch root; nothing is written under the Space. Requires canAuthorWorkbench. 503 no config root, 400 bad body, 403 a case name that is not a plain name, 404 unknown case, 422 malformed case file, 200 {passed, total, failed, cases:[{name, pipeline, passed, error?, expectations:[{expectation, expected, actual, passed}]}]} - a failing case is a 200.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      }
+    },
     "/pipelines/{pipelineId}/bundle" : {
       "get" : {
         "tags" : [ "pipelines" ],

@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 Developer map of `features/inspecto-intelligence`. The full as-built narrative per tier (P0–P5, AGT-6a, egress
 masking, gotchas) is [Embedded intelligence](architecture-embedded-intelligence.md); overview:
-[AI assist](architecture-overview.md).
+[AI assist](architecture.md).
 
 ## Seam
 

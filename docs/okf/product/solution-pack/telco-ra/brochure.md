@@ -37,6 +37,6 @@ Bring a day of switch, mediation and billing extracts for a leakage proof of val
 
 ## Read more
 
-- Architecture: [revenue assurance](../business-assurance/architecture-revenue-assurance.md)
+- Architecture: [revenue assurance](../business-assurance/architecture.md)
 - The template manifest is `spaces/_templates/telco-ra/template.toon`.
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

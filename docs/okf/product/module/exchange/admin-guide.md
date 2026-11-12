@@ -18,7 +18,7 @@ Optional module `inspecto-exchange` (module id `exchange`, feature id `exchange`
 with the module's `absentMessage`, and `shared/...` refs fail closed.
 
 It also needs multi-Space mode: `-Dspaces.root` must be set. With a single Space there is nobody to share with
-and every route answers 409 ([architecture § 3](architecture-overview.md)).
+and every route answers 409 ([architecture § 3](architecture.md)).
 
 ## Permissions
 

@@ -43,7 +43,7 @@ Pipeline run (frontend: asn1) ──▶ Asn1RecordIngester.ingest
 
 When the jar is not on the classpath (Basic), `Parsers` has no `asn1`; an `asn1` ingest fails with the
 `PluginIngesters.notLoaded` message naming the module, and a Pipeline using `parser.asn1.ber` is listed
-`hosted:false` with `missingModule` and a reason (`docs/okf/product/layer/platform/architecture-module-taxonomy.md`).
+`hosted:false` with `missingModule` and a reason (`docs/okf/product/layer/platform/architecture-modules.md`).
 The Pipeline itself still loads; only running it needs the decoder.
 
 ## Editions

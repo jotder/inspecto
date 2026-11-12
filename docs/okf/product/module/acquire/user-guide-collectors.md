@@ -22,7 +22,7 @@ The route, folder and service had already moved; this doc had not — it still c
 
 ## Screens
 
-Screens for Collectors. Design and internals: [Collectors architecture](architecture-collectors.md).
+Screens for Collectors. Design and internals: [Collectors architecture](architecture.md).
 
 - **Collectors** — route `collectors`, `inspecto-ui/src/app/modules/admin/collectors/collectors.component.ts`,
   with the detail drawer `collector-detail.dialog.ts`.

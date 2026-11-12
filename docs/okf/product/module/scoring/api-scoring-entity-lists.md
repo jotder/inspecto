@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Risk Scores and Entity Lists — API
 
-Routes for Risk Scores and Entity Lists. Design and internals: [Risk Scores and Entity Lists architecture](architecture-scoring-entity-lists.md).
+Routes for Risk Scores and Entity Lists. Design and internals: [Risk Scores and Entity Lists architecture](architecture.md).
 
 | Route | Gate | Handler |
 |---|---|---|

@@ -180,7 +180,7 @@ concurrent poll or a crash inside that window re-ingests the file — the same i
 ## See also
 
 - [Design](architecture-pipeline-graph.md) — the graph IR, lift and executor this rides on.
-- [Consignment status flow](architecture-consignment-status.md) — where `FileStage` and the batch ledger fit.
+- [Consignment status flow](architecture.md) — where `FileStage` and the batch ledger fit.
 
 ## Decision 2026-09-06 — expansion members stay refused at drain, but the refusal names its siblings
 

@@ -60,8 +60,9 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   Offering and a priced bill of materials to `target/customers/<id>/` (never `offerings/`: a customer name is client
   data). BOM line types: `edition`, `bought`, `required` (kept only because a bought item needs it — charging for it is
   a decision), `installed-not-sold`. A bought Space Template's needs are derived from the manifests (`config/jobs/*`
-  `type:` → `provides.jobTypes`; `config/registry/<kind>s/` → `provides.configKinds`). `--bundle` copies the Edition
-  bundle, removes left-out jars, their per-jar SBOMs and unbought Space Templates, filters `modules.list`, stamps
+  `type:` → `provides.jobTypes`; `config/registry/<kind>s/` → `provides.configKinds`) plus what its `template.toon`
+  declares (`requiresModules`, below). `--bundle` copies the Edition
+  bundle, removes left-out jars, their per-jar SBOMs and unbought Space Templates, trims the combined SBOM, filters `modules.list`, stamps
   `edition.properties` with `customer=` / `offering=`, and adds `customer-<id>.toon` and an unpriced `customer-bom.csv`.
   Pilot 2026-10-18: a 42-jar Standard bundle trimmed to 30 jars and one Space Template; both booted healthy
   (`telco-fraud` pulled in Anomaly Detection, which pulled in `entity-list`, both as `required`).
@@ -82,19 +83,37 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   Pipeline of it. The bundle gains the Space Template `<customer>-pilot` (those `dirs.poll` set, `data/samples` left out)
   and a `PILOT.txt` naming the folders and the `INSPECTO_JAVA_OPTS=-Dassist.safety.roots=…` line the install starts with:
   the server's path jail refuses a poll folder outside the Space, and the build never widens it. `lib/product.json`
-  says `pilot`. No Space is created at build time.
+  says `pilot`. **The Space `<customer>-pilot` is created in the bundle at build time** (`PILOT-PRECREATED-SPACE-1`, D-PA35 as
+  changed by the operator 2026-11-12): `spaces/<customer>-pilot/` is made from the pilot template the way
+  `SpaceManager.createFromTemplate` makes one — `config/**` with `${SPACE}` replaced in each `.toon`, `data/**` (the zero-row
+  seeds, no samples), the `audit` and `duckdb` folders, `space.toon` from the template's name and tagline, and an empty
+  `config/egress.toon`. It boots with the server and polls the customer's folders. With no server at build time, two
+  things the server does at creation are not done: its seed gate (`TemplateSeedGate`, each seeded Pipeline, Job,
+  Connection and Alert Rule judged as its route would judge it; the bought template is held by its own golden tests
+  instead) and its Job stamp (each Job's author). A Job whose run depends on that author (`JobAuthority`) — any
+  `maintenance`, `la.index.build` or `publish.postgres` Job, or a Job template (a `*_job_template.toon`, or a Job naming
+  one with `template:`) — refuses the
+  build, and leaves no folder; `la-claims` (an `la.index.build` Job) is refused, every Standard Solution pack passes. The
+  template stays in the gallery.
+- **A Space Template declares the modules no manifest derives** (`PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`, 2026-11-12, D-PA37):
+  `requiresModules[N]: a,b` in its `template.toon`. Alert Rules (`alert-rules/`, registry or pending) and a Decision
+  Rule's `create-alert` need `ops` (the server refuses `POST /spaces` with 422 without it), unless the template has a
+  Basic tier (`minEdition: basic`, whose Alert Rules ship unarmed); a Case Rule (`*_caserule.toon`) needs
+  `case-management`. `templateNeeds` adds the declaration to the derived needs, so a customer who buys such a template
+  keeps those modules, billed as `required` and listed in the entitlement. `check-offerings.mjs` check 8 holds the
+  declaration honest (each module has a manifest; what the config needs is declared; an Offering listing the template
+  ships the module). Eight Standard Solution packs declare `ops`, and `telco-fraud`, `telco-bypass` and
+  `partner-settlement` also `case-management`. `la-daily-feed`, a Basic content pack whose Alert Rules made it
+  uncreatable on Basic, gained `minEdition: basic`, as every LA template has.
+- **The combined edition SBOM is trimmed with the jars** (same row): the removed jars' own components go, and so does
+  every third-party component that only removed jars carry, read from the per-jar SBOMs before they are deleted. The
+  pilot customer's bundle: 90 components to 66, equal to the union of its 32 kept jars' per-jar SBOMs, and
+  `sbom-modules.mjs --verify` passes.
 
 ## Known residuals
 
-The first two are row `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`; S6 is row `PRODUCT-MAP-S6-1`.
+S6 is row `PRODUCT-MAP-S6-1`.
 
-- **A pack's ops config is not detected.** Configs under a Template's `config/ops/` (for example `telco-fraud`'s Case
-  Rule) name no owner in any manifest, so `customer-build` cannot derive that they need `ops` / `case-management`; in
-  the pilot that Case Rule loads inert. Fix: a manifest declaration for ops configs. **The same gap refuses the pilot's
-  Space outright (found 2026-11-12):** `telco-fraud`'s Alert Rules need `ops` as well, so without Incidents bought,
-  creating a Space from it answers 422.
-- **The combined edition SBOM over-declares a trimmed bundle** (`sbom/inspecto-<edition>.{cdx,spdx}.json` still lists
-  removed jars; per-jar SBOMs are removed). Safe direction, not exact.
 - **An App has one Order Code**, so a price per App × Edition (D-PA6) has no key yet: row
   `PRODUCT-MAP-APP-EDITION-PRICES-1`, held for the first priced App.
 - `enabled-gate` items are not written into a default `modules.toon` (no item uses `enabled-gate` yet).

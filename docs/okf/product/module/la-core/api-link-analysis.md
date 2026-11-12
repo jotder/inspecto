@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link Analysis — API
 
-Routes for Link Analysis. Design and internals: [Link Analysis architecture](architecture-overview.md).
+Routes for Link Analysis. Design and internals: [Link Analysis architecture](architecture.md).
 
 Grouped; the authoritative list is each module's `META-INF/inspecto/module.toon`.
 

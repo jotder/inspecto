@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Spaces — API
 
-Routes for Spaces. Design and internals: [Spaces architecture](architecture-spaces.md).
+Routes for Spaces. Design and internals: [Spaces architecture](architecture.md).
 
 Server-global, un-prefixed (`SpaceRoutes`):
 

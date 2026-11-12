@@ -4,7 +4,7 @@
 > names, API paths, docs, and conversation must all use the **canonical term** below. The rename rolls out
 > **UI → model → backend** (the migration map is §13). The rules that make this file binding are §0; how the
 > concepts relate to one another is §10 (Component metamodel) and §11 (Graphs & Relationships), with the
-> platform-wide shape in [`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md) and the
+> platform-wide shape in [`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md) and the
 > per-area spine in §14.
 >
 > *Provenance, not authority (2026-09-10):* the two pre-lock analyses this vocabulary was derived from —
@@ -1174,7 +1174,7 @@ industry word (AC-09). Further packs whose Entity Types and Record types join th
 means one Entity Type in every pack); the Domain Profile alone gives the vocabulary. ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
 **Entity Profile** pages below (facts about the data). ⛔ Never bare *pack* for it: *pack* alone is ambiguous (pattern
 pack, Job Pack, Solution pack); say *Industry pack* (§15). As built:
-[`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §3.6.
+[`okf/product/module/la-core/architecture-backend.md`](okf/product/module/la-core/architecture-backend.md) §3.6.
 
 **Entity Type Profile** *(Link Analysis, decided 2026-10-15, D-EP1; plan [`archived-documents/plans-archive/la-entity-profile-plan.md`](archived-documents/plans-archive/la-entity-profile-plan.md))* — What the Space's Datasets say about one **Entity Type**, computed on demand and cached until a new File lands: the Dataset columns bound to it, volume and fill rate, sentinel values, value shapes, time span and per-day timeline, freshness, lineage, link and relationship statistics. Aggregates only: it never names an identifier. Read by `GET /inv/entity-types/{id}/profile`; shown on the **Entities** page. ⛔ Not an *Access Profile* or a *Decode Profile* (different concepts); ⛔ not a Dataset profile (it spans every Dataset the type appears in).
 
@@ -1425,7 +1425,7 @@ vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards 
 
 ---
 
-## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-module-taxonomy.md`, `okf/product/layer/platform/spec-module-reorg-decisions.md`)*
+## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-modules.md`, `okf/product/layer/platform/spec-module-reorg-decisions.md`)*
 
 **Platform module** — A horizontal Maven module that the rest of the system builds on (for example
 `inspecto-engine`): its **Build role** is *Platform module*. ⛔ Not **Platform Service** (§6-A — the grantable

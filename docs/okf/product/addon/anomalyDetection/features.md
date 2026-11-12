@@ -27,4 +27,4 @@ Fraud and assurance analysts looking for what fixed thresholds miss.
 
 [anomaly](../../module/anomaly/index.md) · [scoringLists](../../addon/scoringLists/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

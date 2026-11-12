@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Case Management — screens
 
-Screens for Case Management. Design and internals: [Case Management architecture](architecture-overview.md).
+Screens for Case Management. Design and internals: [Case Management architecture](architecture.md).
 
 Route `/cases` (`inspecto-ui/src/app/modules/admin/objects/cases.routes.ts`):
 

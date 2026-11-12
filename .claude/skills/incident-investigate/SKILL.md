@@ -17,11 +17,11 @@ Routes below are in `docs/api/openapi-v1.json` or the cited hub doc; confirm the
 
 | Topic | Hub / slot file |
 |---|---|
-| Incident model, lifecycle, permissions | `addon/incidents/architecture-incidents.md`, `addon/incidents/plan-incidents.md` |
-| Alerts + Alert Rules | `addon/incidents/architecture-alerts.md`, `addon/incidents/user-guide-alerts.md` |
+| Incident model, lifecycle, permissions | `addon/incidents/architecture.md`, `addon/incidents/plan-incidents.md` |
+| Alerts + Alert Rules | `addon/incidents/architecture.md`, `addon/incidents/user-guide-alerts.md` |
 | Objects (Incident/Case store, workflows, findings) | `module/ops/user-guide-objects.md` |
-| Events, signals | `module/event/architecture-overview.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
-| Observability / backup | `module/observability/architecture-observability-backup.md` |
+| Events, signals | `module/event/architecture.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
+| Observability / backup | `module/observability/architecture.md` |
 | Runs and run detail | `module/engine/user-guide-runs.md`, `module/engine/user-guide-run-detail.md`, `module/engine/spec-step-park-drain.md` |
 | Known failure modes | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-gotchas.md` |
 | Operating, flags | `layer/platform/admin-guide-operations-reference.md`, `layer/platform/admin-guide-launch-flags.md` |
@@ -52,13 +52,13 @@ Recovery and transition routes mutate state — confirm with the operator before
 | Symptom | Start at |
 |---|---|
 | Run FAILED / stuck / parked | `module/engine/user-guide-run-detail.md`, `module/engine/spec-step-park-drain.md` |
-| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/etl/architecture-parsing-ingest.md` |
+| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/etl/architecture.md` |
 | Output in `year=NULL/...` partitions | `layer/platform/admin-guide-troubleshooting.md` |
-| Collector picks nothing up / re-pick | `module/acquire/architecture-collectors.md`; troubleshooting (`.processed` markers) |
+| Collector picks nothing up / re-pick | `module/acquire/architecture.md`; troubleshooting (`.processed` markers) |
 | JVM crash / native access / out of memory | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-launch-flags.md` |
 | Config refused at save | `pipeline-author` skill, `module/config/spec-config-safety.md` |
-| Alert fired / did not fire | `addon/incidents/architecture-alerts.md` |
-| Incident transition refused | `addon/incidents/architecture-incidents.md` (workflow actions), `module/ops/user-guide-objects.md` |
+| Alert fired / did not fire | `addon/incidents/architecture.md` |
+| Incident transition refused | `addon/incidents/architecture.md` (workflow actions), `module/ops/user-guide-objects.md` |
 | Missing or odd events | `module/event/spec-events-metrics.md` |
 | Sign-in / OIDC failure | `module/oidc/` hub, `layer/platform/admin-guide-operations-reference.md` |
 

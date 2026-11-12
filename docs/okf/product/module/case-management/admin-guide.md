@@ -25,12 +25,12 @@ Absent, Case Rules, merge / split and from-entities are not installed.
 | open a Case from entities | `canManageIncidents` (a classified Dataset also needs `canRevealLinkEntities`) |
 | Case transitions | `canWorkIncidents` |
 
-Detail: [API](api-case-management.md), [architecture § 8](architecture-overview.md).
+Detail: [API](api-case-management.md), [architecture § 8](architecture.md).
 
 ## Configuration
 
 - Case Rules: `*_caserule.toon` files with a `case_rule { ... }` block, loaded at boot (an invalid file is
-  skipped with a warning), or saved through `POST /cases/rules`. Keys: [architecture § 5](architecture-overview.md).
+  skipped with a warning), or saved through `POST /cases/rules`. Keys: [architecture § 5](architecture.md).
 - Scheduled evaluation: a Job of Type `caserule.evaluate` with parameter `rule` ([jobs](../processor/spec-jobs.md)).
 - SLA: an SLA Policy accepts `objectType: CASE`; `CLOSED` stops the clock.
 - Storage: `-Dobjects.backend=db|postgres` selects the ops object store ([DB layer](../engine/spec-db-layer.md)).

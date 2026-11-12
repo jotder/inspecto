@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Exchange (multi-entity sharing) — screens
 
-Screens for Exchange (multi-entity sharing). Design and internals: [Exchange (multi-entity sharing) architecture](architecture-overview.md).
+Screens for Exchange (multi-entity sharing). Design and internals: [Exchange (multi-entity sharing) architecture](architecture.md).
 
 - **Catalog - Sharing** (`inspecto-ui/src/app/modules/admin/catalog/sharing.component.ts`): offers, grant
   requests and decisions.

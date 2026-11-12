@@ -35,7 +35,7 @@ reports `unavailable`.
 | `approvers.toon` (Space) | absent | approver roster under OIDC |
 | Approval Policy `expiresAfterHours` | 168 | a `pending` request becomes `expired` |
 
-Each attempt uses the target Connection's `timeout_seconds`. Detail: [architecture § 5](architecture-overview.md).
+Each attempt uses the target Connection's `timeout_seconds`. Detail: [architecture § 5](architecture.md).
 
 ## Storage and retention
 

@@ -18,7 +18,7 @@ with `[searchable]="false"` `[exportable]="false"` (backend search/export are ke
 
 ## Screens
 
-Screens for Events and event log. Design and internals: [Events and event log architecture](architecture-overview.md).
+Screens for Events and event log. Design and internals: [Events and event log architecture](architecture.md).
 
 - **Events** (route `events`, `inspecto-ui/src/app/modules/admin/events/events.component.ts`) - filterable
   event grid; `event-detail.dialog.ts` shows one event's attributes.

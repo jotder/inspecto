@@ -16,7 +16,7 @@ Utilities hold the shared helpers every module uses: DuckDB access, TOON configu
 
 ## What this enables
 
-- Module manifests are what let each Edition and add-on be assembled from optional modules — [architecture-reactor](../../layer/platform/architecture-reactor.md)
+- Module manifests are what let each Edition and add-on be assembled from optional modules — [architecture-modules](../../layer/platform/architecture-modules.md)
 
 ## Related hubs
 

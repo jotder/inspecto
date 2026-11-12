@@ -10,7 +10,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Case management and objects — architecture
 
 The domain design (lifecycles, promotion paths, Cases) is in
-[architecture-incidents](../../addon/incidents/architecture-incidents.md) and
+[incidents architecture](../../addon/incidents/architecture.md) and
 [plan-incidents §3](../../addon/incidents/plan-incidents.md). This page covers how the module plugs in.
 Classes: [spec](spec.md).
 

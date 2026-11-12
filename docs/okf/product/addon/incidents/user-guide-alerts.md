@@ -62,7 +62,7 @@ subject without the capability sees a permission note instead of the buttons.
 
 ## Screens
 
-Screens for Alerts. Design and internals: [Alerts architecture](architecture-alerts.md).
+Screens for Alerts. Design and internals: [Alerts architecture](architecture.md).
 
 The **Alerts** page (route `alerts`, `inspecto-ui/src/app/modules/admin/alerts/alerts.component.ts`) shows
 the fired Alerts grid (Acknowledge on OPEN, Resolve on OPEN or ACKNOWLEDGED, applied optimistically and

@@ -1,11 +1,11 @@
 // Fixture test for tools/customer-build.mjs. Run: node --test tools/customer-build.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateKeyPairSync } from 'node:crypto';
-import { bomCsv, pilotTemplate, pilotText, resolve, signedEntitlement, templateNeeds, trimBundle } from './customer-build.mjs';
+import { bomCsv, pilotSpace, pilotTemplate, pilotText, resolve, signedEntitlement, templateNeeds, trimBundle } from './customer-build.mjs';
 import { customerAssembly } from './customer.mjs';
 import { gather as gatherOfferings } from './check-offerings.mjs';
 import { gather } from './check-product-map.mjs';
@@ -92,6 +92,9 @@ test('templateNeeds derives needs from Job types and registry folders', () => {
         writeFileSync(join(root, 'spaces', '_templates', 't', 'config', 'jobs', 'j.toon'), 'id: j\ntype: anomaly.score\n');
         writeFileSync(join(root, 'spaces', '_templates', 'u', 'config', 'jobs', 'j.toon'), 'id: j\ntype: sql.template\n');
         assert.deepEqual(templateNeeds(root, world().manifests), { t: ['anomaly'], u: [] });
+        // PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1: what no manifest derives, the template declares
+        writeFileSync(join(root, 'spaces', '_templates', 'u', 'template.toon'), 'name: U\nminEdition: standard\nrequiresModules[2]: cases,ops\n');
+        assert.deepEqual(templateNeeds(root, world().manifests), { t: ['anomaly'], u: ['cases', 'ops'] });
     } finally { rmSync(root, { recursive: true, force: true }); }
 });
 // PA-10b (D-PA33, D-PA34): a customer build is an assembly and carries a signed entitlement. Over the repo's own definitions,
@@ -120,6 +123,22 @@ test('PA-10b a Platform customer: the plan keeps what resolve() keeps, the bough
     assert.equal(plan.editionProperties.customer, 'acme');
     assert.ok(plan.customer.bom.every((b) => !('listPrice' in b)), 'the plan carries no prices');
     assert.ok(bom.every((b) => 'listPrice' in b), 'the private bill does');
+});
+test('GAPS-1 a bought template\'s declared needs keep ops and case-management, billed as required and entitled', () => {
+    // the pilot shape: telco-fraud bought without the Incidents Add-on. Its Alert Rules need ops (POST /spaces refuses without it)
+    // and its Case Rule case-management, which telco-fraud's template.toon declares.
+    const R = repo();
+    const { plan } = customerAssembly({ ...R, customer: record({ orderCodes: ['INS-AO-LINK-ANALYSIS', 'INS-SP-TELCO-FRAUD'] }), now });
+    for (const m of ['ops', 'case-management']) {
+        assert.ok(plan.customer.keep.includes(m) && !plan.customer.removed.includes(m), `${m} is kept`);
+        assert.ok(plan.modules.includes(`inspecto-${m}.jar`), `${m} is on the classpath`);
+        assert.ok(plan.customer.entitlement.modules.includes(m), `${m} is entitled`);
+    }
+    assert.ok(plan.customer.bom.some((b) => b.line === 'required' && b.orderCode === 'INS-AO-INCIDENTS' && /'ops' is needed by Space Template 'telco-fraud'/.test(b.reason)));
+    assert.ok(plan.customer.bom.some((b) => b.line === 'required' && b.orderCode === 'INS-AO-CASE-MANAGEMENT'));
+    // a template that declares nothing keeps neither
+    const { plan: bare } = customerAssembly({ ...R, customer: record({ orderCodes: ['INS-SP-ORDERS-STARTER'] }), now });
+    assert.ok(bare.customer.removed.includes('ops') && bare.customer.removed.includes('case-management'));
 });
 test('PA-10b a Domain customer buys Apps by their Order Codes; a required App must be bought; a foreign App is refused', () => {
     const R = repo();
@@ -151,7 +170,23 @@ test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, s
         mkdirSync(join(src, 'lib'), { recursive: true });
         for (const t of ['fraud', 'starter']) mkdirSync(join(src, 'spaces', '_templates', t), { recursive: true });
         const jars = ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-la.jar', 'inspecto-ops.jar'];
-        for (const j of jars) { writeFileSync(join(src, 'lib', j), 'x'); writeFileSync(join(src, 'sbom', j.replace('.jar', '.sbom.cdx.json')), '{}'); }
+        // per-jar SBOMs (tools/sbom-modules.mjs): the jar's own purl and the third-party components it carries
+        const fp = (j) => `pkg:maven/com.gamma.inspector/${j.replace('.jar', '')}@1`;
+        const carries = { 'inspecto.jar': ['pkg:maven/a/shared@1'], 'inspecto-oidc.jar': [], 'inspecto-la.jar': ['pkg:maven/a/shared@1'],
+            'inspecto-ops.jar': ['pkg:maven/a/shared@1', 'pkg:maven/a/only-ops@1'] };
+        for (const j of jars) {
+            writeFileSync(join(src, 'lib', j), 'x');
+            writeFileSync(join(src, 'sbom', j.replace('.jar', '.sbom.cdx.json')), JSON.stringify({ metadata: { component: { purl: fp(j) } }, components: carries[j].map((purl) => ({ purl })) }));
+        }
+        // the combined edition SBOM, both serialisations (tools/sbom.mjs); 'pkg:maven/a/unattributed@1' no per-jar SBOM names
+        const all = [...jars.map((j) => ({ purl: fp(j), properties: [{ name: 'inspecto:bundleFile', value: j }] })),
+            ...['shared', 'only-ops', 'unattributed'].map((n) => ({ purl: `pkg:maven/a/${n}@1` }))];
+        writeFileSync(join(src, 'sbom', 'inspecto-standard.cdx.json'), JSON.stringify({ components: all, dependencies: [{ ref: 'b', dependsOn: all.map((x) => x.purl) }] }));
+        const sid = (p) => `S-${p.replace(/\W/g, '-')}`;
+        writeFileSync(join(src, 'sbom', 'inspecto-standard.spdx.json'), JSON.stringify({
+            packages: [{ SPDXID: 'SPDXRef-BUNDLE' }, ...all.map((x) => ({ SPDXID: sid(x.purl), externalRefs: [{ referenceType: 'purl', referenceLocator: x.purl }] }))],
+            relationships: [{ spdxElementId: 'SPDXRef-DOCUMENT', relatedSpdxElement: 'SPDXRef-BUNDLE' }, ...all.map((x) => ({ spdxElementId: 'SPDXRef-BUNDLE', relatedSpdxElement: sid(x.purl) }))],
+        }));
         writeFileSync(join(src, 'lib', 'modules.list'), jars.map((j) => `lib/${j}`).join('\n') + '\n');
         writeFileSync(join(src, 'lib', 'edition.properties'), 'edition=Standard\nproduct=inspecto\napps=link-analysis\n');
         writeFileSync(join(src, 'lib', 'product.json'), JSON.stringify({ id: 'inspecto', apps: [{ id: 'link-analysis' }] }));
@@ -163,7 +198,16 @@ test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, s
         };
         const dest = join(root, 'out');
         const t = trimBundle(src, dest, plan, { toon: 'schema: x\n', sig: 'c2ln\n' });
-        assert.deepEqual(t, { jars: ['inspecto-ops.jar'], templates: ['starter'] });
+        assert.deepEqual(t, { jars: ['inspecto-ops.jar'], templates: ['starter'], sbom: ['pkg:maven/a/only-ops@1', fp('inspecto-ops.jar')] });
+        // GAPS-1: the combined SBOM no longer lists the removed jar, nor what only it carries; a shared or unattributed component stays
+        const want = [fp('inspecto.jar'), fp('inspecto-oidc.jar'), fp('inspecto-la.jar'), 'pkg:maven/a/shared@1', 'pkg:maven/a/unattributed@1'];
+        const cdx = JSON.parse(readFileSync(join(dest, 'sbom', 'inspecto-standard.cdx.json'), 'utf8'));
+        assert.deepEqual(cdx.components.map((x) => x.purl), want);
+        assert.deepEqual(cdx.dependencies[0].dependsOn, want);
+        const spdx = JSON.parse(readFileSync(join(dest, 'sbom', 'inspecto-standard.spdx.json'), 'utf8'));
+        assert.deepEqual(spdx.packages.slice(1).map((p) => p.externalRefs[0].referenceLocator), want);
+        assert.deepEqual(spdx.relationships.slice(1).map((r) => r.relatedSpdxElement), want.map(sid));
+        assert.equal(spdx.relationships[0].relatedSpdxElement, 'SPDXRef-BUNDLE');
         assert.equal(readFileSync(join(dest, 'lib', 'modules.list'), 'utf8'), 'lib/inspecto.jar\nlib/inspecto-oidc.jar\nlib/inspecto-la.jar\n');
         assert.ok(!existsSync(join(dest, 'sbom', 'inspecto-ops.sbom.cdx.json')) && existsSync(join(dest, 'sbom', 'inspecto-la.sbom.cdx.json')));
         assert.ok(existsSync(join(dest, 'spaces', '_templates', 'fraud')) && !existsSync(join(dest, 'spaces', '_templates', 'starter')));
@@ -193,7 +237,7 @@ test('PA-10c a pilot plan wires every Pipeline of the bought template and says p
     assert.deepEqual(plan.pilot.pipelines.map((p) => `${p.name}=${p.poll}`), ['cdr=D:/feeds/cdr', 'payments=D:/feeds/payments', 'subscriber_events=/srv/feeds/events']);
     assert.deepEqual(plan.pilot.roots, ['/srv/feeds/events', 'D:/feeds/cdr', 'D:/feeds/payments']);
     assert.match(pilotText(plan), /INSPECTO_JAVA_OPTS=-Dassist\.safety\.roots=\/srv\/feeds\/events;D:\/feeds\/cdr;D:\/feeds\/payments/);
-    assert.match(pilotText(plan), /create a Space from the template 'acme-pilot'/);
+    assert.match(pilotText(plan), /The Space 'acme-pilot' is already created \(spaces\/acme-pilot\)/);
     assert.equal(customerAssembly({ ...repo(), customer: pilotRecord(), now }).plan.pilot, null, 'a production build has no pilot');
 });
 test('PA-10c a pilot is refused without its block, for a template not bought, or with a Pipeline unwired, unknown or relative', () => {
@@ -234,5 +278,55 @@ test('PA-10c pilotTemplate copies the bought template, wires dirs.poll, drops th
         assert.ok(existsSync(join(t, 'data', 'samples', 'cdr.csv')), 'the bought template is untouched');
         assert.throws(() => pilotTemplate(root, { template: 'acme-pilot', from: 'fraud', pipelines: [] }), /already has a Space Template 'acme-pilot'/);
         assert.throws(() => pilotTemplate(root, { template: 'x-pilot', from: 'ghost', pipelines: [] }), /no Space Template 'ghost'/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test('PILOT-PRECREATED-SPACE-1 pilotSpace creates the pilot Space from the pilot template, as the server does', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pm-pspace-'));
+    try {
+        const t = join(root, '_templates', 'acme-pilot');
+        mkdirSync(join(t, 'config', 'cdr'), { recursive: true });
+        mkdirSync(join(t, 'config', 'jobs'), { recursive: true });
+        mkdirSync(join(t, 'data', 'cdr', 'database'), { recursive: true });
+        mkdirSync(join(t, 'portal'), { recursive: true });
+        writeFileSync(join(t, 'template.toon'), 'name: "Acme pilot"\ntagline: "Pilot of fraud"\n');
+        writeFileSync(join(t, 'portal', 'p.md'), 'gallery only');
+        writeFileSync(join(t, 'config', 'cdr', 'cdr_pipeline.toon'), 'name: cdr\ndirs:\n  poll: "D:/feeds/cdr"\nspace: ${SPACE}\n');
+        writeFileSync(join(t, 'config', 'jobs', 'a_job.toon'), 'job:\n  type: sql.template\n');
+        writeFileSync(join(t, 'config', 'notes.md'), 'kept as is: ${SPACE}');
+        writeFileSync(join(t, 'data', 'cdr', 'database', 'schema-seed.parquet'), 'x');
+        const now = new Date('2026-11-12T00:00:00Z');
+        const s = pilotSpace(root, { template: 'acme-pilot' }, now);
+        assert.equal(s, join(root, 'acme-pilot'));
+        for (const sub of ['config', 'data', 'audit', 'duckdb']) assert.ok(existsSync(join(s, sub)), sub);
+        assert.equal(readFileSync(join(s, 'config', 'cdr', 'cdr_pipeline.toon'), 'utf8'), 'name: cdr\ndirs:\n  poll: "D:/feeds/cdr"\nspace: acme-pilot\n', 'the customer folder, ${SPACE} replaced');
+        assert.equal(readFileSync(join(s, 'config', 'notes.md'), 'utf8'), 'kept as is: ${SPACE}', 'only .toon files are rewritten');
+        assert.ok(existsSync(join(s, 'data', 'cdr', 'database', 'schema-seed.parquet')), 'the zero-row seeds come along');
+        assert.ok(!existsSync(join(s, 'template.toon')) && !existsSync(join(s, 'portal')), 'gallery files stay in the gallery');
+        assert.equal(readFileSync(join(s, 'space.toon'), 'utf8'), 'display_name: "Acme pilot"\ndescription: "Pilot of fraud"\ncreated_at: "2026-11-12T00:00:00.000Z"\n');
+        assert.match(readFileSync(join(s, 'config', 'egress.toon'), 'utf8'), /^allow\[0\]:\n/);
+        assert.ok(existsSync(join(t, 'template.toon')), 'the template stays');
+        assert.throws(() => pilotSpace(root, { template: 'acme-pilot' }), /already has a Space 'acme-pilot'/);
+        assert.throws(() => pilotSpace(root, { template: 'ghost' }), /no Space Template 'ghost'/);
+        rmSync(s, { recursive: true });
+        // a Job whose run depends on the author the server stamps is refused, and nothing is left behind
+        for (const job of ['job:\n  type: maintenance\n  task: cleanup\n', 'job:\n  type: maintenance\n  task: restore\n',
+            'job:\n  name: idx\n  type: LA.INDEX.BUILD\n', 'job:\n  type: "publish.postgres"\n', 'job:\n  name: nightly\n  template: nightly_restore\n']) {
+            writeFileSync(join(t, 'config', 'jobs', 'b_job.toon'), job);
+            assert.throws(() => pilotSpace(root, { template: 'acme-pilot' }), /depends on the author the server stamps/, job);
+            assert.ok(!existsSync(s), 'a refused pilot Space leaves no folder');
+        }
+        // the Job template file itself (its type, e.g. maintenance, is read only at boot)
+        rmSync(join(t, 'config', 'jobs', 'b_job.toon'));
+        writeFileSync(join(t, 'config', 'jobs', 'nightly_restore_job_template.toon'), 'job_template:\n  name: nightly_restore\n  type: maintenance\n  task: restore\n');
+        assert.throws(() => pilotSpace(root, { template: 'acme-pilot' }), /a Job template depends on the author/);
+        assert.ok(!existsSync(s));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test('PILOT-PRECREATED-SPACE-1 the repo: telco-fraud makes a pilot Space; la-claims (an la.index.build Job) is refused', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pm-pspace-repo-'));
+    try {
+        for (const id of ['telco-fraud', 'la-claims']) cpSync(join('spaces', '_templates', id), join(root, '_templates', id), { recursive: true });
+        assert.ok(existsSync(join(pilotSpace(root, { template: 'telco-fraud' }), 'config', 'cdr', 'cdr_pipeline.toon')));
+        assert.throws(() => pilotSpace(root, { template: 'la-claims' }), /la\.index\.build Job depends on the author/);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });

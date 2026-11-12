@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Graph algorithms — plan](plan.md) |
 | spec | current | [Graph algorithms — spec](spec.md) |
-| architecture | current | [Graph library](architecture-overview.md) |
+| architecture | current | [Graph library](architecture.md) |
 | features | current | [Graph library — features](features-graph.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Graph library — screens](user-guide-graph.md) |

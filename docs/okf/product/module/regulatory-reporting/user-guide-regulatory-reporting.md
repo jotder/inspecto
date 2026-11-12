@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Regulatory Reporting — screens
 
-Screens for Regulatory Reporting. Design and internals: [Regulatory Reporting architecture](architecture-overview.md).
+Screens for Regulatory Reporting. Design and internals: [Regulatory Reporting architecture](architecture.md).
 
 - **Regulatory reports** (`/regulatory-reports`, `inspecto-ui/src/app/modules/admin/regulatory-reports/`): list
   with status filters, the draft dialog, approve / decline / retry, and the template editor

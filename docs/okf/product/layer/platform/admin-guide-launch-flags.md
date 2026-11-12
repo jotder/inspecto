@@ -18,12 +18,12 @@ separate one-shot tool that holds only `migrate-configs`; the `ura` pre-ETL util
 |---|---|
 | `-Dcontrol.port=<n>` | HTTP port for the control API (default `8080`). |
 | `-Dcontrol.bind=<host-or-IP>` | 🔴 **Listen address. Unset = EVERY interface, in every edition** (`ControlApi.java:292-293`) — a deliberate call, not an oversight, because narrowing it would strand existing installs on upgrade. Basic ships **no `Authenticator`**, so a Basic install left on the default binds an **unauthenticated** control plane to every interface. Set `-Dcontrol.bind=127.0.0.1`, or firewall the port, for any single-user install. An unresolvable value **fails the boot** rather than falling back (`:295-296`). |
-| `-Dspaces.root=<dir>` | [Multi-space](../../module/processor/architecture-multi-space.md) root. **Default `<install_dir>/spaces`** (the working directory's `spaces/`) when unset and no config args are given (`SPACE-DATA-ROOT-1`, 2026-10-30); unset WITH config args ⇒ single-tenant, one `default` space built from those args. The `spaces` you see in a bundle is `serve.sh:8`/`serve.bat:9`'s shell default, not a JVM one. A bundle ships **no Spaces** there (only `_templates`): drop your Space folder(s) in, or set `SPACES_ROOT`; an empty root boots and Space-scoped routes answer 503 until one is attached. |
-| `-Dspaces.data.root=<mount>` | Convention data root: every Space without `data_root:` in its `space.toon` keeps its `data/`, `audit/` and `duckdb/` under `<mount>/<id>` (a big disk, NFS, SMB, s3fs or CSI mount); its config stays in the Space folder. Unset ⇒ state stays in the Space folder. See [Spaces](../../module/config/architecture-spaces.md). |
+| `-Dspaces.root=<dir>` | [Multi-space](../../module/processor/architecture.md) root. **Default `<install_dir>/spaces`** (the working directory's `spaces/`) when unset and no config args are given (`SPACE-DATA-ROOT-1`, 2026-10-30); unset WITH config args ⇒ single-tenant, one `default` space built from those args. The `spaces` you see in a bundle is `serve.sh:8`/`serve.bat:9`'s shell default, not a JVM one. A bundle ships **no Spaces** there (only `_templates`): drop your Space folder(s) in, or set `SPACES_ROOT`; an empty root boots and Space-scoped routes answer 503 until one is attached. |
+| `-Dspaces.data.root=<mount>` | Convention data root: every Space without `data_root:` in its `space.toon` keeps its `data/`, `audit/` and `duckdb/` under `<mount>/<id>` (a big disk, NFS, SMB, s3fs or CSI mount); its config stays in the Space folder. Unset ⇒ state stays in the Space folder. See [Spaces](../../module/config/architecture.md). |
 | `-Dui.dir=./ui` | Serve the bundled Angular SPA; omit to disable UI serving. |
 | `-Dcontrol.cors=<origin>` | CORS origin allow-list for the control plane. |
 | `-Dassist.write.root=<dir>` | Enable config/pipeline/connection write-back; absent → mutations return `503` (see [auth & security](../../module/access/admin-guide-auth-security.md)). |
-| `-Dacquire.ledger.backend=db` | Use the durable [DB acquisition ledger](../../module/acquire/architecture-framework.md) instead of in-memory. |
+| `-Dacquire.ledger.backend=db` | Use the durable [DB acquisition ledger](../../module/acquire/architecture.md) instead of in-memory. |
 | `-Dauth.mode=none\|oidc` | **Label only** — read at `BootstrapRoutes.java:55,83` to fill `/bootstrap`'s `edition`/`features.authMode`; **nothing branches on it**. The switch is the classpath: `Authenticators.active()` is a `ServiceLoader` lookup, empty on Basic, so dispatch skips auth entirely. `serve.sh`/`serve.bat` set it beside `inspecto-oidc.jar`, which is what actually decided the edition. |
 
 Plus `--enable-native-access=ALL-UNNAMED` is always required (see [build & test](spec-build-test.md)).
@@ -152,8 +152,10 @@ liveness/readiness delays are therefore 0. The image tag defaults to the chart's
 per-process. Scale-out is the Advanced partitioned topology, not this chart.
 
 **One chart source, a chart per Product (PRODUCT-ASSEMBLY-1 PA-8a, 2026-11-12).** `deploy/helm/inspecto/` is the
-only chart source. `node tools/ship.mjs chart --plan <plan> --out <dir>` stamps a copy for a Product build. The plan
-comes from `tools/assemble.mjs --target container|airgap`. The copy gets:
+only chart template source. Each Product commits its own `Chart.yaml` and `values.yaml` in `deploy/helm/products/<id>/`
+(HELM-PRODUCT-VALUES-1, 2026-11-12); its values override the source's defaults key by key. `node tools/ship.mjs chart
+--plan <plan> --out <dir>` builds the Product's chart from that folder and the source's templates. The plan comes from
+`tools/assemble.mjs --target container|airgap`. The chart gets:
 - the chart name and `image.repository` set to the image name, `inspecto-<product>` (the Platform product stays `inspecto`);
 - the chart version set to the platform version, and `appVersion` to the image tag `<version>-<edition>[-trial]`;
 - the `product` values block, which labels every object `inspecto.io/product` and `inspecto.io/edition`.
@@ -161,7 +163,9 @@ comes from `tools/assemble.mjs --target container|airgap`. The copy gets:
 The packed `<name>-<version>.tgz` has the layout `helm package` writes. Selectors use only `app.kubernetes.io/name` and
 `/instance`, so upgrading a release with a newer chart of the same Product never changes the StatefulSet's immutable selector.
 Moving a release to another Product's chart (from `inspecto` to `inspecto-telco`, say) changes the name label, and
-Kubernetes refuses it: install the new Product as a new release instead. Edit the source, never a copy.
+Kubernetes refuses it: install the new Product as a new release instead. Edit the source or the Product's folder,
+never a built copy; `node tools/ship.mjs check` refuses a template copied anywhere else. Rules and layout:
+[container image, Helm chart and air-gapped install](admin-guide-container-airgap.md) § The chart per Product.
 
 ✅ **Linted and rendered 2026-11-12** with Helm v3.19.0 (from a local Helm container, `--network none`).
 `helm lint --strict` passes on the source and on the stamped charts for inspecto, la and telco. `helm template` of

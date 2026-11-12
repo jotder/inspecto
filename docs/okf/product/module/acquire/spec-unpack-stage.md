@@ -13,7 +13,7 @@ timestamp: 2026-08-22T00:00:00Z
 > files *before* Consignments are planned, and the run-level ledger that reports what became of each
 > Archive. Shipped `d6cd55b7` (2026-08-23); honesty fixes `fe6e1d7e` and the ledger 2026-08-26.
 > Plan (archived, complete): [`archived-documents/plans-archive/unpack-stage-plan.md`](../../../../archived-documents/plans-archive/unpack-stage-plan.md).
-> Related: [`../engine/spec-ingestion.md`](../engine/spec-ingestion.md) · [`../engine/architecture-consignment-status.md`](../engine/architecture-consignment-status.md) ·
+> Related: [`../engine/spec-ingestion.md`](../engine/spec-ingestion.md) · [`../engine/architecture.md`](../engine/architecture.md) ·
 > [`../engine/spec-ingest-wrap-spi.md`](../engine/spec-ingest-wrap-spi.md) · [`../engine/spec-parser-plugins.md`](../engine/spec-parser-plugins.md)
 
 ## 1. Where it sits, and why that is the whole trick

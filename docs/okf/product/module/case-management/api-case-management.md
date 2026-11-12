@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Case Management — API
 
-Routes for Case Management. Design and internals: [Case Management architecture](architecture-overview.md).
+Routes for Case Management. Design and internals: [Case Management architecture](architecture.md).
 
 Handler: `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java`.
 

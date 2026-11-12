@@ -381,7 +381,7 @@ guard exists.
 - Engine-published (D-12), `readOnly()` when pack-contributed (no stand-in); disable refuses the grant.
   Design as-built: `archived-documents/plans-archive/platform-services-stage2-design.md` §5.6.
 
-Related: [Job vs Pipeline Step](architecture-job-vs-step.md) · [Jobs & Scheduling](spec-jobs.md) ·
+Related: [Job vs Pipeline Step](architecture.md) · [Jobs & Scheduling](spec-jobs.md) ·
 [Signal backbone](../event/spec-signal-backbone.md) · [API stability policy](../api/plan-api-stability.md) ·
 [`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md) §5
 

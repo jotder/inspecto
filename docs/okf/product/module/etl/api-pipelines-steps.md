@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Pipelines and Steps — API
 
-Routes for Pipelines and Steps. Design and internals: [Pipelines and Steps architecture](architecture-pipelines-steps.md).
+Routes for Pipelines and Steps. Design and internals: [Pipelines and Steps architecture](architecture.md).
 
 | Route | Purpose |
 |---|---|

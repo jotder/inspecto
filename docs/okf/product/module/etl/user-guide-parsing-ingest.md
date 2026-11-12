@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Parsing and ingest — screens
 
-Screens for Parsing and ingest. Design and internals: [Parsing and ingest architecture](architecture-parsing-ingest.md).
+Screens for Parsing and ingest. Design and internals: [Parsing and ingest architecture](architecture.md).
 
 - **Pipeline editor, Parse definition** (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-parse-definition.component.ts`):
   frontend choice, grammar form rendered from the parser's served `grammarSchema`, and a sample preview.

@@ -43,7 +43,7 @@ Flag-driven channels (system properties):
 
 Per-Space destinations are `channel` components (`/notifications/channels`); fields in [spec](spec.md).
 Webhook egress obeys the Space's Egress Allowlist (`egress.toon`); loopback is never allowlistable.
-Detail: [architecture § 5](architecture-overview.md).
+Detail: [architecture § 5](architecture.md).
 
 ## Common failures
 

@@ -8,6 +8,6 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Graph library — screens
 
-Screens for Graph library. Design and internals: [Graph library architecture](architecture-overview.md).
+Screens for Graph library. Design and internals: [Graph library architecture](architecture.md).
 
 None of its own. Results appear in the Link Analysis algorithm toolbox and pattern search.

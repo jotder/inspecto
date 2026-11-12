@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)](plan-agentic-investigation.md) · [AI assist and intelligence — plan](plan.md) |
 | spec | current | [AI assist and intelligence — spec](spec.md) |
-| architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture-overview.md) |
+| architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture.md) |
 | features | current | [AI assist — features](features-ai-assist.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [AI assist — screens](user-guide-ai-assist.md) · [Assistant](user-guide-assist.md) · [Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)](user-guide-inline-ai-authoring.md) |

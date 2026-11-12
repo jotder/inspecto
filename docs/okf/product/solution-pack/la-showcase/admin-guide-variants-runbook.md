@@ -21,7 +21,7 @@ It carries the Investigation, members, Drafts, Entity Lists, identity assertion,
 
 What it is: the optional module `la/inspecto-la-store-pg` keeps the sealed Investigation log, Working Set sets,
 members and Drafts in PostgreSQL, one `space_<id>` schema per Space
-(`docs/okf/product/module/la-core/architecture.md` section 3.2, `docs/okf/product/module/config/admin-guide-configuration-reference.md` row "Link Analysis Investigations").
+(`docs/okf/product/module/la-core/architecture-backend.md` section 3.2, `docs/okf/product/module/config/admin-guide-configuration-reference.md` row "Link Analysis Investigations").
 
 Prerequisites (verified):
 

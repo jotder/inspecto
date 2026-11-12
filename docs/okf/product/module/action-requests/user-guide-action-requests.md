@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Action Requests — screens
 
-Screens for Action Requests. Design and internals: [Action Requests architecture](architecture-overview.md).
+Screens for Action Requests. Design and internals: [Action Requests architecture](architecture.md).
 
 - **Operations > Action Requests** (`inspecto-ui/src/app/modules/admin/action-requests/`): the inbox; the detail
   shows the parsed target host first, then key, attempts and the exact payload; Approve / Decline / Retry /

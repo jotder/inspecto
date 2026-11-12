@@ -21,7 +21,7 @@ active Share Grant (fail closed). Original phasing (L0–S3 plus the UI track):
 ## Built
 
 - Offer / request / approve ledger, snapshot and live delivery, version pin and drift, the Catalog sharing
-  screens ([spec](spec.md); [architecture](architecture-overview.md)).
+  screens ([spec](spec.md); [architecture](architecture.md)).
 - Saved views on the kind axis (BACKLOG D9, 2026-07-26) and the `signal` kind
   ([cross-space-consequence-design](../../../../archived-documents/plans-archive/cross-space-consequence-design.md),
   2026-09-28) ([spec](spec.md)).
@@ -42,7 +42,7 @@ active Share Grant (fail closed). Original phasing (L0–S3 plus the UI track):
 - P3 *Bundle / Exchange — "load as draft" residuals*: only the browser pass over the six editors remains
   ([BACKLOG](../../../../BACKLOG.md)).
 - Known limits, not rows: Signals cross only between Spaces hosted in one Pod and are never queued; duplicate
-  `EXCHANGE_REFRESHED` events from two pods remain possible ([architecture § 9](architecture-overview.md);
+  `EXCHANGE_REFRESHED` events from two pods remain possible ([architecture § 9](architecture.md);
   [spec](spec.md)).
 
 ## Refused

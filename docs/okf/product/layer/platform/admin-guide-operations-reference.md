@@ -1021,7 +1021,7 @@ Proven 2026-11-12: `package.ps1 -Product telco -Edition Standard -Target contain
 `UP` and `/ready` `READY`, and `lib/product.json` is Inspecto Telco Standard with its four Apps.
 
 As-built decisions:
-- **The jlink module set is derived (2026-10-07, P3c).** `tools/jlink-modules.mjs` unions `jdeps` over every staged jar with `tools/jlink-runtime-extra.txt` (reflection/ServiceLoader needs, each with a WHY) and holds it against `tools/jlink-modules.lock`; since 2026-10-18 `package.ps1` links the derived set alone and stops the package on a lock mismatch or a missing edition section (the hand-kept list was retired). `--check` is the jar-free validity check. Detail: [module-taxonomy](architecture-module-taxonomy.md) (Packaging).
+- **The jlink module set is derived (2026-10-07, P3c).** `tools/jlink-modules.mjs` unions `jdeps` over every staged jar with `tools/jlink-runtime-extra.txt` (reflection/ServiceLoader needs, each with a WHY) and holds it against `tools/jlink-modules.lock`; since 2026-10-18 `package.ps1` links the derived set alone and stops the package on a lock mismatch or a missing edition section (the hand-kept list was retired). `--check` is the jar-free validity check. Detail: [module-taxonomy](architecture-modules.md) (Packaging).
 - **The bundle's own jlink `runtime/` supplies the JVM** (changed 2026-09-17); the base is
   `debian:stable-slim` and provides only glibc + bash. It was `eclipse-temurin:24-jre` with
   `.dockerignore` excluding `runtime/`, so serve.sh's `[ -x runtime/bin/java ]` preference missed on

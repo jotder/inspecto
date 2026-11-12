@@ -52,7 +52,7 @@ in every Edition and bound at build time.
 | Contract | Implementation | Module |
 |---|---|---|
 | `EventSink` (ServiceLoader) | `com.gamma.event.CurrentEventSink` | [event](../event/index.md) |
-| `EventStore` (selected by the event module) | in-memory, Parquet and DB stores | [event](../event/architecture-overview.md) |
+| `EventStore` (selected by the event module) | in-memory, Parquet and DB stores | [event](../event/architecture.md) |
 | `AuditChain` verification | `GET /audit/verify` | [event api](../event/api-events.md) |
 
 ## Failure modes

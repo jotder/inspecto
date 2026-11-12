@@ -834,7 +834,7 @@ current citations name classes the 2026-08-31 rename removed (§5.3 item 7).
 | Execution routes | `RunRoutes`, `JobRoutes` | 🔴 Replay's in-memory lookup (§2.3) |
 | The declared lane owner | [`execution-lanes.md`](spec-execution-lanes.md) | ⚠ Self-contradicts on the orphan gate; omits the post-sync lane |
 | The Job concept page | [`jobs.md`](../processor/spec-jobs.md) | ⚠ Dead class citations, by line |
-| The boundary page | [`job-vs-step.md`](../processor/architecture-job-vs-step.md) | ⚠ A fifth wrong node-type count |
+| The boundary page | [`job-vs-step.md`](../processor/architecture.md) | ⚠ A fifth wrong node-type count |
 | Concurrency | [`consignment-concurrency.md`](spec-consignment-concurrency.md) | ✅ The most accurate page in the area |
 | The ingest fork | [`branch-aware-ingest.md`](spec-branch-aware-ingest.md) | ✅ Accurate |
 | The post-sync lane | [`post-sync-step-chains.md`](spec-post-sync-step-chains.md) | ⚠ Misspells the job type id |

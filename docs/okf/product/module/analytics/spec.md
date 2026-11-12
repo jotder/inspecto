@@ -996,7 +996,7 @@ layering and circular-financing rings are this shape. It returns each match's no
 * **Link Analysis keeps** `PatternQueryCompiler` (stage parsing, the 422 refusals, the necessary-condition SQL prune
   over the whole Dataset and key normalisation), its `Stage` (edge kind, node kind, threshold band), and the
   mapping `Stage.motif()` (every projected node is an `entity`); see
-  [link-analysis §5](../la-core/architecture.md#5-graph-run-graph--la-core--la-storage).
+  [link-analysis §5](../la-core/architecture-backend.md#5-graph-run-graph--la-core--la-storage).
 * **Twin and tests.** It is a line-for-line port of `matchBranchingPattern`
   (`inspecto-ui/projects/link-analysis/src/graph/branching-pattern-engine.ts`); the TypeScript stays with Link
   Analysis. `TemporalMotifMatcherGoldenTest` (inspecto-graph) pins the exact output — written against the LA class
@@ -1165,4 +1165,4 @@ planted anomalies at the top, bit-for-bit repeat, recompute, cap, preview refusa
 * Plan and decisions D-AN1 … D-AN9 and D-AN20 … D-AN29: [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
 * The baselines' first consumer: [anomaly-scores](../anomaly/spec-anomaly-scores.md).
 * The score kinds on the contract: [anomaly-scores](../anomaly/spec-anomaly-scores.md), [risk-scores](../scoring/spec-risk-scores.md).
-* Module axes and manifests: [module-taxonomy](../../layer/platform/architecture-module-taxonomy.md).
+* Module axes and manifests: [module-taxonomy](../../layer/platform/architecture-modules.md).

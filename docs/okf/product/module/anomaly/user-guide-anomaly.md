@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Anomaly Detection — screens
 
-Screens for Anomaly Detection. Design and internals: [Anomaly Detection architecture](architecture-overview.md).
+Screens for Anomaly Detection. Design and internals: [Anomaly Detection architecture](architecture.md).
 
 - `/anomaly-models` — Studio pane (`inspecto-ui/src/app/modules/admin/anomaly-models/anomaly-models.component.ts`)
   with `anomaly-model-form.dialog.ts`, `anomaly-model-features.component.ts` and `anomaly-model-preview.component.ts`.

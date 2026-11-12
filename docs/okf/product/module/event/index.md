@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Event model and log — plan](plan.md) |
 | spec | current | [Events & Metrics](spec-events-metrics.md) · [Signal Backbone (canonical envelope, agent context fabric, gated agentic write)](spec-signal-backbone.md) |
-| architecture | current | [Events and event log](architecture-overview.md) |
+| architecture | current | [Events and event log](architecture.md) |
 | features | current | [Events and event log — features](features-events.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Events & Activity](user-guide-events.md) |

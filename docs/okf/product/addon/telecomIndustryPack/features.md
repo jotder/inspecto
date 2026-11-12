@@ -26,4 +26,4 @@ Telecom operators.
 
 [telecom-asn1](../../module/telecom-asn1/index.md) · [asn-decoders](../../module/asn-decoders/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

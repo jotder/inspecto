@@ -27,7 +27,7 @@ Code: `inspecto/src/main/java/com/gamma/control/PendingChanges.java` (hold, stor
 
 Core control plane (`inspecto` module), not an add-on. It sits between every config-writing route's validation
 gates and its first side effect. The same approver-eligibility reading (`ApproverCheck`) and the same per-Space
-HMAC key are reused by [Action Requests](../action-requests/architecture-overview.md), which has its own mandatory approval and is never
+HMAC key are reused by [Action Requests](../action-requests/architecture.md), which has its own mandatory approval and is never
 held as a Pending Change.
 
-More: [screens](user-guide-maker-checker.md) · [API](api-maker-checker.md) · [architecture](architecture-maker-checker.md).
+More: [screens](user-guide-maker-checker.md) · [API](api-maker-checker.md) · [architecture](architecture.md).

@@ -12,15 +12,17 @@
 //          Edition into <out>/bundle and executes the plan's customer block: removes the jars and per-jar SBOMs of modules not kept
 //          and the Space Templates not kept, filters modules.list, writes lib/product.json from the plan, stamps edition.properties
 //          with customer= and offering=, stages conf/entitlement.toon + .sig, and writes customer-bom.csv WITHOUT prices. The combined
-//          edition SBOM (sbom/inspecto-<edition>.*) is left as is and OVER-declares the trimmed bundle (recorded residual).
+//          edition SBOM (sbom/inspecto-<edition>.*) is trimmed too: the removed jars and the third-party components only they carry go.
 // PILOT    (PA-10c, D-PA35) --distribution pilot: the record's `pilot:` block wires one bought template's Pipelines to the customer's
 //          folders; the bundle gains the Space Template `<customer>-pilot` (no sample data) and lib/product.json says `pilot`.
+//          PILOT-PRECREATED-SPACE-1 (D-PA35 changed): the Space `<customer>-pilot` is also created in the bundle (spaces/<id>).
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bomCsv, customerPlan } from './customer.mjs';
 import { signBytes, toText } from './entitle.mjs';
+import { egressToon, toonValue } from './package-la-showcase.mjs';
 
 export { bomCsv, resolve, templateNeeds } from './customer.mjs';
 
@@ -55,18 +57,23 @@ export function trimBundle(src, dest, plan, entitlement) {
     }
     rmSync(dest, { recursive: true, force: true });
     cpSync(src, dest, { recursive: true });
-    const jars = [];
-    for (const jar of c.removedJars) {
-        if (!existsSync(join(dest, 'lib', jar))) fail(`bundle has no lib/${jar}, which the plan removes`);
-        rmSync(join(dest, 'lib', jar)); rmSync(join(dest, 'sbom', jar.replace(/\.jar$/, '.sbom.cdx.json')), { force: true }); jars.push(jar);
-    }
+    for (const jar of c.removedJars) if (!existsSync(join(dest, 'lib', jar))) fail(`bundle has no lib/${jar}, which the plan removes`);
     const ml = join(dest, 'lib', 'modules.list');
-    writeFileSync(ml, readFileSync(ml, 'utf8').split(/\r?\n/).filter((l) => l && !jars.includes(l.trim().replace(/^lib\//, ''))).join('\n') + '\n');
+    const listed = readFileSync(ml, 'utf8').split(/\r?\n/).filter(Boolean);
+    const kept = listed.filter((l) => !c.removedJars.includes(l.trim().replace(/^lib\//, '')));
+    const sbom = trimCombinedSbom(join(dest, 'sbom'), ed, c.removedJars, kept.map((l) => l.trim().replace(/^lib\//, '')));
+    const jars = [];
+    for (const jar of c.removedJars) { rmSync(join(dest, 'lib', jar)); rmSync(join(dest, 'sbom', perJarSbom(jar)), { force: true }); jars.push(jar); }
+    writeFileSync(ml, kept.join('\n') + '\n');
     const keepT = new Set([...plan.templates, ...(plan.space ? [plan.space.id] : [])]);
     const tdir = join(dest, 'spaces', '_templates');
     const templates = [];
     if (existsSync(tdir)) for (const t of listDirs(tdir)) { if (keepT.has(t)) continue; rmSync(join(tdir, t), { recursive: true }); templates.push(t); }
-    if (plan.pilot) { pilotTemplate(tdir, plan.pilot); writeFileSync(join(dest, 'PILOT.txt'), pilotText(plan)); }
+    if (plan.pilot) {
+        pilotTemplate(tdir, plan.pilot);
+        pilotSpace(join(dest, 'spaces'), plan.pilot);
+        writeFileSync(join(dest, 'PILOT.txt'), pilotText(plan));
+    }
     writeFileSync(join(dest, 'lib', 'product.json'), JSON.stringify(plan.descriptor, null, 2) + '\n');
     // The bundle's `apps=` line is the Product build's selection; the customer's is the plan's.
     const apps = plan.editionProperties?.apps ?? '';
@@ -77,7 +84,49 @@ export function trimBundle(src, dest, plan, entitlement) {
     mkdirSync(join(dest, 'conf'), { recursive: true });
     writeFileSync(join(dest, 'conf', 'entitlement.toon'), entitlement.toon);
     writeFileSync(join(dest, 'conf', 'entitlement.sig'), entitlement.sig);
-    return { jars, templates };
+    return { jars, templates, sbom };
+}
+
+const perJarSbom = (jar) => jar.replace(/\.jar$/, '.sbom.cdx.json');
+const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
+/**
+ * The combined edition SBOM (sbom/inspecto-<edition>.cdx.json and .spdx.json, tools/sbom.mjs) trimmed to the jars the customer
+ * keeps (PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1): each removed jar's own component goes, and so does every third-party component that
+ * only removed jars carry, read from the per-jar SBOMs (tools/sbom-modules.mjs) - so call it before those are deleted. A component
+ * no per-jar SBOM names stays. Returns the purls removed; [] for a bundle without SBOMs.
+ */
+export function trimCombinedSbom(sbomDir, edition, removedJars, keptJars) {
+    const cdxFile = join(sbomDir, `inspecto-${String(edition).toLowerCase()}.cdx.json`);
+    const spdxFile = join(sbomDir, `inspecto-${String(edition).toLowerCase()}.spdx.json`);
+    if (!existsSync(cdxFile)) return [];
+    const carried = (jars) => {
+        const out = new Set();
+        for (const jar of jars) {
+            const f = join(sbomDir, perJarSbom(jar));
+            if (!existsSync(f)) continue;
+            const doc = readJson(f);
+            if (doc.metadata?.component?.purl) out.add(doc.metadata.component.purl);
+            for (const x of doc.components ?? []) out.add(x.purl);
+        }
+        return out;
+    };
+    const keep = carried(keptJars);
+    const cdx = readJson(cdxFile);
+    const bundleFile = (x) => (x.properties ?? []).find((p) => p.name === 'inspecto:bundleFile')?.value?.replace(/^.*[\\/]/, '');
+    const gone = new Set([...carried(removedJars)].filter((p) => !keep.has(p)));
+    for (const x of cdx.components ?? []) if (removedJars.includes(bundleFile(x))) gone.add(x.purl);
+    cdx.components = (cdx.components ?? []).filter((x) => !gone.has(x.purl));
+    for (const d of cdx.dependencies ?? []) if (d.dependsOn) d.dependsOn = d.dependsOn.filter((p) => !gone.has(p));
+    writeFileSync(cdxFile, JSON.stringify(cdx, null, 2) + '\n');
+    if (existsSync(spdxFile)) {
+        const spdx = readJson(spdxFile);
+        const purlOf = (pk) => (pk.externalRefs ?? []).find((r) => r.referenceType === 'purl')?.referenceLocator;
+        const ids = new Set((spdx.packages ?? []).filter((pk) => gone.has(purlOf(pk))).map((pk) => pk.SPDXID));
+        spdx.packages = (spdx.packages ?? []).filter((pk) => !ids.has(pk.SPDXID));
+        spdx.relationships = (spdx.relationships ?? []).filter((r) => !ids.has(r.relatedSpdxElement) && !ids.has(r.spdxElementId));
+        writeFileSync(spdxFile, JSON.stringify(spdx, null, 2) + '\n');
+    }
+    return [...gone].sort();
 }
 /**
  * PA-10c (D-PA35): write the pilot's Space Template beside the one it is made from: each Pipeline's `dirs.poll` set to the
@@ -104,6 +153,56 @@ export function pilotTemplate(tdir, pilot) {
         // the shipped description tells the reader to copy data/samples into the inbox, which the pilot does not have
         .replace(/^description:.*$/m, `description: "The ${safe(pilot.from)} Space Template with each Pipeline reading the customer's own folder (see PILOT.txt at the install root). No sample data ships: the first files are the customer's."`));
 }
+/**
+ * PILOT-PRECREATED-SPACE-1 (D-PA35 as changed by the operator 2026-11-12): the pilot Space `<customer>-pilot`, created inside the
+ * bundle at build time from the pilot template, the way SpaceManager.createFromTemplate creates one: the convention folders
+ * (config, data, audit, duckdb), the template's config/** with `${SPACE}` replaced by the id in every .toon, its data/** (the
+ * zero-row seeds; the pilot template has no samples), a space.toon from template.toon (name, tagline), and an empty
+ * config/egress.toon (a new Space is never seeded). template.toon and portal/ stay in the gallery.
+ * NOT done, because no server runs at build time: the server's seed gate (TemplateSeedGate - each seeded Pipeline, Job,
+ * Connection and Alert Rule judged as its own route would judge it) and its Job stamp (each Job's author, from the
+ * caller). The template is the bought, committed one, held by its own golden tests. A Job whose RUN depends on a recorded
+ * author would not run unstamped (JobAuthority: administrator-only maintenance, la.index.build's owner, publish.postgres
+ * acting as its editor), so a template with a maintenance, la.index.build or publish.postgres Job is refused here, and so is
+ * one with a Job template (a `*_job_template.toon`, or a Job naming one with `template:`), whose type is read only at boot.
+ */
+export function pilotSpace(spacesDir, pilot, now = new Date()) {
+    const id = pilot.template;
+    const from = join(spacesDir, '_templates', id), to = join(spacesDir, id);
+    if (!existsSync(join(from, 'template.toon'))) fail(`the bundle has no Space Template '${id}' to create the pilot Space from`);
+    if (existsSync(to)) fail(`the bundle already has a Space '${id}'`);
+    const cfg = join(from, 'config');
+    const jobFiles = existsSync(cfg) ? listFiles(cfg) : [];
+    const authored = (f, what) => fail(`${f}: ${what} depends on the author the server stamps, which a Space created at build time cannot record - create the pilot Space on the install instead`);
+    for (const f of jobFiles.filter((f) => f.endsWith('_job_template.toon'))) authored(f, 'a Job template');
+    for (const f of jobFiles.filter((f) => f.endsWith('_job.toon'))) {
+        const t = readFileSync(f, 'utf8');
+        const type = /^\s*type:\s*"?([\w.-]+)"?\s*$/m.exec(t)?.[1]?.toLowerCase();
+        if (AUTHORED_JOB_TYPES.includes(type)) authored(f, `a ${type} Job`);
+        if (/^\s+template:/m.test(t)) authored(f, 'a Job made from a Job template');
+    }
+    for (const sub of ['config', 'data', 'audit', 'duckdb']) mkdirSync(join(to, sub), { recursive: true });
+    const copy = (src, dst, rewrite) => {
+        if (!existsSync(src)) return;
+        for (const e of readdirSync(src, { withFileTypes: true })) {
+            const s = join(src, e.name), d = join(dst, e.name);
+            if (e.isDirectory()) { mkdirSync(d, { recursive: true }); copy(s, d, rewrite); }
+            else if (rewrite && e.name.endsWith('.toon')) writeFileSync(d, readFileSync(s, 'utf8').split('${SPACE}').join(id));
+            else cpSync(s, d);
+        }
+    };
+    copy(join(from, 'config'), join(to, 'config'), true);
+    copy(join(from, 'data'), join(to, 'data'), false);
+    const meta = readFileSync(join(from, 'template.toon'), 'utf8');
+    const q = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    writeFileSync(join(to, 'space.toon'), `display_name: ${q(toonValue(meta, 'name') || id)}\ndescription: ${q(toonValue(meta, 'tagline'))}\ncreated_at: ${q(now.toISOString())}\n`);
+    writeFileSync(join(to, 'config', 'egress.toon'), egressToon());
+    return to;
+}
+const listFiles = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? listFiles(join(d, e.name)) : [join(d, e.name)]));
+/** Job types whose runs depend on the author the server stamps (inspecto JobAuthority). */
+const AUTHORED_JOB_TYPES = ['maintenance', 'la.index.build', 'publish.postgres'];
+
 /** PILOT.txt: what the pilot wires and how to start the install so its Collectors may read the customer's folders. */
 export function pilotText(plan) {
     const p = plan.pilot, roots = p.roots.join(';');
@@ -117,7 +216,8 @@ export function pilotText(plan) {
         `  Windows:  set "INSPECTO_JAVA_OPTS=-Dassist.safety.roots=${roots}"   then bin\\serve.bat`,
         `  Linux:    INSPECTO_JAVA_OPTS="-Dassist.safety.roots=${roots}" bin/serve.sh`,
         '',
-        `Then, as an administrator, create a Space from the template '${p.template}' (Settings, Spaces).`,
+        `The Space '${p.template}' is already created (spaces/${p.template}): it boots with the server and polls those folders.`,
+        `The template '${p.template}' stays in the gallery, to create another Space like it.`,
         '',
     ].join('\r\n');
 }
@@ -148,7 +248,7 @@ function main() {
         for (const b of bom) console.log(`  ${b.line.padEnd(19)} ${b.orderCode.padEnd(28)} ${b.reason}`);
         if (args.includes('--bundle')) {
             const t = trimBundle(arg('--bundle'), join(out, 'bundle'), plan, entitlement);
-            console.log(`  bundle -> ${join(out, 'bundle')}: removed ${t.jars.length} jar(s), ${t.templates.length} Space Template(s); conf/entitlement.toon staged; the combined edition SBOM still lists the removed jars`);
+            console.log(`  bundle -> ${join(out, 'bundle')}: removed ${t.jars.length} jar(s), ${t.templates.length} Space Template(s); conf/entitlement.toon staged; ${t.sbom.length} component(s) left out of the combined SBOM`);
         }
     } catch (e) {
         console.error(`customer-build: ${e.message}`);

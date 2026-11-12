@@ -17,7 +17,7 @@ tags: [product-item, solution-pack]
 |---|---|---|
 | plan | current | [Sales, commissions, marketing and churn: a plan (`PACK-SALES-MARKETING-1`)](plan-sales-commissions-churn.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Revenue assurance (telecom)](architecture-revenue-assurance.md) · [Business assurance](architecture.md) |
+| architecture | current | [Business assurance and revenue assurance](architecture.md) |
 | features | current | [Business assurance — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Business assurance — user guide](user-guide.md) |

@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); D-PA26/27 add a demo image and per-Product chart values. PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment); ✅ PA-9b done 2026-11-12 (the windowed Alert Rule: the `window:` block, its SQL compiler over the window buffer, the fired table, the 422 gates; not yet called on commit, PA-9d). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); ✅ D-PA26's demo image built 2026-11-12 (`CONTAINER-DEMO-IMAGE-1`); ✅ D-PA27's per-Product chart folders built 2026-11-12 (`HELM-PRODUCT-VALUES-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment); ✅ PA-9b done 2026-11-12 (the windowed Alert Rule: the `window:` block, its SQL compiler over the window buffer, the fired table, the 422 gates; not yet called on commit, PA-9d). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1238,6 +1238,50 @@ Lanes: 8a `46f5a646f` (the chart per Product), 8b `7a3d74d62` (the image per Pro
 - Helm v3.19 from a local container, `--network none`: `helm lint --strict` passes on the source and on the stamped
   inspecto, la and telco charts (and the chart inside the air-gap tar). `helm template` of Telco renders the Product's
   labels and the image `inspecto-telco:4.0.0-SNAPSHOT-advanced`.
+
+**HELM-PRODUCT-VALUES-1 as built (2026-11-12; D-PA27 as changed by the operator; lane commits `8f8b472b7` and its verification fix).**
+- **Each Product commits its own chart folder**, `deploy/helm/products/<id>/`, with `Chart.yaml` (name = image name,
+  description, `inspecto.io/product`) and `values.yaml` (the Product's own defaults; today the image repository and the
+  `product` id and title). `deploy/helm/inspecto/` stays the one template source and the shared defaults.
+- **`ship.mjs chart` builds from both.** It copies the source's `templates/`, takes the Product's `Chart.yaml`, and lays
+  the Product's `values.yaml` over the source's, key by key, keeping the source's comments; then it stamps the build's
+  facts (version, appVersion, image.repository, the `product` block). The fixed five-line replacement is gone.
+- **Decided here (operator away).** A Product value *overrides* a key the source has and never adds one, so a typo is
+  refused. Only `key: value` and `key:` lines are read: no YAML library is needed (the tools carry no npm dependency),
+  a list or multi-line value is refused, and a map such as `env` is written in flow style. A picked Platform product
+  (`product-map/private/products/`, never committed) uses `deploy/helm/products/inspecto/`. The plan's facts win over
+  the file's, and the guard catches the file disagreeing.
+- **The guard, `ship.mjs check`** (CI, the Product guard step), reads `git ls-files`. It refuses: a `Chart.yaml` outside
+  the source and the Product folders; any file in a Product folder but those two; a Product without a folder or a folder
+  without a Product; a chart name, image or Product id/title that disagrees with `products/<id>.toon`; a value the source
+  lacks.
+- **Proof.** `tools/ship.test.mjs` 12/12, each guard breach planted. Helm v3.19 from the local `alpine/helm` container,
+  `--network none`: `helm lint --strict` passes on the inspecto (Standard), la and telco (Advanced) charts built from
+  their folders, unpacked and as `.tgz`; `helm template` renders each Product's image, name and `inspecto.io/product`
+  labels. A cluster install is still owed (`CONTAINER-AIRGAP-PROOFS-1`).
+
+**CONTAINER-DEMO-IMAGE-1 as built (2026-11-12; D-PA26 as changed by the operator).**
+- **`package.ps1 -Distribution demo -Target container`** builds `inspecto-<product>:<version>-<edition>-demo`. The assembler
+  now refuses the demo Distribution for `airgap` only; `shipOf` tags it `-demo` and gives it `chart: null`.
+- **The image is the demo bundle's.** Step 6c-demo keeps `deploy/Dockerfile` for `-Target container` and rewrites three lines:
+  the run note, `chmod +x bin/serve-demo.sh`, and `ENTRYPOINT ["./bin/serve-demo.sh"]` (a missing line throws). The image
+  carries the baked demo Space (step 6f) in `/app/spaces`, owned by uid 10001, and `DEMO-BUILD.txt`.
+- **`ship.mjs image` checks a demo bundle** (`checkBundleForImage`): the Demo User jar, `bin/serve-demo.sh`, the
+  `serve-demo.sh` entrypoint and `spaces/<seedSpace>/` are required. The reverse holds too: a production or trial image with
+  `lib/inspecto-demo-auth.jar` is refused. A demo image packs no chart.
+- **Decided here (operator away): the server stays on the container's own loopback.** `LoopbackOnly` is unchanged, so a
+  published port reaches nothing and a container network never offers a password-free sign-in. A desk reaches it with
+  `--network host` (Linux; Docker Desktop with host networking on), or with a forwarder sidecar in its network namespace
+  and the port published on the host's loopback only (guide § The demo image). Binding the demo sign-in beyond loopback
+  inside the image (an in-image forwarder) was not done: that weakens the guard, and it is the operator's call.
+- **Proof** (targeted; the full gate was not run). `tools/ship.test.mjs` and `tools/assemble.test.mjs` 32/32, each demo refusal
+  planted. `package.ps1 -Product telco -Edition Advanced -Distribution demo -Target container -GraalvmCache C:\.jdks -NoUi`
+  built `inspecto-telco:4.0.0-SNAPSHOT-advanced-demo` (351 MB; label `io.inspecto.distribution` `demo`), with the Space
+  baked (601 files). Booted, with a Node client in its network namespace: `/ready` `READY` (13 Pipelines); `fm.manager`
+  and `ra.analyst` signed in (200), an unknown user 401, `/alerts` without a token 401; 17 Alerts, one per rule,
+  including `ra_leakage_found`, `fraud_irsf` and `tb_box_suspected`. From the host, the directly published port gave an
+  empty reply, and through a forwarder sidecar `/health` was `UP` and the Demo User `viewer` signed in. The server ran as
+  uid 10001. Not covered: the UI (`-NoUi`), and `--network host`, which this desk's Docker Desktop has turned off.
 - `package.ps1 -Product telco -Edition Standard -Target container -NoUi -GraalvmCache C:\.jdks` built
   `inspecto-telco:4.0.0-SNAPSHOT-standard` (204 MB). Booted `--read-only --cap-drop ALL` as uid 10001: `/health` UP,
   `/ready` READY.
@@ -1578,6 +1622,26 @@ calls the evaluator on commit yet: the commit hook, the Add-on gating and the me
   Consignments that committed but were never evaluated, so with `distinctOn` their replay evaluates nothing. The
   commit hook must evaluate (or replay) every Consignment committed after the last evaluated one.
 
+Code facts for PA-9b (read 2026-11-12; check them before relying on them):
+- **`window` is already an Alert Rule key.** On a metric rule it is a duration string (`window: 1h`, or `Nb` for the last
+  N batches). `AlertRule.MODELLED` lists it (`AlertRule.java` around line 122). A Measure rule (BI-5) "replaces
+  `metric` + `window`" with `dataset` + `measure`. The new block therefore collides by name: either the parser
+  dispatches on the value's shape (a map on a Measure rule, a string on a metric rule), or the block takes another key.
+  Decide this in PA-9b, update the glossary entry with it, and keep a 422 for a map `window` on a metric rule.
+- **Evaluation today is a sweep only.** `AlertService.evaluateRules()` and `evaluateRule(name)` are reached from the
+  `alert.evaluate` Job (`AlertEvaluateJob`) and `POST /alerts/evaluate`. Nothing calls them on a commit; the commit
+  hook is new.
+- **The two ways an Alert is raised behave differently.** A rule firing goes through `persistAlertObject`, then
+  `promoteToIncident` for `error`/`critical`, with a cooldown and `ALERT_FIRED`. `raiseFromEvent(…, dedupeKey, …,
+  escalate)` dedupes on `dedupeKey` while a non-terminal Alert exists, fires no `ALERT_FIRED`, has no cooldown, and opens
+  an Incident only when `escalate` is true. The spike used the second. Which one a windowed rule uses decides the
+  Incident path, `stormCap` and the cooldown (D-PA43 asks for one Alert per rule and one Incident per key).
+- **The Condition Language:** `ConditionSql.predicateBound(when)` returns `Bound(sql, params)`, as used by
+  `DecisionRuleApplier`. **The batch cap:** `PipelineConfig.processing().batchMaxFiles()`, from TOON
+  `processing.batch.max_files`, default 1.
+- **Committed output layout:** `<dirs.database>/year=YYYY/month=MM/day=DD/*.parquet`. In-flight files live under
+  `<dirs.database>/.staging/<consignment>/`, which the evaluator must never read.
+
 **PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
 D-PA26…D-PA31 are PA-8's.
@@ -1644,7 +1708,8 @@ What exists to build on:
     - `user-guide.md`;
     - `admin-guide.md`.
   - Each says it is generated, and `--check` holds it current.
-  - Demo and video scripts are not generated. The demo script is `products/<id>.demo-build.txt`.
+  - ~~Demo and video scripts are not generated.~~ **Changed by the operator 2026-11-12:** a demo script and a video
+    script are generated too (`PRODUCT-SCRIPTS-GENERATED-1`, built the same day; see §11 PA-10d as built).
 - **D-PA37: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` stays open.** Declaring a template's ops needs would keep `ops` and
   `case-management` for `telco-fraud`'s Case Rule. That changes the pilot's jars, and PA-10's proof is that the jars
   do not change. §9's "declared needs" moves to that row.
@@ -1755,12 +1820,103 @@ hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md`
   refused (`refuseHandWritten`). `render-product-docs --check` holds them current in CI.
 - A Product's own Space Templates (Inspecto's 30, Inspecto LA's 20) are listed in its datasheet, and their
   hubs' guides in a section of their own (found by the review: the LA datasheet first showed none).
-- Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs would say so; none does today.
+- An App with no guide in those hubs would say so; none does today.
+- **Demo and video scripts (`PRODUCT-SCRIPTS-GENERATED-1`, 2026-11-12, D-PA36 as changed by the operator).** Two more
+  generated files per Product hub, `brochure-demo-script.md` and `brochure-video-script.md`: topics of the `brochure`
+  slot, as the hand-written LA series is `module/la-core/brochure-video-scripts.md`, so no new slot. `refuseHandWritten`
+  now accepts exactly the six generated names (`GENERATED_FILES`) with the marker in a generated slot; any other
+  `brochure-*` file in a Product hub is refused.
+  - The demo script: the demo Distribution and its Space (`demoSpace`; the composed Space's parts are the Apps'
+    templates), the Demo Users table parsed from the presenter text (`products/<id>.demo-build.txt`, the lines under
+    "pick a Demo User:"), a walk-through per App (its nav pages and blurbs, the Alert Rules its templates ship), a
+    table of the demo Space's Alert Rules (`config/registry/alert-rules/*.toon` of its templates: name, severity,
+    template, the description's first sentence; plus those the demo's seed tool `tools/seed-<demoSpace>.mjs` POSTs to
+    `.../alert-rules`, found by review: la-showcase's `mule-pass-through` is the Alert the LA demo is known to raise),
+    the tagline, Editions, and the presenter text's reset paragraph. The scripts never claim a given Alert Rule fired;
+    they point at **Alerts**. Telco: 4 Apps, 5 Demo Users, 19 Alert Rules; Inspecto LA: 4 Alert Rules. The review also
+    found "new Rules" (bare *Rule*, banned) in `products/telco.demo-build.txt`, copied into the demo script; fixed at
+    the presenter text. A Product with no demo Space (Inspecto) says to demo on a trial or
+    production install.
+  - The video script: a brief (film on, what it shows, claims only from this script) and one overview video in the
+    beats of the hand-written series: Problem (tagline, sign-in body), Sign in (sign-in title), one shot per App (its
+    pages, its blurbs), Outcome (the seeded Alerts), Explore it (the demo Space), Edition. Lengths are left to the
+    agency.
+  - Not generated: per-story industry videos like the LA series; those stay hand-written in their module hub.
 
-**Proof (as built).** `product-documents.test.mjs` 4/4 (in the CI guards job): every Product's four files are generated,
+**Proof (as built).** `product-documents.test.mjs` 5/5 (in the CI guards job; 4/4 before the scripts): every Product's six files are generated,
 marked and committed current; every link resolves; the Telco brochure and datasheet carry its Apps, roles and the
-Edition × App table; a hand-written file in a generated slot is refused. `check-product-docs`, `check-doc-links`, the
+Edition × App table; the Telco demo script names its four Apps, five Demo Users and every seeded Alert Rule (read from the templates independently), its video script one shot per App; a hand-written file in a generated slot is refused, a hand-written or unknown `brochure-*` file too. `check-product-docs`, `check-doc-links`, the
 vocabulary and doc-count guards pass.
+
+**`PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` as built (2026-11-12; D-PA37 "fix it next").** §9's declared needs, for Space
+Templates.
+- A template declares the modules no manifest derives: `requiresModules[N]: a,b` in its `template.toon`. Decided here: the
+  declaration lives on the template, not in a module manifest. Whether Alert Rules need `ops` depends on the template's
+  tier (a Basic-tier template ships them unarmed), so no module can say it for every template.
+- `check-offerings.mjs` check 8 holds it honest, judging the config as the server does
+  (`SpaceManager.missingFeatures`): Alert Rules or a Decision Rule `create-alert` need `ops` unless `minEdition: basic`;
+  a `*_caserule.toon` needs `case-management`; each declared module has a manifest; an Offering listing the template ships it.
+- Declared: `ops` on `aml`, `business-assurance`, `mobile-money`, `payment-fraud`, `telco-ra`; `case-management,ops` on
+  `telco-fraud`, `telco-bypass`, `partner-settlement`.
+- Found by the guard: `la-daily-feed`, a Basic content pack, had Alert Rules and no `minEdition`, so a Basic install
+  refused to create it. Decided here: it gets `minEdition: basic` like every other LA template, so its Alert Rules ship
+  unarmed on Basic (operator 2026-11-08, "A: allow, unarmed").
+- `customer.mjs templateNeeds` adds the declaration, so the pilot customer now keeps `ops` and `case-management`, billed as
+  `required` and listed in the entitlement's `modules`. This changes the pilot's jars: 11 removed instead of 13.
+- `customer-build.mjs` trims the combined edition SBOM (`sbom/inspecto-<edition>.{cdx,spdx}.json`): the removed jars'
+  components go, and so does every third-party component that only removed jars carry (from the per-jar SBOMs, read before
+  they are deleted).
+
+**Proof (as built).** `customer-build.test.mjs` 15/15 (new: declared needs keep `ops` and `case-management`, billed and
+entitled, and a template declaring nothing keeps neither; `templateNeeds` reads the declaration; the trim's combined
+SBOM in both serialisations, keeping a shared and an unattributed component). `check-offerings.test.mjs` 21/21 (check 8
+each way, `templateConfigNeeds` per rule, the repo's declarations). Live, on a Standard bundle
+(`package.ps1 -Product inspecto -Edition Standard -NoRuntime -NoUi`, 43 jars) and the pilot record unchanged (scratch
+copy):
+- 11 jars and 29 templates removed; the combined SBOM 90 → 66 components, equal to the union of the 32 kept jars'
+  per-jar SBOMs; `sbom-modules.mjs --verify` passes; `entitle.mjs verify`: valid, modules include `ops` and `case-management`;
+- booted against a throwaway local OIDC issuer: `/bootstrap.entitlement` state `ok`, Add-ons `linkAnalysis` only; the
+  gallery says `telco-fraud` creatable; `POST /spaces {template: telco-fraud}` **200** (422 before); its Case Rule
+  `fraud_critical_burst` is listed by `GET /cases/rules`.
+
+**`PILOT-PRECREATED-SPACE-1` as built (2026-11-12; D-PA35 as changed by the operator).** `customer-build --distribution
+pilot` now also creates the Space `<customer>-pilot` inside the bundle (`customer-build.mjs pilotSpace`), after it writes
+the pilot template.
+- It is made the way `SpaceManager.createFromTemplate` makes one:
+  - the folders `config`, `data`, `audit` and `duckdb`;
+  - the template's `config/**`, with `${SPACE}` replaced by the id in each `.toon`;
+  - its `data/**`: the zero-row seeds, and no samples, since the pilot template has none;
+  - `space.toon` from the template's name and tagline;
+  - an empty `config/egress.toon`, because a new Space is never seeded.
+- `template.toon` and `portal/` stay in the gallery, and so does the template, for a second Space.
+- It reuses `egressToon` and `toonValue` from `package-la-showcase.mjs`, which pre-creates Showcase Spaces the same way.
+- Not done, because no server runs at build time: the seed gate (`TemplateSeedGate` judges each seeded Pipeline, Job,
+  Connection and Alert Rule as its route would; the bought template is held by its own golden tests instead) and the
+  Job stamp (each Job's author, from the caller).
+- Decided here, the Jobs' author: some Jobs run only as their recorded author (`JobAuthority`: an administrator-only
+  maintenance task, `la.index.build`'s owner, `publish.postgres` acting as its editor). So `pilotSpace` refuses a template
+  with any `maintenance`, `la.index.build` or `publish.postgres` Job (type compared ignoring case), or with a Job template
+  (a `*_job_template.toon`, or a Job naming one with `template:`, whose type is read only at boot), before writing anything. It is deliberately wider than the server's rule, not a copy of it. Every
+  Standard Solution pack passes; `la-claims` (an `la.index.build` Job) is refused, and such a pilot is created on the
+  install instead. Found by the verification review: the first version refused only three maintenance tasks, and the
+  second missed the real Job template shape.
+- `PILOT.txt` says the Space is already created and boots with the server.
+
+**Proof (as built).** `customer-build.test.mjs` 17/17. The two new tests cover:
+- the folders, `${SPACE}` replaced in `.toon` files only, the seeds kept, the gallery files left out, `space.toon` and
+  the empty egress list;
+- each refusal (a Space that exists, a template that is missing, and each author-dependent Job shape), with no folder
+  left behind;
+- on the repo's own templates: `telco-fraud` made into a Space, `la-claims` refused.
+
+Live, on the same Standard bundle:
+- the pilot record, unchanged, in a scratch copy plus a `pilot:` block wiring the three Pipelines to three scratch folders;
+- the bundle holds `spaces/demo-telco-pilot`, with each `dirs.poll` the customer's folder, no CSV, and the seeds;
+- booted with the `INSPECTO_JAVA_OPTS` line from `PILOT.txt`:
+  - `GET /spaces` lists `demo-telco-pilot`, with the Pipelines `cdr`, `payments` and `subscriber_events`;
+  - the log shows each Collector polling its customer folder, and no refusal;
+  - a CDR file dropped into the customer's `cdr` folder was taken within one poll, written to
+    `data/cdr/database/CDR_20260701_out.parquet`, and marked processed.
 
 ## 12. Decisions (operator, signed 2026-11-10 … 2026-11-12; D-PA26 … D-PA37 reviewed 2026-11-12, six changed)
 
@@ -1791,8 +1947,8 @@ vocabulary and doc-count guards pass.
 | D-PA23 | A production bundle with no entitlement file | runs as today (every built Add-on on; Home tells the admin none is installed); only a trial build must carry one (signed 2026-11-11) |
 | D-PA24 | When an entitlement or trial expires | 14 days of warnings, then read-only: ingest, Jobs, runs and config saves refused, reads, dashboards and exports kept; no data removed; a new file restores it without a restart (signed 2026-11-11) |
 | D-PA25 | Upgrading an App whose templates made Spaces | the upgrade replaces the App's templates and nav; each existing Space is offered a dry-run diff applied through the normal config-change path (signed 2026-11-11) |
-| D-PA26 | How the container target is built | from the `linux_amd64` bundle's own Dockerfile; image `inspecto-<product>:<version>-<edition>[-trial]` with OCI labels. **Operator 2026-11-12, changed:** a seeded **demo image** per Product is wanted too (`CONTAINER-DEMO-IMAGE-1`) |
-| D-PA27 | Helm chart per Product | one source (`deploy/helm/inspecto`) stamped per Product by `tools/ship.mjs chart`; single-replica until `SCALEOUT-HELM-NPOD-1`. **Operator 2026-11-12, changed:** keep one template source, but each Product gets its **own committed chart folder and values file** it can override (`HELM-PRODUCT-VALUES-1`); not fully separate hand-kept charts |
+| D-PA26 | How the container target is built | from the `linux_amd64` bundle's own Dockerfile; image `inspecto-<product>:<version>-<edition>[-trial]` with OCI labels. **Operator 2026-11-12, changed:** a seeded **demo image** per Product is wanted too (`CONTAINER-DEMO-IMAGE-1`). **Built 2026-11-12:** `-Distribution demo -Target container` → `inspecto-<product>:<version>-<edition>-demo`, no chart, the server on the container's own loopback (§11 PA-8 as built) |
+| D-PA27 | Helm chart per Product | one source (`deploy/helm/inspecto`) stamped per Product by `tools/ship.mjs chart`; single-replica until `SCALEOUT-HELM-NPOD-1`. **Operator 2026-11-12, changed:** keep one template source, but each Product gets its **own committed chart folder and values file** it can override (`HELM-PRODUCT-VALUES-1`); not fully separate hand-kept charts. **Built 2026-11-12:** `deploy/helm/products/<id>/` (`Chart.yaml`, `values.yaml`), `ship.mjs check` keeps the templates single (§11 PA-8 as built) |
 | D-PA28 | The air-gapped bundle | one tar: the Linux bundle zip, the saved image, the chart `.tgz`, `install-offline.sh`, `SHA256SUMS`, `airgap.json`; DuckDB extensions required; no Helm/kubectl shipped (**signed 2026-11-12, operator, as built**) |
 | D-PA29 | The entry point | `package.ps1 -Target container\|airgap`, through the assembler's plan; refused without a `linux_amd64` bundle (**signed 2026-11-12, operator, as built**) |
 | D-PA30 | The proof bar on a desk with no cluster | Helm lint/template, a read-only image boot, an offline-host boot with `--network none`. **Operator 2026-11-12, changed: PA-8 is NOT done** until a real Kubernetes install passes (`CONTAINER-AIRGAP-PROOFS-1`, now the gate that closes PA-8) |
@@ -1800,9 +1956,9 @@ vocabulary and doc-count guards pass.
 | D-PA32 | Product Map kinds for Products, Apps and Industries | `product`, `app` and `industry` items linked to their definitions; an App is billable (`INS-APP-<ID>`), a Product and an Industry are not; one Order Code per App, a price per App × Edition held for demand (**signed 2026-11-12, operator, as built**) |
 | D-PA33 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (**signed 2026-11-12, operator, as built**) |
 | D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (**signed 2026-11-12, operator, as built**) |
-| D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`) |
-| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`) |
-| D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable |
+| D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`). **Done 2026-11-12** (`customer-build.mjs pilotSpace`; §11) |
+| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`, built 2026-11-12: `brochure-demo-script.md`, `brochure-video-script.md`) |
+| D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable. **Done 2026-11-12** (`requiresModules` in `template.toon`, check 8; the combined SBOM trimmed too; §11) |
 | D-PA38 | The streaming runtime for PA-9 | **Signed 2026-11-12 (operator, as recommended):** micro-batches on the existing `trigger: stream` lane, with windowed Alert Rules evaluated on each commit, scoped to the touched keys; no second execution model. Rejected: an in-process per-record operator (kept as the gate G-RT fallback), Kafka Streams, Flink, Esper or Siddhi, and a detection Job on the commit event (the PA-9a baseline only) |
 | D-PA39 | The stated latency | **Signed 2026-11-12 (operator, as recommended):** p95 ≤ 5 s from broker to Alert and ≤ 10 s to Incident, with `max_wait: 1s`, windows ≤ 1 h, one 4-core node, up to the rate PA-9a measures (proposed floor 5,000 events/s); proven by an engine harness in CI, one recorded real-broker run, and the `inspecto_detection_latency_seconds` metric in production |
 | D-PA40 | The window and state model | **Signed 2026-11-12 (operator, as recommended):** a `window:` block (tumbling or sliding, event time, `lateness`) on a Measure Alert Rule, plus `sequence` and `absence` patterns; the state is the committed Dataset plus a table of what has fired; windows ≤ 1 h; a window buffer table only if gate G-RT trips |
@@ -1892,11 +2048,16 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
 2. ✅ Board row `PRODUCT-ASSEMBLY-1` filed (P2 feature, §3.10). Still to do: apply §13.1 and §13.2 to the board. Each
    closure is marked in its owning hub first, and the counts are re-derived (`tools/check-doc-counts.mjs`).
 3. Run §13.3 as parallel lanes (at most three at a time), one push per lane.
-4. ✅ PA-0 … PA-8 and PA-10 shipped 2026-11-10 … 2026-11-12. The full Advanced reactor gate and the UI checks owed
-   by PA-6/PA-7 were run on `fc8b5d1f0` on 2026-11-12 (Maven green; result recorded in `SESSION_STATUS.local.md`).
-   PA-8 and PA-10 shipped on targeted tests, so the next full gate covers them.
-5. **PA-9** (D-PA38 … D-PA47 signed 2026-11-12): the 9a spike decides gate G-RT, then 9b … 9f in order (D-PA46).
-6. **The operator signs** D-PA26 … D-PA37, decided and recorded 2026-11-12 while the operator was away.
-7. **Owed proofs on real hosts:** `CONTAINER-AIRGAP-PROOFS-1` (a Kubernetes install; a complete air-gapped bundle).
+4. ✅ PA-0 … PA-7 and PA-10 shipped 2026-11-10 … 2026-11-12; PA-8 built 2026-11-12. The full Advanced reactor gate
+   (12,085 tests, 0 failures) and the UI checks (7,542 passed) were run on `fc8b5d1f0` on 2026-11-12. Everything after
+   it shipped on targeted tests, so the next full gate covers PA-8, PA-10 and the review follow-ups.
+5. ✅ The operator reviewed D-PA26 … D-PA37 on 2026-11-12 (`556866ad7`): six signed as built, six changed. All five
+   follow-up rows shipped the same day: `HELM-PRODUCT-VALUES-1` (`8f8b472b7`, `115e483c0`),
+   `PRODUCT-SCRIPTS-GENERATED-1` (`b70e37751`), `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` (`42ebe079f`),
+   `PILOT-PRECREATED-SPACE-1` (`a9a41c260`), `CONTAINER-DEMO-IMAGE-1` (`155ce2523`, merged `81c3df0de`).
+6. **PA-9** (D-PA38 … D-PA47 signed 2026-11-12): ✅ 9a spike (`56a2b643e`, G-RT tripped on the Dataset glob, cleared by
+   the window buffer); 9b windowed Alert Rule building; then 9c … 9f in order (D-PA46).
+7. **PA-8 stays open (D-PA30)** until `CONTAINER-AIRGAP-PROOFS-1` passes on real hosts: a Kubernetes install and a
+   complete air-gapped bundle.
 8. Held for demand: `ADDON-PICKER-PAGE-1`, `PRODUCT-MAP-APP-EDITION-PRICES-1`, `CUSTOMER-BUILD-DOMAIN-APPS-1`,
-   `REALTIME-INLINE-DECISION-1`; open: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`.
+   `REALTIME-INLINE-DECISION-1`.

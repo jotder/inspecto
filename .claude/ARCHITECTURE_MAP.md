@@ -1,5 +1,9 @@
 # Architecture Map
 
+> Quick file locator only. The architecture itself is `docs/okf/product/layer/platform/architecture.md`
+> (backend) and `docs/okf/product/layer/product/architecture.md` (UI); the first ends with a map of every
+> hub's `architecture.md`.
+
 Inspecto (repo `inspecto`) — Java 27 build / Maven `release=27`, multi-module reactor
 (`inspecto-parent`). DuckDB · TOON config (JToon) · OpenCSV · Commons Compress.
 

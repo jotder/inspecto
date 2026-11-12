@@ -62,15 +62,15 @@ The corpus ships in `data/samples`; copy each feed into `data/inbox/<feed>` to i
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md),
-  [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture-incidents.md),
-  [Case management](../../module/case-management/architecture-overview.md).
-- [Scoring and Entity Lists](../../module/scoring/architecture-scoring-entity-lists.md).
-- [Anomaly](../../module/anomaly/architecture-overview.md).
-- [Screening](../../module/screening/architecture-overview.md).
-- [Regulatory reporting](../../module/regulatory-reporting/architecture-overview.md).
-- [Link Analysis](../../module/la-core/architecture-overview.md).
+- [Pipelines and Steps](../../module/etl/architecture.md),
+  [Jobs and scheduler](../../module/processor/architecture.md).
+- [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md),
+  [Case management](../../module/case-management/architecture.md).
+- [Scoring and Entity Lists](../../module/scoring/architecture.md).
+- [Anomaly](../../module/anomaly/architecture.md).
+- [Screening](../../module/screening/architecture.md).
+- [Regulatory reporting](../../module/regulatory-reporting/architecture.md).
+- [Link Analysis](../../module/la-core/architecture.md).
 - [Studio BI](../../layer/product/architecture-studio-bi.md).
 
 ## Diagram

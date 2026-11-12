@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Analytics kernel — API
 
-Routes for Analytics kernel. Design and internals: [Analytics kernel architecture](architecture-overview.md).
+Routes for Analytics kernel. Design and internals: [Analytics kernel architecture](architecture.md).
 
 No HTTP routes. The programmatic surface for Jobs and packs is the Platform Service `analytics`:
 `requires: [analytics]`, then `ctx.services().get(AnalyticsAccess.class)`. `AnalyticsAccess` lives in

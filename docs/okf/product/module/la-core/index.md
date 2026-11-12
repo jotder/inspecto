@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [LA-COLUMN-ROLES-2 — design notes for the three parts that need a decision (2026-11-05)](plan-column-roles-2.md) · [Link analysis core and ports - plan of record](plan.md) |
 | spec | current | [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis core and ports - spec](spec.md) |
-| architecture | current | [Link Analysis](architecture-overview.md) · [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture.md) |
+| architecture | current | [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture-backend.md) · [Link Analysis](architecture.md) |
 | features | current | [Link Analysis — features](features-link-analysis.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Investigation Pivot](user-guide-investigation-pivot.md) · [Link Analysis — User Guide](user-guide-link-analysis.md) |
@@ -52,6 +52,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-INVESTIGATION-DELETE-PG-1` | P3 | feature | delete an Investigation on the Postgres store. | operator |
 | `LA-INVESTIGATION-OPS-DEFERRED-1` | P3 | feature | the unbuilt half of the Investigation model. | demand |
 | `LA-A11Y-AUDIT-1` | P3 | chore | what remains of the Link Analysis / Geo accessibility audit is person-only: a screen-reader reading (NVDA / JAWS / VoiceOver: the dock ta… | — |
-| `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture.md §9-§10; plan archived l… | — |
+| `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture-backend.md §9-§10; plan ar… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |

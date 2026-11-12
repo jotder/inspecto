@@ -887,7 +887,7 @@ citations elsewhere in this spec still resolve.
 Three items from the 2026-07-21 modularization pass had **no current-tier home at all** — they survived only
 in `archived-documents/plans-archive/modularization-optimization-plan.md` and a `BACKLOG.md` §6 row that
 pointed at it. Anchor them on their *text*, never on the letter: that plan uses `C2` for two different items
-and `okf/product/layer/platform/architecture-reactor.md` uses `C2`/`C4` for unrelated things.
+and `okf/product/layer/platform/architecture-modules.md` uses `C2`/`C4` for unrelated things.
 
 | Item | Verdict | Why / measured |
 |---|---|---|
@@ -919,7 +919,7 @@ this area has three sites whose line citations drifted (§3.2).
 | The memory-limit resolver | `DuckDbUtil.memoryLimit` — falls through to nothing when nothing is installed | 🔴 Contradicts a signed decision (§5.3 item 18) |
 | The falsification tests | four `No*ShipsInThePersonalBuild*Test` classes, plus module-side halves for events and metrics | 🔴 Gating cell 7 has none |
 | The examples suite | `inspecto/examples/` — 49 examples in seven groups (144 `.toon` files), tracked and staged | ⚠ One runs in any pipeline |
-| The assembly concept | [`editions-model.md`](architecture-editions-model.md) | ⚠ Says "five" then lists seven; the shade claim is corrected in this commit |
+| The assembly concept | [`editions-model.md`](architecture-editions.md) | ⚠ Says "five" then lists seven; the shade claim is corrected in this commit |
 | The authentication story | [`auth-security.md`](../../module/access/admin-guide-auth-security.md) | — |
 | Bundling and reactor sizes | [`build-test.md`](spec-build-test.md) | ⚠ Its jar *table* omits what its own prose gets right |
 | The feature board | `docs/EDITIONS.md` | See §2 |

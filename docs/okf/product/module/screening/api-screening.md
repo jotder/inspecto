@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Screening — API
 
-Routes for Screening. Design and internals: [Screening architecture](architecture-overview.md).
+Routes for Screening. Design and internals: [Screening architecture](architecture.md).
 
 | Route | Gate | Notes |
 |---|---|---|

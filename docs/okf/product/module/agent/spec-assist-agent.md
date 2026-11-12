@@ -9,7 +9,7 @@ timestamp: 2026-11-07T00:00:00Z
 
 # Assist Agent
 
-The assist surface is an SPI in the core, implemented by the optional [agent module](architecture-module.md).
+The assist surface is an SPI in the core, implemented by the optional [agent module](architecture.md).
 
 > **Which bundles ship it (corrected 2026-11-07).** Standard and every higher edition: `offerings/standard.toon` lists
 > `agent` (add-on `aiAssist`), and `package.ps1` stages the shaded sidecar as `lib/inspecto-agent.jar` (`PKG-5`). A Basic

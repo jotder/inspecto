@@ -17,7 +17,7 @@ tags: [product-item, layer]
 |---|---|---|
 | plan | current | [Compliance (CMP) — capability spec](plan-compliance.md) · [Data plane (DAT)](plan-data-plane.md) · [Editions & packaging (PKG) — capability spec](plan-editions.md) · [Inspecto — Forward Roadmap](plan-roadmap.md) · [Guards & repository tooling (TOOL) — capability spec](plan-tooling.md) |
 | spec | current | [Branching & Release Policy](spec-branching-release.md) · [Build & Test](spec-build-test.md) · [Editions — engineering specification (Basic / Standard / Advanced / Preview)](spec-editions.md) · [Module reorganisation - decision record (D-MR1..D-MR12)](spec-module-reorg-decisions.md) · [Module reorganisation - traps and gotchas](spec-module-reorg-gotchas.md) · [Product Map — the commercial tree, its guard, its views and customer builds (as built)](spec-product-map.md) · [Work tracking — one board, tagged rows, generated hub views](spec-work-tracking.md) |
-| architecture | current | [Log](architecture-change-log.md) · [Editions Model](architecture-editions-model.md) · [Architecture layers — platform-wide design map](architecture-layers.md) · [Inspecto as a Living Operational System](architecture-living-system.md) · [Module taxonomy — axes, offerings, gates (target model)](architecture-module-taxonomy.md) · [Inspecto Backend Overview](architecture-overview.md) · [Platform Services](architecture-platform-services.md) · [Maven reactor & modularization (as-built)](architecture-reactor.md) · [Inspecto — Technical Architecture](architecture-technical.md) · [Backend Architecture](architecture.md) |
+| architecture | current | [Editions](architecture-editions.md) · [Modules](architecture-modules.md) · [Platform Services](architecture-platform-services.md) · [Inspecto platform architecture](architecture.md) |
 | features | current | [Platform — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Platform — the builder kit](user-guide-builder-kit.md) · [Platform — user guide](user-guide.md) |
@@ -38,9 +38,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | two licence calls on the tokenizers natives wait on the operator ((a) accepted 2026-11-01). | operator |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
 | `CONTAINER-AIRGAP-PROOFS-1` | P3 | chore | now the gate that closes PA-8 (operator 2026-11-12, D-PA30) | external |
-| `CONTAINER-DEMO-IMAGE-1` | P3 | feature | a seeded demo container image per Product, beside the production image. | — |
-| `HELM-PRODUCT-VALUES-1` | P3 | feature | each Product gets its own committed chart folder and values file over the one template source. | — |
-| `PILOT-PRECREATED-SPACE-1` | P3 | feature | the pilot Distribution ships its Space already created, not only the wired template. | — |
 | `DEMO-BAKE-WAL-RACE-1` | P3 | defect | ⬇ narrowed 2026-11-11 (PRODUCT-ASSEMBLY-1 PA-5d) to the engine: the Space close abandons a busy Space after 10 s and leaves .wal files. T… | — |
 | `ENTITLEMENT-SPI-NARROWING-1` | P3 | feature | a signed entitlement closes a left-out module's routes (503), features, Job types and /modules state, but not its other extension points:… | demand |
 | `PUBLIC-API-SURFACE-1` | P3 | feature | the extension surface a partner builds against is only partly marked: JobTypeProvider, ConsequenceProvider and CollectorConnector carry n… | demand |
@@ -61,5 +58,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
-| `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P2 | defect | ⬆ P2, fix next (operator 2026-11-12, D-PA37). | — |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
+| `ARCH-DOCS-RESIDUALS-1` | P3 | chore | what ARCH-DOCS-CONSOLIDATE-1 left when it shipped (2026-11-12 | demand |

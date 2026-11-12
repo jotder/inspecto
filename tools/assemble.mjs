@@ -36,14 +36,16 @@ export const SHIPPED_TARGETS = ['container', 'airgap'];
 
 /**
  * PA-8 (D-PA26, D-PA27): the image and Helm chart a container or air-gap build ships. The image is `inspecto-<product>`
- * (the Platform product stays `inspecto`), tagged `<platform version>-<edition>[-trial]`; the chart takes the image's name.
+ * (the Platform product stays `inspecto`), tagged `<platform version>-<edition>[-trial|-demo]`; the chart takes the image's name.
+ * CONTAINER-DEMO-IMAGE-1 (D-PA26 as changed 2026-11-12): a demo build's image ships no chart (chart: null) - it listens on its
+ * own loopback and signs in Demo Users, so it is run on a desk, never installed on a cluster.
  */
 export function shipOf(productId, edition, distribution, platformVersion) {
     const repository = productId === 'inspecto' ? 'inspecto' : `inspecto-${productId}`;
     if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(repository)) fail(`Product id '${productId}' does not make an image name (lowercase letters, digits, '.', '_' and '-' only)`);
-    const tag = `${platformVersion}-${edition}${distribution === 'trial' ? '-trial' : ''}`;
+    const tag = `${platformVersion}-${edition}${distribution === 'trial' ? '-trial' : distribution === 'demo' ? '-demo' : ''}`;
     if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) fail(`'${tag}' is not an image tag`);
-    return { image: { repository, tag }, chart: { name: repository, version: platformVersion, appVersion: tag } };
+    return { image: { repository, tag }, chart: distribution === 'demo' ? null : { name: repository, version: platformVersion, appVersion: tag } };
 }
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,8 +68,9 @@ export function assemble(model, g, { product, edition, distribution = 'productio
     if (!(p.distributions ?? []).includes(distribution)) fail(`Product '${product}' does not offer the '${distribution}' distribution (it lists ${(p.distributions ?? []).join(', ')})`);
     if (!TARGETS.includes(target)) fail(`target '${target}' is not one of ${TARGETS.join(', ')}`);
     const demo = distribution === 'demo';
-    // D-PA26: a demo build binds 127.0.0.1 and signs in Demo Users - a desk build, never a container or an offline install.
-    if (demo && SHIPPED_TARGETS.includes(target)) fail(`the demo distribution is not built for the '${target}' target (it binds 127.0.0.1 and signs in Demo Users); use production or trial`);
+    // D-PA26 (changed 2026-11-12, CONTAINER-DEMO-IMAGE-1): a demo build binds 127.0.0.1 and signs in Demo Users. It may be an
+    // image (run on a desk, its server still on loopback), never an offline install.
+    if (demo && target === 'airgap') fail(`the demo distribution is not built for the 'airgap' target (it binds 127.0.0.1 and signs in Demo Users: a desk build, never an install); a demo image is -Target container`);
     if (demo && !DEMO_EDITIONS.includes(ed)) fail(`the demo distribution exists for ${DEMO_EDITIONS.join(' and ')} only (the demo sign-in replaces the OIDC jars), not '${ed}'`);
 
     const offered = builtAddons(ed, model.offerings);

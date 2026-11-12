@@ -154,7 +154,7 @@ reference, and nothing ran them.)*
 
 `inspecto/package.ps1` emits the deployment bundle. Switches: `-NoBuild` (reuse `target/`), `-NoUi` (skip the
 Angular build), `-NoRuntime` (skip the embedded jlinked JVM), and **`-Edition Basic|Standard|Advanced`** (⚠ this omitted `Advanced` — the only non-Basic flavour CI actually releases — until 2026-09-09) (selects
-the Maven [edition](architecture-editions-model.md) profile + assembles the per-edition fat-JAR). Generated
+the Maven [edition](architecture-editions.md) profile + assembles the per-edition fat-JAR). Generated
 launch scripts embed the native-access flag and the key [`-D` flags](admin-guide-launch-flags.md).
 
 **`-Product inspecto|la` (`PRODUCT-ASSEMBLY-1` PA-2, 2026-11-10; was `-Ui gamma|la-app` from D-5 step 7, 2026-10-02; default `inspecto`) picks WHICH single-page application `ui/` holds** - the Product's `host`,
@@ -312,7 +312,7 @@ the vendored kernel + eoiagent model transport.
 `inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
 **nine** edition modules: `inspecto-oidc`, `inspecto-policy`, and the seven EDG-01 ones
 (`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
-`inspecto-observability`, `inspecto-observability`, `inspecto-ops`) — see [editions model](architecture-editions-model.md). The agent modules build in an
+`inspecto-observability`, `inspecto-observability`, `inspecto-ops`) — see [editions model](architecture-editions.md). The agent modules build in an
 ordinary `mvn test` run; they are simply never *bundled*.
 
 ⚠ **THREE reactor sizes, three baselines** (2026-09-08, EDG-01 complete): the default (Basic) build is

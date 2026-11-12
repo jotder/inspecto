@@ -16,8 +16,8 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Component metamodel & Catalog (MET)](plan-metamodel.md) · [Spaces & tenancy (SPC)](plan-spaces.md) |
-| spec | current | [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [TOON Configuration](spec-toon-config.md) |
-| architecture | current | [Space anatomy — every folder and file in a Space](architecture-space-anatomy.md) · [Spaces](architecture-spaces.md) |
+| spec | current | [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [Space tests — cases that travel with a Space (SE-6a)](spec-space-tests.md) · [TOON Configuration](spec-toon-config.md) |
+| architecture | current | [Space anatomy — every folder and file in a Space](architecture-space-anatomy.md) · [Spaces](architecture.md) |
 | features | current | [Spaces — features](features-spaces.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Config](user-guide-config.md) · [Grammar configuration (the one surface)](user-guide-grammar-config.md) · [Spaces — screens](user-guide-spaces.md) |
@@ -38,4 +38,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
 | — | P3 | defect | PIPELINE-LINK-GAPS-1 links the Pipeline rename and impact scans still miss | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `IMPORT-LOADER-CASE-TOON-1` | P2 | defect | ImportLoaderInventoryTest fails on master: the fixed name case.toon is read by a loader but is neither reserved nor allow-listed (filed 2… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |
