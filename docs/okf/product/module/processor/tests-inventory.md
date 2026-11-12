@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-398 test class(es): 155 unit, 243 real-HTTP control-plane, 0 IT.
+399 test class(es): 156 unit, 243 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -392,6 +392,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ImportJournalTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ImportJournalTest.java` | {@link ImportJournal} rollback — all-or-nothing, but never over a newer write (`IMPORT-RESIDUALS-1` (3)). The |
 | `ImportLoaderInventoryTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ImportLoaderInventoryTest.java` | The LOADER inventory behind the import judge (`SEC-IMPORT-ROLES-ESCALATION-1`): every file or directory a |
 | `ImportPathsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ImportPathsTest.java` | {@link ImportPaths} as a unit. ⚠ WINDOWS-SENSITIVE: the aliases below (a trailing dot, an 8.3 short name) only |
+| `LinkCensusParityTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/LinkCensusParityTest.java` | The census is the complete list (`SPACE-LINK-CENSUS-1` LC-1): every key a link check still reads by a literal |
 | `ModuleRemovalBundleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ModuleRemovalBundleTest.java` | {@code MODULE-REORG-1 P4a} - removal semantics (plan section 2.5) for Space bundles: config of a module that is |
 | `OperationalDbTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/OperationalDbTest.java` | The one operational-database selection: DuckDB for Basic, PostgreSQL for Standard. |
 | `OptionalSpiTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/OptionalSpiTest.java` | {@link OptionalSpi} — the optional-module absence contract must survive a jar that is <b>present but |

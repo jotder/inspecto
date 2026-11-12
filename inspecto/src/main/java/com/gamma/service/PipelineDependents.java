@@ -1,17 +1,9 @@
 package com.gamma.service;
 
-import com.gamma.config.io.ConfigLoader;
-import com.gamma.pipeline.ComponentRegistry;
-import com.gamma.pipeline.ComponentStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.gamma.pipeline.LinkGraph;
 
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -23,13 +15,13 @@ import java.util.stream.Collectors;
 
 /**
  * Read-only reverse-dependency scan for a pipeline (Catalog-lifecycle: "no dependent check on origin
- * delete"). Answers <em>what breaks if this origin goes away</em> over the same by-name binding set the
+ * delete"). Answers <em>what breaks if this origin goes away</em> over the by-name binding set the
  * rename path rewrites, plus the two transitive Studio hops a rename never needed.
  *
- * <p><b>Why this is not an extraction of {@code PipelineRenameRoutes.rewriteDependents}.</b> Those six
- * scanners read <em>and</em> write in one loop body; a read-only variant cannot share it without
- * reshaping a shipped rename path. The key set is deliberately kept identical — <b>if a binding is
- * added there, add it here</b> — but the code stays separate on purpose.
+ * <p>The keys are not kept here: they are the {@link com.gamma.pipeline.LinkCensus} links, read from one
+ * {@link LinkGraph} of the write root (`SPACE-LINK-CENSUS-1` LC-1). The rename path
+ * ({@code PipelineRenameRoutes.rewriteDependents}) still keeps its own copy until LC-2 —
+ * {@code LinkCensusParityTest} fails when it reads a key the census does not declare.
  *
  * <p>Matching mirrors each consumer exactly: enrichment triggers and job triggers compare the whole
  * value case-insensitively, rule targets honour {@code targetType} defaulting to {@code pipeline}
@@ -41,12 +33,9 @@ import java.util.stream.Collectors;
  * as their own kinds so a caller can tell a direct break from a downstream one.
  *
  * <p>Best-effort per file: one malformed sibling must not make an impact read fail closed on a
- * question it could still mostly answer — an unreadable file is logged and skipped, exactly as the
- * rename path treats one.
+ * question it could still mostly answer — an unreadable file is logged and skipped by the graph.
  */
 public final class PipelineDependents {
-
-    private static final Logger log = LoggerFactory.getLogger(PipelineDependents.class);
 
     /** Hard cap on reported dependents, so a diagnostic read can never become an unbounded export. */
     public static final int MAX_DEPENDENTS = 200;
@@ -100,98 +89,68 @@ public final class PipelineDependents {
         }
 
         List<Dependent> all = new ArrayList<>();
-        enrichments(writeRoot, id, all);
-        jobs(writeRoot, id, all);
-
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        componentTargets(store, "expectation", id, all);
-        componentTargets(store, "decision-rule", id, all);
-        Set<String> datasets = datasets(store, id, all);
-        alertRules(store, id, datasets, all);
-        Set<String> widgets = widgets(store, datasets, all);
-        dashboards(store, widgets, all);
+        LinkGraph graph = LinkGraph.of(writeRoot, ReservedConfigPaths::reserved);
+        enrichments(graph, id, all);
+        jobs(graph, id, all);
+        componentTargets(graph, "expectation", id, all);
+        componentTargets(graph, "decision-rule", id, all);
+        Set<String> datasets = datasets(graph, id, all);
+        alertRules(graph, id, datasets, all);
+        Set<String> widgets = widgets(graph, datasets, all);
+        dashboards(graph, widgets, all);
 
         int cap = Math.max(0, Math.min(limit, MAX_DEPENDENTS));
         int total = all.size();
         return new Report(id, List.copyOf(all.subList(0, Math.min(cap, total))), total, total > cap);
     }
 
+    private static boolean names(LinkGraph.Edge e, String id) {
+        return id.equalsIgnoreCase(e.value().trim());
+    }
+
     /** {@code triggers.on_pipeline} and by-name {@code references.<n>.ref} in every {@code *_enrich.toon}. */
-    private static void enrichments(Path writeRoot, String id, List<Dependent> out) {
-        for (Path p : configFiles(writeRoot, "_enrich.toon")) {
-            String name = stem(p);
-            try {
-                Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                if (raw.get("triggers") instanceof Map<?, ?> t
-                        && id.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")).trim())) {
-                    out.add(new Dependent("enrichment", name, "triggers.on_pipeline"));
-                }
-                // A by-name reference resolves against the pipeline registry at RUN time
-                // (ReferenceReader), so a deleted origin surfaces as a job failure, not a load error —
-                // which is exactly why it has to be caught here instead.
-                if (raw.get("references") instanceof Map<?, ?> refs) {
-                    for (Map.Entry<?, ?> e : refs.entrySet()) {
-                        if (!(e.getValue() instanceof Map<?, ?> rv)) continue;
-                        Object ref = rv.get("ref");
-                        if (ref != null && id.equalsIgnoreCase(String.valueOf(ref).trim())) {
-                            out.add(new Dependent("enrichment", name, "references." + e.getKey() + ".ref"));
-                        }
-                    }
-                }
-            } catch (Exception ex) {
-                log.warn("[IMPACT] skipping unreadable enrichment {}: {}", p, ex.getMessage());
-            }
+    private static void enrichments(LinkGraph graph, String id, List<Dependent> out) {
+        // A by-name reference resolves against the pipeline registry at RUN time (ReferenceReader), so a
+        // deleted origin surfaces as a job failure, not a load error — which is exactly why it is caught here.
+        for (LinkGraph.Edge e : graph.from("enrichment")) {
+            boolean trigger = e.link().keyPath().equals("triggers.on_pipeline");
+            if ((trigger || e.link().keyPath().equals("references.*.ref")) && names(e, id))
+                out.add(new Dependent("enrichment", e.fromName(), e.key()));
         }
     }
 
     /** {@code on_pipeline} in every {@code *_job.toon} — under {@code job:} (what the loader reads) or at the top level. */
-    private static void jobs(Path writeRoot, String id, List<Dependent> out) {
-        for (Path p : configFiles(writeRoot, "_job.toon")) {
-            try {
-                Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                if (id.equalsIgnoreCase(String.valueOf(jobSection(raw).get("on_pipeline")).trim())) {
-                    out.add(new Dependent("job", stem(p), "on_pipeline"));
-                }
-            } catch (Exception ex) {
-                log.warn("[IMPACT] skipping unreadable job {}: {}", p, ex.getMessage());
-            }
-        }
+    private static void jobs(LinkGraph graph, String id, List<Dependent> out) {
+        for (LinkGraph.Edge e : graph.edges("job", "on_pipeline"))
+            if (names(e, id)) out.add(new Dependent("job", e.fromName(), "on_pipeline"));
     }
 
     /** {@code target} on every expectation / decision-rule whose {@code targetType} is {@code pipeline}. */
-    private static void componentTargets(ComponentStore store, String type, String id, List<Dependent> out) {
-        for (ComponentRegistry.Component c : store.list(type)) {
-            Map<String, Object> content = c.content();
-            String targetType = String.valueOf(content.getOrDefault("targetType", "pipeline"));
-            if (!"pipeline".equalsIgnoreCase(targetType)) continue;
-            Object target = content.get("target");
-            if (target != null && id.equalsIgnoreCase(String.valueOf(target).trim())) {
-                out.add(new Dependent(type, c.name(), "target"));
-            }
-        }
+    private static void componentTargets(LinkGraph graph, String type, String id, List<Dependent> out) {
+        for (LinkGraph.Edge e : graph.edges(type, "target"))
+            if (e.toKind().equals("pipeline") && names(e, id)) out.add(new Dependent(type, e.fromName(), "target"));
     }
 
     /** Datasets reading this origin's store — by {@code sourceName} or {@code physicalRef}'s head segment. */
-    private static Set<String> datasets(ComponentStore store, String id, List<Dependent> out) {
+    private static Set<String> datasets(LinkGraph graph, String id, List<Dependent> out) {
         Set<String> hit = new LinkedHashSet<>();
-        for (ComponentRegistry.Component c : store.list("dataset")) {
-            Map<String, Object> content = c.content();
-
-            Object sn = content.get("sourceName");
-            if (sn != null && id.equalsIgnoreCase(String.valueOf(sn).trim())) {
-                out.add(new Dependent("dataset", c.name(), "sourceName"));
-                hit.add(c.name());
+        for (LinkGraph.Edge e : graph.from("dataset")) {
+            if (hit.contains(e.fromName())) continue;   // sourceName matched first: one dataset is one dependent
+            String via = e.link().keyPath();
+            boolean match;
+            if (via.equals("sourceName")) {
+                match = names(e, id);
+            } else if (via.equals("physicalRef")) {
+                String ref = e.value().trim();
+                if ("null".equals(ref)) continue;
+                int slash = ref.indexOf('/');
+                match = (slash < 0 ? ref : ref.substring(0, slash)).equalsIgnoreCase(id);
+            } else {
                 continue;
             }
-
-            Object ref = content.get("physicalRef");
-            String refStr = ref == null ? "" : String.valueOf(ref).trim();
-            if (refStr.isEmpty() || "null".equals(refStr)) continue;
-            int slash = refStr.indexOf('/');
-            String head = slash < 0 ? refStr : refStr.substring(0, slash);
-            if (head.equalsIgnoreCase(id)) {
-                out.add(new Dependent("dataset", c.name(), "physicalRef"));
-                hit.add(c.name());
+            if (match) {
+                out.add(new Dependent("dataset", e.fromName(), via));
+                hit.add(e.fromName());
             }
         }
         return hit;
@@ -202,51 +161,49 @@ public final class PipelineDependents {
      * {@code _}, as {@code AlertService} matches it) or one of the affected datasets by {@code dataset}.
      * A rule naming neither watches every pipeline and belongs to the space, not to this one.
      */
-    private static void alertRules(ComponentStore store, String id, Set<String> datasets, List<Dependent> out) {
-        // Sorted by name: the store lists in directory order, which is not stable across platforms.
-        List<ComponentRegistry.Component> rules = new ArrayList<>(store.list("alert-rule"));
-        rules.sort(Comparator.comparing(ComponentRegistry.Component::name));
-        for (ComponentRegistry.Component c : rules) {
-            Map<String, Object> content = c.content();
-            String on = content.get("onPipeline") == null ? "" : String.valueOf(content.get("onPipeline")).trim();
-            if (!on.isEmpty() && (on.equalsIgnoreCase(id) || on.replace(' ', '_').equalsIgnoreCase(id))) {
-                out.add(new Dependent("alert-rule", c.name(), "onPipeline"));
-                continue;
-            }
-            String ds = content.get("dataset") == null ? "" : String.valueOf(content.get("dataset")).trim();
-            if (!ds.isEmpty() && datasets.stream().anyMatch(ds::equalsIgnoreCase)) {
-                out.add(new Dependent("alert-rule", c.name(), "dataset"));
+    private static void alertRules(LinkGraph graph, String id, Set<String> datasets, List<Dependent> out) {
+        // Sorted by name (a stable sort, so a rule's onPipeline stays before its dataset): the store lists in
+        // directory order, which is not stable across platforms.
+        List<LinkGraph.Edge> edges = new ArrayList<>(graph.from("alert-rule"));
+        edges.sort(Comparator.comparing(LinkGraph.Edge::fromName));
+        Set<String> hit = new LinkedHashSet<>();
+        for (LinkGraph.Edge e : edges) {
+            if (hit.contains(e.fromName())) continue;
+            String v = e.value().trim();
+            boolean match = switch (e.link().keyPath()) {
+                case "onPipeline" -> v.equalsIgnoreCase(id) || v.replace(' ', '_').equalsIgnoreCase(id);
+                case "dataset" -> datasets.stream().anyMatch(v::equalsIgnoreCase);
+                default -> false;
+            };
+            if (match) {
+                out.add(new Dependent("alert-rule", e.fromName(), e.link().keyPath()));
+                hit.add(e.fromName());
             }
         }
     }
 
     /** Widgets bound to any of the affected datasets ({@code datasetId}) — the first transitive hop. */
-    private static Set<String> widgets(ComponentStore store, Set<String> datasets, List<Dependent> out) {
+    private static Set<String> widgets(LinkGraph graph, Set<String> datasets, List<Dependent> out) {
         Set<String> hit = new LinkedHashSet<>();
         if (datasets.isEmpty()) return hit;
-        for (ComponentRegistry.Component c : store.list("widget")) {
-            Object dsId = c.content().get("datasetId");
-            if (dsId == null) continue;
-            if (datasets.contains(String.valueOf(dsId).trim())) {
-                out.add(new Dependent("widget", c.name(), "datasetId"));
-                hit.add(c.name());
+        for (LinkGraph.Edge e : graph.edges("widget", "datasetId")) {
+            if (datasets.contains(e.value().trim())) {
+                out.add(new Dependent("widget", e.fromName(), "datasetId"));
+                hit.add(e.fromName());
             }
         }
         return hit;
     }
 
     /** Dashboards with a tile on any affected widget ({@code tiles[].widgetId}) — the second hop. */
-    private static void dashboards(ComponentStore store, Set<String> widgets, List<Dependent> out) {
+    private static void dashboards(LinkGraph graph, Set<String> widgets, List<Dependent> out) {
         if (widgets.isEmpty()) return;
-        for (ComponentRegistry.Component c : store.list("dashboard")) {
-            if (!(c.content().get("tiles") instanceof List<?> tiles)) continue;
-            for (Object tile : tiles) {
-                if (!(tile instanceof Map<?, ?> t)) continue;
-                Object wid = t.get("widgetId");
-                if (wid != null && widgets.contains(String.valueOf(wid).trim())) {
-                    out.add(new Dependent("dashboard", c.name(), "tiles[].widgetId"));
-                    break;   // one dashboard is one dependent, however many of its tiles break
-                }
+        Set<String> hit = new LinkedHashSet<>();
+        for (LinkGraph.Edge e : graph.edges("dashboard", "tiles[].widgetId")) {
+            // one dashboard is one dependent, however many of its tiles break
+            if (!hit.contains(e.fromName()) && widgets.contains(e.value().trim())) {
+                out.add(new Dependent("dashboard", e.fromName(), "tiles[].widgetId"));
+                hit.add(e.fromName());
             }
         }
     }
@@ -254,48 +211,17 @@ public final class PipelineDependents {
     /**
      * Every live config under {@code writeRoot} whose name ends with {@code suffix}, at any depth — the loader
      * ({@code ServiceBootstrap.resolveBySuffix}) walks the whole tree, so a dependent in a sub-folder
-     * ({@code orders/orders_daily_enrich.toon}) is as live as one at the root. Skips what is not a live config:
-     * {@code .history/} copies and the server-written state dirs ({@link ReservedConfigPaths#reserved}).
-     * Shared with the rename path ({@code PipelineRenameRoutes}) so both see the same file set. Empty when
-     * the root is absent.
+     * ({@code orders/orders_daily_enrich.toon}) is as live as one at the root. Skips {@code .history/} copies and
+     * the server-written state dirs ({@link ReservedConfigPaths#reserved}). The file set {@link LinkGraph} reads;
+     * shared with the rename path ({@code PipelineRenameRoutes}). Empty when the root is absent.
      */
     public static List<Path> configFiles(Path writeRoot, String suffix) {
-        if (writeRoot == null || !Files.isDirectory(writeRoot)) return List.of();
-        List<Path> out = new ArrayList<>();
-        try {
-            // walkFileTree, not Files.walk: one unreadable directory or a file deleted mid-walk must not empty
-            // the whole answer (an empty answer lets a delete through and leaves a rename half done).
-            Files.walkFileTree(writeRoot, new SimpleFileVisitor<>() {
-                @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes a) {
-                    return !dir.equals(writeRoot) && ReservedConfigPaths.reserved(writeRoot.relativize(dir).toString())
-                            ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
-                }
-                @Override public FileVisitResult visitFile(Path f, BasicFileAttributes a) {
-                    if (a.isRegularFile() && f.getFileName().toString().endsWith(suffix)
-                            && !ReservedConfigPaths.reserved(writeRoot.relativize(f).toString())) out.add(f);
-                    return FileVisitResult.CONTINUE;
-                }
-                @Override public FileVisitResult visitFileFailed(Path f, IOException ex) {
-                    log.warn("[IMPACT] skipping unreadable {}: {}", f, ex.getMessage());
-                    return FileVisitResult.CONTINUE;
-                }
-            });
-        } catch (IOException | RuntimeException ex) {
-            log.warn("[IMPACT] could not finish listing {} under {}: {}", suffix, writeRoot, ex.getMessage());
-        }
-        out.sort(Comparator.naturalOrder());
-        return List.copyOf(out);
+        return LinkGraph.configFiles(writeRoot, suffix, ReservedConfigPaths::reserved);
     }
 
     /** The map holding a Job's keys: the {@code job:} section {@code JobConfig} loads, else the document itself. */
     public static Map<?, ?> jobSection(Map<String, Object> raw) {
-        return raw.get("job") instanceof Map<?, ?> inner ? inner : raw;
-    }
-
-    /** A config file's id: its filename with the {@code .toon} extension dropped. */
-    private static String stem(Path p) {
-        String n = p.getFileName().toString();
-        return n.endsWith(".toon") ? n.substring(0, n.length() - ".toon".length()) : n;
+        return LinkGraph.jobSection(raw);
     }
 
     /** The report as the route's JSON body — grouped by kind, so a UI can render sections directly. */
