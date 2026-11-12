@@ -39,7 +39,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
 | `CONTAINER-AIRGAP-PROOFS-1` | P3 | chore | now the gate that closes PA-8 (operator 2026-11-12, D-PA30) | external |
 | `DEMO-BAKE-WAL-RACE-1` | P3 | defect | ⬇ narrowed 2026-11-11 (PRODUCT-ASSEMBLY-1 PA-5d) to the engine: the Space close abandons a busy Space after 10 s and leaves .wal files. T… | — |
-| `ENTITLEMENT-SPI-NARROWING-1` | P3 | feature | a signed entitlement closes a left-out module's routes (503), features, Job types and /modules state, but not its other extension points:… | demand |
 | `PUBLIC-API-SURFACE-1` | P3 | feature | the extension surface a partner builds against is only partly marked: JobTypeProvider, ConsequenceProvider and CollectorConnector carry n… | demand |
 | `APP-KIT-ALERT-RULE-1` | P3 | feature | the App kit's starter (tools/inspecto-app.mjs new) ships no Alert Rule, so a partner App made with it raises no Alert from its findings u… | demand |
 | `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4, item 4.5, of the archived plan; wave map in okf/product/layer/product/plan-assuranc… | operator |
