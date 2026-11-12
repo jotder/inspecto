@@ -2062,7 +2062,7 @@ left (`SCREENING-1`, `ANALYTICS-CORE-1`, `TELCO-BYPASS-SIMBOX-1`, `SCALEOUT-OBJS
 | `AUTHORING-REDESIGN-1` (P2) | **P3, `hold: demand`** | only (d), v3 macros, is left, and it is parked |
 | Platform Services Stage 2/3 residuals (P3) | add **`hold: demand`** | says "on demand" with no tag |
 
-**Applied 2026-11-12** (each claim re-checked against `origin/master` first; board 118 → 115):
+**Applied 2026-11-12** (each claim re-checked against `origin/master` first; board −3 rows: 118 → 115, landed as 115 → 112 after peer rows merged):
 - Test mapping row: ✅ **done**, deleted (no `Test mapping` in `inspecto-ui/` confirmed; removed in `42fa41fe5`);
   `user-guide-pipeline-editor.md` line 645 rewritten to say it is gone and where a mapping is previewed now.
 - Queries / BI row: ✅ **done**, deleted; `spec-queries.md` records the retirement, including "more `$`-resolvers".

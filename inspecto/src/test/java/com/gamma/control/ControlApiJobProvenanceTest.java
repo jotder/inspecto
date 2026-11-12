@@ -72,8 +72,8 @@ class ControlApiJobProvenanceTest {
             assertEquals("sql.template", one.get("id").asText(), "the descriptor's own fields still travel");
 
             for (JsonNode t : json(get(c.port, "/jobs/types")))
-                // expectation.evaluate is contributed by this host module (ServiceLoader), not by the engine
-                assertEquals("expectation.evaluate".equals(t.get("id").asText()) ? "classpath" : "builtin",
+                // these are contributed by this host module (META-INF/services JobTypeProvider), not by the engine
+                assertEquals(java.util.Set.of("expectation.evaluate", "space.test").contains(t.get("id").asText()) ? "classpath" : "builtin",
                         t.get("source").asText(), t.get("id").asText() + " is registered by the engine in this build");
         }
     }

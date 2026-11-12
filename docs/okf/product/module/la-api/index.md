@@ -34,7 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-PERF-N9-1` | P3 | defect | Projection tail latency: one 15.99 s call in 60, unexplained (N9); audit append runs on the request thread. | — |
-| `LA-PERF-N10-1` | P3 | chore | About 3,550 native threads and 1.4 GB at idle (N10). | — |
-| `LA-PERF-N11-1` | P3 | chore | Boot takes 3 min 35 s, 185 s before the first log line (N11). | — |
+| `LA-PERF-N9-1` | P3 | defect | Projection tail and audit append on the request thread (N9): an operator design call. | operator |
 | `LA-PERF-P10A5-1` | P3 | feature | Expand and Grow fetch only the delta (P10a-5). | — |
