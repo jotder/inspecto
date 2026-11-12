@@ -628,7 +628,9 @@ final class PipelineRenameRoutes implements RouteModule {
      * never selects its holder — it follows the holder's {@code sourceName} ({@link #rewritten}).
      */
     private static boolean names(LinkCensus.Link l, String value, String oldId) {
-        String v = value.trim();
+        // An Enrichment trigger is compared as written, as the rename always did (a padded value is left alone,
+        // though the runtime and impact trim it — a separate defect, not LC-2's to change).
+        String v = l.keyPath().equals("triggers.on_pipeline") ? value : value.trim();
         if (l.type() == LinkCensus.Type.SQL_RELATION) return false;
         if (l.keyPath().equals("physicalRef")) {
             int slash = v.indexOf('/');
