@@ -13,6 +13,9 @@ The as-built design and decisions are in [`docs/okf/product/layer/platform/spec-
 | `addon/` | an Add-on | `offeringAddon:` = the key under `addons:` in `offerings/*.toon` |
 | `solution-pack/` | a Space Template or Industry pack | `template:` / `industryPack:` |
 | `edition/` | an Edition | `offering:` = `offerings/<id>.toon` |
+| `product/` | a Product (not billable: priced as its Edition plus its Apps) | `product:` = `products/<id>.toon` |
+| `app/` | an App (billable, `INS-APP-<ID>`) | `app:` = `apps/<id>/app.toon` |
+| `industry/` | an Industry (not billable: its pack is a Solution pack) | `industry:` = `industries/<id>/industry.toon` |
 
 Rules:
 - **Never copy technical facts** (roles, dependencies, which Edition holds what) here. Name the id; tools look the facts up.

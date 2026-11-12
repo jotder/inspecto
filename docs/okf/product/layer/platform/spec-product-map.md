@@ -15,7 +15,9 @@ commands) is in [`product-map/README.md`](../../../../../product-map/README.md);
 ## Shape and the one design rule
 
 The Product Map is one TOON file per **Product Map Item** at `product-map/<kind>/<name>.toon`, id `<kind>.<name>`
-(kinds: layer · module · functionality · addon · solution-pack · edition). Ids are **qualified by kind** because the
+(kinds: layer · module · functionality · addon · solution-pack · edition, and since `PRODUCT-ASSEMBLY-1` PA-10a
+product · app · industry, each linked to its definition in `products/`, `apps/` or `industries/` by the key of its kind;
+an App is billable as `INS-APP-<ID>`, a Product and an Industry are not, D-PA30). Ids are **qualified by kind** because the
 namespaces overlap (Add-on `reconciliation` and module `reconciliation`). **The map names manifest and Offering ids
 and never copies their technical facts** (roles, dependencies, which Edition holds what); tools look them up.
 Edition membership is derived from `offerings/*.toon` (`includes` resolved; base / internal modules and Industry
@@ -73,6 +75,8 @@ The first two are row `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`; S6 is row `PRODUCT-MA
   the pilot that Case Rule loads inert. Fix: a manifest declaration for ops configs.
 - **The combined edition SBOM over-declares a trimmed bundle** (`sbom/inspecto-<edition>.{cdx,spdx}.json` still lists
   removed jars; per-jar SBOMs are removed). Safe direction, not exact.
+- **An App has one Order Code**, so a price per App × Edition (D-PA6) has no key yet: row
+  `PRODUCT-MAP-APP-EDITION-PRICES-1`, held for the first priced App.
 - `enabled-gate` items are not written into a default `modules.toon` (no item uses `enabled-gate` yet).
 - **Not built (S6, on demand):** a DuckDB query file of the map, a support view (module → owner / runbook), `usage`
   billing once metering exists.

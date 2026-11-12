@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **105<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 19<!--count:backlog-p2--> × P2 · 86<!--count:backlog-p3--> × P3** —
+> **106<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 19<!--count:backlog-p2--> × P2 · 87<!--count:backlog-p3--> × P3** —
+> ⬆ **105 → 106 (P3 86 → 87) on 2026-11-12**: filed P3 feature `PRODUCT-MAP-APP-EDITION-PRICES-1` [items: layer.platform · kind: feature · hold: demand] — `PRODUCT-ASSEMBLY-1` PA-10a gives each App one Order Code (D-PA30); a price per App × Edition waits for the first priced App.
 > ⬇ **106 → 105 (P3 87 → 86) on 2026-11-12**: closed P3 defect `GAP-DETECTION-ENABLED-IGNORED-1` [items: module.acquire · kind: defect] — `DeliveryCheck.applies` now also requires `gap_detection.enabled`, so a disabled block writes no delivery manifest and raises no windowed `sequence_gap`; the `file_template` stays readable (day labels in Signals, the `kpi.completeness` Job's default). Pinned by `DeliveryCheckTest.aDisabledFileTemplateRecordsAndReportsNothing`. The Telco demo seed now sets `enabled: false` instead of removing the block.
 > ⬆ **105 → 106 (P3 86 → 87) on 2026-11-11**: filed P3 feature `SPACE-EVOLUTION-1` [items: module.config, module.engine · kind: feature] — the longer direction behind `SPACE-LINK-CENSUS-1`: a Space lock, permanent ids kept beside the files, a column contract, a state zone outside `config/`, template provenance, tests in a Space; every step report-only first and no file format change. Nothing built.
 > ⬆ **103 → 105 (P2 18 → 19, P3 85 → 86) on 2026-11-11**: filed P2 feature `SPACE-LINK-CENSUS-1` [items: module.config, module.engine · kind: feature] and P3 defect `PIPELINE-LINK-GAPS-1` [items: module.config, module.engine · kind: defect] — found while writing the Space anatomy page (`okf/product/module/config/architecture-space-anatomy.md` §12). The Pipeline rename and delete-impact scans now read Enrichments and Jobs at any folder depth and inside `job:`; what they still miss is the defect row, and the single link census that replaces six copies of the link keys is the feature row.
@@ -491,10 +492,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 86<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 87<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 86<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 105<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 87<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 106<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -878,6 +879,7 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 - **P3** · `CODEGRAPH-AFFECTED-UNUSABLE-1` — **`codegraph affected` over-reports to uselessness; only the upstream defect is open.** On v1.6.0 an Angular service returned 953 Java test files, and `SqlGuard.java` returned 1078 when the checkout holds 1059 — it fails toward passing, so `-Dtest=` targets picked from it silently become a full reactor. The repo-side remedy shipped (`CLAUDE.md` strikes `affected`; `impact` and `query` were verified sound). Remaining: report it upstream, and re-drive both commands on any codegraph upgrade before relaxing the guidance — the check is that they stop returning cross-language and larger-than-the-corpus results. [items: layer.platform · kind: chore · hold: external]
 - **P3** · `PRODUCT-MAP-S6-1` — **Product Map slice S6, on demand:** a DuckDB query file over the map, a support view (module → owner / runbook), `usage` billing once metering exists. → `okf/product/layer/platform/spec-product-map.md` [items: layer.platform · kind: feature · hold: demand]
+- **P3** · `PRODUCT-MAP-APP-EDITION-PRICES-1` — **an App has one Order Code (`INS-APP-<ID>`), so a price per App × Edition (D-PA6) has no key yet.** Decided 2026-11-12 (`PRODUCT-ASSEMBLY-1` PA-10a, D-PA30): the bill of materials puts the App line beside the Edition line, and no App is priced today. Build when the first App is priced: a price-list key per App × Edition (for example `INS-APP-TELCO-RA@standard` in `private/prices.csv`), read by `render-product-map.mjs` and the customer build's bill. → `okf/product/layer/platform/spec-product-map.md` [items: layer.platform · kind: feature · hold: demand]
 - **P3** · `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` — **a trimmed customer bundle is not exact:** a Space Template's `config/ops/` Case Rule names no owning module, so `customer-build` cannot keep `ops` / `case-management` (the rule loads inert), and the combined edition SBOM still lists the removed jars. → `okf/product/layer/platform/spec-product-map.md` [items: layer.platform, module.ops · kind: defect · hold: operator]
 
 ## 5. Docs & board hygiene

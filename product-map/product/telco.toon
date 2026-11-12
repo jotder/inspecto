@@ -1,0 +1,7 @@
+id: product.telco
+kind: product
+title: Inspecto Telco
+product: telco
+billable: false
+status: ga
+docs: docs/okf/product/product/telco/index.md

@@ -87,3 +87,31 @@ test('7 an impossible enforcement is RED', () => {
     assert.match(run({}, (w) => { w.offerings.basic.addons.workflowSla = { status: 'built', modules: ['ops'] }; }), /module 'ops' is also named by add-on\(s\) workflowSla/);
     assert.match(run({ 'addon/recon': swap('enforcement: build', 'enforcement: enabled-gate') }), /module 'recon' declares no feature id/);
 });
+
+// PA-10a (D-PA30): the assembly kinds product, app and industry, each linked to its definition.
+const defs = (w) => { w.definitions = { product: ['telco'], app: ['telco-ra'], industry: ['telecom'] }; };
+const assembly = {
+    'product/telco': 'id: product.telco\nkind: product\ntitle: Inspecto Telco\nproduct: telco\nbillable: false\nstatus: ga\n',
+    'app/telco-ra': 'id: app.telco-ra\nkind: app\ntitle: Revenue Assurance\napp: telco-ra\nbillable: true\norderCode: INS-APP-TELCO-RA\nenforcement: build\nbilling:\n  model: flat\nstatus: ga\n',
+    'industry/telecom': 'id: industry.telecom\nkind: industry\ntitle: Telecom\nindustry: telecom\nbillable: false\nstatus: ga\n',
+};
+/** The fixture plus the assembly items, then `edits` applied over both (a function edits the item's current text). */
+const runA = (edits = {}) => {
+    const e = { ...assembly };
+    for (const [k, v] of Object.entries(edits)) e[k] = typeof v === 'function' ? v(assembly[k] ?? files()[k]) : v;
+    return run(e, defs);
+};
+test('8 Product, App and Industry items linked to their definitions are GREEN', () => assert.equal(runA(), ''));
+test('8 a definition with no item, or an item whose definition is missing, is RED', () => {
+    assert.match(runA({ 'app/telco-ra': null }), /apps\/telco-ra\/app.toon has no app item/);
+    assert.match(runA({ 'product/telco': swap('product: telco', 'product: ghost') }), /product 'ghost' has no products\/ghost.toon/);
+    assert.match(runA({ 'industry/telecom': swap('industry: telecom\n', '') }), /an industry item names its definition/);
+    assert.match(runA({ 'module/ops': swap('status: ga', 'status: ga\napp: telco-ra') }), /only an app item links app:/);
+});
+test('8 a billable Product or Industry is RED; a billable App needs its commercial fields', () => {
+    assert.match(runA({ 'product/telco': swap('billable: false', 'billable: true\norderCode: INS-P-T\nenforcement: build\nbilling:\n  model: flat') }),
+        /a product is not billable/);
+    assert.match(runA({ 'industry/telecom': swap('billable: false', 'billable: true\norderCode: INS-I-T\nenforcement: contract\nbilling:\n  model: flat') }),
+        /an industry is not billable/);
+    assert.match(runA({ 'app/telco-ra': swap('orderCode: INS-APP-TELCO-RA\n', '') }), /billable but no orderCode/);
+});
