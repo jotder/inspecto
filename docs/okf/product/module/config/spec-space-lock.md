@@ -99,10 +99,12 @@ local administrator did not write it.
   path only schedules.
 - **After server-side writes**: one hook in the Control API request pipeline (`ControlApi.spaceWrites`), after the
   Space is bound, covers every write route without touching any of them. Bursts are debounced: each write
-  restarts a 1.5 s timer.
+  restarts a 1.5 s timer, but a burst postpones a computation by at most 10 s, so steady write traffic still
+  gets one. A computation consumes only the write windows that had ended when it began.
 - **On first read**: `GET /spaces/{id}/integrity` schedules a computation for a Space that has none yet.
 - The file is rewritten only when its content (all but `computedAt`) changed. Closing a Space cancels its pending
-  computation and waits for a running one.
+  computation and waits for a running one; a server write not yet in a lock is flushed then, so the next boot
+  does not report it as an outside edit.
 
 ## 7. `GET /spaces/{id}/integrity`
 

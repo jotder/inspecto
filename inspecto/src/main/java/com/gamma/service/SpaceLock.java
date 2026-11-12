@@ -62,6 +62,8 @@ public final class SpaceLock {
     static final String MAC_DOMAIN = "space-lock\n";
     /** Debounce: a burst of writes is one computation, this long after the last of them. */
     static final long DEBOUNCE_MS = 1500;
+    /** A burst may postpone a computation at most this long, so steady write traffic still gets one. */
+    static final long MAX_WAIT_MS = 10_000;
     /** Slack around a write window for file systems with coarse modification times. */
     static final long SLACK_MS = 2000;
     /** Most items a report list or the {@code removedOutside} history holds. */
@@ -144,6 +146,7 @@ public final class SpaceLock {
         final ReentrantLock computing = new ReentrantLock();
         final List<Window> windows = new ArrayList<>();
         ScheduledFuture<?> pending;
+        long firstAsk;   // when the oldest request still waiting on the pending run was made; 0 = none
         boolean scheduledOnce;
         volatile boolean closed;
         volatile Report last;
@@ -196,7 +199,12 @@ public final class SpaceLock {
     private static void schedule(State s) {
         synchronized (s) {
             if (s.closed) return;
-            if (s.pending != null) s.pending.cancel(false);
+            long now = System.currentTimeMillis();
+            boolean waiting = s.pending != null && !s.pending.isDone();
+            // steady traffic must not postpone the computation for ever: past MAX_WAIT_MS the pending run stands
+            if (waiting && s.firstAsk != 0 && now - s.firstAsk >= MAX_WAIT_MS) return;
+            if (waiting) s.pending.cancel(false);
+            if (!waiting || s.firstAsk == 0) s.firstAsk = now;
             s.scheduledOnce = true;
             s.pending = EXEC.schedule(() -> run(s), DEBOUNCE_MS, TimeUnit.MILLISECONDS);
         }
@@ -207,25 +215,38 @@ public final class SpaceLock {
         s.computing.lock();
         try {
             if (s.closed) return;
-            List<Window> taken;
-            synchronized (s) {
-                taken = List.copyOf(s.windows);
-            }
-            try {
-                s.last = compute(s.spaceId, s.configRoot, taken);
-            } catch (RuntimeException | IOException ex) {
-                log.warn("[SPACE-LOCK] could not compute the lock of Space '{}': {}", s.spaceId, ex.toString());
-                s.last = Report.failed(ex.toString());
-            }
-            synchronized (s) {
-                for (Window w : taken) if (w.end != 0) s.windows.remove(w);
-            }
+            computeNow(s);
         } finally {
             s.computing.unlock();
         }
     }
 
-    /** The Space is closing: cancel its pending computation and wait (bounded) for a running one. */
+    /** One computation over the windows recorded so far; only the windows already ENDED when it began are
+     *  consumed — a write that ends while the scan runs is still covered by the next computation. Caller holds
+     *  {@code s.computing}. */
+    private static void computeNow(State s) {
+        List<Window> taken, ended = new ArrayList<>();
+        synchronized (s) {
+            s.firstAsk = 0;
+            taken = List.copyOf(s.windows);
+            for (Window w : taken) if (w.end != 0) ended.add(w);
+        }
+        try {
+            s.last = compute(s.spaceId, s.configRoot, taken);
+        } catch (RuntimeException | IOException ex) {
+            log.warn("[SPACE-LOCK] could not compute the lock of Space '{}': {}", s.spaceId, ex.toString());
+            s.last = Report.failed(ex.toString());
+        }
+        synchronized (s) {
+            s.windows.removeAll(ended);
+        }
+    }
+
+    /**
+     * The Space is closing: cancel its pending computation and wait (bounded) for a running one. A server write not
+     * yet in a lock is flushed now — dropped, its window would be lost and the next boot would report the file as
+     * changed outside the server. Never throws.
+     */
     public static void forget(Path configRoot) {
         if (configRoot == null) return;
         State s = STATES.remove(configRoot.toAbsolutePath().normalize());
@@ -235,9 +256,21 @@ public final class SpaceLock {
             if (s.pending != null) s.pending.cancel(false);
         }
         try {
-            if (s.computing.tryLock(10, TimeUnit.SECONDS)) s.computing.unlock();
+            if (s.computing.tryLock(10, TimeUnit.SECONDS)) {
+                try {
+                    boolean unrecorded;
+                    synchronized (s) {
+                        unrecorded = s.windows.stream().anyMatch(w -> w.end != 0);
+                    }
+                    if (unrecorded && enabled()) computeNow(s);
+                } finally {
+                    s.computing.unlock();
+                }
+            }
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
+        } catch (RuntimeException ex) {
+            log.warn("[SPACE-LOCK] could not flush the lock of Space '{}' at close: {}", s.spaceId, ex.toString());
         }
     }
 

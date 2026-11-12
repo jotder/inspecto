@@ -262,6 +262,37 @@ class SpaceLockTest {
         }
     }
 
+    /** A server write the debounce has not yet recorded is flushed when the Space closes — dropped, the next boot
+     *  would report the file as changed outside the server (verification finding 1). */
+    @Test
+    void closingFlushesAServerWriteNotYetInALock(@TempDir Path tmp) throws Exception {
+        Path config = space(tmp);
+        SpaceLock.compute("alpha", config, List.of());
+        SpaceLock.Window w = SpaceLock.writeStarted("alpha", config);
+        write(config.resolve("jobs/nightly_job.toon"), "job:\n  name: nightly\n  type: noop\n  x: 2\n");
+        SpaceLock.writeEnded(config, w, true);
+        SpaceLock.forget(config);   // inside the debounce: the pending run is cancelled
+        SpaceLock.Report next = SpaceLock.compute("alpha", config, List.of());   // the next boot
+        assertEquals(0, ((Map<?, ?>) next.body().get("changedOutside")).get("total"), next.body().toString());
+    }
+
+    /** Writes closer together than the debounce still get a computation within the maximum wait (finding 3). */
+    @Test
+    void steadyWritesStillGetAComputation(@TempDir Path tmp) throws Exception {
+        Path config = space(tmp);
+        try {
+            long start = System.currentTimeMillis();
+            while (!Files.exists(SpaceLock.file(config))
+                    && System.currentTimeMillis() - start < SpaceLock.MAX_WAIT_MS + 5_000) {
+                SpaceLock.writeEnded(config, SpaceLock.writeStarted("alpha", config), true);
+                Thread.sleep(SpaceLock.DEBOUNCE_MS / 3);
+            }
+            assertTrue(Files.exists(SpaceLock.file(config)), "no computation under steady writes");
+        } finally {
+            SpaceLock.forget(config);
+        }
+    }
+
     private static SpaceLock.Report await(Path config, java.util.function.Predicate<SpaceLock.Report> ok) throws Exception {
         long deadline = System.currentTimeMillis() + 15_000;
         while (System.currentTimeMillis() < deadline) {
