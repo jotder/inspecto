@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); D-PA26 adds a demo image (`CONTAINER-DEMO-IMAGE-1`); ✅ D-PA27's per-Product chart folders built 2026-11-12 (`HELM-PRODUCT-VALUES-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); D-PA26 adds a demo image (`CONTAINER-DEMO-IMAGE-1`); ✅ D-PA27's per-Product chart folders built 2026-11-12 (`HELM-PRODUCT-VALUES-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1474,6 +1474,88 @@ through the **existing channels**, with no Kafka producer channel in PA-9; Q5 th
 - **Q6 — a desk broker.** May PA-9d pull a Kafka container image for the one real-broker run? Today the test skips,
   and the run would be recorded as not done.
 
+**PA-9a as built (2026-11-12): the spike, and gate G-RT TRIPS on reading the Dataset; the window buffer clears it.**
+No product code changed. The harness is `inspecto/src/test/java/com/gamma/service/RealtimeHopSpikeTest.java`. It is
+opt-in and skips unless `-Drealtime.spike=true`. It drives today's `trigger: stream` lane (`max_wait: 1s`, the
+`faketest` connector) and the real ingest, with Parquet output. The test thread stands in for the commit hook. On each
+commit it runs a Wangiri window over the files committed since the last evaluation: count of distinct B-numbers per
+touched A-number over 10 minutes, with duration under 3 s, threshold 30, 100k keys. It raises each breach through
+`AlertService.raiseFromEvent` with the dedup key `rule:key:window`. Every 5 s it plants a burst of 40 distinct
+B-numbers. History is pre-seeded as one Parquet file per second. Each run lasts 60 s.
+
+| Config | Rate | History | Evaluation p50 / p95 | Planted burst → Alert p50 / p95 (missed) | Verdict |
+|---|---|---|---|---|---|
+| 1 partition, glob | 1k/s (cold JVM) | 10 min | 292 / 726 ms | 1.9 / 4.4 s (1 of 12, the last one, after the run ended) | meets |
+| 1 partition, glob | 5k/s | 10 min | 289 / 522 ms | 1.7 / 2.8 s (0) | meets |
+| 1 partition, glob | 20k/s | 10 min | 244 / 458 ms | 1.3 / 2.8 s (0) | meets |
+| 1 partition, glob | 1k/s | **2 h** | 2,052 / 2,415 ms (max 8.8 s) | 4.4 / **10.3 s** (0) | **fails** |
+| 4 partitions, `batch.max_files` 1 (today's default) | 5k/s | 10 min | 47 / 236 ms | 3.9 / **7.1 s** (3) | **fails** |
+| 4 partitions, `max_files` 64, glob | 5k/s | 10 min | 112 / 124 ms | 2.5 / 3.1 s (0) | meets |
+| 4 partitions, `max_files` 64, glob | 20k/s | 10 min | 120 / 160 ms | 2.0 / 2.8 s (0) | meets |
+| 4 partitions, `max_files` 64, glob | 5k/s | **2 h** | 1,268 / **10,882 ms** | 6.3 / **14.3 s** (0) | **fails** |
+| 4 partitions, `max_files` 64, **buffer** | 5k/s | **2 h** | 43 / 56 ms | 2.9 / 4.9 s (0) | meets, thin margin |
+| 4 partitions, `max_files` 64, **buffer** | 20k/s | 10 min | 46 / 266 ms | 1.4 / 2.9 s (0) | meets |
+
+The 4-partition `max_files` 1 run is the first harness, which scoped each evaluation by an arrival-time mark; the
+fourth finding below explains the 3 missed bursts. Every other row uses the file-scoped harness.
+
+Findings, and what they change downstream:
+- **G-RT trips on reading the Dataset.** A stream Pipeline leaves one output file per drain: 3,540 files an hour with one
+  partition. A window query that globs the Dataset pays for every file, including files outside the window. After 2 h
+  of drains it misses the target, and after a day of drains it would be far worse. **So the state is the window buffer**
+  (the fallback D-PA40 already signed). A DuckDB table per (Dataset, rule set) is appended on commit and trimmed past
+  `size + lateness`. It is rebuilt at boot from the committed files: 1.4 s for 12M rows in 600 files, 8.0 s over 7,200
+  files. Evaluation then costs tens of milliseconds, whatever the history. Option B (the per-record engine) stays
+  closed: the target is met without it.
+- **One drain must commit as one Consignment.** `processing.batch.max_files` defaults to 1, so each partition slice
+  is its own Consignment. A drain over four partitions then queues four ingests on `processing.threads` and misses the
+  target at 5k/s. With `max_files` 64 the same drain is one Consignment. **Decided in this lane, under the standing
+  preference (operator away mid-build):** PA-9b's 422 gate refuses a windowed Alert Rule on a Pipeline whose
+  `processing.batch.max_files` is below 2, and the CEP template sets it to 64. Reverse by dropping the check; this is
+  config only.
+- **Read committed files only.** A bare `**` glob over the database folder also matches `db/.staging/<consignment>/…`.
+  A concurrent Consignment renames those files away mid-read (`Cannot open file`). The evaluator lists committed files;
+  it never globs the folder.
+- **Scope the touched keys by the committed Consignment, not by an arrival mark.** Concurrent Consignments commit out of
+  order, so "rows newer than the last high-water mark" skipped rows. The 3 missed bursts in the `max_files` 1 run came
+  from this harness bug. The commit hook must hand the evaluator the Consignment's own files, which it already knows.
+- **The rate in D-PA39 stands.** The target holds at 5,000 events/s, with 2 h of history in the buffer (p95 4.9 s, a
+  thin margin), and at 20,000 events/s with 10 minutes of history (p95 2.9 s). PA-9d's harness re-proves it on the
+  production evaluator. The stated floor stays 5,000 events/s until then.
+- **Ingest may slow as the output folder fills.** At 5k/s, event → evaluated p50 was 3.2 s with 2 h of history,
+  against 2.7 s with 10 minutes, though evaluation stayed at 43 ms. Not investigated here. PA-9d measures it, and a
+  stream Dataset may need time-sliced output folders.
+
+Not measured in PA-9a:
+- **Alert → Incident:** `raiseFromEvent` was called with `escalate=false`. PA-9d measures the Incident hop.
+- **Option D**, a detection Job triggered on the commit event. It needs the Job wiring and was dropped once the direct
+  hop met the target.
+- **A real broker.** Q6 allows the image for PA-9d.
+- **Runs longer than 60 s per rate.**
+- **A quiet desk.** Peer lanes were building at the time. One earlier attempt died on a full Windows paging file.
+- **The fake connector's fetch count.** It shows about two fetches per landed file (`fetched=468 of 239 csv`). This
+  was not investigated: commits and latencies are counted from the committed output, not from fetches.
+
+Code facts for PA-9b (read 2026-11-12; check them before relying on them):
+- **`window` is already an Alert Rule key.** On a metric rule it is a duration string (`window: 1h`, or `Nb` for the last
+  N batches). `AlertRule.MODELLED` lists it (`AlertRule.java` around line 122). A Measure rule (BI-5) "replaces
+  `metric` + `window`" with `dataset` + `measure`. The new block therefore collides by name: either the parser
+  dispatches on the value's shape (a map on a Measure rule, a string on a metric rule), or the block takes another key.
+  Decide this in PA-9b, update the glossary entry with it, and keep a 422 for a map `window` on a metric rule.
+- **Evaluation today is a sweep only.** `AlertService.evaluateRules()` and `evaluateRule(name)` are reached from the
+  `alert.evaluate` Job (`AlertEvaluateJob`) and `POST /alerts/evaluate`. Nothing calls them on a commit; the commit
+  hook is new.
+- **The two ways an Alert is raised behave differently.** A rule firing goes through `persistAlertObject`, then
+  `promoteToIncident` for `error`/`critical`, with a cooldown and `ALERT_FIRED`. `raiseFromEvent(…, dedupeKey, …,
+  escalate)` dedupes on `dedupeKey` while a non-terminal Alert exists, fires no `ALERT_FIRED`, has no cooldown, and opens
+  an Incident only when `escalate` is true. The spike used the second. Which one a windowed rule uses decides the
+  Incident path, `stormCap` and the cooldown (D-PA43 asks for one Alert per rule and one Incident per key).
+- **The Condition Language:** `ConditionSql.predicateBound(when)` returns `Bound(sql, params)`, as used by
+  `DecisionRuleApplier`. **The batch cap:** `PipelineConfig.processing().batchMaxFiles()`, from TOON
+  `processing.batch.max_files`, default 1.
+- **Committed output layout:** `<dirs.database>/year=YYYY/month=MM/day=DD/*.parquet`. In-flight files live under
+  `<dirs.database>/.staging/<consignment>/`, which the evaluator must never read.
+
 **PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
 D-PA26…D-PA31 are PA-8's.
@@ -1540,7 +1622,8 @@ What exists to build on:
     - `user-guide.md`;
     - `admin-guide.md`.
   - Each says it is generated, and `--check` holds it current.
-  - Demo and video scripts are not generated. The demo script is `products/<id>.demo-build.txt`.
+  - ~~Demo and video scripts are not generated.~~ **Changed by the operator 2026-11-12:** a demo script and a video
+    script are generated too (`PRODUCT-SCRIPTS-GENERATED-1`, built the same day; see §11 PA-10d as built).
 - **D-PA37: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` stays open.** Declaring a template's ops needs would keep `ops` and
   `case-management` for `telco-fraud`'s Case Rule. That changes the pilot's jars, and PA-10's proof is that the jars
   do not change. §9's "declared needs" moves to that row.
@@ -1651,11 +1734,32 @@ hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md`
   refused (`refuseHandWritten`). `render-product-docs --check` holds them current in CI.
 - A Product's own Space Templates (Inspecto's 30, Inspecto LA's 20) are listed in its datasheet, and their
   hubs' guides in a section of their own (found by the review: the LA datasheet first showed none).
-- Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs would say so; none does today.
+- An App with no guide in those hubs would say so; none does today.
+- **Demo and video scripts (`PRODUCT-SCRIPTS-GENERATED-1`, 2026-11-12, D-PA36 as changed by the operator).** Two more
+  generated files per Product hub, `brochure-demo-script.md` and `brochure-video-script.md`: topics of the `brochure`
+  slot, as the hand-written LA series is `module/la-core/brochure-video-scripts.md`, so no new slot. `refuseHandWritten`
+  now accepts exactly the six generated names (`GENERATED_FILES`) with the marker in a generated slot; any other
+  `brochure-*` file in a Product hub is refused.
+  - The demo script: the demo Distribution and its Space (`demoSpace`; the composed Space's parts are the Apps'
+    templates), the Demo Users table parsed from the presenter text (`products/<id>.demo-build.txt`, the lines under
+    "pick a Demo User:"), a walk-through per App (its nav pages and blurbs, the Alert Rules its templates ship), a
+    table of the demo Space's Alert Rules (`config/registry/alert-rules/*.toon` of its templates: name, severity,
+    template, the description's first sentence; plus those the demo's seed tool `tools/seed-<demoSpace>.mjs` POSTs to
+    `.../alert-rules`, found by review: la-showcase's `mule-pass-through` is the Alert the LA demo is known to raise),
+    the tagline, Editions, and the presenter text's reset paragraph. The scripts never claim a given Alert Rule fired;
+    they point at **Alerts**. Telco: 4 Apps, 5 Demo Users, 19 Alert Rules; Inspecto LA: 4 Alert Rules. The review also
+    found "new Rules" (bare *Rule*, banned) in `products/telco.demo-build.txt`, copied into the demo script; fixed at
+    the presenter text. A Product with no demo Space (Inspecto) says to demo on a trial or
+    production install.
+  - The video script: a brief (film on, what it shows, claims only from this script) and one overview video in the
+    beats of the hand-written series: Problem (tagline, sign-in body), Sign in (sign-in title), one shot per App (its
+    pages, its blurbs), Outcome (the seeded Alerts), Explore it (the demo Space), Edition. Lengths are left to the
+    agency.
+  - Not generated: per-story industry videos like the LA series; those stay hand-written in their module hub.
 
-**Proof (as built).** `product-documents.test.mjs` 4/4 (in the CI guards job): every Product's four files are generated,
+**Proof (as built).** `product-documents.test.mjs` 5/5 (in the CI guards job; 4/4 before the scripts): every Product's six files are generated,
 marked and committed current; every link resolves; the Telco brochure and datasheet carry its Apps, roles and the
-Edition × App table; a hand-written file in a generated slot is refused. `check-product-docs`, `check-doc-links`, the
+Edition × App table; the Telco demo script names its four Apps, five Demo Users and every seeded Alert Rule (read from the templates independently), its video script one shot per App; a hand-written file in a generated slot is refused, a hand-written or unknown `brochure-*` file too. `check-product-docs`, `check-doc-links`, the
 vocabulary and doc-count guards pass.
 
 ## 12. Decisions (operator, signed 2026-11-10 … 2026-11-12; D-PA26 … D-PA37 reviewed 2026-11-12, six changed)
@@ -1697,7 +1801,7 @@ vocabulary and doc-count guards pass.
 | D-PA33 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (**signed 2026-11-12, operator, as built**) |
 | D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (**signed 2026-11-12, operator, as built**) |
 | D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus). **Operator 2026-11-12, changed:** the pilot **Space is pre-created at build time** in the bundle (`PILOT-PRECREATED-SPACE-1`) |
-| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`) |
+| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide. **Operator 2026-11-12, changed:** **demo and video scripts are generated too** (`PRODUCT-SCRIPTS-GENERATED-1`, built 2026-11-12: `brochure-demo-script.md`, `brochure-video-script.md`) |
 | D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no, PA-10 did not. **Operator 2026-11-12: fix it next** — templates declare their ops needs and the customer build keeps `ops` when a bought template needs it; the row is P2 and startable |
 | D-PA38 | The streaming runtime for PA-9 | **Signed 2026-11-12 (operator, as recommended):** micro-batches on the existing `trigger: stream` lane, with windowed Alert Rules evaluated on each commit, scoped to the touched keys; no second execution model. Rejected: an in-process per-record operator (kept as the gate G-RT fallback), Kafka Streams, Flink, Esper or Siddhi, and a detection Job on the commit event (the PA-9a baseline only) |
 | D-PA39 | The stated latency | **Signed 2026-11-12 (operator, as recommended):** p95 ≤ 5 s from broker to Alert and ≤ 10 s to Incident, with `max_wait: 1s`, windows ≤ 1 h, one 4-core node, up to the rate PA-9a measures (proposed floor 5,000 events/s); proven by an engine harness in CI, one recorded real-broker run, and the `inspecto_detection_latency_seconds` metric in production |
