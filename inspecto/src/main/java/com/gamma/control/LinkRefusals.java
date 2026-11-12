@@ -9,6 +9,7 @@ import com.gamma.event.EventLog;
 import com.gamma.pipeline.LinkCensus;
 import com.gamma.pipeline.LinkGraph;
 import com.gamma.service.ReservedConfigPaths;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.sun.net.httpserver.HttpExchange;
@@ -162,7 +163,42 @@ final class LinkRefusals {
     static Object save(HttpExchange ex, Path writeRoot, String kind, String name, Map<String, Object> draft,
                        Map<String, Object> stored, List<Finding> findings) throws IOException {
         Mode mode = saveMode();
-        if (mode == Mode.OFF || draft == null || LinkCensus.from(kind).isEmpty() || isDraft(kind, draft)) return null;
+        List<Finding> added = added(mode, writeRoot, kind, name, draft, stored);
+        if (added.isEmpty()) return null;
+        if (mode == Mode.REFUSE) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("type", kind);
+            body.put("written", false);
+            body.put("code", ErrorCodes.CONFIG_VALIDATION_FAILED);
+            body.put("error", "config adds " + added.size() + " link(s) to something that does not exist; not written");
+            body.put("findings", added);
+            return ApiContext.respondJson(ex, 422, body);
+        }
+        log.info("[LINKS] shadow: save of {} '{}' adds {} dangling link(s)", kind, name, added.size());
+        findings.addAll(added);
+        return null;
+    }
+
+    /**
+     * {@link #save} for a kind-specific writer whose response has no findings list ({@code /alerts/rules},
+     * {@code /decision-rules}, {@code /expectations}, every {@code /jobs} write including enable): refuse mode throws
+     * 422 naming each key and missing target; shadow logs what refuse would have refused.
+     */
+    static void requireLinks(Path writeRoot, String kind, String name, Map<String, Object> draft, Map<String, Object> stored) {
+        Mode mode = saveMode();
+        List<Finding> added = added(mode, writeRoot, kind, name, draft, stored);
+        if (added.isEmpty()) return;
+        List<String> what = new ArrayList<>();
+        for (Finding f : added) what.add(f.message());
+        if (mode == Mode.REFUSE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, ERR_LINK_DANGLING + ": " + kind + " '" + name
+                    + "' not written: " + String.join("; ", what) + " — create it first, or save as a draft (enabled: false)");
+        log.warn("[LINKS] shadow: save of {} '{}' adds {} dangling link(s): {}", kind, name, added.size(), String.join("; ", what));
+    }
+
+    private static List<Finding> added(Mode mode, Path writeRoot, String kind, String name, Map<String, Object> draft,
+                                       Map<String, Object> stored) {
+        if (mode == Mode.OFF || draft == null || LinkCensus.from(kind).isEmpty() || isDraft(kind, draft)) return List.of();
         LinkGraph graph = LinkGraph.of(writeRoot, ReservedConfigPaths::reserved);
         Set<String> before = new HashSet<>();
         if (stored != null && !isDraft(kind, stored))
@@ -177,19 +213,7 @@ final class LinkRefusals {
                     refuse ? ERR_LINK_DANGLING : WARN_LINK_DANGLING,
                     "create the " + e.toKind() + " first, or save this " + kind + " as a draft (active: false)"));
         }
-        if (added.isEmpty()) return null;
-        if (refuse) {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("type", kind);
-            body.put("written", false);
-            body.put("code", ErrorCodes.CONFIG_VALIDATION_FAILED);
-            body.put("error", "config adds " + added.size() + " link(s) to something that does not exist; not written");
-            body.put("findings", added);
-            return ApiContext.respondJson(ex, 422, body);
-        }
-        log.info("[LINKS] shadow: save of {} '{}' adds {} dangling link(s)", kind, name, added.size());
-        findings.addAll(added);
-        return null;
+        return added;
     }
 
     /** The stored version of a config file, or null when there is none yet. */

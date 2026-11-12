@@ -61,7 +61,7 @@ class ControlApiLinkRefusalTest {
 
     /** Standard edition: people sign in (an author who may also administer, so no kind gate interferes). */
     private static void signIn() {
-        Authenticators.forTest(ex -> Optional.of(new Subject("author", Set.of("canAuthorWorkbench", "canAdminister"))));
+        Authenticators.forTest(ex -> Optional.of(new Subject("author", Set.of("canAuthorWorkbench", "canAdminister", "canAuthorAlertRules", "canOperateRuns"))));
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
@@ -203,6 +203,8 @@ class ControlApiLinkRefusalTest {
         }
     }
 
+    /** A smoke check that the config-delete hook does not break a delete; it cannot go red on a refusal — no census
+     *  link names an Enrichment — so it is not counted as one of the refusal proofs. */
     @Test
     void aConfigFileNothingLinksToDeletesInRefuseMode(@TempDir Path cfg, @TempDir Path root) throws Exception {
         space(root);
@@ -304,6 +306,45 @@ class ControlApiLinkRefusalTest {
                     job("no_such_feed", true).replace("{\"type\":\"job\",", "{\"type\":\"job\",\"overwrite\":true,"));
             assertEquals(422, active.statusCode(), "activating it is refused: " + active.body());
             assertEquals("on_pipeline", linkFinding(body(active).get("findings")).get("fieldPath").asText());
+        }
+    }
+
+    private static String expectation(String target) {
+        return "{\"name\":\"late\",\"target\":\"" + target + "\",\"column\":\"email\",\"kind\":\"non_null\"}";
+    }
+
+    @Test
+    void theKindSpecificExpectationDoorIsCheckedToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        space(root);
+        signIn();
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> shadow = send(c.port, "POST", "/expectations", expectation("no_such_feed"));
+            assertEquals(200, shadow.statusCode(), "shadow never refuses: " + shadow.body());
+        }
+        System.setProperty(LinkRefusals.SAVE_PROPERTY, "refuse");
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "PUT", "/expectations/late", expectation("other_missing_feed"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("ERR_LINK_DANGLING") && r.body().contains("other_missing_feed"), r.body());
+            assertTrue(Files.readString(root.resolve("registry/expectations/late.toon")).contains("no_such_feed"),
+                    "refused: the stored Expectation is unchanged");
+            HttpResponse<String> ok = send(c.port, "PUT", "/expectations/late", expectation("orders_feed"));
+            assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
+    @Test
+    void enablingADraftJobWithABrokenLinkIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        space(root);
+        System.setProperty(LinkRefusals.SAVE_PROPERTY, "refuse");
+        signIn();
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> draft = send(c.port, "POST", "/jobs",
+                    "{\"name\":\"nightly\",\"type\":\"report\",\"on_pipeline\":\"no_such_feed\",\"enabled\":false}");
+            assertEquals(200, draft.statusCode(), "a draft Job saves: " + draft.body());
+            HttpResponse<String> r = send(c.port, "POST", "/jobs/nightly/enable", null);
+            assertEquals(422, r.statusCode(), "D-LC1: activating a draft is refused until its links resolve: " + r.body());
+            assertTrue(r.body().contains("no_such_feed"), r.body());
         }
     }
 

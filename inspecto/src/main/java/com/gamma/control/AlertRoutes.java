@@ -11,6 +11,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.EditionFeatures;
+import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -209,6 +210,9 @@ final class AlertRoutes implements RouteModule {
 
     private static Map<String, Object> write(ComponentStore store, String name, Map<String, Object> content)
             throws IOException {
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
+        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+                store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             return store.write(TYPE, name, content).content();
         } catch (IllegalArgumentException e) {

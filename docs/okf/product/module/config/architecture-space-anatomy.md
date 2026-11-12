@@ -350,7 +350,9 @@ Two things this table means in practice:
   a link the census judges as dangling saves with a `WARN_LINK_DANGLING` finding (`linkWarnings` on a component
   save). In `-Dlinks.save=refuse` (Standard and Advanced only; Basic stays in shadow, D-LC5) it is refused 422
   `ERR_LINK_DANGLING` naming the key and the missing target; a draft always saves, and activating one is judged
-  on every dangling link it holds.
+  on every dangling link it holds. The kind-specific writers (`/alerts/rules`, `/decision-rules`,
+  `/expectations`, every `/jobs` write including `POST /jobs/{name}/enable`) run the same check; their responses
+  carry no findings, so in shadow they only log it.
 - **Column names are protected by nothing.** Renaming a mapped column in a Schema breaks every widget, rule,
   Expectation and SQL text that uses it, and no check reports it.
 

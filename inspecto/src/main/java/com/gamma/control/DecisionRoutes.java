@@ -513,6 +513,9 @@ final class DecisionRoutes implements RouteModule {
     }
 
     private static Object write(ComponentStore store, String name, Map<String, Object> content) throws IOException {
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
+        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+                store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             ComponentRegistry.Component c = store.write(TYPE, name, content);
             return c.content();

@@ -517,6 +517,8 @@ final class JobRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: "
                     + typeRefusal + " - nothing was written");
         Path target = jobFile(api, c.name());
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: every Job write (create, update, enable, reschedule).
+        LinkRefusals.requireLinks(api.writeRoot(), "job", c.name(), Map.of("job", c.toMap()), LinkRefusals.stored(target));
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");
         HostContext.of(api).service().jobServiceOrCreate().upsertJob(c);
