@@ -91,7 +91,7 @@ export function seed(root) {
             billing: { model: 'flat' }, support: { tier: 'standard' }, status: 'ga',
         });
     }
-    // PA-10a (D-PA30): one item per Product, App and Industry definition. An App is sold (build: a customer build leaves an App
+    // PA-10a (D-PA32): one item per Product, App and Industry definition. An App is sold (build: a customer build leaves an App
     // out unless bought); a Product is priced as its Edition plus its Apps and an Industry's pack is sold as a Solution pack.
     const defs = definitions(root);
     const titleOf = (f) => unquote(parseToon(readFileSync(join(root, f), 'utf8')).title);

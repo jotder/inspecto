@@ -13,7 +13,7 @@
 //         6 a billable item has an orderCode (unique), an enforcement and a billing.model
 //         7 enforcement is possible (D-PM4): `build` only for an item whose every module is optional/provider and named by no other
 //           add-on (a Functionality is never `build`); `enabled-gate` only when every module declares a feature id
-//         8 (PRODUCT-ASSEMBLY-1 PA-10a, D-PA30) a `product`, `app` or `industry` item links its definition (products/<id>.toon,
+//         8 (PRODUCT-ASSEMBLY-1 PA-10a, D-PA32) a `product`, `app` or `industry` item links its definition (products/<id>.toon,
 //           apps/<id>/app.toon, industries/<id>/industry.toon) by the key of its kind; every definition has an item; a Product
 //           (priced as Edition + Apps) and an Industry (its pack is sold as a Solution pack) are not billable
 
@@ -23,7 +23,7 @@ import { join } from 'node:path';
 import { parseToon } from './check-offerings.mjs';
 
 export const KINDS = ['layer', 'module', 'functionality', 'addon', 'solution-pack', 'edition', 'product', 'app', 'industry'];
-/** PA-10a (D-PA30): the assembly kinds, each linked to its definition by the key of the same name. */
+/** PA-10a (D-PA32): the assembly kinds, each linked to its definition by the key of the same name. */
 export const DEFINITION_KINDS = { product: 'products/<id>.toon', app: 'apps/<id>/app.toon', industry: 'industries/<id>/industry.toon' };
 export const VOCAB = {
     billable: ['true', 'false'],
@@ -77,7 +77,7 @@ export function check(files, world) {
             if (it[k] !== undefined && it.kind !== k) out.push(`${r}: only ${an(k)} ${k} item links ${k}:`);
         }
         if ((it.kind === 'product' || it.kind === 'industry') && it.billable === 'true')
-            out.push(`${r}: ${an(it.kind)} ${it.kind} is not billable (${it.kind === 'product' ? 'a Product is priced as its Edition plus its Apps' : "an Industry's pack is sold as a Solution pack"}, D-PA30)`);
+            out.push(`${r}: ${an(it.kind)} ${it.kind} is not billable (${it.kind === 'product' ? 'a Product is priced as its Edition plus its Apps' : "an Industry's pack is sold as a Solution pack"}, D-PA32)`);
         if ((it.kind === 'module' || it.kind === 'functionality') && it.parent === undefined) out.push(`${r}: a ${it.kind} needs a parent`);
         if (it.kind === 'functionality' && it.module === undefined) out.push(`${r}: a functionality needs a module`);
         if (it.parent !== undefined) {

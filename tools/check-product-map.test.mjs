@@ -88,7 +88,7 @@ test('7 an impossible enforcement is RED', () => {
     assert.match(run({ 'addon/recon': swap('enforcement: build', 'enforcement: enabled-gate') }), /module 'recon' declares no feature id/);
 });
 
-// PA-10a (D-PA30): the assembly kinds product, app and industry, each linked to its definition.
+// PA-10a (D-PA32): the assembly kinds product, app and industry, each linked to its definition.
 const defs = (w) => { w.definitions = { product: ['telco'], app: ['telco-ra'], industry: ['telecom'] }; };
 const assembly = {
     'product/telco': 'id: product.telco\nkind: product\ntitle: Inspecto Telco\nproduct: telco\nbillable: false\nstatus: ga\n',

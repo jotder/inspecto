@@ -34,7 +34,7 @@ const KIND_NA = {
     edition: Object.fromEntries(['plan', 'spec', 'architecture', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `an Edition is a build flavor — ${MODULES}`])),
     addon: Object.fromEntries(['plan', 'spec', 'architecture', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `an Add-on licenses modules — ${MODULES}`])),
     'solution-pack': Object.fromEntries(['plan', 'spec', 'api', 'tests'].map((s) => [s, `a Solution pack configures modules — ${MODULES}`])),
-    // PA-10a (D-PA30): the assembly kinds. A Product's brochure, datasheet and guides are composed from its Apps (D-PA34).
+    // PA-10a (D-PA32): the assembly kinds. A Product's brochure, datasheet and guides are composed from its Apps (D-PA36).
     product: Object.fromEntries(['plan', 'spec', 'architecture', 'api', 'tests'].map((s) => [s, 'a Product assembles Apps — see the hubs of its Apps and Add-ons'])),
     app: Object.fromEntries(['plan', 'spec', 'architecture', 'features', 'user-guide', 'admin-guide', 'api', 'tests']
         .map((s) => [s, 'an App installs Space Templates and needs Add-ons — see their hubs (solution-pack, addon)'])),

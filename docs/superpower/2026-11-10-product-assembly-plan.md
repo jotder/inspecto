@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 is next; PA-10 designed and sliced 2026-11-12 (§11, D-PA30…D-PA35). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -403,6 +403,10 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   brand (`name`, and the sign-in pitch when the Product declares one) and each App's nav, from `products/` and
   `apps/`. `--check` fails when a file is stale; it runs in the Product guard's CI step, so an edited `app.toon`
   cannot ship without its host data. The PA-3 parity test against `la-nav.ts` retires with that file.
+  The sign-in page reads the pitch before sign-in from this host data (`APP_ENVIRONMENT.signInPitch`): an SSO
+  sign-in shows its title and body; a demo sign-in shows its title alone, or the bare Product name when the
+  Product declares no pitch (`SIGNIN-DEMO-HEADLINE-1`, 2026-11-12, replacing the hard-coded "`<Product>` MFS" from
+  `52aa6e7a7`; Inspecto LA's demo now reads "Follow every link, one case at a time.").
 - **The session knows the Product.** `SessionService.product` holds `/bootstrap.product`, refreshed on every
   re-read (`init`, after sign-in, and after a Space's Module settings change), because its nav depends on the caller
   and the Space.
@@ -1124,9 +1128,80 @@ and The trial Distribution.
   `ControlApiBootstrapProductTest`, `ProductDescriptorTest`, `SpaceManagerTemplateGateTest` and
   `ImportLoaderInventoryTest` pass.
 
-**PA-10 designed and sliced (2026-11-12; D-PA30…D-PA35 decided while the operator was away, per the standing
+**PA-8 designed and sliced (2026-11-12; D-PA26…D-PA31 decided and recorded while the operator was away, per the
+standing preference).** Proof (§11 table): Inspecto Telco installs on a cluster and on an offline host.
+
+What exists to build on (measured 2026-11-12):
+- **A Dockerfile in every bundle.** `package.ps1` step 6b-2 writes `deploy/Dockerfile` and its `.dockerignore`. The
+  image is the unzipped bundle on a digest-pinned `debian:stable-slim`, with the bundle's own jlink `runtime/`, uid
+  10001, a `HEALTHCHECK` on `/health`, and `bin/serve.sh` as entrypoint. It is valid only in the `linux_amd64` bundle,
+  and it carries no Product in its name or labels.
+- **One Helm chart, `deploy/helm/inspecto`.** A single-replica StatefulSet with one PVC, a read-only root filesystem
+  and an exec `/tmp`, TLS in the JVM and Secret-backed environment. It names no Product. The N-pod mode
+  (`SCALEOUT-HELM-NPOD-1`) is on hold with Postgres (operator, 2026-10-23).
+- **Air-gap pieces.** `package.ps1` stages the DuckDB extensions per platform under `lib/duckdb/<platform>/`, and
+  `-RequireExtensions` makes a missing one a failure. The loader never falls back to a networked `INSTALL` once that
+  folder exists (D-8). The jlink runtime makes a bundle need no JVM on the host.
+- **The assembler** lists `container` and `airgap` as `PLANNED_TARGETS` and refuses them.
+- **On this desk:** Docker 29.5.3, the pinned `debian` base and an `alpine/helm` image are local; there is no Helm
+  binary and no Kubernetes cluster; the Linux jmods are in `C:\.jdks\jdk-27-linux` (so `-GraalvmCache C:\.jdks`
+  cross-builds the `linux_amd64` bundle); there are no DuckDB 2.0 Linux extensions.
+
+**Decisions (decided 2026-11-12, operator away).**
+- **D-PA26: the container target post-processes the Linux bundle.** The image is built from the bundle's own
+  `deploy/Dockerfile`; there is no second Dockerfile. It is named `inspecto-<product>` (the Platform product stays
+  `inspecto`) and tagged `<platform version>-<edition>`, plus `-trial` for a trial build. The Dockerfile gains OCI
+  labels from the plan: title, version, vendor, and `io.inspecto.product`, `.edition`, `.distribution`. The demo
+  Distribution is refused for `container` and `airgap`: it binds 127.0.0.1 and signs in Demo Users, so it is a desk
+  build, not an install.
+- **D-PA27: one chart source, stamped per Product.** `deploy/helm/inspecto` stays the only chart source.
+  `tools/ship.mjs chart` writes a copy per Product build with:
+  - the chart name equal to the image name, the chart version equal to the platform version, `appVersion` equal to
+    the image tag;
+  - `values.image.repository` set to the image name, and a `product` block (id, title, edition, distribution);
+  - labels `app.kubernetes.io/name` (the chart name), `app.kubernetes.io/version`, `inspecto.io/product` and
+    `inspecto.io/edition`.
+
+  It stays single-replica. PA-8 does not lift the `SCALEOUT-HELM-NPOD-1` hold. When that row is built, it changes the
+  one source, and every Product's chart inherits it.
+- **D-PA28: the air-gapped bundle is one tar of everything an offline site needs.** `inspecto-<product>-<edition>-airgap.tar`
+  holds:
+  - the `linux_amd64` bundle zip, for a host install;
+  - the image as `docker save` output, for a cluster or a container host;
+  - the chart as a `.tgz`;
+  - `install-offline.sh`, which checks `SHA256SUMS` first, then does `host` (unzip, optional systemd service) or
+    `load` (load the image and retag it for a private registry), and prints the `helm install` line;
+  - `airgap.json`, the manifest (Product, Edition, image, chart, extensions found).
+
+  The DuckDB extensions for `linux_amd64` are required (`-Target airgap` implies `-RequireExtensions`).
+  `ship.mjs airgap --allow-missing-extensions` exists only for a desk proof: it writes `complete: false` and the
+  missing names into `airgap.json`, and the installer then prints a warning. No Helm, kubectl or registry binary is
+  shipped; the site brings its own.
+- **D-PA29: `package.ps1 -Target container|airgap` is the one entry.** It passes `--target` to the assembler. The plan
+  then carries `image` and `chart`. After the zips are written, it runs `tools/ship.mjs` on the `linux_amd64` bundle,
+  and refuses when none was built (that bundle needs the Linux jmods). Docker is needed only for the image; the chart
+  needs only `tar`. The `windows` and `linux` targets are unchanged.
+- **D-PA30: what proves it here.**
+  - Charts: `helm lint` and `helm template` through the local Helm image, for every Product.
+  - The image: built from a packaged Telco bundle, booted with `--read-only`, answering `/health` and `/ready`, with
+    the right `lib/product.json`.
+  - The offline host: a `debian` container with `--network none` runs `install-offline.sh host` from the air-gap tar
+    and boots Telco; a second run loads the image from the tar after the local copy is removed.
+  - A real cluster install is not possible on this desk (no cluster). It is recorded as not run, with a BACKLOG row
+    that carries it.
+- **D-PA31: the order of the PA-8 lanes.** The per-Product chart and the targets in the assembler (8a), the image
+  through `package.ps1 -Target container` (8b), the air-gapped bundle and the guide (8c).
+
+**Slices (each its own lane).**
+
+| Lane | Builds | Proof |
+|---|---|---|
+| **PA-8a** Per-Product chart | `assemble.mjs` accepts `container` and `airgap` (plan fields `image`, `chart`; demo refused); `tools/ship.mjs chart`; the base chart's labels and `product` values | node tests; `helm lint` and `helm template` for inspecto, la and telco |
+| **PA-8b** Per-Product image | OCI labels in the bundle's Dockerfile; `tools/ship.mjs image` (build, tag, `docker save`); `package.ps1 -Target container` | a Telco Standard image built and booted read-only |
+| **PA-8c** Air-gapped bundle | `tools/ship.mjs airgap`, `install-offline.sh`, `package.ps1 -Target airgap`; the guide `admin-guide-container-airgap.md` | the offline-host boot from the tar, with `--network none` |
+**PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
-D-PA26…D-PA29 are left for PA-8, which is designed in parallel.
+D-PA26…D-PA31 are PA-8's.
 
 What exists to build on:
 - **`tools/customer-build.mjs`** (`PRODUCT-MAP-1` S5). It resolves a private customer record (`edition` plus
@@ -1141,7 +1216,7 @@ What exists to build on:
   items' hubs (`products/telco.toon` points at the `industry-telecom` Solution pack's hub).
 
 **Decisions (decided here, 2026-11-12).**
-- **D-PA30: three new Product Map kinds.** `product`, `app` and `industry` items, at `product-map/<kind>/<id>.toon`,
+- **D-PA32: three new Product Map kinds.** `product`, `app` and `industry` items, at `product-map/<kind>/<id>.toon`,
   link to their definition by `product:`, `app:` or `industry:`.
   - The guard requires one item per definition, and every link must resolve.
   - An App item is billable: `enforcement: build`, Order Code `INS-APP-<ID>`.
@@ -1150,7 +1225,7 @@ What exists to build on:
   - D-PA6 asks for an Order Code per App × Edition. PA-10 gives each App one Order Code, and the bill puts it beside
     the Edition line. A price per App × Edition waits for the first priced App: board row
     `PRODUCT-MAP-APP-EDITION-PRICES-1`, held for demand.
-- **D-PA31: a customer build is an assembly.**
+- **D-PA33: a customer build is an assembly.**
   - The customer record names its Product (`product:`). It defaults to `inspecto`, the Platform product, so the D-PM6
     record stays valid.
   - `assemble.mjs --customer <record>` resolves the record into the Assembly Plan. The plan gains:
@@ -1163,14 +1238,14 @@ What exists to build on:
     `package.ps1` is untouched (PA-8 is changing it).
   - The resolution itself is today's code, moved and not rewritten. That is why the pilot's jars and templates cannot
     drift.
-- **D-PA32: every customer build carries a signed entitlement.**
+- **D-PA34: every customer build carries a signed entitlement.**
   - Its `modules` are exactly the build's kept optional modules, including the ones kept as `required`. Its Add-ons
     are the bought ones plus those whose modules the build keeps whole. So the file and the jars agree by construction:
     a jar copied back in later stays inert.
   - The record may give `expires` and `nodes`; with neither, there is no expiry and one node.
   - The key is `--key`, defaulting to `product-map/private/keys/inspecto-issuer-1.pem`. A build with no key is
     refused, rather than shipped without a file.
-- **D-PA33: the pilot Distribution is a customer build.** `pilot` means the customer's Collectors pre-wired, with no
+- **D-PA35: the pilot Distribution is a customer build.** `pilot` means the customer's Collectors pre-wired, with no
   data.
   - The record's `pilot:` block names one bought Space Template and, for each of its Pipelines, the customer's poll
     folder.
@@ -1181,7 +1256,7 @@ What exists to build on:
     template on day one.
   - `assemble.mjs` refuses `pilot` without `--customer`. So `package.ps1 -Distribution pilot` is refused, and the
     refusal names customer-build.
-- **D-PA34: Product documents are generated into the Product's hub.** Products, Apps and Industries get hubs at
+- **D-PA36: Product documents are generated into the Product's hub.** Products, Apps and Industries get hubs at
   `docs/okf/product/{product,app,industry}/<id>/`.
   - For each Product, `render-product-docs.mjs` writes four files from the Product definition, its Apps, Add-ons and
     Editions, linking into their hubs:
@@ -1191,7 +1266,7 @@ What exists to build on:
     - `admin-guide.md`.
   - Each says it is generated, and `--check` holds it current.
   - Demo and video scripts are not generated. The demo script is `products/<id>.demo-build.txt`.
-- **D-PA35: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` stays open.** Declaring a template's ops needs would keep `ops` and
+- **D-PA37: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` stays open.** Declaring a template's ops needs would keep `ops` and
   `case-management` for `telco-fraud`'s Case Rule. That changes the pilot's jars, and PA-10's proof is that the jars
   do not change. §9's "declared needs" moves to that row.
 
@@ -1246,12 +1321,18 @@ What exists to build on:
 | D-PA23 | A production bundle with no entitlement file | runs as today (every built Add-on on; Home tells the admin none is installed); only a trial build must carry one (signed 2026-11-11) |
 | D-PA24 | When an entitlement or trial expires | 14 days of warnings, then read-only: ingest, Jobs, runs and config saves refused, reads, dashboards and exports kept; no data removed; a new file restores it without a restart (signed 2026-11-11) |
 | D-PA25 | Upgrading an App whose templates made Spaces | the upgrade replaces the App's templates and nav; each existing Space is offered a dry-run diff applied through the normal config-change path (signed 2026-11-11) |
-| D-PA30 | Product Map kinds for Products, Apps and Industries | `product`, `app` and `industry` items linked to their definitions; an App is billable (`INS-APP-<ID>`), a Product and an Industry are not; one Order Code per App, a price per App × Edition held for demand (decided 2026-11-12, operator away) |
-| D-PA31 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (decided 2026-11-12, operator away) |
-| D-PA32 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (decided 2026-11-12, operator away) |
-| D-PA33 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus); no Space is made at build time (decided 2026-11-12, operator away) |
-| D-PA34 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide; demo and video scripts not generated (decided 2026-11-12, operator away) |
-| D-PA35 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no: declared ops needs change the pilot's jars; the row stays open with §9's declared needs (decided 2026-11-12, operator away) |
+| D-PA26 | How the container target is built | from the `linux_amd64` bundle's own Dockerfile; image `inspecto-<product>:<version>-<edition>[-trial]` with OCI labels; no demo container (decided 2026-11-12, operator away) |
+| D-PA27 | Helm chart per Product | one source (`deploy/helm/inspecto`) stamped per Product by `tools/ship.mjs chart`; single-replica until `SCALEOUT-HELM-NPOD-1` (decided 2026-11-12, operator away) |
+| D-PA28 | The air-gapped bundle | one tar: the Linux bundle zip, the saved image, the chart `.tgz`, `install-offline.sh`, `SHA256SUMS`, `airgap.json`; DuckDB extensions required; no Helm/kubectl shipped (decided 2026-11-12, operator away) |
+| D-PA29 | The entry point | `package.ps1 -Target container\|airgap`, through the assembler's plan; refused without a `linux_amd64` bundle (decided 2026-11-12, operator away) |
+| D-PA30 | The proof bar on a desk with no cluster | Helm lint/template, a read-only image boot, an offline-host boot with `--network none`; the cluster install recorded as not run (decided 2026-11-12, operator away) |
+| D-PA31 | The order of the PA-8 lanes | chart and targets (8a), image (8b), air-gapped bundle and guide (8c) (decided 2026-11-12, operator away) |
+| D-PA32 | Product Map kinds for Products, Apps and Industries | `product`, `app` and `industry` items linked to their definitions; an App is billable (`INS-APP-<ID>`), a Product and an Industry are not; one Order Code per App, a price per App × Edition held for demand (decided 2026-11-12, operator away) |
+| D-PA33 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (decided 2026-11-12, operator away) |
+| D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (decided 2026-11-12, operator away) |
+| D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus); no Space is made at build time (decided 2026-11-12, operator away) |
+| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide; demo and video scripts not generated (decided 2026-11-12, operator away) |
+| D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no: declared ops needs change the pilot's jars; the row stays open with §9's declared needs (decided 2026-11-12, operator away) |
 
 ## 13. The open board, re-checked 2026-11-10
 

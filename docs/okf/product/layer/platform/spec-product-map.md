@@ -17,7 +17,7 @@ commands) is in [`product-map/README.md`](../../../../../product-map/README.md);
 The Product Map is one TOON file per **Product Map Item** at `product-map/<kind>/<name>.toon`, id `<kind>.<name>`
 (kinds: layer · module · functionality · addon · solution-pack · edition, and since `PRODUCT-ASSEMBLY-1` PA-10a
 product · app · industry, each linked to its definition in `products/`, `apps/` or `industries/` by the key of its kind;
-an App is billable as `INS-APP-<ID>`, a Product and an Industry are not, D-PA30). Ids are **qualified by kind** because the
+an App is billable as `INS-APP-<ID>`, a Product and an Industry are not, D-PA32). Ids are **qualified by kind** because the
 namespaces overlap (Add-on `reconciliation` and module `reconciliation`). **The map names manifest and Offering ids
 and never copies their technical facts** (roles, dependencies, which Edition holds what); tools look them up.
 Edition membership is derived from `offerings/*.toon` (`includes` resolved; base / internal modules and Industry
