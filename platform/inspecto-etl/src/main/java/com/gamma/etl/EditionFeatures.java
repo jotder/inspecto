@@ -87,6 +87,18 @@ public final class EditionFeatures {
      */
     public static final String PIPELINE_AUTOMATION = "pipeline.automation";
 
+    /**
+     * Real-time Detection (PRODUCT-ASSEMBLY-1 PA-9d, D-PA44): windowed and Pattern Alert Rules ({@code window:} /
+     * {@code pattern:}), evaluated on each commit of a {@code trigger: stream} Pipeline. Declared by the optional
+     * {@code inspecto-realtime} module (the billable Add-on {@value #REALTIME_ADDON}, Standard and above); absent, or
+     * left out of a signed entitlement, a windowed rule is refused at save and loads INERT from disk (never evaluated).
+     */
+    public static final String REALTIME = "realtime";
+    /** The Real-time Detection Add-on ({@code product-map/addon/realtimeDetection.toon}). */
+    public static final String REALTIME_ADDON = "realtimeDetection";
+    /** Its Order Code. */
+    public static final String REALTIME_ORDER_CODE = "INS-AO-REALTIME-DETECTION";
+
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";
 
@@ -180,8 +192,15 @@ public final class EditionFeatures {
                     + "data trust, Case history, Graph Run, index builds and Alert Rules on Investigations)";
             case GEO_MAP -> "The Geo map, routes and co-location (POST /geo/projection, POST /geo/routes)";
             case ENTITY_PAGES -> "Entity profile pages (GET /inv/entity-types/{id}/profile, GET /inv/entities/{type}/{key}/profile)";
+            case REALTIME -> "Real-time Detection (windowed and Pattern Alert Rules, evaluated on each Stream commit)";
             default -> "'" + feature + "'";
         };
+        if (REALTIME.equals(feature))
+            return declared(REALTIME)
+                    ? what + " is " + com.gamma.module.Entitlements.NOT_ENTITLED + " (the Real-time Detection Add-on, "
+                            + REALTIME_ORDER_CODE + ", module inspecto-realtime)"
+                    : what + " needs the Real-time Detection Add-on (" + REALTIME_ORDER_CODE + "), provided by the optional "
+                            + "inspecto-realtime module (Standard edition and above) - this build does not include it";
         if (PII_MASK.equals(feature))
             return what + " is an Advanced feature — this build does not include it";
         if (GEO_MAP.equals(feature) || ENTITY_PAGES.equals(feature))

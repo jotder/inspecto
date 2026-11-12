@@ -1,6 +1,6 @@
 # Inspecto — Competitive Capability Matrix
 
-> Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-10-17** · Companion to
+> Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-11-12** · Companion to
 > [`brochure-competitive-landscape.md`](brochure-competitive-landscape.md) (the living two-sided landscape) and to the offering map
 > in [`../platform/spec-module-reorg-decisions.md`](../platform/spec-module-reorg-decisions.md) (offering map)
 > (where every Inspecto gap below is filed as a module or pack).
@@ -34,15 +34,15 @@ backlog row that would.
 | B | Generic reconciliation engine | Y | P | P | Y | Y | P | **Y** | Reconciliation add-on |
 | C | Re-rating / tariff validation | Y | P | Y | Y | P | Y | **P** | `telco-rerating` Space Template: per-call re-rating against the tariff table, the explanation and the root-cause snapshot (R1 to R3 built); rate structure, allowances and the re-rated-versus-billed Reconciliation open · `PACK-RERATING-1` |
 | D | Fraud management (rules over CDRs / events) | Y | Y | Y | Y | P | N | **Y** | Alerts + `telco-fraud` Space Template |
-| E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | CDR-based only · `TELCO-BYPASS-SIMBOX-1` |
+| E | Bypass / SIM-box detection | Y | Y | Y | Y | N | Y | **P** | `telco-bypass` Space Template (Standard): SIM-day signals, device / cell / batch clusters, an explainable Risk Score and one Incident per suspected box, from CDRs only (B1 to B3 built; B4 to B7 open); test-call and signalling evidence stay out of scope (F, G) · `TELCO-BYPASS-SIMBOX-1` |
 | F | Signalling detection (SS7 / Diameter / SIP, probes, firewalls) | Y | P | Y | P | P | N | **N** | out of scope (network probes) |
 | G | Test call generation | Y | Y | Y | N | N | Y | **N** | out of scope (hardware / service) |
-| H | Interconnect / wholesale fraud (Wangiri, IRSF, flash calls, CLI) | Y | Y | Y | Y | P | Y | **P** | IRSF / Wangiri from CDRs; recharge, data-bypass and internal fraud typologies in `telco-fraud` |
-| I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **N** | `REALTIME-DECISIONING-1` |
+| H | Interconnect / wholesale fraud (Wangiri, IRSF, flash calls, CLI) | Y | Y | Y | Y | P | Y | **P** | IRSF and Wangiri per-subscriber windows (`fraud_irsf`, `fraud_wangiri` Alert Rules) plus recharge, data-bypass and internal fraud typologies in `telco-fraud`; destination-risk, trunk roll-ups and flash-call / CLI patterns not built · `PACK-IRSF-WANGIRI-1` |
+| I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **N** | the windowed Alert Rule and the `sequence` / `absence` Patterns are built (PA-9b, PA-9c) but not yet evaluated on each stream commit; inline allow / block is a separate row · `REALTIME-DECISIONING-1`, `REALTIME-INLINE-DECISION-1` |
 | J | Entity risk scoring | Y | P | Y | Y | N | N | **Y** | Scoring & Lists add-on |
 | K | Watch / deny lists | Y | P | P | Y | N | N | **Y** | Scoring & Lists (Entity Lists) |
-| L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **Y** | Anomaly Detection add-on (shipped 2026-10-10): per-entity robust baselines with seasonality and peer groups, 0–100 score with a per-feature explanation — statistical, not ML (isolation forest is Could C4 of `ANALYTICS-CORE-1`) · `ANOMALY-ML-SCORING-1` |
-| M | Link analysis / graph investigation | Y | P | P | P | N | N | **Y** | Link Analysis & Geo add-on |
+| L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **Y** | Anomaly Detection add-on (shipped 2026-10-10): per-entity robust baselines with seasonality and peer groups, 0–100 score with a per-feature explanation; an isolation-forest `method` on an Anomaly Model since 2026-10-20 (`AnomalyForestScorer`; the `aml` pack model ships on it) · `ANOMALY-ML-SCORING-1` closed |
+| M | Link analysis / graph investigation | Y | P | P | P | N | N | **Y** | Link Analysis (every edition, Basic included) + the Investigations add-on and Geo map (Standard and up) |
 | N | Case management / investigation | P | Y | Y | Y | P | P | **Y** | Incidents + Case Management add-ons |
 | O | Workflow and SLA | N | P | P | P | P | N | **Y** | Workflow & SLA add-on |
 | P | Business assurance (margin, forecast, KPI drift) | Y | Y | Y | Y | Y | P | **Y** | `business-assurance` Space Template |
@@ -51,12 +51,12 @@ backlog row that would.
 | S | AML typologies, sanctions / PEP screening | Y | N | N/P | P | N | N | **Y** | `aml` Space Template (structuring, threshold crossing, smurfing fan-in, watch-list traffic; shipped 2026-10-10) + Screening add-on (fuzzy name matching against Entity Lists, signed hits, four-eyes on `confirmed`; shipped 2026-10-09) |
 | T | Regulatory reporting (SAR / STR) | Y | N | P | N | N | N | **P** | Regulatory Reporting add-on MVP (shipped 2026-10-09): Report Templates rendered to XML / CSV / JSON from a Case or Incident, four-eyes approval, file-drop submission, audit log; regulator-specific SAR / STR formats are templates to author, not shipped · `REGULATORY-SAR-STR-TEMPLATES-1` |
 | U | 5G / IoT / cloud / digital service assurance | Y | P | Y | P | Y | P | **N** | candidate industry pack (cable / IPDR, digital) · `PACK-5G-IOT-ASSURANCE-1` |
-| V | Sales, commissions, marketing, churn | Y | P | Y | N | N | N | **N** | `PREDICTIVE-ANALYTICS-1` (design-only), `PACK-SALES-MARKETING-1`; base: `ANALYTICS-CORE-1` S5 Forecasting & Prediction |
+| V | Sales, commissions, marketing, churn | Y | P | Y | N | N | N | **P** | Predictive Analytics add-on (Standard, shipped 2026-11-01): Customer Segments (RFM), Churn Scores and Forecasts as `predict.segment` / `predict.churn` / `predict.forecast` Jobs, an entity prediction panel and a forecast chart (`features/inspecto-predictive`); sales, commissions and marketing analytics not built · `PACK-SALES-MARKETING-1`, `PREDICTIVE-STUDIO-PREVIEW-1` |
 | W | Identity / digital trust (caller ID, device, ID checks) | N | P | P | P | N | N | **N** | not planned |
 | X | Network analytics / capacity / inventory | P | P | P | N | Y | N | **N** | not planned (different buyer) |
 | Y | Cybersecurity (network / IoT security) | P | P | Y | P | N | N | **N** | not planned (firewall territory) |
 | Z | Managed services / RAFM as a service | Y | Y | Y | P | Y | Y | **N** | a delivery model, not a module |
-| AA | Generative AI / agentic investigation | P | Y | Y | P | P | N | **P** | AI assist + intelligence agents; no agent that works an Incident · `AGENTIC-INVESTIGATION-1` |
+| AA | Generative AI / agentic investigation | P | Y | Y | P | P | N | **P** | AI assist (Standard) + intelligence agents (Advanced); the Incident Brief (`POST /incidents/{id}/briefs`, 2026-11-01): why it fired, cited evidence, declared value at risk and a proposed next action held for four-eyes approval — deterministic, no model-written prose yet; 1 of 6 slices · `AGENTIC-INVESTIGATION-1` |
 
 ## 3. Reading the matrix
 
@@ -70,22 +70,26 @@ full ingest-and-pipeline platform (rather than an assurance tool over someone el
 group-regulator model; air-gapped on-prem editions; installable Space Templates; publication to an external BI
 tool.
 
-**Where Inspecto trails — gaps worth closing (filed in `docs/BACKLOG.md`; refreshed 2026-10-17):**
+**Where Inspecto trails — gaps worth closing (filed in `docs/BACKLOG.md`; refreshed 2026-11-12):**
 
 | Gap | Who has it | Row |
 |---|---|---|
-| Agentic investigation (an agent that explains and works an alert) | Mobileum RAID Agentic, Subex AI Agent Squads | `AGENTIC-INVESTIGATION-1` |
-| Real-time / pre-call decisioning | LATRO, Mobileum, Neural | `REALTIME-DECISIONING-1` |
-| Partner settlement and re-rating | Subex, TEOCO (settlement); LATRO, Mobileum, Neural, Araxxe (re-rating) | `PACK-PARTNER-SETTLEMENT-1` |
-| Sales / marketing / churn analytics | LATRO, Mobileum | `PREDICTIVE-ANALYTICS-1` on the `ANALYTICS-CORE-1` S5 base |
+| Agentic investigation (an agent that explains and works an alert) | Mobileum RAID Agentic, Subex AI Agent Squads | `AGENTIC-INVESTIGATION-1` — partly closed: the Incident Brief (S1) shipped; the Incident page panel, Consequence proposals and model-written prose are open |
+| Real-time / pre-call decisioning | LATRO, Mobileum, Neural | `REALTIME-DECISIONING-1` (windowed Alert Rules and Patterns built, not yet on the stream commit), `REALTIME-INLINE-DECISION-1` |
+| Partner settlement and re-rating | Subex, TEOCO (settlement); LATRO, Mobileum, Neural, Araxxe (re-rating) | partly closed: `PACK-PARTNER-SETTLEMENT-1` (S0 to S8 built; wholesale, MVNO and roaming open), `PACK-RERATING-1` (R1 to R3 built; R4 to R7 open) |
+| Sales / marketing analytics | LATRO, Mobileum | `PACK-SALES-MARKETING-1` — churn, segments and forecasts closed by the Predictive Analytics add-on |
 | Regulator-specific SAR / STR formats | LATRO | `REGULATORY-SAR-STR-TEMPLATES-1` (Report Templates on the shipped `REGULATORY-REPORTING-1` engine) |
 | 5G / IoT / cloud service assurance | LATRO, Mobileum, TEOCO | `PACK-5G-IOT-ASSURANCE-1` |
-| Bypass / SIM-box detection beyond CDRs | LATRO, Subex, Mobileum, Neural, Araxxe | `TELCO-BYPASS-SIMBOX-1` |
-| ML anomaly scoring | LATRO, Subex, Mobileum, Neural | `ANOMALY-ML-SCORING-1` |
+| Bypass / SIM-box detection beyond CDRs | LATRO, Subex, Mobileum, Neural, Araxxe | `TELCO-BYPASS-SIMBOX-1` — the CDR half partly closed (`telco-bypass` B1 to B3); test-call and signalling evidence out of scope |
 
 **Closed since 2026-10-07:** AML typologies and screening (S), explainable anomaly scoring (L), the regulatory
 reporting engine (T, partial), mobile-money assurance (R), the telecom fraud content gaps (H, recharge / data bypass /
 internal fraud).
+
+**Closed or narrowed since 2026-10-17:** ML anomaly scoring (L, isolation forest, `ANOMALY-ML-SCORING-1`);
+churn, segmentation and forecasting (V, N → P, Predictive Analytics add-on); the CDR half of SIM-box detection (E,
+`telco-bypass`); partner settlement and re-rating (C, Q, still P); agentic investigation (AA, the Incident Brief,
+still P).
 
 **Out of reach unless the product changes direction:** signalling firewalls and probes (F), test call generation
 (G), cybersecurity (Y), identity / digital trust (W) and network inventory (X) — they need network equipment,

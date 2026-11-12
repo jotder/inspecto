@@ -48,6 +48,8 @@ public final class StreamLane implements AutoCloseable {
     private final Backoff deathBackoff;
     /** Spacing of re-probes after ordinary probe failures (broker down); per lane. */
     private final Backoff probeBackoff;
+    /** Run on each probe that finds no backlog (PA-9d: the clock floor of absence Patterns); never stops the lane. */
+    private volatile Runnable idle = () -> {};
 
     public StreamLane(String name, long records, long maxWaitMs, long probeMs,
                       Supplier<CollectorConnector> open, Runnable drain, LongSupplier clock) {
@@ -94,6 +96,11 @@ public final class StreamLane implements AutoCloseable {
         if (pending == 0) {
             waitingSince = -1;
             deathBackoff.success();
+            try {
+                idle.run();
+            } catch (RuntimeException e) {
+                log.warn("Stream lane '{}': its idle listener failed: {}", name, e.toString());
+            }
             return false;
         }
         long now = clock.getAsLong();
@@ -127,6 +134,16 @@ public final class StreamLane implements AutoCloseable {
                 "Continuous stream lanes that died and were marked for restart", Map.of("pipeline", name));
         closeConnector();
         return false;
+    }
+
+    /**
+     * PRODUCT-ASSEMBLY-1 PA-9d: {@code listener} runs on every probe that finds the source with no backlog (every
+     * {@code probeMs}), on the lane's thread; a listener that throws is logged and the lane carries on. {@code null}
+     * removes it. Backlog here is what {@link CollectorConnector#pendingRecords()} counts: a slice already landed but
+     * not yet committed is NOT in it, so a listener that needs "everything committed" checks that itself.
+     */
+    public void onIdle(Runnable listener) {
+        this.idle = listener == null ? () -> {} : listener;
     }
 
     /** Whether the lane died (see {@link #die}); a dead lane never steps again and must be replaced. */

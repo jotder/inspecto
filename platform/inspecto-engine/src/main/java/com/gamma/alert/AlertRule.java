@@ -590,6 +590,15 @@ public record AlertRule(String name, String metric, String comparator, double th
         return eventWindow != null;
     }
 
+    /**
+     * PA-9d: every column a windowed rule reads - the event time, the {@code by} keys, the Measure's field, every
+     * {@code when} and Pattern step field, and {@code distinctOn}; empty for any other rule. The save gate checks each
+     * against the Dataset's Schema, so a typo is a 422 at save, not a failure at every commit.
+     */
+    public List<String> windowColumns() {
+        return isWindowed() ? WindowSql.columns(List.of(this)) : List.of();
+    }
+
     /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */
     private static Map<String, Object> unmodelled(Map<String, Object> alert) {
         Map<String, Object> out = new java.util.LinkedHashMap<>();

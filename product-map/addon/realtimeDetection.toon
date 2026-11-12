@@ -1,0 +1,13 @@
+id: addon.realtimeDetection
+kind: addon
+title: Real-time Detection
+offeringAddon: realtimeDetection
+billable: true
+orderCode: INS-AO-REALTIME-DETECTION
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/addon/realtimeDetection/index.md

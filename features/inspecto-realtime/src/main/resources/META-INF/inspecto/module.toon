@@ -1,0 +1,11 @@
+id: realtime
+title: Real-time Detection
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+absentMessage: "Real-time Detection is not installed in this bundle - windowed and Pattern Alert Rules are evaluated on each Stream commit by the optional inspecto-realtime module (Standard edition and above)."
+provides:
+  features[1]: realtime
+  contracts[1]: RealtimeDetection
+requires:
+  modules[1]: ops

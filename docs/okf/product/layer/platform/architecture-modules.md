@@ -302,9 +302,9 @@ are not described here; see `docs/GLOSSARY.md` §15.
   `Main-Class` (`CollectorProcessor` lives in the thin `inspecto-engine` jar), so the launchers start it from the
   classpath, never with `java -jar`.
 - **Jar counts.** Every bundle stages the processor and the 16 core thin jars. On top of that Basic stages 6
-  module jars, Standard 25 and Advanced and Preview 28: `bundleModules('Advanced')` in `tools/bundle-modules.mjs`
-  returns 29<!--count:advanced-first-party-jars--> rows (the processor plus those 28), of which
-  22<!--count:optional-modules--> are absent from Basic. The PostgreSQL driver sidecar is not counted.
+  module jars, Standard 26 and Advanced and Preview 29: `bundleModules('Advanced')` in `tools/bundle-modules.mjs`
+  returns 30<!--count:advanced-first-party-jars--> rows (the processor plus those 29), of which
+  23<!--count:optional-modules--> are absent from Basic. The PostgreSQL driver sidecar is not counted.
 - **Classpath.** `tools/offering-classpath.mjs` resolves the Offering (includes plus the `requires.modules`
   closure) and writes the bundle's `lib/modules.list` (one jar per line, classpath order, processor first) and
   `lib/edition.properties` (`edition=Standard`; `variant=demo` for a demo build). Every launcher reads

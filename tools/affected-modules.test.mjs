@@ -1,7 +1,7 @@
 // Fixture test for tools/affected-modules.mjs. Run: node --test tools/affected-modules.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readReactor, dependentsClosure, discoverConsumers, decide, FULL_THRESHOLD } from './affected-modules.mjs';
+import { readReactor, dependentsClosure, discoverConsumers, decide, FULL_THRESHOLD, parsePorcelain } from './affected-modules.mjs';
 
 const pom = (id, deps = [], packaging = '') => `<project><parent><artifactId>parent</artifactId></parent>${packaging}
 <artifactId>${id}</artifactId><dependencies>${deps.map((d) => `<dependency><artifactId>${d}</artifactId></dependency>`).join('')}
@@ -94,4 +94,19 @@ test('consumer discovery finds tracked repo paths named by test literals', () =>
     const c = discoverConsumers(mods(), Object.keys(files), (f) => files[f], (p) => p === 'docs/api/openapi-v1.json');
     assert.deepEqual([...c.keys()], ['docs/api/openapi-v1.json']);
     assert.deepEqual([...c.get('docs/api/openapi-v1.json')], ['platform/sql']);
+});
+
+test('porcelain parser keeps every path whole, including a leading-space first line', () => {
+    const out = ' M .gitattributes\nM  a/staged.java\nMM a/both.java\nA  a/new.java\n?? a/src/x.java\nR  old/p.java -> new/p.java\n?? "a b/c d.txt"\n';
+    assert.deepEqual(parsePorcelain(out), [
+        { path: '.gitattributes', untracked: false },
+        { path: 'a/staged.java', untracked: false },
+        { path: 'a/both.java', untracked: false },
+        { path: 'a/new.java', untracked: false },
+        { path: 'a/src/x.java', untracked: true },
+        { path: 'new/p.java', untracked: false },
+        { path: 'a b/c d.txt', untracked: true },
+    ]);
+    // AFFECTED-MODULES-PORCELAIN-TRIM-1: the old code trimmed the whole output first, cutting `.gitattributes` to `gitattributes`
+    assert.equal(parsePorcelain(out.trim())[0].path, 'gitattributes');
 });
