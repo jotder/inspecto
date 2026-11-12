@@ -1,0 +1,7 @@
+id: industry.telecom
+kind: industry
+title: Telecom
+industry: telecom
+billable: false
+status: ga
+docs: docs/okf/product/industry/telecom/index.md

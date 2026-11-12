@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1199,6 +1199,98 @@ What exists to build on (measured 2026-11-12):
 | **PA-8a** Per-Product chart | `assemble.mjs` accepts `container` and `airgap` (plan fields `image`, `chart`; demo refused); `tools/ship.mjs chart`; the base chart's labels and `product` values | node tests; `helm lint` and `helm template` for inspecto, la and telco |
 | **PA-8b** Per-Product image | OCI labels in the bundle's Dockerfile; `tools/ship.mjs image` (build, tag, `docker save`); `package.ps1 -Target container` | a Telco Standard image built and booted read-only |
 | **PA-8c** Air-gapped bundle | `tools/ship.mjs airgap`, `install-offline.sh`, `package.ps1 -Target airgap`; the guide `admin-guide-container-airgap.md` | the offline-host boot from the tar, with `--network none` |
+**PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
+preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
+D-PA26…D-PA31 are PA-8's.
+
+What exists to build on:
+- **`tools/customer-build.mjs`** (`PRODUCT-MAP-1` S5). It resolves a private customer record (`edition` plus
+  `orderCodes`) against the Offerings and manifests, writes a priced bill of materials, and with `--bundle` trims an
+  Edition bundle. It knows no Product or App, and writes no entitlement.
+- **The pilot customer** is the made-up `demo-telco` (D-PM6): Standard, Link Analysis, and the `telco-fraud` Solution
+  pack. Its record is in `product-map/private/customers/` (gitignored).
+- **The assembler's plan** still holds the whole Edition's modules (PA-2: "trimming is customer-build's job until
+  PA-10").
+- **`tools/entitle.mjs issue`** builds an entitlement from command-line flags. No customer record feeds it.
+- **The Product Map has six kinds.** Products, Apps and Industries sit outside it, and their `docs:` borrow other
+  items' hubs (`products/telco.toon` points at the `industry-telecom` Solution pack's hub).
+
+**Decisions (decided here, 2026-11-12).**
+- **D-PA32: three new Product Map kinds.** `product`, `app` and `industry` items, at `product-map/<kind>/<id>.toon`,
+  link to their definition by `product:`, `app:` or `industry:`.
+  - The guard requires one item per definition, and every link must resolve.
+  - An App item is billable: `enforcement: build`, Order Code `INS-APP-<ID>`.
+  - A Product item and an Industry item are not billable. A Domain product is priced as Edition + Apps (§10). The
+    Industry's pack is already sold as a Solution pack.
+  - D-PA6 asks for an Order Code per App × Edition. PA-10 gives each App one Order Code, and the bill puts it beside
+    the Edition line. A price per App × Edition waits for the first priced App: board row
+    `PRODUCT-MAP-APP-EDITION-PRICES-1`, held for demand.
+- **D-PA33: a customer build is an assembly.**
+  - The customer record names its Product (`product:`). It defaults to `inspecto`, the Platform product, so the D-PM6
+    record stays valid.
+  - `assemble.mjs --customer <record>` resolves the record into the Assembly Plan. The plan gains:
+    - the modules, narrowed to those the customer keeps;
+    - the templates, narrowed to those bought;
+    - the bill of materials, without prices;
+    - the entitlement to issue.
+  - App Order Codes select the Product's optional Apps, with their templates and Add-ons.
+  - `customer-build.mjs` still trims a Product bundle (D-PM8 unchanged), but every decision now comes from the plan.
+    `package.ps1` is untouched (PA-8 is changing it).
+  - The resolution itself is today's code, moved and not rewritten. That is why the pilot's jars and templates cannot
+    drift.
+- **D-PA34: every customer build carries a signed entitlement.**
+  - Its `modules` are exactly the build's kept optional modules, including the ones kept as `required`. Its Add-ons
+    are the bought ones plus those whose modules the build keeps whole. So the file and the jars agree by construction:
+    a jar copied back in later stays inert.
+  - The record may give `expires` and `nodes`; with neither, there is no expiry and one node.
+  - The key is `--key`, defaulting to `product-map/private/keys/inspecto-issuer-1.pem`. A build with no key is
+    refused, rather than shipped without a file.
+- **D-PA35: the pilot Distribution is a customer build.** `pilot` means the customer's Collectors pre-wired, with no
+  data.
+  - The record's `pilot:` block names one bought Space Template and, for each of its Pipelines, the customer's poll
+    folder.
+  - The build adds the Space Template `<customer>-pilot`. It is that template with those `dirs.poll` replaced, and its
+    golden corpus (`data/samples`) left out.
+  - `lib/product.json` says `pilot`.
+  - No Space is created at build time, so the bundle holds no data. The administrator creates the Space from that
+    template on day one.
+  - `assemble.mjs` refuses `pilot` without `--customer`. So `package.ps1 -Distribution pilot` is refused, and the
+    refusal names customer-build.
+- **D-PA36: Product documents are generated into the Product's hub.** Products, Apps and Industries get hubs at
+  `docs/okf/product/{product,app,industry}/<id>/`.
+  - For each Product, `render-product-docs.mjs` writes four files from the Product definition, its Apps, Add-ons and
+    Editions, linking into their hubs:
+    - `brochure.md`;
+    - `features.md`, the datasheet;
+    - `user-guide.md`;
+    - `admin-guide.md`.
+  - Each says it is generated, and `--check` holds it current.
+  - Demo and video scripts are not generated. The demo script is `products/<id>.demo-build.txt`.
+- **D-PA37: `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` stays open.** Declaring a template's ops needs would keep `ops` and
+  `case-management` for `telco-fraud`'s Case Rule. That changes the pilot's jars, and PA-10's proof is that the jars
+  do not change. §9's "declared needs" moves to that row.
+
+**Slices (one lane each, in this order):**
+- **PA-10a: Product Map kinds.**
+  - Build:
+    - the items for the 3 Products, 4 Apps and 2 Industries;
+    - the guard (`check-product-map.mjs`) and the seed for the new kinds;
+    - their hubs, with each definition's `docs:` pointed at its own hub.
+  - Proof: guard tests per kind, plus `render-product-docs --check` and `check-product-docs` green.
+- **PA-10b: customer builds through the assembler.**
+  - Build `assemble.mjs --customer`, with `customer-build.mjs` as its executor, and the entitlement issued into
+    `conf/`.
+  - Proof:
+    - tests over synthetic records (a Platform customer, and a Domain customer buying an App);
+    - the pilot customer built both ways from one Standard bundle, with the contents diffed;
+    - the new bundle booted with its entitlement.
+- **PA-10c: the pilot Distribution.**
+  - Build the `pilot:` block, the `<customer>-pilot` template, and `pilot` in `DISTRIBUTIONS`.
+  - Proof: tests, plus a pilot build of the pilot customer, booted, with a Space made from its template that polls the
+    customer's folder and holds no data.
+- **PA-10d: generated Product documents.**
+  - Build the four generated files per Product.
+  - Proof: `render-product-docs --check` and the docs guards green.
 
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
@@ -1235,6 +1327,12 @@ What exists to build on (measured 2026-11-12):
 | D-PA29 | The entry point | `package.ps1 -Target container\|airgap`, through the assembler's plan; refused without a `linux_amd64` bundle (decided 2026-11-12, operator away) |
 | D-PA30 | The proof bar on a desk with no cluster | Helm lint/template, a read-only image boot, an offline-host boot with `--network none`; the cluster install recorded as not run (decided 2026-11-12, operator away) |
 | D-PA31 | The order of the PA-8 lanes | chart and targets (8a), image (8b), air-gapped bundle and guide (8c) (decided 2026-11-12, operator away) |
+| D-PA32 | Product Map kinds for Products, Apps and Industries | `product`, `app` and `industry` items linked to their definitions; an App is billable (`INS-APP-<ID>`), a Product and an Industry are not; one Order Code per App, a price per App × Edition held for demand (decided 2026-11-12, operator away) |
+| D-PA33 | How a customer build reaches the assembler | the record names its Product (default `inspecto`); `assemble.mjs --customer` narrows the plan's modules and templates with today's resolution, moved; `customer-build.mjs` trims a Product bundle from the plan; `package.ps1` unchanged (decided 2026-11-12, operator away) |
+| D-PA34 | The entitlement of a customer build | always issued and signed; its modules are exactly the kept optional modules; expiry and nodes from the record; refused without a key (decided 2026-11-12, operator away) |
+| D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus); no Space is made at build time (decided 2026-11-12, operator away) |
+| D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide; demo and video scripts not generated (decided 2026-11-12, operator away) |
+| D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no: declared ops needs change the pilot's jars; the row stays open with §9's declared needs (decided 2026-11-12, operator away) |
 
 ## 13. The open board, re-checked 2026-11-10
 

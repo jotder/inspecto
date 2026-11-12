@@ -11,4 +11,4 @@ templates[30]: aml,business-assurance,la-audit,la-benefits,la-card,la-claims,la-
 distributions[3]: production,trial,demo
 brand:
   name: Inspecto
-docs: docs/okf/product/layer/product/index.md
+docs: docs/okf/product/product/inspecto/index.md

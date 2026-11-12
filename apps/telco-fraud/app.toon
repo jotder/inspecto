@@ -19,4 +19,4 @@ nav:
     icon: heroicons_outline:sparkles
     feature: anomaly
     blurb: Find lines whose usage moves away from their own history.
-docs: docs/okf/product/solution-pack/telco-fraud/index.md
+docs: docs/okf/product/app/telco-fraud/index.md
