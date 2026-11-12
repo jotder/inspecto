@@ -217,8 +217,11 @@ export function customerAssembly({ model, g, files, world, customer, prices = {}
 // The bundle then gains the Space Template `<customer>-pilot`: that template with each Pipeline's `dirs.poll` set to the
 // customer's folder and its golden corpus (`data/samples`) left out. Every Pipeline of the template must be wired.
 
-/** A poll folder the pipeline file can carry: an absolute path, `/`-separated, with no quote, `#`, `$` or control character. */
-const POLL = /^(?:[A-Za-z]:\/|\/)[^"#$\u0000-\u001f]*$/;
+/**
+ * A poll folder the pipeline file and the start line can carry: an absolute path, `/`-separated, with no quote, `#`, `$`,
+ * control character, whitespace (the launchers split INSPECTO_JAVA_OPTS on it) or `;` (it separates assist.safety.roots).
+ */
+const POLL = /^(?:[A-Za-z]:\/|\/)[^"#$;\s\u0000-\u001f]*$/;
 
 /** The Pipelines of a template's config: [{ name, file (relative, /-separated), poll }] - each `*.toon` with a `dirs.poll`. */
 export function templatePipelines(dir) {
@@ -249,12 +252,16 @@ export function pilotOf(customer, templates, model) {
     if (model.templates.includes(id)) fail(`the pilot template id '${id}' is already a Space Template`);
     const dir = model.templateDirs?.[t] ?? join(model.root, 'spaces', '_templates', t);
     const pipelines = templatePipelines(dir);
+    if (!pipelines.length) fail(`pilot.template '${t}' has no Pipeline with a dirs.poll folder, so there is nothing to wire`);
     const poll = pb.poll && typeof pb.poll === 'object' ? pb.poll : {};
     const unknown = Object.keys(poll).filter((n) => !pipelines.some((p) => p.name === n));
     if (unknown.length) fail(`pilot.poll names no Pipeline of '${t}': ${unknown.join(', ')} (it has ${pipelines.map((p) => p.name).join(', ')})`);
     const missing = pipelines.filter((p) => poll[p.name] === undefined).map((p) => p.name);
     if (missing.length) fail(`pilot.poll does not wire every Pipeline of '${t}': ${missing.join(', ')}`);
-    for (const [n, f] of Object.entries(poll)) if (!POLL.test(String(f))) fail(`pilot.poll.${n} '${f}' must be an absolute folder with / separators and no quote, # or $`);
+    for (const [n, f] of Object.entries(poll)) if (!POLL.test(String(f))) fail(`pilot.poll.${n} '${f}' must be an absolute folder with / separators and no space, quote, ;, # or $`);
+    // Two Collectors on one folder would take each other's files.
+    const shared = Object.entries(poll).filter(([n, f]) => Object.entries(poll).some(([m, g]) => m !== n && String(g) === String(f))).map(([n]) => n);
+    if (shared.length) fail(`pilot.poll gives Pipelines ${shared.join(', ')} the same folder; each Pipeline needs its own`);
     // The server reads a Pipeline's folders only under its allowed roots (ConfigSafetyValidator's path jail), so the install
     // starts with these folders allowed (-Dassist.safety.roots); the build names them and never widens the jail itself.
     const roots = [...new Set(Object.values(poll).map(String))].sort();

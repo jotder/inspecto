@@ -100,7 +100,9 @@ export function pilotTemplate(tdir, pilot) {
     const tf = join(to, 'template.toon');
     writeFileSync(tf, readFileSync(tf, 'utf8')
         .replace(/^name:.*$/m, `name: "${safe(pilot.title)}"`)
-        .replace(/^tagline:.*$/m, `tagline: "Pilot of ${safe(pilot.from)}: its Collectors read the customer's own folders, and it ships no sample data"`));
+        .replace(/^tagline:.*$/m, `tagline: "Pilot of ${safe(pilot.from)}: its Collectors read the customer's own folders, and it ships no sample data"`)
+        // the shipped description tells the reader to copy data/samples into the inbox, which the pilot does not have
+        .replace(/^description:.*$/m, `description: "The ${safe(pilot.from)} Space Template with each Pipeline reading the customer's own folder (see PILOT.txt at the install root). No sample data ships: the first files are the customer's."`));
 }
 /** PILOT.txt: what the pilot wires and how to start the install so its Collectors may read the customer's folders. */
 export function pilotText(plan) {

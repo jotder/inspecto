@@ -1332,10 +1332,11 @@ kinds; they are now roots of their own, with their link in the CSV.
   `CUSTOMER_DISTRIBUTIONS = ['pilot']`: `assemble.mjs` refuses it unless called for a customer, naming
   `customer-build.mjs --distribution pilot`, so `package.ps1 -Distribution pilot` is refused the same way.
 - The record's `pilot:` block (`template`, and `poll:` one folder per Pipeline) is checked in `customer.mjs pilotOf`:
-  the template must be bought; every Pipeline of it must be wired and no unknown one named; each folder absolute, `/`
-  separated, with no quote, `#` or `$`.
+  the template must be bought and have at least one Pipeline; every Pipeline of it must be wired, no unknown one named,
+  and no two given the same folder; each folder absolute, `/` separated, with no space, quote, `;`, `#` or `$` (the
+  launchers split `INSPECTO_JAVA_OPTS` on whitespace and `assist.safety.roots` on `;`; found by the review).
 - `customer-build.mjs --distribution pilot` adds `spaces/_templates/<customer>-pilot` (the template with each `dirs.poll`
-  set, `data/samples` left out, the zero-row seeds kept, name and tagline saying pilot), writes `lib/product.json` with
+  set, `data/samples` left out, the zero-row seeds kept, name, tagline and description saying pilot), writes `lib/product.json` with
   `distribution: pilot`, and writes `PILOT.txt` at the bundle root.
 - **Decided here: the build never widens the server's path jail.** The live run found that `ConfigSafetyValidator`
   refuses a `dirs.poll` outside the Space. An install allows more folders with `-Dassist.safety.roots`, so `PILOT.txt`
@@ -1348,7 +1349,7 @@ kinds; they are now roots of their own, with their link in the CSV.
   loads inert", and the row now says so. D-PA37 keeps it out of PA-10, because closing it changes the pilot's jars.
 
 **Proof (as built).**
-- `customer-build.test.mjs` 14/14 (3 new): a pilot plan wires all three `telco-fraud` Pipelines, lists the roots and
+- `customer-build.test.mjs` 14/14 (3 new tests; the refusals widened after the review): a pilot plan wires all three `telco-fraud` Pipelines, lists the roots and
   says `pilot`; each refusal (no block, a template not bought, a Pipeline unwired, an unknown one, a relative or quoted
   folder); `pilotTemplate` on a fixture tree. `assemble.test.mjs` refuses a pilot outside a customer build.
 - **A pilot build, live** (the same Standard bundle; the pilot record plus `INS-AO-INCIDENTS`, in a scratch copy, so
