@@ -638,6 +638,9 @@ public final class AlertService {
 
         for (AlertRule rule : ruleSet) {
             if (!rule.isMeasureRule()) continue;
+            // PA-9b: a windowed rule is evaluated per Window on commit (WindowedRuleEvaluator); over the whole
+            // Dataset on a sweep it would compare one window's threshold against all history.
+            if (rule.isWindowed()) continue;
             if (rule.isGrouped()) {                       // per-entity (by:) — its own edge-triggered pass
                 evaluateGrouped(rule, nowMs, out);
                 continue;

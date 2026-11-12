@@ -813,8 +813,10 @@ public final class ConfigSpecs {
                                 + "checks freshness (alert.maximumAge)."),
                 FieldSpec.of("alert.window", "Window", FieldType.STRING,
                         "Ns/Nm/Nh/Nd elapsed time, or Nb = the last N batches (e.g. 1h, 30m, 20b). "
-                                + "Required for a ledger rule; a Dataset, freshness or Investigation rule "
-                                + "takes none."),
+                                + "Required for a ledger rule; a freshness or Investigation rule takes none. A Dataset "
+                                + "measure rule may take a block instead, an event-time Window evaluated on each commit "
+                                + "of a Stream: {type: tumbling|sliding, size, slide, time, lateness, distinctOn}, "
+                                + "size + lateness at most 1h, at most 60 slides, comparator gt or gte."),
                 FieldSpec.enumField("alert.severity", "Severity",
                         List.of("INFO", "WARNING", "CRITICAL"), "WARNING", "Operator-facing severity."),
                 FieldSpec.of("alert.onPipeline", "Pipeline", FieldType.STRING,

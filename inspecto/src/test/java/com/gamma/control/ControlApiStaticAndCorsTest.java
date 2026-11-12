@@ -270,6 +270,25 @@ class ControlApiStaticAndCorsTest {
         }
     }
 
+    /** N6: a content-hashed build file is immutable for a year; index.html and a plainly named file keep revalidating. */
+    @Test
+    void contentHashedUiFilesAreImmutableAndOthersRevalidate(@TempDir Path dir) throws Exception {
+        Path ui = spaDir(dir);
+        Files.writeString(ui.resolve("chunk-Ab3dE9_x.js"), "export {};");
+        Files.writeString(ui.resolve("runtime-config.js"), "window.x=1;");
+        Files.createDirectories(ui.resolve("media"));
+        Files.writeString(ui.resolve("media").resolve("Inter-roman.var-EDENVCUS.woff2"), "font");
+        try (Ctx c = open(ui.toString(), null)) {
+            assertEquals("public, max-age=31536000, immutable",
+                    ui(c.port, "/chunk-Ab3dE9_x.js").headers().firstValue("Cache-Control").orElse(null));
+            assertEquals("public, max-age=31536000, immutable",
+                    ui(c.port, "/media/Inter-roman.var-EDENVCUS.woff2").headers().firstValue("Cache-Control").orElse(null),
+                    "a hashed font whose stem holds hyphens");
+            for (String path : List.of("/", "/index.html", "/runtime-config.js", "/assets/app.js"))
+                assertEquals("no-cache", ui(c.port, path).headers().firstValue("Cache-Control").orElse(null), path);
+        }
+    }
+
     @Test
     void unchangedUiFileRevalidatesToABodilessNotModified(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
