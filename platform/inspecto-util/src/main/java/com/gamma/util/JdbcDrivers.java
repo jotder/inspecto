@@ -27,8 +27,7 @@ public final class JdbcDrivers {
      * @throws SQLException if the matched driver class is not on the classpath, or the connection fails
      */
     public static Connection connect(String url) throws SQLException {
-        register(url);
-        return DriverManager.getConnection(url);
+        return connect(url, null, null);
     }
 
     /**
@@ -39,9 +38,18 @@ public final class JdbcDrivers {
      */
     public static Connection connect(String url, String user, String pass) throws SQLException {
         register(url);
-        return (user == null && pass == null)
+        Connection conn = (user == null && pass == null)
                 ? DriverManager.getConnection(url)
                 : DriverManager.getConnection(url, user, pass);
+        if (url.startsWith("jdbc:duckdb:")) {
+            try {
+                DuckDbUtil.applyInstanceCaps(conn);   // LA-PERF-N10-1: the long-lived Db* stores open here
+            } catch (SQLException | RuntimeException e) {
+                conn.close();
+                throw e;
+            }
+        }
+        return conn;
     }
 
     /**
