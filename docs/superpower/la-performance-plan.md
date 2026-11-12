@@ -444,7 +444,43 @@ keyed on the viewer's masking profile?
 with different row scope.
 **Answer:** (operator, 2026-11-13, interview: "Masking profile") key every server cache entry on the Dataset
 fingerprint plus the viewer's masking profile and row scope; viewers with identical access may share an entry, others
-never. The shipped P4-2 / P4-3 keys have not yet been checked against this rule.
+never.
+**Audit against the rule (2026-11-13, `PERF-D2-KEYS-1`): every server-side LA cache complies; no key changed.** Masking in
+LA is the Space's (mode, Entity Types, bound columns, masking key), the same for every viewer; the one per-viewer lift,
+`canRevealLinkEntities`, is used only by uncached reads (suggest, Dossier hand-off). Row scope is the R3 Dataset gate
+(and the Investigation open gate); no LA read applies a per-row policy.
+- **P4-2 projection / neighbours** (`ProjectionCache.key`, `la/inspecto-la-api/.../ProjectionCache.java:100`): complies,
+  and is stricter. The key holds the fingerprint, the masking mode, Entity Types, Space masking key and the masking
+  description (`:121`–`:128`), plus the whole viewer (`:116`, `viewer()` at `:256`: Subject id, capabilities, data scopes,
+  attributes, held roles). The same viewer shares an entry; two different Subjects never do, even with identical access.
+  The cache is looked up after every gate (`InvRoutes.java:1019`).
+- **P4-3 Working Set** (`WorkingSetRoutes` relation cache `:150`, key `WorkingSetEtag.relationKey`; ETag
+  `WorkingSetEtag.of`): complies. The cache holds the RAW relation of the Investigation log, read only after
+  `openForRead` (owner / Case member / R3 / PDP); masking is applied after the cache on every request, and the masking
+  profile is in the ETag (`WorkingSetEtag.java:41`, `:52`). Every viewer the gate admits sees the same log.
+- **Graph run results** (`GraphRunService.cacheKey`, `la/inspecto-la-core/.../GraphRunService.java:449`): complies.
+  The key holds the relation key and `scopeFingerprint` (data scopes and attributes, `GraphRunRoutes.java:741`); ids are
+  masked after the cache (`GraphResultJson`).
+- **Entity Type profile** (`EntityProfiles.Cache`, key `(root, type, bindingSignature)` at `EntityProfiles.java:223`):
+  complies. The binding signature is built from the caller's own resolved bindings (`EntityTypeBindings.resolve(ex, …)`,
+  R3 `canView`), so the row scope is in the key; the stamp holds the masking mode and every Dataset's fingerprint
+  (`:905`). Masked types answer aggregates only. The scope is held twice: the stamp also names the caller's Datasets and
+  binding signature, so the test fails only when both key and stamp lose it (mutant run 2026-11-13).
+- **Discover** (`DatasetDiscovery.Cache`, `DatasetDiscovery.java:75`): complies. One Dataset after its R3 gate; the key
+  holds the masking mode; the cached answer holds raw ids and is masked per request after the cache.
+- **N7 / N8 stamped caches** (`StampedCache` for `ComponentRegistry` and `PipelineSchemas`): not in scope of the rule.
+  They hold parsed config (the registry scan, pipeline schema lineage), no Dataset rows or values; every viewer filter
+  runs after them.
+- **Investigation coverage row counts** (`InvestigationCoverageRoutes.ROWS_CACHE`, `InvestigationCoverageRoutes.java:186`, key at
+  `:154`): complies. Per-day counts only, keyed on Dataset, relation, column, zone, window and input stamp; read after
+  `openForRead` and the R3 check in `relationFor` (`:140`).
+- **Draft checkpoints** (`DraftCheckpoints.STATES` / `BASES`, `la/inspecto-la-core/.../DraftCheckpoints.java:40`): complies.
+  Evaluation state keyed on the Draft's log, Investigation-scoped like the Working Set, masked after.
+- `InputFingerprintCache` holds file fingerprints only, and `ExplorationMasking`'s alias book holds Space-wide pseudonyms.
+
+Pinned by `ControlApiProjectionCacheKeyTest.aDifferentRowScopeIsADifferentEntry` / `identicalAccessSharesOneEntry` and
+`ControlApiEntityTypeProfileTest.theProfileCacheIsScopedToTheDatasetsTheCallerCanView`; the Working Set masking profile
+was already pinned by `ControlApiWorkingSetEtagTest.theMaskingProfileIsPartOfTheTagSoAMaskedBodyIsNeverServedForAnotherProfile`.
 
 **PERF-D3 — API change for P10.** A new media type / `v2` path for the edge wire format, or defer P10 entirely?
 *Recommendation:* defer until P0-3 shows bytes are still a problem after P4 (gzip removes most of the cost).
