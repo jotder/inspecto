@@ -81,8 +81,8 @@ Moved to [Action Requests — API](api-action-requests.md).
 
 ## 8. Interactions
 
-- [Maker-checker](../workflow/architecture-maker-checker.md): shares `ApproverCheck`, the roster and the HMAC key; not under its policy.
-- [Decision Kernel](../scoring/architecture-decision-kernel.md): `invoke-api` proposes a pending request on the rule's Incident.
+- [Maker-checker](../workflow/architecture.md): shares `ApproverCheck`, the roster and the HMAC key; not under its policy.
+- [Decision Kernel](../scoring/architecture.md): `invoke-api` proposes a pending request on the rule's Incident.
 - Incidents and Cases (module page `incidents`, `case-management`) via `LinkedSubjectProvider`.
 - Full detail: [Action Requests concept](spec.md).
 

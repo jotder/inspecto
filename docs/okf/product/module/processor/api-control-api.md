@@ -25,7 +25,7 @@ suite, not the server — see [build & run](../../layer/platform/admin-guide-lau
 
 Per request: strip an optional `/api` prefix (Angular dev-proxy); apply CORS if `-Dcontrol.cors` set; answer
 `OPTIONS` preflight; match the `/spaces/{id}/…` seam (extract + validate id, rewrite path, bind the `space`
-MDC — see [multi-space](architecture-multi-space.md)); match `routes` by pattern+method; fall through to static SPA assets
+MDC — see [multi-space](architecture.md)); match `routes` by pattern+method; fall through to static SPA assets
 for unmatched GETs (`-Dui.dir`); always clear the space MDC in `finally`.
 
 ## Request-scoped attributes — never the JDK's exchange map

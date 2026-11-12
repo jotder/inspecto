@@ -23,7 +23,7 @@ calendar, escalation on breach or age, and a second-person approval for config c
 - `ASSURE-MAKER-CHECKER-1` — shipped 2026-09-27; residual rows `ASSURE-MAKER-CHECKER-MULTIPOD-1` (closed
   2026-09-28: a Job's run-time writes stay outside the hold) and `ASSURE-MAKER-CHECKER-RESIDUALS-1` (closed
   2026-10-06: `channel` and `notification-rule` became governable)
-  ([architecture-maker-checker](architecture-maker-checker.md)).
+  ([architecture-maker-checker](architecture.md)).
 
 ## Left
 

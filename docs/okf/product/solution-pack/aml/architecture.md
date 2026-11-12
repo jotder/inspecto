@@ -64,7 +64,7 @@ The corpus ships in `data/samples`; copy each feed into `data/inbox/<feed>` to i
 
 - [Pipelines and Steps](../../module/etl/architecture.md),
   [Jobs and scheduler](../../module/processor/architecture.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture.md),
+- [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md),
   [Case management](../../module/case-management/architecture.md).
 - [Scoring and Entity Lists](../../module/scoring/architecture.md).
 - [Anomaly](../../module/anomaly/architecture.md).

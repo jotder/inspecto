@@ -89,11 +89,11 @@ Moved to [Anomaly Detection — API](api-anomaly.md).
 
 - [scoring-entity-lists](../scoring/architecture.md) — watch-list feed and exclusion list; a model's `_latest`
   Dataset can be a Risk Score factor.
-- [alerts](../../addon/incidents/architecture-alerts.md) / [incidents](../../addon/incidents/architecture.md) — the `afterScore` pending Alert Rule opens an Incident per
+- [alerts](../../addon/incidents/architecture.md) / [incidents](../../addon/incidents/architecture.md) — the `afterScore` pending Alert Rule opens an Incident per
   high entity.
 - [analytics-kernel](../analytics/architecture.md) — baselines and the score output contract.
 - [link-analysis](../la-core/architecture.md) — the entity panel.
-- [maker-checker](../workflow/architecture-maker-checker.md) — model saves go through the component hold.
+- [maker-checker](../workflow/architecture.md) — model saves go through the component hold.
 
 ## 9. Limits and gotchas
 

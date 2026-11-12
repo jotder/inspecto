@@ -103,4 +103,4 @@ guidelines, §4 the decisions); provenance:
   reports truncation pain (demand-driven, tracked in BACKLOG), and the `/runs/runs/{id}`
   Location-header quirk stays until a v2 of the API (renaming would break every stored client link).
 * **Multi-space** — the space segment sits **after** the version: `/api/v1/spaces/{id}/…`
-  (see [multi-space](architecture-multi-space.md)).
+  (see [multi-space](architecture.md)).

@@ -92,8 +92,8 @@ There are no Space TOON keys. A Job definition grants through its type's `requir
 
 ## 8. Interactions
 
-- [Maker-checker](../../module/workflow/architecture-maker-checker.md): Job definitions are a governed kind; a Job's run-time writes are not held.
-- [Decision Kernel](../../module/scoring/architecture-decision-kernel.md): `start-job` runs a Job and its grant.
+- [Maker-checker](../../module/workflow/architecture.md): Job definitions are a governed kind; a Job's run-time writes are not held.
+- [Decision Kernel](../../module/scoring/architecture.md): `start-job` runs a Job and its grant.
 - Jobs and scheduling, Analytics Kernel, Link Analysis and Incidents (module pages `jobs-scheduler`,
   `analytics-kernel`, `link-analysis`, `incidents`) consume or provide services.
 - Concept detail: [Platform Services - the plugin envelope](../../module/processor/spec-platform-services.md).

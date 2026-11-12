@@ -63,7 +63,7 @@ Five synthetic feeds, each a Pipeline with a Schema under `spaces/_templates/mob
 - [Pipelines and Steps](../../module/etl/architecture.md),
   [Jobs and scheduler](../../module/processor/architecture.md).
 - [Reconciliation](../../module/reconciliation/architecture.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture.md).
+- [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md).
 - [Scoring and Entity Lists](../../module/scoring/architecture.md).
 - [Anomaly](../../module/anomaly/architecture.md).
 - [Studio BI](../../layer/product/architecture-studio-bi.md).

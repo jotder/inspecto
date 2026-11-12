@@ -14,5 +14,5 @@ Screens for Observability and backup. Design and internals: [Observability and b
   status, report percentiles, acquisition tiles, raw `/metrics` behind a toggle.
 - **Events** (`inspecto-ui/src/app/modules/admin/events/events.component.ts`) and **Audit log**
   (`inspecto-ui/src/app/modules/admin/audit-logs/audit-logs.component.ts`).
-- **Processing status** and **Run detail** ([parsing-ingest](../etl/architecture-parsing-ingest.md) §6).
+- **Processing status** and **Run detail** ([parsing-ingest](../etl/architecture.md) §6).
 - **Jobs** for backup and restore; there is no dedicated backup screen and no metrics browser.

@@ -96,7 +96,7 @@ Moved to [Observability and backup — API](api-observability-backup.md).
 ## 8. Interactions
 
 - **Events and Alerts:** `maintenance.*` and backup Signals can drive Alert Rules
-  ([events](../event/architecture.md), [alerts](../../addon/incidents/architecture-alerts.md)).
+  ([events](../event/architecture.md), [alerts](../../addon/incidents/architecture.md)).
 - **Jobs:** every task here runs on the scheduler ([jobs-scheduler](../processor/architecture.md)).
 - **Storage:** what is archived and pruned ([storage](../entity-store/architecture.md)).
 - **Identity and access:** the audit trail's actor comes from the session ([identity-access](../access/architecture.md)).

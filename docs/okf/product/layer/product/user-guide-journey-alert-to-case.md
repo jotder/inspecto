@@ -72,8 +72,8 @@ Script: `tools/doc-diagrams/journey-alert-to-case.py`.
 ## Related modules
 
 [events](../../module/event/architecture.md) ·
-[alerts](../../addon/incidents/architecture-alerts.md) ·
-[decision-kernel](../../module/scoring/architecture-decision-kernel.md) ·
+[alerts](../../addon/incidents/architecture.md) ·
+[decision-kernel](../../module/scoring/architecture.md) ·
 [incidents](../../addon/incidents/architecture.md) ·
 [case-management](../../module/case-management/architecture.md) ·
 [action-requests](../../module/action-requests/architecture.md) ·

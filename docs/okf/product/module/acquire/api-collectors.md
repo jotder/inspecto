@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Collectors — API
 
-Routes for Collectors. Design and internals: [Collectors architecture](architecture-collectors.md).
+Routes for Collectors. Design and internals: [Collectors architecture](architecture.md).
 
 From `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` and `ConnectionRoutes.java`:
 

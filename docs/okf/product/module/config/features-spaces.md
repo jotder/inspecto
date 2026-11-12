@@ -18,7 +18,7 @@ reusable blueprint that seeds a new Space (Type → Instance). This page also co
 Enabled → Permitted** gates, because the middle gate is a per-Space setting.
 
 The requirement of record is the [Spaces & tenancy capability spec](plan-spaces.md); the hosting
-mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); the module gates are defined in
+mechanism is [Multi-Space Hosting](../processor/architecture.md); the module gates are defined in
 [module taxonomy](../../layer/platform/architecture-modules.md).
 
 ## Where it fits

@@ -26,4 +26,4 @@ the same CRUD contract as Expectations and Decision Rules. Fired Alerts go to an
 add-on only through the `incidents` Platform Service. Delivery to people is the [Notifications](../../module/notify-channels/architecture.md)
 module's job: an Alert carries a recipient attribute taken from the rule's `owner`.
 
-More: [screens](user-guide-alerts.md) · [API](api-alerts.md) · [architecture](architecture-alerts.md).
+More: [screens](user-guide-alerts.md) · [API](api-alerts.md) · [architecture](architecture.md).

@@ -44,7 +44,7 @@ acquisition ledger.
 
 ⚠ The boundary that is easy to get wrong: **acquisition never widens to "read from N places at once."**
 Multi-location ingest is composition of existing pieces — see
-[multi-location ingest](architecture-multi-location-ingest.md), which is a `PIP` concern.
+[multi-location ingest](architecture.md), which is a `PIP` concern.
 
 ## 2. Requirements of record
 

@@ -22,7 +22,7 @@ Module: `features/inspecto-regulatory-reporting` (manifest id `regulatory-report
 ## 3. Where it sits
 
 An add-on over the platform base. It reads the operational objects of [Case management](../case-management/architecture.md) and
-[Incidents](../../addon/incidents/architecture.md), reuses the [Maker-checker](../workflow/architecture-maker-checker.md) signing key and decision pattern, and writes
+[Incidents](../../addon/incidents/architecture.md), reuses the [Maker-checker](../workflow/architecture.md) signing key and decision pattern, and writes
 into the same path jail as the `report` Job's `out_dir`.
 
 ## 4. How it works
@@ -67,7 +67,7 @@ Moved to [Regulatory Reporting — API](api-regulatory-reporting.md).
 ## 8. Interactions
 
 - [Case management](../case-management/architecture.md), [Incidents](../../addon/incidents/architecture.md) - report subjects.
-- [Maker-checker](../workflow/architecture-maker-checker.md), [Action requests](../action-requests/architecture.md) - four-eyes pattern and storage.
+- [Maker-checker](../workflow/architecture.md), [Action requests](../action-requests/architecture.md) - four-eyes pattern and storage.
 - [Identity and access](../access/architecture.md) - scope checks on subject and member Incidents.
 - [AML solution](../../solution-pack/aml/architecture.md) — the only pack that ships a report template (`aml-str`).
 

@@ -30,4 +30,4 @@ Finance, commercial and business-assurance teams watching revenue and margin.
 
 ## Related hubs
 
-[Architecture](architecture.md) · [Revenue assurance architecture](architecture-revenue-assurance.md) · [Brochure](brochure.md) · [incidents](../../addon/incidents/index.md)
+[Architecture](architecture.md) · [Revenue assurance architecture](architecture.md) · [Brochure](brochure.md) · [incidents](../../addon/incidents/index.md)

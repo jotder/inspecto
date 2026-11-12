@@ -248,7 +248,7 @@ panel is the authored-pipeline `…/dry-run`, a different route) — so no UI ch
 ## Identity and status, per lane
 
 (Supersedes the two-lane table that lived in
-[consignment-status-flow](architecture-consignment-status.md), which still owns the mechanisms —
+[consignment-status-flow](architecture.md), which still owns the mechanisms —
 gauges, ledgers, quarantine, audit drill-down.)
 
 | | Ingest lanes (flat + graph fork) | At-rest job lane | Scratch lane | Parked |

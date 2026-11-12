@@ -26,7 +26,7 @@ A **Sink** is where a Pipeline writes business data. The capability spec of reco
 
 ## Where it fits
 
-Everything else sits on it: [parsing-ingest](../etl/architecture-parsing-ingest.md) and [Pipelines](../etl/architecture.md)
+Everything else sits on it: [parsing-ingest](../etl/architecture.md) and [Pipelines](../etl/architecture.md)
 write business data; [Studio](../../layer/product/architecture-studio-bi.md) reads it through Datasets; every add-on keeps its
 records in the operational stores; [Spaces](../config/architecture.md) decide where each Space's roots are. Code homes:
 

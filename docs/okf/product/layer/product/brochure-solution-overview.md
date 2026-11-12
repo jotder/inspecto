@@ -40,7 +40,7 @@ Each pack page names the modules the pack switches on and walks the end-to-end s
 
 | Solution | For | Page |
 |---|---|---|
-| Revenue Assurance | telecom revenue leakage between switch, mediation, rating and billing | [revenue-assurance](../../solution-pack/business-assurance/architecture-revenue-assurance.md) |
+| Revenue Assurance | telecom revenue leakage between switch, mediation, rating and billing | [revenue-assurance](../../solution-pack/business-assurance/architecture.md) |
 | Telecom Fraud | IRSF, Wangiri, SIM box and related typologies | [telecom-fraud](../../solution-pack/telco-fraud/architecture.md) |
 | Payment Fraud | card and wallet fraud patterns | [payment-fraud](../../solution-pack/payment-fraud/architecture.md) |
 | AML | laundering typologies, screening, suspicious transaction reports | [aml](../../solution-pack/aml/architecture.md) |
@@ -65,8 +65,8 @@ Content packs sit on feature modules, which sit on platform modules, which sit o
 
 [Module pages](../../index.md) — 29 pages, one per module, on one nine-heading template (what it is, who uses
 it, where it sits, how it works, configuration, screens, API, interactions, limits). Start with
-[maker-checker](../../module/workflow/architecture-maker-checker.md) for governance, [Pipelines and Steps](../../module/etl/architecture.md) for data
-flow, or [Alerts](../../addon/incidents/architecture-alerts.md) for detection.
+[maker-checker](../../module/workflow/architecture.md) for governance, [Pipelines and Steps](../../module/etl/architecture.md) for data
+flow, or [Alerts](../../addon/incidents/architecture.md) for detection.
 
 ## 6. Where to go next
 

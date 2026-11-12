@@ -33,7 +33,7 @@ timestamp: 2026-07-16T00:00:00Z
   ingest/commit work must `MDC.getCopyOfContextMap()` on the caller + `setContextMap` on the worker +
   `clear()` in `finally` — `MultiCollectorProcessor.runAll`/`runConfigs` **and** `CollectorProcessor`'s per-batch
   executor. Miss one and that space's metrics/events silently fall back to `"default"`. See
-  [multi-space](../../module/processor/architecture-multi-space.md).
+  [multi-space](../../module/processor/architecture.md).
 * **Pipeline-internal paths resolve against the JVM CWD, not the space root — `schema_file` excepted since
   2026-07-31.** `grammar` and `dirs.*` are still bare `Paths.get(...)` in `PipelineConfigParser` with no
   rebasing to `spaces/<id>/`, and only the *space discovery* layer (`-Dspaces.root`) is space-relative — so

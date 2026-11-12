@@ -22,7 +22,7 @@ server-side operational state (`ReconBreaks` + `ReconStateStore`).
 - **Operators** (`canOperateRuns`) record runs and resolve, re-open or assign Breaks.
 - **Incident handlers** (`canManageIncidents`) promote a single Break to an Incident.
 - Revenue-assurance and business-assurance solutions — see
-  [revenue-assurance](../../solution-pack/business-assurance/architecture-revenue-assurance.md).
+  [revenue-assurance](../../solution-pack/business-assurance/architecture.md).
 
 ## 3. Where it sits
 
@@ -87,7 +87,7 @@ Moved to [Reconciliation — API](api-reconciliation.md).
 ## 8. Interactions
 
 - [incidents](../../addon/incidents/architecture.md) — a breach opens an Incident; single Breaks are promoted with `POST /recon/promote`.
-- [events](../event/architecture.md) / [alerts](../../addon/incidents/architecture-alerts.md) — `recon.run.completed` is a Signal an Alert Rule can watch.
+- [events](../event/architecture.md) / [alerts](../../addon/incidents/architecture.md) — `recon.run.completed` is a Signal an Alert Rule can watch.
 - [jobs-scheduler](../processor/architecture.md) — `recon.run` Job Type (`ReconRunJobType`), `requires: [objects]`.
 - [case-management](../case-management/architecture.md) — Incidents opened here can be escalated to Cases.
 - Deleting a `reconciliation` component triggers `ReconComponentDeleteHook`.

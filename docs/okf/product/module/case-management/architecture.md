@@ -89,7 +89,7 @@ Moved to [Case Management — API](api-case-management.md).
 ## 8. Interactions
 
 - [incidents](../../addon/incidents/architecture.md) — members are Incidents; an Alert Rule's `key.<column>` attributes feed `groupBy`.
-- [alerts](../../addon/incidents/architecture-alerts.md) — first link of the Alert → Incident → Case chain.
+- [alerts](../../addon/incidents/architecture.md) — first link of the Alert → Incident → Case chain.
 - [link-analysis](../la-core/architecture.md) — from-entities opens a Case from investigated entities; a classified
   Dataset needs `canRevealLinkEntities`.
 - [jobs-scheduler](../processor/architecture.md) — `caserule.evaluate`.

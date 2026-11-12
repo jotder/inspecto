@@ -30,4 +30,4 @@ gates and its first side effect. The same approver-eligibility reading (`Approve
 HMAC key are reused by [Action Requests](../action-requests/architecture.md), which has its own mandatory approval and is never
 held as a Pending Change.
 
-More: [screens](user-guide-maker-checker.md) · [API](api-maker-checker.md) · [architecture](architecture-maker-checker.md).
+More: [screens](user-guide-maker-checker.md) · [API](api-maker-checker.md) · [architecture](architecture.md).

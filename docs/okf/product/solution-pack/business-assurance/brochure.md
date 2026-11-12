@@ -35,6 +35,6 @@ Run it on a few months of your own revenue extract in a proof of value.
 ## Read more
 
 - Architecture: [architecture.md](architecture.md)
-- Architecture: [architecture-revenue-assurance.md](architecture-revenue-assurance.md)
+- Architecture: [architecture-revenue-assurance.md](architecture.md)
 - The template manifest is `spaces/_templates/business-assurance/template.toon`.
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

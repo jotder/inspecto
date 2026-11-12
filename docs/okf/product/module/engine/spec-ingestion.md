@@ -63,7 +63,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   always written (see [quarantine](spec-output-sinks.md)). Markers/fingerprints go **last**, so a FAILED
   Consignment leaves no "already processed" record and its files are rediscovered next poll (retry is
   implicit); what is recorded about a Consignment either way — ledgers, provenance, live gauges, and how
-  an operator audits a failed file or record — is [consignment status flow](architecture-consignment-status.md).
+  an operator audits a failed file or record — is [consignment status flow](architecture.md).
 
 * `MultiCollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
   orchestrator running many `.toon` sources concurrently in one JVM, bounded by `Semaphore(sources.max)`.

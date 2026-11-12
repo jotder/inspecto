@@ -26,7 +26,7 @@ A **Sink** is where a Pipeline writes business data. The capability spec of reco
 
 ## 3. Where it sits
 
-Everything else sits on it: [parsing-ingest](../etl/architecture-parsing-ingest.md) and [Pipelines](../etl/architecture.md)
+Everything else sits on it: [parsing-ingest](../etl/architecture.md) and [Pipelines](../etl/architecture.md)
 write business data; [Studio](../../layer/product/architecture-studio-bi.md) reads it through Datasets; every add-on keeps its
 records in the operational stores; [Spaces](../config/architecture.md) decide where each Space's roots are. Code homes:
 
@@ -95,7 +95,7 @@ Moved to [Storage — API](api-storage.md).
 ## 8. Interactions
 
 - **Spaces** own the roots and the per-Space store files ([spaces](../config/architecture.md)).
-- **Maker-checker** can hold a configuration write as a pending change ([maker-checker](../workflow/architecture-maker-checker.md)).
+- **Maker-checker** can hold a configuration write as a pending change ([maker-checker](../workflow/architecture.md)).
 - **Backup** archives a Space's configuration tree; retention Jobs prune stores
   ([observability-backup](../observability/architecture.md)).
 - **Exchange** reads `shared/…` store references across Spaces ([exchange](../exchange/architecture.md)).
@@ -107,6 +107,6 @@ Moved to [Storage — API](api-storage.md).
 - A sink nested inside another store fails the run before any bytes are written.
 - Business data is never in the operational database, in any edition.
 - The `.restricted` refusal store is excluded from reads, listings and backups
-  ([parsing-ingest](../etl/architecture-parsing-ingest.md)).
+  ([parsing-ingest](../etl/architecture.md)).
 - Postgres round-trip tests cover nine of the twelve families; the dedup ledger, acquisition ledger
   and delivery receipts are covered by reasoning only.

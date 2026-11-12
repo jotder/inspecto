@@ -51,7 +51,7 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
 5. **Drafts**: fork, ops, rebase, promote - parallel work on one Investigation without blocking the main log.
 6. **Masking**: `EntityMasking` sends tokens out; raw values stay inside; reveal is audited.
 7. **Outputs**: dossier and bundle (SHA-256 root, verify routes), Case link, Working Set measures, standing
-   detection via the `la.detect` Job into [Alerts](../../addon/incidents/architecture-alerts.md), public embeds.
+   detection via the `la.detect` Job into [Alerts](../../addon/incidents/architecture.md), public embeds.
 8. **Store**: filesystem by default; Postgres with `-Dinvestigations.backend=db` and a `jdbc:postgresql:` URL.
 
 
@@ -108,7 +108,7 @@ Moved to [Link Analysis — API](api-link-analysis.md).
 ## 8. Interactions
 
 - [Graph library](../graph/architecture.md) - algorithms; [Scoring and Entity Lists](../scoring/architecture.md) - identity.
-- [Case management](../case-management/architecture.md) - Case link; [Alerts](../../addon/incidents/architecture-alerts.md) - standing detection.
+- [Case management](../case-management/architecture.md) - Case link; [Alerts](../../addon/incidents/architecture.md) - standing detection.
 - [Jobs scheduler](../processor/architecture.md) - `la.index.build`, `la.detect`; [Storage](../entity-store/architecture.md) - Datasets.
 - [Exchange](../exchange/architecture.md) - saved views shared across Spaces; [AI assist](../intelligence/architecture.md).
 - [Link Analysis solution](../../solution-pack/la-showcase/architecture.md).

@@ -22,7 +22,7 @@ Module: `features/inspecto-regulatory-reporting` (manifest id `regulatory-report
 ## Where it fits
 
 An add-on over the platform base. It reads the operational objects of [Case management](../case-management/architecture.md) and
-[Incidents](../../addon/incidents/architecture.md), reuses the [Maker-checker](../workflow/architecture-maker-checker.md) signing key and decision pattern, and writes
+[Incidents](../../addon/incidents/architecture.md), reuses the [Maker-checker](../workflow/architecture.md) signing key and decision pattern, and writes
 into the same path jail as the `report` Job's `out_dir`.
 
 More: [screens](user-guide-regulatory-reporting.md) · [API](api-regulatory-reporting.md) · [architecture](architecture.md).

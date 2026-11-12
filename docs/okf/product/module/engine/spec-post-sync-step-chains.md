@@ -13,7 +13,7 @@ After sync a Consignment's data is a **table**; everything downstream of the sin
 Consignment info**, never through a piped relation. As-built after the open-DAG plan (stages 2/3/5
 shipped 2026-08-29, stage 4 shipped 2026-08-31, stage 6 refuted, the remaining questions ratified
 2026-09-06). Vocabulary follows [`GLOSSARY.md`](../../../../GLOSSARY.md): **Pipeline**, **Consignment**,
-**Step** (per-Consignment) vs **Job** (cross-Consignment, [job-vs-step](../processor/architecture-job-vs-step.md)),
+**Step** (per-Consignment) vs **Job** (cross-Consignment, [job-vs-step](../processor/architecture.md)),
 **Collector**, **Dataset**.
 
 ## 1. The dataflow model (operator, 2026-08-29)
@@ -226,7 +226,7 @@ that claim is STALE as of 2026-08-31.
 - **Q2** — a chained step sees the Consignment **as the previous step left it** (answered by §4's as-built).
 - **Q3** — when step A re-runs, B's output is **superseded through the existing revision model** (§5).
 - **Q4** — a per-Consignment matrix is a **Step**; a cross-Consignment report is a **Job**
-  ([job-vs-step](../processor/architecture-job-vs-step.md)).
+  ([job-vs-step](../processor/architecture.md)).
 
 ## 10. Refuted and deferred
 
@@ -243,10 +243,10 @@ that claim is STALE as of 2026-08-31.
 ## Related
 
 [consignment-addressing](spec-consignment-addressing.md) (Selector, revision model) ·
-[consignment-status-flow](architecture-consignment-status.md) · [node-types](spec-node-types.md) ·
+[consignment-status-flow](architecture.md) · [node-types](spec-node-types.md) ·
 [transforms-seams](spec-transforms-seams.md) · [plugins](spec-plugin-ingester.md) ·
 [execution-lanes](spec-execution-lanes.md) · [step-catalog](../etl/spec-step-catalog.md) ·
-[jobs](../processor/spec-jobs.md) · [job-vs-step](../processor/architecture-job-vs-step.md)
+[jobs](../processor/spec-jobs.md) · [job-vs-step](../processor/architecture.md)
 
 **Provenance:** distilled from
 [`open-dag-pipeline-design.md`](../../../../archived-documents/plans-archive/open-dag-pipeline-design.md)

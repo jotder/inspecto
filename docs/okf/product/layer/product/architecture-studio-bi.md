@@ -135,7 +135,7 @@ there; its relation is validated when it is read, by
 
 ## 8. Interactions
 
-- **Alerts:** Measure-shape Alert Rules and freshness Alert Rules ([alerts](../../addon/incidents/architecture-alerts.md)).
+- **Alerts:** Measure-shape Alert Rules and freshness Alert Rules ([alerts](../../addon/incidents/architecture.md)).
 - **Jobs:** the `report` Job Type delivers exports on a schedule ([jobs-scheduler](../../module/processor/architecture.md)).
 - **Analytics kernel:** time grains and statistics ([analytics-kernel](../../module/analytics/architecture.md)).
 - **Exchange:** shared Datasets and Widgets across Spaces ([exchange](../../module/exchange/architecture.md)).

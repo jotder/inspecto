@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Scoring — plan](plan.md) |
 | spec | current | [Risk Scores — weighted-factor scoring per entity](spec-risk-scores.md) |
-| architecture | current | [Decision Kernel (Decision Rules and the Condition Language)](architecture-decision-kernel.md) · [Risk Scores and Entity Lists](architecture.md) |
+| architecture | current | [Scoring and the Decision Kernel](architecture.md) |
 | features | current | [Decision Kernel (Decision Rules and the Condition Language) — features](features-decision-kernel.md) · [Risk Scores and Entity Lists — features](features-scoring-entity-lists.md) |
 | feature-db | current | [Scoring — feature database](feature-db.md) |
 | user-guide | current | [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md) · [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md) |

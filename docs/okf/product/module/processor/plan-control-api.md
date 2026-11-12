@@ -679,7 +679,7 @@ Renaming would break every stored client link; migrating an offset pager with no
 | The Platform Services seam, the registry, dry-run substitution, the pack scaffolder | `docs/okf/product/module/processor/spec-platform-services.md` (`Concept`) | `PlatformServices.java` | §3.14 |
 | The machine-readable contract, its rules and the contract-first workflow | `docs/api/README.md` · `docs/api/openapi-v1.json` · `docs/api/examples/` | — | what `ApiContractTest` reads |
 | The gateway and IAM blueprints and the seams they assume | `docs/api/deployment/README.md` · `wso2-api-definition.yaml` · `keycloak-realm-blueprint.json` | — | §3.12 — illustrative, untested |
-| The space seam after the version | `docs/okf/product/module/processor/architecture-multi-space.md` (`Concept`) | — | `/api/v1/spaces/{id}/…` |
+| The space seam after the version | `docs/okf/product/module/processor/architecture.md` (`Concept`) | — | `/api/v1/spaces/{id}/…` |
 | The SPA's API conventions and service catalogue | `docs/okf/product/layer/product/spec-api-and-data.md` (`Convention`) · `docs/okf/product/layer/product/api-services.md` (`Reference`) | `inspecto-ui/src/app/inspecto/api` | §3.15 |
 | The house-style route recipe | `.claude/skills/endpoint/SKILL.md` | — | the gate order and the mandatory real-HTTP test |
 

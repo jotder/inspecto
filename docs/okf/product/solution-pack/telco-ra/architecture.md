@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Telecom revenue assurance — architecture
 
-Everything below is configuration in the `telco-ra` Space Template (`spaces/_templates/telco-ra/`). Platform pieces: [Reconciliation](../../addon/reconciliation/index.md), [Incidents](../../addon/incidents/index.md), [etl](../../module/etl/index.md). The broader revenue assurance design: [revenue assurance architecture](../business-assurance/architecture-revenue-assurance.md).
+Everything below is configuration in the `telco-ra` Space Template (`spaces/_templates/telco-ra/`). Platform pieces: [Reconciliation](../../addon/reconciliation/index.md), [Incidents](../../addon/incidents/index.md), [etl](../../module/etl/index.md). The broader revenue assurance design: [revenue assurance architecture](../business-assurance/architecture.md).
 
 ## Layers
 

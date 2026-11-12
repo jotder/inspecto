@@ -11,7 +11,7 @@ reusable blueprint that seeds a new Space (Type → Instance). This page also co
 Enabled → Permitted** gates, because the middle gate is a per-Space setting.
 
 The requirement of record is the [Spaces & tenancy capability spec](plan-spaces.md); the hosting
-mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); the module gates are defined in
+mechanism is [Multi-Space Hosting](../processor/architecture.md); the module gates are defined in
 [module taxonomy](../../layer/platform/architecture-modules.md).
 
 ## 2. Who uses it
@@ -168,7 +168,7 @@ Moved to [Spaces — API](api-spaces.md).
 - [Storage](../entity-store/architecture.md) — every per-Space store default comes from `SpaceRoot`.
 - [Observability & backup](../observability/architecture.md) — the `space` label on metrics and events.
 - Content packs ([telecom fraud](../../solution-pack/telco-fraud/architecture.md),
-  [revenue assurance](../../solution-pack/business-assurance/architecture-revenue-assurance.md)) ship as Space Templates.
+  [revenue assurance](../../solution-pack/business-assurance/architecture.md)) ship as Space Templates.
 
 ## 9. Limits and gotchas
 

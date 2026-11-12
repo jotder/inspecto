@@ -72,14 +72,14 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 
 ## Related modules
 
-[collectors](../../module/acquire/architecture-collectors.md) ·
-[parsing-ingest](../../module/etl/architecture-parsing-ingest.md) ·
+[collectors](../../module/acquire/architecture.md) ·
+[parsing-ingest](../../module/etl/architecture.md) ·
 [storage](../../module/entity-store/architecture.md) ·
 [pipelines-steps](../../module/etl/architecture.md) ·
 [jobs-scheduler](../../module/processor/architecture.md) ·
 [analytics-kernel](../../module/analytics/architecture.md) ·
 [studio-bi](architecture-studio-bi.md) ·
-[alerts](../../addon/incidents/architecture-alerts.md) ·
+[alerts](../../addon/incidents/architecture.md) ·
 [observability-backup](../../module/observability/architecture.md)
 
 Concepts: [Studio](plan-studio.md) ·

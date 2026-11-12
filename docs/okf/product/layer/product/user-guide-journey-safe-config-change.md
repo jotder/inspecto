@@ -72,7 +72,7 @@ Script: `tools/doc-diagrams/journey-safe-config-change.py`.
 
 ## Related modules
 
-[maker-checker](../../module/workflow/architecture-maker-checker.md) ·
+[maker-checker](../../module/workflow/architecture.md) ·
 [pipelines-steps](../../module/etl/architecture.md) ·
 [jobs-scheduler](../../module/processor/architecture.md) ·
 [platform-services](../platform/architecture-platform-services.md) ·

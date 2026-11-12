@@ -15,7 +15,7 @@ timestamp: 2026-10-19T00:00:00Z
 A **Collector** is a configured collection task bound to one **Connection** (a named endpoint plus
 credentials). It reaches a remote system, decides which files are new and complete, fetches them once,
 and lands them in the Pipeline's inbox (`dirs.poll`). Everything after landing is ingest's job
-([parsing-ingest](../etl/architecture-parsing-ingest.md)). The capability spec of record is
+([parsing-ingest](../etl/architecture.md)). The capability spec of record is
 [acquisition.md](plan-acquisition.md); this page is the module summary.
 
 Code homes:
@@ -52,4 +52,4 @@ The registry files are
 `providers/inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory`
 and the matching file in `inspecto-connectors-kafka`.
 
-More: [screens](user-guide-collectors.md) · [API](api-collectors.md) · [architecture](architecture-collectors.md).
+More: [screens](user-guide-collectors.md) · [API](api-collectors.md) · [architecture](architecture.md).

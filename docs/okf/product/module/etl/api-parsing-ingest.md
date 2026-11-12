@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Parsing and ingest — API
 
-Routes for Parsing and ingest. Design and internals: [Parsing and ingest architecture](architecture-parsing-ingest.md).
+Routes for Parsing and ingest. Design and internals: [Parsing and ingest architecture](architecture.md).
 
 | Route | Purpose |
 |---|---|

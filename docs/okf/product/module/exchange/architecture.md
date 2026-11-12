@@ -65,7 +65,7 @@ Moved to [Exchange (multi-entity sharing) — API](api-exchange.md).
 
 - [Spaces](../config/architecture.md) - owner and consumer; multi-Space mode required.
 - [Studio and BI](../../layer/product/architecture-studio-bi.md) - Widgets and Datasets that bind shared refs.
-- [Alerts](../../addon/incidents/architecture-alerts.md) - an Alert Rule may watch a `shared/...` Dataset.
+- [Alerts](../../addon/incidents/architecture.md) - an Alert Rule may watch a `shared/...` Dataset.
 - [Events](../event/architecture.md) - cross-Space Signals; [Jobs scheduler](../processor/architecture.md) - `on_signal` Jobs on the consumer.
 - [Link Analysis](../la-core/architecture.md) - saved views offered as `link-analysis-view`.
 

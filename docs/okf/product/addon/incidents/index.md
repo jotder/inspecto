@@ -17,7 +17,7 @@ tags: [product-item, addon]
 |---|---|---|
 | plan | current | [Alerts & Incidents (INC)](plan-incidents.md) |
 | spec | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
-| architecture | current | [Alerts](architecture-alerts.md) · [Incidents](architecture.md) |
+| architecture | current | [Incidents and Alerts](architecture.md) |
 | features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |
 | feature-db | current | [Incidents — feature database](feature-db.md) |
 | user-guide | current | [Alerts](user-guide-alerts.md) · [Incidents — screens](user-guide-incidents.md) |

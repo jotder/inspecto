@@ -30,7 +30,7 @@ Two modules sold as one add-on:
 
 Add-ons over the platform base. Scores are written through the shared score output contract (engine
 `ScoreOutputWriter`, see [analytics-kernel](../analytics/architecture.md)); Incidents come from the ordinary Alert Rule
-machinery ([alerts](../../addon/incidents/architecture-alerts.md)). Without the modules `/risk-scores*` and `/entity-lists*` answer 503 and
+machinery ([alerts](../../addon/incidents/architecture.md)). Without the modules `/risk-scores*` and `/entity-lists*` answer 503 and
 `/bootstrap` reports `features.scoring` / `features.entityList` false.
 
 More: [screens](user-guide-scoring-entity-lists.md) · [API](api-scoring-entity-lists.md) · [architecture](architecture.md).

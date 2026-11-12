@@ -33,7 +33,7 @@ The as-built references are the [pipeline-graph bundle](../../index.md) and the
 
 ## Where it fits
 
-A Pipeline binds a [Collector](../acquire/architecture-collectors.md), the [parse stage](architecture-parsing-ingest.md), transform Steps
+A Pipeline binds a [Collector](../acquire/architecture.md), the [parse stage](architecture.md), transform Steps
 and one or more sinks into [storage](../entity-store/architecture.md). Its at-rest half runs as a Job of type `pipeline`
 on the [scheduler](../processor/architecture.md). Code homes:
 

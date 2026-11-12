@@ -9,7 +9,7 @@ timestamp: 2026-09-25T00:00:00Z
 
 # Exchange — Cross-Space Sharing
 
-Datasets, Widgets and saved Views can be shared **read-only, per-item, opt-in** across [Spaces](../processor/architecture-multi-space.md) via
+Datasets, Widgets and saved Views can be shared **read-only, per-item, opt-in** across [Spaces](../processor/architecture.md) via
 a grant-mediated ledger — the "ministries" model (a department's Dataset used by another department's
 Widgets/Queries/Alert Rules, without reprocessing or re-creating pipelines). Nothing is discoverable
 across Spaces unless its owner offers it; nothing is usable without an active grant (fail-closed).
