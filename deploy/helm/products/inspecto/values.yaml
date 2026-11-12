@@ -1,0 +1,11 @@
+# Inspecto's chart values (HELM-PRODUCT-VALUES-1). `tools/ship.mjs chart` lays this file over the chart source's
+# values (deploy/helm/inspecto/values.yaml), key by key: every key here must exist there - a Product overrides the
+# source's defaults, it never adds a value (a map such as env is written in flow style: env: { KEY: value }).
+# Install-time overrides still go to `helm install -f` / `--set`; this file is the Product's own defaults.
+# image.repository and the product block must agree with products/inspecto.toon (`tools/ship.mjs check`).
+image:
+  repository: inspecto
+
+product:
+  id: inspecto
+  title: Inspecto

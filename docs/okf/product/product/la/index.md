@@ -24,7 +24,7 @@ tags: [product-item, product]
 | admin-guide | current | [Inspecto LA — admin guide](admin-guide.md) |
 | api | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | tests | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
-| brochure | current | [Inspecto LA — brochure](brochure.md) |
+| brochure | current | [Inspecto LA — demo script](brochure-demo-script.md) · [Inspecto LA — video script](brochure-video-script.md) · [Inspecto LA — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

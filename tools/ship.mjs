@@ -4,10 +4,18 @@
 //
 //   node tools/ship.mjs chart --plan <assembly-plan.json> --out <dir> [--no-package]
 //
-// `chart` stamps the ONE chart source (deploy/helm/inspecto) for the plan's Product build (D-PA27): it writes
-// <out>/<image name>/ with a generated Chart.yaml (name = image name, version = platform version, appVersion = image
-// tag), values.yaml's image.repository and `product` block set, and, unless --no-package, <out>/<name>-<version>.tgz
-// (the layout `helm package` writes). The plan must come from `assemble.mjs --target container|airgap` (its `ship` field).
+// `chart` builds the plan's Product chart (D-PA27, as changed 2026-11-12: HELM-PRODUCT-VALUES-1) into <out>/<image name>/:
+// the templates of the ONE source (deploy/helm/inspecto/templates), the Product's committed folder
+// deploy/helm/products/<id>/ (its Chart.yaml, and its values.yaml laid over the source's values.yaml, key by key), then
+// the build's facts (version = platform version, appVersion = image tag, image.repository, the `product` block); and,
+// unless --no-package, <out>/<name>-<version>.tgz (the layout `helm package` writes). The plan must come from
+// `assemble.mjs --target container|airgap` (its `ship` field).
+//
+//   node tools/ship.mjs check
+//
+// `check` is the guard (CI, the Product guard step): the template source stays single - no Chart.yaml or template
+// outside deploy/helm/inspecto, each Product's folder holds Chart.yaml and values.yaml only and agrees with products/<id>.toon,
+// and every value it sets is one the source has.
 //
 //   node tools/ship.mjs image --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>
 //
@@ -25,8 +33,8 @@
 // --allow-missing-extensions is for a desk proof only: it records complete: false and the missing names, and the
 // installer warns.
 //
-// REFUSES (exit 1, the reason named): a plan without `ship`; a chart source whose stamped lines are not each found
-// exactly once (the source changed under this tool - fix the tool, never the copy); a bundle that is not the plan's
+// REFUSES (exit 1, the reason named): a plan without `ship`; a Product with no committed chart folder; a value the
+// Product's folder sets that the chart source does not have (a Product overrides values, it never adds one); a bundle that is not the plan's
 // linux_amd64 build (lib/product.json, an ELF runtime/bin/java, the Dockerfile's product label); an image whose label
 // disagrees with the plan; an air-gapped bundle missing a DuckDB extension (unless --allow-missing-extensions).
 
@@ -35,9 +43,12 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shipOf } from './assemble.mjs';
+import { gatherModel } from './products.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const CHART_SOURCE = 'deploy/helm/inspecto';
+export const PRODUCT_CHARTS = 'deploy/helm/products';
 export const AIRGAP_INSTALLER = 'deploy/airgap/install-offline.sh';
 export const AIRGAP_SCHEMA = 'inspecto.airgap/1';
 const fail = (msg) => { throw new Error(msg); };
@@ -47,50 +58,152 @@ export function shipOfPlan(plan) {
     return plan?.ship ?? fail('the Assembly Plan has no `ship` field: assemble it with --target container or --target airgap');
 }
 
-/** Replace `from` (a whole line) with `to`, refusing unless it occurs exactly once. */
-function replaceLine(text, from, to, file) {
+/**
+ * The `key: value` leaves and `key:` blocks of a values or Chart.yaml file, by dotted path (HELM-PRODUCT-VALUES-1).
+ * Only block mappings are read: a value stays the text after `key: ` (a scalar or a flow collection such as `{ a: 1 }`);
+ * a list or a multi-line scalar is refused, so a file this cannot read is never stamped by guesswork.
+ */
+export function yamlPaths(text, file) {
+    const stack = [];
+    const leaves = new Map();
+    const blocks = new Set();
+    text.split('\n').forEach((raw, i) => {
+        const line = raw.replace(/\r$/, '');
+        if (!line.trim() || line.trim().startsWith('#')) return;
+        const m = line.match(/^( *)([A-Za-z0-9_./-]+):(?: +(.*))?$/);
+        if (!m) fail(`${file}:${i + 1}: only 'key: value' and 'key:' lines are understood here (no lists, no multi-line values): ${line.trim()}`);
+        while (stack.length && stack[stack.length - 1].indent >= m[1].length) stack.pop();
+        const path = [...stack.map((s) => s.key), m[2]].join('.');
+        // A block scalar (`key: |` / `key: >-`) spans the lines below it: refused, never read as keys of the parent.
+        if (/^[|>][-+0-9]*\s*(#.*)?$/.test(m[3] ?? '')) fail(`${file}:${i + 1}: '${path}' is a multi-line value (${m[3].trim()}): write it on one line`);
+        if (!m[3] || m[3].startsWith('#')) { blocks.add(path); stack.push({ indent: m[1].length, key: m[2] }); }
+        else leaves.set(path, { i, indent: m[1], key: m[2], value: m[3] });
+    });
+    return { leaves, blocks };
+}
+
+/** `text` with each override's leaf line set to its value. A path the text has no leaf for is refused (never added). */
+function overlay(text, overrides, file) {
+    const { leaves, blocks } = yamlPaths(text, file);
     const lines = text.split('\n');
-    const hits = lines.flatMap((l, i) => (l.replace(/\r$/, '') === from ? [i] : []));
-    if (hits.length !== 1) fail(`${file}: expected the line '${from}' exactly once, found ${hits.length}`);
-    lines[hits[0]] = to;
+    for (const { path, value, from } of overrides) {
+        const at = leaves.get(path);
+        if (!at) fail(blocks.has(path)
+            ? `${from}: '${path}' is a block in ${file}; override its keys one by one`
+            : `${from}: '${path}' is not a value in ${file} - a Product overrides the source's values, it never adds one (a map value such as env is written in flow style: env: { KEY: value })`);
+        lines[at.i] = `${at.indent}${at.key}: ${value}`;
+    }
     return lines.join('\n');
 }
 
-/** Stamp the chart source for one Product build into <out>/<chart name>/. Returns { dir, name, version }. */
+const q = (s) => JSON.stringify(String(s)); // a JSON string is a valid YAML double-quoted scalar
+/** A one-line YAML scalar's text: a "double" or 'single' quoted value is read whole (a ` #` inside it is not a comment). */
+const unq = (v) => {
+    const s = String(v ?? '').trim();
+    const dq = s.match(/^("(?:[^"\\]|\\.)*")\s*(#.*)?$/);
+    if (dq) return JSON.parse(dq[1]);
+    const sq = s.match(/^'((?:[^']|'')*)'\s*(#.*)?$/);
+    if (sq) return sq[1].replace(/''/g, "'");
+    return s.replace(/\s+#.*$/, '');
+};
+
+/**
+ * The committed chart folder a Product build uses (D-PA27 as changed 2026-11-12): deploy/helm/products/<id>/, or the
+ * Platform product's for a picked Platform product (product-map/private/products/, which commits no folder).
+ */
+export function productChartFolder(plan, repo = REPO) {
+    const own = `${PRODUCT_CHARTS}/${plan.product.id}`;
+    if (existsSync(join(repo, own, 'Chart.yaml'))) return own;
+    if (plan.product.shape === 'platform' && existsSync(join(repo, PRODUCT_CHARTS, 'inspecto', 'Chart.yaml'))) return `${PRODUCT_CHARTS}/inspecto`;
+    return fail(`Product '${plan.product.id}' has no committed chart folder ${own}/ (Chart.yaml and values.yaml over ${CHART_SOURCE}): add one`);
+}
+
+/**
+ * Build the chart for one Product build into <out>/<chart name>/ (HELM-PRODUCT-VALUES-1): the templates of the ONE source
+ * (deploy/helm/inspecto/templates), the Product's committed Chart.yaml, and the source's values.yaml with the Product's
+ * committed values.yaml over it; then the build's facts (name, version, appVersion, image, Product, Edition, Distribution).
+ * Returns { dir, name, version, folder }.
+ */
 export function stampChart(plan, out, { repo = REPO } = {}) {
     const { image, chart } = shipOfPlan(plan);
     const edition = String(plan.edition).toLowerCase();
-    const src = join(repo, CHART_SOURCE);
+    const folder = productChartFolder(plan, repo);
     const dir = join(out, chart.name);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(out, { recursive: true });
-    cpSync(src, dir, { recursive: true });
+    cpSync(join(repo, CHART_SOURCE, 'templates'), join(dir, 'templates'), { recursive: true });
 
-    const q = (s) => JSON.stringify(String(s)); // a JSON string is a valid YAML double-quoted scalar
-    writeFileSync(join(dir, 'Chart.yaml'), [
-        '# Generated by tools/ship.mjs from deploy/helm/inspecto (PRODUCT-ASSEMBLY-1 PA-8) - edit the source, not this copy.',
-        'apiVersion: v2',
-        `name: ${chart.name}`,
-        `description: ${q(`${plan.product.title} ${plan.edition}: single-replica control plane (StatefulSet, replicas 1, one PVC). Not multi-replica safe - see values.yaml.`)}`,
-        'type: application',
-        `version: ${q(chart.version)}`,
-        `appVersion: ${q(chart.appVersion)}`,
-        'annotations:',
-        `  inspecto.io/product: ${q(plan.product.id)}`,
-        `  inspecto.io/edition: ${q(edition)}`,
-        `  inspecto.io/distribution: ${q(plan.distribution)}`,
-        '',
-    ].join('\n'));
+    const build = (from) => (path, value) => ({ path, value, from });
+    const fact = build('the build');
+    const chartFile = `${folder}/Chart.yaml`;
+    writeFileSync(join(dir, 'Chart.yaml'),
+        `# Generated by tools/ship.mjs from ${chartFile} and ${CHART_SOURCE}/templates - edit those, never this copy.\n`
+        + overlay(readFileSync(join(repo, chartFile), 'utf8'), [
+            fact('name', chart.name), fact('version', q(chart.version)), fact('appVersion', q(chart.appVersion)),
+            fact('annotations.inspecto.io/product', q(plan.product.id)), fact('annotations.inspecto.io/edition', q(edition)),
+            fact('annotations.inspecto.io/distribution', q(plan.distribution)),
+        ], chartFile));
 
-    const vf = join(dir, 'values.yaml');
-    let values = readFileSync(vf, 'utf8');
-    values = replaceLine(values, '  repository: inspecto', `  repository: ${image.repository}`, CHART_SOURCE + '/values.yaml');
-    values = replaceLine(values, '  id: inspecto', `  id: ${q(plan.product.id)}`, CHART_SOURCE + '/values.yaml');
-    values = replaceLine(values, '  title: Inspecto', `  title: ${q(plan.product.title)}`, CHART_SOURCE + '/values.yaml');
-    values = replaceLine(values, '  edition: standard', `  edition: ${q(edition)}`, CHART_SOURCE + '/values.yaml');
-    values = replaceLine(values, '  distribution: production', `  distribution: ${q(plan.distribution)}`, CHART_SOURCE + '/values.yaml');
-    writeFileSync(vf, values);
-    return { dir, name: chart.name, version: chart.version };
+    const valuesFile = `${folder}/values.yaml`;
+    const own = [...yamlPaths(readFileSync(join(repo, valuesFile), 'utf8'), valuesFile).leaves].map(([path, l]) => build(valuesFile)(path, l.value));
+    writeFileSync(join(dir, 'values.yaml'),
+        `# Generated by tools/ship.mjs: ${CHART_SOURCE}/values.yaml with ${valuesFile} over it, and the build's Product, Edition and\n`
+        + '# Distribution. Edit those, never this copy.\n'
+        + overlay(readFileSync(join(repo, CHART_SOURCE, 'values.yaml'), 'utf8'), [
+            ...own,
+            fact('image.repository', image.repository), fact('product.id', q(plan.product.id)), fact('product.title', q(plan.product.title)),
+            fact('product.edition', q(edition)), fact('product.distribution', q(plan.distribution)),
+        ], `${CHART_SOURCE}/values.yaml`));
+    return { dir, name: chart.name, version: chart.version, folder };
+}
+
+/**
+ * The guard (HELM-PRODUCT-VALUES-1): the template source stays single. `files` are the repo's tracked paths (POSIX).
+ * Every Chart.yaml or file under a templates/ folder of a chart lives in deploy/helm/inspecto; deploy/helm/products/<id>/
+ * holds Chart.yaml and values.yaml only, one per Product in products/; each folder's Chart.yaml and values.yaml name
+ * the Product, its chart and its image as products/<id>.toon does, and its values override only what the source has.
+ * Returns the findings (empty = good).
+ */
+export function checkChartFolders({ repo = REPO, products, files }) {
+    const findings = [];
+    const isChart = (f) => /(^|\/)Chart\.yaml$/.test(f);
+    for (const f of files) {
+        if (f.startsWith(`${CHART_SOURCE}/charts/`)) { findings.push(`${f}: a subchart inside the chart source - the one source carries its templates in ${CHART_SOURCE}/templates only`); continue; }
+        if (f.startsWith(`${CHART_SOURCE}/`)) continue;
+        // A template copied anywhere else, chart or not: a file under a templates/ folder that calls the source's helpers.
+        if (/(^|\/)templates\/[^/]+\.(ya?ml|tpl)$/.test(f)) {
+            let text = '';
+            try { text = readFileSync(join(repo, f), 'utf8'); } catch { /* listed but absent: nothing to read */ }
+            if (/\{\{-?\s*(include|template)\s+"inspecto\./.test(text)) { findings.push(`${f}: a copy of a chart template - the one template source is ${CHART_SOURCE}/templates`); continue; }
+        }
+        const m = f.match(new RegExp(`^${PRODUCT_CHARTS}/([^/]+)/(.+)$`));
+        if (m) { if (!['Chart.yaml', 'values.yaml'].includes(m[2])) findings.push(`${f}: a Product's chart folder holds Chart.yaml and values.yaml only - templates live in ${CHART_SOURCE}/templates`); continue; }
+        if (isChart(f)) findings.push(`${f}: a second chart - the one template source is ${CHART_SOURCE}; a Product's chart is ${PRODUCT_CHARTS}/<id>/`);
+        else if (f.startsWith('deploy/helm/')) findings.push(`${f}: deploy/helm holds the chart source and ${PRODUCT_CHARTS}/<id>/ only`);
+    }
+    const folders = new Set(files.map((f) => f.match(new RegExp(`^${PRODUCT_CHARTS}/([^/]+)/`))?.[1]).filter(Boolean));
+    for (const id of folders) if (!products[id]) findings.push(`${PRODUCT_CHARTS}/${id}/: no Product products/${id}.toon`);
+    const sourceValues = () => readFileSync(join(repo, CHART_SOURCE, 'values.yaml'), 'utf8');
+    for (const [id, p] of Object.entries(products)) {
+        const dir = `${PRODUCT_CHARTS}/${id}`;
+        if (!folders.has(id)) { findings.push(`${dir}/: Product '${id}' has no chart folder (Chart.yaml and values.yaml over ${CHART_SOURCE})`); continue; }
+        const { repository } = shipOf(id, 'standard', 'production', '0').image;
+        try {
+            const chart = yamlPaths(readFileSync(join(repo, dir, 'Chart.yaml'), 'utf8'), `${dir}/Chart.yaml`).leaves;
+            const values = yamlPaths(readFileSync(join(repo, dir, 'values.yaml'), 'utf8'), `${dir}/values.yaml`).leaves;
+            const want = (file, leaves, path, expected) => {
+                const got = unq(leaves.get(path)?.value);
+                if (got !== expected) findings.push(`${dir}/${file}: ${path} is '${got}', products/${id}.toon makes it '${expected}'`);
+            };
+            want('Chart.yaml', chart, 'name', repository);
+            want('Chart.yaml', chart, 'annotations.inspecto.io/product', id);
+            want('values.yaml', values, 'image.repository', repository);
+            want('values.yaml', values, 'product.id', id);
+            want('values.yaml', values, 'product.title', p.title);
+            overlay(sourceValues(), [...values].map(([path, l]) => ({ path, value: l.value, from: `${dir}/values.yaml` })), `${CHART_SOURCE}/values.yaml`);
+        } catch (e) { findings.push(e.message); }
+    }
+    return findings;
 }
 
 /**
@@ -230,7 +343,8 @@ export function buildAirgap(plan, bundleDir, out, { docker = run, allowMissingEx
 }
 
 const USAGE = [
-    'usage: node tools/ship.mjs chart --plan <assembly-plan.json> --out <dir> [--no-package]',
+    'usage: node tools/ship.mjs check',
+    '       node tools/ship.mjs chart --plan <assembly-plan.json> --out <dir> [--no-package]',
     '       node tools/ship.mjs image --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>',
     '       node tools/ship.mjs airgap --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir> [--allow-missing-extensions]',
 ].join('\n');
@@ -239,7 +353,14 @@ function main() {
     const [cmd, ...a] = process.argv.slice(2);
     const val = (k) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : undefined; };
     try {
-        if (!['chart', 'image', 'airgap'].includes(cmd)) fail(USAGE);
+        if (!['check', 'chart', 'image', 'airgap'].includes(cmd)) fail(USAGE);
+        if (cmd === 'check') {
+            const files = execFileSync('git', ['ls-files'], { cwd: REPO, encoding: 'utf8' }).split('\n').filter(Boolean);
+            const findings = checkChartFolders({ products: gatherModel(REPO).products, files });
+            if (findings.length) fail(`the Helm charts are not one template source with a folder per Product:\n  ${findings.join('\n  ')}`);
+            console.log(`ship: one chart source (${CHART_SOURCE}), one folder per Product under ${PRODUCT_CHARTS}/ - OK`);
+            return;
+        }
         const plan = JSON.parse(readFileSync(val('--plan') ?? fail('--plan <assembly-plan.json> is required'), 'utf8'));
         const out = resolve(val('--out') ?? fail('--out <dir> is required'));
         if (cmd === 'airgap') {
@@ -256,7 +377,7 @@ function main() {
             return;
         }
         const stamped = stampChart(plan, out);
-        console.log(`ship: chart ${stamped.name} ${stamped.version} -> ${stamped.dir}`);
+        console.log(`ship: chart ${stamped.name} ${stamped.version} (from ${stamped.folder}) -> ${stamped.dir}`);
         if (!a.includes('--no-package')) console.log(`ship: packaged ${packChart(stamped)}`);
     } catch (e) {
         console.error(`ship: ${e.message}`);

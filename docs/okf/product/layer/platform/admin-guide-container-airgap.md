@@ -45,9 +45,10 @@ applies to every zip the run makes, the Windows one included.
   `inspecto`. It is built with the bundle's own `deploy/Dockerfile` and carries OCI labels: `org.opencontainers.image.title`,
   `.description` and `.version`, plus `io.inspecto.product`, `.edition`, `.distribution` and `.apps`. It runs as uid 10001
   on a digest-pinned `debian:stable-slim`.
-- **The chart** is stamped from the one source `deploy/helm/inspecto` (see
-  [Operations & Launch Flags](admin-guide-launch-flags.md) § Kubernetes). Its name is the image name and its `appVersion`
-  the image tag. It is single-replica: the N-pod chart (`SCALEOUT-HELM-NPOD-1`) waits on Postgres.
+- **The chart** is built from the Product's own committed folder over the one template source (see
+  [Operations & Launch Flags](admin-guide-launch-flags.md) § Kubernetes, and *The chart per Product* below). Its name is
+  the image name and its `appVersion` the image tag. It is single-replica: the N-pod chart (`SCALEOUT-HELM-NPOD-1`)
+  waits on Postgres.
 - **The air-gapped folder** holds:
 
   | Path | What |
@@ -60,6 +61,38 @@ applies to every zip the run makes, the Windows one included.
   | `chart/<chart>-<version>.tgz` | the chart |
 
   No Helm, kubectl or registry binary is shipped: the site brings its own.
+
+## The chart per Product
+
+Each Product has its own committed chart folder, readable in the repo (HELM-PRODUCT-VALUES-1, D-PA27 as changed by the
+operator on 2026-11-12). The templates live once, in `deploy/helm/inspecto/templates`.
+
+| Path | What |
+|---|---|
+| `deploy/helm/inspecto/` | the ONE template source: `templates/` and the defaults every Product shares (`values.yaml`) |
+| `deploy/helm/products/<id>/Chart.yaml` | the Product's chart: its name (the image name), description and `inspecto.io/product` annotation |
+| `deploy/helm/products/<id>/values.yaml` | the Product's own values, laid over the source's defaults key by key |
+
+`node tools/ship.mjs chart --plan <plan> --out <dir>` copies the source's templates, takes the Product's `Chart.yaml`,
+lays its `values.yaml` over the source's, then stamps the build's facts: `version` (the platform version), `appVersion`
+(the image tag), `image.repository`, and the `product` block's id, title, Edition and Distribution. A picked Platform
+product (`tools/pick-addons.mjs`) commits no folder and uses `deploy/helm/products/inspecto/`.
+
+To change a Product's default, set the key in its `values.yaml`, for example `persistence:` then `  size: 200Gi`. The
+rules:
+- a Product **overrides** a key the source has; it never adds one, so a typo is refused, not ignored;
+- set leaves one by one; a block such as `resources:` is not replaced whole by a value;
+- a map value such as `env` is written in flow style: `env: { CORS_ORIGIN: "https://telco.example" }`;
+- lists and multi-line values are refused;
+- install-time choices still go to `helm install -f` or `--set`.
+
+`node tools/ship.mjs check` is the guard; CI runs it in the Product guard step. It refuses a `Chart.yaml` anywhere
+outside these folders, a subchart inside the source, a file in a Product folder other than `Chart.yaml` and `values.yaml`,
+a template anywhere else that calls the source's `inspecto.*` helpers (so no copied template, chart or not), a
+Product without a folder or a folder without a Product, a name, image or Product that disagrees with
+`products/<id>.toon`, and a value the source does not have.
+
+## How the build is checked
 
 `tools/ship.mjs` does this work (`chart`, `image`, `airgap`). Before it builds anything, it checks that the bundle is the
 Assembly Plan's build: `lib/product.json`, an ELF `runtime/bin/java`, and the Dockerfile's product label. After the
@@ -88,6 +121,9 @@ identity provider must be reachable from the site; it is the one service the ins
 
 - **The charts.** `helm lint --strict` (Helm v3.19, run from a local container with `--network none`) passes on the source
   and on the stamped charts for inspecto, la and telco. `helm template` renders the Product's labels and image.
+  Re-run the same day for HELM-PRODUCT-VALUES-1 on the charts built from `deploy/helm/products/<id>/`: `helm lint --strict`
+  passes on each folder and its `.tgz`, and `helm template` renders `inspecto-la:…-advanced` and
+  `inspecto-telco:…-advanced` with their `inspecto.io/product` labels.
 - **The image.** `package.ps1 -Product telco -Edition Standard -Target container -NoUi -GraalvmCache C:\.jdks` built
   `inspecto-telco:4.0.0-SNAPSHOT-standard`. Run with `--read-only --cap-drop ALL`, it answered `/health` `UP` and
   `/ready` `READY` as uid 10001.
