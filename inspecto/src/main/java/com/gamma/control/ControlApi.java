@@ -1307,8 +1307,15 @@ public final class ControlApi implements AutoCloseable, HostContext {
         if (!isRateLimited(method, path)) return;
         if (isEmbedPath(path)) {   // LA-EMBED-VIEW-1: one bucket PER TOKEN (keyed by its hash, never the token) and one per caller IP
             String ip = ApiContext.ip(ex);
-            if (!embedIpLimiter.tryConsume(ip == null ? "unknown" : ip) || !embedLimiter.tryConsume(embedKey(path)))
+            String ipKey = ip == null ? "unknown" : ip;
+            if (!embedIpLimiter.tryConsume(ipKey)) {
+                ex.getResponseHeaders().set("Retry-After", Long.toString(embedIpLimiter.retryAfterSeconds(ipKey)));
                 throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded - retry later");
+            }
+            if (!embedLimiter.tryConsume(embedKey(path))) {
+                ex.getResponseHeaders().set("Retry-After", Long.toString(embedLimiter.retryAfterSeconds(embedKey(path))));
+                throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded - retry later");
+            }
             return;
         }
         String key = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> {
@@ -1319,8 +1326,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 : path.equals("/bi/query") ? dashboardLimiter
                 : path.startsWith("/public/delivery-status/") ? callbackLimiter
                 : StreamPushRoutes.isPushPath(path) ? pushLimiter : rateLimiter;
-        if (!bucket.tryConsume(key))
+        if (!bucket.tryConsume(key)) {
+            ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(key)));
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + path + " — retry later");
+        }
     }
 
     /** The ABAC action verb for a request — the single source of truth shared by the {@link #authorize}
@@ -1466,7 +1475,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
     /**
      * Write a UI file, with a cache directive and a validator.
      *
-     * ⚠ {@code no-cache} is deliberate for EVERY file, content-hashed chunk names included. This
+     * N6 (la-performance-plan): content-hashed build files ({@link #isContentHashed}) are {@code immutable} for a year - the name IS the
+     * content, so a stale name cannot hold other bytes. Every other file (index.html first) keeps {@code no-cache} as below.
+     *
+     * ⚠ {@code no-cache} is deliberate for every file that is not content-hashed. This
      * handler previously sent no cache headers and no validator at all, which does NOT mean "do not
      * cache" — with neither a directive nor a validator a browser falls back to HEURISTIC freshness
      * and may reuse a response without revalidating. Serving an upgraded UI from the same host:port
@@ -1481,12 +1493,21 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * Size+mtime is a sufficient validator here — these files are build output, replaced wholesale by
      * a deploy, never edited in place within a millisecond of the same length.
      */
+    /** Angular build output named {@code <stem>-<8-9 char hash>.js|css|woff|woff2}; the hash must hold an upper-case letter or digit so
+     *  a plain hyphenated name ({@code runtime-config.js}) is not mistaken for one. Everything else (index.html, assets/) revalidates. */
+    private static final java.util.regex.Pattern CONTENT_HASHED =
+            java.util.regex.Pattern.compile("^[\\w.]+-(?=[A-Za-z0-9_-]*[A-Z0-9])[A-Za-z0-9_-]{8,9}\\.(?:js|css|woff2?)$");
+
+    static boolean isContentHashed(String fileName) { return CONTENT_HASHED.matcher(fileName).matches(); }
+
     private void writeFile(HttpExchange ex, Path file) throws IOException {
         BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
         String etag = '"' + Long.toHexString(attrs.lastModifiedTime().toMillis())
                     + '-' + Long.toHexString(attrs.size())
                     + '-' + Integer.toHexString(file.getFileName().toString().hashCode()) + '"';
-        ex.getResponseHeaders().set("Cache-Control", "no-cache");
+        // N6: a content-hashed build file never changes under its name, so it is cached for a year without revalidation
+        ex.getResponseHeaders().set("Cache-Control", isContentHashed(file.getFileName().toString())
+                ? "public, max-age=31536000, immutable" : "no-cache");
         ex.getResponseHeaders().set("ETag", etag);
         if (etag.equals(ex.getRequestHeaders().getFirst("If-None-Match"))) {
             ex.sendResponseHeaders(304, -1);   // -1 ⇒ no body, as 304 requires

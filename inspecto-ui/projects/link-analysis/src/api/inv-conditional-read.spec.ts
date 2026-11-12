@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -229,5 +229,32 @@ describe('InvService - conditional projection reads (PERF-P10a-2)', () => {
             r.flush({ nodes: [], edges: [], mappings: [], truncated: false }, tag('"m"'));
         }
         expect(svc.reads.size).toBe(0);
+    });
+    it('(k) N13: a 429 with Retry-After is retried once after that wait; a second 429 is the refusal', () => {
+        vi.useFakeTimers();
+        try {
+            const throttle = { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '2' } };
+            let got: ProjectionResult | undefined;
+            let err: unknown;
+            project().subscribe({ next: (v) => (got = v), error: (e) => (err = e) });
+            http.expectOne(PROJ).flush(null, throttle);
+            http.expectNone(PROJ); // waiting, not hammering
+            vi.advanceTimersByTime(2000);
+            const b = body();
+            http.expectOne(PROJ).flush(b, tag('"k"'));
+            expect(got).toBe(b);
+
+            project().subscribe({ next: () => undefined, error: (e) => (err = e) });
+            http.expectOne(PROJ).flush(body(), tag('"k"')); // conditional read of the held entry: answer fresh
+            svc.neighbors(NREQ).subscribe({ error: (e) => (err = e) });
+            http.expectOne(NEI).flush(null, throttle);
+            vi.advanceTimersByTime(2000);
+            http.expectOne(NEI).flush(null, throttle);
+            vi.advanceTimersByTime(60000);
+            http.expectNone(NEI);
+            expect((err as HttpErrorResponse).status).toBe(429);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
