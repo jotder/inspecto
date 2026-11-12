@@ -120,7 +120,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (110 open row
 * [Authentication and capability contract](module/auth-spi/index.md) - `module.auth-spi` · 4 doc(s) · 0 open row(s)
 * [Backup and restore](module/backup/index.md) - `module.backup` · 6 doc(s) · 0 open row(s)
 * [Case Management](module/case-management/index.md) - `module.case-management` · 10 doc(s) · 2 open row(s)
-* [Config model and codecs](module/config/index.md) - `module.config` · 15 doc(s) · 5 open row(s)
+* [Config model and codecs](module/config/index.md) - `module.config` · 16 doc(s) · 5 open row(s)
 * [Kafka stream connector](module/connectors-kafka/index.md) - `module.connectors-kafka` · 6 doc(s) · 0 open row(s)
 * [Collector and export connectors](module/connectors/index.md) - `module.connectors` · 8 doc(s) · 2 open row(s)
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)

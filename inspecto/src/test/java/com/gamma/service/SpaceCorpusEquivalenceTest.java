@@ -43,10 +43,25 @@ class SpaceCorpusEquivalenceTest {
             return new Capability(property, () -> System.setProperty(property, "true"),
                     () -> System.clearProperty(property), null);
         }
+
+        /** A capability on by default whose {@code -D} kill switch is {@code off}; the gate restores the property.
+         *  {@code whenOn} runs on the copy's config root before the "on" load (what the capability writes). */
+        static Capability killSwitch(String property, Consumer<Path> whenOn) {
+            return new Capability(property, () -> System.clearProperty(property),
+                    () -> System.setProperty(property, "off"), whenOn);
+        }
     }
 
-    /** The registered capabilities. Empty today; each SE lane adds its {@code -D} flag here. */
-    static final List<Capability> CAPABILITIES = List.of();
+    /** The registered capabilities; each SE lane adds its {@code -D} flag here. */
+    static final List<Capability> CAPABILITIES = List.of(
+            // SE-1a: the "on" load runs over a Space that already holds its signed lock (and the key it made)
+            Capability.killSwitch(SpaceLock.PROPERTY, config -> {
+                try {
+                    SpaceLock.compute(config.getParent().getFileName().toString(), config, List.of());
+                } catch (IOException ex) {
+                    throw new UncheckedIOException(ex);
+                }
+            }));
 
     /**
      * The corpus roots as repo paths. ⚠ These literals ARE the wiring: {@code tools/affected-modules.mjs} discovers
@@ -128,6 +143,7 @@ class SpaceCorpusEquivalenceTest {
         System.out.println("[SE-0] " + e.label() + " " + first.summary());
         for (Capability c : caps) {
             SpaceLoadSnapshot.Snapshot off, on;
+            java.util.Properties saved = (java.util.Properties) System.getProperties().clone();
             c.off().run();
             try {
                 off = SpaceLoadSnapshot.load(e.dir(), e.id(), e.template(), tmp.resolve(key + "-" + c.name() + "-off"), null);
@@ -136,6 +152,7 @@ class SpaceCorpusEquivalenceTest {
                         c.configMutation());
             } finally {
                 c.off().run();
+                System.setProperties(saved);   // a kill switch's "off" must not outlive its comparison
             }
             String d = off.diff(e.label(), on, c.name() + "=off", c.name() + "=on");
             assertEquals("", d, "capability '" + c.name() + "' changes what loads:\n" + d);
