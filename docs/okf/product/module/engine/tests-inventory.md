@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-396 test class(es): 396 unit, 0 real-HTTP control-plane, 0 IT.
+397 test class(es): 397 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -302,6 +302,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ExcelSinkLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ExcelSinkLiftLowerTest.java` | The {@code excel:} block's graph homes (operator 2026-10-06), mirroring {@code WebhookSinkLiftLowerTest}: the |
 | `GapDetectionLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/GapDetectionLiftLowerTest.java` | An unedited lift to lower must not flip {@code collector.gap_detection.enabled}: the flag belongs to the file |
 | `LiftLowerFixtureSweepTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/LiftLowerFixtureSweepTest.java` | Unification W0 (BACKLOG, "prove the lift→lower round trip lossless over the existing configs or NAME the |
+| `LinkGraphColumnsTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/LinkGraphColumnsTest.java` | Column links (`SPACE-LINK-CENSUS-1` LC-5): each COLUMN key and each SQL text resolved against the column set |
 | `LinkGraphTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/LinkGraphTest.java` |  |
 | `MapNodeKeyContractTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/MapNodeKeyContractTest.java` | <b>Two sides, one committed vocabulary</b> — the {@code b061ff41} idiom applied to map-node config. |
 | `MappingComponentTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/MappingComponentTest.java` | The {@code mapping} component kind — the first CSV-backed registry kind (ELT amendment Phase 1 |

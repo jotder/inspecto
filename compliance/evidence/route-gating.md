@@ -158,7 +158,7 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/components/workflow/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:92` |
 | PUT | `/components/workflow/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:91` |
 | POST | `/components/workflow/([^/]+)/versions/([^/]+)/restore` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:93` |
-| DELETE | `/config/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java:41` |
+| DELETE | `/config/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java:44` |
 | PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:98` |
 | POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:51` |
 | POST | `/config/preview/parsing` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:48` |

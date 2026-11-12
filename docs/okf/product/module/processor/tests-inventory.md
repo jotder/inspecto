@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-405 test class(es): 160 unit, 245 real-HTTP control-plane, 0 IT.
+406 test class(es): 160 unit, 246 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -92,6 +92,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiClientIpTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClientIpTest.java` | SEC review F3 over real HTTP: {@code ApiContext.ip} — the per-IP rate-limit key and the audit trail's |
 | `ControlApiCollectorNotifyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorNotifyTest.java` | Real-HTTP tests for {@code POST /collectors/{id}/notify} (ACQ-6 push discovery): v1 202+runId+Location with |
 | `ControlApiCollectorsAndConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorsAndConnectionsTest.java` | Integration tests over real HTTP for the Acquisition/Sources UI backend: {@code GET /collectors} (flattened source <!-- vocab-allow: quoted Javadoc --> |
+| `ControlApiColumnImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnImpactTest.java` | {@code GET /config/schema/{name}/columns/{column}/impact} (`SPACE-LINK-CENSUS-1` LC-5) over real HTTP: the read's |
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
 | `ControlApiComponentsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentsTest.java` | Component registry CRUD (T19, §7.1) over real HTTP: create / list / get / update / delete |

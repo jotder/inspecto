@@ -36,16 +36,27 @@ class LinkCensusParityTest {
             "inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java", "private int rewriteDependents(",
             "inspecto/src/main/java/com/gamma/service/PipelineDependents.java", "",
             "platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentIntegrity.java", "",
-            "platform/inspecto-engine/src/main/java/com/gamma/job/MetadataValidateTask.java", "");
+            "platform/inspecto-engine/src/main/java/com/gamma/job/MetadataValidateTask.java", "",
+            "platform/inspecto-engine/src/main/java/com/gamma/pipeline/ColumnSets.java", "");
 
     /** Literal keys these checks read that are not references, each with why. */
-    static final Map<String, String> NOT_A_LINK = new TreeMap<>(Map.of(
-            "id", "a Pipeline's own id (the universe a link resolves against), not a reference",
-            "name", "a file's or component's own name (its identity), not a reference",
-            "targetType", "the KIND a target names (selects toKind), not a reference of its own",
-            "job", "the job: section a Job's keys sit in (LinkGraph.jobSection), a container",
-            "triggers", "a container (triggers.on_pipeline is the link)",
-            "references", "a container (references.<n>.ref / .path are the links)"));
+    static final Map<String, String> NOT_A_LINK = new TreeMap<>(Map.ofEntries(
+            Map.entry("id", "a Pipeline's own id (the universe a link resolves against), not a reference"),
+            Map.entry("name", "a file's or component's own name (its identity), not a reference"),
+            Map.entry("targetType", "the KIND a target names (selects toKind), not a reference of its own"),
+            Map.entry("job", "the job: section a Job's keys sit in (LinkGraph.jobSection), a container"),
+            Map.entry("triggers", "a container (triggers.on_pipeline is the link)"),
+            Map.entry("references", "a container (references.<n>.ref / .path are the links)"),
+            // LC-5 (ColumnSets): the column sets column links resolve against - a Schema's or Dataset's own
+            // declaration, never a reference to something defined elsewhere
+            Map.entry("dirs", "a Pipeline's own directories; dirs.database names the store it publishes its columns under"),
+            Map.entry("mapping", "a Schema's own mapping section, a container of its column declaration"),
+            Map.entry("fields", "mapping.fields / processing.map.fields: the columns a Pipeline publishes, the universe"),
+            Map.entry("map", "processing.map, a container of the projection that outranks mapping.fields"),
+            Map.entry("schemas", "processing.schemas (plural): only read to mark the column set unknown"),
+            Map.entry("mapping_file", "processing.mapping_file: only read to mark the column set unknown"),
+            Map.entry("columns", "a Dataset's own declared columns, the universe"),
+            Map.entry("columnMap", "a Reconciliation side's column renames: only read to mark that side unknown")));
 
     private static Set<String> censusSegments() {
         Set<String> segs = new HashSet<>();
@@ -77,6 +88,25 @@ class LinkCensusParityTest {
         assertTrue(seen >= 10, "the scan went blind — it saw only " + seen + " key reads");
         assertTrue(open.isEmpty(), () -> "keys a link check reads that LinkCensus does not declare — add the link "
                 + "to LinkCensus.LINKS, or a reason to NOT_A_LINK: " + open);
+    }
+
+    @Test
+    void theColumnLinksArePinnedAndReportOnly() {
+        // LC-5: the column links LinkGraph judges against Schema / Dataset column sets. Report-only: none is
+        // rewritten by a rename, none is read by the bundle import pre-check.
+        Set<String> cols = new TreeSet<>();
+        for (LinkCensus.Link l : LinkCensus.columnLinks()) {
+            cols.add(l.fromKind() + ":" + l.keyPath());
+            assertEquals("column", l.toKind(), l.fromKind() + ":" + l.keyPath());
+            assertEquals(LinkCensus.OnRename.REPORT, l.onRename(), l.fromKind() + ":" + l.keyPath());
+            assertTrue(!l.checks().contains(LinkCensus.Check.IMPORT) && !l.checks().contains(LinkCensus.Check.RENAME),
+                    l.fromKind() + ":" + l.keyPath() + " must stay report-only");
+        }
+        assertEquals(new TreeSet<>(List.of("enrichment:transform", "expectation:column", "expectation:refColumn",
+                "expectation:when.**.field", "decision-rule:when.**.field", "dataset:sql", "dataset:dateField",
+                "dataset:calculated[].expr", "widget:controls.*.field", "widget:controls.*[].field",
+                "reconciliation:keyColumns[]", "reconciliation:compareColumns[].column", "reconciliation:impact.column",
+                "query:text")), cols);
     }
 
     @Test

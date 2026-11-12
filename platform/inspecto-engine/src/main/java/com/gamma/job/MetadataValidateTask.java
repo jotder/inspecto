@@ -70,6 +70,10 @@ final class MetadataValidateTask {
             findings.addAll(com.gamma.pipeline.ComponentIntegrity.brokenPipelineRefs(byType, pipelines));
             brokenEnrichmentRefs(writeRoot, pipelines, findings);
         }
+        // LC-5: column links judged against the Schemas' mapped columns. Hidden folders (.history/) are skipped —
+        // the engine cannot see ReservedConfigPaths; no other reserved folder holds a link-bearing config.
+        findings.addAll(com.gamma.pipeline.ComponentIntegrity.brokenColumns(
+                com.gamma.pipeline.LinkGraph.of(writeRoot, MetadataValidateTask::hidden)));
         if (ctx != null) {
             for (String f : findings) ctx.log().warn(f);
             if (!findings.isEmpty()) {
@@ -80,6 +84,12 @@ final class MetadataValidateTask {
         return JobResult.ok("metadata_validate: " + findings.size() + " finding(s) across " + total
                 + " component(s)" + (findings.isEmpty() ? " — healthy" : ""),
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /** A root-relative path with a segment starting {@code .} ({@code .history/}). */
+    static boolean hidden(String rel) {
+        for (String seg : rel.replace('\\', '/').split("/")) if (seg.startsWith(".")) return true;
+        return false;
     }
 
     /**

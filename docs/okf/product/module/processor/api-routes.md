@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-376 route(s) registered; 376 in the OpenAPI contract, 0 not.
+377 route(s) registered; 377 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -132,6 +132,7 @@ tags: [api, routes, generated]
 | GET | `/config/pipeline/{pipelineId}/impact` | GET /config/pipeline/{pipelineId}/impact (generated skeleton) | config | — | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java` |
 | POST | `/config/preview/parsing` | Parse a raw sample with a draft's parsing settings | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java` |
 | POST | `/config/preview/schema` | TRY_CAST already-parsed sample rows against a draft schema's typed fields | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java` |
+| GET | `/config/schema/{schemaId}/columns/{columnId}/impact` | What reads one mapped column of a Schema (column impact, report-only) | config | — | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java` |
 | GET | `/config/schema/derived` | GET /config/schema/derived (generated skeleton) | config | — | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java` |
 | GET | `/config/spec/{type}` | Declarative spec for a config type | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java` |
 | POST | `/config/suggest/schema` | POST /config/suggest/schema (generated skeleton) | config | — | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java` |
