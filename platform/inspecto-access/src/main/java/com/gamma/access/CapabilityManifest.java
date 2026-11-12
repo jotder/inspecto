@@ -399,6 +399,8 @@ public final class CapabilityManifest {
             // SpaceTestRoutes — SE-6a: running a Space's test cases is a run-to-here over its sample files,
             // gated like run-to-here (the GET listing is a read and carries no gate).
             new Entry("POST", "/tests/run", Roles.CAN_AUTHOR_WORKBENCH),
+            // SpaceIntegrityRoutes — SE-1a: the Space lock's report lists every config path, so it is an author's read.
+            new Entry("GET", "/integrity", Roles.CAN_AUTHOR_WORKBENCH),
             // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
             // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
             // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is

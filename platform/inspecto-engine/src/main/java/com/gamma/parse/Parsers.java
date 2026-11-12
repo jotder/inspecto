@@ -46,7 +46,7 @@ public final class Parsers {
     private static Map<String, ParserPlugin> load() {
         Map<String, ParserPlugin> m = new LinkedHashMap<>();
         for (ParserPlugin p : BuiltinParsers.all()) m.put(p.id(), p);
-        for (ParserPlugin p : ServiceLoader.load(ParserPlugin.class)) {
+        for (ParserPlugin p : com.gamma.module.EntitledServices.load(ParserPlugin.class)) {
             String id = requireValidId(p);
             ParserPlugin prev = m.putIfAbsent(id, p);
             if (prev != null) {

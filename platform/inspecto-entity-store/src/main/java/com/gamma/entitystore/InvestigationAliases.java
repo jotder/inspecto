@@ -25,6 +25,6 @@ public interface InvestigationAliases {
     String resolve(ApiContext api, HttpExchange ex, String investigationId, String alias) throws IOException;
 
     static Optional<InvestigationAliases> provider() {
-        return ServiceLoader.load(InvestigationAliases.class).findFirst();
+        return com.gamma.module.EntitledServices.stream(InvestigationAliases.class).findFirst();
     }
 }

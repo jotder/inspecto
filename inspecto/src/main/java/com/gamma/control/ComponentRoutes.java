@@ -500,7 +500,8 @@ final class ComponentRoutes implements RouteModule {
         }
         // R2-03: state an optional module keeps beside the registry (a Reconciliation's run state) is deleted with
         // the component, or a re-created component of the same id would inherit it — the module's ComponentDeleteHook.
-        for (ComponentDeleteHook hook : com.gamma.spi.OptionalSpi.all(ComponentDeleteHook.class)) {
+        // ENTITLEMENT-SPI-NARROWING-1: allInstalled - the clean-up runs even while the entitlement leaves the module out.
+        for (ComponentDeleteHook hook : com.gamma.spi.OptionalSpi.allInstalled(ComponentDeleteHook.class)) {
             if (!type.equals(hook.type())) continue;
             try {
                 hook.afterDelete(api.writeRoot(), id);
@@ -831,15 +832,16 @@ final class ComponentRoutes implements RouteModule {
         validateKind(type, id, content);
         if ("dataset".equals(type)) DatasetEntryRules.validateMapping(writeRoot, id, content);   // LA-DATA-PAGE-1
         // An optional module's own kinds and reserved store names (the risk-score kind and its risk_scores_ outputs):
-        // absent module = the kind stays opaque config and nothing is reserved.
-        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class)) {
+        // absent module = the kind stays opaque config and nothing is reserved. ENTITLEMENT-SPI-NARROWING-1: allInstalled -
+        // validators only refuse, so a left-out module's kinds and store names stay checked and reserved.
+        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.allInstalled(ComponentKindValidator.class)) {
             if (v.type().equals(type)) v.validateInSpace(writeRoot, dataRoot, id, content);
             if ("dataset".equals(type) || "sink".equals(type)) v.requireNotReserved(writeRoot, type, id, content);
         }
     }
 
     static void validateKind(String type, String id, Map<String, Object> content) {
-        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class))
+        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.allInstalled(ComponentKindValidator.class))
             if (v.type().equals(type)) v.validate(id, content);
         // LA-ONBOARD-1 OB-8: primaryEntityType + defaultLinkMapping on a Dataset entry.
         if ("dataset".equals(type)) DatasetEntryRules.validate(content);

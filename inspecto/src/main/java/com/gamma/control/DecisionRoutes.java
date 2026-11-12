@@ -271,7 +271,9 @@ final class DecisionRoutes implements RouteModule {
             com.gamma.module.ModuleManifest declared = declaringModule(action);
             res = declared != null
                     ? ConsequenceProvider.Result.unavailable("'" + action + "' is not available: "
-                            + com.gamma.module.KnownModules.absentMessage(declared))
+                            + (com.gamma.module.Entitlements.moduleEntitled(declared)
+                                    ? com.gamma.module.KnownModules.absentMessage(declared)
+                                    : "module '" + declared.id() + "' is " + com.gamma.module.Entitlements.NOT_ENTITLED))
                     : ConsequenceProvider.Result.skipped("unknown action '" + action
                             + "' — no installed module provides it; the rule is kept unchanged");
         }

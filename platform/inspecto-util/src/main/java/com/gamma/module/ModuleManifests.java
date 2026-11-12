@@ -86,6 +86,38 @@ public final class ModuleManifests {
         return new Loaded(List.copyOf(out), List.copyOf(diag), hostStamp);
     }
 
+    /**
+     * The manifests that the jar or classes directory at {@code codeSource} carries (a class's
+     * {@code getProtectionDomain().getCodeSource().getLocation()}). {@code ENTITLEMENT-SPI-NARROWING-1} resolves a
+     * {@code ServiceLoader} provider to its module this way: each module jar carries one {@value #RESOURCE}. Empty when the
+     * location carries none, or when it cannot be read or parsed: {@link #load} reports those as boot diagnostics.
+     */
+    public static List<ModuleManifest> at(URL codeSource) {
+        URL url;
+        try {
+            String s = codeSource.toExternalForm();
+            url = java.net.URI.create(s.endsWith("/") ? s + RESOURCE : "jar:" + s + "!/" + RESOURCE).toURL();
+        } catch (IllegalArgumentException | java.net.MalformedURLException e) {
+            return List.of();
+        }
+        String text;
+        try (var in = openUncached(url)) {
+            text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException absent) {
+            return List.of();
+        }
+        List<ModuleManifest> out = new ArrayList<>();
+        for (String chunk : text.split("(?m)^" + SEPARATOR + "[ \\t]*\\r?$")) {
+            if (chunk.isBlank()) continue;
+            try {
+                out.add(parse(chunk.strip()));
+            } catch (RuntimeException bad) {
+                // a diagnostic of load(); never a module here
+            }
+        }
+        return List.copyOf(out);
+    }
+
     /** Uncached, so reading a manifest never leaves its jar open (a locked file on Windows). */
     static java.io.InputStream openUncached(URL url) throws IOException {
         java.net.URLConnection c = url.openConnection();

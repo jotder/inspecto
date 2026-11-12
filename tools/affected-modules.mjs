@@ -22,6 +22,14 @@ import { posix } from 'node:path';
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 1 << 28 }).trim();
 export const FULL_THRESHOLD = 0.7;
 
+// `git status --porcelain` lines are `XY path` or `XY old -> new`; the status column may start with a space
+export function parsePorcelain(text) {
+    return text.split('\n').filter((l) => l.length > 3).map((l) => ({
+        path: l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, ''),
+        untracked: l.startsWith('??'),
+    }));
+}
+
 /** Paths that no Java build or test reads unless a test literally names them (then the consumer scan wins). */
 const NO_BUILD = [/^docs\//, /^\.claude\//, /^product-map\//, /^offerings\//, /^products\//, /^apps\//, /^industries\//, /^compliance\//, /^tools\/(?!templates\/)/,
     /^\.github\//, /^\.githooks\//, /\.md$/i, /^\.gitignore$/, /^\.gitattributes$/, /^\.claudeignore$/, /^\.mcp\.json$/,
@@ -145,9 +153,9 @@ function main() {
     const now = (f) => (head ? show(head, f) : (existsSync(f) ? readFileSync(f, 'utf8') : ''));
     const pomChanged = (f) => (f.endsWith('.java') ? stripJava(show(base, f)) !== stripJava(now(f)) : strip(show(base, f)) !== strip(now(f)));
     const untracked = [];
-    if (!head) for (const l of git('status', '--porcelain', '--untracked-files=all').split('\n').filter(Boolean)) {
-        const p = l.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, '');
-        if (l.startsWith('??')) untracked.push(p); else changed.add(p);
+    // raw output: git() trims, which would eat the leading space of a ` M path` first line
+    if (!head) for (const { path: p, untracked: u } of parsePorcelain(execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8', maxBuffer: 1 << 28 }))) {
+        if (u) untracked.push(p); else changed.add(p);
     }
     const tracked = git('ls-files').split('\n');
     const trackedSet = new Set(tracked);
