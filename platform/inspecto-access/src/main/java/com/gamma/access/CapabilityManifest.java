@@ -396,6 +396,9 @@ public final class CapabilityManifest {
             // PipelineHistoryRoutes — restoring a config version is a save (PIPELINE-CONFIG-HISTORY-1);
             // the list/read/diff reads carry no gate, like GET /pipelines/{name}/graph/raw.
             new Entry("POST", "/pipelines/([^/]+)/history/([^/]+)/restore", Roles.CAN_AUTHOR_WORKBENCH),
+            // SpaceTestRoutes — SE-6a: running a Space's test cases is a run-to-here over its sample files,
+            // gated like run-to-here (the GET listing is a read and carries no gate).
+            new Entry("POST", "/tests/run", Roles.CAN_AUTHOR_WORKBENCH),
             // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
             // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
             // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is
