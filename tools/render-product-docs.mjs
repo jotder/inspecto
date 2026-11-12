@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path';
 import { SLOTS } from './check-product-docs.mjs';
 import { parseBoard } from './check-backlog-items.mjs';
+import { productDocuments } from './product-documents.mjs';
 
 const HUBS = 'docs/okf/product', MAP = 'product-map';
 const check = process.argv.includes('--check');
@@ -53,6 +54,9 @@ function put(path, text) {
     mkdirSync(join(path, '..'), { recursive: true });
     writeFileSync(path, text);
 }
+
+// PA-10d (D-PA36): each Product hub's brochure, datasheet and guides are generated first, so the hub tables list them.
+for (const [path, text] of Object.entries(productDocuments('.'))) put(path, text);
 
 const items = [];
 for (const kind of KIND_ORDER) {

@@ -18,13 +18,13 @@ tags: [product-item, product]
 | plan | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | spec | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | architecture | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
-| features | missing | |
+| features | current | [Inspecto Telco — datasheet](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | missing | |
-| admin-guide | missing | |
+| user-guide | current | [Inspecto Telco — user guide](user-guide.md) |
+| admin-guide | current | [Inspecto Telco — admin guide](admin-guide.md) |
 | api | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | tests | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
-| brochure | missing | |
+| brochure | current | [Inspecto Telco — brochure](brochure.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

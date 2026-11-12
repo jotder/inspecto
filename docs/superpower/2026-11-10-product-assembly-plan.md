@@ -1324,6 +1324,26 @@ kinds; they are now roots of their own, with their link in the CSV.
   - the same bundle with one byte of the entitlement changed refuses to boot ("the signature does not match").
 - The pilot's record and outputs stay out of git (the record is in `product-map/private/`, the outputs in a scratch folder).
 
+**PA-10d as built (2026-11-12).** `tools/product-documents.mjs`, called by `render-product-docs.mjs` before it draws the
+hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md` and `admin-guide.md` into each
+`docs/okf/product/product/<id>/` hub.
+- Composed from the Product definition (brand tagline and body, Editions, Distributions, the composed Space), its Apps
+  (title, role, nav blurbs, version, Platform range, Add-ons, templates), and the Product Map titles of the Add-ons,
+  Editions and Solution packs. Each line links into that item's hub.
+- An App's guides are the user or admin guides in the hubs of its Space Templates, its Add-ons and the modules those
+  Add-ons hold, so the Link Analysis App lists the `la-core` and `geo-link` guides. The Platform product's user guide
+  also lists the console's own guides (`layer/product`). The admin guide starts with the entitlement, live App
+  install, operations and launch-flag guides.
+- Each file carries a generated marker; a file of one of those four slots in a Product hub that is not generated is
+  refused (`refuseHandWritten`). `render-product-docs --check` holds them current in CI.
+- Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs says so (Case Management has no
+  admin guide yet).
+
+**Proof (as built).** `product-documents.test.mjs` 4/4 (in the CI guards job): every Product's four files are generated,
+marked and committed current; every link resolves; the Telco brochure and datasheet carry its Apps, roles and the
+Edition × App table; a hand-written file in a generated slot is refused. `check-product-docs`, `check-doc-links`, the
+vocabulary and doc-count guards pass.
+
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
 | Id | Call | Signed |

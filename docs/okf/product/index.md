@@ -17,9 +17,9 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (105 open row
 
 # Products
 
-* [Inspecto](product/inspecto/index.md) - `product.inspecto` · 0 doc(s) · 0 open row(s)
-* [Inspecto LA](product/la/index.md) - `product.la` · 0 doc(s) · 0 open row(s)
-* [Inspecto Telco](product/telco/index.md) - `product.telco` · 0 doc(s) · 0 open row(s)
+* [Inspecto](product/inspecto/index.md) - `product.inspecto` · 4 doc(s) · 0 open row(s)
+* [Inspecto LA](product/la/index.md) - `product.la` · 4 doc(s) · 0 open row(s)
+* [Inspecto Telco](product/telco/index.md) - `product.telco` · 4 doc(s) · 0 open row(s)
 
 # Apps
 
