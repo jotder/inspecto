@@ -88,8 +88,10 @@ final class DeliveryCheck {
         }
     }
 
+    /** The manifest and the windowed check run only for an enabled block (GAP-DETECTION-ENABLED-IGNORED-1). */
     static boolean applies(PipelineConfig cfg) {
-        return cfg.collector().gapDetection().hasFileTemplate() && manifestFile(cfg) != null;
+        PipelineConfig.GapDetection gd = cfg.collector().gapDetection();
+        return gd.enabled() && gd.hasFileTemplate() && manifestFile(cfg) != null;
     }
 
     /** Records the committed members of {@code batch}; returns the anomalies found (also signalled). */

@@ -633,10 +633,10 @@ The slices, each its own lane (D-PA16):
     six nightly Jobs, each for 2026-07-01…03. It waits on each run and ends with the Alert sweep. It fails unless one
     Alert each of `ra_leakage_found`, `fraud_irsf` and `tb_box_suspected` exists. A Job its own `on_signal` chain is
     already running (a 409, or a run recorded SKIPPED "previous run still in flight") is fired again. In the demo Space
-    only, the gap-detection block is removed: the corpus is fixed to July 2026, so FM's `payments` and
+    only, the gap-detection block is switched off (`enabled: false`): the corpus is fixed to July 2026, so FM's `payments` and
     `subscriber_events` raised 262 `sequence_gap` Alerts (one per missing day), and one more each day the bundle aged.
-    Removed, not `enabled: false`, because the file-template check ignores that switch (`GAP-DETECTION-ENABLED-IGNORED-1`).
-    The templates keep it.
+    It was removed until `GAP-DETECTION-ENABLED-IGNORED-1` (fixed 2026-11-12) made the file-template check honour the
+    switch. The templates keep it on.
   - **The presenter text**, `products/telco.demo-build.txt` (the bundle's `DEMO-BUILD.txt`): what each App shows, the
     Demo Users, the App switcher, the July 2026 dating, and the reset.
   - **The Product matrix.** `tools/check-product-build.mjs` assembles a Product × Edition × Distribution without

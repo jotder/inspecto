@@ -95,7 +95,7 @@ there is no other spelling):
 | `duplicate` | `mode`, `algorithm`, `on_change` |
 | `guarantee` | `BEST_EFFORT` (default), `AT_LEAST_ONCE`, `EXACTLY_ONCE` |
 | `incremental.watermark` | `last_modified` file-level watermark |
-| `gap_detection` | `enabled`, `sequence`, `file_template`, `seq_scope` |
+| `gap_detection` | `enabled`, `sequence`, `file_template`, `seq_scope` — `enabled: false` (default `true`) stops the live `sequence` detector, the windowed `file_template` check and the per-day delivery manifest; the `file_template` still names a file's day in Signals and is the `kpi.completeness` Job's default template (`GAP-DETECTION-ENABLED-IGNORED-1`, 2026-11-12) |
 | `fetch` | `mode`, `staging_dir`, `parallel_fetch`, `rate_limit` |
 | `retry` | `count`, `backoff`, `initial_delay`, `max_delay` |
 | `circuit_breaker` | `failure_threshold`, `cooldown` |
