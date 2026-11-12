@@ -561,7 +561,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Release notes for the pending MAJOR | `BACKLOG.md` §2 *Release notes for the next MAJOR* | The draft accrues in `api-stability.md`; the tag is not cut |
 | X5 cross-lane StepInfo envelope | `BACKLOG.md` §2 *X5* | ~1 KB pointer + schema + diagnostics, deferred to the MAJOR |
 | Platform Services Stage 2 (open Step-kind registry) and Stage 3 (pack-contributed services); no timeout/cancellation either side | `BACKLOG.md` §4 *Platform Services* | Design only |
-| Structured (non-SQL) queries from an external consumer; more `$`-resolvers | `BACKLOG.md` §3 *Queries / BI* (P3) | `422` on non-SQL is the deliberate contract (R6) |
+| Structured (non-SQL) queries from an external consumer; more `$`-resolvers | no board row (the *Queries / BI* row was deleted 2026-11-12; add a resolver when a caller asks by name) | `422` on non-SQL is the deliberate contract (R6) |
 | Draft/published version history as designed (guideline 7, W3b) | `REQUIREMENTS.md` MET-5 (partial) | Behind store widening |
 | Per-context split of `openapi-v1.json` | `docs/api/README.md` (deferred, reversible) | Only if the file becomes unwieldy |
 

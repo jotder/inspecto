@@ -392,7 +392,7 @@ in the first sales conversation.
 case.** An operator asked the obvious question — *what if there is only one Space, under huge load?* —
 and under D3 as written, N pods buy that customer **nothing**. For a tier-1 telecom that most likely has
 one Space with many feeds, that is the common case, not an edge case, and it is the flagship Enterprise
-story. This section records the grounding; the resulting choices are **D14–D16** in §9, unsigned.
+story. This section records the grounding; the resulting choices are **D14–D16** in §9 (D14 and D16 signed 2026-10-20; D15: board `SCALEOUT-D14-D16-DECISIONS-1`).
 
 D3's stated justification is that pipelines in a Space share **inboxes**, **ledgers** and **dedup state**.
 Two of those three do not survive grounding:
@@ -1115,7 +1115,7 @@ Work under (ii):
 
 ### 5.5 Request distribution — the UI and the API *(added 2026-09-11)*
 
-> **Status (audited 2026-10-12):** NOT BUILT - D16 unsigned; `/spaces` still pod-local; `/auth/refresh` statelessness UNKNOWN.
+> **Status (audited 2026-10-12):** NOT BUILT - D16 signed 2026-10-20, nothing built yet; `/spaces` still pod-local; `/auth/refresh` statelessness UNKNOWN.
 
 **Invariant:** *What an operator sees must not depend on which pod answered.*
 
@@ -1171,7 +1171,7 @@ Work:
 and is worth having if the next phase never happens. Stop between any two.
 
 ⚠ **This sequencing is UNCHANGED by the 2026-09-11 amendment and does not yet incorporate it.** §4.1's
-units `U1`–`U4` and §5.5's routing work hang on **D14–D16, which are unsigned**. If D14 is signed, the
+units `U1`–`U4` and §5.5's routing work hang on **D14–D16** (D14 and D16 signed 2026-10-20; D15 on the board). With D14 signed, the
 natural revision is to pull `U1` (distributed remote acquisition) into phase A — it needs only the claim
 surfaces phase A already moves to Postgres, and it is the cheapest horizontal scale in the system — and to
 place `U2` in phase B beside the lease. ⛔ Do not re-sequence before the decisions are signed; ⚠ and note
