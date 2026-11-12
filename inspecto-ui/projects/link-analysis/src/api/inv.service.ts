@@ -1,4 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { decodeEdges, type EdgeWire } from './edge-wire';
 import { HttpClient, HttpErrorResponse, HttpParameterCodec, HttpParams } from '@angular/common/http';
 import { Observable, catchError, map, of, switchMap, tap, throwError, timer } from 'rxjs';
 import { retryAfterMs } from '@inspecto/link-analysis/link-analysis/limit-refusal';
@@ -1994,17 +1995,23 @@ export class InvService {
      * `304` returns the stored body object itself (it carries the masking note, which `noted` re-applies). Any other
      * error drops the entry and propagates unchanged; a response without an ETag stores nothing.
      */
-    private conditionalPost<T extends { masking?: MaskingNote }>(path: string, req: unknown): Observable<T> {
+    private conditionalPost<T extends { masking?: MaskingNote }, W = T>(
+        path: string,
+        req: unknown,
+        decode: (wire: W) => T = (w) => w as unknown as T,
+    ): Observable<T> {
         const key = this.reads.keyOf('POST', path, req);
         const held = this.reads.entry(key);
         const send = (etag: string | null) =>
-            this.http.post<T>(apiUrl(path), req, {
+            this.http.post<W>(apiUrl(path), req, {
                 observe: 'response',
                 headers: etag ? { 'If-None-Match': etag } : undefined,
             });
-        const keep = map((res: { body: T | null; headers: { get(n: string): string | null } }) => {
-            this.reads.store(key, res.headers.get('ETag'), res.body);
-            return res.body as T;
+        // PERF-P10-1: decoded ONCE, before it is held, so a 304 hands back the same decoded object (P10a-2 reuse)
+        const keep = map((res: { body: W | null; headers: { get(n: string): string | null } }) => {
+            const body = res.body == null ? null : decode(res.body);
+            this.reads.store(key, res.headers.get('ETag'), body);
+            return body as T;
         });
         const run = (retried: boolean): Observable<T> =>
             send(retried ? null : (held?.etag ?? null)).pipe(
@@ -2029,12 +2036,12 @@ export class InvService {
     }
 
     project(req: ProjectionRequest): Observable<ProjectionResult> {
-        return this.conditionalPost<ProjectionResult>('/inv/projection', req);
+        return this.conditionalPost<ProjectionResult, EdgeWire>('/inv/projection', req, decodeEdges);
     }
 
     /** Phase E incremental expand: the one-hop neighborhood of `req.value` within the mapping. */
     neighbors(req: NeighborsRequest): Observable<ProjectionResult> {
-        return this.conditionalPost<ProjectionResult>('/inv/projection/neighbors', req);
+        return this.conditionalPost<ProjectionResult, EdgeWire>('/inv/projection/neighbors', req, decodeEdges);
     }
 
     /** LA-EXPAND-PICK-NEIGHBOURS-1: a window of the entity's neighbours with the real total; never held by the fan-out threshold. */

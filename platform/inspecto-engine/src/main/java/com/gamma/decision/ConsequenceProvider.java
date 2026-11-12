@@ -1,5 +1,7 @@
 package com.gamma.decision;
 
+import com.gamma.api.PublicApi;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,7 @@ import java.util.Map;
  * {@link Result#UNAVAILABLE} — never silently executed or skipped. An action nobody ever declared stays
  * {@link Result#SKIPPED} ("unknown action").
  */
+@PublicApi(since = "4.0.0")
 public interface ConsequenceProvider {
 
     /** The action string, e.g. {@code emit-signal}. The registry key. */

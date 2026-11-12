@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.api.PublicApi;
+
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.EnumSet;
@@ -32,6 +34,7 @@ import java.util.List;
  * In particular: <em>do not</em> download to temp, read, then move to backup. Either stream
  * ({@code open}) when there is nothing to keep, or write directly to the destination ({@code fetchTo}).
  */
+@PublicApi(since = "4.0.0")
 public interface CollectorConnector extends AutoCloseable {
 
     /** Stable scheme id used in config ({@code source.connector}) and {@code ServiceLoader} lookup. */

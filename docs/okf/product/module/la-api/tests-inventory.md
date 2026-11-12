@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-51 test class(es): 51 unit, 0 real-HTTP control-plane, 0 IT.
+52 test class(es): 52 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -36,6 +36,7 @@ mvn -o test -pl la/inspecto-la-api -Dtest=CaseHistoryRoutesContractTest,ColumnPr
 | `DraftPromoteCostTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DraftPromoteCostTest.java` | LA-DRAFT-PROMOTE-COST-1: promote reuses the Draft's own sealed per-step hash and set file instead of re-serialising the whole |
 | `DraftRebaseCostTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DraftRebaseCostTest.java` | LA-DRAFT-REBASE-COST-1: the rebase plan serialises each rebased state ONCE (hash and set file from the same canonical bytes) instead of |
 | `DraftRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DraftRoutesContractTest.java` | {@link DraftRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |
+| `EdgeWireParityTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EdgeWireParityTest.java` | PERF-P10-1 parity: the compact edge rows ({@link InvRoutes#edgeArrays}), decoded the way the SPA decodes them |
 | `EmbedExpirySweepTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EmbedExpirySweepTest.java` | LA-EMBED-EXPIRY-SWEEP-1: the sweep drops an expired grant's hash with NO mint and NO list call. |
 | `EmbedGrantsExpiryClockTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EmbedGrantsExpiryClockTest.java` | LA-EMBED-VIEW-1 remainder (d): real expiry, driven by an INJECTED clock (every grant call takes {@code now}), including a lifetime |
 | `EntityIdentityRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/EntityIdentityRoutesContractTest.java` | {@link EntityIdentityRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |

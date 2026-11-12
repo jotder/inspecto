@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
 import com.gamma.signal.SignalEmitter;
 import com.gamma.util.RunLog;
 
@@ -11,6 +12,7 @@ import java.util.Map;
  * job-framework refactor ({@code docs/job-framework-design.md} §6.2); the data-plane façade that
  * design named {@code JobServices} is {@link #services()} (platform-services plan, 2026-08-09).
  */
+@PublicApi(since = "4.0.0")
 public interface JobContext {
 
     /** This run's id (matches the {@link JobRun#runId()} recorded for it). */

@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.api.PublicApi;
+
 import java.util.List;
 
 /**
@@ -17,6 +19,7 @@ import java.util.List;
  * with the source root at depth 0 ({@code inbox/*} = 1, {@code inbox/*}{@code /*} = 2);
  * {@link #UNBOUNDED} (-1) walks the whole tree.
  */
+@PublicApi(since = "4.0.0")
 public record DiscoveryContext(List<String> includes, List<String> excludes, int maxDepth) {
 
     /** Walk the entire tree (the legacy default). */

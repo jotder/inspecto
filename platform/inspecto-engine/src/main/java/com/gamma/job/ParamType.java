@@ -1,9 +1,12 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 /**
  * The declared type of a Job {@link ParameterDecl} (job-framework §7.1). Drives resolution
  * ({@link ParameterResolver}, P3a) and UI form widgets.
  */
+@PublicApi(since = "4.0.0")
 public enum ParamType {
     /** Free text. {@code TEXT} is the multiline variant — it retires the renderer's {@code name == "sql"}
      *  guess (job-parameter-contract §7.1). */

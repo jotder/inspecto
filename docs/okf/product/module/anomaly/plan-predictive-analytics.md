@@ -1,6 +1,10 @@
 # Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)
 
 > ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
+>
+> **2026-11-12:** the board row `PREDICTIVE-ANALYTICS-1` was merged into `PREDICTIVE-STUDIO-PREVIEW-1` (the slices below
+> shipped, so "design-only" was stale). The still-open OD-10, OD-12, OD-13 and OD-16 (section 9) now travel on that row;
+> OD-11 is settled by the forecast slice; OD-15 is answered on `PACK-SALES-MARKETING-1`.
 
 *2026-11-01:* slice **S2 (Segmentation A) is BUILT** as `PREDICTIVE-SEGMENT-RFM-1` in the new module `features/inspecto-predictive` (S1's windowed Measures were built as ANALYTICS-CORE-1 C1; the module skeleton came with S2). As built, with decisions D-PS1…D-PS8 (output prefix `customer_segments_`, not `segments_`): [`okf/product/module/predictive/spec-segmentation.md`](../predictive/spec-segmentation.md). The rest of this design stays parked.
 

@@ -1,11 +1,14 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 /**
  * How a Run was started: a {@code kind} ({@code schedule} | {@code event} | {@code manual} |
  * {@code catch-up}) and its {@code detail} (the actor for {@code manual:<actor>}, the upstream
  * pipeline for {@code event:<pipeline>}, else blank). Parsed from the recorded trigger string so a
  * Job can branch on how it fired without re-parsing.
  */
+@PublicApi(since = "4.0.0")
 public record TriggerInfo(String kind, String detail) {
 
     /**

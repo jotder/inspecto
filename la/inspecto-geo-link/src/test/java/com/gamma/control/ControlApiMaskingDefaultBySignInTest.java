@@ -82,7 +82,7 @@ class ControlApiMaskingDefaultBySignInTest {
         b = body == null ? b.GET() : b.method(method, HttpRequest.BodyPublishers.ofString(body));
         HttpResponse<String> r = client.send(b.build(), BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), path + " -> " + r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private void assertUnmasked(Ctx c) throws Exception {

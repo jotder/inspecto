@@ -176,7 +176,7 @@ class ControlApiLaPortsBridgeTest {
             String create = "{\"id\":\"inv-a\",\"purpose\":\"p\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
                     + "\"targetCol\":\"callee\",\"caseRef\":\"CASE-1\"}";
             assertEquals(200, send(c, "POST", "/inv/investigations", create, "Bearer owner").statusCode());
-            JsonNode s = JSON.readTree(send(c, "GET", "/inv/investigations/inv-a/case", null, "Bearer owner").body()).get("data");
+            JsonNode s = EdgeWireTestRows.decoded(JSON.readTree(send(c, "GET", "/inv/investigations/inv-a/case", null, "Bearer owner").body()).get("data"));
             assertEquals("CASE-1", s.get("caseRef").asText());
             assertFalse(s.get("sharing").asBoolean(), s.toString());
             assertTrue(s.get("reason").asText().contains("not installed"), s.toString());
