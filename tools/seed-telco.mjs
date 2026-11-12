@@ -99,8 +99,8 @@ export function scaffold(spacesRoot, { repoRoot = repo } = {}) {
     }
     // The demo corpus is fixed to July 2026, so a feed watching for one file a day (gap detection) would raise an Alert for
     // every day since then (262 on 2026-11-11, from FM's payments and subscriber_events), and one more each day the bundle
-    // ages. In the demo Space only, the watch is REMOVED; the templates keep it. Removed, not `enabled: false`: the
-    // file-template check ignores that switch (GAP-DETECTION-ENABLED-IGNORED-1).
+    // ages. In the demo Space only, the watch is switched OFF (`enabled: false`, honoured since
+    // GAP-DETECTION-ENABLED-IGNORED-1); the templates keep it on, and the demo keeps its template to switch back on.
     for (const dir of fs.readdirSync(path.join(base, 'config'))) {
         const f = path.join(base, 'config', dir, `${dir}_pipeline.toon`);
         if (!fs.existsSync(f)) continue;
@@ -109,9 +109,9 @@ export function scaffold(spacesRoot, { repoRoot = repo } = {}) {
         if (at < 0) continue;
         let end = at + 1;
         while (end < lines.length && /^ {4,}\S/.test(lines[end])) end++;
-        lines.splice(at, end - at);
-        // A `collector:` left with nothing under it goes too (an empty key is not an empty map).
-        if (at > 0 && /^collector:\r?$/.test(lines[at - 1]) && !/^ {2,}\S/.test(lines[at] ?? '')) lines.splice(at - 1, 1);
+        const on = lines.slice(at + 1, end).findIndex((l) => /^    enabled:/.test(l));
+        if (on >= 0) lines[at + 1 + on] = '    enabled: false';
+        else lines.splice(at + 1, 0, '    enabled: false');
         fs.writeFileSync(f, lines.join('\n'));
     }
     const samples = path.join(base, 'data', 'samples');
