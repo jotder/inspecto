@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P3 | defect | a trimmed customer bundle is not exact: | operator |
+| `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P2 | defect | ⬆ P2, fix next (operator 2026-11-12, D-PA37). | — |
