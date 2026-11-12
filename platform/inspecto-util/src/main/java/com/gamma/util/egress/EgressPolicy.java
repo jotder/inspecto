@@ -86,8 +86,8 @@ public final class EgressPolicy {
      * it as an address that a Java-side pattern or CIDR check never compared. Refusing beats normalising: the gate and
      * the dialler can then never disagree on which address a spelling means.
      *
-     * @return {@code true} when {@code host} is an accepted IP literal, {@code false} when it is not numeric (a name,
-     *         which this method does not check)
+     * @return {@code true} when {@code host} is an accepted IP literal, {@code false} when it is not numeric (a name;
+     *         only its trailing dot is checked here, and an all-digit last label such as {@code kafka.01} reads as numeric and is refused)
      * @throws IllegalArgumentException for a numeric host that is not canonical
      */
     public static boolean checkAddressSpelling(String host) {
@@ -98,7 +98,7 @@ public final class EgressPolicy {
                 throw new IllegalArgumentException("the host '" + host + "' is not a valid IPv6 literal (no zone ids, "
                         + "no port)");
             try {
-                if (!(InetAddress.ofLiteral(inner) instanceof Inet6Address) && !inner.startsWith("::ffff:"))
+                if (!(InetAddress.ofLiteral(inner) instanceof Inet6Address) && !inner.toLowerCase(Locale.ROOT).startsWith("::ffff:"))
                     throw new IllegalArgumentException("the host '" + host + "' is not an IPv6 literal");
             } catch (IllegalArgumentException bad) {
                 throw new IllegalArgumentException("the host '" + host + "' is not a valid IPv6 literal");

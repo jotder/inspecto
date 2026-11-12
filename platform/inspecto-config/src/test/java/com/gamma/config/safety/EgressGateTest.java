@@ -101,6 +101,19 @@ class EgressGateTest {
     }
 
     @Test
+    void aNumericSpellingHiddenBehindIdnaDotsIsRefusedInAuditModeToo() {
+        // IDNA maps U+3002 to '.', so the policy (and an IDNA-aware dialler) reads these as 0177.0.0.1 / 127.1.
+        // Audit mode lets every policy miss through, so only the spelling rule can stop them; each twin ends in 'l'.
+        EgressGate audit = EgressGate.of(tier(false, null, null, SafetyPolicyTier.Mode.AUDIT));
+        assertThrows(EgressRefusedException.class, () -> audit.require("0177。0。0。1", 80, "x"));
+        assertDoesNotThrow(() -> audit.require("0177。0。0。l", 80, "x"));
+        assertThrows(EgressRefusedException.class, () -> audit.require("127．1", 80, "x"));
+        assertDoesNotThrow(() -> audit.require("127．l", 80, "x"));
+        // An upper-case IPv4-mapped literal is the same address as its lower-case twin and is accepted alike.
+        assertDoesNotThrow(() -> audit.require("::FFFF:127.0.0.1", 80, "x"));
+    }
+
+    @Test
     void anIpv6AddressCarryingADeniedIpv4IsRefused() {
         // NAT64 64:ff9b::/96 carries 127.0.0.1; its twin one character away (64:ff9c::) carries nothing.
         EgressGate g = gate(null, null, List.of("127.0.0.0/8"));

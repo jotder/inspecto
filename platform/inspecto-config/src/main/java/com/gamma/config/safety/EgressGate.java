@@ -127,9 +127,22 @@ public final class EgressGate {
         if (host == null || host.isBlank()) return null;   // refusal() reports "no host"
         try {
             EgressPolicy.checkAddressSpelling(host.trim());
-            return null;
         } catch (IllegalArgumentException bad) {
             return bad.getMessage();
+        }
+        // The policy compares the IDNA form, which maps U+3002 / U+FF0E / U+FF61 to '.': '0177。0。0。1' must be judged
+        // as the '0177.0.0.1' it becomes (an IDNA-aware dialler reads it that way too).
+        String normalized;
+        try {
+            normalized = HostPattern.normalizeHost(host);
+        } catch (IllegalArgumentException idnaRefused) {
+            return null;   // not a name IDNA accepts: the policy sees it as before
+        }
+        try {
+            EgressPolicy.checkAddressSpelling(normalized);
+            return null;
+        } catch (IllegalArgumentException bad) {
+            return bad.getMessage() + " (after IDNA mapping of '" + host + "')";
         }
     }
 

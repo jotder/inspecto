@@ -958,11 +958,13 @@ Design: [`policy-narrowing-design.md`](../../../../archived-documents/plans-arch
     DuckDB `httpfs`) reads them as an address the `allow.hosts` / `deny.hosts` patterns never compared. **Refuse,
     don't normalise** (decided 2026-11-13): normalising would make the gate one more parser that must agree with
     every dialler's; refusing leaves exactly one spelling per address. A name is not checked here (IDN names keep
-    passing). The D13 CIDR check also classifies an IPv6 answer by the IPv4 it carries (mapped, compatible, NAT64
+    passing), but the rule runs on the raw host AND on its IDNA form (`HostPattern.normalizeHost`, which maps
+    `。` U+3002, U+FF0E and U+FF61 to `.`), so `0177。0。0。1` is judged as `0177.0.0.1`. ⚠ An all-digit last
+    label (`kafka.01`) reads as numeric and is refused too. The D13 CIDR check also classifies an IPv6 answer by the IPv4 it carries (mapped, compatible, NAT64
     `64:ff9b::/96` and `64:ff9b:1::/48`, 6to4 — `EgressPolicy.embeddedIpv4`), so `64:ff9b::7f00:1` hits a
     `127.0.0.0/8` deny. Since `EgressGate.require` is the one chokepoint, every act site above and the object-store
     `dirs.database` gate inherit the rule.
-  - Tests: `EgressGateTest` (13; the three item-(e) tests each pair a refused spelling with an accepted twin one
+  - Tests: `EgressGateTest` (14; the four item-(e) tests each pair a refused spelling with an accepted twin one
     character away and went red against the pre-fix gate), `SafetyPolicyEgressTest` in `inspecto-connectors` (T14, T8, T7 request gate, T12 leader hosts — each with an allowed twin and an observed socket/request count), `ConnectionTesterTest`, `ControlApiSystemRoutesTest`. Mutation-checked: removing the N1 gate turns T14 and T8 red.
   - Not gated by S4 (by design or deferred): N10–N12 (server-configured, D15); `allow.connectors` (scheme gate, not a host); the DuckDB-side egress N13–N15 is S5.
 - **S5 (2026-10-04):** `DuckDbExtension` honours `allow.extensions` and refuses the `INSTALL` fallback under `permit.install_extensions: false`; `DuckLakeRegistrar` gates the catalog host and a remote data path through `EgressGate` before its catch-all. Still open: the `IndexBuilder` file-access opt-in.
