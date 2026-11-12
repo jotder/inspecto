@@ -219,7 +219,7 @@ public final class SpaceTestRunner {
                 lines.add(new Line("checksum", c.checksum(), sum, c.checksum().equalsIgnoreCase(sum)));
             }
             for (ColumnCheck k : c.columns()) {
-                String q = com.gamma.sql.SqlIdent.q(k.column());
+                String q = com.gamma.util.SqlIdent.q(k.column());
                 String label = k.column() + " " + k.check();
                 try {
                     switch (k.check()) {

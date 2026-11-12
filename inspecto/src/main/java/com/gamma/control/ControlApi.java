@@ -649,7 +649,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new BootstrapRoutes(), new AuthRoutes(),
                 new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
                 new RunRoutes(),
-                new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new SpaceTestRoutes(),new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
+                new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new SpaceTestRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
                 new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-observability (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
                 new QueryRoutes(), new DatasetRoutes(), new OnboardRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),

@@ -47,6 +47,10 @@ folder (`PathJail.contains`). A case that names a file outside its folder is mal
 The checksum and column checks read the scratch Parquet outputs, then the scratch root is deleted. Nothing is
 written under the Space's `data/`, `audit/` or `duckdb/`, nor under `tests/`.
 
+⚠ One exception is inherited from the engine: `forScratchRun` does not re-root
+`processing.duckdb.temp_directory`. A Pipeline that sets it gets DuckDB spill files (and the branch commit log)
+there during a case. No shipped Pipeline sets it inside a Space.
+
 Each expectation produces one line: `name`, `expected`, `actual`, `passed`. A case passes when every line passes.
 A case that cannot run (unknown Pipeline, a batch that FAILED) fails with that reason, it does not error the call.
 
