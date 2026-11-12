@@ -2313,8 +2313,34 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.removeSubscriber(datasetWriteSubscriber);   // de-register the S3b dataset-write trigger
         securityTriggers.detach();   // …and release the log, so a later service's evaluator takes over
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
-        try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log
+        closeStores(true);
+    }
+
+    private final Object storesCloseLock = new Object();
+    private boolean storesClosed;
+
+    /**
+     * DEMO-BAKE-WAL-RACE-1: close this Space's stores now, without waiting for its in-flight work to drain. A closing
+     * DuckDB store checkpoints, so none keeps a {@code .wal}. {@code SpaceManager} calls it when {@link #close()} has
+     * overrun its stop budget (a long Job Run, a backed-up notification queue): the abandoned drain would otherwise
+     * reach the store closes only after the JVM had exited. Work still running then fails on a closed store, which is
+     * the stop it was already asked to make ({@link #beginClose}). Each store serialises its connection, so a close
+     * waits for a statement in flight on it, never cuts it. Idempotent with {@link #close()}.
+     */
+    public void closeStoresNow() {
+        closeStores(false);
+    }
+
+    private void closeStores(boolean drained) {
+        synchronized (storesCloseLock) {   // a second caller waits until the first has closed everything
+            if (storesClosed) return;
+            storesClosed = true;
+            JobService j = jobs;
+            if (j != null) {
+                try { j.closeStores(); } catch (Exception e) { log.warn("Error closing Job stores: {}", e.getMessage()); }
+            }
+            try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         // Release the output-file registry this service registered (+ its DB handle); no-op when default-off.
         com.gamma.consignment.ConsignmentOutputStores.unregister(spaceId);
         com.gamma.consignment.FileStages.unregister(spaceId);
@@ -2328,13 +2354,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         objectEngine.ifPresent(e -> {
             try { e.close(); } catch (Exception ex) { log.warn("Error closing object engine: {}", ex.getMessage()); }
         });
-        try { alertStore.close(); } catch (Exception e) { log.warn("Error closing Alert store: {}", e.getMessage()); }
-        log.info("CollectorService stopped");
-        // Close last so the "stopped" log line above is itself captured, then flushed to disk.
-        try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }
-        // …then detach it, or the next service on this log (the default Space shares EventLog.global()) drains
-        // this closed store's history into its own store and chain on installStore.
-        this.eventLog.releaseStore(events);
+            try { alertStore.close(); } catch (Exception e) { log.warn("Error closing Alert store: {}", e.getMessage()); }
+            if (drained) log.info("CollectorService stopped");
+            else log.warn("CollectorService stores closed before its in-flight work drained");
+            // Close last so the log line above is itself captured, then flushed to disk.
+            try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }
+            // …then detach it, or the next service on this log (the default Space shares EventLog.global()) drains
+            // this closed store's history into its own store and chain on installStore.
+            this.eventLog.releaseStore(events);
+        }
     }
 
     // ── CLI ────────────────────────────────────────────────────────────────────

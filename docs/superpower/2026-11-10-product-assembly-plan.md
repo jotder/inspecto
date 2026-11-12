@@ -659,7 +659,8 @@ The slices, each its own lane (D-PA16):
   - **Found, not fixed (a board row each):** a Collector's file-template gap check ignores `gap_detection.enabled: false`
     (`GAP-DETECTION-ENABLED-IGNORED-1`). The demo sign-in headline is hard-coded `{{ product }} MFS`
     (`sign-in.component.ts`, from `52aa6e7a7`), so the Telco demo reads "Inspecto Telco MFS". The engine's Space close
-    still abandons a busy Space after 10 s without a checkpoint; the bake now avoids it, but a production stop does not.
+    still abandons a busy Space after 10 s without a checkpoint; the bake now avoids it, but a production stop does not
+    (fixed 2026-11-12, `DEMO-BAKE-WAL-RACE-1`: an abandoned close now closes the Space's stores).
   **Proof (as built).** Node: `seed-telco.test.mjs` 6/6 (plan order and windows, dry run, Demo User sign-in, the
   SKIPPED and 409 re-fire, a failed run and a missing App Alert fail the seed, the real scaffold), and
   `check-product-build.test.mjs` 3/3 (the seed test also fails a crashed Pipeline run: FAILED with no failed file). With the Product tools, 99/99 across `check-products`, `assemble`,
