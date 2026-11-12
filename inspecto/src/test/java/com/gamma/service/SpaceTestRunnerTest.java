@@ -1,8 +1,10 @@
 package com.gamma.service;
 
+import com.gamma.event.EventLog;
 import com.gamma.job.CapturingJobContext;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobResult;
+import com.gamma.pipeline.SpaceConfigRoot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -159,7 +161,9 @@ class SpaceTestRunnerTest {
         copyCase(space, "orders_ingest", "orders_broken");
         Files.writeString(tests.resolve("orders_broken/case.toon"),
                 "pipeline: orders\ninputs[1]: ORDERS_20260701.csv\nexpect:\n  rows: 1\n");
-        System.setProperty("assist.write.root", space.resolve("config").toString());
+        // The Job resolves SpaceConfigRoot.requireCurrent(), where a registered default-Space root (left behind by any
+        // earlier DecisionRules/SpaceBootstrap use in this JVM) beats -Dassist.write.root: register ours explicitly.
+        SpaceConfigRoot.register(EventLog.DEFAULT_SPACE_ID, space.resolve("config"));
         try {
             var job = new SpaceTestJobType().create(new JobConfig("t", SpaceTestJobType.TYPE, null, null, true, false,
                     Map.of(), null, null));
@@ -176,7 +180,7 @@ class SpaceTestRunnerTest {
                     && List.of("orders_broken").equals(s.get("cases"))), all.signals.toString());
             assertTrue(all.warned("orders_broken"), all.warnings.toString());
         } finally {
-            System.clearProperty("assist.write.root");
+            SpaceConfigRoot.forget(EventLog.DEFAULT_SPACE_ID);
         }
         assertFalse(Files.exists(space.resolve("data")), "the Job must not create the Space's data folder");
     }
