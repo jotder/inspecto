@@ -59,5 +59,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-MOSCOW-UNTRACKED-1` | P2 | chore | check eleven architecture gaps that the MoSCoW analysis found in documents but that have no board row, then file or refuse each (filed 20… | — |
+| `ARCH-MOSCOW-UNTRACKED-1` | P2 | chore | check ten architecture gaps that the MoSCoW analysis found in documents but that have no board row, then file or refuse each (filed 2026-… | — |
 | `ARCH-DOC-CONTRADICTIONS-1` | P3 | chore | fourteen places where current docs contradict each other, found by the MoSCoW research pass (filed 2026-11-12); settle each against the c… | — |

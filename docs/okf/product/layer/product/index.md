@@ -43,6 +43,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-BRANDING-SPEC-ORDER-1` | P3 | defect | branding.service.spec.ts fails only inside the full npx ng test run (filed 2026-11-12). | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-MOSCOW-UNTRACKED-1` | P2 | chore | check eleven architecture gaps that the MoSCoW analysis found in documents but that have no board row, then file or refuse each (filed 20… | — |
+| `ARCH-MOSCOW-UNTRACKED-1` | P2 | chore | check ten architecture gaps that the MoSCoW analysis found in documents but that have no board row, then file or refuse each (filed 2026-… | — |
 | `ARCH-DOC-CONTRADICTIONS-1` | P3 | chore | fourteen places where current docs contradict each other, found by the MoSCoW research pass (filed 2026-11-12); settle each against the c… | — |
 | `DOCS-FUNCTIONALITY-HUBS-1` | P3 | chore | decide whether functionality/ Product Map Items get their own hubs or stay sections of their module's features slot (none exist yet, so n… | operator |

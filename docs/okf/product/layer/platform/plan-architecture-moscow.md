@@ -59,12 +59,12 @@ Three of the eight (M2, M3 and M8) need no decision from anyone and can start no
 | S6 | Platform Services Stage 2 | `DatasetAccess` pins per call; a Run holds no snapshot. | Two reads in one Run may see different file lists; no failure has been reported. |
 | S7 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | Object-store `dirs.database` is written by ingest; sinks, References and the readers still refuse it. | Phase C of scale-out stays partial; single-Pod installs are unaffected. |
 | S8 | `DATA-TIERS-1` · `PRODUCT-ASSEMBLY-1` with `CONTAINER-AIRGAP-PROOFS-1` | The data layer by Edition is unfinished; the Kubernetes install and the air-gapped bundle are unproven. | In flight under their own plans; a Basic or Standard zip install does not depend on them. |
-| S9 | `SPACE-LINK-CENSUS-1` (then `SPACE-EVOLUTION-1`, `PIPELINE-LINK-GAPS-1`) | Link keys are hard-coded in six checks, so rename and impact scans miss links. | LC-1 is startable; nothing is red. |
-| S10 | `ARCH-MOSCOW-UNTRACKED-1` item 5 *(no row of its own)* | About 3,550 native threads and 1.4 GB at idle with 48 DuckDB files; no thread cap per instance. | Suspected, not proven, as the cause of slow projections. Measure before changing. |
+| S9 | `SPACE-LINK-CENSUS-1` (then `SPACE-EVOLUTION-1`, `PIPELINE-LINK-GAPS-1`) | Link keys are hard-coded in six checks, so rename and impact scans miss links. | LC-1 has shipped (the board row's text lags); the rest is open and nothing is red. |
+| S10 | `LA-PERF-N10-1` | About 3,550 native threads and 1.4 GB at idle with 48 DuckDB files; no thread cap per instance. | Suspected, not proven, as the cause of slow projections. Measure before changing. |
 | S11 | `ARCH-MOSCOW-UNTRACKED-1` item 6 *(no row of its own)* | `/metrics` and `/health/details` are unauthenticated by design and fenced only by a proxy; the preflight, proxy and TLS templates, off-site backup, verify and upgrade scripts are unbuilt. | Safe behind a correctly set proxy; the scripts make that the default, not an instruction. |
 | S12 | `ARCH-MOSCOW-UNTRACKED-1` item 7 *(no row of its own)* | Retention and legal hold cover Incidents only. | The Advanced brochure promises legal hold; either build it or narrow the claim. |
 | S13 | `DEMO-BAKE-WAL-RACE-1` | Closing a busy Space gives up after 10 s and leaves `.wal` files. | Seen while baking demo images; the row itself says it is open for a production stop. |
-| S14 | `ARCH-MOSCOW-UNTRACKED-1` item 8 *(no row of its own)* | UI: "the core never imports a feature" is not lint-enforced, and 48 feature-to-feature imports rest on review. Link Analysis graph layouts run on the main thread (2.3 to 3.6 s at 767 nodes). | The convention holds today; the freeze is a usability cost. The lint is small. |
+| S14 | `ARCH-MOSCOW-UNTRACKED-1` item 8 *(no row of its own)* for the two lint halves; `LA-PERF-N4-1` for the layouts | UI: "the core never imports a feature" is not lint-enforced, and 48 feature-to-feature imports rest on review. Link Analysis graph layouts run on the main thread (2.3 to 3.6 s at 767 nodes). | The convention holds today; the freeze is a usability cost. The lint is small. |
 | S15 | `ARCH-DOC-CONTRADICTIONS-1` | Fourteen places (one settled since) where current docs contradict each other (thin-jar count, shading, Postgres multi-user state, D15, old Edition names and more). | Docs, not behaviour; but a reader acting on the wrong page gets the wrong answer. |
 | S16 | `DOCS-AGENT-WRITTEN-REVIEW-1` | A work list of wrong claims in plan and admin-guide pages remains; module architecture pages were not re-checked. | Same reason as S15; done a module at a time when next touched. |
 
@@ -114,7 +114,7 @@ Three of the eight (M2, M3 and M8) need no decision from anyone and can start no
 3. **Two correctness defects in Jobs (M3, M8) are the only Musts that are plain engineering.**
 4. **Structure is in good shape.** No Must is about module boundaries: the split-package count is 0, the
    remaining cycles are inside one module each, and the refusals in §5 have held.
-5. **Eleven items have no board row.** They come from docs, not code. `ARCH-MOSCOW-UNTRACKED-1` checks each
+5. **Ten items have no board row.** They come from docs, not code. `ARCH-MOSCOW-UNTRACKED-1` checks each
    and files or refuses it; M6 (masking of `CONFIDENTIAL` columns) and S1 (unknown config keys) first.
 
 ## 7. Limits of this analysis
