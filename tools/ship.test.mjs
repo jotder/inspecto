@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { assemble } from './assemble.mjs';
 import { gatherModel } from './products.mjs';
 import { gather } from './check-offerings.mjs';
-import { buildImage, CHART_SOURCE, packChart, stampChart } from './ship.mjs';
+import { buildAirgap, buildImage, CHART_SOURCE, duckdbExtensionNames, packChart, renderInstaller, stampChart } from './ship.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const model = gatherModel(repo);
@@ -96,6 +96,59 @@ test('REFUSED image: a Windows bundle, another Product\'s bundle, an unlabelled 
     try {
         assert.throws(() => buildImage(plan, b, tmp(), { docker: (c, args) => (args[1] === 'inspect' ? 'la' : null) }), /labelled io\.inspecto\.product='la', the plan 'telco'/);
     } finally { rmSync(b, { recursive: true, force: true }); }
+});
+
+/** A docker stub: `inspect` answers the plan's Product, `save` writes a small file where the image tar goes. */
+const dockerStub = (product) => (cmd, args) => {
+    if (args[0] === 'save') writeFileSync(args[2], 'image-bytes');
+    return args[1] === 'inspect' ? product : null;
+};
+
+test('airgap: the bundle, image, chart, installer, manifest and SHA256SUMS, tarred', () => {
+    const plan = assemble(model, g, { product: 'telco', edition: 'standard', target: 'airgap' });
+    const bundle = fakeBundle(plan);
+    const names = duckdbExtensionNames();
+    mkdirSync(join(bundle, 'lib', 'duckdb', 'linux_amd64'), { recursive: true });
+    for (const n of names) writeFileSync(join(bundle, 'lib', 'duckdb', 'linux_amd64', `${n}.duckdb_extension`), n);
+    const out = tmp();
+    try {
+        const r = buildAirgap(plan, bundle, out, { docker: dockerStub('telco') });
+        const name = `inspecto-telco-${plan.platformVersion}-standard-airgap`;
+        assert.equal(r.complete, true);
+        assert.equal(r.tar, join(out, `${name}.tar`));
+        const sums = readFileSync(join(r.root, 'SHA256SUMS'), 'utf8').trim().split('\n').map((l) => l.split('  ')[1]);
+        for (const f of ['install-offline.sh', 'airgap.json', 'bundle/inspecto-deploy/lib/product.json', `image/inspecto-telco-${plan.platformVersion}-standard.image.tar`, `chart/inspecto-telco-${plan.platformVersion}.tgz`])
+            assert.ok(sums.includes(f), `SHA256SUMS lists ${f}`);
+        assert.ok(!sums.includes('SHA256SUMS') && !sums.some((f) => f.startsWith('chart/inspecto-telco/')), 'no self entry and no unpacked chart');
+        const manifest = JSON.parse(readFileSync(join(r.root, 'airgap.json'), 'utf8'));
+        assert.equal(manifest.product, 'telco');
+        assert.deepEqual(manifest.extensions, { platform: 'linux_amd64', required: names, missing: [] });
+        const sh = readFileSync(join(r.root, 'install-offline.sh'), 'utf8');
+        assert.match(sh, new RegExp(`^IMAGE_REF='inspecto-telco:${plan.platformVersion}-standard'$`, 'm'));
+        assert.match(sh, /^COMPLETE='true'$/m);
+        assert.doesNotMatch(sh, /@[A-Z_]+@/);
+        const listed = execFileSync('tar', ['-tf', `${name}.tar`], { cwd: out, encoding: 'utf8' }).split('\n').map((l) => l.replace(/\\/g, '/'));
+        assert.ok(listed.includes(`${name}/install-offline.sh`) && listed.includes(`${name}/SHA256SUMS`), 'the tar holds the folder');
+        assert.match(readFileSync(`${r.tar}.sha256`, 'utf8'), new RegExp(`^[0-9a-f]{64}  ${name}\\.tar\\n$`));
+    } finally { rmSync(bundle, { recursive: true, force: true }); rmSync(out, { recursive: true, force: true }); }
+});
+
+test('REFUSED airgap: a missing DuckDB extension, unless a desk proof allows it and says so', () => {
+    const plan = assemble(model, g, { product: 'telco', edition: 'standard', target: 'airgap' });
+    const bundle = fakeBundle(plan);
+    const out = tmp();
+    try {
+        assert.throws(() => buildAirgap(plan, bundle, out, { docker: () => assert.fail('docker must not run') }), /lacks the linux_amd64 DuckDB extension\(s\) excel, /);
+        const r = buildAirgap(plan, bundle, out, { docker: dockerStub('telco'), allowMissingExtensions: true });
+        assert.equal(r.complete, false);
+        assert.equal(JSON.parse(readFileSync(join(r.root, 'airgap.json'), 'utf8')).complete, false);
+        assert.match(readFileSync(join(r.root, 'install-offline.sh'), 'utf8'), /^COMPLETE='false'$/m);
+    } finally { rmSync(bundle, { recursive: true, force: true }); rmSync(out, { recursive: true, force: true }); }
+});
+
+test('REFUSED airgap installer: a value that cannot sit in single quotes, a placeholder left unfilled', () => {
+    assert.throws(() => renderInstaller("X='@T@'", { T: "it's" }), /cannot hold a quote/);
+    assert.throws(() => renderInstaller("X='@T@' @U@", { T: 'ok' }), /@U@ has no value/);
 });
 
 test('REFUSED: a plan from a zip target has no ship field', () => {

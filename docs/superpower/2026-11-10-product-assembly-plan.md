@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); ✅ PA-8 done 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle; a cluster install and a complete air-gapped bundle are owed, `CONTAINER-AIRGAP-PROOFS-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -311,7 +311,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-5** **Inspecto Telco** as proof (lanes 5a ✅ … 5d, §11) | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; the App switcher and *My work* across Apps; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
 | **PA-6** Platform product | the Add-on picker; builder-kit docs; `inspecto app new/validate/test/package`; the conformance kit | a sample partner App built only with the kit passes conformance |
 | **PA-7** Entitlements and live App install | signed entitlements; `POST /apps` install / upgrade / remove; the trial Distribution | install, upgrade and remove an App on a running server with no lost config |
-| **PA-8** Container and air-gap | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
+| **PA-8** Container and air-gap ✅ 2026-11-12 | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
 | **PA-9** CEP App | the **Streaming** Add-on (Kafka in, windowed conditions on the Decision Kernel, Alerts out); the CEP App | a pattern on a live stream raises an Alert within a stated latency |
 | **PA-10** Go-to-market | Product Map kinds; generated Product documents; `customer-build` through the assembler | a customer build of the pilot customer matches today's, plus an entitlement |
 
@@ -1199,6 +1199,60 @@ What exists to build on (measured 2026-11-12):
 | **PA-8a** Per-Product chart | `assemble.mjs` accepts `container` and `airgap` (plan fields `image`, `chart`; demo refused); `tools/ship.mjs chart`; the base chart's labels and `product` values | node tests; `helm lint` and `helm template` for inspecto, la and telco |
 | **PA-8b** Per-Product image | OCI labels in the bundle's Dockerfile; `tools/ship.mjs image` (build, tag, `docker save`); `package.ps1 -Target container` | a Telco Standard image built and booted read-only |
 | **PA-8c** Air-gapped bundle | `tools/ship.mjs airgap`, `install-offline.sh`, `package.ps1 -Target airgap`; the guide `admin-guide-container-airgap.md` | the offline-host boot from the tar, with `--network none` |
+
+**PA-8 as built (2026-11-12).** Guide: [`okf/product/layer/platform/admin-guide-container-airgap.md`](../okf/product/layer/platform/admin-guide-container-airgap.md).
+Lanes: 8a `46f5a646f` (the chart per Product), 8b `7a3d74d62` (the image per Product), 8c (the air-gapped bundle).
+- **The plan field is `ship`.** For `container` and `airgap`, `assemble.mjs` writes `ship: {image: {repository, tag},
+  chart: {name, version, appVersion}}` (`shipOf`), and `null` for the zip targets. The design said `image` and `chart`
+  side by side; one field keeps "this build ships beyond a zip" a single test.
+- **`tools/ship.mjs`** has three commands: `chart`, `image` and `airgap`.
+  - `chart` copies `deploy/helm/inspecto` and generates `Chart.yaml`. It replaces five exact lines of `values.yaml`
+    and refuses when one is not found exactly once.
+  - `image` checks the unpacked bundle against the plan (`lib/product.json`, an ELF `runtime/bin/java`, the Dockerfile's
+    product label), builds, checks the image's label, `docker save`s and stamps the chart.
+  - `airgap` adds the layout, `install-offline.sh` (template `deploy/airgap/install-offline.sh`), `airgap.json`,
+    `SHA256SUMS` and the tar.
+- **The chart source changed.** The selector labels are split from the descriptive ones, so the StatefulSet's
+  immutable selector is name plus instance only. A `product` values block now labels every object.
+  - Moving a release from one Product's chart to another's changes the name label, and Kubernetes refuses it; the guide
+    says to install a new release instead.
+- **`package.ps1 -Target`** takes `windows`, `linux`, `container` or `airgap`.
+  - Docker is checked up front. The Linux zip is required after the zips are made, and it is unpacked with
+    `Expand-Archive`: the shell's `tar` may be GNU tar, which reads no zip, and the staging folder holds the host runtime
+    after a cross-build.
+  - `airgap` sets `-RequireExtensions`, which applies to every zip the run makes.
+  - Every bundle's Dockerfile now carries OCI labels from the plan. `$` is escaped twice over: for Docker, and for
+    the .NET replacement string. The review found that hole.
+- **The air-gapped bundle carries the unpacked Linux bundle, not the zip.** A slim Linux host has no `unzip`, and
+  every Linux host has `tar`.
+  - The installer resolves its own path first, so a relative install folder is relative to where it was run.
+  - It sets the exec bits that a Windows-made archive drops, `jspawnhelper` included.
+  - The guide says to unpack as a normal user: a Windows tar records every file as writable by all.
+- **Decided here.** The image keeps the bundle's digest-pinned base and uid 10001, and no registry is assumed. The
+  chart stays single-replica, so PA-8 does not lift the `SCALEOUT-HELM-NPOD-1` hold.
+
+**Proof (as built), targeted tests only (the full gate runs in another session).**
+- `tools/ship.test.mjs` 9/9 (docker injected) and `tools/assemble.test.mjs`. The Java tests that read
+  `assemble.mjs` or `package.ps1`: `TelcoComposedSpaceGoldenTest`, `TelcoComposedBypassTest`, and
+  `ObjectsBackendEditionBootTest` 6/6.
+- Helm v3.19 from a local container, `--network none`: `helm lint --strict` passes on the source and on the stamped
+  inspecto, la and telco charts (and the chart inside the air-gap tar). `helm template` of Telco renders the Product's
+  labels and the image `inspecto-telco:4.0.0-SNAPSHOT-advanced`.
+- `package.ps1 -Product telco -Edition Standard -Target container -NoUi -GraalvmCache C:\.jdks` built
+  `inspecto-telco:4.0.0-SNAPSHOT-standard` (204 MB). Booted `--read-only --cap-drop ALL` as uid 10001: `/health` UP,
+  `/ready` READY.
+- **The offline host.** `ship.mjs airgap` on that build's Linux zip gave a 409 MB tar. Then:
+  - In a `debian:stable-slim` container with `--network none` (interfaces: `lo` only), the installer ran `verify`,
+    `host` (also from outside its folder, to a relative folder) and started `serve.sh` on the bundle's Java 27.
+    `/health` answered UP and `/ready` READY. Inspecto Telco Standard and its templates are present.
+  - With the local image removed, `install-offline.sh load` from a fresh extraction loaded it, and it booted
+    `--network none`: UP and READY.
+  - The review also showed that a changed or deleted file stops every command, and that the `ctr` path works.
+- **Not proven here (`CONTAINER-AIRGAP-PROOFS-1`):**
+  - **A Kubernetes install.** The desk has no cluster.
+  - **A complete air-gapped bundle.** The desk has no DuckDB 2.0 Linux extensions, so the proof used
+    `--allow-missing-extensions` and recorded `complete: false`.
+  - **A packaged `-Target airgap` run, and a build with the UI.**
 **PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
 D-PA26…D-PA31 are PA-8's.
