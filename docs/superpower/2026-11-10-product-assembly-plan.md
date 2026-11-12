@@ -1515,6 +1515,26 @@ Not measured in PA-9a:
 - **The fake connector's fetch count.** It shows about two fetches per landed file (`fetched=468 of 239 csv`). This
   was not investigated: commits and latencies are counted from the committed output, not from fetches.
 
+Code facts for PA-9b (read 2026-11-12; check them before relying on them):
+- **`window` is already an Alert Rule key.** On a metric rule it is a duration string (`window: 1h`, or `Nb` for the last
+  N batches). `AlertRule.MODELLED` lists it (`AlertRule.java` around line 122). A Measure rule (BI-5) "replaces
+  `metric` + `window`" with `dataset` + `measure`. The new block therefore collides by name: either the parser
+  dispatches on the value's shape (a map on a Measure rule, a string on a metric rule), or the block takes another key.
+  Decide this in PA-9b, update the glossary entry with it, and keep a 422 for a map `window` on a metric rule.
+- **Evaluation today is a sweep only.** `AlertService.evaluateRules()` and `evaluateRule(name)` are reached from the
+  `alert.evaluate` Job (`AlertEvaluateJob`) and `POST /alerts/evaluate`. Nothing calls them on a commit; the commit
+  hook is new.
+- **The two ways an Alert is raised behave differently.** A rule firing goes through `persistAlertObject`, then
+  `promoteToIncident` for `error`/`critical`, with a cooldown and `ALERT_FIRED`. `raiseFromEvent(…, dedupeKey, …,
+  escalate)` dedupes on `dedupeKey` while a non-terminal Alert exists, fires no `ALERT_FIRED`, has no cooldown, and opens
+  an Incident only when `escalate` is true. The spike used the second. Which one a windowed rule uses decides the
+  Incident path, `stormCap` and the cooldown (D-PA43 asks for one Alert per rule and one Incident per key).
+- **The Condition Language:** `ConditionSql.predicateBound(when)` returns `Bound(sql, params)`, as used by
+  `DecisionRuleApplier`. **The batch cap:** `PipelineConfig.processing().batchMaxFiles()`, from TOON
+  `processing.batch.max_files`, default 1.
+- **Committed output layout:** `<dirs.database>/year=YYYY/month=MM/day=DD/*.parquet`. In-flight files live under
+  `<dirs.database>/.staging/<consignment>/`, which the evaluator must never read.
+
 **PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
 D-PA26…D-PA31 are PA-8's.
