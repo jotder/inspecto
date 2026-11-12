@@ -144,13 +144,35 @@ public final class PipelineSchemas {
      */
     public record Producers(List<PipelineConfig> configs, boolean unreadable) {}
 
-    /** The Pipelines under {@code configRoot} that write {@code origin} (PA-9b: a windowed Alert Rule's save gates). */
-    public static Producers producers(Path configRoot, String origin) {
-        List<PipelineConfig> configs = new ArrayList<>();
-        boolean unreadable = false;
-        if (origin == null || origin.isBlank() || configRoot == null || !Files.isDirectory(configRoot))
-            return new Producers(configs, false);
-        String o = origin.trim().toLowerCase(Locale.ROOT);
+    /** One pipeline file as loaded ({@code cfg} null = it failed to load). */
+    private record Parsed(Path file, PipelineConfig cfg) { }
+
+    private static final com.gamma.pipeline.StampedCache<List<Parsed>> PARSED_CACHE = new com.gamma.pipeline.StampedCache<>();
+
+    /**
+     * Whether a pipeline parses depends on the Safety Policy (a schema ref must lie under an allowed root and no denied one),
+     * which lives outside the config tree and is per caller: the roots are part of the cache key. Null (the policy cannot be
+     * read) = never cached, so a narrowing or an unreadable policy fails closed exactly as an uncached parse does.
+     */
+    private static Object policySalt() {
+        try {
+            return List.of(com.gamma.config.safety.PathJail.allowedRoots(), com.gamma.config.safety.PathJail.deniedRoots());
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** False when a pipeline read a schema / grammar file outside {@code root}: a stamp of the tree would not see it change. */
+    private static boolean allInside(Path root, List<Parsed> all) {
+        Path r = root.toAbsolutePath().normalize();
+        for (Parsed p : all)
+            if (p.cfg() != null)
+                for (Path f : p.cfg().referencedFiles())
+                    if (!f.toAbsolutePath().normalize().startsWith(r)) return false;
+        return true;
+    }
+
+    private static List<Parsed> parseAll(Path configRoot) {
         List<Path> files;
         try (Stream<Path> w = Files.walk(configRoot, 4)) {
             files = w.filter(Files::isRegularFile)
@@ -160,12 +182,32 @@ public final class PipelineSchemas {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        List<Parsed> out = new ArrayList<>();
         for (Path f : files) {
-            PipelineConfig cfg;
+            PipelineConfig cfg = null;
             try {
                 cfg = PipelineConfig.loadForValidation(f.toString());
             } catch (Exception e) {
-                if (!claimsAnotherStore(f, o)) unreadable = true;
+                // stays null: the caller decides, per origin, whether the file may be this store's (fail closed)
+            }
+            out.add(new Parsed(f, cfg));
+        }
+        return List.copyOf(out);
+    }
+
+    /** The Pipelines under {@code configRoot} that write {@code origin} (PA-9b: a windowed Alert Rule's save gates). */
+    public static Producers producers(Path configRoot, String origin) {
+        List<PipelineConfig> configs = new ArrayList<>();
+        boolean unreadable = false;
+        if (origin == null || origin.isBlank() || configRoot == null || !Files.isDirectory(configRoot))
+            return new Producers(configs, false);
+        String o = origin.trim().toLowerCase(Locale.ROOT);
+        // LA-PERF-SERVER-1: every masking decision asks this, and parsing every pipeline file per ask was ~80 % of an
+        // Investigation list. The parse is remembered while nothing under the config root changed (StampedCache: no TTL).
+        for (Parsed p : PARSED_CACHE.get(configRoot, policySalt(), () -> parseAll(configRoot), l -> allInside(configRoot, l))) {
+            PipelineConfig cfg = p.cfg();
+            if (cfg == null) {
+                if (!claimsAnotherStore(p.file(), o)) unreadable = true;
                 continue;
             }
             if (o.equalsIgnoreCase(cfg.identity().pipelineName()) || o.equalsIgnoreCase(cfg.stream())) configs.add(cfg);

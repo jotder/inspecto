@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-392 test class(es): 392 unit, 0 real-HTTP control-plane, 0 IT.
+393 test class(es): 393 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -334,6 +334,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `SchemaAccessTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/SchemaAccessTest.java` | The read-only {@code schema} Platform Service (S1-5): list/get/fingerprint over the space's |
 | `SpaceConfigRootTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/SpaceConfigRootTest.java` | {@link SpaceConfigRoot} — the resolution behind {@code MATERIALIZE-SPACE-ROOT-1}. |
 | `SqlSavePathGuardTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/SqlSavePathGuardTest.java` | The save path must refuse author SQL the sandbox guard rejects. |
+| `StampedCacheTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/StampedCacheTest.java` | LA-PERF-SERVER-1: a stamped cache serves a quiet tree from memory and never serves a stale answer. |
 | `StepKindModulesTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/StepKindModulesTest.java` | MODULE-REORG-P4-1: a step kind a known-but-uninstalled module declares ({@code provides.stepKinds}) names that module; |
 | `ViewStoreTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ViewStoreTest.java` | {@link ViewStore}: persist / read / delete / list {@code sink.view} definitions (T32 Phase C). |
 | `WebhookSinkLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/WebhookSinkLiftLowerTest.java` | The {@code webhook:} block's graph homes: the at-rest lift runs it as a second commit BRANCH beside the |
