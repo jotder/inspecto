@@ -89,7 +89,8 @@ class ControlApiAnalyticsCatalogueTest {
             HttpResponse<String> r = send(api, "GET", ROUTE, "Bearer dev");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode d = JSON.readTree(r.body()).get("data");
-            assertEquals(7, d.get("kernels").size(), "statistics, profiler, time series, forecast, similarity, grouping, graph");
+            assertEquals(9, d.get("kernels").size(),
+                    "statistics, profiler, time series, forecast, similarity, grouping, graph, cohort, model");
             assertEquals(d.get("functions").size(), d.get("total").asInt());
             JsonNode quantile = null;
             for (JsonNode f : d.get("functions")) if (f.get("id").asText().equals("stats.quantile")) quantile = f;
@@ -115,7 +116,7 @@ class ControlApiAnalyticsCatalogueTest {
                 named++;
                 assertTrue(real.contains(f.get("step").asText()), f.get("id").asText() + " names unknown Step " + f.get("step"));
             }
-            assertTrue(named >= 8, "the Step-backed functions are linked, got " + named);
+            assertTrue(named >= 11, "the Step-backed functions are linked, got " + named);
         });
     }
 
@@ -125,7 +126,7 @@ class ControlApiAnalyticsCatalogueTest {
             JsonNode d = JSON.readTree(send(api, "GET", ROUTE + "?kernel=similarity", "Bearer dev").body()).get("data");
             assertTrue(d.get("total").asInt() >= 1);
             for (JsonNode f : d.get("functions")) assertEquals("similarity", f.get("kernel").asText());
-            assertEquals(7, d.get("kernels").size(), "the kernel counts stay whole");
+            assertEquals(9, d.get("kernels").size(), "the kernel counts stay whole");
         });
     }
 
