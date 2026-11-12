@@ -33,7 +33,9 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P3a Grow preview rescans | ⛔ MEASURED NO-GO (DuckDB already materialises the CTE; only a semantic rewrite would help) | — |
 | P0 measure (browser timings, per-option algorithm timings) | 🟡 DONE in-page, 2026-10-25 (§0b); no Chrome performance-panel trace; largest graph available is only 767 nodes | — |
 | P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1; §0b shows betweenness is NOT the top cost (385 ms at 465 nodes), layouts and hulls are | — |
-| P6 layout on expand, P8 hulls, P11 polish | ⬜ OPEN — P8 hulls is now MEASURED at about 3.1 s per toggle (§0b N2) and moves to the top | — |
+| P6 layout on expand | ✅ SHIPPED 2026-11-12 on its vitest proof; the after-timing was NOT measured (§P6) | see §P6 |
+| P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
+| P11 polish | ⬜ OPEN — not measured, so not built (§P11); board row `LA-PERF-P11-1` | — |
 | P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
 | P10 wire format | ⬜ DEFERRED — PERF-D3 | — |
 
@@ -81,13 +83,13 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
 
 ### The re-ranked open list (by what an analyst feels)
-Open items N3, N4, N7–N11, P5, P6 and P10a-5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
+Open items N4, N7–N11, P5, P10a-5 and P11 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
 
 **Tier 1 — freezes the page**
 - **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
 - **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured). ✅ **SHIPPED 2026-10-25** (3 rounds; targeted tests only): the hulls toggle no longer rebuilds the graph, Louvain is memoised per graph signature and cap, hull shapes come off before a data change and return after it. `0ceee890f`, `f0ecaeed5`, `aec36325a`.
 - **N3 Cold first-open freezes 2.7–4.1 s.** Cause not isolated: the lazy graph chunk (~1.2 MB of library, now loaded on first open since P7) plus the layout. Prefetch the chunk when the landing page is idle; measure parse vs layout separately before building anything. ⛔ **PREFETCH MEASURED NO-GO 2026-11-12** (table below): the chunk costs about 0.28 s; the freeze is G6 creating 4,767 elements (2.7 s) and the Force layout (4.1 s). What is left is the worker case, PERF-D5.
-- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision. ✅ **Layout switch SHIPPED 2026-11-12** (targeted spec only): a layout pick no longer destroys and rebuilds the graph; it runs the new layout on the live graph and re-runs the element styles only when `display` changed too. Circular 2.7 → 1.2 s, Force 5.2 → 2.3 s (table below); a node size change still rebuilds, because the entity icon size is fixed at construction (found by the verifier). `c0b60fdb1`, `b8aababb1`. The layout itself and the selection repaint stay on the main thread (PERF-D5).
+- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision. ✅ **Layout switch SHIPPED 2026-11-12** (targeted spec only): a layout pick no longer destroys and rebuilds the graph; it runs the new layout on the live graph and re-runs the element styles only when `display` changed too. Circular 2.7 → 1.2 s, Force 5.2 → 2.3 s (table below); a node size change still rebuilds, because the entity icon size is fixed at construction (found by the verifier). `c0b60fdb1`, `b8aababb1`. The layout itself and the selection repaint stay on the main thread (PERF-D5, answered 2026-11-12: no worker). ✅ **Layout on expand (P6) SHIPPED 2026-11-12**: a small expand no longer re-lays out the graph; before 378–435 ms per few-node expand on ~405 nodes, after NOT measured (§P6).
 
 #### N3 / N4 measured, 2026-11-12
 Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle on :8081 with a copy of `la-showcase`, saved view `telecom_fraud_network` (767 nodes / 4,000 links, default layout Force), the built-in browser. In-page `PerformanceObserver` long tasks and long-animation-frame script attribution, plus TEMPORARY `performance.mark`s on G6's `beforerender / beforeelementcreate / beforelayout / afterlayout / beforedraw / afterrender` events (not shipped). No Chrome performance-panel trace: the agent's browser tools give no DevTools protocol. Before and after are separate builds of the same tree measured in the same session.
@@ -254,6 +256,22 @@ if an analyst reports the ~425 ms as a felt freeze".
 |---|---|---|
 | PERF-P6-1 | Position only the new nodes from their neighbours; re-layout only when the new set is large (threshold stated in code) | P0-1: expand scripting drops on S-expand; positions of existing nodes unchanged (test) |
 
+✅ **SHIPPED 2026-11-12 (`perf(link-analysis)`, hash in the board's closing note; targeted spec only).** `applyData` in
+`graph-view.component.ts` now gives each new node a position beside its drawn neighbours (`placeBesideNeighbours`: their
+centre plus a golden-angle spiral offset, new-to-new chains in later passes, the caller's data never written) and calls
+`graph.draw()`, so no existing node moves. The whole layout re-runs (`graph.render()`) only for more than
+`EXPAND_RELAYOUT_MAX_NEW` = 50 new nodes or a new node with no drawn neighbour. Proof: three vitest specs in
+`graph-view.component.spec.ts` (existing positions unchanged and no layout on a small expand; 51 new nodes re-lay out;
+siblings of one hub do not stack).
+
+*Measured BEFORE* (production `la-app` build of `fbac92982`, demo-auth Preview bundle on :8083 over a copy of `la-showcase`,
+built-in browser pane, in-page `PerformanceObserver` long tasks — the §0b method): an Investigation from `99979100001`
+grown to about 405 nodes; expands adding 2, 5 and 3 nodes cost **378, 379 and 435 ms** of long tasks (longest 236–283 ms),
+and the whole graph visibly moved after each. *AFTER:* **NOT measured** — the browser pane was hidden for the rest of the
+session (a hidden pane runs as a background page, so its timings are not comparable), no Claude-in-Chrome or Playwright
+was available, and the operator chose to ship on the vitest proof. The before/after box-select + hover screenshot was
+NOT taken either. Re-measure on the next visible-pane session with the same method.
+
 ### P7 — browser: bundle (unknown gain until P0-2; low risk if confirmed)
 
 **Why:** a static import chain may put the graph library into the eager `main` chunk on every page load
@@ -321,6 +339,11 @@ be visibly marked as "as of" a time, never silently shown as current.
 |---|---|---|
 | PERF-P11-1 | Fuse the 8–12 derived passes in the browser pipeline; memoise `autoStyleOf`; add value comparators on `canvasData` and its intermediate computeds (as `canvasPlugins` already does) | P0-1 scripting per action drops; no identity churn in the change log |
 
+⬜ **NOT BUILT, 2026-11-12:** the brief makes P11 conditional on a measurement showing scripting per action drops, and
+no measurement surface was available (browser pane hidden, see §P6). Nothing was changed; it stays open as board row
+`LA-PERF-P11-1`. Context: the P6 before numbers put a whole small expand at about 0.4 s of long tasks on 405 nodes, so
+the page-side derived passes are a fraction of an action, not the freeze.
+
 ---
 
 ## 3. Sequencing
@@ -345,7 +368,8 @@ be visibly marked as "as of" a time, never silently shown as current.
 freeze is reported with a trace?
 *Recommendation:* keep refused until P0-1 shows it as the top scripting cost on S-large; the existing reopen trigger
 is about analyst reports, so record one if it happens.
-**Answer:**
+**Answer:** (2026-11-12, aligned with the operator's PERF-D5 answer at the operator's instruction "align D1") keep refused: no worker, no approximation. Reopen only on an
+analyst-reported felt freeze with a trace.
 
 **PERF-D4 — Working Set staleness bound (ANSWERED 2026-10-25, operator: "go with your 30s TTL decision").**
 The Working Set GET trusts a cheap change token (size + nanosecond mtime + file key + a hash of the last log line)
@@ -368,7 +392,9 @@ with different row scope.
 **PERF-D5 — Heavy graph work off the main thread (NEW 2026-10-25, from §0b).** The live measurement found the freezes are LAYOUTS and HULLS, not betweenness: Radial blocks the tab for more than 3 minutes at 767 nodes / 4,000 links, Fruchterman / Force / Layered take 2.3–3.6 s, the hulls toggle 3.1 s, a cold first-open 2.7–4.1 s, while betweenness is 385 ms at 465 nodes and is already refused above 500. The standing refusals LA-06 / LA-07 (viewport culling, Web Worker for the algorithms) were reasoned at a 500-node canvas cap and one slow algorithm. Choose: (a) keep the refusals and fix by CAPS and MEMOISATION only (N1 cap on Radial, N2 memoised hulls, prefetch the graph chunk), or (b) reopen LA-07 to cover layouts and Louvain in a Web Worker (G6 supports worker layouts for some algorithms).
 *Recommendation:* (a) first — N1 and N2 are small and remove the worst freezes (both SHIPPED 2026-10-25) — then re-measure; reopen (b) only if layouts above the caps are still a felt freeze. This also supersedes PERF-D1's framing: betweenness alone does not justify a worker.
 *Evidence, 2026-11-12 (§0b "N3 / N4 measured"; the worker was NOT built, this decision stays the operator's):* with N1, N2 and the N4 live relayout shipped and every layout cap in place, the main thread still blocks on the default graph of 767 nodes / 4,000 links for **7.4 s at first open** (G6 element creation 2.7 s + Force layout 4.1 s), **2.3 s for a switch to Force** and **3.8 s to Force (spread)**, and **1.3 s to paint a 767-node selection**. Prefetching the chunk would save 0.28 s of that. A worker can take only the layout part: about 4.1 s at first open and 1.3–2.8 s of a Force switch (the switch minus the ~1 s position update). It cannot take element creation or the selection repaint, which are G6 canvas work. Cheaper alternatives that are NOT caps: fewer d3-force ticks (a faster `alphaDecay`, visibly looser layout; not tried) and positions remembered per graph signature so a re-open skips the layout. Both change behaviour or add state, so they are listed for the decision rather than built.
-**Answer:**
+**Answer:** (operator, 2026-11-12: "go with your recommendation on PERF-D5") option (a): keep LA-06 / LA-07 refused,
+no Web Worker for layouts or algorithms; fix by caps and memoisation only. Reopen (b) only on an analyst-reported felt
+freeze with a trace.
 
 ## 6. Documentation that must be corrected
 
