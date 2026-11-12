@@ -37,7 +37,7 @@ Module-level architecture pages were not read for this ranking, so observability
 | # | Item | What is open | Why it is a Must | Waits on |
 |---|---|---|---|---|
 | M1 | `IMPORT-LOADER-CASE-TOON-1` and `SPACE-TEST-SUITE-RED-1` | Three tests of `inspecto-processor` are red on master, all around the `space.test` Job Type of SE-6a: a loader reads the fixed name `case.toon`, which is neither reserved nor allow-listed; `space.test` reports `classpath` where a test expects `builtin`; and one test fails only inside the full suite. | Master is red, and an import could plant the file. | The SE-6a owner: reserve or allow, and which provenance is right. |
-| M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | Two records of 2026-11-12 disagree on whether master is green. The product-assembly plan records a green full Advanced reactor gate over `6a7d8c20b` plus PA-9b. A run of the whole `inspecto-processor` suite on `fe87aa121` (2,733 tests) had the three failures of M1, and two of them fail alone on `e45b25f9d`. | Until one full gate on current master settles it, nobody can say master is green. | Nothing: one run. |
+| M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | Two records of 2026-11-12 disagree on whether master is green. The product-assembly plan records a green full Advanced reactor gate over `6a7d8c20b` plus PA-9b. A run of the whole `inspecto-processor` suite on `fe87aa121` (2,733 tests) had the three failures of M1, and two of them fail alone on `e45b25f9d`. **Settled 2026-11-12:** one full Advanced reactor gate on `f0aa137da` built 57 of 57 modules and ran 12,188 tests with 3 failures, 0 errors and 149 skipped (94 of them Postgres-backed). The failures are exactly the three of M1. | Master is red by M1 only. The gate has to be repeated daily, as the lane workflow says, or this answer goes stale. | Done; M1 remains. |
 | M3 | `JOB-SIGNAL-OVERLAP-SKIP-1` | An `on_signal` Job loses the last landing when a signal arrives while it runs. | A Dataset missed a month of data until another commit; three packs carry a cron workaround. | Nothing. |
 | M4 | Release notes for the next MAJOR (§2 of the board) | Breaking route removals are typed `docs:` in git, so a `feat!:` scan misses them; every `since = "4.0.0"` type is unpublished. | The release notes are generated from commit types; they would be wrong. | The MAJOR tag. |
 | M5 | `ARCH-MOSCOW-UNTRACKED-1` item 2 *(no row of its own)* and `MODULE-REORG-P3-THIN-JARS` | `release.yml` signing, SBOM and scan have never run on a tag; the keystore, secrets and TSA URL are owed. | Supply-chain claims are unproven and jars would ship unsigned. | Operator: keys and a release date. |
@@ -45,7 +45,7 @@ Module-level architecture pages were not read for this ranking, so observability
 | M7 | `ASSURE-OPERABILITY-1`, Deployment topology live validation, `DEPLOY-SERVICE-WRAPPER-1` | No recorded restore drill, RPO and RTO unmeasured, the kill -9 and reboot acceptance of the service wrapper unrun, the chart never installed. | The wrapper is the recovery mechanism; recovery that was never exercised is a claim, not a property. | Operator: targets and host access. |
 | M8 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | `SqlTemplateJob.swapIn` deletes the old snapshot while a running reader still reads it. | A dependent Job fails all its retries (seen in `la-banking`). | Nothing. |
 
-Three of the eight (M2, M3 and M8) need no decision from anyone and can start now.
+M2 is done (2026-11-12). Two of the remaining seven (M3 and M8) need no decision from anyone and can start now.
 
 ## 3. Should — 16 items
 
@@ -106,8 +106,9 @@ Three of the eight (M2, M3 and M8) need no decision from anyone and can start no
 
 ## 6. What this ranking says
 
-1. **Master is not known to be green.** M1 and M2 come before everything else: decide the red tests, run
-   the full gate once on current master, and keep it as the daily gate the lane workflow already calls for.
+1. **Master is red by three tests, and only those.** The full gate of 2026-11-12 on `f0aa137da` (M2) showed
+   that. M1 comes before everything else: decide the red tests, then keep the full gate as the daily gate
+   the lane workflow already calls for.
 2. **The release path is the largest unproven piece.** M4, M5 and M7 are all "it exists and has never
    run": the release workflow, the recovery drill, the service wrapper acceptance. None needs design; each
    needs an operator input and one execution.
