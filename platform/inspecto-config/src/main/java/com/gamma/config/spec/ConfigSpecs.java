@@ -813,8 +813,17 @@ public final class ConfigSpecs {
                                 + "checks freshness (alert.maximumAge)."),
                 FieldSpec.of("alert.window", "Window", FieldType.STRING,
                         "Ns/Nm/Nh/Nd elapsed time, or Nb = the last N batches (e.g. 1h, 30m, 20b). "
-                                + "Required for a ledger rule; a Dataset, freshness or Investigation rule "
-                                + "takes none."),
+                                + "Required for a ledger rule; a freshness or Investigation rule takes none. A Dataset "
+                                + "measure rule may take a block instead, an event-time Window evaluated on each commit "
+                                + "of a Stream: {type: tumbling|sliding, size, slide, time, lateness, distinctOn}, "
+                                + "size + lateness at most 1h, at most 60 slides, comparator gt or gte."),
+                // PA-9c: a Pattern rides on the window block of a Dataset rule.
+                FieldSpec.of("alert.pattern", "Pattern", FieldType.MAP,
+                        "A shape an aggregate cannot express, on a windowed Dataset rule (it needs the window block): "
+                                + "{type: sequence, steps: [<when A>, <when B>]} - A then B for the same key within the "
+                                + "window's size (a tumbling window; no rule-level when) - or {type: absence} - a key "
+                                + "that had an event in the slide before a Window and none in it, judged once the Window "
+                                + "closes. Takes no measure, comparator or threshold."),
                 FieldSpec.enumField("alert.severity", "Severity",
                         List.of("INFO", "WARNING", "CRITICAL"), "WARNING", "Operator-facing severity."),
                 FieldSpec.of("alert.onPipeline", "Pipeline", FieldType.STRING,
@@ -897,8 +906,8 @@ public final class ConfigSpecs {
                         Severity.ERROR,
                         List.of("alert.threshold"),
                         raw -> {
-                            if ("freshness".equals(alertShape(raw))) {
-                                return true;
+                            if ("freshness".equals(alertShape(raw)) || present(raw, "alert.pattern")) {
+                                return true;   // a freshness or Pattern rule fixes its own threshold
                             }
                             String t = str(raw, "alert.threshold");
                             if (t == null) {
@@ -916,6 +925,7 @@ public final class ConfigSpecs {
                         Severity.ERROR,
                         List.of("alert.window"),
                         raw -> {
+                            if (at(raw, "alert.window") instanceof Map<?, ?>) return true;   // PA-9b block: AlertWindow checks it
                             String w = str(raw, "alert.window");
                             return w == null || w.trim().toLowerCase().matches("\\d+[smhdb]");
                         })

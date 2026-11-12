@@ -291,6 +291,8 @@ class ControlApiConfigIfMatchTest {
                     "a browser cannot read the ETag it must send back unless it is exposed; got: " + exposed);
             assertTrue(exposed.contains(", ETag") || exposed.startsWith("ETag"),
                     "comma-space separated, so the header stays a valid list: " + exposed);
+            // N13: the SPA (another origin in dev) backs off on a 429's Retry-After only if it can read it
+            assertTrue(exposed.contains("Retry-After"), "Retry-After must be exposed; got: " + exposed);
         }
     }
 }

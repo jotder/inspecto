@@ -101,7 +101,7 @@ src/app/
 - A feature = `modules/admin/<feature>/`: `*.component.ts` (+ `.html`), optional `*.dialog.ts`, and
   `<feature>.routes.ts` (`export default [...] as Routes`).
 - **No cross-feature dependencies.** Share via `inspecto/`. A pane may be reused across routes via
-  `ActivatedRoute.snapshot.data` (Cases/Issues = one `ObjectsComponent`).
+  `ActivatedRoute.snapshot.data` (`/cases` and `/incidents` = one `ObjectMailComponent`, told apart by route `data.type`).
 - **No business logic in a component.** A `.component.ts` is template + signals + calls into `inspecto/`;
   validation, data shaping and business rules live in a shared library. This is the W3 rule from the
   2026-07-02 frontend review, landed here 2026-09-10 (Sprint 7.2) because the review plan was its only home.
@@ -919,8 +919,10 @@ in use. Look there before picking a class — do not invent a token.
 
 ## 11. Routing
 
-- Lazy `{ path, loadChildren: () => import('app/modules/admin/<f>/<f>.routes') }` in `app.routes.ts` (no auth
-  guard — the app is auth-free). Each `<f>.routes.ts` is `export default [...] as Routes`. Default route → `dashboard`.
+- Lazy `{ path, loadChildren: () => import('app/modules/admin/<f>/<f>.routes') }` in `app.routes.ts`, under the
+  shell route's `canActivate: [authGuard]` (a pass-through on Basic, where auth mode is `none`; OIDC sign-in on
+  Standard and above). Each `<f>.routes.ts` is `export default [...] as Routes`. Default route: `''` runs
+  `landingGuard`, which redirects to the Demo User's or Space's landing page, else `/home`; `/dashboard` redirects to `/overview`.
 - **Adding a page = two edits:** the lazy route in `app.routes.ts` **and** the nav item in
   `core/navigation/navigation-data.ts` (4 collapsable groups: Pipelines / Acquisition / Operations /
   Settings, + Dashboard/Assistant basics). `NavigationService` serves this const client-side (+ the

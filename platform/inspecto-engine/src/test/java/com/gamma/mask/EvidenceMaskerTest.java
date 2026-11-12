@@ -89,6 +89,40 @@ class EvidenceMaskerTest {
         return EvidenceMasker.of(store, config, List.of("cust"));
     }
 
+    /**
+     * LA-PERF-SERVER-1: the pipeline parse behind a masking decision is remembered while the config tree is quiet, and a
+     * changed classification is seen on the next read - the cache is a stamp, never a time-to-live, so it cannot keep a
+     * column masked (or unmasked) after its schema changed.
+     */
+    @Test
+    void aReclassifiedSchemaIsSeenAtOnceEvenWhenTheTreeWasServedFromMemory(@TempDir Path space) throws Exception {
+        Path config = Files.createDirectories(space.resolve("config"));
+        custMasker(config, "MSISDN", "");
+        ageTree(config, 10);
+        java.util.Set<String> stores = java.util.Set.of("cust");
+        for (int i = 0; i < 3; i++)   // the 2nd and 3rd are served from memory: same answer
+            assertEquals(Map.of("m", "MSISDN", "msisdn", "MSISDN"),
+                    EvidenceMasker.schemaClassification(config, stores, EvidenceMasker.SENSITIVE::contains));
+        Path schema = config.resolve("cust/cust_schema.toon");
+        String original = Files.readString(schema);
+        Files.writeString(schema, original.replace("MSISDN,\"0\",VARCHAR,\"\",\"\",\"MSISDN\"", "MSISDN,\"0\",VARCHAR,\"\",\"\",\"\""));
+        ageTree(config, 9);
+        assertEquals(Map.of(), EvidenceMasker.schemaClassification(config, stores, EvidenceMasker.SENSITIVE::contains),
+                "the declassified column is open on the very next read");
+        Files.writeString(schema, original.replace("MSISDN,\"0\",VARCHAR,\"\",\"\",\"MSISDN\"", "MSISDN,\"0\",VARCHAR,\"\",\"\",\"\"")
+                .replace("PLAN,\"1\",VARCHAR,\"\",\"\",\"\"", "PLAN,\"1\",VARCHAR,\"\",\"\",\"MSISDN\""));
+        ageTree(config, 8);
+        assertEquals(Map.of("plan", "MSISDN"), EvidenceMasker.schemaClassification(config, stores, EvidenceMasker.SENSITIVE::contains),
+                "a column classified later is masked on the very next read");
+    }
+
+    private static void ageTree(Path dir, long minutes) throws Exception {
+        try (var w = Files.walk(dir)) {
+            for (Path p : w.filter(Files::isRegularFile).toList())
+                Files.setLastModifiedTime(p, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() - minutes * 60_000L));
+        }
+    }
+
     @Test
     void aColumnRenamedFromAClassifiedRawFieldIsMaskedInEvidence(@TempDir Path space) throws Exception {
         EvidenceMasker m = custMasker(Files.createDirectories(space.resolve("config")), "MSISDN", "");

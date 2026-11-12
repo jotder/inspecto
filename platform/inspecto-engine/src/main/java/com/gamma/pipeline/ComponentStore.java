@@ -226,6 +226,7 @@ public final class ComponentStore {
         if (archive) archivePrevious(type, name, file);   // MET-5: snapshot the outgoing copy first
         byte[] bytes = encode(type, name, doc).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(file, bytes, ".comp-");
+        ComponentRegistry.forget(registryRoot);
         return new ComponentRegistry.Component(type, name, file, doc);
     }
 
@@ -272,6 +273,7 @@ public final class ComponentStore {
         Optional<ComponentRegistry.Component> c = get(type, id);
         if (c.isEmpty()) return false;
         boolean removed = Files.deleteIfExists(c.get().path());
+        ComponentRegistry.forget(registryRoot);
         purgeHistory(type, validId(id));   // MET-5: delete means gone, history included (restore is for edits)
         return removed;
     }

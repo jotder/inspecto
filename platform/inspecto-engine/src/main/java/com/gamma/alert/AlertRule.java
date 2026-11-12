@@ -65,6 +65,25 @@ import java.util.Set;
  *   }
  * </pre>
  *
+ * <p><b>Windowed rules (PA-9b, D-PA40)</b> — a Dataset measure rule may replace "the current data" with an
+ * event-time Window ({@link AlertWindow}): the Measure is evaluated per key and per Window of a Stream Dataset on
+ * each commit, by {@link WindowedRuleEvaluator}, never by the sweep. Its {@code when} is a Condition Language tree
+ * over the rows; its comparator is {@code gt} or {@code gte}; it fires once per (rule, key, window start).
+ *
+ * <pre>
+ *   alert {
+ *     name:       wangiri-burst
+ *     dataset:    voice_cdr
+ *     when:       {kind: group, op: AND, items: [{kind: condition, field: duration_s, operator: "<", value: 3}]}
+ *     measure:    countDistinct(b_number)
+ *     by:         [a_number]
+ *     comparator: gte
+ *     threshold:  30
+ *     window:     {type: sliding, size: 10m, slide: 1m, time: event_ts, lateness: 2m}
+ *     severity:   CRITICAL
+ *   }
+ * </pre>
+ *
  * <p><b>Investigation rules (LA-23)</b> — watch a Measure over a Link Analysis Investigation's Working Set
  * (the derived relation of LA-20) instead of a Dataset. {@code relation} picks one of the Working Set's three
  * relations and {@code measure} is the SAME Measure shorthand a Dataset measure rule takes, over that relation's
@@ -113,7 +132,8 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
                         List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
-                        int healAfterSweeps, Map<String, Object> extra, String runbook, boolean indexLag) {
+                        int healAfterSweeps, Map<String, Object> extra, String runbook, boolean indexLag,
+                        AlertWindow eventWindow) {
 
     /**
      * Every key {@link #fromMap} models (and the R3 {@code shares} envelope key, which the save routes carry
@@ -121,7 +141,7 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
             "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
-            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag");
+            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag", "pattern");
     /** The prefix of an author-owned annotation key: kept through every save, never refused. */
     public static final String AUTHOR_PREFIX = "x-";
 
@@ -159,6 +179,18 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     public static final Set<String> VALUE_MEASURES = Set.of("passThrough", "velocity", "timeToCashOut",
             "cashOutConcentration", "structuring", "benefitTransfer");
+
+    /** Every pre-{@code eventWindow} (pre-PA-9b) caller of the full shape: not a windowed rule. */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
+                     int healAfterSweeps, Map<String, Object> extra, String runbook, boolean indexLag) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, valueMeasure, healAfterSweeps, extra, runbook,
+                indexLag, null);
+    }
 
     /** Every pre-{@code indexLag} caller of the full shape: not an index-lag rule. */
     public AlertRule(String name, String metric, String comparator, double threshold,
@@ -287,6 +319,28 @@ public record AlertRule(String name, String metric, String comparator, double th
         relation = (relation == null || relation.isBlank()) ? null : relation.trim().toLowerCase(Locale.ROOT);
         valueMeasure = (valueMeasure == null || valueMeasure.isEmpty()) ? null
                 : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(valueMeasure));
+        if (eventWindow != null && eventWindow.isPattern()) {
+            // PA-9c Pattern rule (D-PA40): its Measure, comparator and threshold are fixed - "at least one match" for
+            // a sequence, "at least one silent Window" for an absence - as a freshness rule's are.
+            require(measure == null || "count".equals(measure),
+                    "a Pattern alert (pattern:) takes no measure: it counts matches (sequence) or silent Windows (absence)");
+            require(!eventWindow.pattern().isSequence() || when == null,
+                    "a sequence alert.pattern takes no alert.when: each of its steps carries its own condition tree");
+            measure = "count";
+            comparator = "gte";
+            threshold = 1;
+        }
+        if (eventWindow != null) {
+            // PA-9b windowed rule (D-PA40): a Dataset measure rule evaluated per event-time Window on each commit.
+            require(dataset != null && measure != null && metric == null && maximumAge == null && investigation == null
+                            && valueMeasure == null && window == null,
+                    "alert.window as a block {type, size, …} applies to a Dataset measure rule (dataset: + measure:) only");
+            // An open window can only grow towards a gt/gte threshold, so it fires the first time it breaches. "Too few
+            // events" can only be judged once the window closes: that is the absence Pattern (PA-9c), not this rule.
+            require("gt".equals(comparator) || "gte".equals(comparator),
+                    "a windowed alert takes comparator gt or gte; 'too few events in a window' is an absence Pattern");
+            require(healAfterSweeps == 0, "a windowed alert fires once per window and key; it takes no healAfterSweeps");
+        }
         if (valueMeasure != null) {
             // LA-18 value-measure rule: an Investigation rule whose Measure is a named value Measure over the WHOLE
             // Dataset the Investigation is bound to. It watches the COUNT of entities breaching the Measure's own
@@ -362,8 +416,11 @@ public record AlertRule(String name, String metric, String comparator, double th
         } else if (dataset != null) {
             // Measure rule (BI-5): a scalar Measure over a Dataset; the ledger window does not apply.
             require(metric == null, "a measure alert (dataset:) must not also declare a ledger metric");
-            require(window == null, "a measure alert (dataset:) takes no window (it reads current data)");
-            require(when == null, "alert.when scopes ledger rows; a measure alert (dataset:) has none");
+            require(window == null, "a measure alert (dataset:) takes no ledger window (it reads current data); "
+                    + "a windowed alert takes the block window: {type, size, time, …}");
+            // A windowed rule's `when` is a Condition Language tree over the Dataset's rows (D-PA42).
+            require(when == null || eventWindow != null,
+                    "alert.when scopes ledger rows; a measure alert (dataset:) has none unless it is windowed");
             require(com.gamma.query.DatasetMeasureProbe.validMeasure(measure),
                     "alert.measure must be count or agg(field), agg a Measure aggregate (sum, avg, median, p95, …)");
         } else {
@@ -476,7 +533,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         long seconds = Math.max(1, pollMultiple(maximumAge) * pollIntervalMs / 1000);
         return new AlertRule(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when,
                 seconds + "s", investigation, relation, description, by, stormCap, owner, valueMeasure,
-                0, extra, runbook, indexLag);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
+                0, extra, runbook, indexLag, eventWindow);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
     }
 
     /** The elapsed-time span a freshness rule allows between publications (a literal limit; see {@link #resolvedFor}). */
@@ -496,12 +553,17 @@ public record AlertRule(String name, String metric, String comparator, double th
      *  promotion, a stored {@code alert-rule} component's content — same flat shape, no wrapper). */
     public static AlertRule fromMap(Map<String, Object> alert) {
         require(alert != null, "missing 'alert' block");
+        Object rawWindow = alert.get("window");
+        boolean windowBlock = rawWindow instanceof Map<?, ?>;   // PA-9b: a block is an event-time Window
+        Object rawPattern = alert.get("pattern");                // PA-9c: a Pattern rides on that Window
+        require(rawPattern == null || windowBlock, "alert.pattern needs the rule's window: block "
+                + "{type, size, time, lateness} (the event-time column and how late an event may be)");
         return new AlertRule(
                 str(alert.get("name")),
                 str(alert.get("metric")),
                 str(alert.get("comparator")),
-                alert.get("maximumAge") == null ? number(alert.get("threshold")) : 0,
-                str(alert.get("window")),
+                alert.get("maximumAge") == null && rawPattern == null ? number(alert.get("threshold")) : 0,
+                windowBlock ? null : str(rawWindow),
                 str(alert.get("severity")),
                 str(alert.get("onPipeline")),
                 str(alert.get("dataset")),
@@ -519,7 +581,13 @@ public record AlertRule(String name, String metric, String comparator, double th
                         : wholeNumber(alert.get("healAfterSweeps"), "alert.healAfterSweeps"),
                 unmodelled(alert),
                 str(alert.get("runbook")),
-                flag(alert.get("indexLag"), "alert.indexLag"));
+                flag(alert.get("indexLag"), "alert.indexLag"),
+                windowBlock ? AlertWindow.fromMap(rawWindow, rawPattern) : null);
+    }
+
+    /** Whether this is a PA-9b windowed rule: a Dataset measure evaluated per event-time Window on each commit. */
+    public boolean isWindowed() {
+        return eventWindow != null;
     }
 
     /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */
@@ -594,6 +662,8 @@ public record AlertRule(String name, String metric, String comparator, double th
         m.put("comparator", comparator);
         m.put("threshold", threshold);
         if (window != null) m.put("window", window);
+        if (eventWindow != null) m.put("window", eventWindow.toMap());
+        if (eventWindow != null && eventWindow.isPattern()) m.put("pattern", eventWindow.pattern().toMap());
         m.put("severity", severity);
         if (onPipeline != null) m.put("onPipeline", onPipeline);
         if (when != null) m.put("when", when);

@@ -19,7 +19,7 @@
 |---|---|---|
 | Separation, option D (D-0…D-6) | built (`LA-APP-REAL-SIGNIN-1` closed 2026-10-13: la-app signed in through a real WSO2) | I1 trust, `LA-INDEX-SCALE-MEASURE-1` (§1) |
 | D-7 parallel analyst sandboxes (Drafts) | built D7-1…D7-7 | team Drafts, Draft SPA surface, linear rebase (§1) |
-| Embed view | **built** 2026-10-12/14 (`LA-EMBED-VIEW-1` closed 2026-10-14; as-built la-core `architecture-backend.md` §6.2); §3 below is the design record | nothing |
+| Embed view | **built** 2026-10-12/14 (`LA-EMBED-VIEW-1` closed 2026-10-14; as-built la-core `architecture-http-surface.md` §6.2); §3 below is the design record | nothing |
 | Data preparation (CDR → fast index) | **plan; spikes SP1, SP2 (indicative), SP4, SP5 measured 2026-10-06; WP3 index builder still unbuilt** | LDP-D1…D11 open, WP0…WP10 (§2) |
 | Daily ingestion (CSV / Hive / database to the index) | **ingest chain built and accepted (T1-T9)** | `LA-DAILY-INGEST-1` T1…T9, decisions D-ING1…D-ING6 answered (D-ING5 file-first), T1/T2/T3/T4/T6/T7/T9 done, T5/T8 built; open: follow-ups in the BACKLOG row |
 | Configurable limits (`LA-CONFIG-LIMITS-1`) | **built 2026-10-15** (every limit a server-gated configuration item; plan archived) | `LA-CONFIG-LIMITS-RESIDUALS-1`; as-built: [`okf/product/module/la-core/architecture-backend.md`](../okf/product/module/la-core/architecture-backend.md) §9 |
@@ -121,7 +121,7 @@ Name decided (D16): **Draft** (not "sandbox": that is the SQL lockdown; ⛔ not 
 - Accepted gaps: a pending promote does not freeze the Draft (a later write just makes approval 409); expiry of a Draft with a pending promote => approve 409, redo from a new fork; analyst promote on a NON-sensitive Investigation appends with no second person (as signed, say so if unwanted); conflict report recomputes on every GET; `expiryWarning` field is the only warning (no push channel); a same-size/same-mtime in-place tamper of the main log is caught only by replay; checkpoint is in memory (restart = one cold fold); Draft writes still parse main prefix + own log (parse-free path open).
 - ⚠ `reveal` and fork-reorder are lead-only; if analysts must unmask that is a decision to take at the Draft gate, not an accident.
 
-### 3. Embed view (`LA-EMBED-VIEW-1`) — design record; BUILT 2026-10-12/14 (row closed 2026-10-14, as-built la-core `architecture-backend.md` §6.2)
+### 3. Embed view (`LA-EMBED-VIEW-1`) — design record; BUILT 2026-10-12/14 (row closed 2026-10-14, as-built la-core `architecture-http-surface.md` §6.2)
 
 > The "deferred" wording below is the 2026-10-05 design state, kept until this section is distilled; the operator lifted the deferral when a real customer portal became the consumer (2026-10-13).
 
@@ -574,7 +574,7 @@ Hard invariants: narrow only (a refusal is EMPTY, never a value); aggregate outp
 
 ## Demos, showcases, edition placement and upload - what is still open (folded 2026-10-22)
 
-Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture-backend.md`](../okf/product/module/la-core/architecture-backend.md) §6.6 (upload) and §8 (editions), [`spec-editions.md`](../okf/product/layer/platform/spec-editions.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
+Drawn from six plans archived 2026-10-22 in `docs/archived-documents/plans-archive/` (read them for history and full detail, never as current). As-built facts: the [demo runbook](../okf/product/module/la-core/admin-guide-demo.md) (§8 holds the real-feed lessons), [`la-core/architecture-http-surface.md`](../okf/product/module/la-core/architecture-http-surface.md) §6.6 (upload) and [`la-core/architecture-backend.md`](../okf/product/module/la-core/architecture-backend.md) §8 (editions), [`spec-editions.md`](../okf/product/layer/platform/spec-editions.md), the [showcase design rules](../okf/product/solution-pack/la-showcase/architecture.md) and the per-vertical runbooks under `okf/product/solution-pack/la-*/`.
 
 ### D1. Demo readiness (`la-demo-readiness-plan`) - nothing open
 
@@ -598,7 +598,7 @@ D-LAE1 (Case history), D-LAE2 (dashboard widgets, UI flag only), D-LAE5 (Geo map
 
 ### D4. Analyst CSV upload (`la-analyst-upload-plan`) - built, three items open
 
-Built 2026-10-18/19 (route, status, delete, retention, pane, review hardening; la-core `architecture-backend.md` §6.6). D-UP1…D-UP8 CONFIRMED by the operator 2026-10-25. Open: a live browser drive over HTTP (`LA-I2-GAPS-RESIDUALS-1` item 2); a daily-quota ledger shared across nodes (one JVM lock today).
+Built 2026-10-18/19 (route, status, delete, retention, pane, review hardening; la-core `architecture-http-surface.md` §6.6). D-UP1…D-UP8 CONFIRMED by the operator 2026-10-25. Open: a live browser drive over HTTP (`LA-I2-GAPS-RESIDUALS-1` item 2); a daily-quota ledger shared across nodes (one JVM lock today).
 
 ### D5. Showcases (`la-multi-vertical-showcase-plan`, `la-ims-showcase-plan`) - browser rehearsal owed
 

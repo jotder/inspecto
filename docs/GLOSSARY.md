@@ -687,6 +687,46 @@ overlap pruning cannot give them. Derived on read, never stored. **Absent means 
 - **Wall clock** (`$job.last_success_time`) — when a Job last succeeded, not where its data reaches. Say
   **last-success time**.
 
+**Window** *(added 2026-11-12 — PA-9b, `AlertWindow.java`)* — An **event-time interval `[lo, hi)` of one Stream
+Dataset** over which a **windowed Alert Rule** evaluates its Measure per key, on each commit. Declared as the rule's
+`window:` block: `tumbling` (back-to-back, `size`) or `sliding` (`size`, a new window every `slide`), over an
+event-time `time` column, with `lateness` — a window counts events until the **Watermark** reaches `hi + lateness`, then
+it is **closed**; an event that falls only in closed windows is a **late event** (kept in the Dataset, alerted on by
+nothing, counted). Bounded: `size + lateness` ≤ 1 h, ≤ 60 slides. A windowed Alert Rule fires at most once per
+(rule, key, window start). ⛔ Not the **ledger window** of a ledger-metric Alert Rule (`window: 1h | 20b`, the last span
+or N batches of the batches ledger): that one is a string, this one a block; say *ledger window* for the old one.
+⛔ No processing-time window: arrival time is ingest time.
+
+**Window buffer** *(added 2026-11-12 — PA-9b, `WindowedRuleEvaluator`)* — The **derived state of windowed Alert Rules**:
+a DuckDB table per (Dataset, rule set) holding only the columns the rules read and only rows whose windows may still be
+open; appended from each committed Consignment's own files, trimmed past `size + lateness`, rebuilt from the committed
+files at boot. Never a second record — the Dataset is the record. Beside it, the **fired table** keeps one row per
+(rule, key, window start) that has fired, so an Alert is raised effectively once. ⛔ Not a *state store* or *cache*.
+
+**Pattern** *(added 2026-11-12 — PA-9 design; built in PA-9c, `AlertPattern.java`)* — A **windowed Alert Rule shape
+an aggregate cannot express**, authored as `pattern:` beside the rule's `window:` block: `sequence` (an event matching
+step A, then one matching step B for the same key, `a ≤ b ≤ a + size` on event time; each step its own Condition
+Language tree; fires once per key and A event) or `absence` (a key — or the whole Stream — that had an event in the slide
+before a Window and none in it; judged only once the **close frontier** passes the Window's `hi + lateness`; one Alert
+per silence). A Pattern rule's Measure, comparator and threshold are fixed. ⛔ Not a *rule* (the rule is the Alert
+Rule; the Pattern is its shape), not a *regex* pattern, not a Link Analysis pattern tool.
+
+**Close frontier** *(added 2026-11-12 — PA-9c, `WindowedRuleEvaluator`)* — **How far an absence Pattern has judged its
+Windows**: `max(Watermark, clock floor)`; a Window is judged once, when the frontier first reaches `hi + lateness`. ⛔
+Not the **Watermark** itself (the frontier may run ahead of it on the clock) and not a *committed frontier* (how far a
+Stream's lane has made input durable).
+
+**Clock floor** *(added 2026-11-12 — PA-9 design D-PA40; built in PA-9c, `WindowedRuleEvaluator.tick`)* — **The wall
+clock standing in for the Watermark when a Stream is silent**: a silent feed sends no commit, so its Watermark never
+reaches the end of the Window an absence waits on; a tick raises the close frontier to the clock and judges absence
+Windows only. It never moves the Watermark. Called only while the Stream has no backlog. ⛔ Not a *cron sweep* (the
+batch Alert Rule floor) and not processing time.
+
+**Detection latency** *(added 2026-11-12 — PA-9 design, D-PA39)* — **The time from an event's arrival at the broker to
+the Alert that names it** (the newest event in its window; `inspecto_detection_latency_seconds{rule}`, PA-9d). The
+stated promise: p95 ≤ 5 s to Alert and ≤ 10 s to Incident, under the conditions D-PA39 lists. ⛔ Not *lag* (the
+backlog a Stream has not drained, `inspecto_stream_lag_records`).
+
 **Query** *(added 2026-07-06, R3)* — A first-class, reusable **executable knowledge** Component:
 `{ type (sql \| structured), source Dataset, text \| model, Parameters }`. Lifted out of the artifacts that
 embed it (a Dataset's view SQL, a Widget's channel mapping) so **one Query serves many renderings**. Authored in
