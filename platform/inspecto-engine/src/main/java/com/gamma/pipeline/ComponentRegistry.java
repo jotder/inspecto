@@ -135,6 +135,19 @@ public final class ComponentRegistry {
      * {@code type/name} warns and the later file wins (matching {@code ConfigRegistry}).
      */
     public static ComponentRegistry scan(Path registryRoot) {
+        if (registryRoot == null) return scanFiles(null);
+        return CACHE.get(registryRoot, () -> scanFiles(registryRoot));
+    }
+
+    /** One scan per registry directory while no file under it changes (LA-PERF-SERVER-1; {@link StampedCache}). */
+    private static final StampedCache<ComponentRegistry> CACHE = new StampedCache<>();
+
+    /** Forgets the remembered scan of {@code registryRoot}: a writer just changed a component under it. */
+    static void forget(Path registryRoot) {
+        if (registryRoot != null) CACHE.invalidate(registryRoot);
+    }
+
+    private static ComponentRegistry scanFiles(Path registryRoot) {
         SCANS.incrementAndGet();
         Map<String, Component> idx = new LinkedHashMap<>();
         if (registryRoot != null && Files.isDirectory(registryRoot)) {

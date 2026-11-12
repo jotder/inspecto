@@ -1280,7 +1280,7 @@ distinct ([`GLOSSARY.md`](../../../../GLOSSARY.md) §11): this studio works on *
   * *Pattern packs* — a picker (`pattern-packs.ts`) that pre-fills the motif builder from parameterized
     starter templates (layering chain, pass-through, inbound collector, forwarding relay, circular flow,
     shared associates); packs whose shape isn't a path motif hint at the fitter tool (cycles/similarity).
-  Guarded by `ANALYSIS_NODE_CAP` (2000) where super-linear; 53 pure unit tests + 11 toolbox specs.
+  Guarded by `analysis_node_cap` (default 2,500, settings-driven) where super-linear; 53 pure unit tests + 11 toolbox specs.
 * **Saved investigations** — a **Link-Analysis View** (Component kind `link-analysis-view`) via the
   shared `investigation` folder of the library (`inspecto-ui/projects/link-analysis/src/investigation/`); when its source is `entity-projection` it is renderable as a
   **Widget** (a Graph Visualization Type bound to a Dataset).
@@ -1543,9 +1543,9 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
 
 | Limit | Value | Where | Behaviour at the edge |
 |---|---|---|---|
-| `PROJECTION_NODE_CAP` | **500** | `entity-projection.ts:32`, applied `:99,:150` | truncates the fetch — the real governor |
-| `ANALYSIS_NODE_CAP` | 2 000 | `graph-analysis.ts:11`, `requireUnderCap` `:836-840` | ⚠ **throws** on the super-linear algorithms |
-| `DEFAULT_LIMIT` / `MAX_LIMIT` | 2 000 / 20 000 | `InvRoutes.java:62-63,178-179` | clamps, sets `truncated: true` |
+| `projection_node_cap` | **1,000** (setting) | `projectionNodeCapValue()` in `entity-projection.ts`; default in `la-limits.ts` | truncates the fetch; the 4,000-row read cap often binds first (465–767 nodes), and the notice says which cap cut it |
+| `analysis_node_cap` | 2,500 (setting) | `analysisNodeCapValue()`; default in `la-limits.ts` | ⚠ **throws** on the super-linear algorithms |
+| `traversal.rows_default` / `traversal.rows_max` | 4,000 / 40,000 rows (settings) | `LaLimit.java` | clamps, sets `truncated: true` |
 | Render | none | `graph-view.component.ts` | no virtualisation, culling or WebGL |
 
 * **An edge is a folded aggregate** (`GROUP BY`, carrying `count`), nodes are implied endpoints with no
@@ -1622,11 +1622,11 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
     graph data.
 * **The two graph caps are per-space SETTINGS, not constants** — `GET|PUT /settings/link-analysis`
   (`link-analysis.toon`, `canAuthorWorkbench`, the same shape as branding and geo). **A PUT REPLACES the whole document** (as every settings PUT does, decided 2026-10-12): a key absent from the body is written as `null`, so a body of only `{index:{maxAgeHours:24}}` resets the masking mode and the four-eyes thresholds to the shipped defaults - send the full form (the SPA does). `null` on either
-  field means **inherit the shipped default**, never *unbounded*. The shipped values (500 projection,
-  2 000 analysis) are **measurements, not truths**: they came from one host, one browser and one
+  field means **inherit the shipped default**, never *unbounded*. The shipped defaults (1,000 projection,
+  2,500 analysis) are **measurements, not truths**: they came from one host, one browser and one
   synthetic graph shape, and a denser graph or a slower laptop moves them.
 * **Embed links** (Settings > Link Analysis, 2026-10-12): `embed.defaultTtlHours` / `maxTtlHours` (1..8760; the default may not exceed the cap, a blank cap is 720) and `refuseClassifications` (comma list, at most 20 names of at most 64 characters) with `embedInForce` shown; the client range check mirrors `SettingsRoutes.embed`, an all-blank block is omitted from the PUT. The pane only states that the feature is OFF unless the host runs with `-Dla.embed.enabled` - there is no status API for it.
-* **Share (embed link) panel** (`LA-EMBED-SPA-1`, 2026-10-12): `link-analysis-embed.component.ts` in the Investigation tab (after Members) - the grant list (`GET /inv/investigations/{id}/embeds`: label, status chip, expiry, views, Revoke behind a confirm; never a token) and `link-analysis-embed-mint.dialog.ts` (label, *What the link shows* = scope `working_set` / `with_notes` / `full`, *Masking for this link* = the Space's mode or a stricter one (never offered a looser one), lifetime 1..`embedInForce.maxTtlHours` checked client-side, default `defaultTtlHours`; the grant list shows each link's scope and masking). Gate: `LensService.canShareInvestigation` (identity capability) AND the members route's `you` = lead. States: loading, empty, feature dark (the list's `enabled:false` or a 503, with the `-Dla.embed.enabled=true` hint), read-only note, server errors in place. The token lives only in the dialog's `link` signal (absolute link = origin + `apiUrl(answer.url)`), cleared on Done/destroy, never in a URL, storage or host state; the host re-reads the list (no token) after a mint. The link shown is the SPA viewer link `<origin>/embed/inv/<token>` (not the API URL). Settings > Link Analysis > Embed links also edits *Sites that may frame the viewer page* (`embed.frameAncestors`; a save of the page that omitted it would have wiped the list, so it is in the form). The viewer (`la-app` `embed-view.page.ts`, route `embed/inv/:token`, outside the guarded shell) renders a read-only canvas (`layoutEmbedGraph`: one ring per hop, hop 0 in the centre; zoom +/- and reset, drag or arrow keys to pan, click or *Highlight* to select an entity and light its links; at most 3000 links drawn, labels only on small sets or the selection) and a searchable, paged Working Set table (the accessible equivalent of the canvas), with notes and references shown per the link's `scope`, all as returned (masked). No app chrome, no write control, no third-party call (the host serves the page with its external font links removed under a strict CSP, `okf/product/module/la-core/architecture-backend.md` §6.2). Once the first answer is in the address bar is rewritten to `/embed/inv/shared` (`Location.replaceState`, no navigation) so the token leaves history; a reload therefore says *not available - open the original link again*. One neutral page for every bad / expired / revoked link (the server's answer is the same, deliberately) and a separate *Could not reach the server* page for status 0 / 5xx (which keeps its address so a reload can work); reads through a raw `HttpBackend` client so no Authorization header and no interceptor/error tracker sees the token. *Remainder closed 2026-10-14:* the page is framed only by the token's OWN Space's allow-list (never the union; a non-live token frames for nobody), the inlined Google `@font-face` rules are stripped so the console is clean under the CSP (system fonts; the viewer uses no `mat-icon`), the token is redacted from the host's log line for the page path too, a proxy-log redaction duty is documented in `okf/product/module/la-core/admin-guide-demo.md`, and expiry (including a Space `max_ttl_hours` above 720) is pinned with an injected clock (`EmbedGrantsExpiryClockTest`). NOT DRIVEN in the browser: no bundle was served for this lane; the font strip was checked by applying the same patterns to a built `dist/gamma` index (23 `@font-face` before, 0 external URLs after).
+* **Share (embed link) panel** (`LA-EMBED-SPA-1`, 2026-10-12): `link-analysis-embed.component.ts` in the Investigation tab (after Members) - the grant list (`GET /inv/investigations/{id}/embeds`: label, status chip, expiry, views, Revoke behind a confirm; never a token) and `link-analysis-embed-mint.dialog.ts` (label, *What the link shows* = scope `working_set` / `with_notes` / `full`, *Masking for this link* = the Space's mode or a stricter one (never offered a looser one), lifetime 1..`embedInForce.maxTtlHours` checked client-side, default `defaultTtlHours`; the grant list shows each link's scope and masking). Gate: `LensService.canShareInvestigation` (identity capability) AND the members route's `you` = lead. States: loading, empty, feature dark (the list's `enabled:false` or a 503, with the `-Dla.embed.enabled=true` hint), read-only note, server errors in place. The token lives only in the dialog's `link` signal (absolute link = origin + `apiUrl(answer.url)`), cleared on Done/destroy, never in a URL, storage or host state; the host re-reads the list (no token) after a mint. The link shown is the SPA viewer link `<origin>/embed/inv/<token>` (not the API URL). Settings > Link Analysis > Embed links also edits *Sites that may frame the viewer page* (`embed.frameAncestors`; a save of the page that omitted it would have wiped the list, so it is in the form). The viewer (`la-app` `embed-view.page.ts`, route `embed/inv/:token`, outside the guarded shell) renders a read-only canvas (`layoutEmbedGraph`: one ring per hop, hop 0 in the centre; zoom +/- and reset, drag or arrow keys to pan, click or *Highlight* to select an entity and light its links; at most 3000 links drawn, labels only on small sets or the selection) and a searchable, paged Working Set table (the accessible equivalent of the canvas), with notes and references shown per the link's `scope`, all as returned (masked). No app chrome, no write control, no third-party call (the host serves the page with its external font links removed under a strict CSP, `okf/product/module/la-core/architecture-http-surface.md` §6.2). Once the first answer is in the address bar is rewritten to `/embed/inv/shared` (`Location.replaceState`, no navigation) so the token leaves history; a reload therefore says *not available - open the original link again*. One neutral page for every bad / expired / revoked link (the server's answer is the same, deliberately) and a separate *Could not reach the server* page for status 0 / 5xx (which keeps its address so a reload can work); reads through a raw `HttpBackend` client so no Authorization header and no interceptor/error tracker sees the token. *Remainder closed 2026-10-14:* the page is framed only by the token's OWN Space's allow-list (never the union; a non-live token frames for nobody), the inlined Google `@font-face` rules are stripped so the console is clean under the CSP (system fonts; the viewer uses no `mat-icon`), the token is redacted from the host's log line for the page path too, a proxy-log redaction duty is documented in `okf/product/module/la-core/admin-guide-demo.md`, and expiry (including a Space `max_ttl_hours` above 720) is pinned with an injected clock (`EmbedGrantsExpiryClockTest`). NOT DRIVEN in the browser: no bundle was served for this lane; the font strip was checked by applying the same patterns to a built `dist/gamma` index (23 `@font-face` before, 0 external URLs after).
 * ⛔ **A persisted cap is refused, not clamped.** A non-integer or anything outside `1..100000` is a
   **422 naming the field and the range** — because an operator typed it and deserves to be told. A silent
   clamp is the pattern for a per-request parameter, not for a stored setting.
@@ -1648,8 +1648,8 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   carries its own `kind`, so it is excluded from the legend and kind tallies rather than counted as an
   entity, and the working-set tiles are measured **before** aggregation — live on the demo graph, the
   canvas draws 159 marks while the tiles correctly report 170 entities.
-* ⛔ **Viewport culling and progressive edge loading were REFUSED as premature** — the projection cap is
-  500 nodes, the edge array is already weight-ordered from the server, and the bottleneck those clauses
+* ⛔ **Viewport culling and progressive edge loading were REFUSED as premature** — the projection cap was
+  500 nodes when this was decided (default now 1,000), the edge array is already weight-ordered from the server, and the bottleneck those clauses
   targeted was the pre-LA-05 rebuild, which no longer exists. 🔴 A culling pass that filtered the
   canvas's `data` would re-introduce the LA-05 regression, running a full layout on every pan.
 * **A pattern can require its hops to be in TIME ORDER** (LA-14a). A step marked `afterPrevious` must
@@ -1769,7 +1769,7 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   default. The form has no field for it yet; a save round-trips it untouched (pinned by the component spec).
 * **The server half runs the SAME motif over the whole Dataset** (LA-14b, 2026-09-23):
   `POST /inv/pattern/branching` (`inspecto-geo-link` `PatternRoutes` → `PatternQueryCompiler` →
-  `TemporalMotifMatcher`, the platform graph library's matcher since S6). 🔴 **Why:** the projection is capped (2 000 links, `cnt DESC`; and 500 nodes in the
+  `TemporalMotifMatcher`, the platform graph library's matcher since S6). 🔴 **Why:** the projection is capped (4,000 rows by default, `cnt DESC`; and 1,000 nodes by default in the
   browser), and structuring legs are small one-offs — they sort LAST and are cut FIRST, so on a large feed the
   browser matcher looks at a graph the ring was removed from. **Split of work:** SQL pushes each stage's kind,
   threshold band and the query `filter` into the `WHERE` of the whole Dataset and prunes with NECESSARY
@@ -3545,7 +3545,7 @@ The analyst's answer to *what data am I looking at*: a **Data strip** above the 
 This supersedes the layout parts of *Graph page UX* and *i2-gap work* below (the older controls are gone; see
 [Part I §18](#18-if-you-used-the-old-studio)). The end-user walk-through is
 [Part I §4–§11](#4-the-screen); the design is archived as `docs/archived-documents/plans-archive/la-studio-ui-reorg-plan.md` and the as-built
-facts are in [architecture-backend.md](architecture-backend.md) §6.14.
+facts are in [architecture-investigation-ui.md](architecture-investigation-ui.md) §6.14.
 
 - **One header row (visual polish, operator 2026-10-28):** `header[data-testid="la-header"]` holds the title
   **Link Analysis** (the page's one `<h1>`, `la-title`, `text-lg` since 2026-10-29), then the tool rail and the canvas
@@ -3601,7 +3601,7 @@ An operator-requested pass on the Link Analysis page (`link-analysis.component.h
 
 ## Entity profile pages (as built 2026-10-15)
 
-Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-archive/la-entity-profile-plan.md); routes in [`okf/product/module/la-core/architecture-backend.md`](architecture-backend.md) §6.3.
+Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-archive/la-entity-profile-plan.md); routes in [`okf/product/module/la-core/architecture-http-surface.md`](architecture-http-surface.md) §6.3.
 
 - **Where:** `projects/link-analysis/src/entities/*` in the shared library, mounted by la-app (nav entry **Entities** beside Entity Lists) and by the full SPA (D-EP6). Three pages: **Entities** (one card per Entity Type: distinct, Datasets, data as of, a stale or not-assessed badge), the **Entity Type Profile** (Identity, Where it appears, Lineage, Volume and quality, Value shapes, Time, Links, Relationships, What is not here; collapsible sections) and the **Entity Profile** (seen, rows per day, where, links, related identifiers, lists and groups, freshness). The graph's node dialog links to the Entity page.
 - **Open an Entity** is a pen row: Enter in the editor (or Open) POSTs the value to `resolve` and navigates by the returned key, so the URL holds an alias for a masked type, never the raw value. ⚠ The pen field takes Enter to commit and so the form never submits; the lookup listens for Enter on the host: from the INPUT, and on the CLOSED row when it already holds a value (typed, then committed by Tab or a click elsewhere; `preventDefault` suppresses the button's own Enter-click that re-opened the editor and read as "Enter does nothing", LA-ONBOARD-FIXES-1 F-12). An empty row and the pencil still start editing. The Entity Type Profile's **Masked** tile shows the EFFECTIVE state under the Space's masking mode (`masking.masked` from the server, else `maskedUnder(mode, type.masked)` in `entity-profile-view.ts`), with the mode and the type's own setting in the hint; the Entities cards say "Masked: shown as aliases." only when the mode in force (`/settings/link-analysis` `maskingModeInForce`, `none` by default on Basic) actually masks the type, and nothing until the mode is read (F-6).
@@ -3610,7 +3610,7 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
 
 ## Open in Inspecto LA page (as built 2026-10-17)
 
-The SPA half of the inbound deep link; the wire contract and the server rules are in [`okf/product/module/la-core/architecture-backend.md`](architecture-backend.md) §6.4.
+The SPA half of the inbound deep link; the wire contract and the server rules are in [`okf/product/module/la-core/architecture-http-surface.md`](architecture-http-surface.md) §6.4.
 
 - **Where:** `projects/link-analysis/src/open/*` in the shared library (`open.routes.ts`, `OpenInLaComponent`, `open-link.ts` with `parseOpenLink` and `DeepLinkService`), mounted by la-app at `/open` (inside the signed-in shell, not a nav entry) and by the full SPA at `/studio/open`. The page reads its base from the route, so its links are its siblings (`link-analysis?investigation=`, `entities/<type>/<key>`).
 - **Two checks:** `parseOpenLink` refuses an unknown parameter, a missing entity and Investigation, a malformed `<type>:<key>`, a bad id or a zone-less / inverted window with a readable sentence, without calling the server; then `POST /inv/deep-links/resolve` re-checks it, and its refusal (a raw value of a masked type, an unreadable Investigation) is shown the same way.
@@ -3782,7 +3782,7 @@ starting entities as grown, so **Expand…** continues from the ring. On the Inv
 Investigation (a Domain Profile that investigates the type binds its own mapping); a list or a paste is drawn and queued
 as the first seeds. **Investigate** on an Entity profile takes the same path. Which Datasets can start a graph: the
 Dataset's `defaultLinkMapping`, else a Domain Profile `investigate` mapping, else the first saved view over it, else its
-two classified link-end columns. Code: `link-analysis/start-from.ts`; detail: [architecture-backend §3.4](architecture-backend.md).
+two classified link-end columns. Code: `link-analysis/start-from.ts`; detail: [architecture-masking §3.4](architecture-masking.md).
 
 ## My work
 
@@ -3797,7 +3797,7 @@ On the la-app front page, after the Space guide, **My work** lists:
 
 **Quick questions** (top of the On screen tab) asks *Busiest nodes*, *Tight groups* and *Route from A to B*, each
 answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
-Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture-backend §3.4](architecture-backend.md).
+Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture-masking §3.4](architecture-masking.md).
 
 ## Screens
 

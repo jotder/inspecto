@@ -50,7 +50,7 @@ Authenticate (401) → rate class (`linkAnalysis` bucket for expensive reads, 42
 (`geoLink` in the Space's `modules.toon`, 404 `MODULE_DISABLED`) → capability (403) → `InvestigationRoutes.open`:
 write root (503), safe id (422), header (404), membership role, Dataset visibility (404), Advanced PDP (404), deferred
 role refusal (403) → handler → masking → audit. Non-members get 404-as-absence. Detail:
-[la-core architecture-backend](../la-core/architecture-backend.md) §6.1.
+[la-core architecture-http-surface](../la-core/architecture-http-surface.md) §6.1.
 
 ## Key flows
 
@@ -67,7 +67,7 @@ role refusal (403) → handler → masking → audit. Non-members get 404-as-abs
 - **Index build.** `IndexRoutes` (on request) and `ScheduledIndexBuild` (the `la.index.build` Job via geo-link) submit
   to la-storage's `IndexBuildService` with the plan's advice (`full` / `append` / `compact`).
 - **Embed view.** Mint and revoke in `InvestigationEmbedRoutes`; the public GET in `PublicInvestigationRoutes` is
-  authenticated by its token alone; every failure is one 404 ([la-core architecture-backend](../la-core/architecture-backend.md) §6.2).
+  authenticated by its token alone; every failure is one 404 ([la-core architecture-http-surface](../la-core/architecture-http-surface.md) §6.2).
 - **Dataset read faults** are translated in one place, `DatasetReadFault` (409 for an empty store, 422 with paths
   stripped otherwise).
 

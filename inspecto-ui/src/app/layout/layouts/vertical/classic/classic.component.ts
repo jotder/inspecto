@@ -273,7 +273,7 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
 
     /**
      * Recompute the rendered navigation: flattened search results while filtering, otherwise the
-     * full tree. Written into a signal so the zoneless shell re-renders the OnPush
+     * full tree. Written into a signal so the shell re-renders the OnPush
      * vertical-navigation on every change (lens switch, access profile, search).
      *
      * @private

@@ -319,6 +319,7 @@ import {
     branchingResultToGraph,
     invErrorMessage,
     projectionNodeCapValue,
+    truncationNotice,
     recursivePathsToGraph,
     resolveRunQuery,
     splitIdentityGroups,
@@ -2343,6 +2344,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly addDataOffered = hasRoute(this.router.config, 'add-data');
     /** The projection node cap in force - read, never cached (My browser may lower it). */
     readonly nodeCap = (): number => projectionNodeCapValue();
+    /** N14: the "Result cut short" sentence - names the node cap or the row limit, whichever cut the read. */
+    protected readonly truncationNotice = truncationNotice;
 
     private loadStartSources(): void {
         this.startTypesLoaded = new Promise<void>((resolve) => {

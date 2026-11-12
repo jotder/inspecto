@@ -794,8 +794,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /**
      * Classify the change and do the SMALLEST thing that satisfies it (LA-05). A full rebuild is the
-     * last resort: G6 fixes the layout, behaviors, plugins and tooltip wiring at construction, so only
-     * those force a recreate. A data change is applied onto the live graph, and a purely cosmetic
+     * last resort: G6 fixes the behaviors, plugins, tooltip wiring and icon size at construction, so only
+     * those (and a node size change) force a recreate; a layout or spacing change re-runs the layout on the
+     * live graph (N4). A data change is applied onto the live graph, and a purely cosmetic
      * change (emphasis, display overrides, theme) is a redraw that never runs layout — which is what
      * keeps node positions under the analyst's cursor mid-investigation.
      *
@@ -825,6 +826,15 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             const layoutKey = this.layoutKey();
             const pluginKey = this.pluginKey();
             if (layoutKey !== this.prevLayoutKey || pluginKey !== this.prevPluginKey) {
+                // N4: a layout or spacing pick re-runs the layout on the LIVE graph; rebuilding it re-creates every element (about 2 s at
+                // 767 nodes / 4,000 links). A node size change still rebuilds: the icon size is a constant fixed at construction.
+                if (
+                    pluginKey === this.prevPluginKey &&
+                    !changes['data'] &&
+                    this.layoutNodeSize(layoutKey) === this.layoutNodeSize(this.prevLayoutKey) &&
+                    this.relayout(layoutKey)
+                )
+                    return;
                 this.create();
                 return;
             }
@@ -1037,10 +1047,52 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /**
      * Signature of what the LAYOUT depends on: the engine, and the node size and spacing it scales its distances by.
-     * Those are fixed at construction, so a change in any of them rebuilds the graph and re-runs the layout.
+     * A change in the engine or the spacing re-runs the layout on the live graph ({@link relayout}); a node size change rebuilds.
      */
     private layoutKey(): string {
         return stableKey([this.effectiveLayout(), this.display?.nodeSize ?? null, this.display?.layoutSpacing ?? null]);
+    }
+
+    /** The node size a {@link layoutKey} was taken at ('' for no key yet). */
+    private layoutNodeSize(key: string): string {
+        return key ? JSON.stringify((JSON.parse(key) as unknown[])[1]) : '';
+    }
+
+    /**
+     * Run the layout again on the live graph (a layout pick or spacing): no destroy and no element re-creation, which
+     * is what made every switch cost a full rebuild on top of the layout itself. False = nothing to do it on; the caller rebuilds.
+     */
+    private relayout(layoutKey: string): boolean {
+        const graph = this.graph;
+        if (!graph || !this.data?.nodes.length) return false;
+        this.refreshStyleState();
+        this.prevLayoutKey = layoutKey;
+        const styleKey = this.styleKey();
+        // A layout pick alone leaves every style as it is; a spacing change (it lives in `display`) repaints too.
+        const restyle = styleKey !== this.prevStyleKey;
+        this.prevStyleKey = styleKey;
+        // The hulls were fitted to the OLD positions and do not follow a layout: take them off, put them back once it ran.
+        if ((graph.getPlugins() as unknown[]).some(isCommunityShape)) {
+            swapCommunityShapes(graph, []);
+            this.prevHullKey = '';
+        }
+        // Re-setting the data re-runs the element mappers (see redraw); the new layout then places every node.
+        if (restyle) graph.setData(this.data as unknown as GraphData);
+        graph.setLayout(
+            layoutConfig(this.effectiveLayout(), {
+                nodeSize: this.display?.nodeSize,
+                spacing: this.display?.layoutSpacing,
+            }) as LayoutOptions,
+        );
+        void graph
+            .layout()
+            .then(() => {
+                this.syncHulls();
+                this.syncSelectionState();
+                return graph.fitView();
+            })
+            .catch((e: unknown) => console.warn('[graph-view] the layout failed', e));
+        return true;
     }
 
     /** Signature of the inputs that affect PAINT ONLY. */

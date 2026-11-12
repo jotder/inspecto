@@ -38,5 +38,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
 | — | P3 | defect | PIPELINE-LINK-GAPS-1 links the Pipeline rename and impact scans still miss | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `SPACE-TEST-SUITE-RED-1` | P2 | defect | two more red tests around the space.test Job Type, found by running the whole inspecto-processor suite on fe87aa121 (2,733 run, 3 failure… | — |
 | `IMPORT-LOADER-CASE-TOON-1` | P2 | defect | ImportLoaderInventoryTest fails on master: the fixed name case.toon is read by a loader but is neither reserved nor allow-listed (filed 2… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |

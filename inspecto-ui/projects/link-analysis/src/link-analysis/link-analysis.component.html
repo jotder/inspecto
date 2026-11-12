@@ -1236,7 +1236,7 @@
         }
         @if (truncated() && !workingSetCanvas()) {
             <inspecto-alert variant="warning" title="Result cut short">
-                Some nodes are not shown. Narrow the Dataset or add a filter.
+                {{ truncationNotice(graph()?.nodes?.length ?? 0) }}
             </inspecto-alert>
         }
         @if (startNotice(); as n) {

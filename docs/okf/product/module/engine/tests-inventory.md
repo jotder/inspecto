@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-394 test class(es): 394 unit, 0 real-HTTP control-plane, 0 IT.
+396 test class(es): 396 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -302,6 +302,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ExcelSinkLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ExcelSinkLiftLowerTest.java` | The {@code excel:} block's graph homes (operator 2026-10-06), mirroring {@code WebhookSinkLiftLowerTest}: the |
 | `GapDetectionLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/GapDetectionLiftLowerTest.java` | An unedited lift to lower must not flip {@code collector.gap_detection.enabled}: the flag belongs to the file |
 | `LiftLowerFixtureSweepTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/LiftLowerFixtureSweepTest.java` | Unification W0 (BACKLOG, "prove the lift→lower round trip lossless over the existing configs or NAME the |
+| `LinkGraphTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/LinkGraphTest.java` |  |
 | `MapNodeKeyContractTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/MapNodeKeyContractTest.java` | <b>Two sides, one committed vocabulary</b> — the {@code b061ff41} idiom applied to map-node config. |
 | `MappingComponentTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/MappingComponentTest.java` | The {@code mapping} component kind — the first CSV-backed registry kind (ELT amendment Phase 1 |
 | `MappingRulesTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/MappingRulesTest.java` | {@link MappingRules} — the authoring-time gate for a mapping component's rules (S6b). |
@@ -336,6 +337,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `SchemaAccessTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/SchemaAccessTest.java` | The read-only {@code schema} Platform Service (S1-5): list/get/fingerprint over the space's |
 | `SpaceConfigRootTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/SpaceConfigRootTest.java` | {@link SpaceConfigRoot} — the resolution behind {@code MATERIALIZE-SPACE-ROOT-1}. |
 | `SqlSavePathGuardTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/SqlSavePathGuardTest.java` | The save path must refuse author SQL the sandbox guard rejects. |
+| `StampedCacheTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/StampedCacheTest.java` | LA-PERF-SERVER-1: a stamped cache serves a quiet tree from memory and never serves a stale answer. |
 | `StepKindModulesTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/StepKindModulesTest.java` | MODULE-REORG-P4-1: a step kind a known-but-uninstalled module declares ({@code provides.stepKinds}) names that module; |
 | `ViewStoreTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/ViewStoreTest.java` | {@link ViewStore}: persist / read / delete / list {@code sink.view} definitions (T32 Phase C). |
 | `WebhookSinkLiftLowerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/WebhookSinkLiftLowerTest.java` | The {@code webhook:} block's graph homes: the at-rest lift runs it as a second commit BRANCH beside the |

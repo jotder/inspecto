@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParameterCodec, HttpParams } from '@angular/common/http';
-import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, of, switchMap, tap, throwError, timer } from 'rxjs';
+import { retryAfterMs } from '@inspecto/link-analysis/link-analysis/limit-refusal';
 // eslint-disable-next-line no-restricted-imports -- only `actor`, to keep a stored answer from crossing viewers (as la-limits.service does)
 import { SessionService, SpacesService } from '@inspecto/core/api';
 import { ConditionalReadCache } from './conditional-read-cache';
@@ -2005,8 +2006,8 @@ export class InvService {
             this.reads.store(key, res.headers.get('ETag'), res.body);
             return res.body as T;
         });
-        return this.noted(
-            send(held?.etag ?? null).pipe(
+        const run = (retried: boolean): Observable<T> =>
+            send(retried ? null : (held?.etag ?? null)).pipe(
                 keep,
                 catchError((err: unknown) => {
                     if (err instanceof HttpErrorResponse && err.status === 304) {
@@ -2018,10 +2019,13 @@ export class InvService {
                         return send(null).pipe(keep);
                     }
                     this.reads.drop(key);
+                    // N13: a 429 that says how long to wait is retried once after that wait, then the refusal stands
+                    const wait = retryAfterMs(err);
+                    if (wait != null && !retried) return timer(wait).pipe(switchMap(() => run(true)));
                     return throwError(() => err);
                 }),
-            ),
-        );
+            );
+        return this.noted(run(false));
     }
 
     project(req: ProjectionRequest): Observable<ProjectionResult> {

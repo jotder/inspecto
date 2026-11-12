@@ -66,6 +66,16 @@ export function projectionNodeCapValue(): number {
 }
 
 /**
+ * N14: which cap cut a projection short. A projection stops at the node cap only when it holds that many nodes; a graph
+ * below it was cut by the server's row limit (the 4 000-row read cap binds first on a dense graph, at 465-767 nodes).
+ */
+export function truncationNotice(nodeCount: number, nodeCap: number = projectionNodeCapValue()): string {
+    return nodeCount >= nodeCap
+        ? `Some nodes are not shown: the graph reached the node cap (${nodeCap}). Narrow the Dataset or add a filter.`
+        : 'Some links are not shown: the server stopped reading at its row limit. Narrow the Dataset or add a filter.';
+}
+
+/**
  * An `entity-projection` query with its mappings replaced by the typed ones the answer resolved (D-M6), so every
  * later mint off the remembered run (Working Set, traversal, advanced search) agrees with the drawn ids.
  */

@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [LA-COLUMN-ROLES-2 — design notes for the three parts that need a decision (2026-11-05)](plan-column-roles-2.md) · [Link analysis core and ports - plan of record](plan.md) |
 | spec | current | [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis core and ports - spec](spec.md) |
-| architecture | current | [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture-backend.md) · [Link Analysis](architecture.md) |
+| architecture | current | [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture-backend.md) · [Link Analysis — data onboarding](architecture-data-onboarding.md) · [Link Analysis — HTTP surface](architecture-http-surface.md) · [Link Analysis — Investigation UI](architecture-investigation-ui.md) · [Link Analysis — masking](architecture-masking.md) · [Link Analysis](architecture.md) |
 | features | current | [Link Analysis — features](features-link-analysis.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Investigation Pivot](user-guide-investigation-pivot.md) · [Link Analysis — User Guide](user-guide-link-analysis.md) |
@@ -55,3 +55,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture-backend.md §9-§10; plan ar… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
+| `LA-PERF-N4-1` | P2 | feature | Layouts and large-selection repaints still block the main thread on 767 nodes / 4,000 links (N4, re-measured 2026-11-12): first open 7.4… | operator |
+| `LA-PERF-P5-1` | P3 | feature | Betweenness in a Web Worker, or approximated (P5). | operator |
+| `LA-PERF-P10A5-1` | P3 | feature | Expand and Grow fetch only the delta (P10a-5). | — |

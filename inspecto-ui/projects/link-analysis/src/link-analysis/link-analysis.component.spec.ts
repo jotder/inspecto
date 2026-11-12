@@ -2505,7 +2505,7 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         await c.expandNode('c', 'C', ['C']);
-        const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('Some nodes are not shown. Narrow the Dataset or add a filter.');
+        const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('Some links are not shown: the server stopped reading at its row limit.');
         fixture.detectChanges();
         expect(alert()).toBe(true);
 

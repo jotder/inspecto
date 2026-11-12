@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Link analysis and geo routes - plan of record](plan.md) |
-| spec | current | [Link analysis and geo routes - spec](spec.md) |
+| spec | current | [LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)](spec-server-profile.md) · [Link analysis and geo routes - spec](spec.md) |
 | architecture | current | [Link analysis and geo routes - architecture](architecture.md) |
 | features | current | [Link analysis and geo routes — features](features.md) |
 | feature-db | current | [Link analysis and geo routes — feature database](feature-db.md) |
@@ -32,4 +32,9 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.la-api` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-PERF-N9-1` | P3 | defect | Projection tail latency: one 15.99 s call in 60, unexplained (N9); audit append runs on the request thread. | — |
+| `LA-PERF-N10-1` | P3 | chore | About 3,550 native threads and 1.4 GB at idle (N10). | — |
+| `LA-PERF-N11-1` | P3 | chore | Boot takes 3 min 35 s, 185 s before the first log line (N11). | — |
+| `LA-PERF-P10A5-1` | P3 | feature | Expand and Grow fetch only the delta (P10a-5). | — |

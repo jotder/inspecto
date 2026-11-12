@@ -701,7 +701,11 @@ class ControlApiInvestigationEmbedTest {
             String one = mint(c, "{}");
             String two = mint(c, "{}");
             for (int i = 0; i < 3; i++) assertEquals(200, pub(c, one).statusCode(), "request " + i);
-            assertEquals(429, pub(c, one).statusCode(), "the fourth request on ONE link is throttled");
+            var throttled = pub(c, one);
+            assertEquals(429, throttled.statusCode(), "the fourth request on ONE link is throttled");
+            // N13: one token per 1,000 s - the wait is the rest of that, never 1 and never more
+            long wait = Long.parseLong(throttled.headers().firstValue("Retry-After").orElseThrow());
+            assertTrue(wait > 900 && wait <= 1000, "Retry-After: " + wait);
             assertEquals(200, pub(c, two).statusCode(), "another link has its own budget");
             assertNotEquals(429, pub(c, "unknown-token-1.AAAA").statusCode());
         }
