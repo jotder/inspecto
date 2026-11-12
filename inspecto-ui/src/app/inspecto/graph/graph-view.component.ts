@@ -825,6 +825,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             const layoutKey = this.layoutKey();
             const pluginKey = this.pluginKey();
             if (layoutKey !== this.prevLayoutKey || pluginKey !== this.prevPluginKey) {
+                // N4: a layout pick alone re-runs the layout on the LIVE graph; rebuilding it re-creates every element (about 3 s at 767 nodes / 4,000 links).
+                if (pluginKey === this.prevPluginKey && !changes['data'] && this.relayout(layoutKey)) return;
                 this.create();
                 return;
             }
@@ -1041,6 +1043,43 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
      */
     private layoutKey(): string {
         return stableKey([this.effectiveLayout(), this.display?.nodeSize ?? null, this.display?.layoutSpacing ?? null]);
+    }
+
+    /**
+     * Run the layout again on the live graph (a layout pick, spacing or node size): no destroy and no element re-creation, which
+     * is what made every switch cost a full rebuild on top of the layout itself. False = nothing to do it on; the caller rebuilds.
+     */
+    private relayout(layoutKey: string): boolean {
+        const graph = this.graph;
+        if (!graph || !this.data?.nodes.length) return false;
+        this.refreshStyleState();
+        this.prevLayoutKey = layoutKey;
+        const styleKey = this.styleKey();
+        // A layout pick alone leaves every style as it is; a node size or spacing (both in `display`) repaints too.
+        const restyle = styleKey !== this.prevStyleKey;
+        this.prevStyleKey = styleKey;
+        // The hulls were fitted to the OLD positions and do not follow a layout: take them off, put them back once it ran.
+        if ((graph.getPlugins() as unknown[]).some(isCommunityShape)) {
+            swapCommunityShapes(graph, []);
+            this.prevHullKey = '';
+        }
+        // Re-setting the data re-runs the element mappers (see redraw); the new layout then places every node.
+        if (restyle) graph.setData(this.data as unknown as GraphData);
+        graph.setLayout(
+            layoutConfig(this.effectiveLayout(), {
+                nodeSize: this.display?.nodeSize,
+                spacing: this.display?.layoutSpacing,
+            }) as LayoutOptions,
+        );
+        void graph
+            .layout()
+            .then(() => {
+                this.syncHulls();
+                this.syncSelectionState();
+                return graph.fitView();
+            })
+            .catch((e: unknown) => console.warn('[graph-view] the layout failed', e));
+        return true;
     }
 
     /** Signature of the inputs that affect PAINT ONLY. */
