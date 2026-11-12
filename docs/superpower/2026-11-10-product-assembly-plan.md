@@ -2049,14 +2049,17 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
    closure is marked in its owning hub first, and the counts are re-derived (`tools/check-doc-counts.mjs`).
 3. Run §13.3 as parallel lanes (at most three at a time), one push per lane.
 4. ✅ PA-0 … PA-7 and PA-10 shipped 2026-11-10 … 2026-11-12; PA-8 built 2026-11-12. The full Advanced reactor gate
-   (12,085 tests, 0 failures) and the UI checks (7,542 passed) were run on `fc8b5d1f0` on 2026-11-12. Everything after
-   it shipped on targeted tests, so the next full gate covers PA-8, PA-10 and the review follow-ups.
+   (12,085 tests, 0 failures) and the UI checks (7,542 passed) were run on `fc8b5d1f0` on 2026-11-12. The full
+   Advanced reactor gate ran green again in the PA-9b lane on 2026-11-12 (over `6a7d8c20b` plus PA-9b), so it covers
+   PA-8, PA-10 and the review follow-ups too; the UI checks have not been re-run since `fc8b5d1f0`.
 5. ✅ The operator reviewed D-PA26 … D-PA37 on 2026-11-12 (`556866ad7`): six signed as built, six changed. All five
    follow-up rows shipped the same day: `HELM-PRODUCT-VALUES-1` (`8f8b472b7`, `115e483c0`),
    `PRODUCT-SCRIPTS-GENERATED-1` (`b70e37751`), `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` (`42ebe079f`),
    `PILOT-PRECREATED-SPACE-1` (`a9a41c260`), `CONTAINER-DEMO-IMAGE-1` (`155ce2523`, merged `81c3df0de`).
 6. **PA-9** (D-PA38 … D-PA47 signed 2026-11-12): ✅ 9a spike (`56a2b643e`, G-RT tripped on the Dataset glob, cleared by
-   the window buffer); 9b windowed Alert Rule building; then 9c … 9f in order (D-PA46).
+   the window buffer); ✅ 9b windowed Alert Rule (`252e60a92`, merged `373ea3338`; 12 of 12 mutants killed); next 9c
+   (`sequence` and `absence`), then 9d (the Add-on, the commit hook, the latency harness, and the two items 9b's
+   verification left to it), 9e, 9f in order (D-PA46). Each lane waits for the operator's go.
 7. **PA-8 stays open (D-PA30)** until `CONTAINER-AIRGAP-PROOFS-1` passes on real hosts: a Kubernetes install and a
    complete air-gapped bundle.
 8. Held for demand: `ADDON-PICKER-PAGE-1`, `PRODUCT-MAP-APP-EDITION-PRICES-1`, `CUSTOMER-BUILD-DOMAIN-APPS-1`,
