@@ -39,7 +39,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
 | `CONTAINER-AIRGAP-PROOFS-1` | P3 | chore | now the gate that closes PA-8 (operator 2026-11-12, D-PA30) | external |
 | `ENTITLEMENT-SPI-NARROWING-1` | P3 | feature | a signed entitlement closes a left-out module's routes (503), features, Job types and /modules state, but not its other extension points:… | demand |
-| `PUBLIC-API-SURFACE-1` | P3 | feature | the extension surface a partner builds against is only partly marked: JobTypeProvider, ConsequenceProvider and CollectorConnector carry n… | demand |
 | `APP-KIT-ALERT-RULE-1` | P3 | feature | the App kit's starter (tools/inspecto-app.mjs new) ships no Alert Rule, so a partner App made with it raises no Alert from its findings u… | demand |
 | `ASSURE-OPERABILITY-1` | P2 | feature | the generic operability half (WS-01/02/04/26, wave 4, item 4.5, of the archived plan; wave map in okf/product/layer/product/plan-assuranc… | operator |
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
@@ -47,7 +46,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Detection Add-on and the CEP App (PRODUCT-ASSEMBLY-1 phase PA-9) | — |
 | `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |
-| `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 stays open (operator-signed 2026-10-18 per the index,… | operator |
 | `SCALEOUT-LIVE-HALVES-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

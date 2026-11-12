@@ -2328,7 +2328,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * the stop it was already asked to make ({@link #beginClose}). Each store serialises its connection, so a close
      * waits for a statement in flight on it, never cuts it. Idempotent with {@link #close()}.
      */
-    public void closeStoresNow() {
+    void closeStoresNow() {
         closeStores(false);
     }
 

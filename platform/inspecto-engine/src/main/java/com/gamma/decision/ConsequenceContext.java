@@ -1,5 +1,6 @@
 package com.gamma.decision;
 
+import com.gamma.api.PublicApi;
 import com.gamma.objects.ObjectAccess;
 
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Optional;
  * services a consequence needs. The host ({@code DecisionRoutes}) implements it; {@code HostContext} /
  * {@code ApiContext} never cross the SPI.
  */
+@PublicApi(since = "4.0.0")
 public interface ConsequenceContext {
 
     String ruleName();

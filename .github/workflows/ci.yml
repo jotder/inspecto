@@ -350,6 +350,12 @@ jobs:
       - name: Guard - the engine names no Link Analysis class
         run: node tools/check-engine-names-no-la.mjs && node --test tools/check-engine-names-no-la.test.mjs tools/la-demo-smoke.test.mjs tools/seed-la-showcase.test.mjs tools/la-demo-burst.test.mjs tools/la-demo-figures.test.mjs tools/gen-la-showcase-data.test.mjs tools/la_gen_io.test.mjs
 
+      # Public API guard (PUBLIC-API-SURFACE-1, 2026-11-12): every @PublicApi signature in every tracked .java file
+      # must match the committed baseline platform/inspecto-api/public-api.txt, so a changed signature lands only
+      # with `--update` in the same change; the fixture test plants each kind of change and requires red.
+      - name: Guard - the @PublicApi surface matches its committed baseline
+        run: node tools/check-public-api.mjs && node --test tools/check-public-api.test.mjs
+
       # Launcher guard (LAUNCHER-GUARD-1, 2026-09-14). Third in the same family: package.ps1 emits the
       # deployment surface and nothing had ever EXECUTED any of it. serve.bat spent its life dropping
       # -Dauth.mode=oidc on every Windows Standard/Advanced bundle — a parenthesised `if` block, which

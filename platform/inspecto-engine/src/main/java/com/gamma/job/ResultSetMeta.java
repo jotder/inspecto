@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 import java.util.List;
 
 /**
@@ -8,6 +10,7 @@ import java.util.List;
  * so the output is immediately describable (and, later, bindable by Widgets / Show-Me, which match on
  * this same shape). Serialized as part of the artifact JSONL.
  */
+@PublicApi(since = "4.0.0")
 public record ResultSetMeta(List<Column> columns) {
 
     /** The analytic role of a column (drives Widget/measure binding). */

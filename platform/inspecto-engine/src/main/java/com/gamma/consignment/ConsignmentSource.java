@@ -1,5 +1,7 @@
 package com.gamma.consignment;
 
+import com.gamma.api.PublicApi;
+
 /**
  * One source Consignment an at-rest run READ (execution residuals X2 — cross-lane provenance): the
  * consignment id, the pipeline that produced it ({@code consignment_outputs.producer}, {@code null} on
@@ -9,4 +11,5 @@ package com.gamma.consignment;
  * surface that opens a Consignment is keyed by the {@code (pipeline, batchId)} pair — a linkage the reader
  * cannot follow is only half a linkage.
  */
+@PublicApi(since = "4.0.0")
 public record ConsignmentSource(String consignmentId, String pipeline, String tableName) {}
