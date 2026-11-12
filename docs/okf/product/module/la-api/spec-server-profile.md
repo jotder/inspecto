@@ -59,13 +59,13 @@ absolute timings are noisy. Compare runs only within this section.
 ### N10: who owns the native threads
 | | Before | After `async_threads=1` |
 |---|---|---|
-| OS threads in the JVM | 5,338 (5,251 start in `libduckdb_java`, 79 are Java threads) | **1,158** |
+| OS threads in the JVM (at the probe) | 5,332 (the native dump a minute earlier: 5,338, of which 5,251 start in `libduckdb_java` and 79 are Java threads) | **1,158** |
 | Working set after 60 projections | 1,844 MB | **1,483 MB** (1,436-1,655 over later runs) |
 | Projection p50 / p90 / max (60 calls) | 579 / 1,393 / 1,982 ms | **450 / 1,249 / 10,299** ms; then 392 / 833 / 1,300 and 455 / 1,318 / 1,659 |
 
 Cause, measured in isolation with the bundled `duckdb_jdbc` 2.0.0.0 on 12 cores: each database instance starts
 **59 threads**: 11 workers (`threads=12`) and **48 async I/O threads (`async_threads`, 4 × cores)**. The server held 89
-open DuckDB connections (`GC.class_histogram`), and 89 × 59 = 5,251. `SET threads=4` saves only 8 per instance. `SET
+open DuckDB connections (`GC.class_histogram`), and 89 × 59 = 5,251. `SET threads` saves only 8-11 per instance (8 at `threads=4`, 11 at `threads=1`). `SET
 async_threads=1` leaves 12, and it works after open. A 20 M-row parquet group-by: best of 5 is 592-667 ms by default and
 623-706 ms with `async_threads` 0 or 1, within noise. The fix is `DuckDbUtil.applyInstanceCaps`, called from
 `applyCorrectnessSettings` and from `JdbcDrivers.connect` for `jdbc:duckdb:` URLs (the per-Space stores). Its default is
