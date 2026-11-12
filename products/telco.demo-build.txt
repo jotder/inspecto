@@ -27,7 +27,7 @@ day. Nothing needs a seed step; no node is required. What you will find:
 The findings are dated July 2026, the corpus's month: filter by that period, not by "today".
 
 RESET THE DEMO: stop the server, delete .\spaces\telco, and restore that folder from the zip (re-extract spaces\telco).
-Anything done during a session (assignments, dispositions, new Rules) lives in that folder, so a reset discards it.
+Anything done during a session (assignments, dispositions, new Alert Rules) lives in that folder, so a reset discards it.
 
 The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
 The bundled SBOM describes the Advanced module set: it lists inspecto-oidc (not shipped here) and
