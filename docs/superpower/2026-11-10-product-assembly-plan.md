@@ -1292,6 +1292,38 @@ What exists to build on:
   - Build the four generated files per Product.
   - Proof: `render-product-docs --check` and the docs guards green.
 
+**PA-10a as built (2026-11-12).** The 9 items are in `product-map/{product,app,industry}/`; `check-product-map.mjs` rule 8
+holds them; the hubs are generated. The review found the mind map (`render-product-map.mjs`) dropping the new parentless
+kinds; they are now roots of their own, with their link in the CSV.
+
+**PA-10b as built (2026-11-12).** Spec: [`okf/product/layer/platform/spec-product-map.md`](../okf/product/layer/platform/spec-product-map.md).
+- `tools/customer.mjs` holds the resolution, moved unchanged apart from App Order Codes, plus `customerAssembly` and
+  `customerPlan`. `assemble.mjs --customer` writes a customer plan; `customer-build.mjs` signs its entitlement and trims a
+  Product bundle to it.
+- The trim refuses a bundle of another Product or Edition, a jar the plan removes that is missing, and a Domain product
+  whose composed Space joins Apps the customer did not buy.
+- Decided here: a Platform product's optional App comes along when every Add-on it needs is bought (so the pilot keeps
+  the Link Analysis App, as today); the entitlement's `addons` are the bought ones only, so an Add-on whose module ships
+  as `required` (Anomaly Detection for `telco-fraud`) is not "held" by `holdsAddon`, while its module runs because it is
+  listed in `modules`.
+
+**Proof (as built).**
+- `customer-build.test.mjs` 11/11: the old resolution cases; a synthetic Platform customer whose plan keeps exactly what
+  `resolve()` keeps and whose file entitles exactly those modules; a Domain customer buying Apps, a missing required
+  App and a foreign App refused; expiry and nodes reaching a file that verifies; the trim's effects and each refusal.
+- **The pilot customer, both ways, from one bundle** (`package.ps1 -Product inspecto -Edition Standard -NoRuntime -NoUi`
+  at `28e51e97b`, 47 files in `lib/`):
+  - today's `customer-build.mjs demo-telco --bundle` (origin/master before this lane) and the assembled one each removed
+    13 jars and 29 Space Templates;
+  - a SHA-256 diff of the two trees: **227 files identical, nothing missing or changed; the assembled build adds only
+    `conf/entitlement.toon` and `conf/entitlement.sig`** (`lib/product.json` is rewritten from the plan, byte for byte the
+    same);
+  - `entitle.mjs verify`: signed by `inspecto-issuer-1`, valid; 12 optional modules, Add-on `linkAnalysis`, App
+    `link-analysis`, no expiry;
+  - booted from its root (OIDC jars pointed at a dead JWKS, as the boot smoke does): `/health` 200, `/bootstrap` answers;
+  - the same bundle with one byte of the entitlement changed refuses to boot ("the signature does not match").
+- The pilot's record and outputs stay out of git (the record is in `product-map/private/`, the outputs in a scratch folder).
+
 ## 12. Decisions (operator, signed 2026-11-10 and 2026-11-11 as recommended)
 
 | Id | Call | Signed |
