@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-391 test class(es): 391 unit, 0 real-HTTP control-plane, 0 IT.
+394 test class(es): 394 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,6 +29,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `AlertKeyCoverageContractTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertKeyCoverageContractTest.java` | <b>The {@code alert} config type's parser census</b> — the second type to get one |
 | `AlertLifecycleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertLifecycleTest.java` | The Alert lifecycle that was {@code Workflow.defaultFor(ALERT)}: unchanged move for move. |
 | `AlertOwnerRoutingTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertOwnerRoutingTest.java` | DUCKLE-C1 residual 2 — <b>owner-routed alerting</b>, the rule half: an Alert Rule carries an owner (the |
+| `AlertPatternTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertPatternTest.java` | PA-9c: the {@code pattern:} block of a windowed Alert Rule. Every refusal (a 422 at every save door, since |
 | `AlertPurgeStoreTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertPurgeStoreTest.java` | {@link AlertStore#purgeResolvedBefore} on the heap store and the durable DuckDB file (real file, reopened). |
 | `AlertRecordsParityTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRecordsParityTest.java` | MODULE-REORG-P7-INCIDENTS slices 1-2 — the characterisation of {@link AlertService} over its {@link AlertRecords} |
 | `AlertRetentionPinTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRetentionPinTest.java` | MODULE-REORG-P7-INCIDENTS (retention of resolved Alert rows) - characterisation, written BEFORE the purge: on |
@@ -42,9 +43,11 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `FreshnessAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/FreshnessAlertTest.java` | DUCKLE-C1 Dataset freshness: the three states, the fresh→stale edge, and the all-clear. |
 | `IndexLagAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/IndexLagAlertTest.java` | LA-DATA-TRUST-1 S4: (a) Files waiting for the Link Analysis index longer than a limit - an Alert Rule with |
 | `MeasureAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/MeasureAlertTest.java` | BI-5 measure alerts: dataset+measure rules evaluated via the wired probe, cooldown, validation. |
+| `PatternSqlOracleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PatternSqlOracleTest.java` | PA-9c: the Pattern SQL ({@link WindowSql#sequence}, {@link WindowSql#absence}) against an independent oracle — a |
 | `PerEntityAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PerEntityAlertTest.java` | ASSURE-PER-ENTITY-ALERTS-1 — a Dataset measure Alert Rule with {@code by} evaluates the Measure per key over |
 | `PollRelativeFreshnessTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PollRelativeFreshnessTest.java` | LA-DATA-TRUST-1 S3: a freshness Alert Rule whose {@code maximumAge} is a MULTIPLE of the feeding Collector's poll interval |
 | `RunbookTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/RunbookTest.java` | The {@code runbook} kind's structural validator, and the Alert Rule's {@code runbook:} link. |
+| `WindowedPatternEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedPatternEvaluatorTest.java` | PA-9c: {@link WindowedRuleEvaluator} running the {@code sequence} and {@code absence} Patterns over committed |
 | `WindowedRuleEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedRuleEvaluatorTest.java` | PA-9b: {@link WindowedRuleEvaluator} over committed Parquet files — the window buffer, effectively-once Alerts |
 | `WindowSqlOracleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowSqlOracleTest.java` | PA-9b: the window SQL compiler ({@link WindowSql}) against an independent oracle — a plain-Java evaluation of the |
 | `CatalogModelTest` | `com.gamma.catalog` | unit | `platform/inspecto-engine/src/test/java/com/gamma/catalog/CatalogModelTest.java` | Unit tests for the pure metadata-graph model (P0): id formatting/parsing, description |

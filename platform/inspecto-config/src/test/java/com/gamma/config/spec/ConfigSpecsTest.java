@@ -676,6 +676,19 @@ class ConfigSpecsTest {
                     f + " is required per shape, never flatly");
     }
 
+    /**
+     * PA-9c: a Pattern rule fixes its own threshold, as a freshness rule does; the same rule without the block needs
+     * one. The {@code window:} block (PA-9b) is not held to the ledger window's {@code \d+[smhdb]} shape.
+     */
+    @Test
+    void aPatternRuleIsNotRefusedForOmittingTheThreshold() {
+        Map<String, Object> window = Map.of("type", "tumbling", "size", "5m", "time", "event_ts");
+        assertEquals(List.of(), alertErrors(Map.of("name", "silent", "dataset", "feed", "window", window,
+                "pattern", Map.of("type", "absence"), "severity", "WARNING")));
+        assertEquals(List.of("alert.threshold"), alertErrors(Map.of("name", "silent", "dataset", "feed", "window", window,
+                "measure", "count", "severity", "WARNING")));
+    }
+
     /** ...while the ledger rule keeps every requirement it had, now stated per shape. */
     @Test
     void aLedgerRuleStillNeedsMetricThresholdAndWindow() {

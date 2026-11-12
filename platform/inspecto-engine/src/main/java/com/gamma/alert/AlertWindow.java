@@ -34,7 +34,7 @@ import java.util.Set;
  * slides per window. Anything longer is a batch Alert Rule on a schedule.
  */
 public record AlertWindow(String type, Duration size, Duration slide, String time, Duration lateness,
-                          List<String> distinctOn) {
+                          List<String> distinctOn, AlertPattern pattern) {
 
     public static final String TUMBLING = "tumbling";
     public static final String SLIDING = "sliding";
@@ -72,6 +72,29 @@ public record AlertWindow(String type, Duration size, Duration slide, String tim
         for (String c : distinctOn)
             require(c != null && COLUMN.matcher(c).matches(), "alert.window.distinctOn column '" + c + "' must be a plain column name");
         require(distinctOn.stream().distinct().count() == distinctOn.size(), "alert.window.distinctOn names a column twice");
+        // PA-9c: a sequence's Window is anchored at its first step's event (B within size of A), not aligned to a grid
+        require(pattern == null || !pattern.isSequence() || TUMBLING.equals(type),
+                "a sequence alert.pattern is anchored at its first event: its window is tumbling (size = how soon B "
+                        + "must follow A) and takes no slide");
+    }
+
+    /** A windowed Measure rule's Window: no Pattern. */
+    public AlertWindow(String type, Duration size, Duration slide, String time, Duration lateness, List<String> distinctOn) {
+        this(type, size, slide, time, lateness, distinctOn, null);
+    }
+
+    /** Whether this Window carries a Pattern (PA-9c) rather than a Measure over each Window. */
+    public boolean isPattern() {
+        return pattern != null;
+    }
+
+    /**
+     * How long a buffered row may still matter, in µs: {@code size + lateness}; an absence also reads the slide
+     * before each Window (its key's last event), so it keeps {@code slide} more.
+     */
+    long spanUs() {
+        long span = WindowSql.micros(size.plus(lateness));
+        return pattern != null && pattern.isAbsence() ? span + WindowSql.micros(slide) : span;
     }
 
     /** How many windows one event falls in: 1 for tumbling, {@code size / slide} for sliding. */
@@ -81,13 +104,19 @@ public record AlertWindow(String type, Duration size, Duration slide, String tim
 
     /** Parse the authored block; every refusal is an {@link IllegalArgumentException} naming the key. */
     public static AlertWindow fromMap(Object raw) {
+        return fromMap(raw, null);
+    }
+
+    /** Parse the authored block and, when present, the rule's {@code pattern:} block (PA-9c). */
+    public static AlertWindow fromMap(Object raw, Object rawPattern) {
         require(raw instanceof Map<?, ?>, "alert.window on a Dataset measure rule must be a block "
                 + "{type, size, slide, time, lateness}");
         Map<?, ?> m = (Map<?, ?>) raw;
         for (Object k : m.keySet())
             require(KEYS.contains(String.valueOf(k)), "alert.window." + k + " is not a window key (one of " + KEYS + ")");
         return new AlertWindow(lower(m.get("type")), duration(m.get("size"), "size"), duration(m.get("slide"), "slide"),
-                str(m.get("time")), duration(m.get("lateness"), "lateness"), columns(m.get("distinctOn")));
+                str(m.get("time")), duration(m.get("lateness"), "lateness"), columns(m.get("distinctOn")),
+                rawPattern == null ? null : AlertPattern.fromMap(rawPattern));
     }
 
     /** The stored shape: durations in their shortest whole unit. */

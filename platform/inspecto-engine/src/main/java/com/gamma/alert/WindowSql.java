@@ -57,6 +57,7 @@ final class WindowSql {
             MeasureCompiler.Measure m = measure(r);
             if (m.field() != null) out.add(m.field());
             whenFields(r.when(), out);
+            if (r.eventWindow().isPattern()) for (Object step : r.eventWindow().pattern().steps()) whenFields(step, out);
             out.addAll(r.eventWindow().distinctOn());
         }
         return List.copyOf(out);
@@ -118,6 +119,99 @@ final class WindowSql {
         return new Compiled(sql, List.copyOf(params));
     }
 
+    /** The buffer column numbering the commit that buffered a row (PA-9c: a sequence's touched scope). */
+    static final String SEQ = "__inspecto_seq";
+
+    /**
+     * PA-9c {@code sequence}: the (key, A event) pairs with a B event for the same key at or after A and at most
+     * {@code size} later, where A or B arrived in commit {@code seq} and A's Window was still open before it
+     * ({@code a + size + lateness > watermark}). A row never pairs with itself. Columns as {@link #breaches}:
+     * {@link #WINDOW_START} is A's event time (the fired table's window start), {@link #VALUE} how many B events
+     * follow it, {@link #FIRST} A's and {@link #LAST} the first B's event time (epoch µs).
+     *
+     * @param buffer a table holding {@link #columns} plus {@link #SEQ}
+     */
+    static Compiled sequence(AlertRule rule, String buffer, long seq, long watermarkUs) {
+        AlertWindow w = rule.eventWindow();
+        long within = micros(w.size()), late = micros(w.lateness());
+        String ts = SqlIdent.q(w.time()), sq = SqlIdent.q(SEQ), rid = SqlIdent.q("__inspecto_rid");
+        ConditionSql.Bound a = ConditionSql.predicateBound(w.pattern().steps().get(0));
+        ConditionSql.Bound b = ConditionSql.predicateBound(w.pattern().steps().get(1));
+        List<String> keySelect = new ArrayList<>(), keyOut = new ArrayList<>(), keyJoin = new ArrayList<>();
+        for (int i = 0; i < rule.by().size(); i++) {
+            String c = SqlIdent.q(rule.by().get(i)), k = SqlIdent.q(keyColumn(i));
+            keySelect.add("a." + c + " AS " + k);
+            keyOut.add("a." + c);
+            keyJoin.add("b." + c + " IS NOT DISTINCT FROM a." + c);
+        }
+        String aTs = "epoch_us(a." + ts + ")", bTs = "epoch_us(b." + ts + ")";
+        keyJoin.add("a." + rid + " <> b." + rid);
+        keyJoin.add(bTs + " >= " + aTs);
+        keyJoin.add(bTs + " <= " + aTs + " + " + within);
+        List<String> groupBy = new ArrayList<>(keyOut);
+        groupBy.add(aTs);
+        String all = "SELECT rowid AS " + rid + ", * FROM " + SqlIdent.q(buffer);
+        String sql = "WITH " + SqlIdent.q("__inspecto_a") + " AS (" + all + " WHERE " + a.sql() + "), "
+                + SqlIdent.q("__inspecto_b") + " AS (" + all + " WHERE " + b.sql() + ") "
+                + "SELECT " + String.join("", keySelect.stream().map(x -> x + ", ").toList())
+                + aTs + " AS " + SqlIdent.q(WINDOW_START) + ", count(*) AS " + SqlIdent.q(VALUE) + ", "
+                + aTs + " AS " + SqlIdent.q(FIRST) + ", min(" + bTs + ") AS " + SqlIdent.q(LAST)
+                + " FROM " + SqlIdent.q("__inspecto_a") + " AS a JOIN " + SqlIdent.q("__inspecto_b") + " AS b ON "
+                + String.join(" AND ", keyJoin)
+                + " WHERE (a." + sq + " = ? OR b." + sq + " = ?) AND " + aTs + " + " + (within + late) + " > ?"
+                + " GROUP BY " + String.join(", ", groupBy)
+                + " ORDER BY " + SqlIdent.q(WINDOW_START)
+                + String.join("", java.util.stream.IntStream.range(0, rule.by().size())
+                        .mapToObj(i -> ", " + SqlIdent.q(keyColumn(i))).toList());
+        List<Object> params = new ArrayList<>(a.params());
+        params.addAll(b.params());
+        params.add(seq);
+        params.add(seq);
+        params.add(watermarkUs);
+        return new Compiled(sql, List.copyOf(params));
+    }
+
+    /**
+     * PA-9c {@code absence}: the (key, Window) pairs judged by moving the close frontier from {@code fromUs} to
+     * {@code toUs} — Windows {@code [ws, ws + size)} with {@code fromUs < ws + size + lateness <= toUs} — where the key
+     * had an event matching {@code when} in the slide {@code [ws - slide, ws)} and has none in the Window. Columns as
+     * {@link #breaches}: {@link #VALUE} is 0, {@link #FIRST} and {@link #LAST} the key's last event before the
+     * silence (epoch µs).
+     */
+    static Compiled absence(AlertRule rule, String buffer, long fromUs, long toUs) {
+        AlertWindow w = rule.eventWindow();
+        long size = micros(w.size()), slide = micros(w.slide()), late = micros(w.lateness());
+        String ts = SqlIdent.q(w.time());
+        ConditionSql.Bound when = ConditionSql.predicateBound(rule.when());
+        List<String> keySelect = new ArrayList<>(), keyOut = new ArrayList<>(), keyJoin = new ArrayList<>();
+        for (int i = 0; i < rule.by().size(); i++) {
+            String c = SqlIdent.q(rule.by().get(i)), k = SqlIdent.q(keyColumn(i));
+            keySelect.add("e." + c + " AS " + k);
+            keyOut.add("r." + k);
+            keyJoin.add("b." + c + " IS NOT DISTINCT FROM r." + k);
+        }
+        String ws = "r." + SqlIdent.q(WINDOW_START);
+        keyJoin.add("epoch_us(b." + ts + ") >= " + ws);
+        keyJoin.add("epoch_us(b." + ts + ") < " + ws + " + " + size);
+        String sql = "WITH " + SqlIdent.q("__inspecto_bw") + " AS (SELECT * FROM " + SqlIdent.q(buffer) + " WHERE " + when.sql() + "), "
+                // the Window right after each event's slide: the one a silence after that event would leave empty
+                + SqlIdent.q("__inspecto_ref") + " AS (SELECT "
+                + String.join("", keySelect.stream().map(x -> x + ", ").toList())
+                + "((epoch_us(e." + ts + ") // " + slide + ") + 1) * " + slide + " AS " + SqlIdent.q(WINDOW_START) + ", "
+                + "max(epoch_us(e." + ts + ")) AS " + SqlIdent.q(LAST)
+                + " FROM " + SqlIdent.q("__inspecto_bw") + " AS e GROUP BY ALL) "
+                + "SELECT " + String.join("", keyOut.stream().map(x -> x + ", ").toList()) + ws + ", "
+                + "0 AS " + SqlIdent.q(VALUE) + ", r." + SqlIdent.q(LAST) + " AS " + SqlIdent.q(FIRST) + ", r." + SqlIdent.q(LAST)
+                + " FROM " + SqlIdent.q("__inspecto_ref") + " AS r"
+                + " WHERE " + ws + " + " + (size + late) + " > ? AND " + ws + " + " + (size + late) + " <= ?"
+                + " AND NOT EXISTS (SELECT 1 FROM " + SqlIdent.q("__inspecto_bw") + " AS b WHERE " + String.join(" AND ", keyJoin) + ")"
+                + " ORDER BY " + ws + String.join("", keyOut.stream().map(x -> ", " + x).toList());
+        List<Object> params = new ArrayList<>(when.params());
+        params.add(fromUs);
+        params.add(toUs);
+        return new Compiled(sql, List.copyOf(params));
+    }
+
     /**
      * How many {@code fresh} rows matching the rule's {@code when} arrived too late for every window they fall in:
      * their latest window had closed ({@code end + lateness <= watermark}) before this commit. They are kept, and
@@ -126,6 +220,17 @@ final class WindowSql {
     static Compiled lateRows(AlertRule rule, String fresh, long watermarkUs) {
         AlertWindow w = rule.eventWindow();
         long size = micros(w.size()), slide = micros(w.slide()), late = micros(w.lateness());
+        if (w.isPattern() && w.pattern().isSequence()) {
+            // PA-9c: a step's event is late once every Window it could pair in (anchored at A, size long) has closed
+            ConditionSql.Bound a = ConditionSql.predicateBound(w.pattern().steps().get(0));
+            ConditionSql.Bound b = ConditionSql.predicateBound(w.pattern().steps().get(1));
+            String sql = "SELECT count(*) FROM " + SqlIdent.q(fresh) + " WHERE ((" + a.sql() + ") OR (" + b.sql() + "))"
+                    + " AND epoch_us(" + SqlIdent.q(w.time()) + ") + " + (size + late) + " <= ?";
+            List<Object> params = new ArrayList<>(a.params());
+            params.addAll(b.params());
+            params.add(watermarkUs);
+            return new Compiled(sql, List.copyOf(params));
+        }
         ConditionSql.Bound when = ConditionSql.predicateBound(rule.when());
         String sql = "SELECT count(*) FROM " + SqlIdent.q(fresh) + " WHERE " + when.sql()
                 + " AND (epoch_us(" + SqlIdent.q(w.time()) + ") // " + slide + ") * " + slide + " + " + (size + late) + " <= ?";

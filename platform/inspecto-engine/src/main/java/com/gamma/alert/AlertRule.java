@@ -141,7 +141,7 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
             "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
-            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag");
+            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag", "pattern");
     /** The prefix of an author-owned annotation key: kept through every save, never refused. */
     public static final String AUTHOR_PREFIX = "x-";
 
@@ -319,6 +319,17 @@ public record AlertRule(String name, String metric, String comparator, double th
         relation = (relation == null || relation.isBlank()) ? null : relation.trim().toLowerCase(Locale.ROOT);
         valueMeasure = (valueMeasure == null || valueMeasure.isEmpty()) ? null
                 : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(valueMeasure));
+        if (eventWindow != null && eventWindow.isPattern()) {
+            // PA-9c Pattern rule (D-PA40): its Measure, comparator and threshold are fixed - "at least one match" for
+            // a sequence, "at least one silent Window" for an absence - as a freshness rule's are.
+            require(measure == null || "count".equals(measure),
+                    "a Pattern alert (pattern:) takes no measure: it counts matches (sequence) or silent Windows (absence)");
+            require(!eventWindow.pattern().isSequence() || when == null,
+                    "a sequence alert.pattern takes no alert.when: each of its steps carries its own condition tree");
+            measure = "count";
+            comparator = "gte";
+            threshold = 1;
+        }
         if (eventWindow != null) {
             // PA-9b windowed rule (D-PA40): a Dataset measure rule evaluated per event-time Window on each commit.
             require(dataset != null && measure != null && metric == null && maximumAge == null && investigation == null
@@ -544,11 +555,14 @@ public record AlertRule(String name, String metric, String comparator, double th
         require(alert != null, "missing 'alert' block");
         Object rawWindow = alert.get("window");
         boolean windowBlock = rawWindow instanceof Map<?, ?>;   // PA-9b: a block is an event-time Window
+        Object rawPattern = alert.get("pattern");                // PA-9c: a Pattern rides on that Window
+        require(rawPattern == null || windowBlock, "alert.pattern needs the rule's window: block "
+                + "{type, size, time, lateness} (the event-time column and how late an event may be)");
         return new AlertRule(
                 str(alert.get("name")),
                 str(alert.get("metric")),
                 str(alert.get("comparator")),
-                alert.get("maximumAge") == null ? number(alert.get("threshold")) : 0,
+                alert.get("maximumAge") == null && rawPattern == null ? number(alert.get("threshold")) : 0,
                 windowBlock ? null : str(rawWindow),
                 str(alert.get("severity")),
                 str(alert.get("onPipeline")),
@@ -568,7 +582,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                 unmodelled(alert),
                 str(alert.get("runbook")),
                 flag(alert.get("indexLag"), "alert.indexLag"),
-                windowBlock ? AlertWindow.fromMap(rawWindow) : null);
+                windowBlock ? AlertWindow.fromMap(rawWindow, rawPattern) : null);
     }
 
     /** Whether this is a PA-9b windowed rule: a Dataset measure evaluated per event-time Window on each commit. */
@@ -649,6 +663,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         m.put("threshold", threshold);
         if (window != null) m.put("window", window);
         if (eventWindow != null) m.put("window", eventWindow.toMap());
+        if (eventWindow != null && eventWindow.isPattern()) m.put("pattern", eventWindow.pattern().toMap());
         m.put("severity", severity);
         if (onPipeline != null) m.put("onPipeline", onPipeline);
         if (when != null) m.put("when", when);

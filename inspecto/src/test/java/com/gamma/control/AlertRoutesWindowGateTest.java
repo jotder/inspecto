@@ -186,6 +186,41 @@ class AlertRoutesWindowGateTest {
         save(s, body);
     }
 
+    /** PA-9c: a sequence over voice_cdr — a short call, then a long one from the same A-number within 10 minutes. */
+    private static Map<String, Object> sequence(String windowType) {
+        Map<String, Object> w = new HashMap<>(Map.of("type", windowType, "size", "10m", "time", "event_ts"));
+        if ("sliding".equals(windowType)) w.put("slide", "1m");
+        Map<String, Object> m = new HashMap<>();
+        m.put("name", "short-then-long");
+        m.put("dataset", "voice_cdr");
+        m.put("by", List.of("a_number"));
+        m.put("window", w);
+        m.put("pattern", Map.of("type", "sequence", "steps", List.of(
+                Map.of("kind", "group", "op", "AND", "items", List.of(Map.of("kind", "condition", "field", "duration_s", "operator", "<", "value", "3"))),
+                Map.of("kind", "group", "op", "AND", "items", List.of(Map.of("kind", "condition", "field", "duration_s", "operator", ">", "value", "600"))))));
+        return m;
+    }
+
+    @Test
+    void aPatternIs422AtTheDoorOneKeyAwayFromAccepted(@TempDir Path dir) throws Exception {
+        Space s = space(dir, STREAM, BATCH_64);
+        AlertRule ok = save(s, sequence("tumbling"));
+        assertTrue(ok.eventWindow().pattern().isSequence());
+        refused(s, sequence("sliding"), "a sequence alert.pattern is anchored at its first event");
+        Map<String, Object> absence = sequence("sliding");
+        absence.put("pattern", Map.of("type", "absence"));
+        assertTrue(save(s, absence).eventWindow().pattern().isAbsence());
+        absence.put("pattern", Map.of("type", "absence", "within", "5m"));
+        refused(s, absence, "alert.pattern.within is not a pattern key");
+    }
+
+    @Test
+    void aPatternTakesTheSameStreamGatesAsAWindowedMeasure(@TempDir Path dir) throws Exception {
+        save(space(dir.resolve("ok"), STREAM, BATCH_64), sequence("tumbling"));
+        refused(space(dir.resolve("poll"), "", BATCH_64), sequence("tumbling"), "has no trigger {type: stream}");
+        refused(space(dir.resolve("one"), STREAM, ""), sequence("tumbling"), "processing.batch.max_files 1");
+    }
+
     @Test
     void thePostRouteRefusesAWindowedRuleOnADatasetNoStreamWrites(@TempDir Path cfg, @TempDir Path root) throws Exception {
         // a view-backed Dataset: readable Schema, TIMESTAMP column, but no physicalRef naming a Pipeline
