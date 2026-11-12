@@ -24,4 +24,4 @@ An App ships in an Edition when that Edition builds every Add-on the App needs.
 
 The Apps' Space Templates are composed into one Space Template, `telco`, over one ingest of the Industry's records.
 
-Distributions: production, trial, demo.
+Distributions: production, trial, demo, pilot.

@@ -74,7 +74,8 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   the same Product), rewrites `lib/product.json` from the plan, and always stages a **signed entitlement**
   (`conf/entitlement.toon` + `.sig`) whose `modules` are exactly the kept optional modules, so a jar copied back in stays
   inert. It is refused without the issuer key. A Domain product whose composed Space joins Apps the customer did not buy is
-  refused (`package.ps1` builds every optional App; trimming cannot recompose a Space), and so is a bundle built with an
+  refused (`package.ps1` builds every optional App; trimming cannot recompose a Space; row
+  `CUSTOMER-BUILD-DOMAIN-APPS-1`), and so is a bundle built with an
   App the Product does not define (a partner App). The bundle's `edition.properties` `apps=` line follows the plan.
 - **The pilot Distribution (PA-10c, D-PA35)** is `customer-build.mjs <customer> --distribution pilot --bundle <production
   bundle>`. The record's `pilot:` block names one bought template and, under `poll:`, an absolute folder for every

@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); ✅ PA-8 done 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle; a cluster install and a complete air-gapped bundle are owed, `CONTAINER-AIRGAP-PROOFS-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 **PROPOSED, awaiting operator**, nothing built). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); ✅ PA-8 done 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle; a cluster install and a complete air-gapped bundle are owed, `CONTAINER-AIRGAP-PROOFS-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 **PROPOSED, awaiting operator**, nothing built). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -313,7 +313,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-7** Entitlements and live App install | signed entitlements; `POST /apps` install / upgrade / remove; the trial Distribution | install, upgrade and remove an App on a running server with no lost config |
 | **PA-8** Container and air-gap ✅ 2026-11-12 | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
 | **PA-9** CEP App | the **Streaming** Add-on (Kafka in, windowed conditions on the Decision Kernel, Alerts out); the CEP App | a pattern on a live stream raises an Alert within a stated latency |
-| **PA-10** Go-to-market | Product Map kinds; generated Product documents; `customer-build` through the assembler | a customer build of the pilot customer matches today's, plus an entitlement |
+| **PA-10** Go-to-market ✅ 2026-11-12 | Product Map kinds; generated Product documents; `customer-build` through the assembler | a customer build of the pilot customer matches today's, plus an entitlement |
 
 **PA-1 as built (2026-11-10).**
 - **The two Products partition the 30 templates** (the first draft said 31; corrected after review). The LA App owns the 20 `la-*` templates, including
@@ -1623,7 +1623,7 @@ hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md`
   install, operations and launch-flag guides.
 - Each file carries a generated marker; a file of one of those four slots in a Product hub that is not generated is
   refused (`refuseHandWritten`). `render-product-docs --check` holds them current in CI.
-- A Product's own Space Templates (Inspecto's 30, Inspecto LA's 20 showcases) are listed in its datasheet, and their
+- A Product's own Space Templates (Inspecto's 30, Inspecto LA's 20) are listed in its datasheet, and their
   hubs' guides in a section of their own (found by the review: the LA datasheet first showed none).
 - Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs would say so; none does today.
 

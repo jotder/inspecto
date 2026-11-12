@@ -18,7 +18,7 @@ Inspecto is the Inspecto Platform with the Add-ons you choose, for teams that bu
 
 ## Editions and Distributions
 
-Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo.
+Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo, pilot.
 
 ## Read next
 

@@ -23,7 +23,7 @@ Revenue Assurance, Fraud Management, Link Analysis and Case Management in one pr
 
 ## Editions and Distributions
 
-Editions: [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md). Distributions: production, trial, demo.
+Editions: [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md). Distributions: production, trial, demo, pilot.
 
 ## Read next
 

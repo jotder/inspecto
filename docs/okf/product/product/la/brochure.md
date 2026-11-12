@@ -20,7 +20,7 @@ Explore who is connected to whom, investigate a number, and build a Dossier you 
 
 ## Editions and Distributions
 
-Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo.
+Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo, pilot.
 
 ## Read next
 
