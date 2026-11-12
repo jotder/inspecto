@@ -134,6 +134,10 @@ on and proves the load identical.
   reported as outside edits.
 - **Files outside the live set** (`.asn`, `.sql`, unreferenced `.toon` files) and the single-tenant default Space.
 - **UI.**
+- **Known gaps, open on the board as `SPACE-LOCK-CLOSE-RESIDUALS-1`:** a crash loses the in-memory windows, so writes
+  in flight are then reported as outside edits, as are a second JVM's writes and a server write to a Space other than
+  the bound one; the longest delay is about 11.5 s (§6's 10 s plus the 1.5 s debounce); and the close path can overrun
+  the Space's 10 s close budget or recreate a deleted Space's folders.
 
 ## References
 
