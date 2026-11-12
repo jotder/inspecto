@@ -52,6 +52,11 @@ export const OPEN = {
     'platform/inspecto-entity-store/src/main/java/com/gamma/entitystore/MaskingDefault.java': {
         sites: 1, why: 'the Link Analysis masking default: without the provider a sign-in install would lose its masking default',
     },
+    'platform/inspecto-etl/src/main/java/com/gamma/etl/EditionFeatures.java': {
+        sites: 1,
+        why: 'the census of the features the BUILD declares, cached once per JVM; the entitlement is applied per use '
+            + '(Entitlements.featureEntitled), so a renewal reaches it at once and a refusal names the entitlement',
+    },
     'providers/asn-parser/asn-decoders/asn-transform/src/main/java/com/gamma/asn/transform/FunctionRegistry.java': {
         sites: 1,
         why: 'the ASN.1 library\'s own transform functions, internal to it, in a jar with no Inspecto dependency; the library '

@@ -313,7 +313,10 @@ public final class EditionFeatures {
     private static Set<String> discover() {
         Set<String> found = new HashSet<>();
         try {
-            for (EditionFeatureProvider p : com.gamma.module.EntitledServices.load(EditionFeatureProvider.class)) found.addAll(p.features());
+            // ENTITLEMENT-SPI-NARROWING-1: deliberately NOT EntitledServices. This is the census of what the BUILD declares
+            // (cached once per JVM); the signed entitlement is applied per use (Entitlements.featureEntitled), so a renewal
+            // reaches it at once and the refusal names the entitlement rather than "this build does not include it".
+            for (EditionFeatureProvider p : java.util.ServiceLoader.load(EditionFeatureProvider.class)) found.addAll(p.features());
         } catch (ServiceConfigurationError | LinkageError unloadable) {
             // absent, not fatal: the gate then refuses, which is the safe direction
         }
