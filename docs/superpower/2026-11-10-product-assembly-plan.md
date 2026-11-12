@@ -403,6 +403,10 @@ and the nav the shells will draw in PA-4. Nothing changes for a user yet: no she
   brand (`name`, and the sign-in pitch when the Product declares one) and each App's nav, from `products/` and
   `apps/`. `--check` fails when a file is stale; it runs in the Product guard's CI step, so an edited `app.toon`
   cannot ship without its host data. The PA-3 parity test against `la-nav.ts` retires with that file.
+  The sign-in page reads the pitch before sign-in from this host data (`APP_ENVIRONMENT.signInPitch`): an SSO
+  sign-in shows its title and body; a demo sign-in shows its title alone, or the bare Product name when the
+  Product declares no pitch (`SIGNIN-DEMO-HEADLINE-1`, 2026-11-12, replacing the hard-coded "`<Product>` MFS" from
+  `52aa6e7a7`; Inspecto LA's demo now reads "Follow every link, one case at a time.").
 - **The session knows the Product.** `SessionService.product` holds `/bootstrap.product`, refreshed on every
   re-read (`init`, after sign-in, and after a Space's Module settings change), because its nav depends on the caller
   and the Space.
