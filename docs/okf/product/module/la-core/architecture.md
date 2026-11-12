@@ -15,6 +15,12 @@ The full backend structure is in [Link Analysis backend architecture](architectu
 behaviour and decisions in the [feature concept](user-guide-link-analysis.md). This page is the
 module-level summary.
 
+- [architecture-backend.md](architecture-backend.md) - modules, domain core, link index, Graph Run, the route table, host registration, editions, limits (§1-§10).
+- [architecture-masking.md](architecture-masking.md) - masking (§3.4).
+- [architecture-http-surface.md](architecture-http-surface.md) - gate order, embed links, entity profile routes, third-party integration, analyst upload, exclusion lists (§6.1-§6.8).
+- [architecture-investigation-ui.md](architecture-investigation-ui.md) - Grow, Held and Exclude, the Investigation tab, the Studio UI reorganization (§6.9, §6.14).
+- [architecture-data-onboarding.md](architecture-data-onboarding.md) - Add data, onboarding, column roles, discovery in Basic, arrivals, Dataset storage (§6.10-§6.13, §6.15-§6.20).
+
 ## 2. Who uses it
 
 - **Fraud and AML investigators** expand from a seed entity, pin evidence, and export a dossier.
@@ -60,7 +66,7 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
 - **Exploration alias book, persisted.** An exploration alias survives a restart or an eviction: each minted alias is
   appended to the Space's alias book in one write through an `APPEND` channel (two processes lose no line), a line is
   believed only when its alias is the token of its raw value, a per-file offset index makes a miss one line read, and a
-  repeated miss on a book of unchanged size answers from a bounded negative cache ([architecture-backend §3.4](architecture-backend.md)).
+  repeated miss on a book of unchanged size answers from a bounded negative cache ([architecture-masking §3.4](architecture-masking.md)).
 - **Case history refuses raw keys under masking** (`LA-CASE-HISTORY-RAW-KEY-1`). `POST /inv/case-history` resolves a
   raw key only under masking mode `none`; under any other mode it answers `resolved:false`, the same as an unknown
   alias, so the route is no raw-id oracle.
@@ -73,7 +79,7 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
   tray, Exclude removes from this Investigation or adds to a list, and every recorded change is an existing op
   (`expand`, `exclude`, `excludeBy`, `undo`). **Category exclusion lists** kept by an administrator with `autoApply` become
   `excludeBy` steps when an Investigation is created; a restricted list's members are hidden from callers who may not
-  read them, the Dossier included ([architecture §6.8, §6.9](architecture-backend.md)).
+  read them, the Dossier included ([architecture-http-surface §6.8](architecture-http-surface.md), [architecture-investigation-ui §6.9](architecture-investigation-ui.md)).
 - **Onboarding** (`LA-ONBOARD-1`, closed 2026-10-22): a **Getting started** page with a sample Space and a Space guide;
   **Add data** (the core `/onboard/files` import, every edition) writing `primaryEntityType` and `defaultLinkMapping`
   on the Dataset; **Start from...** one entity, a list, a paste or the whole Dataset through the neighbours read;
@@ -81,10 +87,10 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
   in imported data) and *Find something interesting*; help on every screen (*What can I do next?*, terms on first use)
   and local onboarding counters (`GET /onboarding/metrics`). Investigations need the runtime add-on
   `laInvestigations`; without it LA runs at the Explorer level with locked, not hidden, actions
-  ([architecture §3.4, §6.10, §6.11](architecture-backend.md)).
+  ([architecture-masking §3.4](architecture-masking.md), [architecture-data-onboarding §6.10, §6.11](architecture-data-onboarding.md)).
 - **Analyst upload status and delete.** `GET /inv/uploads` (the Collectors that accept uploads),
   `GET /inv/uploads/{collector}` (own uploads with their ingest state; an administrator sees every upload) and `DELETE /inv/uploads/{collector}/{file}` (withdraw a file not yet picked up, under the Pipeline's
-  run claim); a metadata record per upload is kept 90 days ([architecture-backend §6.6](architecture-backend.md)).
+  run claim); a metadata record per upload is kept 90 days ([architecture-http-surface §6.6](architecture-http-surface.md)).
 
 ## 5. Configuration
 
