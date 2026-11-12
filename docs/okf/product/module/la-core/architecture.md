@@ -60,7 +60,7 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
 - **Exploration alias book, persisted.** An exploration alias survives a restart or an eviction: each minted alias is
   appended to the Space's alias book in one write through an `APPEND` channel (two processes lose no line), a line is
   believed only when its alias is the token of its raw value, a per-file offset index makes a miss one line read, and a
-  repeated miss on a book of unchanged size answers from a bounded negative cache ([architecture §3.4](architecture-backend.md)).
+  repeated miss on a book of unchanged size answers from a bounded negative cache ([architecture-backend §3.4](architecture-backend.md)).
 - **Case history refuses raw keys under masking** (`LA-CASE-HISTORY-RAW-KEY-1`). `POST /inv/case-history` resolves a
   raw key only under masking mode `none`; under any other mode it answers `resolved:false`, the same as an unknown
   alias, so the route is no raw-id oracle.
@@ -84,7 +84,7 @@ identity facts, `LinkAnalysisSettings`). The engine names no `la-*` class; it re
   ([architecture §3.4, §6.10, §6.11](architecture-backend.md)).
 - **Analyst upload status and delete.** `GET /inv/uploads` (the Collectors that accept uploads),
   `GET /inv/uploads/{collector}` (own uploads with their ingest state; an administrator sees every upload) and `DELETE /inv/uploads/{collector}/{file}` (withdraw a file not yet picked up, under the Pipeline's
-  run claim); a metadata record per upload is kept 90 days ([architecture §6.6](architecture-backend.md)).
+  run claim); a metadata record per upload is kept 90 days ([architecture-backend §6.6](architecture-backend.md)).
 
 ## 5. Configuration
 

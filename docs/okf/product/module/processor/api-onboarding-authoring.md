@@ -771,4 +771,4 @@ A successful commit (inline or 202) records `first_dataset` once per installatio
 the undo stack is cleared, so a rolled-back commit counts nothing. The counters themselves - the file in the
 server-wide document home, the closed vocabulary, `GET /onboarding/metrics` (`canAdminister`) and
 `POST /onboarding/events` (open, rate-limited) - are described in the la-core
-[architecture](../la-core/architecture-backend.md) §6.11. `POST /spaces` records `space_created` the same way.
+[architecture-backend](../la-core/architecture-backend.md) §6.11. `POST /spaces` records `space_created` the same way.

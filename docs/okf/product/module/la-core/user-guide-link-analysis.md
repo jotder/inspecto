@@ -3782,7 +3782,7 @@ starting entities as grown, so **Expand…** continues from the ring. On the Inv
 Investigation (a Domain Profile that investigates the type binds its own mapping); a list or a paste is drawn and queued
 as the first seeds. **Investigate** on an Entity profile takes the same path. Which Datasets can start a graph: the
 Dataset's `defaultLinkMapping`, else a Domain Profile `investigate` mapping, else the first saved view over it, else its
-two classified link-end columns. Code: `link-analysis/start-from.ts`; detail: [architecture §3.4](architecture-backend.md).
+two classified link-end columns. Code: `link-analysis/start-from.ts`; detail: [architecture-backend §3.4](architecture-backend.md).
 
 ## My work
 
@@ -3797,7 +3797,7 @@ On the la-app front page, after the Space guide, **My work** lists:
 
 **Quick questions** (top of the On screen tab) asks *Busiest nodes*, *Tight groups* and *Route from A to B*, each
 answered in one sentence with **Show on graph**, **Start from these** and **Add to a list**.
-Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture §3.4](architecture-backend.md).
+Code: `la-app` `my-work.ts`, `discover.ts`; detail: [architecture-backend §3.4](architecture-backend.md).
 
 ## Screens
 
