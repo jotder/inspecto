@@ -1336,8 +1336,9 @@ hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md`
   install, operations and launch-flag guides.
 - Each file carries a generated marker; a file of one of those four slots in a Product hub that is not generated is
   refused (`refuseHandWritten`). `render-product-docs --check` holds them current in CI.
-- Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs says so (Case Management has no
-  admin guide yet).
+- A Product's own Space Templates (Inspecto's 30, Inspecto LA's 20 showcases) are listed in its datasheet, and their
+  hubs' guides in a section of their own (found by the review: the LA datasheet first showed none).
+- Not generated (D-PA36): demo and video scripts. An App with no guide in those hubs would say so; none does today.
 
 **Proof (as built).** `product-documents.test.mjs` 4/4 (in the CI guards job): every Product's four files are generated,
 marked and committed current; every link resolves; the Telco brochure and datasheet carry its Apps, roles and the

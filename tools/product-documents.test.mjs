@@ -32,6 +32,9 @@ test('the Telco brochure and datasheet are composed from its definition and its 
     assert.match(f, /composed into one Space Template, `telco`/);
     assert.match(docs['docs/okf/product/product/telco/user-guide.md'], /## Link Analysis\n\n(- .*\n)*- \[[^\]]+\]\(\.\.\/\.\.\/module\/la-core\//);
     assert.match(docs['docs/okf/product/product/inspecto/user-guide.md'], /## The console/);
+    // a Domain product's own templates (Inspecto LA's showcases) are listed too, with their hubs' guides
+    assert.match(docs['docs/okf/product/product/la/features.md'], /## Space Templates it ships\n\n.*\(\.\.\/\.\.\/solution-pack\/la-showcase\/index\.md\)/);
+    assert.match(docs['docs/okf/product/product/la/admin-guide.md'], /## The Space Templates it ships\n\n(- .*\n)*- \[[^\]]+\]\(\.\.\/\.\.\/solution-pack\/la-/);
 });
 test('a hand-written file in a generated slot of a Product hub is refused', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pd-'));

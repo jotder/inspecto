@@ -111,9 +111,16 @@ export function productDocuments(root) {
             `| Edition | ${apps.map((a) => model.apps[a].title ?? a).join(' | ') || 'Apps'} |`, `|---|${apps.map(() => '---').join('|') || '---'}|`,
             ...editions.map((e) => `| ${editionLink(e)} | ${apps.map((a) => (addonsOf(a).every((x) => offered[e].has(x)) ? 'yes' : 'no')).join(' | ') || '—'} |`), '',
             ...(p.space ? [`The Apps' Space Templates are composed into one Space Template, \`${p.space}\`, over one ingest of the Industry's records.`, ''] : []),
-            ...(p.shape === 'platform' && list(p.templates).length ? ['## Space Templates it ships', '', list(p.templates).map(packLink).join(' · '), ''] : []),
+            ...(list(p.templates).length ? ['## Space Templates it ships', '', list(p.templates).map(packLink).join(' · '), ''] : []),
             `Distributions: ${list(p.distributions).join(', ')}.`, '',
         ].join('\n');
+
+        // The Space Templates a Product ships itself (not through an App), with the guides their hubs hold.
+        const ownTemplates = list(p.templates);
+        const ownTemplateGuides = (slot) => {
+            const g = [...new Set(ownTemplates.map((t) => packItems[t]?.name).filter(Boolean).flatMap((n) => entries('solution-pack', n, slot)))];
+            return g.length ? ['## The Space Templates it ships', '', ...g.map((x) => `- ${x}`), ''] : [];
+        };
 
         // user guide
         // The Platform product is used through the console, whose own guides live in layer/product.
@@ -125,6 +132,7 @@ export function productDocuments(root) {
                 const g = guides(a, 'user-guide');
                 return [`## ${model.apps[a].title ?? a}`, '', ...(g.length ? g.map((x) => `- ${x}`) : [`- No user guide in the hubs of this App's templates and Add-ons yet; see ${appLink(a)}.`]), ''];
             }),
+            ...ownTemplateGuides('user-guide'),
         ].join('\n');
 
         // admin guide
@@ -139,6 +147,7 @@ export function productDocuments(root) {
                 const g = guides(a, 'admin-guide');
                 return [`## ${model.apps[a].title ?? a}`, '', ...(g.length ? g.map((x) => `- ${x}`) : [`- No admin guide in the hubs of this App's templates and Add-ons yet; see ${appLink(a)}.`]), ''];
             }),
+            ...ownTemplateGuides('admin-guide'),
         ].join('\n');
     }
     return out;
