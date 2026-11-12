@@ -212,7 +212,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
     /** The first registered processor whose {@link ConsignmentProcessor#id()} matches, or {@code null}. */
     private static ConsignmentProcessor fromServiceLoader(String id) {
         if (id == null || id.isBlank()) return null;
-        for (ConsignmentProcessor p : ServiceLoader.load(ConsignmentProcessor.class))
+        for (ConsignmentProcessor p : com.gamma.module.EntitledServices.load(ConsignmentProcessor.class))
             if (id.equals(p.id())) return p;
         return null;
     }

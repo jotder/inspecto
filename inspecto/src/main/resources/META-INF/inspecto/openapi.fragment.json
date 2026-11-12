@@ -88,6 +88,7 @@
     "/pipelines/{pipelineId}/related",
     "/tests",
     "/tests/run",
+    "/integrity",
     "/pipelines/{pipelineId}/bundle",
     "/pipelines/import",
     "/components/{componentId}",
@@ -3227,6 +3228,19 @@
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {cases:[{name, pipeline, inputs, error?}]}."
+          }
+        }
+      }
+    },
+    "/integrity" : {
+      "get" : {
+        "tags" : [ "spaces" ],
+        "summary" : "GET /integrity - the Space lock's report: broken links, duplicates, files changed outside the server",
+        "operationId" : "getIntegrity",
+        "description" : "SE-1a. Reached as /spaces/{id}/integrity. Report-only: always 200 with status computing (the lock is computed in the background after boot and after server writes; ask again), ready {checkedAt, lockWrittenAt, baseline, baselineNote?, files, links, broken, duplicates, changedOutside - each list {total, items} with at most 200 items}, disabled (-Dspace.integrity=off) or unavailable (single-tenant default Space). Requires canAuthorWorkbench. Spec: docs/okf/product/module/config/spec-space-lock.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {status, ...}."
           }
         }
       }

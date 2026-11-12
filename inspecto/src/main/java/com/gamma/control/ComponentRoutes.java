@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -482,6 +483,9 @@ final class ComponentRoutes implements RouteModule {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "dataset '" + id + "' is read by Mapping(s): "
                         + String.join(", ", mappings) + " - delete them first");
         }
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC3): a census link still naming this component — mode links.delete.
+        LinkRefusals.Delete links = LinkRefusals.delete(api.writeRoot(), ex, type, id);
+        if (links.refused()) return links.respond(ex);
         // LA-ONBOARD-ORPHAN-PIPELINE-1: an Add data Dataset takes its import Pipeline with it.
         OnboardImport.Retirement retirement = "dataset".equals(type) ? OnboardImport.claimRetirement(api, id, current.content()) : null;
         boolean removed;
@@ -500,7 +504,8 @@ final class ComponentRoutes implements RouteModule {
         }
         // R2-03: state an optional module keeps beside the registry (a Reconciliation's run state) is deleted with
         // the component, or a re-created component of the same id would inherit it — the module's ComponentDeleteHook.
-        for (ComponentDeleteHook hook : com.gamma.spi.OptionalSpi.all(ComponentDeleteHook.class)) {
+        // ENTITLEMENT-SPI-NARROWING-1: allInstalled - the clean-up runs even while the entitlement leaves the module out.
+        for (ComponentDeleteHook hook : com.gamma.spi.OptionalSpi.allInstalled(ComponentDeleteHook.class)) {
             if (!type.equals(hook.type())) continue;
             try {
                 hook.afterDelete(api.writeRoot(), id);
@@ -510,8 +515,8 @@ final class ComponentRoutes implements RouteModule {
                 throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
             }
         }
-        if (retirement == null) return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed);
-        return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed, "retiredPipeline", id);
+        if (retirement == null) return links.report(ex, Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed));
+        return links.report(ex, Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed, "retiredPipeline", id));
     }
 
     /**
@@ -790,6 +795,11 @@ final class ComponentRoutes implements RouteModule {
             Map<String, Object> stamped = new LinkedHashMap<>(content);
             stamped.put("name", id);   // what the store persists
             ComponentRegistry.Component before = existing(store, type, id);
+            // SPACE-LINK-CENSUS-1 LC-3 (D-LC1): an active component adding a dangling link — mode links.save.
+            List<Finding> linkFindings = new ArrayList<>();
+            Object refused = LinkRefusals.save(ex, api.writeRoot(), type, id, stamped,
+                    before == null ? null : before.content(), linkFindings);
+            if (refused != null) return refused;
             PendingChanges.hold(api, ex, type, id, stamped, before == null ? null : before.content());
             // D7 (c): a widget's `tags` array is a projection of the assignment store, so it is derived
             // here rather than taken from the body — adopted on create, overwritten on update.
@@ -798,7 +808,10 @@ final class ComponentRoutes implements RouteModule {
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));
-            return componentDoc(c);
+            if (linkFindings.isEmpty()) return componentDoc(c);
+            Map<String, Object> doc = componentDoc(c);
+            doc.put("linkWarnings", linkFindings);   // shadow: what refuse mode would have refused
+            return doc;
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
@@ -831,15 +844,16 @@ final class ComponentRoutes implements RouteModule {
         validateKind(type, id, content);
         if ("dataset".equals(type)) DatasetEntryRules.validateMapping(writeRoot, id, content);   // LA-DATA-PAGE-1
         // An optional module's own kinds and reserved store names (the risk-score kind and its risk_scores_ outputs):
-        // absent module = the kind stays opaque config and nothing is reserved.
-        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class)) {
+        // absent module = the kind stays opaque config and nothing is reserved. ENTITLEMENT-SPI-NARROWING-1: allInstalled -
+        // validators only refuse, so a left-out module's kinds and store names stay checked and reserved.
+        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.allInstalled(ComponentKindValidator.class)) {
             if (v.type().equals(type)) v.validateInSpace(writeRoot, dataRoot, id, content);
             if ("dataset".equals(type) || "sink".equals(type)) v.requireNotReserved(writeRoot, type, id, content);
         }
     }
 
     static void validateKind(String type, String id, Map<String, Object> content) {
-        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.all(ComponentKindValidator.class))
+        for (ComponentKindValidator v : com.gamma.spi.OptionalSpi.allInstalled(ComponentKindValidator.class))
             if (v.type().equals(type)) v.validate(id, content);
         // LA-ONBOARD-1 OB-8: primaryEntityType + defaultLinkMapping on a Dataset entry.
         if ("dataset".equals(type)) DatasetEntryRules.validate(content);

@@ -11,6 +11,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.EditionFeatures;
+import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -209,6 +210,9 @@ final class AlertRoutes implements RouteModule {
 
     private static Map<String, Object> write(ComponentStore store, String name, Map<String, Object> content)
             throws IOException {
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
+        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+                store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             return store.write(TYPE, name, content).content();
         } catch (IllegalArgumentException e) {
@@ -306,6 +310,10 @@ final class AlertRoutes implements RouteModule {
     static void requireWindow(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
                               AlertRule rule) {
         if (!rule.isWindowed()) return;
+        // PA-9d (D-PA44): a windowed or Pattern rule needs the Real-time Detection Add-on - the inspecto-realtime module,
+        // and an entitlement that holds it. Without it the rule would be saved and never evaluated.
+        if (!EditionFeatures.present(EditionFeatures.REALTIME))
+            throw refused(FindingCodes.ERR_EDITION_FEATURE + ": " + EditionFeatures.refusal(EditionFeatures.REALTIME));
         if (writeRoot == null)
             throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
                     "alert rule write disabled: set -Dassist.write.root to enable");
@@ -328,6 +336,12 @@ final class AlertRoutes implements RouteModule {
         List<String> missing = w.distinctOn().stream().filter(c -> !columns.contains(c)).toList();
         if (!missing.isEmpty())
             throw refused("alert.window.distinctOn column(s) " + missing + " are not in the Schema of dataset '" + ds + "'");
+        // PA-9d (owed by 9b and 9c): every column the rule reads - its `by` keys, the Measure's field, every `when` and
+        // Pattern step field - must be in the Schema, so a typo is refused here instead of failing at every commit
+        List<String> unknown = rule.windowColumns().stream().filter(c -> !columns.contains(c)).toList();
+        if (!unknown.isEmpty())
+            throw refused("windowed alert '" + rule.name() + "' reads column(s) " + unknown
+                    + " that are not in the Schema of dataset '" + ds + "' (have: " + columns + ")");
 
         Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", ds)
                 .map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(Map.of());

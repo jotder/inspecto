@@ -108,7 +108,7 @@ public final class ModelProviderFactory {
                     OllamaModelProvider.routerFor(new ModelProfile("settings", baseUrl, true, models)),
                     settings);
         }
-        for (HostedProviderPlugin plugin : ServiceLoader.load(HostedProviderPlugin.class)) {
+        for (HostedProviderPlugin plugin : com.gamma.module.EntitledServices.load(HostedProviderPlugin.class)) {
             if (plugin.providers().contains(id)) {
                 return withDeadline(
                         plugin.createRouter(settings, AssistModelSettings.resolveApiKey(settings)),
@@ -134,7 +134,7 @@ public final class ModelProviderFactory {
     public static Set<String> availableProviders() {
         Set<String> out = new LinkedHashSet<>();
         out.add("ollama");
-        for (HostedProviderPlugin plugin : ServiceLoader.load(HostedProviderPlugin.class)) {
+        for (HostedProviderPlugin plugin : com.gamma.module.EntitledServices.load(HostedProviderPlugin.class)) {
             out.addAll(plugin.providers());
         }
         return out;

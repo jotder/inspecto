@@ -824,10 +824,41 @@ final class PipelineScheduler {
             StreamLane lane = new StreamLane(id, t.streamRecords(), t.everyMs(), STREAM_PROBE_MS,
                     () -> CollectorConnectors.forConfig(configRegistry.get(id).orElseThrow()),
                     () -> drainNow(id), System::currentTimeMillis, backoff);
+            lane.onIdle(() -> streamIdle(id));
             lane.start(mdc);
             log.info("Stream lane started for '{}' (drain at {} record(s) or {} ms)", id, t.streamRecords(), t.everyMs());
             return lane;
         }));
+    }
+
+    /** PA-9d: told when a stream Pipeline is drained (the Real-time Detection clock floor); {@code null} = nobody. */
+    private volatile java.util.function.Consumer<String> streamIdleListener;
+    /** The last time each Pipeline's listener was told (ms): at most once a second, though the lane probes every 200 ms. */
+    private final Map<String, Long> lastStreamIdle = new java.util.concurrent.ConcurrentHashMap<>();
+    static final long STREAM_IDLE_MIN_GAP_MS = 1_000;
+
+    /** PA-9d: {@code listener} is told a stream Pipeline's id when it is drained (see {@link #streamIdle}). */
+    void onStreamIdle(java.util.function.Consumer<String> listener) {
+        this.streamIdleListener = listener;
+    }
+
+    /**
+     * A lane found no backlog on the source. The Pipeline is DRAINED only when, besides, no run of it is in progress and
+     * its inbox holds no landed slice waiting to be ingested: a slice landed but not yet committed is not counted as
+     * backlog by the connector. Only then may the clock judge an absence Window silent (PA-9c: events still queued
+     * would land in Windows the clock already judged). Throttled to {@value #STREAM_IDLE_MIN_GAP_MS} ms per Pipeline.
+     */
+    void streamIdle(String id) {
+        var listener = streamIdleListener;
+        if (listener == null || running.contains(id)) return;
+        long now = System.currentTimeMillis();
+        Long last = lastStreamIdle.get(id);
+        if (last != null && now - last < STREAM_IDLE_MIN_GAP_MS) return;
+        PipelineConfig cfg = configRegistry.get(id).orElse(null);
+        // a failed inbox scan (-1) is not "drained": the clock must not judge a Window events may still land in
+        if (cfg == null || CollectorProcessor.countPending(cfg) != 0) return;
+        lastStreamIdle.put(id, now);
+        listener.accept(id);
     }
 
     /** The lane's drain: fetch-and-land under the acquire claim, then ingest via the ordinary trigger path. */

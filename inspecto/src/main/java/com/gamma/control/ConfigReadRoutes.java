@@ -114,6 +114,11 @@ final class ConfigReadRoutes implements RouteModule {
             }
         }
 
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC3), mode links.delete: a census link still naming this config. A Pipeline
+        // keeps its own dependents refusal above, unchanged in every mode.
+        LinkRefusals.Delete links = "pipeline".equals(type) ? null : LinkRefusals.delete(writeRoot, ex, type, fileName);
+        if (links != null && links.refused()) return links.respond(ex);
+
         // Maker-checker (ASSURE-MAKER-CHECKER-1): a delete is a change — held before any data or file goes.
         PendingChanges.hold(api, ex, type, fileName, null, ConfigFileSupport.storedContent(target, type));
 
@@ -177,7 +182,7 @@ final class ConfigReadRoutes implements RouteModule {
             r.put("dataRemoved", dataRemoval.removed());
             r.put("dataRetained", dataRemoval.retained());
         }
-        return r;
+        return links == null ? r : links.report(ex, r);
     }
 
     /**

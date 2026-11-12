@@ -58,7 +58,7 @@ export const CLASSPATH_ORDER = [
     'inspecto-policy',
     'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',
     'inspecto-entity-list', 'inspecto-la-storage', 'inspecto-la-core', 'inspecto-la-api', 'inspecto-la-store-pg', 'inspecto-geo-link',
-    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive',
+    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive', 'inspecto-realtime',
     'inspecto-agent', 'inspecto-intelligence',
 ];
 
@@ -142,7 +142,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in classpath order.
- * Basic 7, Standard 26, Advanced 29, Preview 29 — first-party only; add PG_SIDECAR for the jar count.
+ * Basic 7, Standard 27, Advanced 30, Preview 30 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this very line.
  */
 export function bundleModules(edition) {

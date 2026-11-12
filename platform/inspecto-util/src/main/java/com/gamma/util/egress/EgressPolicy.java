@@ -68,33 +68,55 @@ public final class EgressPolicy {
         if (h.indexOf('@') >= 0)
             throw new IllegalArgumentException("the host '" + host + "' carries userinfo ('@') — it would read as one "
                     + "host and dial another");
+        if (checkAddressSpelling(h)) return;
+        String lower = h.toLowerCase(Locale.ROOT);
+        String[] labels = lower.split("\\.", -1);
+        if (lower.length() > 253) throw new IllegalArgumentException("the host '" + host + "' is longer than 253 chars");
+        for (String l : labels)
+            if (!LABEL.matcher(l).matches())
+                throw new IllegalArgumentException("the host '" + host + "' is not a valid DNS name (label '" + l + "')");
+    }
+
+    /**
+     * The numeric half of {@link #checkHost} ({@code SCALEOUT-OBJSTORE-DATABASE-DIR-1} (e), 2026-11-13), shared with
+     * the Safety Policy's {@code EgressGate}: a host that READS AS AN ADDRESS must be a canonical IPv4 dotted quad or
+     * a valid IPv6 literal (bracketed or not; no zone id, no port). Every other numeric spelling — decimal
+     * {@code 2130706433}, octal {@code 0177.0.0.1}, hex {@code 0x7f.1}, short {@code 127.1}, leading zeros, a trailing
+     * dot {@code 127.0.0.1.} — is refused, because {@code inet_aton}-style resolvers (libcurl, DuckDB's httpfs) read
+     * it as an address that a Java-side pattern or CIDR check never compared. Refusing beats normalising: the gate and
+     * the dialler can then never disagree on which address a spelling means.
+     *
+     * @return {@code true} when {@code host} is an accepted IP literal, {@code false} when it is not numeric (a name;
+     *         only its trailing dot is checked here, and an all-digit last label such as {@code kafka.01} reads as numeric and is refused)
+     * @throws IllegalArgumentException for a numeric host that is not canonical
+     */
+    public static boolean checkAddressSpelling(String host) {
+        String h = host;
         if (h.startsWith("[") || h.indexOf(':') >= 0) {
             String inner = h.startsWith("[") && h.endsWith("]") ? h.substring(1, h.length() - 1) : h;
             if (inner.indexOf('%') >= 0 || inner.indexOf('[') >= 0 || inner.indexOf(']') >= 0 || inner.indexOf(':') < 0)
                 throw new IllegalArgumentException("the host '" + host + "' is not a valid IPv6 literal (no zone ids, "
                         + "no port)");
             try {
-                if (!(InetAddress.ofLiteral(inner) instanceof Inet6Address) && !inner.startsWith("::ffff:"))
+                if (!(InetAddress.ofLiteral(inner) instanceof Inet6Address) && !inner.toLowerCase(Locale.ROOT).startsWith("::ffff:"))
                     throw new IllegalArgumentException("the host '" + host + "' is not an IPv6 literal");
             } catch (IllegalArgumentException bad) {
                 throw new IllegalArgumentException("the host '" + host + "' is not a valid IPv6 literal");
             }
-            return;
+            return true;
         }
         String lower = h.toLowerCase(Locale.ROOT);
+        if (lower.endsWith("."))
+            throw new IllegalArgumentException("the host '" + host + "' ends with a dot — write it without the "
+                    + "trailing dot");
         String[] labels = lower.split("\\.", -1);
         String last = labels[labels.length - 1];
         boolean numeric = last.chars().allMatch(Character::isDigit) || lower.startsWith("0x") || lower.contains(".0x");
-        if (numeric) {
-            if (!CANONICAL_V4.matcher(lower).matches())
-                throw new IllegalArgumentException("the host '" + host + "' is a non-canonical numeric address — write "
-                        + "an IPv4 address as four decimal octets (no decimal, octal, hex or short forms)");
-            return;
-        }
-        if (lower.length() > 253) throw new IllegalArgumentException("the host '" + host + "' is longer than 253 chars");
-        for (String l : labels)
-            if (!LABEL.matcher(l).matches())
-                throw new IllegalArgumentException("the host '" + host + "' is not a valid DNS name (label '" + l + "')");
+        if (!numeric) return false;
+        if (!CANONICAL_V4.matcher(lower).matches())
+            throw new IllegalArgumentException("the host '" + host + "' is a non-canonical numeric address — write "
+                    + "an IPv4 address as four decimal octets (no decimal, octal, hex or short forms)");
+        return true;
     }
 
     /** Whether {@code host} is an IP literal (after {@link #checkHost}). */
@@ -141,7 +163,7 @@ public final class EgressPolicy {
     }
 
     /** The IPv4 addresses an IPv6 address carries, by the embeddings {@link #deniedClass} names; empty for none. */
-    static List<InetAddress> embeddedIpv4(byte[] b) {
+    public static List<InetAddress> embeddedIpv4(byte[] b) {
         List<InetAddress> out = new ArrayList<>();
         if (b.length != 16) return out;
         boolean zero0to9 = true;

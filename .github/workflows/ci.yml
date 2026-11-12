@@ -296,6 +296,12 @@ jobs:
       - name: Guard — the demo sign-in module reaches no real bundle
         run: node tools/check-demo-auth-isolation.mjs && node --test tools/check-demo-auth-isolation.test.mjs
 
+      # Entitled-loader guard (ENTITLEMENT-SPI-NARROWING-1, 2026-11-12). A signed entitlement leaves modules out; every
+      # ServiceLoader site goes through com.gamma.module.EntitledServices so their extension points are skipped too. This
+      # fails on a raw ServiceLoader.load in main code outside the listed open loaders (each with its reason).
+      - name: Guard — every extension point honours the signed entitlement
+        run: node tools/check-entitled-loaders.mjs && node --test tools/check-entitled-loaders.test.mjs
+
       # Product guard (PRODUCT-ASSEMBLY-1 PA-1, 2026-11-10). products/, apps/ and industries/ name Offerings, Add-ons,
       # Space Templates, Industry packs and Angular projects; this fails when a name does not resolve, when a required
       # App's Add-ons are missing from an edition the Product lists, when an App serves another Industry, when a

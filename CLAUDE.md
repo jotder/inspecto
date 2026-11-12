@@ -138,25 +138,14 @@ shift gets the identical environment.
 - Commits use the shared identity; work lands on `master` per the `release-workflow` skill — no
   per-user branches or PRs.
 - **One lane per push (operator, 2026-10-20 — binding for every session and subagent).** Lanes may be BUILT in
-  parallel, but each lane (or one small related group) is INTEGRATED and PUSHED on its own: in a clean sibling
-  worktree from `origin/master` (never by merging in this shared checkout — peers' uncommitted edits block its
-  fast-forward and the pre-push guards read the dirty tree), fix what it broke there, run the affected-build
-  protocol plus the lane's named tests, merge `origin/master` again if it moved, then `git push origin HEAD:master`.
-  One full gate per day or release. Detail and rationale: `.claude/memory/lane-integration-workflow.md`.
-  `.githooks/pre-push` prints a note (never blocks) when it runs from a dirty tree.
-- **`origin/master` is the only line (operator, 2026-10-26 — binding for every session, peer and subagent).**
-  There are no long-lived, per-person or per-topic branches and no parked worktrees (2026-10-26: 117 local branches,
-  45 of them Link Analysis, and 9 LA worktrees had piled up, every one of them already merged).
-  - **Start** a lane from a fresh `git fetch` then `git worktree add --detach C:\sandbox\<lane> origin/master` — never
-    from the shared checkout's local `master`, which is not a base.
-  - **End** the lane the moment it is pushed: `git worktree remove` it and delete its private Maven repo
-    (`C:\sandbox\.m2-<lane>`); if you made a branch, delete it too. One session per lane; archive it when the lane is pushed.
-  - **Unpushed work is not parked.** An unfinished lane may stay for ONE shift as one worktree, listed in
-    `SESSION_STATUS.local.md` with its owner and date; anything unlisted and unpushed at the next shift is removed.
-  - **Shift audit** (start and end): `git worktree list` shows the shared checkout plus listed lanes only, and
-    `git branch` shows `master` only. The shared checkout fast-forwards (`git merge --ff-only origin/master`) when clean.
-  - **Never delete unpushed commits blindly:** `git cherry origin/master <branch>` first; bundle what differs
-    (`git bundle create … <refs> ^origin/master`) into `C:\sandbox\archive\`.
+  parallel; each lane (or one small related group) is INTEGRATED and PUSHED on its own from a clean sibling
+  worktree off `origin/master` — never by merging in this shared checkout. One full gate per day or release.
+- **`origin/master` is the only line (operator, 2026-10-26 — binding for every session, peer and subagent).** No
+  long-lived, per-person or per-topic branches, no parked worktrees: a lane starts from a fresh `origin/master` and
+  its worktree, private Maven repo and session end the moment it is pushed. Unpushed work stays at most ONE shift,
+  listed in `SESSION_STATUS.local.md` with owner and date. Never delete unpushed commits blindly (`git cherry` first).
+- Commands, shift audit and rationale: the **`release-workflow`** and **`handoff`** skills and
+  `.claude/memory/lane-integration-workflow.md`.
 
 ## Model & effort routing (token economy)
 
@@ -215,35 +204,6 @@ shift gets the identical environment.
 
 ## CodeGraph (code knowledge graph)
 
-This project is indexed by **CodeGraph** (`.codegraph/`, machine-local + gitignored). It exposes
-exactly **one** MCP tool, `codegraph_explore`, plus a CLI.
-
-- **Reach for `codegraph_explore` FIRST** for orientation questions — *how does X work*, *where is X*,
-  *what does changing X break* — and before editing an unfamiliar symbol. It returns the **verbatim
-  source** of the relevant symbols grouped by file, plus the call path among them, in one capped call.
-  ⚠ **Treat that source as already Read — do NOT re-open those files**, or the saving is cancelled.
-- **It covers BOTH layers**: Java (`inspecto*/src`) and the Angular SPA (`inspecto-ui/src`), and a single
-  result can cross them. ⛔ Do not carry over the old graphify assumption that the UI is unindexed.
-- **Still use Grep/Read** for pinpoint work: a known file+line, a literal string, config/TOON/docs, or
-  anything non-code. A graph is for *relationships*; grep is for *locations*.
-- **CLI for relationship questions** grep cannot answer: `codegraph callers <symbol>` ·
-  `codegraph callees <symbol>` · `codegraph impact <symbol>` · `codegraph query <name>` for a quick
-  symbol lookup. ⚠ `callers` reports IMPORTING FILES (namespace nodes at `:1`), not call sites, and
-  is **not exhaustive** — it returned 10 files for `SqlGuard` where `grep -rl` finds 40. Cross-check
-  with grep before treating a caller list as complete.
-- ⛔ **`codegraph affected <files...>` is BROKEN — never use it to pick tests.** Tested 2026-09-19 on
-  v1.6.0: `affected inspecto-ui/src/app/inspecto/api/config.service.ts` — an **Angular** service —
-  returns **953 Java test files**, led by `asn-parser` ASN.1 decoder tests that cannot possibly be
-  affected; `affected platform/inspecto-sql/.../SqlGuard.java` returns **1078** when the whole repo holds
-  **1059** test files. It fails toward over-reporting, so selecting `-Dtest=` targets from it silently
-  becomes a full-reactor run — the opposite of the unit-test-per-change rule above. Use `impact` plus
-  judgement, or the module the change lives in. (`CODEGRAPH-AFFECTED-UNUSABLE-1`)
-- ⚠ **Name SYMBOLS in a query, don't phrase a concept** — ranking is substantially lexical. Asking
-  *"ConfigSafetyValidator validate control api route gating"* put `RowShaper.java` (a DuckDB row
-  splitter whose methods happen to be named `validate` and `route`) above the actual gating code.
-- **Refresh is automatic** — a file watcher syncs on save. After a big rebase or branch switch,
-  `codegraph sync` catches up; `codegraph index` rebuilds from scratch. ⚠ There is no `codegraph
-  stats`; the command is `codegraph status`.
-- ⚠ **Delegation is still the bigger token lever.** For a broad sweep across many files, a subagent
-  (`backend-explorer` / `frontend-explorer` / `Explore`) keeps the raw reads out of the main thread
-  entirely. CodeGraph shrinks a lookup; a subagent removes it from this context.
+Indexed by **CodeGraph** (`codegraph_explore` MCP tool + CLI, Java and Angular both). Reach for it first for
+orientation and treat its source as already Read. ⛔ Never pick tests with `codegraph affected` (broken), and
+`callers` is not exhaustive. Usage, CLI and traps: the **`codegraph`** skill.

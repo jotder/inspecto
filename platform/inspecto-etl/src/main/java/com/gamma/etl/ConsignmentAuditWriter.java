@@ -210,7 +210,9 @@ public final class ConsignmentAuditWriter {
             ConsignmentEvent event = new ConsignmentEvent(
                     batch.pipeline(), batch.batchId(), batch.status(),
                     partitions, batch.totalOutputRows(), batch.durationMs(), batch.rejectedFiles(),
-                    batch.error(), offendingFile, errorRows, dryRun);
+                    batch.error(), offendingFile, errorRows, dryRun,
+                    lineageRows.stream().map(LineageRow::outputFile)
+                            .filter(f -> f != null && !f.isBlank()).distinct().collect(Collectors.toList()));
             if (commitListener != null) commitListener.accept(event);
             if (terminalBatchSink != null) terminalBatchSink.accept(event);
         }

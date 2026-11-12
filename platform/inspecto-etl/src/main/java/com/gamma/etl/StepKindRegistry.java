@@ -34,7 +34,7 @@ public interface StepKindRegistry {
         private Holder() {}
 
         private static StepKindRegistry load() {
-            for (StepKindRegistry r : ServiceLoader.load(StepKindRegistry.class)) return r;
+            for (StepKindRegistry r : com.gamma.module.EntitledServices.load(StepKindRegistry.class)) return r;
             return kind -> false;
         }
     }

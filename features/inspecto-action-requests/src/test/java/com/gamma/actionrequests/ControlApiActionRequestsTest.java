@@ -558,6 +558,60 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /**
+     * ENTITLEMENT-SPI-NARROWING-1 over real HTTP: a signed entitlement that leaves Action Requests out stops a Decision Rule
+     * firing its {@code invoke-api} Consequence - reported {@code unavailable}, naming the entitlement, and nothing proposed.
+     * The same rule, applied a moment earlier without a file, proposes a request (so the refusal is the entitlement's).
+     */
+    @Test
+    void aDecisionRuleCannotFireTheConsequenceOfAModuleTheEntitlementLeavesOut(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        java.security.KeyPair issuer = java.security.KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        com.gamma.module.Entitlements.trustForTests(Map.of("test-issuer", issuer.getPublic()));
+        com.gamma.module.Entitlements.clockForTests(java.time.Clock.fixed(java.time.Instant.parse("2026-11-12T00:00:00Z"), java.time.ZoneOffset.UTC));
+        System.setProperty(com.gamma.module.Entitlements.FILE_PROPERTY, tmp.resolve("conf/entitlement.toon").toString());
+        com.gamma.module.Entitlements.reset();
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            data(send(c, "POST", "/decision-rules", "{\"name\":\"leak\",\"consequences\":[{\"action\":\"invoke-api\","
+                    + "\"params\":{\"connection\":\"hook\"}}]}", POWER), 200);
+            JsonNode before = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200);
+            assertEquals("executed", before.at("/executed/0/status").asText(), "no file: the Consequence fires (D-PA23) " + before);
+            String proposed = before.at("/executed/0/actionRequestId").asText();
+            assertEquals("declined", data(send(c, "POST", "/action-requests/" + proposed + "/decline", "{}", CHECKER), 200)
+                    .get("status").asText(), "decided, so the next application would propose afresh");
+
+            String edition = data(send(c, "GET", "/bootstrap", null, CHECKER), 200).path("edition").asText();
+            installEntitlement(issuer, tmp, edition, List.of("notify-channels", "ops"));   // Action Requests left out
+
+            JsonNode after = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200);
+            JsonNode one = after.at("/executed/0");
+            assertEquals("unavailable", one.path("status").asText(), after.toString());
+            assertTrue(one.path("detail").asText().contains(com.gamma.module.Entitlements.NOT_ENTITLED), one.toString());
+            assertFalse(one.has("actionRequestId"), "nothing proposed: " + one);
+            assertTrue(keys.isEmpty(), "and nothing was ever sent");
+            assertEquals(503, send(c, "GET", "/action-requests", null, CHECKER).statusCode(), "its routes are closed too");
+        } finally {
+            System.clearProperty(com.gamma.module.Entitlements.FILE_PROPERTY);
+            com.gamma.module.Entitlements.trustForTests(null);
+            com.gamma.module.Entitlements.clockForTests(null);
+        }
+    }
+
+    /** Sign {@code tmp/conf/entitlement.toon} for {@code edition} listing {@code modules}, and have the server read it now. */
+    private static void installEntitlement(java.security.KeyPair issuer, Path tmp, String edition, List<String> modules) throws Exception {
+        String toon = String.join("\n", "schema: inspecto.entitlement/1", "id: acme-2026-11-12", "customer: acme", "title: Acme",
+                "product: inspecto", "edition: " + edition, "apps[0]:", "addons[0]:",
+                "modules[" + modules.size() + "]: " + String.join(",", modules),
+                "nodes: 1", "notBefore: 2026-11-01", "expires: 2027-11-12", "issued: 2026-11-12", "keyId: test-issuer", "");
+        Path dir = Files.createDirectories(tmp.resolve("conf"));
+        Files.writeString(dir.resolve("entitlement.toon"), toon, StandardCharsets.UTF_8);
+        java.security.Signature s = java.security.Signature.getInstance("Ed25519");
+        s.initSign(issuer.getPrivate());
+        s.update(toon.getBytes(StandardCharsets.UTF_8));
+        Files.writeString(dir.resolve("entitlement.sig"), java.util.Base64.getEncoder().encodeToString(s.sign()));
+        com.gamma.module.Entitlements.recheckNow();   // a renewal is picked up without a restart (PA-7b)
+    }
+
     /** MODULE-REORG-P7 step 1 pin: the rule's open Incident is REUSED (the active-attribute index), not re-opened;
      *  the resolved-Incident half needs a real workflow and is pinned in inspecto-ops. */
     @Test

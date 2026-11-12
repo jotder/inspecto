@@ -39,7 +39,7 @@ public final class Decompressors {
         byte[] head = head(file);
         DecompressorPlugin best = null;
         int bestLen = -1;
-        for (DecompressorPlugin p : ServiceLoader.load(DecompressorPlugin.class)) {
+        for (DecompressorPlugin p : com.gamma.module.EntitledServices.load(DecompressorPlugin.class)) {
             if (!p.supports(name, head)) continue;
             int len = p.suffixes().stream()
                     .map(s -> s.toLowerCase(Locale.ROOT))
@@ -56,7 +56,7 @@ public final class Decompressors {
      */
     public static List<String> knownSuffixes() {
         List<String> out = new ArrayList<>();
-        for (DecompressorPlugin p : ServiceLoader.load(DecompressorPlugin.class))
+        for (DecompressorPlugin p : com.gamma.module.EntitledServices.load(DecompressorPlugin.class))
             for (String s : p.suffixes()) out.add(s.toLowerCase(Locale.ROOT));
         return out;
     }

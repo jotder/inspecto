@@ -3,7 +3,7 @@ title: Inspecto
 shape: platform
 host: gamma
 editions[4]: basic,standard,advanced,preview
-addons[17]: actionRequests,aiAssist,anomalyDetection,caseManagement,incidents,integrationDelivery,laInvestigations,linkAnalysis,multiEntity,predictiveAnalytics,premiumConnectors,reconciliation,regulatoryReporting,scoringLists,screening,telecomIndustryPack,workflowSla
+addons[18]: actionRequests,aiAssist,anomalyDetection,caseManagement,incidents,integrationDelivery,laInvestigations,linkAnalysis,multiEntity,predictiveAnalytics,premiumConnectors,realtimeDetection,reconciliation,regulatoryReporting,scoringLists,screening,telecomIndustryPack,workflowSla
 apps:
   required[0]:
   optional[1]: link-analysis

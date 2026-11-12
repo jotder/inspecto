@@ -8,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 
 /**
@@ -61,7 +60,7 @@ public final class MetadataGraphService {
     /** Discover description providers on the classpath (the agent module adds an AI one at M3). */
     private static List<DescriptionProvider> discoverDescribers() {
         List<DescriptionProvider> out = new ArrayList<>();
-        for (DescriptionProvider p : ServiceLoader.load(DescriptionProvider.class)) out.add(p);
+        for (DescriptionProvider p : com.gamma.module.EntitledServices.load(DescriptionProvider.class)) out.add(p);
         return out;
     }
 

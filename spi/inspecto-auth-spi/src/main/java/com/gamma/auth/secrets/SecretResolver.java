@@ -64,7 +64,7 @@ public final class SecretResolver {
             synchronized (SecretResolver.class) {
                 p = providers;
                 if (p == null) {
-                    p = ServiceLoader.load(SecretsProvider.class).stream().map(ServiceLoader.Provider::get).toList();
+                    p = com.gamma.module.EntitledServices.stream(SecretsProvider.class).toList();
                     providers = p;
                 }
             }

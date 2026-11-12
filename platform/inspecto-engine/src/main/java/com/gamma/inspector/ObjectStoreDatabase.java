@@ -8,12 +8,12 @@ import com.gamma.config.safety.PathJail;
 import com.gamma.etl.DuckDbExtension;
 import com.gamma.etl.DuckLakeRegistrar;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.util.egress.EgressPolicy;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import static com.gamma.util.SqlIdent.sqlStr;
 
@@ -36,7 +36,6 @@ final class ObjectStoreDatabase {
 
     /** The DuckDB secret's name on the ingest connection. */
     static final String STORE_SECRET_NAME = "inspecto_output_store";
-    private static final Pattern BARE_HOST = Pattern.compile("[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*");
 
     private ObjectStoreDatabase() {}
 
@@ -125,10 +124,21 @@ final class ObjectStoreDatabase {
         if (p.host() == null || p.host().isBlank())
             throw refuse("output.connection '" + id + "' has no host");
         // The host is glued into DuckDB's ENDPOINT, which dials whatever authority it parses: a ':', '/' or '@'
-        // would let 'evil:80/x.allowed.com' pass the egress pattern yet dial 'evil'. Bare DNS names only.
-        if (!BARE_HOST.matcher(p.host()).matches())
-            throw refuse("output.connection '" + id + "' host must be a bare DNS name, without port, path or "
-                    + "userinfo (the port goes in the port field)");
+        // would let 'evil:80/x.allowed.com' pass the egress pattern yet dial 'evil'. A DNS name or a canonical IPv4
+        // dotted quad only (item (e)): libcurl reads '2130706433', '0x7f.1', '0177.0.0.1' or '127.1' as 127.0.0.1,
+        // which the Safety Policy's patterns never compared; an IPv6 literal cannot be glued into ENDPOINT unbracketed.
+        String hostProblem = null;
+        if (p.host().indexOf(':') >= 0 || p.host().indexOf('[') >= 0) hostProblem = "an IPv6 literal or a port";
+        else {
+            try {
+                EgressPolicy.checkHost(p.host());
+            } catch (IllegalArgumentException bad) {
+                hostProblem = bad.getMessage();
+            }
+        }
+        if (hostProblem != null)
+            throw refuse("output.connection '" + id + "' host must be a bare DNS name or a canonical IPv4 address, "
+                    + "without port, path or userinfo (the port goes in the port field): " + hostProblem);
         String secret = SecretResolver.resolve(p.password());
         if (p.username() == null || p.username().isBlank() || secret == null || secret.isBlank())
             throw refuse("output.connection '" + id + "' has no access key and resolvable secret");

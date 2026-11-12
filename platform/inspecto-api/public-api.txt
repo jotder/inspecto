@@ -802,7 +802,8 @@ com.gamma.enrich.ReferenceReader | public final class ReferenceReader
 com.gamma.enrich.ReferenceReader | public static EnrichmentConfig.Reference parse(String)
 com.gamma.enrich.ReferenceReader | public static String sqlFor(EnrichmentConfig.Reference, List<PipelineConfig>)
 com.gamma.etl.ConsignmentEvent | public ConsignmentEvent(String, String, String, List<String>, long, long, int)
-com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline, String batchId, String status, List<String> partitions, long outputRows, long durationMs, int rejectedCount, String error, String offendingFile, long errorRows, boolean dryRun)
+com.gamma.etl.ConsignmentEvent | public ConsignmentEvent(String, String, String, List<String>, long, long, int, String, String, long, boolean)
+com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline, String batchId, String status, List<String> partitions, long outputRows, long durationMs, int rejectedCount, String error, String offendingFile, long errorRows, boolean dryRun, List<String> outputFiles)
 com.gamma.etl.EditionFeatureProvider | Set<String> features()
 com.gamma.etl.EditionFeatureProvider | public interface EditionFeatureProvider
 com.gamma.etl.IngestResult | public record IngestResult(long parsedRows, long errorRows, long junkCandidateRows)

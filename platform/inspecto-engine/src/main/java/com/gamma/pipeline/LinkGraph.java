@@ -73,9 +73,24 @@ public final class LinkGraph {
     }
 
     private final List<Edge> edges;
+    private final Universe universe;
 
-    private LinkGraph(List<Edge> edges) {
+    private LinkGraph(List<Edge> edges, Universe universe) {
         this.edges = List.copyOf(edges);
+        this.universe = universe;
+    }
+
+    /**
+     * The edges one document would hold as a {@code kind} named {@code name}, judged against this graph's
+     * universe (`SPACE-LINK-CENSUS-1` LC-3: the save check compares a draft's {@link Status#DANGLING} edges with
+     * the stored version's). A Job is read inside its {@code job:} section. {@code file} on each edge is null.
+     */
+    public List<Edge> edgesOf(String kind, String name, Map<?, ?> doc) {
+        List<Edge> out = new ArrayList<>();
+        if (doc == null) return out;
+        Map<?, ?> d = kind.equals("job") && doc.get("job") instanceof Map<?, ?> inner ? inner : doc;
+        emit(kind, null, name, d, universe, out);
+        return out;
     }
 
     public List<Edge> edges() {
@@ -127,7 +142,8 @@ public final class LinkGraph {
      * logged and skipped. An absent root is an empty graph.
      */
     public static LinkGraph of(Path configRoot, Predicate<String> reserved) {
-        if (configRoot == null || !Files.isDirectory(configRoot)) return new LinkGraph(List.of());
+        if (configRoot == null || !Files.isDirectory(configRoot))
+            return new LinkGraph(List.of(), Universe.of(Map.of(), null, null));
         Map<String, List<ComponentRegistry.Component>> byType = new LinkedHashMap<>();
         ComponentRegistry registry = ComponentRegistry.scan(configRoot.resolve("registry"));
         for (String t : List.of("dataset", "query", "widget")) byType.put(t, registry.ofType(t));
@@ -165,7 +181,7 @@ public final class LinkGraph {
             Map<String, Object> raw = decode(nav);
             if (raw != null) fileEdges("nav-menu", nav, raw, u, out);
         }
-        return new LinkGraph(out);
+        return new LinkGraph(out, u);
     }
 
     /**
@@ -181,8 +197,9 @@ public final class LinkGraph {
             for (String p : pipelineIds) ids.add(p.toLowerCase());
         }
         List<Edge> out = new ArrayList<>();
-        componentEdges(byType, Universe.of(byType, ids, null), out);
-        return new LinkGraph(out);
+        Universe u = Universe.of(byType, ids, null);
+        componentEdges(byType, u, out);
+        return new LinkGraph(out, u);
     }
 
     /** {@code columns} is {@code null} when column links are not judged ({@link #ofComponents}). */

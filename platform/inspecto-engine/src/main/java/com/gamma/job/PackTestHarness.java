@@ -92,7 +92,7 @@ public final class PackTestHarness {
     /** Load every {@link JobTypeProvider} on the current classpath — what a pack's own tests want. */
     public PackTestHarness loadFromClasspath() {
         List<JobTypeProvider> found = new ArrayList<>();
-        ServiceLoader.load(JobTypeProvider.class).forEach(found::add);
+        com.gamma.module.EntitledServices.load(JobTypeProvider.class).forEach(found::add);
         if (found.isEmpty())
             throw new IllegalStateException("no JobTypeProvider on the classpath — is "
                     + "META-INF/services/com.gamma.job.JobTypeProvider present and does it name your provider?");
