@@ -46,7 +46,7 @@ INSTALL keys: `graph_run.threads` (2) / `queue` (16), `index.threads` (1) / `que
 ## Secure
 
 - Embed links are bearer tokens: keep `-Dla.embed.enabled` off unless a portal needs them; the per-Space frame
-  allow-list and TTLs bound them ([la-core architecture-backend](../la-core/architecture-backend.md) §6.2).
+  allow-list and TTLs bound them ([la-core architecture-http-surface](../la-core/architecture-http-surface.md) §6.2).
 - Investigation access is membership-based; non-members see 404. The Advanced PDP (`providers/inspecto-policy`) can only
   narrow.
 - Audit rows use the `LINK_*` event types; tokens are redacted.

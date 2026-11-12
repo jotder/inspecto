@@ -390,7 +390,7 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   says decimal even when every fraction is zero), so a later `12.25` is kept, not cut to 12. A column whose sample is
   whole numbers but whose file has a fraction further down (`OnboardDraft.fractions`, one scan of the whole file) is
   DOUBLE too, `high`, evidence `the 1000 sampled values are whole numbers, but the file also has '99.95', so a decimal
-  number`. A later file into an existing BIGINT column with such a value is refused (la-core `architecture-backend.md` §6.17).
+  number`. A later file into an existing BIGINT column with such a value is refused (la-core `architecture-data-onboarding.md` §6.17).
 * **The decimal mark (`format.decimalMark`, C1; `DecimalMark`).** `.` (`1,234.50`) or `,` (`1.234,50`); digit groups
   may be split by the other mark or a space. A column decides when every sampled value reads with one mark and not the
   other (`12.5` → `.`; `12,5`, `1.234,50` → `,`); a whole part with a leading zero (`000 345 678`, `012.000.789`) is
@@ -771,4 +771,4 @@ A successful commit (inline or 202) records `first_dataset` once per installatio
 the undo stack is cleared, so a rolled-back commit counts nothing. The counters themselves - the file in the
 server-wide document home, the closed vocabulary, `GET /onboarding/metrics` (`canAdminister`) and
 `POST /onboarding/events` (open, rate-limited) - are described in the la-core
-[architecture-backend](../la-core/architecture-backend.md) §6.11. `POST /spaces` records `space_created` the same way.
+[architecture-data-onboarding](../la-core/architecture-data-onboarding.md) §6.11. `POST /spaces` records `space_created` the same way.
