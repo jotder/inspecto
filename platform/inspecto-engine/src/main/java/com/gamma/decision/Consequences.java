@@ -39,7 +39,9 @@ public final class Consequences {
         while (true) {
             try {
                 if (!it.hasNext()) break;
-                c.add(it.next());
+                ConsequenceProvider p = it.next();
+                if (com.gamma.module.EntitledServices.entitled(p)) c.add(p);
+                else log.info("[DECISION] ConsequenceProvider '{}' skipped: its module is not in this installation's entitlement", p.id());
             } catch (ServiceConfigurationError | RuntimeException e) {
                 log.warn("[DECISION] a ConsequenceProvider could not be loaded - skipped: {}", e.toString());
             }
@@ -56,12 +58,16 @@ public final class Consequences {
         byId.put(id, p);
     }
 
+    /**
+     * The provider of {@code id}, if it is registered AND its module is entitled now: the registry is cached for the life
+     * of the host, and a renewed entitlement can leave a module out after it loaded (ENTITLEMENT-SPI-NARROWING-1).
+     */
     public Optional<ConsequenceProvider> find(String id) {
-        return Optional.ofNullable(byId.get(id));
+        return Optional.ofNullable(byId.get(id)).filter(com.gamma.module.EntitledServices::entitled);
     }
 
-    /** Every provider, built-ins first, then contributed ones in load order. */
+    /** Every entitled provider, built-ins first, then contributed ones in load order. */
     public List<ConsequenceProvider> all() {
-        return new ArrayList<>(byId.values());
+        return new ArrayList<>(byId.values().stream().filter(com.gamma.module.EntitledServices::entitled).toList());
     }
 }

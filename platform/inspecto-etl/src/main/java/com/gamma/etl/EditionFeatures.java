@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -86,6 +85,18 @@ public final class EditionFeatures {
      * {@code inspecto-ops} (operator 2026-11-05: no module declared it, so real Standard bundles refused both).
      */
     public static final String PIPELINE_AUTOMATION = "pipeline.automation";
+
+    /**
+     * Real-time Detection (PRODUCT-ASSEMBLY-1 PA-9d, D-PA44): windowed and Pattern Alert Rules ({@code window:} /
+     * {@code pattern:}), evaluated on each commit of a {@code trigger: stream} Pipeline. Declared by the optional
+     * {@code inspecto-realtime} module (the billable Add-on {@value #REALTIME_ADDON}, Standard and above); absent, or
+     * left out of a signed entitlement, a windowed rule is refused at save and loads INERT from disk (never evaluated).
+     */
+    public static final String REALTIME = "realtime";
+    /** The Real-time Detection Add-on ({@code product-map/addon/realtimeDetection.toon}). */
+    public static final String REALTIME_ADDON = "realtimeDetection";
+    /** Its Order Code. */
+    public static final String REALTIME_ORDER_CODE = "INS-AO-REALTIME-DETECTION";
 
     /** The finding / error code every refusal carries. Mirrors {@code FindingCodes.ERR_EDITION_FEATURE}. */
     public static final String CODE = "ERR_EDITION_FEATURE";
@@ -180,8 +191,15 @@ public final class EditionFeatures {
                     + "data trust, Case history, Graph Run, index builds and Alert Rules on Investigations)";
             case GEO_MAP -> "The Geo map, routes and co-location (POST /geo/projection, POST /geo/routes)";
             case ENTITY_PAGES -> "Entity profile pages (GET /inv/entity-types/{id}/profile, GET /inv/entities/{type}/{key}/profile)";
+            case REALTIME -> "Real-time Detection (windowed and Pattern Alert Rules, evaluated on each Stream commit)";
             default -> "'" + feature + "'";
         };
+        if (REALTIME.equals(feature))
+            return declared(REALTIME)
+                    ? what + " is " + com.gamma.module.Entitlements.NOT_ENTITLED + " (the Real-time Detection Add-on, "
+                            + REALTIME_ORDER_CODE + ", module inspecto-realtime)"
+                    : what + " needs the Real-time Detection Add-on (" + REALTIME_ORDER_CODE + "), provided by the optional "
+                            + "inspecto-realtime module (Standard edition and above) - this build does not include it";
         if (PII_MASK.equals(feature))
             return what + " is an Advanced feature — this build does not include it";
         if (GEO_MAP.equals(feature) || ENTITY_PAGES.equals(feature))
@@ -295,7 +313,10 @@ public final class EditionFeatures {
     private static Set<String> discover() {
         Set<String> found = new HashSet<>();
         try {
-            for (EditionFeatureProvider p : ServiceLoader.load(EditionFeatureProvider.class)) found.addAll(p.features());
+            // ENTITLEMENT-SPI-NARROWING-1: deliberately NOT EntitledServices. This is the census of what the BUILD declares
+            // (cached once per JVM); the signed entitlement is applied per use (Entitlements.featureEntitled), so a renewal
+            // reaches it at once and the refusal names the entitlement rather than "this build does not include it".
+            for (EditionFeatureProvider p : java.util.ServiceLoader.load(EditionFeatureProvider.class)) found.addAll(p.features());
         } catch (ServiceConfigurationError | LinkageError unloadable) {
             // absent, not fatal: the gate then refuses, which is the safe direction
         }

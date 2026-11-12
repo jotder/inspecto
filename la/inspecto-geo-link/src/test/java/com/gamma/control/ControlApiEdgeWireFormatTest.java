@@ -197,6 +197,20 @@ class ControlApiEdgeWireFormatTest {
         }
     }
 
+    /** The read itself fails (a measure column the Dataset lacks) AFTER the cache lookup: still plain JSON, no ETag. */
+    @Test
+    void aReadThatFailsAfterTheCacheLookupIsPlainJsonWithNoETag(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            for (String[] rq : ROUTES) {
+                HttpResponse<String> r = post(c, rq[0], rq[1].replace("\"attrCols\"", "\"measureCol\":\"no_such_col\",\"attrCols\""), OWNER, null);
+                assertEquals(422, r.statusCode(), r.body());
+                assertTrue(r.body().contains("projection failed"), r.body());
+                assertEquals("application/json", type(r), rq[0] + ": an error is not the edges media type");
+                assertTrue(r.headers().firstValue("ETag").isEmpty(), rq[0]);
+            }
+        }
+    }
+
     @Test
     void anUnauthenticatedRequestIs401(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

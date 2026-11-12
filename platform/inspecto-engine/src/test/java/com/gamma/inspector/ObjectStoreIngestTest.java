@@ -147,6 +147,36 @@ class ObjectStoreIngestTest {
     }
 
     @Test
+    void aNumericHostSpellingIsRefusedAndItsOneCharacterTwinPassesTheHostCheck(@TempDir Path dir) throws Exception {
+        // Item (e): libcurl (inet_aton) reads each refused spelling as 127.0.0.1, which no Safety Policy pattern or
+        // CIDR compared. Each twin is one character away and is a DNS name or a canonical dotted quad: it passes the
+        // host check and stops at the NEXT gate (no secret), which proves the host check alone refused its sibling.
+        Map<String, String> refusedToTwin = new LinkedHashMap<>();
+        refusedToTwin.put("2130706433", "2130706433x");
+        refusedToTwin.put("0177.0.0.1", "177.0.0.1");
+        refusedToTwin.put("0x7f000001", "ox7f000001");
+        refusedToTwin.put("127.1", "127.l");
+        refusedToTwin.put("127.0.0.01", "127.0.0.1");
+        refusedToTwin.put("127.0.0.1.", "127.0.0.1");
+        refusedToTwin.put("s3.example.test.", "s3.example.test");
+        for (var e : refusedToTwin.entrySet()) {
+            ConnectionRegistry.register(s3("odd_host", e.getKey(), 9, null));
+            assertRefused(cfg(dir, m -> ((Map<String, Object>) m.get("output")).put("connection", "odd_host")),
+                    "a canonical IPv4 address");
+            ConnectionRegistry.register(new ConnectionProfile("odd_host", "s3", e.getValue(), 9, null, BUCKET,
+                    "a-key", null, Map.of("protocol", "http"), null, null));
+            assertRefused(cfg(dir, m -> ((Map<String, Object>) m.get("output")).put("connection", "odd_host")),
+                    "no access key and resolvable secret");
+        }
+        // No accepted twin one character away exists for these: a hex first label, or any ':' (IPv6 / port).
+        for (String host : List.of("0x7f.1", "::1", "[::1]", "::ffff:127.0.0.1")) {
+            ConnectionRegistry.register(s3("odd_host", host, 9, null));
+            assertRefused(cfg(dir, m -> ((Map<String, Object>) m.get("output")).put("connection", "odd_host")),
+                    "a canonical IPv4 address");
+        }
+    }
+
+    @Test
     void aConnectionWithNoHostIsRefused(@TempDir Path dir) throws Exception {
         ConnectionRegistry.register(s3("no_host", " ", 9, null));
         assertRefused(cfg(dir, m -> ((Map<String, Object>) m.get("output")).put("connection", "no_host")),

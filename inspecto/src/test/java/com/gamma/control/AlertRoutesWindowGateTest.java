@@ -34,7 +34,8 @@ class AlertRoutesWindowGateTest {
 
     @BeforeEach
     void standardBuild() {
-        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH,
+                com.gamma.etl.EditionFeatures.REALTIME));
     }
 
     @AfterEach
@@ -137,6 +138,43 @@ class AlertRoutesWindowGateTest {
         Space s = space(dir, STREAM, BATCH_64);
         save(s, rule("event_ts", List.of("topic", "offset")));
         refused(s, rule("event_ts", List.of("topic", "seq")), "alert.window.distinctOn column(s) [seq] are not in the Schema");
+    }
+
+    /** PA-9d (D-PA44): without the Real-time Detection Add-on a windowed rule is refused at the door, naming the Add-on. */
+    @Test
+    void aWindowedRuleNeedsTheRealtimeAddOn(@TempDir Path dir) throws Exception {
+        Space s = space(dir, STREAM, BATCH_64);
+        save(s, rule("event_ts", null));
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+        refused(s, rule("event_ts", null), "ERR_EDITION_FEATURE: Real-time Detection");
+        refused(s, sequence("tumbling"), "needs the Real-time Detection Add-on (INS-AO-REALTIME-DETECTION)");
+        Map<String, Object> plain = rule("event_ts", null);
+        plain.remove("window");
+        assertFalse(save(s, plain).isWindowed(), "a rule with no window does not need the Add-on");
+    }
+
+    /** PA-9d (owed by 9b and 9c): every field a windowed rule reads must be in the Schema, one key from accepted. */
+    @Test
+    void everyFieldTheRuleReadsMustBeInTheSchema(@TempDir Path dir) throws Exception {
+        Space s = space(dir, STREAM, BATCH_64);
+        Map<String, Object> when = rule("event_ts", null);
+        when.put("when", Map.of("kind", "group", "op", "AND", "items",
+                List.of(Map.of("kind", "condition", "field", "duration_s", "operator", "<", "value", "3"))));
+        save(s, when);
+        when.put("when", Map.of("kind", "group", "op", "AND", "items",
+                List.of(Map.of("kind", "condition", "field", "duraton_s", "operator", "<", "value", "3"))));
+        refused(s, when, "reads column(s) [duraton_s] that are not in the Schema of dataset 'voice_cdr'");
+
+        Map<String, Object> measure = rule("event_ts", null);
+        measure.put("measure", "countDistinct(b_numbr)");
+        refused(s, measure, "reads column(s) [b_numbr]");
+
+        Map<String, Object> step = sequence("tumbling");
+        save(s, step);
+        step.put("pattern", Map.of("type", "sequence", "steps", List.of(
+                Map.of("kind", "group", "op", "AND", "items", List.of(Map.of("kind", "condition", "field", "duration_s", "operator", "<", "value", "3"))),
+                Map.of("kind", "group", "op", "AND", "items", List.of(Map.of("kind", "condition", "field", "durations", "operator", ">", "value", "600"))))));
+        refused(s, step, "reads column(s) [durations]");
     }
 
     @Test

@@ -33,7 +33,7 @@ public final class PipelineNodeExecutors {
 
     private static Map<String, PipelineNodeExecutor> load() {
         Map<String, PipelineNodeExecutor> m = new LinkedHashMap<>();
-        for (PipelineNodeExecutor e : ServiceLoader.load(PipelineNodeExecutor.class)) m.put(e.type(), e);
+        for (PipelineNodeExecutor e : com.gamma.module.EntitledServices.load(PipelineNodeExecutor.class)) m.put(e.type(), e);
         return Map.copyOf(m);
     }
 

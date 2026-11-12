@@ -234,4 +234,31 @@ class ModuleManifestsTest {
         var st = ModuleActivator.resolve(List.of(m("x", List.of("y"), List.of(), List.of()), m("y", List.of("x"), List.of(), List.of())));
         assertTrue(st.stream().allMatch(s -> s.state() == ModuleStatus.State.ACTIVE));
     }
+
+    // ── ENTITLEMENT-SPI-NARROWING-1: the manifests beside a class, by its code source ──
+
+    private static final String PROBE = "id: probe\ntitle: Probe\nbuildRole: implementation\nofferingRole: optional\nbindingTime: boot\n";
+
+    @Test
+    void atReadsTheManifestInsideAModuleJar(@TempDir Path tmp) throws Exception {
+        Path jar = tmp.resolve("probe dir/probe.jar");   // a space in the path, as a Windows install often has
+        Files.createDirectories(jar.getParent());
+        try (var j = new java.util.jar.JarOutputStream(Files.newOutputStream(jar))) {
+            j.putNextEntry(new java.util.jar.JarEntry(ModuleManifests.RESOURCE));
+            j.write(PROBE.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            j.closeEntry();
+        }
+        assertEquals(List.of("probe"), ModuleManifests.at(jar.toUri().toURL()).stream().map(ModuleManifest::id).toList());
+    }
+
+    @Test
+    void atReadsTheManifestInAClassesDirectoryAndNothingWhereThereIsNone(@TempDir Path tmp) throws Exception {
+        Path classes = tmp.resolve("classes");
+        Files.createDirectories(classes.resolve("META-INF/inspecto"));
+        Files.writeString(classes.resolve(ModuleManifests.RESOURCE), PROBE);
+        assertEquals(List.of("probe"), ModuleManifests.at(classes.toUri().toURL()).stream().map(ModuleManifest::id).toList());
+        assertEquals(List.of(), ModuleManifests.at(tmp.resolve("empty").toUri().toURL()), "a directory without one");
+        assertEquals(List.of(), ModuleManifests.at(tmp.resolve("missing.jar").toUri().toURL()), "a jar that is not there");
+        assertEquals(List.of(), Entitlements.modulesOf(String.class), "a JDK class has no code source, so no module");
+    }
 }

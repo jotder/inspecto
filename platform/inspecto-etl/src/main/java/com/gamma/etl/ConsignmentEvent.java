@@ -50,13 +50,29 @@ import java.util.List;
  *                      {@code AlertService}, {@code CollectorService}'s event-log bridge,
  *                      {@code PipelineScheduler.onUpstreamCommit} and {@code EnrichmentService} refuse and
  *                      log what they would have done.
+ * @param outputFiles   the committed output files this batch wrote (absolute paths, from lineage; empty for a
+ *                      failed batch and for the emitters that do not know them) - what a commit hook that reads only
+ *                      this Consignment's rows needs (PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection commit hook)
  */
 @PublicApi(since = "4.0.0")
 public record ConsignmentEvent(String pipeline, String batchId, String status,
                          List<String> partitions, long outputRows,
                          long durationMs, int rejectedCount,
                          String error, String offendingFile, long errorRows,
-                         boolean dryRun) {
+                         boolean dryRun, List<String> outputFiles) {
+
+    public ConsignmentEvent {
+        outputFiles = outputFiles == null ? List.of() : List.copyOf(outputFiles);
+    }
+
+    /** The pre-PA-9d shape: no committed output files named (the emitters other than the ingest audit writer). */
+    public ConsignmentEvent(String pipeline, String batchId, String status,
+                      List<String> partitions, long outputRows,
+                      long durationMs, int rejectedCount,
+                      String error, String offendingFile, long errorRows, boolean dryRun) {
+        this(pipeline, batchId, status, partitions, outputRows, durationMs, rejectedCount,
+                error, offendingFile, errorRows, dryRun, List.of());
+    }
 
     /**
      * Back-compat constructor (pre-v3.7.0 shape) — defaults the error detail to

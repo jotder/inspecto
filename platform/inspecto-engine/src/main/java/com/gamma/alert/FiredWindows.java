@@ -72,6 +72,21 @@ public final class FiredWindows implements AutoCloseable {
         }
     }
 
+    /**
+     * The keys (their {@link AlertService#keyId}) of {@code rule} that still hold a fired row: a Window they fired in has
+     * not closed yet ({@link #purgeBefore} drops closed ones). PA-9d: what keeps a key open on the rule's one Alert.
+     */
+    public synchronized java.util.Set<String> keyIds(String rule) throws SQLException {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT DISTINCT key_id FROM fired WHERE rule = ? ORDER BY key_id")) {
+            ps.setString(1, rule);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(rs.getString(1));
+            }
+        }
+        return out;
+    }
+
     /** How many rows the table holds. */
     public synchronized long size() throws SQLException {
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM fired")) {

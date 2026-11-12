@@ -103,7 +103,7 @@ public final class NotificationService implements NotificationAccess, AutoClosea
 
     private static List<NotificationChannel> discoverChannels() {
         List<NotificationChannel> found = new ArrayList<>();
-        for (NotificationChannel ch : ServiceLoader.load(NotificationChannel.class)) {
+        for (NotificationChannel ch : com.gamma.module.EntitledServices.load(NotificationChannel.class)) {
             if (ch.configured()) found.add(ch);
             else log.debug("notification channel {} registered but not configured — skipped", ch.id());
         }

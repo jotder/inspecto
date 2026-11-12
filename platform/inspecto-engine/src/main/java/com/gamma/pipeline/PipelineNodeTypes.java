@@ -50,7 +50,7 @@ public final class PipelineNodeTypes {
         Map<String, PipelineNodeType> m = new LinkedHashMap<>();
         for (BuiltinNodeType b : BuiltinNodeType.values()) m.put(b.type(), b);
         // Providers are layered last so an edition can override a built-in of the same type().
-        for (PipelineNodeType t : ServiceLoader.load(PipelineNodeType.class)) m.put(t.type(), t);
+        for (PipelineNodeType t : com.gamma.module.EntitledServices.load(PipelineNodeType.class)) m.put(t.type(), t);
         return Map.copyOf(m);
     }
 

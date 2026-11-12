@@ -266,7 +266,21 @@ public final class AlertService {
 
     /** The loaded rules, JSON-ready — backs {@code GET /alerts/rules}. */
     public List<Map<String, Object>> rules() {
-        return rules.stream().map(AlertRule::toMap).toList();
+        boolean realtime = com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.REALTIME);
+        return rules.stream().map(r -> {
+            Map<String, Object> m = r.toMap();
+            if (realtime || !r.isWindowed()) return m;
+            // PA-9d: a windowed or Pattern rule loaded without the Real-time Detection Add-on is armed but never
+            // evaluated (the sweep skips it and no commit hook runs); say so, and why, on the rule itself
+            Map<String, Object> inert = new LinkedHashMap<>(m);
+            inert.put("inert", com.gamma.etl.EditionFeatures.refusal(com.gamma.etl.EditionFeatures.REALTIME));
+            return inert;
+        }).toList();
+    }
+
+    /** The armed windowed and Pattern rules ({@link AlertRule#isWindowed}) - what the Real-time Detection commit hook evaluates. */
+    public List<AlertRule> windowedRules() {
+        return rules.stream().filter(AlertRule::isWindowed).toList();
     }
 
     /** True when a rule with this name is armed (the create-conflict / update-exists check). */
@@ -1046,6 +1060,136 @@ public final class AlertService {
 
     private static String streakPrefix(AlertRule rule) {
         return rule.name() + "|" + rule.dataset() + "|";
+    }
+
+    /**
+     * One key a windowed rule newly fired on in a commit (PA-9d, D-PA43): its key (empty for a rule with no {@code by}),
+     * the Measure value, a one-line message and the window's evidence (key, window, value, first and last event).
+     */
+    public record WindowHit(Map<String, Object> key, double value, String message, Map<String, String> evidence) {}
+
+    /**
+     * PA-9d (D-PA43): bring a windowed rule's state in line after one evaluation, through the same per-rule fold a
+     * {@code by} rule's sweep uses (ALERT-PER-RULE-1): ONE Alert per rule listing its open keys, ONE Incident per key
+     * (an {@code error} or {@code critical} rule), and above {@code stormCap} one storm flag and one storm Incident.
+     * Case, Notification and Escalation Rules then apply unchanged.
+     *
+     * <ul>
+     *   <li>{@code fresh}: the keys this evaluation newly fired on (one per key; the window evidence rides on the key's
+     *       Incident);</li>
+     *   <li>{@code storm}: more keys fired in this evaluation than the rule's {@code stormCap};</li>
+     *   <li>{@code openKeyIds}: every key ({@link #keyId}) that still has a Window it fired in open. A key not in it has
+     *       healed: it leaves the rule's Alert, and the Alert resolves (the all-clear) when no key and no storm is left.
+     *       A heal never resolves an Incident.</li>
+     * </ul>
+     * A windowed rule is never swept ({@link #evaluateRules} skips it), so this is the only place its Alert moves.
+     *
+     * @return the Alerts opened by this call (the rule's Alert when it was not open before), for the caller's metrics
+     */
+    public synchronized List<Alert> syncWindowed(AlertRule rule, List<WindowHit> fresh, boolean storm,
+                                                 java.util.Set<String> openKeyIds, long nowMs) {
+        List<Alert> out = new ArrayList<>();
+        java.util.Set<String> open = openKeys.computeIfAbsent(rule.name(), n -> seedOpenKeys(rule));
+        java.util.Set<String> stillOpen = new java.util.HashSet<>();
+        for (String k : openKeyIds) stillOpen.add(keyDigest(k));
+        boolean changed = false;
+        for (String digest : List.copyOf(open)) {
+            boolean keep = STORM_KEY.equals(digest) ? storm || !openKeyIds.isEmpty() : stillOpen.contains(digest);
+            if (!keep) {
+                open.remove(digest);
+                changed = true;
+            }
+        }
+        List<WindowHit> started = new ArrayList<>();
+        boolean stormStarted = false;
+        if (storm) stormStarted = open.add(STORM_KEY);
+        else for (WindowHit h : fresh) if (open.add(keyDigest(keyId(h.key())))) started.add(h);
+        if (!changed && started.isEmpty() && !stormStarted) return out;
+        ObjectIndex index = new ObjectIndex(rule.dataset());
+        long count = storm ? fresh.size() : openKeyCount(open);
+        Map<String, String> lastWindow = fresh.isEmpty() ? lastWindowOf(index.alerts().get(rule.name() + "|" + STORM_KEY))
+                : Map.of();
+        String alertId = syncRuleAlert(rule, open, count, open.contains(STORM_KEY), true, nowMs, out, index);
+        if (alertId != null && !lastWindow.isEmpty()) restoreLastWindow(rule, alertId, lastWindow);   // a heal keeps it
+        if (stormStarted) openStormIncident(rule, fresh.size(), alertId, nowMs, index);
+        for (WindowHit h : started) openWindowIncident(rule, h, alertId, index);
+        if (alertId != null && !fresh.isEmpty()) windowEvidence(rule, alertId, fresh.get(fresh.size() - 1));
+        return out;
+    }
+
+    /** The {@code lastWindow.*} attributes of the rule's open Alert ({@code alertId} may be null). */
+    private Map<String, String> lastWindowOf(String alertId) {
+        if (alertId == null) return Map.of();
+        Map<String, String> out = new LinkedHashMap<>();
+        try {
+            records.findAlert(alertId).ifPresent(r -> r.attributes().forEach((k, v) -> {
+                if (k.startsWith("lastWindow.")) out.put(k, v);
+            }));
+        } catch (RuntimeException e) {
+            log.warn("could not read the window evidence of an Alert: {}", e.getMessage());
+        }
+        return out;
+    }
+
+    private void restoreLastWindow(AlertRule rule, String alertId, Map<String, String> lastWindow) {
+        try {
+            AlertStore.Row row = records.findAlert(alertId).orElse(null);
+            if (row == null) return;
+            Map<String, String> attrs = new LinkedHashMap<>(row.attributes());
+            attrs.putAll(lastWindow);
+            records.updateAlert(alertId, row.message(), attrs, row.fired());
+        } catch (RuntimeException e) {
+            log.warn("could not keep the window evidence on the Alert of rule {}: {}", rule.name(), e.getMessage());
+        }
+    }
+
+    /**
+     * The newest fired Window's evidence on the rule's Alert ({@code lastWindow.*}: window, Measure value, first and last
+     * event). Never the key: the rule's Alert names no entity (ALERT-PER-RULE-1), so a caller who cannot reveal one can
+     * read it; the key and the per-key message are on the key's Incident.
+     */
+    private void windowEvidence(AlertRule rule, String alertId, WindowHit h) {
+        try {
+            AlertStore.Row row = records.findAlert(alertId).orElse(null);
+            if (row == null) return;
+            Map<String, String> attrs = new LinkedHashMap<>(row.attributes());
+            h.evidence().forEach((k, v) -> {
+                if (!"key".equals(k)) attrs.put("lastWindow." + k, v);
+            });
+            records.updateAlert(alertId, row.message(), attrs, row.fired());
+        } catch (RuntimeException e) {
+            log.warn("could not record the window evidence on the Alert of rule {}: {}", rule.name(), e.getMessage());
+        }
+    }
+
+    /** {@link #openKeyIncident} for a windowed rule's key: its title names the key (or the Dataset), its body the Window. */
+    private void openWindowIncident(AlertRule rule, WindowHit h, String ruleAlertId, ObjectIndex index) {
+        if (!isHighSeverity(rule.severity()) || ruleAlertId == null) return;
+        String keyId = keyId(h.key());
+        String scope = rule.dataset();
+        try {
+            String alertKey = rule.name() + "|" + keyId;
+            Map<String, String> attrs = new LinkedHashMap<>(h.evidence());
+            attrs.put("rule", rule.name());
+            if (rule.runbook() != null) attrs.put("runbook", rule.runbook());
+            attrs.put("dataset", rule.dataset());
+            attrs.put("comparator", rule.comparator());
+            attrs.put("threshold", String.valueOf(rule.threshold()));
+            attrs.put("value", String.valueOf(h.value()));
+            attrs.put(ALERT_KEY, alertKey);
+            if (!h.key().isEmpty()) {
+                attrs.put("key", keyLabel(h.key()));
+                h.key().forEach((column, v) -> attrs.put("key." + column, v == null ? "NULL" : String.valueOf(v)));
+            }
+            records.findAlert(ruleAlertId).map(r -> r.attributes().get("causedByEvent"))
+                    .ifPresent(e -> attrs.put("causedByEvent", e));
+            String title = h.key().isEmpty() ? Alert.title(rule, textScope(rule, scope))
+                    : Alert.keyTitle(rule, textScope(rule, scope), keyLabel(h.key()));
+            linkIncident(rule, alertKey, ruleAlertId, index, incidents.openIncident(title, h.message(), rule.severity(),
+                    rule.dataset(), attrs, ALERT_KEY));
+        } catch (RuntimeException e) {
+            log.warn("could not open the Incident of windowed rule {} key {}: {}", rule.name(), keyId, e.getMessage());
+        }
     }
 
     /** The keys held open: every ledger entry but the {@link #STORM_KEY} flag. */

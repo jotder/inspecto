@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.function.Function;
 
 /**
@@ -257,6 +256,6 @@ public final class WebhookSink {
 
     /** The first bundled {@link WebhookSinkTransport}, or {@code null} — Basic bundles none. */
     public static WebhookSinkTransport discoveredTransport() {
-        return ServiceLoader.load(WebhookSinkTransport.class).findFirst().orElse(null);
+        return com.gamma.module.EntitledServices.stream(WebhookSinkTransport.class).findFirst().orElse(null);
     }
 }

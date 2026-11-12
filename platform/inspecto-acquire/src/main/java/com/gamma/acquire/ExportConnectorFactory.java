@@ -2,7 +2,6 @@ package com.gamma.acquire;
 
 import com.gamma.api.PublicApi;
 
-import java.util.ServiceLoader;
 
 /**
  * The plugin seam for outbound {@link ExportConnector}s (EXPORT-1) — the mirror of
@@ -27,7 +26,7 @@ public interface ExportConnectorFactory {
      * {@link IllegalStateException} naming the scheme when this bundle ships none.
      */
     static ExportConnector forProfile(ConnectionProfile profile) {
-        for (ExportConnectorFactory f : ServiceLoader.load(ExportConnectorFactory.class))
+        for (ExportConnectorFactory f : com.gamma.module.EntitledServices.load(ExportConnectorFactory.class))
             if (f.scheme().equalsIgnoreCase(profile.connector())) return f.exporter(profile);
         throw new IllegalStateException("Connection '" + profile.id() + "' uses connector '" + profile.connector()
                 + "', and no outbound export transport for it is installed (only s3, from inspecto-connectors;"

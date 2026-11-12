@@ -48,10 +48,16 @@ public final class SpaceContext implements AutoCloseable {
     public CollectorService service() { return service; }
 
     /** Arm this space's poll loop / schedules (delegates to {@link CollectorService#start()}). */
-    public void start() { service.start(); }
+    public void start() {
+        service.start();
+        SpaceLock.afterBoot(id.value(), root.config());   // SE-1a: only schedules; computed in the background
+    }
 
     @Override
-    public void close() { service.close(); }
+    public void close() {
+        SpaceLock.forget(root.config());
+        service.close();
+    }
 
     /**
      * The {@code space.toon} display metadata. The manifest is optional — a space is discovered by its

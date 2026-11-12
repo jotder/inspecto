@@ -5,7 +5,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.ServiceLoader;
 import java.util.Set;
 
 /**
@@ -27,7 +26,7 @@ public final class AnalyticsCatalogue {
     /** The catalogue of every provider on the class path. */
     public static AnalyticsCatalogue load() {
         List<AnalyticsFunctionProvider> providers = new ArrayList<>();
-        for (AnalyticsFunctionProvider p : ServiceLoader.load(AnalyticsFunctionProvider.class)) providers.add(p);
+        for (AnalyticsFunctionProvider p : com.gamma.module.EntitledServices.load(AnalyticsFunctionProvider.class)) providers.add(p);
         return of(providers);
     }
 

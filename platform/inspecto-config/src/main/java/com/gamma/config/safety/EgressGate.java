@@ -3,6 +3,8 @@ package com.gamma.config.safety;
 
 
 
+import com.gamma.util.egress.EgressPolicy;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
@@ -43,6 +45,9 @@ public final class EgressGate {
      * @throws EgressRefusedException when the Safety Policy forbids the dial in {@code enforce} mode
      */
     public void require(String host, int port, String purpose) {
+        String spelling = spellingRefusal(host);
+        if (spelling != null)   // a malformed host, not a policy verdict: refused in every mode, under every tier
+            throw new EgressRefusedException("egress refused: " + purpose + " -> " + host + " (" + spelling + ")");
         String why = refusal(host);
         if (why == null) return;
         String msg = "egress refused by the Safety Policy: " + purpose + " -> " + host
@@ -112,14 +117,49 @@ public final class EgressGate {
         try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return 0; }
     }
 
+    /**
+     * {@code SCALEOUT-OBJSTORE-DATABASE-DIR-1} (e): a host that reads as an address must be a canonical IPv4 dotted
+     * quad or a valid IPv6 literal ({@link EgressPolicy#checkAddressSpelling}); decimal, octal, hex, short and
+     * trailing-dot spellings are refused, because a native dialler ({@code inet_aton}) reads them as an address that
+     * {@code allow.hosts} / {@code deny.hosts} never compared.
+     */
+    private static String spellingRefusal(String host) {
+        if (host == null || host.isBlank()) return null;   // refusal() reports "no host"
+        try {
+            EgressPolicy.checkAddressSpelling(host.trim());
+        } catch (IllegalArgumentException bad) {
+            return bad.getMessage();
+        }
+        // The policy compares the IDNA form, which maps U+3002 / U+FF0E / U+FF61 to '.': '0177。0。0。1' must be judged
+        // as the '0177.0.0.1' it becomes (an IDNA-aware dialler reads it that way too).
+        String normalized;
+        try {
+            normalized = HostPattern.normalizeHost(host);
+        } catch (IllegalArgumentException idnaRefused) {
+            return null;   // not a name IDNA accepts: the policy sees it as before
+        }
+        try {
+            EgressPolicy.checkAddressSpelling(normalized);
+            return null;
+        } catch (IllegalArgumentException bad) {
+            return bad.getMessage() + " (after IDNA mapping of '" + host + "')";
+        }
+    }
+
     private String refusal(String host) {
         if (host == null || host.isBlank()) return "no host";
         if (!tier.permitsNetwork()) return "permit.network is false";
         if (!tier.permitsHost(host)) return "host not permitted by allow.hosts / deny.hosts";
         if (tier.denyHosts() != null && tier.denyHosts().stream().anyMatch(p -> p.kind() == HostPattern.Kind.CIDR)) {
             try {
-                for (InetAddress a : InetAddress.getAllByName(HostPattern.normalizeHost(host)))
+                for (InetAddress a : InetAddress.getAllByName(HostPattern.normalizeHost(host))) {
                     if (tier.deniesAddress(a)) return "resolves to denied address " + a.getHostAddress();
+                    // An IPv6 address carrying an IPv4 one (mapped, compatible, NAT64, 6to4) is the IPv4 it carries.
+                    for (InetAddress v4 : EgressPolicy.embeddedIpv4(a.getAddress()))
+                        if (tier.deniesAddress(v4))
+                            return "resolves to " + a.getHostAddress() + ", which carries denied address "
+                                    + v4.getHostAddress();
+                }
             } catch (UnknownHostException e) {
                 // an unresolvable name cannot be dialled; the connector reports it
             }
