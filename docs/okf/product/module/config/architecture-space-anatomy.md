@@ -339,8 +339,18 @@ check found in the code.
 
 Two things this table means in practice:
 
-- **Only a Pipeline's `use:` reference and a Connection refuse a delete.** Deleting a Dataset, Widget or Query
-  that another component names is not refused; the break shows up only in `metadata_validate` or in the UI.
+- **Only a Pipeline's `use:` reference, a Pipeline's dependents and a Connection refuse a delete today.** Deleting a
+  Dataset, Widget or Query that another config names goes through, but since `SPACE-LINK-CENSUS-1` LC-3 the
+  response lists what it broke (`brokenLinks`) and an AUDIT event (`config.delete.links-broken`) records it. That is
+  the shadow of the census delete refusal (`-Dlinks.delete=shadow|refuse|off`, default `shadow`, every edition):
+  in `refuse` the delete answers 409 with `dependents` (kind, name, key) and `?force=true` deletes as before. It
+  covers every link the census judges (the rows naming a Dataset, Query, Widget or Pipeline id); a Pipeline delete
+  keeps its own refusal in every mode.
+- **A save that adds a broken link warns.** An active config (not `active: false` / `enabled: false`) that adds
+  a link the census judges as dangling saves with a `WARN_LINK_DANGLING` finding (`linkWarnings` on a component
+  save). In `-Dlinks.save=refuse` (Standard and Advanced only; Basic stays in shadow, D-LC5) it is refused 422
+  `ERR_LINK_DANGLING` naming the key and the missing target; a draft always saves, and activating one is judged
+  on every dangling link it holds.
 - **Column names are protected by nothing.** Renaming a mapped column in a Schema breaks every widget, rule,
   Expectation and SQL text that uses it, and no check reports it.
 
@@ -406,6 +416,8 @@ Closing the unchecked rows is part of `SPACE-LINK-CENSUS-1` (§12.6).
    ```
 
 4. **Dry-run a changed Pipeline before activating it**, and leave `active: false` until it passes.
+   Read the `brokenLinks` of a delete response and the `WARN_LINK_DANGLING` findings of a save response: they
+   are what the census refusal modes (§12.2) would refuse.
 5. **Never hand-edit server-written state** (§4.6, §5, `audit/`): signatures and hash chains break.
 
 ### 12.6 Where enforcement is going
@@ -416,7 +428,8 @@ it here"). That copying is why §12.2 has rows marked **none** and why the scans
 planned fix is one declared **link census** that every check reads, refusal of a save or delete that would
 break a link, a column-level check, duplicate detection, and a report of files changed outside the server:
 [Space link census plan](../../../../superpower/2026-11-11-space-link-census-plan.md), board row
-`SPACE-LINK-CENSUS-1`. Nothing of it is built.
+`SPACE-LINK-CENSUS-1`. Built so far: the census and the checks that read it (LC-1, LC-2) and the delete and
+save refusals in shadow mode (LC-3, §12.2).
 
 ## 13. Gotchas
 

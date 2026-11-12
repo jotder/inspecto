@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-405 test class(es): 160 unit, 245 real-HTTP control-plane, 0 IT.
+406 test class(es): 160 unit, 246 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -175,6 +175,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiLegacyDashboardScheduleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLegacyDashboardScheduleTest.java` | SCHEDULE-EXPORT-DASHBOARD-SCOPE-1 (declined until demand): a legacy report schedule that still carries |
 | `ControlApiLineageTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLineageTest.java` | Integration + unit tests for the cross-engine store lineage stitch ({@code GET /lineage?store=}, §11). |
 | `ControlApiLinkAnalysisLimitsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLinkAnalysisLimitsTest.java` | {@code GET\|PUT /settings/link-analysis/limits} and {@code PUT /system/link-analysis/limits} ({@code LA-CONFIG-LIMITS-1} |
+| `ControlApiLinkRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLinkRefusalTest.java` | `SPACE-LINK-CENSUS-1` LC-3 over real HTTP: the census delete refusal ({@code -Dlinks.delete}, D-LC3) for each kind a |
 | `ControlApiMappingValidateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiMappingValidateTest.java` | {@code POST /components/mapping/validate} over real HTTP (ELT amendment UI plan §2.5, S6b): the |
 | `ControlApiMeasureRuleSpaceRootTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiMeasureRuleSpaceRootTest.java` | {@code MEASURE-PROBE-SPACE-ROOT-1} — <b>a measure Alert Rule in a named Space reads that Space's registry.</b> |
 | `ControlApiMetadataV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiMetadataV1Test.java` | Real-HTTP tests for W3 versioned metadata: the widened {@code ComponentStore} (a {@code widget} |

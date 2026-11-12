@@ -45,8 +45,17 @@ class SpaceCorpusEquivalenceTest {
         }
     }
 
-    /** The registered capabilities. Empty today; each SE lane adds its {@code -D} flag here. */
-    static final List<Capability> CAPABILITIES = List.of();
+    /** The registered capabilities. Each SE lane adds its {@code -D} flag here. */
+    static final List<Capability> CAPABILITIES = List.of(
+            // SPACE-LINK-CENSUS-1 LC-3: the census delete / save refusal modes (shadow|refuse|off) touch routes only
+            mode("links.delete"),
+            mode("links.save"));
+
+    /** A {@code shadow|refuse|off} mode property: on = refuse, off = the default (shadow), cleared so no test inherits it. */
+    private static Capability mode(String property) {
+        return new Capability(property, () -> System.setProperty(property, "refuse"),
+                () -> System.clearProperty(property), null);
+    }
 
     /**
      * The corpus roots as repo paths. ⚠ These literals ARE the wiring: {@code tools/affected-modules.mjs} discovers

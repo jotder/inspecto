@@ -228,6 +228,11 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
+        Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), draft,
+                LinkRefusals.stored(target), findings);
+        if (linkRefusal != null) return linkRefusal;
+
         // Maker-checker (ASSURE-MAKER-CHECKER-1): every gate above has passed; under the Space's approval
         // policy the write becomes a Pending Change here, before the first byte (the schema's CSV siblings
         // included) is written.
@@ -447,6 +452,10 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
+        Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), merged,
+                LinkRefusals.stored(target), findings);
+        if (linkRefusal != null) return linkRefusal;
         PendingChanges.hold(api, ex, type, fileName, merged, existing);   // maker-checker, before any byte
 
         Map<String, Object> toWrite = merged;
