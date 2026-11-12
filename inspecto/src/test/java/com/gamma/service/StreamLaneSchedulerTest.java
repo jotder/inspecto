@@ -136,4 +136,59 @@ class StreamLaneSchedulerTest {
         return s.streamLaneIds().stream().map(x -> x.toLowerCase(java.util.Locale.ROOT))
                 .collect(java.util.stream.Collectors.toSet());
     }
+
+    /**
+     * PA-9d: the clock floor is told a Pipeline is drained only when no run of it is in progress and nothing landed in
+     * its inbox waits to be ingested (a landed but uncommitted slice is not the connector's backlog), at most once a second.
+     */
+    @Test
+    void theStreamIsReportedDrainedOnlyWhenNothingIsInFlight(@TempDir Path dir) throws Exception {
+        Path cfg = pipeline(dir, "trigger:\n  type: stream\n  records: 1000\n  max_wait: 1s");
+        CollectorService svc = new CollectorService(List.of(cfg), 3600, 1);
+        try {
+            PipelineScheduler s = scheduler(svc);
+            java.util.List<String> told = new java.util.concurrent.CopyOnWriteArrayList<>();
+            s.onStreamIdle(told::add);
+            Path inbox = Files.createDirectories(dir.resolve("inbox"));
+            Path landed = inbox.resolve("slice.csv");
+            Files.writeString(landed, CSV);
+            s.streamIdle("lane_etl");
+            assertTrue(told.isEmpty(), "a landed slice waits to be ingested: not drained");
+            Files.delete(landed);
+            Field running = PipelineScheduler.class.getDeclaredField("running");
+            running.setAccessible(true);
+            @SuppressWarnings("unchecked") java.util.Set<String> runs = (java.util.Set<String>) running.get(s);
+            runs.add("lane_etl");
+            s.streamIdle("lane_etl");
+            assertTrue(told.isEmpty(), "a run in progress: not drained");
+            runs.remove("lane_etl");
+            s.streamIdle("lane_etl");
+            assertEquals(List.of("lane_etl"), told, "drained");
+            s.streamIdle("lane_etl");
+            assertEquals(1, told.size(), "at most once a second");
+        } finally {
+            svc.close();
+        }
+    }
+
+    /**
+     * PA-9d: a Space folder's Real-time Detection state is its own, even with the process-wide -Djobs.audit.dir set:
+     * two Spaces sharing one fired table would suppress each other's Alerts for the same rule, key and Window.
+     */
+    @Test
+    void realtimeStateIsPerSpaceEvenWithAProcessWideAuditDir(@TempDir Path dir) throws Exception {
+        String before = System.getProperty("jobs.audit.dir");
+        System.setProperty("jobs.audit.dir", dir.resolve("shared").toString());
+        try {
+            Path a = CollectorService.realtimeStateDir(SpaceRoot.under(Files.createDirectories(dir.resolve("a").resolve("config")).getParent()));
+            Path b = CollectorService.realtimeStateDir(SpaceRoot.under(Files.createDirectories(dir.resolve("b").resolve("config")).getParent()));
+            assertNotEquals(a, b);
+            assertTrue(a.startsWith(dir.resolve("a")) && b.startsWith(dir.resolve("b")), a + " / " + b);
+            assertEquals(Path.of(dir.resolve("shared").toString(), "realtime"), CollectorService.realtimeStateDir(SpaceRoot.legacy()),
+                    "the legacy single-tenant root keeps the override");
+        } finally {
+            if (before == null) System.clearProperty("jobs.audit.dir");
+            else System.setProperty("jobs.audit.dir", before);
+        }
+    }
 }

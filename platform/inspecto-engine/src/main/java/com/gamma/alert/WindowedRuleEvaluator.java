@@ -36,8 +36,9 @@ import java.util.stream.Stream;
  *
  * <p><b>Effectively-once Alerts.</b> Delivery stays at-least-once per slice. With {@code distinctOn} a re-delivered
  * event is not buffered twice, so it cannot inflate a count; and every (rule, key, window start) that has fired is
- * kept in {@link FiredWindows}, so nothing raises twice. Alerts go through {@link AlertService#raiseFromEvent} with
- * the dedupe key {@code <rule>:<key>:<window start>}; a CRITICAL rule's Alert is promoted to an Incident there.
+ * kept in {@link FiredWindows}, so nothing raises twice. Alerts go through {@link AlertService#syncWindowed} (PA-9d,
+ * D-PA43): one Alert per rule listing its open keys, one Incident per key of an {@code error} or {@code critical} rule,
+ * the storm cap, and the heal edge once every Window a key fired in has closed.
  *
  * <p><b>Patterns (PA-9c).</b> A {@code sequence} rule pairs a step-A event with a later step-B event of the same key
  * that arrived in this commit or an earlier one ({@link WindowSql#sequence}); it fires once per (key, A's event time).
@@ -196,8 +197,6 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
                     fresh.computeIfAbsent(keyId, k -> new ArrayList<>()).add(b);
             }
             boolean storm = rule.isGrouped() && fresh.size() > rule.stormCap();
-            if (storm) raiseStorm(rule, fresh.values().stream().map(l -> l.get(0)).toList(), nowMs);
-            else for (List<Breach> windows : fresh.values()) raise(rule, windows.get(0), windows.size(), nowMs);
             for (Breach b : found) {
                 List<Breach> keyWindows = fresh.get(AlertService.keyId(b.key()));
                 boolean isNew = keyWindows != null && keyWindows.contains(b);
@@ -208,6 +207,11 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
             AlertWindow w = rule.eventWindow();
             // a window whose end + lateness is at or below the Watermark is never evaluated again
             if (watermarkUs != Long.MIN_VALUE) fired.purgeBefore(rule.name(), (watermarkUs - WindowSql.micros(w.size().plus(w.lateness()))) / 1000);
+            // PA-9d (D-PA43): one Alert per rule, one Incident per key, the storm cap and the heal edge - the keys
+            // whose every fired Window has closed leave the rule's Alert
+            List<AlertService.WindowHit> hits = new ArrayList<>();
+            for (List<Breach> windows : fresh.values()) hits.add(hit(rule, windows.get(0), windows.size()));
+            alerts.syncWindowed(rule, hits, storm, fired.keyIds(rule.name()), nowMs);
         }
         judgedUs = Math.max(judgedUs, frontier);
         trim();
@@ -312,8 +316,8 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
         return ps;
     }
 
-    /** One Alert for a key's earliest newly breaching window; {@code windows} says how many windows breached with it. */
-    private void raise(AlertRule rule, Breach b, int windows, long nowMs) {
+    /** A key's earliest newly breaching window, as the rule's fold takes it; {@code windows} says how many breached with it. */
+    private AlertService.WindowHit hit(AlertRule rule, Breach b, int windows) {
         String keyLabel = b.key().isEmpty() ? dataset : AlertService.keyLabel(b.key());
         String window = Instant.ofEpochMilli(b.windowStartMs()) + " .. " + Instant.ofEpochMilli(b.windowEndMs());
         Map<String, String> evidence = new LinkedHashMap<>();
@@ -339,30 +343,7 @@ public final class WindowedRuleEvaluator implements AutoCloseable {
                         + (windows > 1 ? " (and " + (windows - 1) + " more step-A event(s))" : "")
                 : "absence: no event for " + keyLabel + " in the window " + window + "; last seen "
                         + Instant.ofEpochMilli(b.lastEventMs()) + more;
-        Alert alert = new Alert(rule.name(), rule.severity(), dataset, rule.measure(), b.value(), rule.comparator(),
-                rule.threshold(), AlertWindow.text(rule.eventWindow().size()), nowMs, message, evidence);
-        String title = b.key().isEmpty() ? Alert.title(rule, dataset) : Alert.keyTitle(rule, dataset, keyLabel);
-        alerts.raiseFromEvent(alert, title, dataset,
-                rule.name() + ":" + AlertService.keyId(b.key()) + ":" + b.windowStartMs(), evidence,
-                "CRITICAL".equals(rule.severity()));
-    }
-
-    /** Above the rule's {@code stormCap}, one Alert reports how many keys breached instead of one per key. */
-    private void raiseStorm(AlertRule rule, List<Breach> fresh, long nowMs) {
-        long firstWindow = fresh.stream().mapToLong(Breach::windowStartMs).min().orElseThrow();
-        Map<String, String> evidence = new LinkedHashMap<>();
-        evidence.put("rule", rule.name());
-        evidence.put("dataset", dataset);
-        evidence.put("storm", "true");
-        evidence.put("stormCap", String.valueOf(rule.stormCap()));
-        evidence.put("breachedKeys", String.valueOf(fresh.size()));
-        evidence.put("windowStart", Instant.ofEpochMilli(firstWindow).toString());
-        String message = fresh.size() + " keys breached " + rule.measure() + " " + rule.comparator() + " "
-                + number(rule.threshold()) + " in one commit (above the storm cap of " + rule.stormCap() + ")";
-        Alert alert = new Alert(rule.name(), rule.severity(), dataset, rule.measure(), fresh.size(), rule.comparator(),
-                rule.threshold(), AlertWindow.text(rule.eventWindow().size()), nowMs, message, evidence);
-        alerts.raiseFromEvent(alert, Alert.title(rule, dataset), dataset, rule.name() + ":storm:" + firstWindow, evidence,
-                "CRITICAL".equals(rule.severity()));
+        return new AlertService.WindowHit(b.key(), b.value(), message, evidence);
     }
 
     private static String number(double v) {

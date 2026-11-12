@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); ✅ D-PA26's demo image built 2026-11-12 (`CONTAINER-DEMO-IMAGE-1`); ✅ D-PA27's per-Product chart folders built 2026-11-12 (`HELM-PRODUCT-VALUES-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment); ✅ PA-9b done 2026-11-12 (the windowed Alert Rule: the `window:` block, its SQL compiler over the window buffer, the fired table, the 422 gates; not yet called on commit, PA-9d); ✅ PA-9c done 2026-11-12 (the `sequence` and `absence` Patterns, the close frontier and the clock floor; not yet called on commit or tick, PA-9d). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); ✅ D-PA26's demo image built 2026-11-12 (`CONTAINER-DEMO-IMAGE-1`); ✅ D-PA27's per-Product chart folders built 2026-11-12 (`HELM-PRODUCT-VALUES-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment); ✅ PA-9b done 2026-11-12 (the windowed Alert Rule: the `window:` block, its SQL compiler over the window buffer, the fired table, the 422 gates; not yet called on commit, PA-9d); ✅ PA-9c done 2026-11-12 (the `sequence` and `absence` Patterns, the close frontier and the clock floor); ✅ PA-9d done 2026-11-12 (the Real-time Detection Add-on `features/inspecto-realtime`, evaluation on each commit with the replay of unevaluated Consignments, the clock floor, the latency harness: p95 2.4 s at 5,000 events/s, 1.9 s on a real broker). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1681,6 +1681,120 @@ untouched. Nothing calls the evaluator on commit or on a tick yet (PA-9d).
 - **Not in PA-9c:** the commit hook and the tick wiring, the Add-on and its gating, the latency and late-event metrics,
   the harness (PA-9d); the authoring UI.
 
+**PA-9d as built (2026-11-12): the Real-time Detection Add-on, evaluation on commit, and the latency harness.**
+Module `features/inspecto-realtime` (package `com.gamma.realtime`), the commit-hook contract
+`com.gamma.alert.RealtimeDetection` in the engine, and small core seams. No route added or changed, so
+`openapi-v1.json` and the generated inventories are untouched; `GET /alerts/rules` gains an `inert` field on a rule.
+- **The Add-on (D-PA44).** One optional module (`module.toon`: `offeringRole: optional`, `bindingTime: boot`,
+  `provides.features: realtime`, `contracts: RealtimeDetection`, `requires.modules: ops`), built in the Standard,
+  Advanced and Preview profiles, zero third-party jars. Offered in `offerings/standard.toon` as the Add-on
+  `realtimeDetection` (module `realtime`); Product Map `addon.realtimeDetection` (billable,
+  `INS-AO-REALTIME-DETECTION`, `enforcement: build`) and `module.realtime`; listed in `products/inspecto.toon`;
+  `tools/bundle-modules.mjs` ships `inspecto-realtime`. `EditionFeatures.REALTIME` is declared by the module
+  (`RealtimeEditionFeatures`), so `present(realtime)` = the module on the classpath **and** the signed entitlement
+  holding it (`Entitlements.featureEntitled`); its refusal names the Add-on, its Order Code and the module, or says the
+  entitlement leaves it out.
+- **Gating.** Save: `AlertRoutes.requireWindow` refuses a `window:` or `pattern:` rule with 422
+  `ERR_EDITION_FEATURE` when the feature is absent (every door, as the 9b gates). Boot: a windowed rule on disk loads
+  **inert** - armed, never evaluated (the sweep skips it and no hook runs), a WARN naming why, and `GET /alerts/rules`
+  carries `inert: <reason>`. Run: the session asks `present(realtime)` before every evaluation, so a renewed
+  entitlement that drops or restores the Add-on takes effect without a restart; while absent nothing is evaluated,
+  and when it returns the rebuild replays what committed meanwhile.
+- **The commit hook.** `ConsignmentEvent` now carries `outputFiles` (the committed files from lineage, filled by
+  `ConsignmentAuditWriter`; an 11-argument constructor keeps the other emitters unchanged). `CollectorService` opens
+  one `RealtimeSession` per Space through `OptionalSpi` and subscribes it to the bus. A SUCCESS, non-dry commit of a
+  Pipeline that writes a windowed rule's Dataset (its `physicalRef` head names the Pipeline or its Stream, and the
+  Pipeline has `trigger: stream`) hands that Consignment's own Parquet files to the group's `WindowedRuleEvaluator`.
+  Rules are grouped by (Dataset, `time`, `distinctOn`). Every evaluation runs on the session's one worker thread in
+  arrival order, never on the commit's thread (D-PA41: a slow evaluation never blocks a commit).
+- **Replay of what was never evaluated (owed by 9b and 9c).** An `EvaluatedLedger` (DuckDB, the Space's
+  `<audit>/realtime/`)
+  records each file a group evaluated, and when each group was first armed. A build (boot, a rule or stream-Pipeline
+  change, the Add-on returning) loads the files the ledger holds and the files committed before the group was armed
+  (history), and **replays** - evaluates - every other committed file of the last 24 h, so a Consignment committed
+  but never evaluated is judged, `sequence` rules included. The fired table stops a second raise. Decided in this
+  lane (standing preference): a group of the session's first build is armed when the session opened; a rule authored
+  later arms its group then, so it never fires on what committed before it existed. A group remembers the files it
+  buffered for an hour, so a commit queued behind a build that already replayed it is not appended twice.
+- **The state is per Space** (`CollectorService.realtimeStateDir`; found by the lane's verification): a Space folder
+  keeps its fired table and ledger under its own audit folder and ignores the process-wide `-Djobs.audit.dir`; only
+  the legacy single-tenant root honours it. Built first from that property, two Spaces of one process shared one fired
+  table, so the second Space's Alerts for the same rule, key and Window were suppressed as already fired (the
+  harness's two tests, run in one JVM, missed 7-9 of 17 bursts).
+- **The clock floor (owed by 9c).** `StreamLane.onIdle` runs on each probe that finds no backlog;
+  `PipelineScheduler` passes it on only when the Pipeline is **drained** - no run in progress and nothing landed in
+  its inbox (`CollectorProcessor.countPending` is 0; a failed scan, -1, is not drained), since a landed but
+  uncommitted slice is not counted as backlog - and at most once a second. The session then ticks only the groups with an absence rule fed by that Pipeline. Push
+  ingest (`POST /streams/{id}/records`) has no lane, so an absence over a push-only Stream is judged on commits only.
+- **The Alert path (D-PA43).** Built: `AlertService.syncWindowed` replaces 9b's per-window `raiseFromEvent`. A
+  windowed rule folds like a `by` rule (ALERT-PER-RULE-1): **one Alert per rule** counting its open keys, **one
+  Incident per key** for an `error` or `critical` rule (title and message name the key and the Window; the window
+  evidence is in the Incident's attributes), one storm flag and storm Incident above `stormCap`. The heal edge: a key
+  leaves the rule's Alert once every Window it fired in has closed (the fired table's purge), and the Alert resolves
+  when no key is left; a heal never resolves an Incident. The rule's Alert carries the newest Window's evidence as
+  `lastWindow.*` (window, Measure value, first and last event; kept when a heal refreshes the Alert) but never the key, so a caller who cannot reveal an
+  entity can read it. Case, Notification and Escalation Rules apply unchanged.
+- **Metrics.** `inspecto_detection_latency_seconds{space,rule}` (histogram): the raise time minus the event time of
+  the newest event in the Window that fired (for an absence: minus the Window's close, `end + lateness`); replays are
+  not observed. `inspecto_detection_late_events_total{space,rule}`: committed rows that matched a rule but fell only
+  in closed Windows. Decided in this lane: the latency is measured from the **event time**, not a broker column - it
+  equals the broker time where the producer stamps events at send (Kafka CreateTime), and push ingest has no broker.
+- **Save-time Schema check (owed by 9b and 9c).** `AlertRule.windowColumns()` lists every column a windowed rule
+  reads (event time, `by`, the Measure's field, every `when` and Pattern step field, `distinctOn`); `requireWindow`
+  refuses any not in the Dataset's Schema (422, naming them).
+- **Proof.** `RealtimeSessionTest` (7, real Parquet): only a producer's successful, non-dry commit and only its own
+  files; a Consignment committed while the server was down is replayed at the next build and, with the fired table
+  deleted, not again after (the ledger alone stops it); files
+  committed before arming are history; inert without the Add-on, replayed when it returns; a Dataset no stream
+  writes is inert with its reason; the clock floor from the producer's lane only; both metrics.
+  `ControlApiRealtimeGateTest` (3, real HTTP, SpaceManager): present and unrestricted 2xx and not inert; absent 422
+  `ERR_EDITION_FEATURE` naming `INS-AO-REALTIME-DETECTION` and a rule on disk listed `inert`; an entitlement without
+  the module 422 "not in this installation's entitlement", with it 2xx. `AlertRoutesWindowGateTest` (+2): the Add-on
+  pair, and each unknown `when`, Measure and step field refused one key from accepted. `WindowedRuleEvaluatorTest`
+  (+1): a CRITICAL rule opens one Alert and one Incident per key, heals and resolves when its Windows close; the 9b/9c
+  tests now assert the folded Alert. `StreamLaneTest` (+1): the idle listener runs only on an empty probe and a
+  failing one never kills the lane. `StreamLaneSchedulerTest` (+2): drained only with no run and an empty inbox, at
+  most once a second; the state folder is per Space with `-Djobs.audit.dir` set.
+- **The latency harness** (`RealtimeLatencyHarnessTest`, runs in CI): the production path end to end - a
+  `trigger: stream` Pipeline's lane (`max_wait: 1s`, `batch.max_files: 64`), the real ingest committing Parquet, the
+  bus, this module's session, the window buffer, a CRITICAL Wangiri rule (10-minute sliding Window, 30 distinct
+  B-numbers under 3 s) raising its Alert and the key's Incident (`inspecto-ops`) in the same evaluation. A synthetic
+  producer writes one file a second at the given rate, stamping each event's send time as its event time, and plants
+  a 40-number burst on a fresh key every 2 s after a 6 s warm-up. CI load: 1,000 events/s for 40 s, asserting no
+  burst missed and p95 event → Alert ≤ 5 s. The CI feed is the `faketest` connector, which cannot count its backlog,
+  so its lane drains on the 1 s timer; a `MockConsumer`-backed Kafka connector needs a connector-factory seam that was
+  not built (see below).
+
+  | Run (2026-11-12, this desk: Windows 11, 12 logical CPUs, JDK 27) | Bursts | Missed | Event → Alert and Incident p50 / p95 / max | Ingest p50 | Desk |
+  |---|---|---|---|---|---|
+  | CI load, `faketest`, 1,000 events/s, 40 s | 17 | 0 | 2.7 / **4.2** / 4.2 s | 0.9 s | 68 % CPU (peers building) |
+  | **Full rate**, `faketest`, 5,000 events/s, 60 s | 27 | 0 | 1.4 / **2.4** / 2.5 s | 0.5 s | same |
+  | CI load, `faketest`, 1,000 events/s, 40 s, after the per-Space state fix, in one JVM with the broker test | 17 | 0 | 1.3 / **3.3** / 3.3 s | 0.7 s | shared |
+  | CI load, `faketest`, 1,000 events/s, 40 s, four earlier runs | 17 | 0 | 4.0-7.3 / **5.8-14.0** s | 1.9-4.6 s | **100 % CPU** (peer reactor gates) |
+
+  The Incident opens inside the same evaluation as its Alert, so event → Incident is at most the Alert figure: the
+  10 s Incident budget is met wherever the 5 s Alert budget is. Measured cost of one evaluation: 150-300 ms with 10
+  breaching windows, about 50 ms with none. On a saturated desk the CPU-bound ingest (not the evaluation) misses the
+  budget; the CI assertion therefore needs a CI runner that is not shared with other builds. The stated rate, 5,000
+  events/s (D-PA39), holds with margin on the production evaluator.
+- **The one real-broker run** (`RealtimeLatencyHarnessTest.theSameThroughARealBroker`, skips unless a broker
+  answers at `-Dkafka.it.bootstrap`): the same harness through the real `KafkaConnector` (raw CSV payload, one
+  partition), the operator's Q6 image: `apache/kafka:3.8.0` (KRaft, one broker, `docker run -p 9092:9092`, Docker
+  29.5.3 on the same desk), topics `inspecto-rt-*` created by the producer.
+
+  | Run (2026-11-12) | Bursts | Missed | Broker → Alert and Incident p50 / p95 / max | Consignments | Ingest p50 |
+  |---|---|---|---|---|---|
+  | 1,000 events/s, 40 s (desk at 100 % CPU) | 17 | 0 | 3.2 / **4.3** / 4.3 s | 21 | 1.0 s |
+  | 1,000 events/s, 40 s, after the per-Space state fix | 17 | 0 | 1.6 / **3.5** / 3.5 s | 34 | 0.4 s |
+  | **5,000 events/s, 60 s** | 27 | 0 | 1.3 / **1.9** / 2.0 s | 58 | 0.3 s |
+
+  The broker drains by record count (the lane's `records`), so it is faster than the timer-drained `faketest` feed.
+  D-PA39 is met on a real broker at the stated rate.
+- **Not in PA-9d / left over:** the CEP App and its landing (PA-9e); the hubs' spec and admin guide, including the
+  9c note that `lateness` must cover how far a feed's event times run behind the clock (PA-9f); a connector-factory
+  seam for a `MockConsumer`-backed Kafka harness; a Kafka *producer* channel (Q4, not in PA-9).
+
+
 Code facts for PA-9b (read 2026-11-12; check them before relying on them):
 - **`window` is already an Alert Rule key.** On a metric rule it is a duration string (`window: 1h`, or `Nb` for the last
   N batches). `AlertRule.MODELLED` lists it (`AlertRule.java` around line 122). A Measure rule (BI-5) "replaces
@@ -2117,9 +2231,11 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
    `PILOT-PRECREATED-SPACE-1` (`a9a41c260`), `CONTAINER-DEMO-IMAGE-1` (`155ce2523`, merged `81c3df0de`).
 6. **PA-9** (D-PA38 … D-PA47 signed 2026-11-12): ✅ 9a spike (`56a2b643e`, G-RT tripped on the Dataset glob, cleared by
    the window buffer); ✅ 9b windowed Alert Rule (`252e60a92`, merged `373ea3338`; 12 of 12 mutants killed); ✅ 9c
-   `sequence` and `absence` (§11 "PA-9c as built"; 21 of 21 mutants killed); next 9d (the Add-on, the commit hook and the
-   tick wiring, the latency harness, and the items 9b's verification and 9c left to it), then 9e, 9f in order
-   (D-PA46). Each lane waits for the operator's go.
+   `sequence` and `absence` (§11 "PA-9c as built"; 21 of 21 mutants killed); ✅ 9d the Real-time Detection Add-on,
+   the commit hook with replay and the clock floor, one Alert per rule and one Incident per key, the metrics, the
+   latency harness in CI and the real-broker run (§11 "PA-9d as built": p95 2.4 s at 5,000 events/s, 1.9 s on a real
+   broker; the full reactor gate was not run, by the operator's instruction); next 9e, 9f in order (D-PA46). Each lane
+   waits for the operator's go.
 7. **PA-8 stays open (D-PA30)** until `CONTAINER-AIRGAP-PROOFS-1` passes on real hosts: a Kubernetes install and a
    complete air-gapped bundle.
 8. Held for demand: `ADDON-PICKER-PAGE-1`, `PRODUCT-MAP-APP-EDITION-PRICES-1`, `CUSTOMER-BUILD-DOMAIN-APPS-1`,

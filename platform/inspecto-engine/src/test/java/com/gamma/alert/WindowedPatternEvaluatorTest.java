@@ -104,8 +104,7 @@ class WindowedPatternEvaluatorTest {
             assertEquals(T0 + 10 * MIN, b.lastEventMs());
             List<Map<String, Object>> raised = alerts.recent(10);
             assertEquals(1, raised.size());
-            String message = String.valueOf(raised.get(0).get("message"));
-            assertTrue(message.startsWith("sequence for msisdn=m1"), message);
+            assertEquals("sequence", alerts.openAlerts().get(0).attributes().get("lastWindow.pattern"));
 
             var replay = ev.commit(List.of(parquet(db, new Ev("m1", "transfer", 900, T0 + 10 * MIN, 3))));
             assertTrue(replay.breaches().isEmpty(), "the same offset re-delivered is not buffered twice: " + replay);
@@ -168,7 +167,7 @@ class WindowedPatternEvaluatorTest {
                     new Ev("m1", "transfer", 900, T0 + 2 * MIN, 3))));
             assertEquals(2, out.newlyFired().size());
             assertEquals(1, alerts.recent(10).size(), "one Alert per key per commit");
-            assertTrue(String.valueOf(alerts.recent(10).get(0).get("message")).contains("1 more step-A event"));
+            assertEquals("2", alerts.openAlerts().get(0).attributes().get("lastWindow.windows"), "both As, on one Alert");
             assertEquals(2, fired.size());
         }
     }
@@ -193,13 +192,16 @@ class WindowedPatternEvaluatorTest {
             assertEquals(T0 + 10 * MIN, b.windowEndMs());
             assertEquals(0, b.value());
             assertEquals(T0 + 2 * MIN, b.lastEventMs(), "last seen");
-            assertTrue(String.valueOf(alerts.recent(10).get(0).get("message")).startsWith("absence: no event for msisdn=sw1"));
+            assertEquals("absence", alerts.openAlerts().get(0).attributes().get("lastWindow.pattern"));
 
             // sw2 then falls silent in [T0+15m, T0+20m); sw1 stays silent but is not raised again
             var later = ev.commit(List.of(parquet(db, new Ev("sw2", "hb", 0, T0 + 30 * MIN, 6))));
             assertEquals(List.of(Map.of("msisdn", "sw2")), later.newlyFired().stream().map(WindowedRuleEvaluator.Breach::key).toList(),
                     "one Alert per silence, not one per silent Window: " + later);
-            assertEquals(2, alerts.recent(10).size());
+            // PA-9d: still the rule's one Alert - sw1's closed Window healed it off, sw2's silence is on it now
+            assertEquals(1, alerts.recent(10).size());
+            assertEquals(java.time.Instant.ofEpochMilli(T0 + 15 * MIN).toString(),
+                    alerts.openAlerts().get(0).attributes().get("lastWindow.windowStart"));
         }
     }
 

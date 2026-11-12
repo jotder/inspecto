@@ -155,6 +155,8 @@
                 <module>features/inspecto-anomaly</module>
                 <!-- PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind, predict.segment Job); Standard and above (OD-5). -->
                 <module>features/inspecto-predictive</module>
+                <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
+                <module>features/inspecto-realtime</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -199,6 +201,8 @@
                 <module>features/inspecto-anomaly</module>
                 <!-- PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind, predict.segment Job); Standard and above (OD-5). -->
                 <module>features/inspecto-predictive</module>
+                <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
+                <module>features/inspecto-realtime</module>
             </modules>
         </profile>
         <!-- Advanced = Standard + the ABAC policy engine (rbac-abac-plan §5) + the PostgreSQL Investigation store: the same
@@ -236,6 +240,8 @@
                 <module>features/inspecto-anomaly</module>
                 <!-- PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind, predict.segment Job); Standard and above (OD-5). -->
                 <module>features/inspecto-predictive</module>
+                <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
+                <module>features/inspecto-realtime</module>
             </modules>
         </profile>
         

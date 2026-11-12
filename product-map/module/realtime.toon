@@ -1,0 +1,8 @@
+id: module.realtime
+kind: module
+title: Real-time Detection
+parent: layer.features
+module: realtime
+billable: false
+status: ga
+docs: docs/okf/product/module/realtime/index.md
