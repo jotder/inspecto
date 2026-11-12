@@ -28,8 +28,8 @@ The module `features/inspecto-case-management` (id `case-management`, feature id
 
 ## Where it fits
 
-An add-on on top of [incidents](../../addon/incidents/architecture-incidents.md): it needs the `ops` module, which supplies the objects, links,
+An add-on on top of [incidents](../../addon/incidents/architecture.md): it needs the `ops` module, which supplies the objects, links,
 workflow engine and SLA sweep. The chain is Alert → Incident → Case
 ([Incidents capability](../../addon/incidents/plan-incidents.md)).
 
-More: [screens](user-guide-case-management.md) · [API](api-case-management.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-case-management.md) · [API](api-case-management.md) · [architecture](architecture.md).

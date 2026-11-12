@@ -88,7 +88,7 @@ and — under an explicit human gate — acts.
 
 | Where it is stated | What it says |
 |---|---|
-| `okf/product/index.md`, `okf/product/module/agent/architecture-overview.md` | `0.1.0-SNAPSHOT`, "no release tag yet" |
+| `okf/product/index.md`, `okf/product/module/agent/architecture.md` | `0.1.0-SNAPSHOT`, "no release tag yet" |
 | `REQUIREMENTS.md` `EOI-7` | `v0.1.0` tagged, poms pin `0.1.0`, "no SNAPSHOT anywhere" |
 | `pom.xml` (the build) | **`<eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>`** |
 | `okf/product/module/intelligence/architecture-embedded-intelligence.md` | CI builds from the upstream `main`, "currently `0.2.0-SNAPSHOT`" |

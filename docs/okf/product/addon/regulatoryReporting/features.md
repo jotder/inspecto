@@ -27,4 +27,4 @@ Compliance teams with recurring regulatory submissions.
 
 [regulatory-reporting](../../module/regulatory-reporting/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

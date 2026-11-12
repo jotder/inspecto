@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Reconciliation — requirement of record](plan.md) |
 | spec | current | [Reconciliation — implementation spec](spec.md) |
-| architecture | current | [Reconciliation](architecture-overview.md) |
+| architecture | current | [Reconciliation](architecture.md) |
 | features | current | [Reconciliation — features](features-reconciliation.md) |
 | feature-db | current | [Reconciliation — feature database](feature-db.md) |
 | user-guide | current | [Reconciliation](user-guide-reconciliation.md) |

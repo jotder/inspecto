@@ -38,4 +38,4 @@ only under the `edition-standard`, `edition-preview` and `edition-advanced` prof
 the `mail` Platform Service (`MailAccess`), which sends to recipients an author names — see
 [Platform Services](../../layer/platform/architecture-platform-services.md).
 
-More: [screens](user-guide-notifications.md) · [API](api-notifications.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-notifications.md) · [API](api-notifications.md) · [architecture](architecture.md).

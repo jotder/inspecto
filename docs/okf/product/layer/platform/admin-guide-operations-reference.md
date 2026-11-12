@@ -1001,8 +1001,27 @@ docker build -f deploy/Dockerfile -t inspecto .
 docker run -p 8080:8080 -v /srv/inspecto/spaces:/app/spaces inspecto
 ```
 
+**An image per Product (PRODUCT-ASSEMBLY-1 PA-8b, 2026-11-12; D-PA26).** `package.ps1 -Product <id> -Edition <e> -Target container`
+does the build above for you. It needs Docker and the `linux_amd64` zip, so pass `-GraalvmCache` a folder holding a
+`*linux*` JDK with `jmods/`; the build is refused up front without Docker and after the zips without the Linux zip.
+- It unpacks the Linux zip, never the staging folder, which holds the host runtime after a cross-build.
+- `tools/ship.mjs image` then checks that the bundle is the plan's build: `lib/product.json` names the plan's Product,
+  Edition and Distribution, `runtime/bin/java` is an ELF file, and the Dockerfile carries the Product label.
+- It builds `inspecto-<product>:<version>-<edition>[-trial]` (the Platform product stays `inspecto`) and checks the
+  image's `io.inspecto.product` label.
+- It saves the image as `inspecto-ship/<image>-<tag>/<image>-<tag>.image.tar` and stamps the Product's Helm chart beside it.
+
+Every bundle's Dockerfile now carries OCI labels from the Assembly Plan: `org.opencontainers.image.title`,
+`.description` and `.version`, plus `io.inspecto.product`, `.edition`, `.distribution` and `.apps`. The demo
+Distribution is refused for this target.
+
+Proven 2026-11-12: `package.ps1 -Product telco -Edition Standard -Target container -NoUi -GraalvmCache C:\.jdks` built
+`inspecto-telco:4.0.0-SNAPSHOT-standard` (204 MB saved). Run with `--read-only --tmpfs /tmp:exec --cap-drop ALL
+--security-opt no-new-privileges` and placeholder `AUTH_OIDC_*` values, it ran as uid 10001; `/health` answered
+`UP` and `/ready` `READY`, and `lib/product.json` is Inspecto Telco Standard with its four Apps.
+
 As-built decisions:
-- **The jlink module set is derived (2026-10-07, P3c).** `tools/jlink-modules.mjs` unions `jdeps` over every staged jar with `tools/jlink-runtime-extra.txt` (reflection/ServiceLoader needs, each with a WHY) and holds it against `tools/jlink-modules.lock`; since 2026-10-18 `package.ps1` links the derived set alone and stops the package on a lock mismatch or a missing edition section (the hand-kept list was retired). `--check` is the jar-free validity check. Detail: [module-taxonomy](architecture-module-taxonomy.md) (Packaging).
+- **The jlink module set is derived (2026-10-07, P3c).** `tools/jlink-modules.mjs` unions `jdeps` over every staged jar with `tools/jlink-runtime-extra.txt` (reflection/ServiceLoader needs, each with a WHY) and holds it against `tools/jlink-modules.lock`; since 2026-10-18 `package.ps1` links the derived set alone and stops the package on a lock mismatch or a missing edition section (the hand-kept list was retired). `--check` is the jar-free validity check. Detail: [module-taxonomy](architecture-modules.md) (Packaging).
 - **The bundle's own jlink `runtime/` supplies the JVM** (changed 2026-09-17); the base is
   `debian:stable-slim` and provides only glibc + bash. It was `eclipse-temurin:24-jre` with
   `.dockerignore` excluding `runtime/`, so serve.sh's `[ -x runtime/bin/java ]` preference missed on

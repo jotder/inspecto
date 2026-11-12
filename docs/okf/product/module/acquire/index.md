@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Acquisition & connectivity (ACQ)](plan-acquisition.md) |
 | spec | current | [Data acquisition — the original requirement](spec-framework-design.md) · [Unpack stage — decompression at the Collector](spec-unpack-stage.md) |
-| architecture | current | [Collectors](architecture-collectors.md) · [Data Acquisition Framework](architecture-framework.md) · [Multi-location ingest — the composition pattern](architecture-multi-location-ingest.md) |
+| architecture | current | [Acquisition](architecture.md) |
 | features | current | [Collectors — features](features-collectors.md) |
 | feature-db | current | [Acquisition and collectors — feature database](feature-db.md) |
 | user-guide | current | [Collector configuration (the one surface)](user-guide-collector-config.md) · [Collectors](user-guide-collectors.md) |
@@ -36,5 +36,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P3 | feature | Unpack (11) absent codecs | demand |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
-| `GAP-DETECTION-ENABLED-IGNORED-1` | P3 | defect | a Collector's file-template gap check ignores gap_detection.enabled: false: PipelineConfig.GapDetection.hasFileTemplate() reads only file… | — |
 | `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

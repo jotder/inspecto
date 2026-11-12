@@ -25,4 +25,4 @@ nav:
     icon: heroicons_outline:briefcase
     feature: cases
     blurb: Group related Incidents into one Case and work it to a decision.
-docs: docs/okf/product/module/case-management/index.md
+docs: docs/okf/product/app/case-management/index.md

@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Storage — screens
 
-Screens for Storage. Design and internals: [Storage architecture](architecture-storage.md).
+Screens for Storage. Design and internals: [Storage architecture](architecture.md).
 
 - **Operational DB** (`inspecto-ui/src/app/modules/admin/settings/operational-db.component.ts`):
   what each store family uses, and a connection test. There is no save; the database is a

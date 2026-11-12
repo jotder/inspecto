@@ -1,7 +1,8 @@
 # Platform Services
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: every edition; some services are bound only when their module is installed. Checked against the code on 2026-10-17.
+> Offering: every edition. All ten service ids are bound in every build; `objects` and `link-index` have a working
+> implementation only when their module is installed. Checked against the code on 2026-11-12.
 
 ## 1. What it is
 
@@ -17,7 +18,9 @@ Code: `platform/inspecto-engine/src/main/java/com/gamma/job/PlatformServices.jav
 
 ## 2. Who uses it
 
-- **Built-in Job Types** (`mail.send`, `alert.evaluate`, `la.detect`, `objects.analytics`, `caserule.evaluate`, ...).
+- **Shipped Job Types**: engine built-ins (`mail.send`, `alert.evaluate`, `la.detect`, ...) and Job Types an
+  optional module contributes (`objects.analytics` from `inspecto-ops`, `caserule.evaluate` from
+  `inspecto-case-management`).
 - **Pack authors** writing Job Types, Steps or services (`tools/scaffold.mjs`, `PackTestHarness`).
 - **Operators** reading a Job Type's reach on its "Uses services" chip row before arming it.
 
@@ -31,8 +34,10 @@ registry is a `JobService` constructor parameter, so `requires:` is validated du
 
 ![Grant and dry-run path](../../assets/platform-services.svg)
 
-1. **Registry.** `PlatformServiceRegistry` is the boot-built table `id -> interface -> impl`. It fails closed on a
-   duplicate id or interface; `grant(ids)` throws naming any id not bound in this build.
+1. **Registry.** `PlatformServiceRegistry` is the boot-built table `id -> interface -> impl`, one per Space. It
+   fails closed on a duplicate id or interface; `grant(ids)` throws naming any id not bound in this build, and
+   refuses an id that was disabled. An id bound with no implementation (see `objects` below) is granted as
+   absent: `find` answers empty.
 2. **Declared grant.** A Job Type declares `requires: [...]` on its descriptor. Validation is at registration,
    never at fire time: an unknown or build-absent id refuses the type (pack-atomically).
 3. **`JobContext.services()`** carries the grant; it defaults to empty. An undeclared service is invisible even
@@ -57,8 +62,8 @@ registry is a `JobService` constructor parameter, so `requires:` is validated du
 | `datasets` | `DatasetAccess` | read-only (per-call pinning) |
 | `analytics` | `AnalyticsAccess` | read-only (Analytics Kernel) |
 | `alerts` | `AlertAccess` | does not evaluate; returns empty and says nothing was checked |
-| `link-index` | `LinkIndexAccess` | reports `DRY_RUN`, builds nothing |
-| `objects` | `ObjectAccess` (only with `inspecto-ops`) | reads pass through; writes log and change nothing |
+| `link-index` | `LinkIndexAccess` (a real build needs the `inspecto-geo-link` bridge; without it the call throws and the Job fails closed) | reports `DRY_RUN`, builds nothing |
+| `objects` | `ObjectAccess` (the id is always bound; the implementation exists only with `inspecto-ops`) | reads pass through; writes log and change nothing |
 
 **`DryRunCoverageTest`** (`inspecto/src/test/java/com/gamma/job/DryRunCoverageTest.java`) reads every
 `platformServices.register(...)` in `CollectorService`, binds each interface to a proxy and fails unless the
@@ -71,7 +76,8 @@ dry-run lookup returns something else, or the id is on its read-only list (`sche
 There are no Space TOON keys. A Job definition grants through its type's `requires:`; the related keys are:
 
 - `-Djobs.packs.requireSignature` - pack integrity (a different guarantee from grants).
-- `deadline_seconds:` on a Job definition and `-Djob.deadlineCeilingSeconds` - Run deadline (default 30 min, ceiling 24 h).
+- `deadline_seconds:` on a Job definition and `-Djob.deadlineCeilingSeconds` - Run deadline (default 30 min,
+  ceiling 24 h; long-running built-in types such as `pipeline`, `enrich` and `maintenance` default to the ceiling).
 - `PlatformServiceRegistry.disable/enable` - per service id, engine-internal only, not persisted, no route.
 
 ## 6. Screens
@@ -86,8 +92,8 @@ There are no Space TOON keys. A Job definition grants through its type's `requir
 
 ## 8. Interactions
 
-- [Maker-checker](../../module/workflow/architecture-maker-checker.md): Job definitions are a governed kind; a Job's run-time writes are not held.
-- [Decision Kernel](../../module/scoring/architecture-decision-kernel.md): `start-job` runs a Job and its grant.
+- [Maker-checker](../../module/workflow/architecture.md): Job definitions are a governed kind; a Job's run-time writes are not held.
+- [Decision Kernel](../../module/scoring/architecture.md): `start-job` runs a Job and its grant.
 - Jobs and scheduling, Analytics Kernel, Link Analysis and Incidents (module pages `jobs-scheduler`,
   `analytics-kernel`, `link-analysis`, `incidents`) consume or provide services.
 - Concept detail: [Platform Services - the plugin envelope](../../module/processor/spec-platform-services.md).

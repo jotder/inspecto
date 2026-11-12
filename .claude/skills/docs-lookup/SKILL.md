@@ -11,7 +11,8 @@ description: >
 
 Every current doc lives in **one hub per Product Map Item**: `docs/okf/product/<kind>/<name>/`, mirroring
 `product-map/<kind>/<name>.toon` (PRODUCT-DOCS-HUB-1, 2026-10-19). Kinds: `module`, `addon`, `layer`,
-`edition`, `solution-pack`. All hubs are listed in `docs/okf/product/index.md`.
+`edition`, `solution-pack`, and since PA-10 `product`, `app`, `industry` (a Product's brochure, datasheet and guides
+live in its `product/<id>` hub). All hubs are listed in `docs/okf/product/index.md`.
 
 ## Procedure
 
@@ -32,7 +33,7 @@ Every current doc lives in **one hub per Product Map Item**: `docs/okf/product/<
 |---|---|---|
 | `plan` | why / decisions / roadmap of the item | `docs/okf/product/module/etl/plan-pipeline-authoring.md` |
 | `spec` | exact behaviour, contracts, config keys | `docs/okf/product/module/config/spec-config-safety.md` |
-| `architecture` | how it is built, seams, classes | `docs/okf/product/module/engine/architecture-pipeline-graph.md` |
+| `architecture` | how it is built, seams, classes — every hub's entry page is `architecture.md`; all of them are listed in the map at the end of `docs/okf/product/layer/platform/architecture.md` | `docs/okf/product/module/engine/architecture-pipeline-graph.md` |
 | `features` | what it can do (feature list) | — |
 | `feature-db` | feature rows / inventory data | — |
 | `user-guide` | how a user does a task in the UI | `docs/okf/product/module/etl/user-guide-pipelines.md` |

@@ -15,7 +15,9 @@ commands) is in [`product-map/README.md`](../../../../../product-map/README.md);
 ## Shape and the one design rule
 
 The Product Map is one TOON file per **Product Map Item** at `product-map/<kind>/<name>.toon`, id `<kind>.<name>`
-(kinds: layer · module · functionality · addon · solution-pack · edition). Ids are **qualified by kind** because the
+(kinds: layer · module · functionality · addon · solution-pack · edition, and since `PRODUCT-ASSEMBLY-1` PA-10a
+product · app · industry, each linked to its definition in `products/`, `apps/` or `industries/` by the key of its kind;
+an App is billable as `INS-APP-<ID>`, a Product and an Industry are not, D-PA32). Ids are **qualified by kind** because the
 namespaces overlap (Add-on `reconciliation` and module `reconciliation`). **The map names manifest and Offering ids
 and never copies their technical facts** (roles, dependencies, which Edition holds what); tools look them up.
 Edition membership is derived from `offerings/*.toon` (`includes` resolved; base / internal modules and Industry
@@ -58,21 +60,62 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   Offering and a priced bill of materials to `target/customers/<id>/` (never `offerings/`: a customer name is client
   data). BOM line types: `edition`, `bought`, `required` (kept only because a bought item needs it — charging for it is
   a decision), `installed-not-sold`. A bought Space Template's needs are derived from the manifests (`config/jobs/*`
-  `type:` → `provides.jobTypes`; `config/registry/<kind>s/` → `provides.configKinds`). `--bundle` copies the Edition
-  bundle, removes left-out jars, their per-jar SBOMs and unbought Space Templates, filters `modules.list`, stamps
+  `type:` → `provides.jobTypes`; `config/registry/<kind>s/` → `provides.configKinds`) plus what its `template.toon`
+  declares (`requiresModules`, below). `--bundle` copies the Edition
+  bundle, removes left-out jars, their per-jar SBOMs and unbought Space Templates, trims the combined SBOM, filters `modules.list`, stamps
   `edition.properties` with `customer=` / `offering=`, and adds `customer-<id>.toon` and an unpriced `customer-bom.csv`.
   Pilot 2026-10-18: a 42-jar Standard bundle trimmed to 30 jars and one Space Template; both booted healthy
   (`telco-fraud` pulled in Anomaly Detection, which pulled in `entity-list`, both as `required`).
+- **Since `PRODUCT-ASSEMBLY-1` PA-10b (2026-11-12, D-PA33/D-PA34) a customer build is an assembly.** The resolution above
+  moved unchanged into `tools/customer.mjs`; `assemble.mjs --customer <id|record.toon>` turns the record into an
+  Assembly Plan narrowed to the kept modules and templates, with a `customer` block. The record names its Product
+  (`product:`, default `inspecto`), and an App's Order Code (`INS-APP-<ID>`) buys that App: its Add-ons' modules and its
+  templates. A Domain product's required Apps must be bought; a Platform product's optional App comes along when every
+  Add-on it needs is bought. `customer-build.mjs` executes the plan on a **Product** bundle (`lib/product.json` must name
+  the same Product), rewrites `lib/product.json` from the plan, and always stages a **signed entitlement**
+  (`conf/entitlement.toon` + `.sig`) whose `modules` are exactly the kept optional modules, so a jar copied back in stays
+  inert. It is refused without the issuer key. A Domain product whose composed Space joins Apps the customer did not buy is
+  refused (`package.ps1` builds every optional App; trimming cannot recompose a Space; row
+  `CUSTOMER-BUILD-DOMAIN-APPS-1`), and so is a bundle built with an
+  App the Product does not define (a partner App). The bundle's `edition.properties` `apps=` line follows the plan.
+- **The pilot Distribution (PA-10c, D-PA35)** is `customer-build.mjs <customer> --distribution pilot --bundle <production
+  bundle>`. The record's `pilot:` block names one bought template and, under `poll:`, an absolute folder for every
+  Pipeline of it. The bundle gains the Space Template `<customer>-pilot` (those `dirs.poll` set, `data/samples` left out)
+  and a `PILOT.txt` naming the folders and the `INSPECTO_JAVA_OPTS=-Dassist.safety.roots=…` line the install starts with:
+  the server's path jail refuses a poll folder outside the Space, and the build never widens it. `lib/product.json`
+  says `pilot`. **The Space `<customer>-pilot` is created in the bundle at build time** (`PILOT-PRECREATED-SPACE-1`, D-PA35 as
+  changed by the operator 2026-11-12): `spaces/<customer>-pilot/` is made from the pilot template the way
+  `SpaceManager.createFromTemplate` makes one — `config/**` with `${SPACE}` replaced in each `.toon`, `data/**` (the zero-row
+  seeds, no samples), the `audit` and `duckdb` folders, `space.toon` from the template's name and tagline, and an empty
+  `config/egress.toon`. It boots with the server and polls the customer's folders. With no server at build time, two
+  things the server does at creation are not done: its seed gate (`TemplateSeedGate`, each seeded Pipeline, Job,
+  Connection and Alert Rule judged as its route would judge it; the bought template is held by its own golden tests
+  instead) and its Job stamp (each Job's author). A Job whose run depends on that author (`JobAuthority`) — any
+  `maintenance`, `la.index.build` or `publish.postgres` Job, or a Job template (a `*_job_template.toon`, or a Job naming
+  one with `template:`) — refuses the
+  build, and leaves no folder; `la-claims` (an `la.index.build` Job) is refused, every Standard Solution pack passes. The
+  template stays in the gallery.
+- **A Space Template declares the modules no manifest derives** (`PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`, 2026-11-12, D-PA37):
+  `requiresModules[N]: a,b` in its `template.toon`. Alert Rules (`alert-rules/`, registry or pending) and a Decision
+  Rule's `create-alert` need `ops` (the server refuses `POST /spaces` with 422 without it), unless the template has a
+  Basic tier (`minEdition: basic`, whose Alert Rules ship unarmed); a Case Rule (`*_caserule.toon`) needs
+  `case-management`. `templateNeeds` adds the declaration to the derived needs, so a customer who buys such a template
+  keeps those modules, billed as `required` and listed in the entitlement. `check-offerings.mjs` check 8 holds the
+  declaration honest (each module has a manifest; what the config needs is declared; an Offering listing the template
+  ships the module). Eight Standard Solution packs declare `ops`, and `telco-fraud`, `telco-bypass` and
+  `partner-settlement` also `case-management`. `la-daily-feed`, a Basic content pack whose Alert Rules made it
+  uncreatable on Basic, gained `minEdition: basic`, as every LA template has.
+- **The combined edition SBOM is trimmed with the jars** (same row): the removed jars' own components go, and so does
+  every third-party component that only removed jars carry, read from the per-jar SBOMs before they are deleted. The
+  pilot customer's bundle: 90 components to 66, equal to the union of its 32 kept jars' per-jar SBOMs, and
+  `sbom-modules.mjs --verify` passes.
 
 ## Known residuals
 
-The first two are row `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`; S6 is row `PRODUCT-MAP-S6-1`.
+S6 is row `PRODUCT-MAP-S6-1`.
 
-- **A pack's ops config is not detected.** Configs under a Template's `config/ops/` (for example `telco-fraud`'s Case
-  Rule) name no owner in any manifest, so `customer-build` cannot derive that they need `ops` / `case-management`; in
-  the pilot that Case Rule loads inert. Fix: a manifest declaration for ops configs.
-- **The combined edition SBOM over-declares a trimmed bundle** (`sbom/inspecto-<edition>.{cdx,spdx}.json` still lists
-  removed jars; per-jar SBOMs are removed). Safe direction, not exact.
+- **An App has one Order Code**, so a price per App × Edition (D-PA6) has no key yet: row
+  `PRODUCT-MAP-APP-EDITION-PRICES-1`, held for the first priced App.
 - `enabled-gate` items are not written into a default `modules.toon` (no item uses `enabled-gate` yet).
 - **Not built (S6, on demand):** a DuckDB query file of the map, a support view (module → owner / runbook), `usage`
   billing once metering exists.

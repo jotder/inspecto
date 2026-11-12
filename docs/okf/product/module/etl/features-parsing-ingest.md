@@ -19,7 +19,7 @@ Consignment atomically. A file that cannot be read goes to the **quarantine** tr
 parsing go to a reject file beside it.
 
 The capability spec of record is [ingestion.md](plan-ingestion.md); the design is
-[stage1-architecture.md](../engine/architecture-stage1.md). This page is the module summary.
+[architecture-stage1.md](../engine/architecture-stage1.md). This page is the module summary.
 
 Code homes:
 
@@ -33,10 +33,10 @@ Code homes:
 
 ## Where it fits
 
-Ingest starts where a [Collector](../acquire/architecture-collectors.md) has landed a file in `dirs.poll`. It ends at a
-committed store that [Datasets](../../layer/product/architecture-studio-bi.md) and at-rest [Steps](architecture-pipelines-steps.md) read. Typing
-rules come from the Schema registry (metamodel); storage layout is described in [storage](../entity-store/architecture-storage.md).
+Ingest starts where a [Collector](../acquire/architecture.md) has landed a file in `dirs.poll`. It ends at a
+committed store that [Datasets](../../layer/product/architecture-studio-bi.md) and at-rest [Steps](architecture.md) read. Typing
+rules come from the Schema registry (metamodel); storage layout is described in [storage](../entity-store/architecture.md).
 Every Consignment runs on a virtual thread bounded by `processing.threads`; many Pipelines share one
 JVM under `MultiCollectorProcessor`.
 
-More: [screens](user-guide-parsing-ingest.md) · [API](api-parsing-ingest.md) · [architecture](architecture-parsing-ingest.md).
+More: [screens](user-guide-parsing-ingest.md) · [API](api-parsing-ingest.md) · [architecture](architecture.md).

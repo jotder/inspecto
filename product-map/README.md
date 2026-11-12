@@ -13,6 +13,9 @@ The as-built design and decisions are in [`docs/okf/product/layer/platform/spec-
 | `addon/` | an Add-on | `offeringAddon:` = the key under `addons:` in `offerings/*.toon` |
 | `solution-pack/` | a Space Template or Industry pack | `template:` / `industryPack:` |
 | `edition/` | an Edition | `offering:` = `offerings/<id>.toon` |
+| `product/` | a Product (not billable: priced as its Edition plus its Apps) | `product:` = `products/<id>.toon` |
+| `app/` | an App (billable, `INS-APP-<ID>`) | `app:` = `apps/<id>/app.toon` |
+| `industry/` | an Industry (not billable: its pack is a Solution pack) | `industry:` = `industries/<id>/industry.toon` |
 
 Rules:
 - **Never copy technical facts** (roles, dependencies, which Edition holds what) here. Name the id; tools look the facts up.
@@ -22,9 +25,13 @@ Rules:
   `private/prices.csv` (`orderCode,listPrice,currency`) when it exists.
 - `node tools/product-map-import.mjs <edited.csv|edited.xlsx> [--sheet "Price list"] [--write]` brings commercial edits back
   (title, billing, support, status, prices). It is a dry run without `--write`, and it refuses structural edits.
-- `node tools/customer-build.mjs <customer> [--bundle <edition-bundle-dir>]` reads `private/customers/<customer>.toon`
-  (`id`, `title`, `edition`, `orderCodes[N]`) and writes the customer Offering, a priced bill of materials and, with `--bundle`,
-  a trimmed copy of the Edition bundle to `target/customers/<customer>/`.
+- `node tools/customer-build.mjs <customer|record.toon> [--bundle <product-bundle-dir>] [--key <issuer.pem>]` reads
+  `private/customers/<customer>.toon` (`id`, `title`, `product` (default `inspecto`), `edition`, `orderCodes[N]`, optional
+  `expires` and `nodes`), assembles it (`tools/assemble.mjs --customer`, PA-10b) and writes the Assembly Plan, the customer
+  Offering, a priced bill of materials and a signed entitlement to `target/customers/<customer>/`; with `--bundle`, a copy of the
+  Product bundle trimmed to the plan, with `conf/entitlement.toon` + `.sig`. The key defaults to `private/keys/inspecto-issuer-1.pem`.
+  `--distribution pilot` (PA-10c) also needs the record's `pilot:` block (`template`, and under `poll:` one absolute
+  folder per Pipeline of it) and adds the Space Template `<customer>-pilot` plus a `PILOT.txt` to the bundle.
 - `node tools/pick-addons.mjs` lists the Platform product's Add-ons with their closure, Edition floor and price;
   `--pick a,b --id <id> --write` writes a picked Platform product to `private/products/<id>.toon`, which
   `inspecto/package.ps1 -ProductFile` builds in place of the Platform product it narrows.

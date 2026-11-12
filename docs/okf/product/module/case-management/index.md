@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Case Management — requirement of record](plan.md) |
 | spec | current | [Case Management — specification](spec.md) |
-| architecture | current | [Case Management](architecture-overview.md) |
+| architecture | current | [Case Management](architecture.md) |
 | features | current | [Case Management — features](features-case-management.md) |
 | feature-db | current | [Case Management — feature database](feature-db.md) |
 | user-guide | current | [Case Management — screens](user-guide-case-management.md) |

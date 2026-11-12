@@ -22,7 +22,7 @@ operation is [admin-guide-operations](../../layer/platform/admin-guide-operation
 | `-Dcontrol.cors` | unset | The single allowed CORS origin (a string, not a list; unset disables CORS) |
 | `-Dui.dir` | unset | Directory of the built UI to serve |
 | `-Dassist.write.root` | unset | Enables config write-back; without it mutating routes answer `503` |
-| `-Dspaces.root` | unset | Multi-space root; unset means one `default` Space from the CLI config args ([architecture-multi-space](architecture-multi-space.md)) |
+| `-Dspaces.root` | unset | Multi-space root; unset means one `default` Space from the CLI config args ([architecture](architecture.md)) |
 
 ## Health
 

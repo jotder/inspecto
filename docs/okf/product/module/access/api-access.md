@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Identity and Access — API
 
-Routes for Identity and Access. Design and internals: [Identity and Access architecture](architecture-overview.md).
+Routes for Identity and Access. Design and internals: [Identity and Access architecture](architecture.md).
 
 | Route | Gate | Purpose |
 |---|---|---|

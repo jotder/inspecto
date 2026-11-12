@@ -33,4 +33,4 @@ An add-on over the platform base. Routes live in the host (`AssistRoutes`, `Agen
 The agents hold no write credential of their own; anything that changes state goes through the control plane's
 own gates and audit.
 
-More: [screens](user-guide-ai-assist.md) · [API](api-ai-assist.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-ai-assist.md) · [API](api-ai-assist.md) · [architecture](architecture.md).

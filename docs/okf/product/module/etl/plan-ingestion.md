@@ -675,7 +675,7 @@ It costs nothing, is pinned, and a hand-authored file may still carry it; the re
 | Every `parsing:` key, per frontend, with the refusals | `docs/okf/product/module/engine/spec-parsing-options.md` (`Reference`) | — | §3.3 |
 | The three frontends and the live CSV knobs — ⚠ carries the 4.1 `*.grammar.toon` account | `docs/okf/product/module/engine/spec-parsing-grammar.md` (`Concept`) | — | flagged with this spec |
 | Unpack — placement, DATA, the verdict, the ledger, identity, traps | `docs/okf/product/module/acquire/spec-unpack-stage.md` (`Concept`) | `platform/inspecto-etl/src/main/java/com/gamma/etl/unpack` | §3.5 |
-| Status flow — gauges, ledgers, quarantine, drill-down, the two-facts rule | `docs/okf/product/module/engine/architecture-consignment-status.md` (`Concept`) | — | §3.6 |
+| Status flow — gauges, ledgers, quarantine, drill-down, the two-facts rule | `docs/okf/product/module/engine/architecture.md` (`Concept`) | — | §3.6 |
 | Stage-1 module map, dedup's exit, the at-rest chain, orphan audit | `docs/okf/product/module/engine/architecture-stage1.md` (`Architecture`) | — | §3.2 |
 | `route:` on the poll path, the lane flag, the engagement predicate | `docs/okf/product/module/engine/spec-branch-aware-ingest.md` (`Concept`) | — | §3.2 |
 | The run budget, the broker, the fetch lane | `docs/okf/product/module/engine/spec-consignment-concurrency.md` (`Concept`) | — | bounds |

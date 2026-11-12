@@ -178,7 +178,7 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
 
             expect(el.textContent).not.toMatch(/secured/i);
             expect(el.textContent).not.toMatch(/single sign-on|\bSSO\b/i);
-            expect(text(el.querySelector('h1'))).toBe('Inspecto MFS');
+            expect(text(el.querySelector('h1')), 'SIGNIN-DEMO-HEADLINE-1: no brand pitch, the bare Product name').toBe('Inspecto');
             expect(el.querySelector('h1 + p'), 'T-001: the panel does not repeat the card').toBeNull();
             expect(text(el.querySelector('h2 + p'))).toBe('Choose a user to continue.');
             expect(el.textContent!.match(/Choose a user/g), 'T-001: said once').toHaveLength(1);
@@ -197,7 +197,20 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
 
             const { el } = create({ demoUsers: DEMO, productName: 'Inspecto LA' });
             expect(brand(el)).toBe('Inspecto LA');
-            expect(text(el.querySelector('h1'))).toBe('Inspecto LA MFS');
+            expect(text(el.querySelector('h1'))).toBe('Inspecto LA');
+            await expectNoA11yViolations(el);
+        });
+
+        // SIGNIN-DEMO-HEADLINE-1: a demo headline is the Product's brand.signInTitle, never "<Product> MFS".
+        it('demo sign-in: the Product brand headline, no "MFS"', async () => {
+            const { el } = create({
+                demoUsers: DEMO,
+                productName: 'Inspecto Telco',
+                signInPitch: { title: 'Find the leakage, catch the fraud, close the case.', body: 'Four Apps in one product.' },
+            });
+            expect(text(el.querySelector('h1'))).toBe('Find the leakage, catch the fraud, close the case.');
+            expect(el.textContent).not.toContain('MFS');
+            expect(el.querySelector('h1 + p'), 'T-001: the panel does not repeat the card').toBeNull();
             await expectNoA11yViolations(el);
         });
 

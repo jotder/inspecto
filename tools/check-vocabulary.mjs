@@ -174,8 +174,6 @@ const DOC_ALLOW = {
     // is headed **Selector** now — exactly the `raw.fields[].selector` it renders — so the doc describing it
     // no longer uses a reserved word and needs no allowance. Preferred outcome: an exemption records that a
     // banned word is tolerated somewhere, and every one of them is a small ongoing cost.
-    'docs/okf/product/layer/platform/architecture-change-log.md::bare-flow':
-        'Historical changelog: the entry records the `flow-graph`→`pipeline-graph` directory rename itself.',
 
     // ── root canon (added with the tier, 2026-08-29) ──────────────────────────────────────────────
     // Four files, four SUBJECT-MATTER exemptions. Everything else the new scope found was stale and was

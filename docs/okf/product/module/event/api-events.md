@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Events and event log — API
 
-Routes for Events and event log. Design and internals: [Events and event log architecture](architecture-overview.md).
+Routes for Events and event log. Design and internals: [Events and event log architecture](architecture.md).
 
 | Route | Gate |
 |---|---|

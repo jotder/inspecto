@@ -16,7 +16,7 @@ Service contracts (SPI) are the small interfaces — auth, audit, HTTP routes �
 
 ## What this enables
 
-- Integrators extend Inspecto against stable, narrow contracts — [architecture-layers](../platform/architecture-layers.md)
+- Integrators extend Inspecto against stable, narrow contracts — [platform architecture](../platform/architecture.md)
 
 ## Related hubs
 

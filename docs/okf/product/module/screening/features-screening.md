@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## What it does
 
-Screening matches subjects (a key, a name, an identifier) against [Entity Lists](../scoring/architecture-scoring-entity-lists.md) and keeps
+Screening matches subjects (a key, a name, an identifier) against [Entity Lists](../scoring/architecture.md) and keeps
 a reviewable record of every match a scheduled run finds. Two paths share one matcher:
 
 - **Check** - an ad-hoc, read-shaped call that returns Match Scores and persists nothing.
@@ -25,8 +25,8 @@ notes: [Screening concept](spec.md).
 ## Where it fits
 
 An add-on over the platform base. It reads Entity Lists (`entity-list` module), runs as a Job through the
-[Jobs scheduler](../processor/architecture-jobs-scheduler.md), and on confirm opens an [Incident](../../addon/incidents/architecture-incidents.md) and a
-[Case](../case-management/architecture-overview.md). Bundles without the jar answer the routes with the manifest's `absentMessage`
+[Jobs scheduler](../processor/architecture.md), and on confirm opens an [Incident](../../addon/incidents/architecture.md) and a
+[Case](../case-management/architecture.md). Bundles without the jar answer the routes with the manifest's `absentMessage`
 ("Standard edition and above").
 
-More: [screens](user-guide-screening.md) · [API](api-screening.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-screening.md) · [API](api-screening.md) · [architecture](architecture.md).

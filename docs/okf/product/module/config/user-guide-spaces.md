@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Spaces — screens
 
-Screens for Spaces. Design and internals: [Spaces architecture](architecture-spaces.md).
+Screens for Spaces. Design and internals: [Spaces architecture](architecture.md).
 
 - **Settings → Spaces** (`inspecto-ui/src/app/modules/admin/spaces/spaces.component.ts`): list, create,
   rename, delete, import; the template picker is

@@ -29,4 +29,4 @@ Integration engineers onboarding new feeds, and operators who verify and run the
 
 [acquire](../../module/acquire/index.md) · [connectors-kafka](../../module/connectors-kafka/index.md) · [premiumConnectors](../../addon/premiumConnectors/index.md)
 
-More in this hub: [admin-guide-connectors-runbook](admin-guide-connectors-runbook.md) · [architecture](architecture.md) · [plan-warehouse-targets](plan-warehouse-targets.md) · [spec-connectors](spec-connectors.md) · [user-guide-connections](user-guide-connections.md).
+More in this hub: [admin-guide-connectors-runbook](admin-guide-connectors-runbook.md) · [architecture](architecture.md) · [plan-warehouse-targets](plan-warehouse-targets.md) · [spec-connectors](spec-connectors.md) · [user-guide-connections](user-guide-connections.md)

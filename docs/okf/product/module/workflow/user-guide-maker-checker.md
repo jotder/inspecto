@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Maker-checker (Pending Changes) — screens
 
-Screens for Maker-checker (Pending Changes). Design and internals: [Maker-checker (Pending Changes) architecture](architecture-maker-checker.md).
+Screens for Maker-checker (Pending Changes). Design and internals: [Maker-checker (Pending Changes) architecture](architecture.md).
 
 - **Operations > Pending Changes** (`/pending-changes`, `inspecto-ui/src/app/modules/admin/pending-changes/`):
   waiting or all changes; author, reason, expiry, decision and a line diff. Approve / Decline show only with

@@ -11,7 +11,7 @@ description: >
 
 # Link Analysis showcase Spaces — how they are built
 
-Canonical facts: `docs/okf/product/solution-pack/la-showcase/architecture-showcase-catalogue.md` (pattern,
+Canonical facts: `docs/okf/product/solution-pack/la-showcase/architecture.md` (pattern,
 data generation, gotchas) and each Space's own hub `docs/okf/product/solution-pack/la-<id>/`. Read the
 catalogue before changing a pattern; update it (and the Space hub) in the same change. Demo installs and
 redeploys: `.claude/memory/preview-la-demo.md`.

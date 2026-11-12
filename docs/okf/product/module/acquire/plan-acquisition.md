@@ -44,7 +44,7 @@ acquisition ledger.
 
 ⚠ The boundary that is easy to get wrong: **acquisition never widens to "read from N places at once."**
 Multi-location ingest is composition of existing pieces — see
-[multi-location ingest](architecture-multi-location-ingest.md), which is a `PIP` concern.
+[multi-location ingest](architecture.md), which is a `PIP` concern.
 
 ## 2. Requirements of record
 
@@ -954,7 +954,7 @@ pair is not "reconciled" by flattening one of them.
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| Poll cycle, phases A–F, back-pressure | `docs/okf/product/module/acquire/architecture-framework.md` (`Concept`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | the two-timer / two-guard split, the manual-run overlap gotcha, B4 vs `IntakeGovernor` |
+| Poll cycle, phases A–F, back-pressure | `docs/okf/product/module/acquire/architecture.md` (`Concept`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | the two-timer / two-guard split, the manual-run overlap gotcha, B4 vs `IntakeGovernor` |
 | Connector SPI, 8 schemes, profiles, secrets, workbench, proxy chain | `docs/okf/product/module/connectors/spec-connectors.md` (`Concept`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | stage-then-land, SDK-free auth per store, the four dial-through ships, workbench disciplines |
 | The 14 numbered requirement areas | `docs/okf/product/module/acquire/spec-framework-design.md` (`Reference`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | requirement-of-record wording + the mounted-share security note |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | `docs/okf/product/module/connectors/admin-guide-connectors-runbook.md` (`Reference`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | the copy-pasteable profile shapes and the `curl` verification sequence |

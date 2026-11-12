@@ -16,7 +16,7 @@ real people, businesses or plates.
 
 This page helps you pick one. The screens are the shared studio ones, described in the
 [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). How the catalogue is built and shipped:
-[catalogue architecture](architecture-showcase-catalogue.md); building and boot-testing a release:
+[catalogue architecture](architecture.md); building and boot-testing a release:
 [release guide](admin-guide-showcase-release.md).
 
 ## Where to start
@@ -166,5 +166,5 @@ the industry Spaces land.
 
 ## References
 
-[la-showcase hub](index.md) · [Distribution and install layout](architecture-showcase-catalogue.md#distribution-and-install-layout) ·
+[la-showcase hub](index.md) · [Distribution and install layout](architecture.md#distribution-and-install-layout) ·
 [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md)

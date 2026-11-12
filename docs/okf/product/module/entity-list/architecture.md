@@ -10,7 +10,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Entity Lists — architecture
 
 Every rule in detail: [spec](spec.md). Routes: [api-routes](api-routes.md). The Risk Score side of the
-watch-list feed: [scoring architecture](../scoring/architecture-scoring-entity-lists.md).
+watch-list feed: [scoring architecture](../scoring/architecture.md).
 
 ## Where it sits
 

@@ -27,4 +27,4 @@ Groups and regulators that combine assurance across several entities.
 
 [exchange](../../module/exchange/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

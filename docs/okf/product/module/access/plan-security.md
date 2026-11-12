@@ -656,7 +656,7 @@ the logs were deleted 2026-07-26 before export).
 |---|---|---|---|
 | The whole posture, RBAC R0–R5, ABAC A1–A5, the 2026-07-25 decisions, the boot precondition | `docs/okf/product/module/access/admin-guide-auth-security.md` (`Concept`) | `providers/inspecto-oidc/, providers/inspecto-policy/` | the long-form narrative every row above was distilled from |
 | The Standard module's classes, properties, shading and boot behaviour | `docs/okf/product/module/oidc/architecture.md` (`Concept`) | `providers/inspecto-oidc/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
-| Edition gating as a mechanism; the EDG-01 recipe items | `docs/okf/product/layer/platform/architecture-editions-model.md` (`Concept`) | `pom.xml` | how a module joins a profile and what the compiler cannot see |
+| Edition gating as a mechanism; the EDG-01 recipe items | `docs/okf/product/layer/platform/architecture-editions.md` (`Concept`) | `pom.xml` | how a module joins a profile and what the compiler cannot see |
 | Request dispatch, `PUBLIC_PATHS`, the envelope, error codes | `docs/okf/product/module/processor/api-control-api.md` · `api-v1.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | the contract SEC gates inside |
 | Intra-Space shares and the cross-Space Exchange lifecycle | `docs/okf/product/module/exchange/spec.md` (`Concept`) | `features/inspecto-exchange/` | the `ShareGrant` state machine and the attribute-scope pin |
 | The write-root jail, `PathJail`, `ConfigSafetyValidator` | `docs/okf/product/module/config/spec-config-safety.md` (`Concept`) | `platform/inspecto-config/` | what happens *inside* the root once §3.13 lets a write through |

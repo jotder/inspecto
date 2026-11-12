@@ -27,4 +27,4 @@ Compliance and AML teams.
 
 [screening](../../module/screening/index.md) · [scoringLists](../../addon/scoringLists/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

@@ -1,11 +1,11 @@
 # LA-COLUMN-ROLES-2 — design notes for the three parts that need a decision (2026-11-05)
 
-`LA-COLUMN-ROLES-2` is the deliberate remainder of `LA-COLUMN-ROLES-1` (as built: `architecture.md` §6.15). Of its
+`LA-COLUMN-ROLES-2` is the deliberate remainder of `LA-COLUMN-ROLES-1` (as built: `architecture-backend.md` §6.15). Of its
 four parts, the **Mapping-level override of `carried`** follows from §6.15 and is built without a decision (a Mapping's
 own `columns[].carried`, set in the Mapping form, seeded from the base for a new Mapping and from the Mapping when
 edited). The other three each had a real choice, put to the operator with a recommendation first.
 
-**Operator decisions (2026-11-05): D-1 b, D-2 a, D-3 b.** **All four parts shipped 2026-11-05** (as built: `architecture.md` §6.15).
+**Operator decisions (2026-11-05): D-1 b, D-2 a, D-3 b.** **All four parts shipped 2026-11-05** (as built: `architecture-backend.md` §6.15).
 - **D-1 b:** count / sum / min / max per binding × Measure, plus the per-Entity distribution of each Measure's total
   (GROUP BY per Entity, sampled). The sample size and its cap are stated, and live in the existing limits config
   (`entity_profile.*`); a test proves the sample stays bounded on a large synthetic Dataset.

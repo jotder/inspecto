@@ -29,4 +29,4 @@ An optional feature module; its manifest is
 wire is `inspecto-notify-channels` (`HttpWebhookSinkTransport`, pinned connect). Linked Incidents / Cases are
 resolved through the core `LinkedSubjectProvider` seam that `inspecto-ops` fills.
 
-More: [screens](user-guide-action-requests.md) · [API](api-action-requests.md) · [architecture](architecture-overview.md).
+More: [screens](user-guide-action-requests.md) · [API](api-action-requests.md) · [architecture](architecture.md).

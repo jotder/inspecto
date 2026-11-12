@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # AI assist — screens
 
-Screens for AI assist. Design and internals: [AI assist architecture](architecture-overview.md).
+Screens for AI assist. Design and internals: [AI assist architecture](architecture.md).
 
 Under `inspecto-ui/src/app/modules/admin/`: **Assist** (`assist/`), **Agent chat** (`agent-chat/`),
 **Diagnoses** (`diagnoses/`), **Approvals** (`approvals/`), **Autonomy** (`autonomy/`), **Learning**

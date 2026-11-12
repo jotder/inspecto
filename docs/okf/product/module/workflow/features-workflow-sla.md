@@ -27,6 +27,6 @@ models", `offeringRole: base`); the runtime sweep lives in `features/inspecto-op
 The models are platform base; they are applied to `INCIDENT` and `CASE` objects by `ObjectService` in
 `features/inspecto-ops` (`sweepIncidentSla`), with authored files loaded by `GovernanceRegistry`. Without
 `inspecto-ops` there are no objects to govern and `GET /workflows/{type}` answers 503. See
-[incidents](../../addon/incidents/architecture-incidents.md) and [case-management](../case-management/architecture-overview.md).
+[incidents](../../addon/incidents/architecture.md) and [case-management](../case-management/architecture.md).
 
-More: [screens](user-guide-workflow-sla.md) · [API](api-workflow-sla.md) · [architecture](architecture-workflow-sla.md).
+More: [screens](user-guide-workflow-sla.md) · [API](api-workflow-sla.md) · [architecture](architecture.md).

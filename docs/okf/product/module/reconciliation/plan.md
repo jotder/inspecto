@@ -21,7 +21,7 @@ scheduling, and promotion of a Break to an Incident
 ## Built
 
 - The Board, N-way compare and Break lifecycle (`open | assigned | resolved | auto_closed`), the `recon.run` Job
-  Type and `POST /recon/promote` ([architecture](architecture-overview.md); [spec](spec.md);
+  Type and `POST /recon/promote` ([architecture](architecture.md); [spec](spec.md);
   [user guide](user-guide-reconciliation.md)).
 - `RECON-CARDINALITY-1` tier 1 (2026-09-12): asserted cardinality; a violation is a `cardinality_break`
   (decided 2026-09-13, [recon-cardinality-plan § 7](../../../../archived-documents/plans-archive/recon-cardinality-plan.md)).

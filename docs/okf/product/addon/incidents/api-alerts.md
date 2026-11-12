@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Alerts — API
 
-Routes for Alerts. Design and internals: [Alerts architecture](architecture-alerts.md).
+Routes for Alerts. Design and internals: [Alerts architecture](architecture.md).
 
 All in `AlertRoutes.java`:
 

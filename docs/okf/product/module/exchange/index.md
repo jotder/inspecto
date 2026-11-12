@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Exchange — requirement of record](plan.md) |
 | spec | current | [Exchange — Cross-Space Sharing](spec.md) |
-| architecture | current | [Exchange (multi-entity sharing)](architecture-overview.md) |
+| architecture | current | [Exchange (multi-entity sharing)](architecture.md) |
 | features | current | [Exchange (multi-entity sharing) — features](features-exchange.md) |
 | feature-db | current | [Exchange (publication and ingestion contracts) — feature database](feature-db.md) |
 | user-guide | current | [Exchange (multi-entity sharing) — screens](user-guide-exchange.md) |

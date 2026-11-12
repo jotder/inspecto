@@ -1,0 +1,8 @@
+pipeline: payments
+inputs[2]: PAYMENTS_20260801.psv,PAYMENTS_20260802.psv
+expect:
+  rows: 12
+  rejects: 0
+  columns[2]{column,check,value}:
+    PAYMENT_ID,not_null,""
+    PAYMENT_ID,distinct,12

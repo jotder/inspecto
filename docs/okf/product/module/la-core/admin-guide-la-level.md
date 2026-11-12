@@ -9,7 +9,7 @@ timestamp: 2026-10-22T00:00:00Z
 # The Link Analysis level, the Investigations add-on and the masking default
 
 *As built 2026-10-22 (`LA-ONBOARD-1` phase 1: OB-5, OB-6, OB-10). Design and seams:
-[architecture](architecture.md) §8 "Trust vs level"; placement: [`EDITIONS.md`](../../../../EDITIONS.md).*
+[architecture-backend](architecture-backend.md) §8 "Trust vs level"; placement: [`EDITIONS.md`](../../../../EDITIONS.md).*
 
 Three things are decided separately:
 

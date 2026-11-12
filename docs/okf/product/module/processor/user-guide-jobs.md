@@ -123,7 +123,7 @@ runtime Expressions*. Design of record:
 
 ## Screens
 
-Screens for Jobs and scheduler. Design and internals: [Jobs and scheduler architecture](architecture-jobs-scheduler.md).
+Screens for Jobs and scheduler. Design and internals: [Jobs and scheduler architecture](architecture.md).
 
 - **Jobs** (`inspecto-ui/src/app/modules/admin/jobs/jobs.component.ts`): schedules mode (list,
   trigger, enable, reschedule, edit, delete) and reporting mode (`/jobs/metrics`, `/jobs/runs`,

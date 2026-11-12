@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Workflow and SLA — screens
 
-Screens for Workflow and SLA. Design and internals: [Workflow and SLA architecture](architecture-workflow-sla.md).
+Screens for Workflow and SLA. Design and internals: [Workflow and SLA architecture](architecture.md).
 
 Settings → Incident governance:
 

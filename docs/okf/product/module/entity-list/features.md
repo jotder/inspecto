@@ -28,4 +28,4 @@ Fraud and assurance analysts maintaining watch lists, and reviewers approving li
 
 [scoringLists](../../addon/scoringLists/index.md) · [scoring](../../module/scoring/index.md) · [screening](../../module/screening/index.md) · [entity-store](../../module/entity-store/index.md)
 
-More in this hub: [feature-db](feature-db.md) · [spec](spec.md).
+More in this hub: [feature-db](feature-db.md) · [spec](spec.md)

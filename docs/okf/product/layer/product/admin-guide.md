@@ -66,5 +66,5 @@ gateway and IdP blueprints: [`docs/api/deployment/`](../../../../api/deployment/
 | Something is broken | [troubleshooting](../platform/admin-guide-troubleshooting.md) · `ADVANCED_GUIDE.md` §11 |
 | Known traps | [gotchas](../platform/admin-guide-gotchas.md) |
 | HA / DR drill | [HA-DR drill](../platform/admin-guide-ha-dr-drill.md) |
-| Spaces on disk | [multi-space](../../module/processor/architecture-multi-space.md) |
+| Spaces on disk | [multi-space](../../module/processor/architecture.md) |
 | Seed a UAT environment | [UAT seeding](../platform/admin-guide-uat-seeding.md) |

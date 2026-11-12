@@ -23,10 +23,10 @@ Analysts and pipeline authors who want guided help inside the product, and secur
 - Seven read-only assist skills behind the `/assist` routes, abstain-only policy — [spec-assist-agent](spec-assist-agent.md)
 - Approval gate and dry-run for every mutating action, Role × Capability × Profile policy, append-only audit — [spec-governance](spec-governance.md)
 - Model / provider settings for the assistant and AI-backed features — [user-guide-model-settings](user-guide-model-settings.md)
-- Offline-first agent platform with permissive-only licensing — [architecture-overview](architecture-overview.md)
+- Offline-first agent platform with permissive-only licensing — [architecture](architecture.md)
 
 ## Related hubs
 
 [aiAssist](../../addon/aiAssist/index.md) · [intelligence](../../module/intelligence/index.md) · [agent-hosted](../../module/agent-hosted/index.md)
 
-More in this hub: [architecture-integration](architecture-integration.md) · [architecture-module](architecture-module.md) · [architecture-overview](architecture-overview.md) · [architecture](architecture.md) · [plan-assistant](plan-assistant.md) · [spec-adr-log](spec-adr-log.md) · [spec-assist-agent](spec-assist-agent.md) · [spec-governance](spec-governance.md) · [user-guide-model-settings](user-guide-model-settings.md).
+More in this hub: [architecture](architecture.md) · [plan-assistant](plan-assistant.md) · [spec-adr-log](spec-adr-log.md) · [spec-assist-agent](spec-assist-agent.md) · [spec-governance](spec-governance.md) · [user-guide-model-settings](user-guide-model-settings.md)

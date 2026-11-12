@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Control API (API)](plan-control-api.md) |
 | spec | current | [Component Registry](spec-component-registry.md) · [Decision Rules & the Condition-Tree Evaluator](spec-decision-rules.md) · [Jobs & Scheduling](spec-jobs.md) · [Metadata Bundle & Transportability](spec-metadata-bundle.md) · [Pipeline closure — what belongs to a pipeline](spec-pipeline-closure.md) · [Pipeline identity — rename & save-as-template](spec-pipeline-identity.md) · [Platform Services — the plugin envelope](spec-platform-services.md) · [Query catalog & execution](spec-queries.md) · [Tags — the cross-entity label graph](spec-tags.md) |
-| architecture | current | [Job vs Pipeline Step — capability boundary](architecture-job-vs-step.md) · [Jobs and scheduler](architecture-jobs-scheduler.md) · [Multi-Space Hosting](architecture-multi-space.md) |
+| architecture | current | [Jobs, scheduler and multi-Space](architecture.md) |
 | features | current | [Jobs and scheduler — features](features-jobs-scheduler.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Diagnoses](user-guide-diagnoses.md) · [Jobs](user-guide-jobs.md) |
@@ -38,4 +38,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Queries / BI | demand |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
+| `IMPORT-LOADER-CASE-TOON-1` | P2 | defect | ImportLoaderInventoryTest fails on master: the fixed name case.toon is read by a loader but is neither reserved nor allow-listed (filed 2… | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |

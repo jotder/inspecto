@@ -39,7 +39,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
 ## Consignment coordination
 
 * `CollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) — the per-source ETL
-  entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquire/architecture-framework.md)
+  entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquire/architecture.md)
   phases (remote fetch-and-land; a no-op for a `local` collector), and **`ingest(cfg, onCommit)`** scans the
   inbox → groups into `Consignment`s via `ConsignmentPlanner` — whose audit label is the selected schema's
   `raw.name`, or the literal `schema` for a plugin-ingester pipeline, whose selection carries NO single
@@ -53,7 +53,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   virtual-thread executor bounded by `Semaphore(processing.threads)`. `run()` = `acquire` then `ingest`, the
   self-contained one-shot used by the single-pipeline CLI `main`, `reprocess`, and the service's manual "run
   now". The always-on service instead drives the two halves on **separate timers with separate budgets** — see
-  [acquisition](../acquire/architecture-framework.md). Ingest always walks the local inbox: a remote-fetched file, once
+  [acquisition](../acquire/architecture.md). Ingest always walks the local inbox: a remote-fetched file, once
   landed, is discovered exactly like a locally-pushed one, so `countPending` is now the exact landed backlog
   (no remote approximation).
 * `ConsignmentIngestor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java`) — a thin, stateless
@@ -63,7 +63,7 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   always written (see [quarantine](spec-output-sinks.md)). Markers/fingerprints go **last**, so a FAILED
   Consignment leaves no "already processed" record and its files are rediscovered next poll (retry is
   implicit); what is recorded about a Consignment either way — ledgers, provenance, live gauges, and how
-  an operator audits a failed file or record — is [consignment status flow](architecture-consignment-status.md).
+  an operator audits a failed file or record — is [consignment status flow](architecture.md).
 
 * `MultiCollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
   orchestrator running many `.toon` sources concurrently in one JVM, bounded by `Semaphore(sources.max)`.

@@ -11,7 +11,7 @@ timestamp: 2026-11-08T00:00:00Z
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included; the saved
 Geo View needs the Geo map (Standard and above) and does nothing on Basic. Layout and seams:
-[showcase distribution and install layout](../la-showcase/architecture-showcase-catalogue.md#distribution-and-install-layout)
+[showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`SPACES_DATA_ROOT`).
 
 | Download | File | Unzip into |

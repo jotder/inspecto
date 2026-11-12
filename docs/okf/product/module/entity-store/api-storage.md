@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Storage — API
 
-Routes for Storage. Design and internals: [Storage architecture](architecture-storage.md).
+Routes for Storage. Design and internals: [Storage architecture](architecture.md).
 
 | Route | Purpose |
 |---|---|

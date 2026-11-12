@@ -18,8 +18,8 @@ reusable blueprint that seeds a new Space (Type → Instance). This page also co
 Enabled → Permitted** gates, because the middle gate is a per-Space setting.
 
 The requirement of record is the [Spaces & tenancy capability spec](plan-spaces.md); the hosting
-mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); the module gates are defined in
-[module taxonomy](../../layer/platform/architecture-module-taxonomy.md).
+mechanism is [Multi-Space Hosting](../processor/architecture.md); the module gates are defined in
+[module taxonomy](../../layer/platform/architecture-modules.md).
 
 ## Where it fits
 
@@ -37,4 +37,4 @@ mechanism is [Multi-Space Hosting](../processor/architecture-multi-space.md); th
 | Permitted gate | `ApiContext.withCapability` in `spi/inspecto-http-spi/src/main/java/com/gamma/spi/http/ApiContext.java` |
 | Template catalog | `spaces/_templates/` (one directory per template) |
 
-More: [screens](user-guide-spaces.md) · [API](api-spaces.md) · [architecture](architecture-spaces.md).
+More: [screens](user-guide-spaces.md) · [API](api-spaces.md) · [architecture](architecture.md).

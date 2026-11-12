@@ -95,9 +95,9 @@ Each space is fully isolated: its own service, scheduler, event log, stores, con
   gate re-reads the *raw* URI, so a space-outside path is never an API path at all). An unknown id is a
   `404`; `/health`, `/ready`, `/metrics` stay un-prefixed and server-global; an un-prefixed API path
   resolves the `default` (or sole) space. The wire protocol lives in
-  [multi-space](../processor/architecture-multi-space.md) — do not restate routes here.
+  [multi-space](../processor/architecture.md) — do not restate routes here.
 - **Space CRUD** is server-global and lives on the wire-protocol page — the seven routes are documented
-  in [multi-space](../processor/architecture-multi-space.md); this file covers on-disk layout and `SpaceMigrator`
+  in [multi-space](../processor/architecture.md); this file covers on-disk layout and `SpaceMigrator`
   only.
 - **Single-tenant mode** (no `-Dspaces.root` AND a config/dir passed on the CLI) hosts one `default` space and is
   byte-identical to the pre-spaces behaviour; CRUD returns `409`.

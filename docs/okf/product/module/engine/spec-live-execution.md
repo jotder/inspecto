@@ -32,7 +32,7 @@ shipped 2026-06-18/19):
    through `ProvenanceStores` since 2026-08-12) and run `ConservationCheck` → emit
    `PIPELINE_CONSERVATION_IMBALANCE` events when records are lost at a non-amplifying node. The
    executor also reports its live position per node (`StepProgress`, cleared in a `finally`) — see
-   [consignment status flow](architecture-consignment-status.md).
+   [consignment status flow](architecture.md).
 7. Advance `PipelineWatermarkStore` per source (opt-in incremental mode); register `sink.view` outputs as durable
    `ViewDefinition`s.
 8. Publish a `ConsignmentEvent`, return a `JobResult`.

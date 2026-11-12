@@ -28,4 +28,4 @@ Fraud and AML analysts prioritising work.
 
 [entity-list](../../module/entity-list/index.md) · [scoring](../../module/scoring/index.md) · [screening](../../addon/screening/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

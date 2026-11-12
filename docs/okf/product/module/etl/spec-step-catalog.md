@@ -195,7 +195,7 @@ relation, so nothing disappears unaccounted. ✅ **The INGEST lane keeps it too,
 the batch ledger's `rejected_rows`, and `total_input_rows` includes it, so nothing disappears
 unaccounted on either lane. 🔴 It did not until then: the ledger reported `rejected_count=0` for a file
 that lost a truncated record, with input and output both excluding it, so the counters reconciled while
-the record was missing. See [`consignment-status-flow.md`](../engine/architecture-consignment-status.md). A NULL predicate result drops the row. Mid-branch (inside
+the record was missing. See [`consignment-status-flow.md`](../engine/architecture.md). A NULL predicate result drops the row. Mid-branch (inside
 `route:`) a filter must carry `where:`; a blank predicate or a pre-parse key refuses to arm. At rest the
 legacy pre-map filter (`csv_settings.where`) is refused because the landed store no longer has raw columns.
 
@@ -1949,7 +1949,7 @@ file to `archive/archive/…`).
   [pipeline-config-keys](../config/spec-pipeline-config-keys.md) (who reads every block) ·
   [execution-lanes](../engine/spec-execution-lanes.md) · [catalog-vs-executors](../engine/spec-catalog-vs-executors.md) ·
   [pipeline-editor](user-guide-pipeline-editor.md) (the palette and panes) ·
-  [job-vs-step](../processor/architecture-job-vs-step.md) (why some catalog entries are Jobs, not Steps).
+  [job-vs-step](../processor/architecture.md) (why some catalog entries are Jobs, not Steps).
 
 ## Adding a node type — what is declared once, what is derived, what is legitimately separate (2026-09-15)
 

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-399 test class(es): 156 unit, 243 real-HTTP control-plane, 0 IT.
+403 test class(es): 159 unit, 244 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -249,6 +249,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSpaceTemplateKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateKpiTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) over real HTTP, with an armed Authenticator: a Space Template's KPI pack |
 | `ControlApiSpaceTemplateSeedGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateSeedGateTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠ over real HTTP: EVERY registry kind a Space Template seeds meets its own |
 | `ControlApiSpaceTemplatesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplatesTest.java` | The shipped space-template gallery over real HTTP: {@code GET /spaces/templates} lists |
+| `ControlApiSpaceTestsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTestsTest.java` | SE-6a — {@code GET /tests} and {@code POST /tests/run} (reached as {@code /spaces/{id}/tests…}) over real HTTP |
 | `ControlApiSprintAContractsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSprintAContractsTest.java` | The Sprint A contracts — four routes that used to answer the wrong thing, each proved over real HTTP. |
 | `ControlApiSqlAstTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSqlAstTest.java` | {@code POST /components/sql/ast} — the READ-ONLY structure of author SQL, as DuckDB's own |
 | `ControlApiStaticAndCorsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiStaticAndCorsTest.java` | Tests for the v4.1.0 UI-hosting additions to {@link ControlApi} (both pure-JDK, no new deps): |
@@ -402,6 +403,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `PostgresSchemaPerSpaceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PostgresSchemaPerSpaceTest.java` | Schema-per-space wiring (BACKLOG "Postgres multi-user" P3): the URL derivation and fail-closed rules always run; |
 | `PostgresStateStoreTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java` | DAT-6 — proves the JDBC-backed stores actually run on <b>real PostgreSQL</b>, not just the |
 | `RawJdbcBackendRefusalTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/RawJdbcBackendRefusalTest.java` | A raw {@code jdbc:postgresql:} value in a family's own {@code *.backend} IS the URL and would bypass the |
+| `RealtimeHopSpikeTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/RealtimeHopSpikeTest.java` | PA-9a spike (PRODUCT-ASSEMBLY-1, D-PA38/D-PA39, gate G-RT): how long from an event's arrival to its Alert when a |
 | `RemoteSliceFrontierCommitTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/RemoteSliceFrontierCommitTest.java` | KAFKA-OFFSET-REKEY-1 (design slice 0, stream-consumer-design §2.2): drives the REAL remote path — the |
 | `RepoSpacesConfigValidationTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/RepoSpacesConfigValidationTest.java` | Guards the repo's committed sample spaces ({@code ../spaces/<id>/config} + {@code ../spaces/_templates}): |
 | `RunLeaseContractTest` | `com.gamma.service` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/service/RunLeaseContractTest.java` | <b>The scale-out plan's §7 gate</b> — "one run per pipeline per trigger, across processes". |
@@ -410,6 +412,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ShippedJobStoreKeyNamesARealStoreTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ShippedJobStoreKeyNamesARealStoreTest.java` | A job's {@code store:} key is a <b>data-store id</b>, never a path. It is read at |
 | `SlaSweepModuleGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SlaSweepModuleGateTest.java` | {@code MODULE-REORG-1 P4f}: the SLA sweep tick of {@code CollectorService} consults the Space's module gate. The |
 | `SpaceBootstrapTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceBootstrapTest.java` | Builds one space's runtime from its own {@code config/} directory (the per-space analogue of ServiceBootstrap). |
+| `SpaceCorpusEquivalenceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCorpusEquivalenceTest.java` | SE-0 corpus equivalence gate ({@code docs/superpower/2026-11-11-space-evolution-plan.md} §3): every tracked |
 | `SpaceDataRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDataRootTest.java` | SPACE-DATA-ROOT-1: where a Space's data, audit and DuckDB stores live, and the load-time checks. |
 | `SpaceDiscoveryRuleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDiscoveryRuleTest.java` | Which folders under the Spaces root {@link SpaceManager#discover} admits — real folder trees, no mocks. |
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
@@ -421,6 +424,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpacePartitionTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpacePartitionTest.java` | Static work distribution — scale-out plan §5.3. Which Spaces a pod hosts, and what it does when the |
 | `SpaceRefTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceRefTest.java` | {@code <id>.ref} Space references, booted together with a convention data root (SPACE-DATA-ROOT-1). |
 | `SpaceRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceRootTest.java` | {@link SpaceRoot#under} per-space DB URLs: asking for any DuckDB URL mints {@code <base>/duckdb/} first. |
+| `SpaceTestRunnerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceTestRunnerTest.java` | SE-6a — the case format, its path jail, the run over the SHIPPED demo cases (read in place, nothing written |
 | `StatusProjectionFreshnessTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/StatusProjectionFreshnessTest.java` | Freshness of the DB-backed status projection — the blocker that gated serving the ledgers from a |
 | `StreamLaneSchedulerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/StreamLaneSchedulerTest.java` | The continuous lane's WIRING (ASSURE-PUSH-INGEST-1): a {@code trigger: {type: stream}} remote Pipeline gets a |
 | `TemplateGovernanceExamplesTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/TemplateGovernanceExamplesTest.java` | ASSURE-WORKFLOW-SLA-1 (3): every Space Template ships example SLA policies and Escalation Rules as a labelled, |

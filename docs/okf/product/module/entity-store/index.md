@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Entity store — plan](plan.md) |
 | spec | current | [Entity store — spec](spec.md) |
-| architecture | current | [Storage](architecture-storage.md) |
+| architecture | current | [Storage](architecture.md) |
 | features | current | [Storage — features](features-storage.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Storage — screens](user-guide-storage.md) |

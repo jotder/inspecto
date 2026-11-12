@@ -60,12 +60,12 @@ Five synthetic feeds, each a Pipeline with a Schema under `spaces/_templates/mob
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture-pipelines-steps.md),
-  [Jobs and scheduler](../../module/processor/architecture-jobs-scheduler.md).
-- [Reconciliation](../../module/reconciliation/architecture-overview.md).
-- [Alerts](../../addon/incidents/architecture-alerts.md), [Incidents](../../addon/incidents/architecture-incidents.md).
-- [Scoring and Entity Lists](../../module/scoring/architecture-scoring-entity-lists.md).
-- [Anomaly](../../module/anomaly/architecture-overview.md).
+- [Pipelines and Steps](../../module/etl/architecture.md),
+  [Jobs and scheduler](../../module/processor/architecture.md).
+- [Reconciliation](../../module/reconciliation/architecture.md).
+- [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md).
+- [Scoring and Entity Lists](../../module/scoring/architecture.md).
+- [Anomaly](../../module/anomaly/architecture.md).
 - [Studio BI](../../layer/product/architecture-studio-bi.md).
 - For network investigation of wallets and agents see the separate `la-mobile-money` template on the
   [Link Analysis solution page](../la-showcase/architecture.md).

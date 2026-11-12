@@ -27,4 +27,4 @@ Operations managers accountable for response times.
 
 [ops](../../module/ops/index.md) · [workflow](../../module/workflow/index.md) · [incidents](../../addon/incidents/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

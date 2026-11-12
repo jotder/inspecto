@@ -36,4 +36,4 @@ Shared studio capabilities: [la-showcase features](../la-showcase/features.md) �
 
 [la-showcase](../la-showcase/index.md) · [la-core](../../module/la-core/index.md) · [linkAnalysis](../../addon/linkAnalysis/index.md)
 
-More in this hub: [architecture](architecture.md) · [user-guide](user-guide.md) · [runbook](admin-guide-showcase-runbook.md) · [brochure](brochure.md).
+More in this hub: [architecture](architecture.md) · [user-guide](user-guide.md) · [admin-guide-showcase-runbook](admin-guide-showcase-runbook.md) · [brochure](brochure.md)

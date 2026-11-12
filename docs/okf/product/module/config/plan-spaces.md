@@ -1001,7 +1001,7 @@ Everything under a `SpaceContext` is per Space: `OperationalDb`, `EventStore`, `
 `ComponentStore` / registry, `JobService` (the scheduler). The per-Space **settings documents** live under
 the Space's config root and are bound by `Roles.ATTR_CONFIG_ROOT`, stamped pre-auth by `ControlApi`
 (`:767`): `roles.toon`, `access-policies.toon` (both **fail closed** when unreadable — `SEC` §3.6, §3.10),
-`branding.toon`, `geo.toon`, `icon-map.toon`, `nav-menus.toon` (missing ⇒ shipped defaults), `modules.toon` (`disabled: [feature ids]`, `GET|PUT /settings/modules`, `canAdminister`; missing ⇒ every installed module enabled — the per-Space Enabled gate, MODULE-REORG-1 P2b, see [module-taxonomy](../../layer/platform/architecture-module-taxonomy.md)). Store
+`branding.toon`, `geo.toon`, `icon-map.toon`, `nav-menus.toon` (missing ⇒ shipped defaults), `modules.toon` (`disabled: [feature ids]`, `GET|PUT /settings/modules`, `canAdminister`; missing ⇒ every installed module enabled — the per-Space Enabled gate, MODULE-REORG-1 P2b, see [module-taxonomy](../../layer/platform/architecture-modules.md)). Store
 **backends** are process-global `-D` flags (`-Dinspecto.db=duckdb|postgres`, `-Dstatus.backend`, …) — the
 selection, not the files, is shared, and an unhonourable `postgres` **fails at boot** (`verifySelectable`,
 PG-1). Each Space's root joins the config-path jail as a *discovered* root (`SafetyPolicy.defaultPolicy()` =
@@ -1215,7 +1215,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| `SpaceManager` / `SpaceContext` / `SpaceMigrator`, MDC isolation, the seven CRUD routes and the two 409s | `docs/okf/product/module/processor/architecture-multi-space.md` (`Concept`) | `SpaceManager.java` | §3.1–§3.3 |
+| `SpaceManager` / `SpaceContext` / `SpaceMigrator`, MDC isolation, the seven CRUD routes and the two 409s | `docs/okf/product/module/processor/architecture.md` (`Concept`) | `SpaceManager.java` | §3.1–§3.3 |
 | Bundle v2 end to end — endpoints, apply order, the boundary, `connection` and `enrichment` | `docs/okf/product/module/processor/spec-metadata-bundle.md` (`Concept`) | `BundleRoutes.java` | §3.6 |
 | Offers, grants, snapshots, `_shared/`, D9 | `docs/okf/product/module/exchange/spec.md` (`Concept`) | `features/inspecto-exchange/` | §3.7 |
 | Per-Space file topology, `OperationalDb`, PG-1, the CWD traps | `docs/okf/product/module/engine/spec-db-layer.md` (`Reference`) §4–§5 | `inspecto-engine` | §3.8 |

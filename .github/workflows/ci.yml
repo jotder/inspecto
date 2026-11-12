@@ -304,8 +304,10 @@ jobs:
       # package.ps1 executes; its tests prove each refusal and the plan both existing Products produce.
       # PA-4 (2026-11-10): each host's product.generated.ts (brand + App nav) must be what the definitions generate.
       # PA-6c (2026-11-11): the Add-on picker (tools/pick-addons.mjs) - closure, Edition floor, the narrowed Platform product.
+      # HELM-PRODUCT-VALUES-1 (2026-11-12): `ship.mjs check` - one chart template source (deploy/helm/inspecto), one
+      # committed Chart.yaml + values.yaml per Product (deploy/helm/products/<id>/), no copied template anywhere.
       - name: Guard — Product, App and Industry definitions resolve
-        run: node tools/check-products.mjs && node tools/render-product-hosts.mjs --check && node --test tools/check-products.test.mjs tools/assemble.test.mjs tools/render-product-hosts.test.mjs tools/compose-space.test.mjs tools/telecom-usage.test.mjs tools/check-product-build.test.mjs tools/seed-telco.test.mjs tools/inspecto-app.test.mjs tools/pick-addons.test.mjs tools/entitle.test.mjs
+        run: node tools/check-products.mjs && node tools/render-product-hosts.mjs --check && node tools/ship.mjs check && node --test tools/check-products.test.mjs tools/assemble.test.mjs tools/render-product-hosts.test.mjs tools/compose-space.test.mjs tools/telecom-usage.test.mjs tools/check-product-build.test.mjs tools/seed-telco.test.mjs tools/inspecto-app.test.mjs tools/pick-addons.test.mjs tools/entitle.test.mjs tools/ship.test.mjs
 
       # PA-6b (2026-11-11): the sample partner App, made with the App kit outside apps/ (examples/partner-app), holds the
       # kit's static conformance: it validates and assembles into the Platform product on every Edition that builds it.
@@ -392,7 +394,7 @@ jobs:
       # and Industry packs, covers every one of them, holds no price (prices live only in the gitignored product-map/private/) and no
       # copied technical fact, and claims only an enforcement the build can honour. Reads files only; no build.
       - name: Guard — Product Map items link to real modules and Offerings, and hold no prices
-        run: node tools/check-product-map.mjs && node tools/render-feature-db.mjs --check && node tools/render-tests-inventory.mjs --check && node tools/render-api-routes.mjs --check && node tools/render-product-docs.mjs --check && node tools/check-product-docs.mjs && node --test tools/affected-modules.test.mjs tools/render-feature-db.test.mjs tools/render-tests-inventory.test.mjs tools/render-api-routes.test.mjs tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs
+        run: node tools/check-product-map.mjs && node tools/render-feature-db.mjs --check && node tools/render-tests-inventory.mjs --check && node tools/render-api-routes.mjs --check && node tools/render-product-docs.mjs --check && node tools/check-product-docs.mjs && node --test tools/affected-modules.test.mjs tools/render-feature-db.test.mjs tools/render-tests-inventory.test.mjs tools/render-api-routes.test.mjs tools/check-product-docs.test.mjs tools/check-product-map.test.mjs tools/render-product-map.test.mjs tools/product-map-import.test.mjs tools/customer-build.test.mjs tools/product-documents.test.mjs
 
       # Docs-touched check (PRODUCT-DOCS-HUB-1, ADVISORY — always exits 0): a Product Map Item whose module main code changed in
       # the range but whose hub docs/okf/product/<kind>/<name>/ did not gets a ::warning naming the likely slots. The guards

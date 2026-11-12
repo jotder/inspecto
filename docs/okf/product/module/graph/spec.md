@@ -10,7 +10,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 Module `platform/inspecto-graph`, package `com.gamma.graph`. Plain JDK plus `jackson-databind`; no
 dependency on any other Inspecto module. `module.toon`: `buildRole: platform`, `offeringRole: base`,
-`bindingTime: build` — in every edition. Design and the caller table: [architecture](architecture-overview.md).
+`bindingTime: build` — in every edition. Design and the caller table: [architecture](architecture.md).
 
 ## Types
 

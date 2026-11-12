@@ -22,4 +22,4 @@ Hosted model providers plug external LLM SDKs into the assistant as ModelProvide
 
 [agent](../../module/agent/index.md) · [aiAssist](../../addon/aiAssist/index.md)
 
-More in this hub: [architecture](architecture.md) · [spec](spec.md).
+More in this hub: [architecture](architecture.md) · [spec](spec.md)

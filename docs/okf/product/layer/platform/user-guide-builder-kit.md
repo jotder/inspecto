@@ -73,7 +73,7 @@ template's `README.md` gives its commands. The kinds deploy in two ways:
 A **module** is the in-tree form, for code that ships with an Edition: a Maven module with
 `META-INF/inspecto/module.toon`. The manifest declares its `id`, its `offeringRole`, its `requires.modules`, and
 what it `provides`: features, config kinds, contracts, Job types and routes. `ModuleManifestGuardTest` holds the
-manifests to the code. Read [the module taxonomy](architecture-module-taxonomy.md).
+manifests to the code. Read [the module taxonomy](architecture-modules.md).
 
 Deeper reading:
 - [node types](../../module/engine/spec-node-types.md) (Steps);
@@ -107,7 +107,7 @@ code outside the repo. Its `since` attribute names the Platform version that int
 - **Everything else unmarked** is internal and may change in any release.
 - **No guard yet** holds the marked surface stable between releases.
 
-Read [the layers architecture](architecture-layers.md).
+Read [the layers architecture](architecture.md).
 
 ## 5. The App kit: `tools/inspecto-app.mjs`
 

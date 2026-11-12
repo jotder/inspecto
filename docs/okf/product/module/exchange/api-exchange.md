@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Exchange (multi-entity sharing) — API
 
-Routes for Exchange (multi-entity sharing). Design and internals: [Exchange (multi-entity sharing) architecture](architecture-overview.md).
+Routes for Exchange (multi-entity sharing). Design and internals: [Exchange (multi-entity sharing) architecture](architecture.md).
 
 | Route | Capability (owning Space's role table) |
 |---|---|

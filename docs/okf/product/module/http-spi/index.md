@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [Route module contract — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a pure Java contract with no screens; each route module's screens are documented in its own hub |
-| admin-guide | n/a | nothing to install or configure in this jar; which route modules a bundle carries is an edition choice documented in layer/platform architecture-editions-model.md |
+| admin-guide | n/a | nothing to install or configure in this jar; which route modules a bundle carries is an edition choice documented in layer/platform architecture-editions.md |
 | api | current | [Route module contract — Java API](api.md) |
 | tests | n/a | the module has no test classes of its own; its test tree is the platform test kit (FakeApiContext, RouteModuleContract, ModuleRoutesParity) shipped as a test-jar and exercised by every feature module's RouteModuleContract subclass |
 | brochure | n/a | per edition / solution pack |

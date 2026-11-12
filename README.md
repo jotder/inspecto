@@ -71,7 +71,7 @@ Work lands on `master` — see [`docs/BRANCHING.md`](docs/BRANCHING.md) and the 
 
 - Build, test and packaging: [`spec-build-test.md`](docs/okf/product/layer/platform/spec-build-test.md); what a bundle
   contains, logging and deployment: [operations reference](docs/okf/product/layer/platform/admin-guide-operations-reference.md).
-- Architecture: [platform layers](docs/okf/product/layer/platform/architecture-layers.md) and the
+- Architecture: [platform layers](docs/okf/product/layer/platform/architecture.md) and the
   [Stage-1 ingest design](docs/okf/product/module/engine/architecture-stage1.md); configuration:
   [configuration reference](docs/okf/product/module/config/admin-guide-configuration-reference.md).
 - The Assistant and its skill catalog: [`spec-assist-agent.md`](docs/okf/product/module/agent/spec-assist-agent.md).

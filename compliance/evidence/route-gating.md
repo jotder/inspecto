@@ -412,6 +412,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/tags/rules` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:57` |
 | DELETE | `/tags/rules/([^/]+)` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:58` |
 | POST | `/tags/rules/([^/]+)/apply` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:60` |
+| POST | `/tests/run` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SpaceTestRoutes.java:32` |
 | POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:147` |
 | POST | `/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:45` |
 

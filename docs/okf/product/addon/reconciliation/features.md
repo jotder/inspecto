@@ -27,4 +27,4 @@ Revenue assurance and finance teams.
 
 [reconciliation](../../module/reconciliation/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

@@ -13,13 +13,18 @@
 //         6 a billable item has an orderCode (unique), an enforcement and a billing.model
 //         7 enforcement is possible (D-PM4): `build` only for an item whose every module is optional/provider and named by no other
 //           add-on (a Functionality is never `build`); `enabled-gate` only when every module declares a feature id
+//         8 (PRODUCT-ASSEMBLY-1 PA-10a, D-PA32) a `product`, `app` or `industry` item links its definition (products/<id>.toon,
+//           apps/<id>/app.toon, industries/<id>/industry.toon) by the key of its kind; every definition has an item; a Product
+//           (priced as Edition + Apps) and an Industry (its pack is sold as a Solution pack) are not billable
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseToon } from './check-offerings.mjs';
 
-export const KINDS = ['layer', 'module', 'functionality', 'addon', 'solution-pack', 'edition'];
+export const KINDS = ['layer', 'module', 'functionality', 'addon', 'solution-pack', 'edition', 'product', 'app', 'industry'];
+/** PA-10a (D-PA32): the assembly kinds, each linked to its definition by the key of the same name. */
+export const DEFINITION_KINDS = { product: 'products/<id>.toon', app: 'apps/<id>/app.toon', industry: 'industries/<id>/industry.toon' };
 export const VOCAB = {
     billable: ['true', 'false'],
     enforcement: ['build', 'enabled-gate', 'contract', 'runtime'],
@@ -28,8 +33,10 @@ export const VOCAB = {
     status: ['planned', 'preview', 'ga', 'deprecated'],
 };
 const ALLOWED = new Set(['id', 'kind', 'title', 'parent', 'module', 'offering', 'offeringAddon', 'template', 'industryPack', 'billable',
-    'orderCode', 'enforcement', 'billing', 'billing.model', 'support', 'support.tier', 'support.owner', 'support.runbook', 'status', 'docs']);
+    'orderCode', 'enforcement', 'billing', 'billing.model', 'support', 'support.tier', 'support.owner', 'support.runbook', 'status', 'docs',
+    'product', 'app', 'industry']);
 
+const an = (word) => (/^[aeiou]/.test(word) ? 'an' : 'a');
 const flat = (o, pre = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v)
     ? [[pre + k, v], ...flat(v, `${pre}${k}.`)] : [[pre + k, v]]));
 
@@ -64,6 +71,13 @@ export function check(files, world) {
         if (it.template !== undefined && !templates.includes(it.template)) out.push(`${r}: template '${it.template}' is not under spaces/_templates`);
         if (it.industryPack !== undefined && !industryPacks.includes(it.industryPack)) out.push(`${r}: industryPack '${it.industryPack}' does not exist`);
         if (it.docs !== undefined && !docExists(it.docs)) out.push(`${r}: docs '${it.docs}' does not exist`);
+        for (const [k, where] of Object.entries(DEFINITION_KINDS)) {
+            if (it[k] !== undefined && !(world.definitions?.[k] ?? []).includes(it[k])) out.push(`${r}: ${k} '${it[k]}' has no ${where.replace('<id>', it[k])}`);
+            if (it.kind === k && it[k] === undefined) out.push(`${r}: ${an(k)} ${k} item names its definition (${k}: <id>)`);
+            if (it[k] !== undefined && it.kind !== k) out.push(`${r}: only ${an(k)} ${k} item links ${k}:`);
+        }
+        if ((it.kind === 'product' || it.kind === 'industry') && it.billable === 'true')
+            out.push(`${r}: ${an(it.kind)} ${it.kind} is not billable (${it.kind === 'product' ? 'a Product is priced as its Edition plus its Apps' : "an Industry's pack is sold as a Solution pack"}, D-PA32)`);
         if ((it.kind === 'module' || it.kind === 'functionality') && it.parent === undefined) out.push(`${r}: a ${it.kind} needs a parent`);
         if (it.kind === 'functionality' && it.module === undefined) out.push(`${r}: a functionality needs a module`);
         if (it.parent !== undefined) {
@@ -104,6 +118,8 @@ export function check(files, world) {
     for (const n of Object.keys(addons)) if (!has((i) => i.offeringAddon === n)) out.push(`add-on '${n}' has no addon item`);
     for (const t of templates) if (!has((i) => i.template === t)) out.push(`Space Template '${t}' has no solution-pack item`);
     for (const p of industryPacks) if (!has((i) => i.industryPack === p)) out.push(`Industry pack '${p}' has no solution-pack item`);
+    for (const [k, where] of Object.entries(DEFINITION_KINDS))
+        for (const id of world.definitions?.[k] ?? []) if (!has((i) => i.kind === k && i[k] === id)) out.push(`${where.replace('<id>', id)} has no ${k} item (run tools/product-map-seed.mjs)`);
     return out;
 }
 
@@ -126,7 +142,18 @@ export function gather(root) {
         templates: readdirSync(tdir).filter((t) => existsSync(join(tdir, t, 'template.toon'))),
         industryPacks: [...new Set(ls('*META-INF/inspecto/industry-packs/*').map((p) => /industry-packs\/([^/]+)\//.exec(p)?.[1]).filter(Boolean))],
         docExists: (p) => existsSync(join(root, p)),
+        definitions: definitions(root),
     }];
+}
+
+/** PA-10a: the first-party assembly definitions by kind - { product: [ids], app: [ids], industry: [ids] }. */
+export function definitions(root) {
+    const sub = (d, f) => (existsSync(join(root, d)) ? readdirSync(join(root, d), { withFileTypes: true }).filter((e) => e.isDirectory() && existsSync(join(root, d, e.name, f))).map((e) => e.name).sort() : []);
+    return {
+        product: existsSync(join(root, 'products')) ? readdirSync(join(root, 'products')).filter((n) => n.endsWith('.toon')).map((n) => n.slice(0, -5)).sort() : [],
+        app: sub('apps', 'app.toon'),
+        industry: sub('industries', 'industry.toon'),
+    };
 }
 
 function main() {

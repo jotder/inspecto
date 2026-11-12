@@ -223,7 +223,7 @@ Decisions GE-6, GE-8, GE-9 and GE-11 of [`la-grow-exclude-plan.md`](../../../../
   keeps serving its members (an authoring decision; the confirm already says masking does not apply to it).
 - **In Link Analysis** the sealed list carries `visibility: restricted`, a new Investigation applies every auto-apply list as
   its first steps, and Investigation answers hide the members and round the removed counts (nearest 5, never below 5, 0
-  stays 0, `EntityListFacts.roundedCount`): la-core [architecture §6.8](../la-core/architecture.md).
+  stays 0, `EntityListFacts.roundedCount`): la-core [architecture-backend §6.8](../la-core/architecture-backend.md).
 - **Not done (deliberate):** the Parquet sidecar of a restricted list is written like any other (it is under the data root,
   not a served route); the Pending Change shown to an approver lists the proposed keys as for any list.
 - Tests: `ControlApiEntityListCategoryTest` (5: attributes recorded and refused, the attributes route and time travel, 503,

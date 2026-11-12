@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)](plan-predictive-analytics.md) · [Anomaly Detection — plan](plan.md) |
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
-| architecture | current | [Anomaly Detection](architecture-overview.md) |
+| architecture | current | [Anomaly Detection](architecture.md) |
 | features | current | [Anomaly Detection — features](features-anomaly.md) |
 | feature-db | current | [Anomaly Detection — feature database](feature-db.md) |
 | user-guide | current | [Anomaly Detection — screens](user-guide-anomaly.md) |

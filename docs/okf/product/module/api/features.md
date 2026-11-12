@@ -22,4 +22,4 @@ Public API annotations mark which Java surfaces are intended to stay stable for 
 
 [platform](../../layer/platform/index.md) · [spi](../../layer/spi/index.md)
 
-More in this hub: [plan-api-stability](plan-api-stability.md).
+More in this hub: [plan-api-stability](plan-api-stability.md)

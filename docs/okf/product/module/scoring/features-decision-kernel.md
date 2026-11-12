@@ -30,4 +30,4 @@ Engine base (`inspecto-engine`) plus control-plane routes. The browser twin is
 and a backend count agree. The `Conditions` text notation (Access Policies only) is separate; compiling it into
 the tree was declined (see [module reorganisation decisions](../../layer/platform/spec-module-reorg-decisions.md)).
 
-More: [screens](user-guide-decision-kernel.md) · [API](api-decision-kernel.md) · [architecture](architecture-decision-kernel.md).
+More: [screens](user-guide-decision-kernel.md) · [API](api-decision-kernel.md) · [architecture](architecture.md).

@@ -61,5 +61,5 @@ come from the env var `api.key.ref` names. Failure diagnoses are kept in memory.
 | `POST /assist/settings` 400 with a `baseUrl` | `anthropic` and `gemini` always use their vendor endpoint |
 | Key lost after restart | Keys posted through the API are not persisted; set the env var named by `api.key.ref` |
 
-More: [AI assist — limits](../intelligence/architecture-overview.md),
+More: [AI assist — limits](../intelligence/architecture.md),
 [Governance](spec-governance.md).

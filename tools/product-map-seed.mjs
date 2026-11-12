@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseToon } from './check-offerings.mjs';
+import { definitions } from './check-product-map.mjs';
 
 const LAYER_TITLE = {
     spi: 'Service contracts (SPI)', platform: 'Platform', features: 'Feature modules', la: 'Link Analysis modules',
@@ -90,6 +91,16 @@ export function seed(root) {
             billing: { model: 'flat' }, support: { tier: 'standard' }, status: 'ga',
         });
     }
+    // PA-10a (D-PA32): one item per Product, App and Industry definition. An App is sold (build: a customer build leaves an App
+    // out unless bought); a Product is priced as its Edition plus its Apps and an Industry's pack is sold as a Solution pack.
+    const defs = definitions(root);
+    const titleOf = (f) => unquote(parseToon(readFileSync(join(root, f), 'utf8')).title);
+    for (const id of defs.product) put('product', id, { title: titleOf(`products/${id}.toon`) || id, product: id, billable: false, status: 'ga' });
+    for (const id of defs.app) {
+        put('app', id, { title: titleOf(`apps/${id}/app.toon`) || id, app: id, billable: true, orderCode: code('APP', id), enforcement: 'build',
+            billing: { model: 'flat' }, support: { tier: 'standard' }, status: 'ga' });
+    }
+    for (const id of defs.industry) put('industry', id, { title: titleOf(`industries/${id}/industry.toon`) || id, industry: id, billable: false, status: 'ga' });
     return items;
 }
 

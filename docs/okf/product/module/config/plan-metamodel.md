@@ -499,7 +499,7 @@ A draft is server state (an inactive pipeline); "⚠ Do not implement" stands in
 | `schema_file` / `grammar` / `mapping` resolution and the jail | `docs/okf/product/module/config/spec-config-safety.md` (`Concept`) | `platform/inspecto-config/` | §3.7 |
 | Draft lifecycle, previews, the register pair, Reference production | `docs/okf/product/module/processor/api-onboarding-authoring.md` (`Seam`) | — | §3.8 |
 | Bundle refs, `APPLY_ORDER`, `ComponentIntegrity` in the import pre-check | `docs/okf/product/module/processor/spec-metadata-bundle.md` (`Concept`) | `BundleRoutes.java` | §3.4 |
-| The layer table naming `catalog` as L2 | `docs/okf/product/layer/platform/architecture-layers.md` (`Architecture`) | — | the one structural line on the read model |
+| The layer table naming `catalog` as L2 | `docs/okf/product/layer/platform/architecture.md` (`Architecture`) | — | the one structural line on the read model |
 | Catalog tabs, resolve, the Data Browser | `docs/okf/product/layer/product/user-guide-catalog.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/catalog` | §3.9 |
 | Onboarding as the editor's checklist; stream bundle import | `docs/okf/product/layer/product/user-guide-onboarding.md` (`Feature`) | — | §3.8 |
 | The schema / mapping grids, the compatibility gate's UI | `docs/okf/product/module/etl/user-guide-schema-mapping.md` (`Feature`) | — | §3.7 |

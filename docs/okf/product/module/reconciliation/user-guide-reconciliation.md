@@ -565,7 +565,7 @@ review sheet: [`reviews/reconciliation.md`](../../../../archived-documents/super
 
 ## Screens
 
-Screens for Reconciliation. Design and internals: [Reconciliation architecture](architecture-overview.md).
+Screens for Reconciliation. Design and internals: [Reconciliation architecture](architecture.md).
 
 Route `/reconciliation` (`inspecto-ui/src/app/modules/admin/reconciliation/reconciliation.routes.ts`):
 

@@ -10,7 +10,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Link analysis PostgreSQL store - architecture
 
 Layer overview: [layer/la architecture](../../layer/la/architecture.md). Store comparison (filesystem versus PostgreSQL):
-[la-core architecture](../la-core/architecture.md) §3.2. Class detail: [spec](spec.md).
+[la-core architecture-backend](../la-core/architecture-backend.md) §3.2. Class detail: [spec](spec.md).
 
 ## How it plugs in
 

@@ -1,0 +1,13 @@
+id: app.link-analysis
+kind: app
+title: Link Analysis
+app: link-analysis
+billable: true
+orderCode: INS-APP-LINK-ANALYSIS
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/app/link-analysis/index.md

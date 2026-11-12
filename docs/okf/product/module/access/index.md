@@ -17,7 +17,7 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [Security (SEC)](plan-security.md) |
 | spec | current | [Access policy — spec](spec.md) |
-| architecture | current | [Identity and Access](architecture-overview.md) |
+| architecture | current | [Identity and Access](architecture.md) |
 | features | current | [Identity and Access — features](features-access.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Identity and Access — screens](user-guide-access.md) |

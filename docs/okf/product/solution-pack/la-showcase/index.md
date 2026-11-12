@@ -17,7 +17,7 @@ tags: [product-item, solution-pack]
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Link Analysis showcase catalogue — architecture](architecture-showcase-catalogue.md) · [Link Analysis](architecture.md) |
+| architecture | current | [Link Analysis showcase](architecture.md) |
 | features | current | [Link Analysis showcase — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Link Analysis showcase catalogue — user guide](user-guide-showcase-catalogue.md) · [Link Analysis showcase — user guide](user-guide.md) |

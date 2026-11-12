@@ -16,7 +16,7 @@ dependencies on both sides; **v2** (R6, shipped 2026-07-06) adds `items[].refs` 
 canonical JSON), and top-level `requires` (the deduped external refs — the bundle's contract with the target).
 v1 files stay importable (refs/provenance optional ⇒ derived on the target). Schema:
 [`metadata-bundle.schema.json`](../../../../api/schemas/metadata-bundle.schema.json). Distinct from the
-**Space zip bundle** (whole-space clone, [multi-space](architecture-multi-space.md)).
+**Space zip bundle** (whole-space clone, [multi-space](architecture.md)).
 
 ## Backend endpoints (SPC-4, shipped 2026-07-07)
 
