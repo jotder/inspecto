@@ -248,7 +248,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
             for (Workflow w : load(configPaths, "_workflow.toon", p -> Workflow.load(p).validated(), "workflow")) service.registerWorkflow(w);
             // Add-on object-type behaviour (MODULE-REORG-P7): an installed module loads its own config kinds here
             // (inspecto-case-management reads *_caserule.toon). Fail-soft, like every loader above.
-            for (ObjectEngineExtension x : java.util.ServiceLoader.load(ObjectEngineExtension.class)) {
+            for (ObjectEngineExtension x : com.gamma.module.EntitledServices.load(ObjectEngineExtension.class)) {
                 try {
                     x.loadConfigs(service, configPaths);
                 } catch (RuntimeException e) {

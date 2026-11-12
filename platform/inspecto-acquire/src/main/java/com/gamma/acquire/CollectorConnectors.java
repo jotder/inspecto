@@ -6,7 +6,6 @@ import com.gamma.etl.PipelineConfig;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
-import java.util.ServiceLoader;
 
 /**
  * Resolves the {@link CollectorConnector} for a pipeline from its {@code source.connector} scheme.
@@ -31,7 +30,7 @@ public final class CollectorConnectors {
     public static void validate(ConnectionProfile profile) {
         String scheme = profile.connector();
         if (scheme == null || scheme.isBlank() || scheme.equalsIgnoreCase("local")) return;
-        for (CollectorConnectorFactory f : ServiceLoader.load(CollectorConnectorFactory.class)) {
+        for (CollectorConnectorFactory f : com.gamma.module.EntitledServices.load(CollectorConnectorFactory.class)) {
             if (f.scheme().equalsIgnoreCase(scheme)) { f.validate(profile); return; }
         }
     }
@@ -45,7 +44,7 @@ public final class CollectorConnectors {
                 ? ConnectionRegistry.find(cfg.collector().connection()).orElse(null)
                 : null;
         if (profile != null) requireEgress(EgressGate.current(), profile);
-        for (CollectorConnectorFactory f : ServiceLoader.load(CollectorConnectorFactory.class)) {
+        for (CollectorConnectorFactory f : com.gamma.module.EntitledServices.load(CollectorConnectorFactory.class)) {
             if (f.scheme().equalsIgnoreCase(scheme)) return f.create(cfg, profile);
         }
         throw new IllegalArgumentException(

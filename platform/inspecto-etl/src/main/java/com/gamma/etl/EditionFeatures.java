@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -295,7 +294,7 @@ public final class EditionFeatures {
     private static Set<String> discover() {
         Set<String> found = new HashSet<>();
         try {
-            for (EditionFeatureProvider p : ServiceLoader.load(EditionFeatureProvider.class)) found.addAll(p.features());
+            for (EditionFeatureProvider p : com.gamma.module.EntitledServices.load(EditionFeatureProvider.class)) found.addAll(p.features());
         } catch (ServiceConfigurationError | LinkageError unloadable) {
             // absent, not fatal: the gate then refuses, which is the safe direction
         }

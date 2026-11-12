@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-404 test class(es): 159 unit, 245 real-HTTP control-plane, 0 IT.
+405 test class(es): 160 unit, 245 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -271,6 +271,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `DatasetNewColumnsLocalDayTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetNewColumnsLocalDayTest.java` | DATES-ONE-ZONE-1 (Basic live check 2026-11-06): the arrivals list showed a file received at {@code 2026-11-06 |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |
+| `EntitledLoaderFamiliesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntitledLoaderFamiliesTest.java` | ENTITLEMENT-SPI-NARROWING-1: each extension-point family skips a provider whose module the signed entitlement leaves out. |
 | `EntityShapesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntityShapesTest.java` | ENTITY-TYPE-CATALOG-1 P1: Add data proposes a column's Entity Type from the SPACE's types' value shapes, not from a list |
 | `ExchangeAttributeScopeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ExchangeAttributeScopeTest.java` | SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): nothing stamped on the exchange by one request may be readable |
 | `FindingJsonShapeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/FindingJsonShapeTest.java` | The {@link Finding} diagnostic contract (authoring-residuals R1) through the REAL serializer the |

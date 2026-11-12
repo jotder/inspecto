@@ -361,6 +361,27 @@ public final class Entitlements {
         return providers.isEmpty() || providers.stream().anyMatch(Entitlements::moduleEntitled);
     }
 
+    /**
+     * {@code ENTITLEMENT-SPI-NARROWING-1}: whether a {@code ServiceLoader} provider of class {@code type} may load. False only
+     * when a file is present and every module whose jar carries {@code type} is one it leaves out. A class in a jar that
+     * carries no module manifest (the JDK, a third-party library, a Job pack, a test class) is not a module's, so it loads.
+     * {@link EntitledServices} is the loader every extension point uses.
+     */
+    public static boolean providerEntitled(Class<?> type) {
+        if (current().isEmpty()) return true;
+        List<ModuleManifest> owners = modulesOf(type);
+        return owners.isEmpty() || owners.stream().anyMatch(Entitlements::moduleEntitled);
+    }
+
+    private static final Map<String, List<ModuleManifest>> BY_CODE_SOURCE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** The modules whose jar (or classes directory) carries {@code type}; empty for a class no module manifest sits beside. */
+    public static List<ModuleManifest> modulesOf(Class<?> type) {
+        java.security.CodeSource src = type.getProtectionDomain().getCodeSource();
+        if (src == null || src.getLocation() == null) return List.of();
+        return BY_CODE_SOURCE.computeIfAbsent(src.getLocation().toExternalForm(), k -> ModuleManifests.at(src.getLocation()));
+    }
+
     /** Whether the entitlement lists Add-on {@code addon}; true without a file. */
     public static boolean addonEntitled(String addon) {
         return current().map(e -> e.addons().contains(addon)).orElse(true);

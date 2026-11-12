@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-100 test file(s). Run one, or all:
+101 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -30,6 +30,7 @@ node --test tools/
 | `tools/check-doc-routes.test.mjs` |  |
 | `tools/check-docs-touched.test.mjs` | Fixture test for tools/check-docs-touched.mjs. Run: node --test tools/check-docs-touched.test.mjs |
 | `tools/check-engine-names-no-la.test.mjs` | Fixture test for tools/check-engine-names-no-la.mjs. Run: node --test tools/check-engine-names-no-la.test.mjs |
+| `tools/check-entitled-loaders.test.mjs` | Fixture test for tools/check-entitled-loaders.mjs: the real repo is green, and each planted hole turns it red. |
 | `tools/check-family-count.test.mjs` | Negative fixtures for tools/check-family-count.mjs. Run: node --test tools/check-family-count.test.mjs |
 | `tools/check-jar-signatures.test.mjs` | Fixtures for tools/check-jar-signatures.mjs (P3h per-jar signing). Run: node --test tools/check-jar-signatures.test.mjs |
 | `tools/check-launchers.test.mjs` | Negative fixtures for tools/check-launchers.mjs. Run: node --test tools/check-launchers.test.mjs |

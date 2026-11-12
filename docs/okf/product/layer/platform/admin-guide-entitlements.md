@@ -22,7 +22,23 @@ home (D-PA22, product assembly plan §12).
   - `/bootstrap` reports its features false, with that reason in `featureReasons`, so the screens hide it;
   - `/modules` lists it `INERT` with that reason, and every module that requires it goes inert too;
   - an App whose modules are inert drops out of the Product's nav;
-  - its Job types are not registered, so a Job of that type is refused as an unknown type.
+  - its Job types are not registered, so a Job of that type is refused as an unknown type;
+  - its other extension points do not load (`ENTITLEMENT-SPI-NARROWING-1`): Decision Rule Consequences, step kinds and
+    Pipeline node types, Collector and export connectors, maintenance tasks, boot hooks, notification channels, parsers,
+    decompressors, secrets providers and the rest. A Decision Rule whose Consequence belongs to the module reports it
+    `unavailable`, saying the module is "not in this installation's entitlement", and nothing fires.
+
+  A provider belongs to the module whose `module.toon` sits in the same jar. A class in a jar with no module manifest
+  (the JDK, a third-party library, a Job pack) is nobody's module and always loads. Most extension points decide when
+  they load, at boot, so a renewal that changes the modules list reaches them at the next restart. Routes and
+  Consequences are checked on each use, so a renewal reaches them at once.
+
+  **What an entitlement never closes.** Some loaders stay open on purpose, because closing them would make the install
+  less safe, never smaller: the Authenticator, the access decider and the durable Investigation store (the fail-closed
+  slots), the audit trail, row masking for exported reports and the Link Analysis masking default. The ASN.1 library's
+  own transform functions also stay open; the library reaches Inspecto only through the Telecom parser, which is
+  narrowed. `tools/check-entitled-loaders.mjs` lists each with its reason, and fails CI when a new `ServiceLoader.load`
+  bypasses `com.gamma.module.EntitledServices`.
 - **The Investigations Add-on** follows the file's `addons` (`laInvestigations`). The install setting is ignored
   while a file is installed.
 - **Refused at boot,** naming the file:
@@ -121,12 +137,12 @@ customer honest. It is not tamper-proof: the trial flag is in `lib/product.json`
 ## Not yet
 
 - **The node count** is recorded and shown, not enforced (D-PA22).
-- **Only part of the surface is narrowed.** A left-out module's routes, features, Job types and module state are
-  closed. Its other extension points still load from the classpath: Consequences, step kinds, Collector connectors,
-  maintenance tasks and boot hooks. That is `ENTITLEMENT-SPI-NARROWING-1` on the board.
 
 ## References
 
 - The design and decisions: `docs/superpower/2026-11-10-product-assembly-plan.md` §11 (PA-7) and §12 (D-PA22…D-PA25).
-- Code: `com.gamma.module.Entitlements` (`platform/inspecto-util`), `tools/entitle.mjs`. Tests: `EntitlementsTest`,
-  `ControlApiEntitlementTest` (`features/inspecto-screening`), `tools/entitle.test.mjs`.
+- Code: `com.gamma.module.Entitlements` and `EntitledServices` (`platform/inspecto-util`), `tools/entitle.mjs`,
+  `tools/check-entitled-loaders.mjs`. Tests: `EntitlementsTest`, `ModuleManifestsTest`, `ControlApiEntitlementTest`
+  (`features/inspecto-screening`), `EntitledLoaderFamiliesTest` (`inspecto`), the Decision Rule test in
+  `ControlApiActionRequestsTest` (`features/inspecto-action-requests`), `tools/entitle.test.mjs`,
+  `tools/check-entitled-loaders.test.mjs`.

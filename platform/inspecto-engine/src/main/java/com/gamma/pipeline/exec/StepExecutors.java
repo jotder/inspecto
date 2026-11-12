@@ -9,7 +9,6 @@ import com.gamma.util.RunLog;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -61,7 +60,7 @@ public final class StepExecutors {
 
     private static Map<String, Registration> load() {
         Map<String, Registration> m = new LinkedHashMap<>();
-        for (StepExecutor e : ServiceLoader.load(StepExecutor.class)) m.put(e.type(), new Registration(e, null, Grant.NONE));
+        for (StepExecutor e : com.gamma.module.EntitledServices.load(StepExecutor.class)) m.put(e.type(), new Registration(e, null, Grant.NONE));
         return Map.copyOf(m);
     }
 

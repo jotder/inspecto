@@ -68,9 +68,25 @@ public final class OptionalSpi {
 
     /**
      * Every loadable provider of {@code spi}, in {@link ServiceLoader} order. Providers that cannot be
-     * loaded are skipped with one warning apiece; the ones that can are returned.
+     * loaded are skipped with one warning apiece; the ones that can are returned. A provider whose module the
+     * install's signed entitlement leaves out is skipped too ({@code ENTITLEMENT-SPI-NARROWING-1},
+     * {@link com.gamma.module.EntitledServices}).
      */
     public static <T> List<T> all(Class<T> spi) {
+        return discover(spi, true);
+    }
+
+    /**
+     * As {@link #all}, WITHOUT the entitlement filter: every loadable provider on the classpath. Only for a loader whose
+     * providers are gated per use instead - the control plane's {@code RouteModule}s, whose routes answer 503 per request
+     * while the entitlement leaves their module out, so a renewed entitlement opens them without a restart.
+     * {@code tools/check-entitled-loaders.mjs} lists the files allowed to call it.
+     */
+    public static <T> List<T> allInstalled(Class<T> spi) {
+        return discover(spi, false);
+    }
+
+    private static <T> List<T> discover(Class<T> spi, boolean entitledOnly) {
         List<T> found = new ArrayList<>();
         Iterator<T> it;
         try {
@@ -82,7 +98,9 @@ public final class OptionalSpi {
         for (int guard = 0; guard < MAX_PROVIDERS; guard++) {
             try {
                 if (!it.hasNext()) return found;
-                found.add(it.next());
+                T next = it.next();
+                // ENTITLEMENT-SPI-NARROWING-1: a module the signed entitlement leaves out is absent here too.
+                if (!entitledOnly || com.gamma.module.EntitledServices.entitled(next)) found.add(next);
             } catch (ServiceConfigurationError | LinkageError e) {
                 warn(spi, e);
             }
