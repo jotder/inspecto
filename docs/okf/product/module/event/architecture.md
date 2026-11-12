@@ -103,6 +103,18 @@ Moved to [Events and event log — API](api-events.md).
   from the remaining files rather than failing.
 - The `/events*` read routes carry no capability gate; any caller past AuthN can read the whole log. Where the
   `observability` module is off, the feed is gone but `/audit/search` still serves the audit projection.
+- **Parquet store: append vs flush (`LA-PERF-N9-1`, 2026-11-13).** `ParquetEventStore.append` writes the event
+  to the journal `pending.jsonl` on the caller's thread (forced for `AUDIT` / `ACCESS_DENIED`), so an audit
+  event is durable before the HTTP reply. A threshold or time-roll flush runs on the `event-store-flush` thread
+  in three steps. (1) Under the store lock, the journal is renamed to `pending.seg-<n>.jsonl` and the buffer
+  becomes the in-flight batch. (2) Without the lock, the batch is written on a second DuckDB connection into
+  `.staging/flush-<n>/`. (3) Under the lock, the files are moved into place, the batch leaves memory and the
+  segment is deleted. Reads merge the in-flight batch and never walk `.staging/`. If the flush fails, the
+  events not already in Parquet go back to the buffer and the journal. On open, the store replays the held
+  file, every segment and the journal, skipping event ids already in Parquet, and deletes leftover scratch
+  directories. `flush()` and `close()` wait for an in-flight flush. `prune`, `close` and replay still flush
+  under the lock. Measured per append (50-event threshold): p99 fell from 153–245 ms to 5.7–7.3 ms. The
+  ~2.6 ms median is the journal force, which stays.
 
 ## References
 
