@@ -683,7 +683,8 @@ up front), `/pipelines/import` (every satellite, every companion, the pipeline f
    `SEC-IMPORT-OPS-CONFIGS-1`, 2026-09-26): `*_workflow.toon`, `*_caserule.toon`, `*_tagrule.toon`,
    `*_tag.toon` (`OpsEngineProvider.loadConfigs`), `*_meta.toon`, `*_rca.toon`, `*_job_template.toon`
    (`ServiceBootstrap.buildFrom`), and the loader-less `*_escalation.toon` / `*_queue.toon`. The boot scans
-   (`ServiceBootstrap.resolveBySuffix`, a recursive `Files.walk`) read them from ANY depth, so a directory is
+   (`ServiceBootstrap.resolveBySuffix`, a recursive `Files.walk`) read them from ANY depth (only the component store's
+   `registry/` is skipped, since 2026-11-13, `JOB-LOADER-SAVED-VIEW-SUFFIX-1`), so a directory is
    no containment: an `incident_workflow.toon` in a zip subfolder returned 200 and the last workflow per object type wins,
    which replaced the Incident lifecycle the Disposition gate is keyed on. None travels in a data-source or
    Pipeline bundle; each has its own validated route (`POST /cases/rules`, `/tags*`). The real keys (`ImportPaths.referenceValues`) are the loader's own:

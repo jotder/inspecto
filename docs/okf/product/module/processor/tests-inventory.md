@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-410 test class(es): 162 unit, 248 real-HTTP control-plane, 0 IT.
+411 test class(es): 163 unit, 248 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -412,6 +412,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `RemoteSliceFrontierCommitTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/RemoteSliceFrontierCommitTest.java` | KAFKA-OFFSET-REKEY-1 (design slice 0, stream-consumer-design §2.2): drives the REAL remote path — the |
 | `RepoSpacesConfigValidationTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/RepoSpacesConfigValidationTest.java` | Guards the repo's committed sample spaces ({@code ../spaces/<id>/config} + {@code ../spaces/_templates}): |
 | `RunLeaseContractTest` | `com.gamma.service` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/service/RunLeaseContractTest.java` | <b>The scale-out plan's §7 gate</b> — "one run per pipeline per trigger, across processes". |
+| `ServiceBootstrapJobScanTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ServiceBootstrapJobScanTest.java` | JOB-LOADER-SAVED-VIEW-SUFFIX-1 (release proof 2026-11-09): {@code la-logistics} ships the saved view |
 | `ServiceBootstrapLedgerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ServiceBootstrapLedgerTest.java` | The legacy (single-tenant / CLI) space's acquisition ledger resolves its URL through {@link OperationalDb}, |
 | `ServiceStoresDefaultsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ServiceStoresDefaultsTest.java` | The backend-toggle defaults in {@link ServiceStores} (addressing plan D1). |
 | `ShippedJobStoreKeyNamesARealStoreTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ShippedJobStoreKeyNamesARealStoreTest.java` | A job's {@code store:} key is a <b>data-store id</b>, never a path. It is read at |

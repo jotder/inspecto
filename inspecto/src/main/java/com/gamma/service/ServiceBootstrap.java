@@ -117,14 +117,19 @@ public final class ServiceBootstrap {
         AcquisitionLedgers.register(root.id(), AcquisitionLedgers.build(url, root.id()));
     }
 
-    /** Walk CLI paths for files ending in {@code suffix} (file args matched directly). */
-    private static List<Path> resolveBySuffix(String[] args, String suffix) throws IOException {
+    /** Walk CLI paths for files ending in {@code suffix} (file args matched directly). A walked directory's
+     *  {@code registry/} is skipped: it is the component store's tree (saved views, alert rules, Datasets…), whose
+     *  file names are component ids, so a saved view named {@code *_inside_job} was read as a Job and warned on
+     *  every boot (JOB-LOADER-SAVED-VIEW-SUFFIX-1). Package-private for the test. */
+    static List<Path> resolveBySuffix(String[] args, String suffix) throws IOException {
         List<Path> out = new ArrayList<>();
         for (String a : args) {
             Path p = Path.of(a);
             if (Files.isDirectory(p)) {
+                Path registry = p.resolve("registry");
                 try (Stream<Path> w = Files.walk(p)) {
                     w.filter(Files::isRegularFile)
+                     .filter(f -> !f.startsWith(registry))
                      .filter(f -> f.getFileName().toString().endsWith(suffix))
                      .sorted().forEach(out::add);
                 }

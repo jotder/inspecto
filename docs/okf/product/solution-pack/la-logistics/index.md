@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-logistics` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `JOB-LOADER-SAVED-VIEW-SUFFIX-1` | P3 | defect | the Job loader reads a saved view whose file name ends in _job.toon. | — |
+_No open rows._

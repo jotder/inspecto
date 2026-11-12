@@ -43,7 +43,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `CENSUS-EXPECTATION-TARGET-PATH-1` | P3 | defect | the link census reports a false broken link: it reads an Expectation target (with targetType: pipeline) as a Pipeline id, but Expectation… | — |
 | `ALERT-EVALUATE-NO-BREACH-WORDING-1` | P3 | defect | an alert.evaluate Job logs "no rule breached" on every run while an Alert it raised stays OPEN. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
-| `JOB-LOADER-SAVED-VIEW-SUFFIX-1` | P3 | defect | the Job loader reads a saved view whose file name ends in _job.toon. | — |
 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | P3 | defect | a Job reading a snapshot Dataset fails when the Job that writes that Dataset publishes a new snapshot during the read. | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |

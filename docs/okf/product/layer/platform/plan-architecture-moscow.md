@@ -83,7 +83,7 @@ Of the remaining six, M8 needs no decision from anyone and can start now.
 | C8 | Branch-aware executor residuals | The pre-fetch intake cap needs a listing-with-sizes connector seam. |
 | C9 | `REALTIME-DECISIONING-1` | The engine is batch; windowed Alert Rules on a `trigger: stream` Pipeline are in progress (PA-9a and PA-9b built, the rest designed). Large, and worth it only for card-authorisation or pre-call-blocking bids. |
 | C10 | `LA-INDEX-SCALE-MEASURE-1` | Link index behaviour is measured to about 10^8, not 10^9. |
-| C11 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` · `UI-SCHEMA-FORM-EDITOR-1` | A WARN on every boot; the last file on the forms lint allow-list. |
+| C11 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` · `UI-SCHEMA-FORM-EDITOR-1` | A WARN on every boot (fixed 2026-11-13: the boot scan skips `registry/`); the last file on the forms lint allow-list. |
 | C12 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` · `CODEGRAPH-AFFECTED-UNUSABLE-1` · `AGT-5` | Three upstream reports or seams owed outside this repo. |
 | C13 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` · `NATIVE-LICENCE-LINUX-MACOS-1` | The Linux product zip; two licence calls on native libraries. |
 | C14 | `DOCS-FUNCTIONALITY-HUBS-1` | Whether `functionality/` items get hubs. |

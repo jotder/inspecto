@@ -132,9 +132,9 @@ its Schema when the Space is created.
 **Checked live (2026-11-09 release).** On the Preview demo product, with all twelve showcases of that day in one server,
 the 52 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **5 (WARNING)**,
 `seed-la-logistics.mjs --apply` created 19 steps with none failed, and every persona got the answers in the table above
-(the held expand ran once the manager approved it). Every boot, on every edition, logs a harmless WARN "Pipeline toon is
-missing required section 'job'": the Job loader also reads the saved view `driver_team_inside_job.toon` for its file
-name (`JOB-LOADER-SAVED-VIEW-SUFFIX-1`). On Basic the rule stayed unarmed and the Space had no Alert. Method and record:
+(the held expand ran once the manager approved it). Until 2026-11-13 every boot, on every edition, logged a harmless WARN
+"Pipeline toon is missing required section 'job'": the Job loader also read the saved view `driver_team_inside_job.toon`
+for its file name (`JOB-LOADER-SAVED-VIEW-SUFFIX-1`, fixed: the boot scan skips `registry/`). On Basic the rule stayed unarmed and the Space had no Alert. Method and record:
 [showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
 
 ## Rebuild the downloads (maintainers)
