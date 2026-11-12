@@ -2,7 +2,9 @@ package com.gamma.config.safety;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -58,6 +60,54 @@ class EgressGateTest {
         EgressGate g = gate(null, null, List.of("127.0.0.0/8"));
         EgressRefusedException e = assertThrows(EgressRefusedException.class, () -> g.require("localhost", 80, "x"));
         assertTrue(e.getMessage().contains("denied address"), e.getMessage());
+    }
+
+    /** Item (e) of SCALEOUT-OBJSTORE-DATABASE-DIR-1: each refused spelling beside an accepted twin one character away. */
+    private static final Map<String, String> REFUSED_TO_TWIN = new LinkedHashMap<>();
+    static {
+        REFUSED_TO_TWIN.put("2130706433", "2130706433x");
+        REFUSED_TO_TWIN.put("0177.0.0.1", "177.0.0.1");
+        REFUSED_TO_TWIN.put("0x7f000001", "ox7f000001");
+        REFUSED_TO_TWIN.put("127.1", "127.l");
+        REFUSED_TO_TWIN.put("127.0.0.01", "127.0.0.1");
+        REFUSED_TO_TWIN.put("127.0.0.1.", "127.0.0.1");
+        REFUSED_TO_TWIN.put("fe80::1%1", "fe80::1");
+        REFUSED_TO_TWIN.put("[::1]x", "[::1]");
+    }
+
+    @Test
+    void aNonCanonicalNumericHostIsRefusedUnderEveryTierAndItsTwinIsNot() {
+        // A malformed host, not a policy verdict: refused with no policy at all and in audit mode too.
+        EgressGate open = EgressGate.of(SafetyPolicyTier.NONE);
+        EgressGate audit = EgressGate.of(tier(false, null, null, SafetyPolicyTier.Mode.AUDIT));
+        REFUSED_TO_TWIN.forEach((bad, twin) -> {
+            assertThrows(EgressRefusedException.class, () -> open.require(bad, 80, "x"), bad);
+            assertThrows(EgressRefusedException.class, () -> audit.require(bad, 80, "x"), bad);
+            assertDoesNotThrow(() -> open.require(twin, 80, "x"), twin);
+        });
+        assertThrows(EgressRefusedException.class, () -> open.requireHostList("2130706433:9092", "kafka"));
+        assertDoesNotThrow(() -> open.requireHostList("2130706433x:9092", "kafka"));
+        assertThrows(EgressRefusedException.class,
+                () -> open.requireJdbcUrl("jdbc:postgresql://0x7f.1:5432/app", "db"));
+        assertDoesNotThrow(() -> open.requireJdbcUrl("jdbc:postgresql://127.0.0.1:5432/app", "db"));
+    }
+
+    @Test
+    void aNumericSpellingCannotSlipPastADeniedCidr() {
+        // inet_aton reads every one of these as 127.0.0.1; the old gate compared none of them with 127.0.0.0/8.
+        EgressGate g = gate(null, null, List.of("127.0.0.0/8"));
+        for (String bad : List.of("0x7f.1", "0177.0.0.1", "2130706433", "127.1", "0x7f.0.0.1"))
+            assertThrows(EgressRefusedException.class, () -> g.require(bad, 80, "object store"), bad);
+    }
+
+    @Test
+    void anIpv6AddressCarryingADeniedIpv4IsRefused() {
+        // NAT64 64:ff9b::/96 carries 127.0.0.1; its twin one character away (64:ff9c::) carries nothing.
+        EgressGate g = gate(null, null, List.of("127.0.0.0/8"));
+        EgressRefusedException e = assertThrows(EgressRefusedException.class,
+                () -> g.require("64:ff9b::7f00:1", 80, "x"));
+        assertTrue(e.getMessage().contains("carries denied address 127.0.0.1"), e.getMessage());
+        assertDoesNotThrow(() -> g.require("64:ff9c::7f00:1", 80, "x"));
     }
 
     @Test

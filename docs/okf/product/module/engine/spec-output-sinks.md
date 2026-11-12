@@ -209,9 +209,12 @@ output:
 
 * **Where it happens.** `ConsignmentIngestStrategy.configure` calls `ObjectStoreDatabase.prepare` BEFORE the
   seal (LOAD is file access and is refused after it): containment re-checked; the Connection resolved from
-  `ConnectionRegistry` (this Space); its host refused unless it is a bare DNS name or IPv4 address (no `:`, `/`,
-  `@`, `?`, `#`, whitespace: DuckDB dials the authority it parses from `ENDPOINT`, so
-  `evil:80/x.allowed.com` would pass an allow-list pattern yet dial `evil` — verification finding) and then
+  `ConnectionRegistry` (this Space); its host refused unless it is a DNS name or a canonical IPv4 dotted quad
+  (`EgressPolicy.checkHost`, plus no `:` or `[`: no port and no IPv6 literal, which `ENDPOINT` cannot carry
+  unbracketed; no `/`, `@`, `?`, `#`, whitespace: DuckDB dials the authority it parses from `ENDPOINT`, so
+  `evil:80/x.allowed.com` would pass an allow-list pattern yet dial `evil` — verification finding; and no
+  decimal / octal / hex / short / leading-zero / trailing-dot spelling, which libcurl reads as an address the
+  Safety Policy never compared — item (e), 2026-11-13, `ObjectStoreIngestTest.aNumericHostSpelling…`) and then
   passed through `EgressGate` (DuckDB's S3 client dials from native code, past every Java-side egress hop); `httpfs` loaded; then `CREATE OR REPLACE SECRET inspecto_output_store
   (TYPE s3, …, SCOPE '<prefix>/')` (the trailing `/` matters: DuckDB matches a scope as a string prefix) — temporary, in memory, shown redacted by `duckdb_secrets()`. The seal adds the
   prefix to `allowed_directories`; `ingestAllowedDirs` leaves the URI out of the local list.
