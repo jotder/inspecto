@@ -186,6 +186,11 @@ public final class ServiceBootstrap {
             try {
                 com.gamma.alert.AlertRule r = com.gamma.alert.AlertRule.fromMap(c.content());
                 rules.add(r);
+                // PA-9d (D-PA44): without the Real-time Detection Add-on a windowed rule loads INERT - armed, listed with
+                // its reason by GET /alerts/rules, and never evaluated (no commit hook runs; the sweep skips it)
+                if (r.isWindowed() && !com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.REALTIME))
+                    log.warn("Alert rule '{}' loads inert: {}", r.name(),
+                            com.gamma.etl.EditionFeatures.refusal(com.gamma.etl.EditionFeatures.REALTIME));
                 // A measure rule (BI-5) has no metric/window — it names a Dataset measure instead, so log
                 // that shape; printing metric/window for it read "null gte 1.0 over null".
                 if (r.isMeasureRule())

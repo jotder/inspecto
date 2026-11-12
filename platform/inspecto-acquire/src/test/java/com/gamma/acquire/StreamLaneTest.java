@@ -221,4 +221,23 @@ class StreamLaneTest {
         Thread.sleep(100);
         assertEquals(after, drained.get(), "nothing drains after close");
     }
+
+    /** PA-9d: the idle listener runs on a probe that finds no backlog, never on one that does, and cannot kill the lane. */
+    @Test
+    void theIdleListenerRunsOnlyWhenTheProbeFindsNoBacklog() {
+        StreamLane l = lane(100, 5_000);
+        AtomicInteger idle = new AtomicInteger();
+        l.onIdle(idle::incrementAndGet);
+        probe.pending = 3;
+        l.step();
+        assertEquals(0, idle.get(), "a backlog is not idle");
+        probe.pending = 0;
+        l.step();
+        assertEquals(1, idle.get());
+        l.onIdle(() -> { throw new IllegalStateException("listener broke"); });
+        assertFalse(l.step());
+        assertFalse(l.dead(), "a failing listener never kills the lane");
+        probe.pending = 100;
+        assertTrue(l.step(), "and the lane still drains");
+    }
 }

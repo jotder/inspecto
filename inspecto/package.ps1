@@ -432,6 +432,7 @@ $regReportJarSrc = $null
 $screeningJarSrc = $null
 $anomalyJarSrc = $null
 $predictiveJarSrc = $null
+$realtimeJarSrc = $null
 if ($Edition -ne 'Basic') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Preview') { 'edition-preview' } elseif ($Edition -eq 'Advanced') { 'edition-advanced' } else { 'edition-standard' }
@@ -592,6 +593,14 @@ if ($Edition -ne 'Basic') {
                         Select-Object -First 1 -ExpandProperty FullName
     if (-not $predictiveJarSrc -or -not (Test-Path $predictiveJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $predictiveTargetDir\inspecto-predictive-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-predictive -am -DskipTests"
+    }
+    # PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit). THIN; requires ops; Standard and above (D-PA44).
+    $realtimeTargetDir = Join-Path $sandboxRoot 'features\inspecto-realtime\target'
+    $realtimeJarSrc = Get-ChildItem -Path $realtimeTargetDir -Filter 'inspecto-realtime-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $realtimeJarSrc -or -not (Test-Path $realtimeJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $realtimeTargetDir\inspecto-realtime-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-realtime -am -DskipTests"
     }
     # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Standard and above.
     $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
@@ -1103,6 +1112,23 @@ if ($predictiveJarSrc) {
         }
         Write-Host "  verified: JobTypeProvider and ComponentKindValidator registrations present in the Predictive Analytics module" -ForegroundColor DarkGray
     } finally { $paZip.Dispose() }
+}
+if ($realtimeJarSrc) {
+    Copy-Item $realtimeJarSrc "$libDir\inspecto-realtime.jar"
+    Write-Host "Bundled Real-time Detection module -> inspecto-realtime.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - no commit hook, and the feature undeclared.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $rtZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-realtime.jar")
+    try {
+        foreach ($svc in @(@('com.gamma.alert.RealtimeDetection', 'com.gamma.realtime.RealtimeDetectionProvider'), @('com.gamma.etl.EditionFeatureProvider', 'com.gamma.realtime.RealtimeEditionFeatures'))) {
+            $rtEntry = $rtZip.Entries | Where-Object { $_.FullName -eq "META-INF/services/$($svc[0])" }
+            if (-not $rtEntry) { throw "inspecto-realtime.jar has no META-INF/services/$($svc[0]) - $($svc[1]) would never be discovered." }
+            $rtReader = New-Object System.IO.StreamReader($rtEntry.Open())
+            try { $rtBody = $rtReader.ReadToEnd() } finally { $rtReader.Dispose() }
+            if ($rtBody -notmatch [regex]::Escape($svc[1])) { throw "inspecto-realtime.jar's $($svc[0]) service file does not list $($svc[1]) - it lists only: $rtBody" }
+        }
+        Write-Host "  verified: RealtimeDetection and EditionFeatureProvider registrations present in the Real-time Detection module" -ForegroundColor DarkGray
+    } finally { $rtZip.Dispose() }
 }
 if ($caseMgmtJarSrc) {
     Copy-Item $caseMgmtJarSrc "$libDir\inspecto-case-management.jar"
