@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assemble, diffLocks, productLock, PLAN_SCHEMA } from './assemble.mjs';
+import { assemble, diffLocks, productLock, PLAN_SCHEMA, shipOf } from './assemble.mjs';
 import { gatherModel } from './products.mjs';
 import { gather } from './check-offerings.mjs';
 import { classpath } from './offering-classpath.mjs';
@@ -97,12 +97,30 @@ test('PA-5: Inspecto Telco is la-app built with -c telco, four Apps, and one Spa
     assert.throws(() => plan({ product: 'telco', edition: 'basic' }), /Product 'telco' does not come in edition 'basic'/);
 });
 
+test('PA-8: a container or air-gap build names its image and chart; a zip build names none', () => {
+    const telco = plan({ product: 'telco', edition: 'standard', target: 'container' });
+    assert.deepEqual(telco.ship, {
+        image: { repository: 'inspecto-telco', tag: `${telco.platformVersion}-standard` },
+        chart: { name: 'inspecto-telco', version: telco.platformVersion, appVersion: `${telco.platformVersion}-standard` },
+    });
+    assert.equal(plan({ product: 'inspecto', edition: 'basic', target: 'airgap' }).ship.image.repository, 'inspecto', 'the Platform product keeps the plain name');
+    assert.equal(plan({ product: 'la', edition: 'basic', distribution: 'trial', target: 'airgap' }).ship.image.tag.endsWith('-basic-trial'), true);
+    assert.equal(plan({ product: 'la', edition: 'basic' }).ship, null);
+    assert.equal(plan({ product: 'la', edition: 'basic', target: 'linux' }).ship, null);
+});
+
+test('PA-8: a Product id that cannot be an image name is refused', () => {
+    assert.throws(() => shipOf('Acme Platform', 'standard', 'production', '4.0.0'), /does not make an image name/);
+});
+
 const REFUSED = {
     'an unknown Product': [{ product: 'nope', edition: 'basic' }, /unknown Product 'nope'/],
     'an edition the Product does not list': [{ product: 'la', edition: 'enterprise' }, /does not come in edition 'enterprise'/],
     'a demo on Basic': [{ product: 'la', edition: 'basic', distribution: 'demo' }, /demo distribution exists for advanced and preview only/],
     'a planned distribution': [{ product: 'la', edition: 'advanced', distribution: 'pilot' }, /'pilot' is not built yet: PA-10/],
-    'a planned target': [{ product: 'la', edition: 'advanced', target: 'container' }, /target 'container' is not built yet: PA-8/],
+    'an unknown target': [{ product: 'la', edition: 'advanced', target: 'saas' }, /target 'saas' is not one of windows, linux, container, airgap/],
+    'a demo container': [{ product: 'telco', edition: 'advanced', distribution: 'demo', target: 'container' }, /demo distribution is not built for the 'container' target/],
+    'a demo air-gapped bundle': [{ product: 'la', edition: 'advanced', distribution: 'demo', target: 'airgap' }, /demo distribution is not built for the 'airgap' target/],
     'an App the Product does not have': [{ product: 'la', edition: 'advanced', apps: ['telco-ra'] }, /App 'telco-ra' is not one of Product 'la''s Apps/],
 };
 for (const [name, [opts, re]] of Object.entries(REFUSED)) test(`REFUSED: ${name}`, () => assert.throws(() => plan(opts), re));
